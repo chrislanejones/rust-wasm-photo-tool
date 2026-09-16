@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Wand2, Flame, Cloud, Moon, Sparkles } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ToolButton } from "@/components/ui/tool-button";
 
 interface EffectsSettingsProps {
   settings: ToolSettings;
@@ -21,25 +19,6 @@ interface EffectsSettingsProps {
   /** Active photo id — switching photos also re-syncs the latches. */
   activePhotoId?: string | null;
 }
-
-/**
- * FIVE TILES IN ONE 3-COLUMN GRID, the same shape as Select's
- * All / Deselect / Delete / Copy / Cut — two rows out of a five-item grid, the
- * last cell empty. 4x Upscale sits in it as a disabled fifth rather than in a
- * "Coming Soon" card of its own: it is one of the things you can do to a
- * photo, and a greyed tile beside four live ones says "not yet" without
- * spending a whole row to say it.
- *
- * `upscale: true` marks the one with no numbers — the others apply brightness
- * and contrast in a single undo-able step.
- */
-const PRESETS = [
-  { label: "Enhance",     Icon: Wand2,    brightness: 0.08,  contrast: 1.25 },
-  { label: "Vivid",       Icon: Flame,    brightness: 0,     contrast: 1.5  },
-  { label: "Fade",        Icon: Cloud,    brightness: 0.06,  contrast: 0.72 },
-  { label: "Dark",        Icon: Moon,     brightness: -0.12, contrast: 1.1  },
-  { label: "4x Upscale",  Icon: Sparkles, upscale: true },
-] as const;
 
 export function EffectsSettings({
   settings: _settings,
@@ -167,16 +146,10 @@ export function EffectsSettings({
     }
   };
 
-  const applyPreset = (brightness: number, contrast: number) => {
-    if (brightness !== 0 || contrast !== 1) selfEditRef.current = true;
-    if (brightness !== 0) onBrightness(brightness);
-    if (contrast !== 1) onContrast(contrast);
-  };
-
   return (
     <div className="space-y-3 -mt-2">
       <SectionHeader
-        title="Levels"
+        title="Adjustments"
         info="Brightness, Contrast, and Blur each latch to the slider's released position — drag again to apply another delta on top. All are undo-able."
       />
 
@@ -307,41 +280,6 @@ export function EffectsSettings({
         </div>
       )}
 
-      {/* Quick Adjust — five tiles, 3 columns, like Select's action grid. */}
-      <div className="space-y-2 pt-2 border-t border-theme-sidebar-border">
-        <SectionHeader
-          title="Quick Adjust"
-          info={
-            <>
-              One-shot adjustments, each a single undo-able step. Enhance lifts
-              contrast a little, Vivid pushes it hard, Fade flattens it, Dark
-              drops the exposure. <strong>4x Upscale</strong> is not connected
-              yet — it needs a model, so it stays greyed rather than pretending.
-            </>
-          }
-        />
-        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-          {PRESETS.map((preset) => (
-            <ToolButton
-              key={preset.label}
-              stacked
-              disabled={"upscale" in preset ? true : !imageReady}
-              title={
-                "upscale" in preset
-                  ? "4x Upscale isn't connected yet — it needs a model"
-                  : `Apply ${preset.label}`
-              }
-              onClick={
-                "upscale" in preset
-                  ? undefined
-                  : () => applyPreset(preset.brightness, preset.contrast)
-              }
-            >
-              <preset.Icon /> {preset.label}
-            </ToolButton>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

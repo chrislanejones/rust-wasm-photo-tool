@@ -1441,19 +1441,11 @@ fn shift_annotations(doc: &mut Document, dx: i32, dy: i32) {
     }
 }
 
-/// Precompute the 256-entry levels remap for a channel value.
+/// Precompute the 256-entry levels remap for a channel value. Delegates to the
+/// live Levels tool, so replay and the live apply are one function and cannot
+/// drift (`levels.rs`). The math moved there unchanged.
 fn build_levels_lut(p: &LevelsParams) -> [u8; 256] {
-    let lo = p.black as f32;
-    let hi = p.white as f32;
-    let denom = (hi - lo).max(1.0);
-    let inv_gamma = 1.0 / p.gamma.max(0.01);
-    let mut lut = [0u8; 256];
-    for (v, out) in lut.iter_mut().enumerate() {
-        let t = ((v as f32 - lo) / denom).clamp(0.0, 1.0);
-        let t = t.powf(inv_gamma);
-        *out = (t * 255.0).round().clamp(0.0, 255.0) as u8;
-    }
-    lut
+    crate::levels::levels_lut(p.black, p.white, p.gamma)
 }
 
 // ── The log ──────────────────────────────────────────────────────────────────

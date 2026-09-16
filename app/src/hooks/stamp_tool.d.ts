@@ -499,6 +499,42 @@ declare module "stamp_tool" {
     adjust_highlights(amount: number): void;
     /** Unsharp-mask sharpen over the whole active layer. 0 = no sharpening. */
     adjust_sharpen(amount: number): void;
+    /** Open a live tonal preview on the active layer (one copy of its pixels).
+     *  ONE slot, shared by Levels and colour presets — `false` if one is
+     *  already open. See src/tonal_preview.rs. */
+    tonal_preview_begin(): boolean;
+    /** Whether a tonal preview is open. */
+    tonal_preview_active(): boolean;
+    /** Recompute the preview from the copy — black/white 0..=255, gamma > 0.
+     *  Never an undo step. `false` means there is no live preview (it was
+     *  dropped because history moved), so begin again. */
+    levels_preview_set(black: number, white: number, gamma: number): boolean;
+    /** Close the preview and put the copy back. `true` when pixels changed. */
+    tonal_preview_cancel(): boolean;
+    /** Commit Levels as ONE undo step and ONE recorded `Op::Levels`. The
+     *  identity (0, 255, 1) changes nothing. `true` when pixels changed. */
+    levels_apply(black: number, white: number, gamma: number): boolean;
+    /** Preview a colour preset from the copy. Never an undo step. `false`
+     *  means there is no live preview, so begin again. Units differ per
+     *  component: brightness -1..1, contrast/saturation are factors (1 =
+     *  as-is), shadows/highlights are ABSOLUTE 8-bit (-255..255). */
+    preset_preview_set(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+    ): boolean;
+    /** Commit a colour preset as ONE undo step (the old Quick Adjust grid
+     *  cost two). An all-identity preset changes nothing and costs none.
+     *  `true` when pixels changed. See src/presets.rs. */
+    preset_apply(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+    ): boolean;
     blur_region(
       cx: number,
       cy: number,

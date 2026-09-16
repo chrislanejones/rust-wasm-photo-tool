@@ -55,7 +55,10 @@ function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
     case "text": return s.textMode;
     case "emoji": return s.batchMode;
     case "perspective": return s.perspectiveMode;
-    default: return undefined; // single-mode: effects, crop, arrow, compress
+    // Two tiles on one tool id: Adjustments and Levels. Without this case a
+    // Levels link reloaded as Adjustments (routeState.test.ts round-trip).
+    case "effects": return s.effectsMode;
+    default: return undefined; // single-mode: crop, arrow, compress
   }
 }
 

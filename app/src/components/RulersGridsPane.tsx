@@ -35,20 +35,10 @@ interface RulersGridsPaneProps {
   onChange: (patch: Partial<Preferences>) => void;
 }
 
-const RULER_TOGGLE = [
-  { id: "off" as const, label: "Off", icon: Ruler },
-  { id: "on" as const, label: "On", icon: Ruler },
-];
-
 const RULER_UNITS: { id: RulerUnit; label: string }[] = [
   { id: "px", label: "Pixels" },
   { id: "in", label: "Inches" },
   { id: "cm", label: "Cm" },
-];
-
-const GRID_TOGGLE = [
-  { id: "off" as const, label: "Off", icon: Grid3x3 },
-  { id: "on" as const, label: "On", icon: Grid3x3 },
 ];
 
 const GRID_LAYOUTS: { id: GridKind; label: string; icon: typeof Grid3x3 }[] = [
@@ -74,20 +64,42 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
     <div className="space-y-4">
       <div className="space-y-2">
         <SectionHeader
-          title="Rulers"
+          title="Rulers and Grid"
           info={
             <>
-              Top and left rulers along the canvas; the tick labels track the
-              zoom level. Inches and centimetres are derived at 96&nbsp;DPI — a
-              web image has no physical size of its own, so that is a fixed
-              convention rather than a print measurement.
+              <strong className="font-semibold text-theme-foreground">
+                Rulers
+              </strong>{" "}
+              draws top and left rulers along the canvas; the tick labels track
+              the zoom level. Inches and centimetres are derived at 96&nbsp;DPI
+              — a web image has no physical size of its own, so that is a fixed
+              convention rather than a print measurement.{" "}
+              <strong className="font-semibold text-theme-foreground">
+                Grid
+              </strong>{" "}
+              is a non-destructive overlay to guide composition and alignment.
+              It is drawn over the canvas and never touches the image, so it is
+              absent from every export.
             </>
           }
         />
-        <ToolButtonGroup
-          options={RULER_TOGGLE}
-          value={value.rulers ? "on" : "off"}
-          onChange={(id) => onChange({ rulers: id === "on" })}
+        {/* ONE button per feature, lit when it is on — not two Off/On pairs.
+            Four buttons to say two booleans meant the segmented control had to
+            spell out the state it was already showing, and "Off" lit up is a
+            confusing thing to look at. Both toggles live in one group now
+            because they are peers, which is also what puts them side by side.
+            Per-option `active` is what makes an independent pair expressible
+            in this primitive at all. */}
+        <ToolButtonGroup<"rulers" | "grid">
+          options={[
+            { id: "rulers", label: "Rulers", icon: Ruler, active: value.rulers },
+            { id: "grid", label: "Grid", icon: Grid3x3, active: value.grid },
+          ]}
+          onChange={(id) =>
+            id === "rulers"
+              ? onChange({ rulers: !value.rulers })
+              : onChange({ grid: !value.grid })
+          }
         />
         {/* Units stay hidden while the rulers are off — a unit picker for an
             invisible ruler is a control with no visible effect, which is how a
@@ -101,24 +113,6 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             onChange={(id) => onChange({ rulerUnit: id })}
           />
         )}
-      </div>
-
-      <div className="space-y-2">
-        <SectionHeader
-          title="Grid"
-          info={
-            <>
-              A non-destructive overlay to guide composition and alignment. It
-              is drawn over the canvas and never touches the image, so it is
-              absent from every export.
-            </>
-          }
-        />
-        <ToolButtonGroup
-          options={GRID_TOGGLE}
-          value={value.grid ? "on" : "off"}
-          onChange={(id) => onChange({ grid: id === "on" })}
-        />
       </div>
 
       {value.grid && (

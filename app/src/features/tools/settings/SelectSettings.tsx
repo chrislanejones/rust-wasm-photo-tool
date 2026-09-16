@@ -44,11 +44,13 @@ import {
   Wand2,
   Blend,
   Magnet,
-  Eraser,
   CopyPlus,
   Scissors,
 } from "lucide-react";
-import { ToolButton } from "@/components/ui/tool-button";
+import {
+  PanelAction,
+  PanelActionBar,
+} from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
@@ -296,14 +298,18 @@ export function SelectSettings({
             title="Remove Object"
             info="Erases the selection and rebuilds it from the rest of the image, on your device. Cover the whole object — a partial selection lets it rebuild the object from its own leftovers. Big areas can come out soft."
           />
-          <ToolButton
-            disabled={disabled || !selection.active}
-            onClick={selection.onRemoveObject}
-            className="w-full"
-            title="Remove Object"
-          >
-            <Eraser /> Remove Object
-          </ToolButton>
+          {/* The shared panel action bar, not a stretched ToolButton: this is
+              a commit — it rewrites pixels and costs an undo step — so it gets
+              the same weight as Apply Crop rather than the light tile weight
+              of the Selection grid above it. */}
+          <PanelActionBar>
+            <PanelAction
+              disabled={disabled || !selection.active}
+              onClick={selection.onRemoveObject}
+            >
+              Remove Object
+            </PanelAction>
+          </PanelActionBar>
         </div>
       )}
     </div>

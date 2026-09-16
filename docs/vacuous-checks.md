@@ -4,7 +4,7 @@ A **vacuous check** is a gate that is green because it is incapable of being
 red. It is worse than no gate: it costs the same to run, it occupies the slot
 where a real check would go, and it actively reports safety.
 
-This repo has now produced **fourteen**, in three families. They are collected here
+This repo has now produced **sixteen**, in three families. They are collected here
 because they keep being found one at a time and re-derived from scratch.
 
 > **Where this lives.** `CLAUDE.md` is gitignored — an edit there is local to one
@@ -62,6 +62,8 @@ The check ran against something other than what it claimed to check.
 | 12 | a stale-dep check that **navigates between observations** | navigation remounts the component and re-runs the effect on mount, so a wrong dependency array is invisible (2026-09-06, #70) |
 | 13 | a green check that had **SKIPPED itself** | the sentinel's tier 2 skips when CI's commit differs from the live one. On a fix PR it did exactly that, the job went green, and the green said nothing about whether the fix worked (2026-09-07) |
 | 14 | a merge rehearsal run with the **wrong merge verb** | the dry run used `git merge`; the real script used `gh pr merge --squash`. Equivalent for independent PRs, **not** for a stacked one — see below (2026-09-07) |
+| 15 | `guardrails.sh` **dead-exports, engine half** | the CI job checks out and runs the script — it never builds wasm, and `pkg/` is gitignored, so `pkg/stamp_tool.d.ts` is **absent**, the audit prints a `note:` and counts **0**. Green in CI for its whole life while `history_max_bytes` sits exported with no JS caller. Only ever fires on a laptop that happens to have built `pkg/` (2026-09-12) |
+| 16 | `cspInlineHash.test.ts` | checked the CSP inline-script hash in **`netlify.toml`** while production's headers come from the root **`vercel.json`**. The one security-header guard in the suite. With `vercel.json`'s hash deliberately broken it went **2/2 green**. It also matched the hash anywhere in the file, so one left in a comment would have passed too (2026-09-15) |
 
 **Rule.** Verify the observation happened before believing what it says, and
 that it was an observation of **the thing you meant**.
@@ -70,7 +72,11 @@ that it was an observation of **the thing you meant**.
 - Assert the **mutation applied** before reading the suite result. A mutation
   test has three outcomes, not two: killed, survived, **and did not apply**.
 - Build the wasm before trusting any test run in a fresh worktree; `pkg/` is
-  gitignored, and CI does this for you (`build:all`).
+  gitignored, and CI does this for you (`build:all`) — **except in the
+  `guardrails` job, which does not**. A gate that reads a generated artifact
+  must either build it or fail when it is missing; counting zero and printing
+  a `note:` is the third time `pkg/` being absent has produced a false green
+  in this file (#9, #11, #15).
 - To test staleness, **stay on the surface**. Anything that remounts hides it.
 - Assert **which path executed**, not just the exit code. A check that skipped
   itself and a check that ran and passed produce the same green.
@@ -135,3 +141,28 @@ looked like deleted work.
 **Rule: wait for each merge to settle before issuing the next.** Poll
 `gh pr view <n> --json mergeable` until it is `MERGEABLE` rather than assuming
 the previous merge has landed.
+## `dead-exports` never checks the engine in CI (found 2026-09-12)
+
+`scripts/guardrails.sh` runs `scripts/dead-exports-audit.mjs`, whose engine half
+reads `pkg/stamp_tool.d.ts`. **`pkg/` is gitignored, and the guardrails CI job
+never builds it** — the job is `checkout` → install ripgrep → `guardrails.sh`,
+with no `build:wasm` step. The audit handles the absence gracefully
+(`dead-exports-audit.mjs:164` prints *"note: pkg/stamp_tool.d.ts absent"* to
+stderr and continues), so it reports **0 WASM dead exports and passes**.
+
+The engine half of this check has therefore never run in CI. It fires only on a
+machine that happens to have built `pkg/`, which is why it can sit at baseline 0
+while a real violation exists.
+
+**Proof it is not theoretical:** running it locally against a built `pkg/` finds
+`history_max_bytes` — exported from `src/settings.rs:62` with a doc comment
+explaining that JS reads it ("JS estimates the depth from the live document size
+and this number"), and `git log --all -G "history_max_bytes" -- app/src` is
+**empty**: the JS caller was never written. Shipped in #127, invisible to CI ever
+since.
+
+**Fix options:** build wasm in the guardrails job (slow, ~3 min), or split the
+engine half into a job that already has `pkg/` (the `Rust / WASM` job does), or
+make the audit **fail** rather than note when `pkg/` is missing and the engine
+half was expected. Failing closed is the cheapest and matches the ratchet's
+stated intent.

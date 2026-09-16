@@ -1493,7 +1493,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           <DrawPreviewOverlay ref={drawPreviewRef} {...overlayFrame} />
         )}
 
-        <CompareSlider canvasEl={canvasRef.current} />
+        <CompareSlider canvasEl={canvasRef.current} toolRef={hookResult.toolRef} revision={hookResult.state.undoCount} />
 
         {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}
         {(lassoCommitted || lassoPreview) && (

@@ -24,6 +24,83 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.78",
+    date: "2026-09-15",
+    headline: "The Stroke Stabilizer steadies your line again, and a pasted picture saves as pasted-revised",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Stroke Stabilizer works again. Since v8.75 it did worse than nothing: a stroke drew your raw line, then closed itself with a straight line back to where you started, so an L came out as a triangle and a U as a box. It happened on every setting and on the Paint brush, the Eraser, mask painting and the Magic Eraser brush. One line in the engine had the leash stuck at zero.",
+      },
+      {
+        tag: "ui",
+        text: "A picture you paste in, like a screenshot or \"Copy image\" from a web page, exports as pasted-revised instead of image-revised. Paste an actual file from File Explorer and it keeps its own name.",
+      },
+      {
+        tag: "ui",
+        text: "Create AI Image is hidden until it works. It opened a dialog you could fill in and then couldn't generate from.",
+      },
+      {
+        tag: "infra",
+        text: "The old Netlify address shows a notice that the editor moved to edit.imagehorse.app and starts forwarding there on September 29. Photos saved there without signing in stay with that address, so the notice says to download them first.",
+      },
+    ],
+  },
+  {
+    version: "v8.77",
+    date: "2026-09-14",
+    headline: "Other sites can't frame the editor, and A/B compare lines up",
+    entries: [
+      {
+        tag: "fix",
+        text: "Other websites can no longer load the editor or the front page inside a frame of their own. A rule meant to stop that has been there since v8.70, but it sat in the half of the security policy that only reports, so it never blocked anything. Both sites now send a header the browser enforces by itself, checked in a real browser before and after.",
+      },
+      {
+        tag: "ui",
+        text: "A/B compare lines up. With the default canvas border, the original half was stretched across the border while the edited half showed it, so the two sides differed in something that isn't your picture. The original now sits exactly over the photo, the border looks the same on both sides, and turning compare off leaves your document exactly as it was.",
+      },
+      {
+        tag: "rust",
+        text: "The engine the editor downloads is now byte-for-byte the one the test builds produce: 823,503 bytes. Vercel keeps its Rust packages somewhere the build wasn't told to tidy up, so real file paths ended up inside the binary and production ran 24 bytes different from every other build of the same code. One line fixed it.",
+      },
+    ],
+  },
+  {
+    version: "v8.76",
+    date: "2026-09-12",
+    headline: "The editor has its own address, and the front page is the front page again",
+    entries: [
+      {
+        tag: "infra",
+        text: "Image Horse runs on its own domain. The site is at imagehorse.app, the editor opens at edit.imagehorse.app, and www redirects to the apex. The old Netlify address still works and stays up for now, so nothing you have bookmarked breaks.",
+      },
+      {
+        tag: "fix",
+        text: "For a few hours the front page served the editor instead of the site. Two projects share this repo and a Root Directory setting decides which one builds which site; the marketing project was still pointed at the repo root, where the config had just been changed to build the editor. It points at marketing/ now.",
+      },
+      {
+        tag: "infra",
+        text: "Underneath that sat a config file that had never once worked. Vercel rejects any key it does not recognise, and marketing/vercel.json carried eight comment keys, so every deploy that read it was refused before a build started. Nothing noticed, because nothing had ever read it.",
+      },
+      {
+        tag: "fix",
+        text: "Junk URLs give a real 404 again instead of quietly answering with the home page, and the site carries its own security headers and content-security policy rather than borrowing the editor's — it loads no wasm, no auth and no database, so it allows none of them.",
+      },
+      {
+        tag: "ui",
+        text: "Ten entries on the Features page were drawing a plain square where an icon should be. The feature list is generated from the repo's own list; the icon map beside it is written by hand. Eight features had shipped without an icon, and two more had been renamed, which drops the icon just as quietly. Every feature has one now, and anything unmapped falls back to a dot, so the next gap looks like a gap rather than a broken tile.",
+      },
+      {
+        tag: "fix",
+        text: "The sitemap stops stamping every URL with the deploy date — a shallow clone has no history to read a real date from, so it was inventing one. The editor's canonical link and share card name edit.imagehorse.app rather than a build host.",
+      },
+      {
+        tag: "rust",
+        text: "The engine builds on the new host unchanged: 823,479 bytes, tiles and patchmatch present, and the served copy matches its own build record. Which features go into a build now has one home in the build script instead of being repeated in a host config, which is the trap that once shipped ten releases of a featureless engine.",
+      },
+    ],
+  },
+  {
     version: "v8.75",
     date: "2026-09-11",
     headline: "Shapes duplicate in any direction, the Stroke Stabilizer steadies every brush, and the lists stop disagreeing with each other",

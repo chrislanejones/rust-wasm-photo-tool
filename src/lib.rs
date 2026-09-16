@@ -28,8 +28,10 @@ mod edges;
 mod effects;
 mod history;
 mod layer;
+mod levels;
 mod livewire;
 mod paint;
+mod presets;
 // Pure-geometry projective transforms (the Perspective tool). `pub` for the
 // same reason `ops`/`tiles` are: the integration tests in `tests/` build
 // `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen
@@ -41,6 +43,7 @@ mod settings;
 mod stabilizer;
 mod stamp;
 mod text;
+mod tonal_preview;
 mod transform;
 mod utils;
 
@@ -587,6 +590,9 @@ pub struct ImageHorseTool {
     #[cfg(feature = "tiles")]
     #[allow(clippy::type_complexity)]
     rec_effect: Option<(Vec<(f64, f64)>, f64, u32, u8)>,
+    /// Open tonal preview (Levels or a colour preset): the untouched layer
+    /// copy. ONE slot for both — see `tonal_preview.rs`.
+    tonal_preview: Option<crate::tonal_preview::TonalPreview>,
 }
 
 impl ImageHorseTool {
@@ -931,6 +937,7 @@ impl ImageHorseTool {
             rec_stroke: None,
             #[cfg(feature = "tiles")]
             rec_effect: None,
+            tonal_preview: None,
         }
     }
 
@@ -2077,6 +2084,9 @@ impl ImageHorseTool {
         let w = self.width as i32;
         let h = self.height as i32;
         let snap = self.make_snapshot(&format!("Stamp {}", self.stamp.stroke_counter + 1));
+        // The stroke changes pixels now but pushes its snapshot at the END, so
+        // move the generation here, where history actually changes (`History::generation`).
+        self.hist.generation += 1;
         let active = self.active;
         let layer = &mut self.layers[active];
         self.stamp.begin_stroke(

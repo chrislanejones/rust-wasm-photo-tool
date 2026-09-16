@@ -13,6 +13,42 @@ import { webgpuEnabled, gpuUsable } from "@/lib/webgpu/detect";
 import { gaussianBlurGpu } from "@/lib/webgpu/gpuBlur";
 import type { EngineCore } from "./useEngineCore";
 
+/** Enhance › Levels, as its panel drives it (see the `levels` block below). */
+export interface LevelsControls {
+  /** Open a live preview on the active layer. Resolves false with no engine. */
+  begin: () => Promise<boolean>;
+  /** Move the preview. Latest wins; never an undo step. */
+  preview: (black: number, white: number, gamma: number) => void;
+  /** Close the preview and put the photo back. */
+  cancel: () => Promise<void>;
+  /** Commit as one undo step. Resolves whether pixels changed. */
+  apply: (black: number, white: number, gamma: number) => Promise<boolean>;
+  /** Histogram of the current composite: R, G, B and luma, 256 bins each. */
+  histogram: () => Promise<Uint32Array | null>;
+}
+
+/** One colour preset's five components, in the engine's own units: brightness
+ *  is a -1..1 fraction, contrast and saturation are factors (1 = as-is), and
+ *  shadows/highlights are ABSOLUTE 8-bit (-255..255) — see src/presets.rs. */
+export interface PresetStack {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  shadows: number;
+  highlights: number;
+}
+
+export interface PresetControls {
+  /** Open a live preview on the active layer. Resolves false with no engine. */
+  begin: () => Promise<boolean>;
+  /** Show a preset on the photo. Latest wins; never an undo step. */
+  preview: (p: PresetStack) => void;
+  /** Close the preview and put the photo back. */
+  cancel: () => Promise<void>;
+  /** Commit as ONE undo step. Resolves whether pixels changed. */
+  apply: (p: PresetStack) => Promise<boolean>;
+}
+
 export function useTransforms(engine: EngineCore) {
   const {
     toolRef,
@@ -416,6 +452,179 @@ export function useTransforms(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
 
+  // ── Levels (Enhance › Levels) ─────────────────────────────────────────────
+  // A live preview the panel drives while it is open, then one commit. The
+  // engine keeps a copy of the layer and recomputes from it on every move
+  // (src/levels.rs), so moves never compound and a preview is never an undo
+  // step.
+  //
+  // STABLE IDENTITY ON PURPOSE. The panel opens its preview in an effect keyed
+  // on this object. If the object changed whenever `flushToCanvas` did, that
+  // effect would cancel and reopen the preview in the middle of a drag, so the
+  // callbacks read flush and sync through refs and the object depends on
+  // `toolRef` alone.
+  //
+  // LATEST WINS. Slider input outruns the worker, so at most one
+  // `levels_preview_set` is in flight and newer values overwrite the unsent
+  // one, the backpressure the brushes use (lib/strokeCoalescer.ts). `open`
+  // gates the loop: once the panel cancels or applies, a queued move must not
+  // quietly reopen a preview behind it.
+  const levelsFlushRef = useRef(flushToCanvas);
+  levelsFlushRef.current = flushToCanvas;
+  const levelsSyncRef = useRef(syncState);
+  levelsSyncRef.current = syncState;
+  const levelsOpenRef = useRef(false);
+  const levelsPendingRef = useRef<[number, number, number] | null>(null);
+  const levelsBusyRef = useRef(false);
+
+  const levels = useMemo<LevelsControls>(
+    () => ({
+      begin: async () => {
+        const t = toolRef.current;
+        if (!t) return false;
+        levelsOpenRef.current = true;
+        await t.tonal_preview_begin();
+        return true;
+      },
+      preview: (black, white, gamma) => {
+        levelsPendingRef.current = [black, white, gamma];
+        if (levelsBusyRef.current) return;
+        levelsBusyRef.current = true;
+        void (async () => {
+          try {
+            while (levelsPendingRef.current && levelsOpenRef.current) {
+              const [b, w, g] = levelsPendingRef.current;
+              levelsPendingRef.current = null;
+              const t = toolRef.current;
+              if (!t) break;
+              let ok = await t.levels_preview_set(b, w, g);
+              if (!ok && levelsOpenRef.current) {
+                // The engine dropped a stale preview: history moved under it
+                // (an undo, say). Start again from the document as it is now.
+                await t.tonal_preview_begin();
+                ok = await t.levels_preview_set(b, w, g);
+              }
+              if (ok) levelsFlushRef.current();
+            }
+          } finally {
+            levelsBusyRef.current = false;
+          }
+        })();
+      },
+      cancel: async () => {
+        levelsOpenRef.current = false;
+        levelsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return;
+        if (await t.tonal_preview_cancel()) levelsFlushRef.current();
+      },
+      apply: async (black, white, gamma) => {
+        levelsOpenRef.current = false;
+        levelsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        const changed = await t.levels_apply(black, white, gamma);
+        levelsFlushRef.current();
+        levelsSyncRef.current();
+        return changed;
+      },
+      histogram: async () => {
+        const t = toolRef.current;
+        return t ? await t.calculate_histogram() : null;
+      },
+    }),
+    [toolRef],
+  );
+
+  // Colour presets share ONE preview slot with Levels (src/tonal_preview.rs),
+  // so only one of the two panels may hold a preview open at a time. The panel
+  // opens on first hover and closes when the pointer leaves the grid.
+  //
+  // LATEST WINS, same as Levels: sweeping the pointer across the grid outruns
+  // the worker, so at most one `preset_preview_set` is in flight and a newer
+  // preset overwrites the unsent one. `open` gates the loop so a queued hover
+  // cannot reopen a preview after the panel has cancelled or applied.
+  const presetsFlushRef = useRef(flushToCanvas);
+  presetsFlushRef.current = flushToCanvas;
+  const presetsSyncRef = useRef(syncState);
+  presetsSyncRef.current = syncState;
+  const presetsOpenRef = useRef(false);
+  const presetsPendingRef = useRef<PresetStack | null>(null);
+  const presetsBusyRef = useRef(false);
+
+  const presets = useMemo<PresetControls>(
+    () => ({
+      begin: async () => {
+        const t = toolRef.current;
+        if (!t) return false;
+        presetsOpenRef.current = true;
+        await t.tonal_preview_begin();
+        return true;
+      },
+      preview: (p) => {
+        presetsPendingRef.current = p;
+        if (presetsBusyRef.current) return;
+        presetsBusyRef.current = true;
+        void (async () => {
+          try {
+            while (presetsPendingRef.current && presetsOpenRef.current) {
+              const q = presetsPendingRef.current;
+              presetsPendingRef.current = null;
+              const t = toolRef.current;
+              if (!t) break;
+              let ok = await t.preset_preview_set(
+                q.brightness,
+                q.contrast,
+                q.saturation,
+                q.shadows,
+                q.highlights,
+              );
+              if (!ok && presetsOpenRef.current) {
+                // The engine dropped a stale preview: history moved under it
+                // (an undo, say). Start again from the document as it is now.
+                await t.tonal_preview_begin();
+                ok = await t.preset_preview_set(
+                  q.brightness,
+                  q.contrast,
+                  q.saturation,
+                  q.shadows,
+                  q.highlights,
+                );
+              }
+              if (ok) presetsFlushRef.current();
+            }
+          } finally {
+            presetsBusyRef.current = false;
+          }
+        })();
+      },
+      cancel: async () => {
+        presetsOpenRef.current = false;
+        presetsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return;
+        if (await t.tonal_preview_cancel()) presetsFlushRef.current();
+      },
+      apply: async (p) => {
+        presetsOpenRef.current = false;
+        presetsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        const changed = await t.preset_apply(
+          p.brightness,
+          p.contrast,
+          p.saturation,
+          p.shadows,
+          p.highlights,
+        );
+        presetsFlushRef.current();
+        presetsSyncRef.current();
+        return changed;
+      },
+    }),
+    [toolRef],
+  );
+
   return useMemo(
     () => ({
       copyRegion,
@@ -436,6 +645,8 @@ export function useTransforms(engine: EngineCore) {
       adjustShadows,
       adjustHighlights,
       adjustSharpen,
+      levels,
+      presets,
     }),
     [
       copyRegion,
@@ -456,6 +667,8 @@ export function useTransforms(engine: EngineCore) {
       adjustShadows,
       adjustHighlights,
       adjustSharpen,
+      levels,
+      presets,
     ],
   );
 }

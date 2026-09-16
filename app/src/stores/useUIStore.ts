@@ -39,6 +39,15 @@ interface UIState {
   showTopBar: boolean;
   masterTab: MasterTab;
   showTools: boolean;
+  /** The New dialog's "does this leave the tab" switch. OFF (default) keeps
+   *  the marketing promise — nothing leaves the tab — by hiding the tiles whose
+   *  job is to send data to a server. ON adds `Create AI Image` to the grid.
+   *  A remembered choice, so it persists like masterTab.
+   *
+   *  Named for the AXIS, not for AI: this is a persisted key, so the name had
+   *  to be right before it shipped. AI is the first thing behind it, not the
+   *  only candidate — index.html's Google Fonts are the other live example. */
+  onlineFeaturesEnabled: boolean;
   showGallery: boolean;
   showHistory: boolean;
   /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
@@ -103,6 +112,7 @@ interface UIState {
   setShowTopBar: (v: SetArg<boolean>) => void;
   setMasterTab: (v: SetArg<MasterTab>) => void;
   setShowTools: (v: SetArg<boolean>) => void;
+  setOnlineFeaturesEnabled: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
   setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
@@ -146,6 +156,7 @@ export const useUIStore = create<UIState>()(
       showTopBar: false,
       masterTab: "tools",
       showTools: false,
+      onlineFeaturesEnabled: false,
       showGallery: false,
       showHistory: false,
       mobileNoticeDismissed: false,
@@ -179,6 +190,8 @@ export const useUIStore = create<UIState>()(
       setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
       setMasterTab: (v) => set((s) => ({ masterTab: resolveSet(v, s.masterTab) })),
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
+      setOnlineFeaturesEnabled: (v) =>
+        set((s) => ({ onlineFeaturesEnabled: resolveSet(v, s.onlineFeaturesEnabled) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
       setMobileNoticeDismissed: (v) =>
@@ -284,6 +297,8 @@ export const useUIStore = create<UIState>()(
         // same class as masterTab. The palette OPEN flag stays transient.
         recentCommands: s.recentCommands,
         commandUsage: s.commandUsage,
+        // The AI switch is a remembered choice, same class as masterTab.
+        onlineFeaturesEnabled: s.onlineFeaturesEnabled,
       }),
       // Same hydration guard as useToolStore: runs every rehydrate, not just
       // on a version bump. masterTab is checked against its current union;
@@ -302,6 +317,10 @@ export const useUIStore = create<UIState>()(
           commandUsage: p.commandUsage
             ? validatedNumberRecord(p.commandUsage)
             : current.commandUsage,
+          onlineFeaturesEnabled:
+            typeof p.onlineFeaturesEnabled === "boolean"
+              ? p.onlineFeaturesEnabled
+              : current.onlineFeaturesEnabled,
         };
       },
     },

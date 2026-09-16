@@ -29,10 +29,34 @@
 # does not expand `$CARGO_HOME` — so a new CI provider or a renamed home
 # directory silently reintroduces the drift. The tier-2 check is what catches
 # it, which is the argument for keeping that check fail-loud.
+#
+# ⚠️ AND IT HAPPENED AGAIN, to production this time. Moving the editor to
+# Vercel (v8.76) added a FOURTH builder and nobody added its line, so for
+# commit 8d1fb6e the live binary was 823,479 B / `0383b226…` while this
+# laptop, CI and Netlify all produced 823,503 B / `102e26d9…` — three
+# builders agreeing byte for byte and the one serving users disagreeing.
+#
+# The whole 24 B is this list failing to match. Vercel's CARGO_HOME is `/rust`,
+# not a home directory, so its registry path is `/rust/registry/...` — it hits
+# none of the three prefixes above and the real path is embedded verbatim.
+# Counted in the two live binaries: 27 embedded paths each way, `/cargo-registry`
+# (15 chars) against `/rust/registry` (14), so 27 B less string — and a 24 B
+# smaller file. The missing 3 B are somewhere in the re-encoding that shifts
+# with them; not chased, because the fix does not depend on where they went.
+# Nothing about the CODE differed.
+#
+# Note what did NOT catch this: build-info.json records rustc, wasm_pack,
+# binaryen and features, and all four MATCHED across the two hosts. A build
+# fingerprint that names every tool can still miss the filesystem the tool ran
+# on, and that filesystem is in the output.
 [target.wasm32-unknown-unknown]
 rustflags = [
   "-C", "target-feature=+simd128",
   "--remap-path-prefix=/home/clj/.cargo/registry=/cargo-registry",
   "--remap-path-prefix=/opt/buildhome/.cargo/registry=/cargo-registry",
   "--remap-path-prefix=/home/runner/.cargo/registry=/cargo-registry",
+  # Vercel (the editor's host since v8.76). CARGO_HOME is `/rust`, so there
+  # is no `.cargo` segment and no home directory in this one — matching the
+  # others' shape would not match the path Vercel actually embeds.
+  "--remap-path-prefix=/rust/registry=/cargo-registry",
 ]

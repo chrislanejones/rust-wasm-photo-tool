@@ -54,6 +54,19 @@
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
 
+  /* ── Dialog scrim — the single source for every modal backdrop. ──
+     ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. The New dialog, the
+     shortcut modal, object removal, the idle and multi-tab screens, the
+     subscription sheet, AppShell's inline scrim, `ui/dialog`'s default and
+     the drag-and-drop affordance each carried their own copy: five different
+     opacities (.40 / .42 / .60 / .70 / .80), two blur radii (8px and 2px)
+     and two with no blur at all. The drift had one cause — `ui/dialog`
+     shipped its default WITHOUT a blur, so every dialog that wanted one
+     hand-rolled a backdrop and picked its own number. Change these two
+     values, never a class. */
+  --overlay-scrim: rgb(0 0 0 / 0.65);
+  --overlay-blur: 8px;
+
   /* ── Motion — durations + shared easing. ── */
   --dur-fast: 0.1s;
   --dur-base: 0.15s;
@@ -113,6 +126,17 @@
   --accent-ui-foreground: #2a2622;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
+  /* Destructive TEXT on a destructive TINT — the "Remove canvas" action, and
+     any future one like it. `--destructive` itself cannot do this job: the
+     tint it makes (`bg-destructive/15` over the panel) resolves to #f7dad6
+     here, and #dc2626 on that measures 3.66:1 — under the 4.5:1 WCAG 1.4.3
+     asks of 12px semibold. MEASURED in the browser, 2026-09-16; the dark
+     theme's twin measured 3.98:1, which is the same shortfall lib/styles.ts
+     already documents for the confirm-dialog button it replaced with a solid
+     fill. A panel control is not a dialog's final "yes, delete it", so the
+     tint stays and the INK deepens instead: this is red-700 to
+     `--destructive`'s red-600, 4.9:1 on the same tint. */
+  --destructive-strong: #b91c1c;
   --input: #d8d0c2;
   --ring: #c98f3f;
 
@@ -191,6 +215,10 @@
   --focus-ring: #eeeeee;
   --destructive: #e55032;
   --destructive-foreground: #ffffff;
+  /* Dark counterpart — the tint resolves to #36201b here and #e55032 on it is
+     3.98:1. Same hue, lifted until it clears: 4.95:1. Lifting rather than
+     deepening because the tint is the dark thing in this theme. */
+  --destructive-strong: #ef6a4a;
   --input: #484848;
   --ring: #fcdfc2;
 }
@@ -213,6 +241,7 @@
   --color-accent-foreground: var(--accent-ui-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
   --color-confirm: var(--confirm);
   --color-confirm-foreground: var(--confirm-foreground);
   --color-confirm-danger: var(--confirm-danger);
@@ -1094,6 +1123,22 @@ textarea:focus-visible {
   margin-left: auto;
 }
 
+/* The ONE dialog backdrop. Colour and radius come from --overlay-scrim and
+   --overlay-blur; this class exists so the pair is applied identically
+   everywhere and so a non-Radix overlay can reach it too.
+
+   It deliberately does NOT fade in. Animating opacity on a full-viewport
+   backdrop-filter makes the browser re-blur the entire screen every frame:
+   measured on the New dialog, frames went 16.7ms → 150, 150, 150, 183, 183,
+   183… and never recovered inside the 600ms window. With the blur static the
+   same open costs one ~117ms mount hitch and is back at 60fps six frames
+   later. The panel animates; the scrim just appears. */
+.dialog-scrim {
+  background: var(--overlay-scrim);
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
+}
+
 /* ── Full-window image-drop affordance (drag an image anywhere over the app) ──
    A dimmed scrim with a spinning gradient border ring around the viewport (the
    "Claude in Chrome" glow) and a centered prompt. Non-interactive. */
@@ -1105,9 +1150,9 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(10, 12, 16, 0.42);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: var(--overlay-scrim);
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
 }
 
 @property --drop-angle {

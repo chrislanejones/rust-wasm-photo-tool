@@ -2,7 +2,7 @@
 
 ![Image Horse](public/IH-Hero-Image-August-2026.webp)
 
-**Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
+**Live:** [imagehorse.app](https://imagehorse.app/) &nbsp;·&nbsp; **Editor:** [edit.imagehorse.app](https://edit.imagehorse.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 
 A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** with **Zustand** state stores for the UI, and **Convex** for optional cloud persistence. Edits run locally in WebAssembly and your originals + edits live in the browser's **IndexedDB** — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **batch editor** that works across a whole gallery in one pass — stamp a logo, apply text, bulk-rename by pattern, or name every photo from what is actually in it with a local describer that needs no account and no per-image cost.
 
@@ -36,6 +36,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
 - **[OpenRaster (.ora)](docs/OpenRaster-Export-Import.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
+- **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and the in-progress move of the editor off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
@@ -62,7 +63,7 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 
 ## The marketing site
 
-`marketing/` — the five-page site at **[image-horse.vercel.app](https://image-horse.vercel.app/)**:
+`marketing/` — the five-page site at **[imagehorse.app](https://imagehorse.app/)**:
 home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
 plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
 Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what
@@ -84,91 +85,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.76 — 2026-09-11
+### v8.78 — 2026-09-15
 
-**Perspective, Distort and Skew work on the things you drew — squares,
-circles and text — and the box can be cancelled.**
+**The Stroke Stabilizer steadies your line again, and a pasted picture saves as `pasted-revised`.**
 
-Point the Perspective tool at a square, a circle or a piece of text and the
-warp happens to *that object*, not to the photo underneath it. Until now only
-text worked that way; everything else fell through to the destructive pixel
-warp, so a square you had just drawn sat perfectly still while the picture
-under it was resampled. That is what "it only works with raster" meant, and it
-is fixed: click the object, drag the corners, press Apply.
+The Stroke Stabilizer had been doing worse than nothing since v8.75. With it
+on, a stroke drew your raw line, then closed itself with a straight line back to
+where you started: an L came out as a triangle, a U as a box. It happened on
+every setting, on the Paint brush, the Eraser, mask painting and the Magic
+Eraser brush. One line in the engine had the leash stuck at zero. Your line
+trails the cursor again, and a new test fails if a stroke ever closes itself.
 
-The result stays an object. Recolour it, move it, drag it to a new size, undo
-it, or click it again and adjust the same corners — the perspective comes
-along, because it is stored on the shape as fractions of its own box rather
-than baked into pixels. Resize a warped square and the warp scales with it.
+A picture you paste in, like a screenshot or "Copy image" from a web page, now
+exports as `pasted-revised` instead of `image-revised`. The browser calls every
+pasted picture `image.png`, so that's what the file ended up named. Copy an
+actual file in File Explorer and paste it, and it keeps its own name.
 
-Apply, Reset and Cancel now sit **on the canvas**, under the box, as well as
-in the panel — the gesture happens there, so the buttons that end it belong
-there. **Esc cancels**, and cancelling takes the whole six-handle frame and
-its grid off the canvas instead of just straightening the corners. When there
-is no box the panel offers a single button to put one back.
+Create AI Image is hidden until it works. It opened a dialog you could fill in
+and then couldn't generate from.
 
-Only the objects on the layer you are working in can be picked, and switching
-layers drops the pick rather than leaving the box floating over something that
-is no longer there.
+If you're still on the old Netlify address, you'll see a notice that the editor
+moved to edit.imagehorse.app, and that on September 29 the old address starts
+forwarding there. Photos saved there without signing in live in your browser
+for that address only, so download them first with Alt+Shift+E.
 
-Under it: shapes carry a projective quad the way text has since v8.42, the
-engine warps them through a tile padded past the shape's box so a thick stroke
-is not shaved off, and the on-disk op format steps to v6 — older documents
-decode unchanged and simply mean "no perspective", which is what they meant.
-
-### v8.75 — 2026-09-11
-
-**Shapes duplicate in any direction, the Stroke Stabilizer steadies every
-brush, and the lists stop disagreeing with each other.**
-
-Pick a rectangle or a circle out of Review → Reselect and press the d-pad on
-its row: four ⊕ appear around the shape on the canvas. Press one and you get
-another copy of the same size, clear of the original, in that direction. Press
-the left one twice and you get two marching left. Each side counts on its own,
-so a press upward afterwards goes above the original rather than above the
-last copy — which is what you want when you are building a diagram out of
-repeated boxes.
-
-Any placed text or shape can also be duplicated straight from its row. The
-copy is made inside the engine by cloning the object rather than rebuilding it
-from a list of properties, so nothing about it can be quietly left behind — a
-shadow, a rotation, a background, a perspective warp all come with it.
-
-The Stroke Stabilizer used to reach only the Paint brush. It now steadies the
-Eraser, the blur brush, pixelate, redact and the clone stamp, from the one
-setting — turn it on because your hand shakes and it is on everywhere. The
-Eraser had in fact been honouring it all along; there was simply no control in
-the panel to switch it on. On the clone stamp the source offset is kept
-exactly, so the smoothing changes the path and nothing else.
-
-History, Reselect and the Layers list are one component now instead of three
-that had drifted apart. Row buttons sit together in one cluster, the coloured
-dots are gone in favour of the numbers that were already beside them, and
-Reselect rows are numbered too. History and Reselect keep their buttons out of
-sight until you hover or tab into a row; the Layers list keeps its visible,
-because those get used constantly and the eye is reporting a state, not just
-offering an action.
-
-The gallery bar's header is three columns — the count on the left, the
-compress buttons centred, the actions on the right — and the compress pair is
-centred on the bar rather than on the space left over, so it stops shifting
-when a selection appears.
-
-The "+" on any colour swatch opens a real colour picker — a hue wheel or a
-saturation/brightness rectangle, with hex, RGB and HSL fields that all track
-each other. Colours you keep land in a palette that follows you: saved locally
-when you are logged out, synced to your account when you are signed in.
-
-Smaller things: dropping an image with nothing open goes straight to the
-gallery instead of asking a question with one possible answer; the status
-bar's second number is labelled; the Eraser panel says "Eraser" rather than
-"Brush" above a field called Brush Size; and the mobile version can save a
-photo to your device, which the notice now says.
-
-Known and open: on a freshly imported photo the status bar reports the
-document size, which includes the canvas border, and a resize to an exact
-width applies that width to the document rather than the picture. Export of an
-untouched photo is correct.
+The website link on the start screen goes to imagehorse.app instead of an old
+host.
 
 ## License
 

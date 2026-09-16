@@ -764,7 +764,28 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // has no `.length` and no indices, so an un-awaited read would silently
     // produce `undefined` bounds and fall back to the document — the exact
     // number this change exists to stop reporting.
-    // v8.76 — 137 -> 139: the Perspective tool reaching SHAPES adds TWO
+    // Levels (#87) — 137 -> 141: `useTransforms`' Levels controls, born
+    // awaited. `levels_preview_set` (twice: the move, and the retry after a
+    // re-begin), `tonal_preview_cancel` and `levels_apply` all return a
+    // boolean that decides whether to flush or re-begin, and under the worker
+    // an un-awaited boolean is a Promise, which is always truthy: a stale
+    // preview would never re-begin and every cancel would flush for nothing.
+    // Remaining stays 5 and un-awaited stays 0, so nothing new is unconverted.
+    // Presets (#88) — 141 -> 144: `useTransforms`' preset controls add SIX
+    // engine calls, of which three are counted here and three are not. The
+    // three inside the hover loop (`preset_preview_set` twice and the
+    // `tonal_preview_begin` that retries after a stale drop) classify as
+    // `c-hot-path`, the same bucket Levels' own `levels_preview_set` sits in,
+    // because they run per pointer-move. The three counted are the discrete
+    // ones: `tonal_preview_begin` opening the slot, `tonal_preview_cancel`
+    // deciding whether to flush on leave, and `preset_apply` returning whether
+    // pixels changed. Born awaited for the usual reason — under the worker an
+    // un-awaited boolean is a Promise and always truthy, so a hover that never
+    // changed anything would still flush and a stale preview would never
+    // re-begin. Remaining stays 5 and un-awaited stays 0.
+    // Perspective on SHAPES (#130) — 144 -> 146: rebased onto Levels and
+    // Presets, so this pair stacks on 144 rather than the 137 it was written
+    // against. The Perspective tool reaching SHAPES adds TWO
     // awaited sites in `usePerspectiveTool`, both born awaited rather than
     // converted and both the exact twins of the text pair already counted
     // above: `shape_perspective_of` (the reselect seed — it CONSUMES the
@@ -777,7 +798,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // gate numbers below (5 exempt / 0 unawaited / 0 truthy) are again
     // unchanged, which is the point of updating this number deliberately
     // instead of loosening the assertion.
-    expect(gate.awaited, "cumulative converted sites").toBe(139);
+    expect(gate.awaited, "cumulative converted sites").toBe(146);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

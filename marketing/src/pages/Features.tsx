@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import { FEATURES } from "../data/features";
 import { getFeatureIcon, getGroupIcon, featureSlug } from "../data/featureIcons";
+import { useMediaQuery } from "../useMediaQuery";
 
 // Same breakpoint Nav.tsx uses for its own desktop/mobile split.
 const DESKTOP_QUERY = "(min-width: 60.0625rem)";
@@ -21,13 +22,16 @@ export default function Features() {
   // scroll past before reaching a single word of the page. Closed on mobile,
   // open on desktop — and re-decided on every resize across the breakpoint,
   // same as Nav's sheet giving up its open state when the window grows back.
-  const [desktop, setDesktop] = useState(() => matchMedia(DESKTOP_QUERY).matches);
-  useEffect(() => {
-    const mq = matchMedia(DESKTOP_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setDesktop(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+  //
+  // The server value is `false` (closed), and it is the narrow case on purpose.
+  // This page is prerendered, so some answer has to exist before any browser
+  // has been asked — and the one that survives being wrong is the one that
+  // matches what a crawler on a phone user-agent should get. Being wrong here
+  // costs a collapsed rail for the frame before hydration, and nothing else:
+  // `desktop` only drives the `open` attribute on the rail's <details>, never
+  // `fx__body` below, so every word of the feature text is in the prerendered
+  // HTML at either setting.
+  const desktop = useMediaQuery(DESKTOP_QUERY, false);
 
   // The rail follows the reader. IntersectionObserver, never a scroll listener.
   // The top margin clears the fixed nav, so a feature counts as current when

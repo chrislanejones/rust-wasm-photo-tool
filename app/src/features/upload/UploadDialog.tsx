@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { NewActions } from "@/features/upload/NewActions";
 
 const horseLogo = "/Image-Horse-Logo.svg";
+import { DIALOG_OVERLAY } from "@/lib/styles";
 
 interface Props {
   open: boolean;
@@ -60,7 +61,7 @@ export function UploadDialog({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className={`${DIALOG_OVERLAY} z-[var(--z-dialog)] flex items-center justify-center`}
           onClick={handleTryClose}
         >
           <motion.div

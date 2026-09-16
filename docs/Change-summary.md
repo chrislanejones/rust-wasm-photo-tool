@@ -10602,25 +10602,44 @@ This activates nothing. The service worker still ships dark.
 
 wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 
-## v8.76 Change Summary — 2026-09-11
+## v8.76 Change Summary — 2026-09-12
 
-**Perspective, Distort and Skew work on the things you drew — squares, circles and text — and the box can be cancelled.**
+**The editor has its own address, and the front page is the front page again.**
 
 | Area | Change |
 | --- | --- |
-| **Perspective** | The tool can be pointed at a **square, a circle, a line, an arrow, a pin, a pen path or a piece of text** and warps *that object*, non-destructively. Before this, text was the only vector target and everything else fell through to the destructive pixel warp — which is what *"only works with raster"* meant: the photo under the square moved and the square did not. |
-| **Perspective** | The warped object is **still an object**. Recolour it, move it, drag it to a new size, undo it, or re-select it and adjust the same corners — the perspective comes along, because the quad is stored on the annotation as fractions of its own box and applied at render time. Resize a warped square and the warp scales with it. |
-| **Perspective** | **Apply · Reset · Cancel on the canvas**, under the box, as well as in the panel. The gesture happens on the canvas; the buttons that end it now live there too. |
-| **Perspective** | **Esc cancels** — it takes the whole six-handle frame and its grid off the canvas, instead of straightening the corners and leaving the box there. It used to do nothing at all on a box that had not been dragged yet. Reset (the old Esc behaviour) is still a button. With no box, the panel offers one button to place a new one. |
-| **Perspective** | **Layer separation**: only the objects on the active layer are pickable — both annotation lists are already per-layer — and switching layers drops the pick rather than leaving the box over something that is no longer there. |
-| **Perspective** | The panel names the target: *"Warping **Square** — stays editable"*, versus *"Click an object to warp it, or warp pixels (destructive)"*. |
-| **Engine** | `ShapeAnnotation` carries a normalised projective quad, applied by `render_shape_into` through a tile **padded past the shape's bbox** so a thick stroke or an arrowhead is not shaved off. The padding provably cannot move the transform — the padded corners go through the same homography the bbox defines ([ADR-053](adr/053-a-shapes-perspective-is-normalised-over-its-bbox-and-its-tile-is-padded.md)). |
-| **Engine** | `set_shape_perspective` / `shape_perspective_of`, the square/circle twins of the text pair. One "Perspective" history step per commit; a quad that lands where it started costs none. |
-| **Engine** | `perspective::NormQuad` — a newtype whose `Default` is the IDENTITY. Six shape constructors build with `..Default::default()`, and a bare `[(f32,f32);4]` would have given each of them a collapsed-to-a-point quad. The hazard is answered in the type rather than remembered at each call site. |
-| **Op log** | Format **v5 → v6** by the same prefix-extension recipe as v3/v4/v5: `#[serde(skip)]` on the new field, an appended `Op::ShapePerspective`, a seventh trailing tuple element. v5 blobs decode unchanged and mean "no perspective" — pinned by `v5_blobs_still_decode_under_v6` and `v5_op_bytes_still_decode_under_v6`. |
-| **Refactor** | `oplog_sync_annotations`' diff moved out of `lib.rs` to `ops::annotation_sync_ops`, beside the variants it emits — `src/lib.rs` **4,912 → 4,798** lines, guardrail lowered in the same commit. The Perspective tool's canvas wiring moved out of `CanvasArea.tsx` to `features/canvas/PerspectiveLayer.tsx` — **2,950 → 2,909**, eslint baseline lowered with it. |
-| **Tests** | `tests/shape_perspective.rs` (11), a `ShapePerspective` replay-parity case, seven op-format/sync unit tests, `app/src/lib/perspectiveTarget.test.ts` (8), and `e2e/perspective-vector.spec.ts` — which drives the real browser: draw a square, warp it, read the quad back **out of the engine**, confirm the bbox never moved, then Esc and Cancel. |
+| **Hosting** | Image Horse runs on its own domain. The site is at `imagehorse.app`, the editor at `edit.imagehorse.app`, and `www` 308s to the apex. The Netlify address still works and stays up as the rollback path. |
+| **Hosting** | The apex had been serving the **editor**. Two Vercel projects share this repo and a Root Directory setting picks which config each reads; the marketing project was still rooted at the repo root, where `vercel.json` had just been repointed at the editor build. It is rooted at `marketing/` now. |
+| **Hosting** | `marketing/vercel.json` had never been valid. Vercel's config schema is `additionalProperties: false` at every level, so the eight `"//"` comment keys it carried made every deploy that read it a 400 *before a build started*. It went unnoticed because no project had ever read the file. The prose moved to `marketing/VERCEL-CONFIG.md`. |
+| **Site** | Unmatched paths return a real 404 again instead of answering with the home page at status 200 — the catch-all rewrite belonged to the editor's config, not the site's. |
+| **Site** | The marketing site carries its own security headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS) and its own content-security policy, rather than inheriting the editor's — it loads no wasm, no Clerk and no Convex, so it allows none of them. |
+| **Features page** | Ten entries drew a plain square instead of an icon. `features.ts` is generated from `docs/Features.md`; the icon map beside it is hand-written, and eight features had shipped with no entry while two more had been renamed, which drops the icon just as quietly. All 48 features are mapped, and the fallback is now a dot rather than `Square` — which "Blank Canvas" legitimately uses, so an unmapped feature had been indistinguishable from a real one. |
+| **SEO** | The sitemap stops stamping every URL with the deploy date. A shallow clone has no history to read a real `lastmod` from, so it invented one for all five URLs. |
+| **SEO** | The editor's canonical link and `og:url` name `edit.imagehorse.app` instead of a build host. |
+| **Engine** | The wasm builds on Vercel unchanged — 823,479 B, `features tiles,patchmatch`, exports intact, served copy matching its own build record. The feature set now has one home, `scripts/build-wasm.sh`, instead of being duplicated in a host config. |
+| **Deploy check** | `scripts/deploy-sentinel.sh` follows production to `edit.imagehorse.app`, after a manual run against that host passed. Note its limit: it inspects the wasm binary, not whether the app mounts — it passed green while the editor rendered a blank screen. |
 
-### QC
+## v8.77 Change Summary — 2026-09-14
 
-`imagehorse-qc` was **not run** for this cut. What *was* driven in a real browser on the production build: the whole reported flow — import, draw a square, Edit → Perspective, click the square (panel reads "Warping Square"), drag a corner, Apply, and the engine answers with a non-identity quad on that shape while its `x0,y0,x1,y1` are untouched; then Esc clears the box, "Place box" brings it back, and Cancel clears it again. That is `e2e/perspective-vector.spec.ts`, and it is green alongside the rest of the suite. The wasm in this session was built **without `wasm-opt`** (binaryen 117 was unreachable from the container), so no size figure is quoted here — the artifact is not the shipped one.
+**Other sites can't frame the editor, and A/B compare lines up.**
+
+| Area | Change |
+| --- | --- |
+| **Security** | Both sites send `X-Frame-Options: DENY`. ADR-048 counted `frame-ancestors 'none'` as enforcing, but it shipped inside `Content-Security-Policy-Report-Only`, which blocks nothing: since v8.70, `edit.imagehorse.app`, `imagehorse.app` and the Netlify site all rendered inside a cross-origin iframe. Proven in Chromium with a must-block and a must-load control, then proven blocked with the header (#144). |
+| **Compare** | The A/B overlay covers `photo_bounds` instead of the whole canvas. On a 400×300 photo with the default 10px artboard the overlay was 420×320, and the original was stretched across the band. Now the band shows through the same on both halves. Nothing in the document changes, so leaving compare has nothing to restore. A unit test and an e2e spec pin it, and each fails against the old geometry (#146). |
+| **Engine** | Vercel's wasm is byte-identical to CI's: **823,503 B, `102e26d9…`**. Vercel's `CARGO_HOME` is `/rust`, which matched none of the `--remap-path-prefix` entries, so 27 registry paths were embedded and production ran 24 B off every other builder (823,479 B). One line in `.cargo/config.toml`, verified against the served preview asset, not only the build record (#145). |
+| **Docs** | Vacuous check #15 (the guardrails CI job never builds wasm) and why `netlify.toml` stays. Three findings parked: `history_max_bytes` has no caller; `cspInlineHash.test.ts` guards `netlify.toml` only; and the scheduled `cargo audit` has been red for eight weeks because the job lacks `issues: write`. It found no vulnerabilities. |
+
+## v8.78 Change Summary — 2026-09-15
+
+**The Stroke Stabilizer steadies your line again, and a pasted picture saves as `pasted-revised`.**
+
+| Area | Change |
+| --- | --- |
+| **Stroke Stabilizer** | Dead since v8.75. #122 moved the leash into `Stabilizer` and left `paint_move` reading `let leash = 0.0; if leash > 0.0 { … }`, so the stabilized branch never ran: moves painted the raw path, the tip stayed at the press point, and `paint_up`'s catch-up flush drew a straight line from the press point to the release point. Every level, in Paint, Eraser, mask paint and the Magic Eraser brush; clone stamp and blur wire their own stabilizer and were fine. Found in QC on v8.77. Fix: `if self.paint_stab.is_on()`. New `tests/paint_stabilized.rs` goes 4 of 6 red on the old engine, 6/6 on the fix; the same in-browser probe draws the closing diagonal on the served v8.77 build and not on the fix. Saved documents replay as drawn, no migration (#151). |
+| **Paste** | A pasted picture exports as `pasted-revised`. Browsers name pasted bitmaps `image.png`, so every paste exported as `image-revised`, and the three paste entry points had drifted to three names. One rule in `lib/pastedImageName.ts`: a generic `image.*` name, no name, or a bare Blob becomes `pasted.<ext>`; a real file from File Explorer keeps its name. Unit test and e2e spec, the spec red against the old call sites (#148). |
+| **Start screen** | Create AI Image is hidden behind `AI_IMAGE_READY` until a text-to-image job type exists, and the tile grid goes 2×2 while it's hidden (#150). The website icon opens `imagehorse.app` instead of `image-horse.vercel.app` (#137). |
+| **Netlify** | On `rust-wasm-photo-tool.netlify.app` and its deploy previews only, a toast says the editor moved and that the address forwards to `edit.imagehorse.app` on 2026-09-29, and tells signed-out users to export first, since their IndexedDB gallery is per origin. Checked on the real Netlify preview: one notice, wraps cleanly (#149). |
+| **Tests** | `cspInlineHash.test.ts` checked the inline-script hash in `netlify.toml` only, while production serves `vercel.json`; it went 2/2 green with production's hash broken. It now reads both files and the hash out of each CSP header's `script-src`. Vacuous check #16 (#147). |
+| **Engine size** | 823,503 → **823,714 B** (+211 B). The only source change that compiles into the wasm is the stabilizer branch, which the optimizer had been dropping while `leash` was a constant 0. |
+| **QC** | Checklist rows 1–7 passed on a local production build of master + #137, #147–#149 (Export all keeps edits after reload, real screenshot paste, file paste, gallery reload, A/B compare, keyboard). That pass found the stabilizer bug and the stale link. |

@@ -46,7 +46,7 @@ export function ShortcutModal({ open, onClose }: Props) {
       <DialogContent
         size="xl"
         aria-describedby={undefined}
-        overlayClassName="z-[var(--z-modal)] bg-black/60 backdrop-blur-sm"
+        overlayClassName="z-[var(--z-modal)]"
         className="z-[var(--z-modal)] flex max-h-[80vh] flex-col"
       >
         <DialogHeader className="px-5 py-4">

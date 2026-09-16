@@ -4,6 +4,148 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
+
+Found by the records audit while retiring the Quick Adjust grid for the Presets
+tile (#88), and **caused by that retirement** — flagged rather than fixed,
+because marketing copy is Margot's lane and the call is Chris's.
+
+| Where | Line | Claim |
+|---|---|---|
+| `marketing/src/pages/Pricing.tsx` | 66, 144 | "4× upscale" listed as a Pro feature |
+| `marketing/src/seo.ts` | 97, 221 | same, in the SEO copy |
+
+Until this session the editor had a **greyed 4x Upscale tile** sitting in the
+Quick Adjust grid's empty fifth cell, captioned "isn't connected yet — it needs
+a model". Selling it on the Pricing page was a stretch, but the app at least
+said "not yet" out loud. Retiring the grid removed that tile, and it existed
+nowhere else — so the editor now has no 4× upscale affordance at all, greyed or
+otherwise, while the Pricing page still lists it as something Pro buys.
+
+Three ways out, in rough order of honesty: build it; drop the claim from
+Pricing + SEO; or re-home the greyed tile somewhere (Enhance › Presets has no
+natural slot for it, which is part of why it went).
+
+Related: [[project_paid_tier_gating_bug]] is the same family — a tier claim with
+no wire behind it.
+
+## OPEN — 2,351 wasm bytes are reclaimable from the tonal filters (2026-09-15)
+
+Measured while building the Presets tile (#88), not taken in that diff.
+
+`presets::apply_stack` calls the five `filters::adjust_*` delegators, and the
+optimiser inlines all five SIMD filter bodies into it — code that already
+exists behind the Adjustments sliders. Cost, measured on the pinned build:
+
+| build | wasm bytes | SIMD opcodes |
+|---|---|---|
+| master (Levels, `b19a45a9`) | 829,481 | 5563 |
+| with Presets | 832,962 | 5765 |
+| **+ `#[inline(never)]` on the 5 delegators** | **830,611** | **5563** |
+
+So the attribute reclaims **2,351 B** and returns the SIMD opcode count to
+*exactly* the baseline — no duplicated SIMD code at all. Two dead ends already
+ruled out: `#[inline(never)]` on `apply_stack` itself produces a byte-identical
+build (it stops the wrong inlining), and wrapping the calls in `#[inline(never)]`
+helpers inside `presets.rs` makes it *worse* (833,200 B / 5781) because the real
+filter is then inlined into the wrapper anyway.
+
+**Why it was parked rather than taken.** It edits five shared functions that the
+six Adjustments sliders also call, and `filters` is named as a hot path by the
+`rust-wasm-loop` skill, so the change needs a bench. The only bench harness here
+is criterion on the host, where `cfg(target_feature = "simd128")` is false — it
+would measure the scalar mirror while the change affects the wasm SIMD build.
+Greening a hot-path edit on a bench that cannot execute the path in question is
+the vacuous-check pattern (`docs/vacuous-checks.md`), so the honest order is:
+get a wasm-level bench first, then take the 2,351 B.
+
+The overhead in question is one function call per WHOLE-BUFFER pass, so the
+expected cost is nil — but "expected" is the word doing the work, which is
+exactly why it wants a measurement.
+
+## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+Found while testing the Levels tile, and **not caused by it**. Undo still shows
+the right pixels, so nothing is lost — but it always takes the snapshot path,
+so the undo depth the op log exists to protect (ADR-052: ~10 steps on a 12 MP
+photo, ~5 on 24 MP) is never actually delivered.
+
+| Run (fresh Canvas + Photo document, production build) | After undo |
+|---|---|
+| A — paint stroke via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| B — Levels preview → apply via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| C — **paint stroke through the real UI**, Ctrl+Z | ❌ cursor stays 1, `oplog_status` = "broken — snapshot undo has taken over" |
+| Levels through the real UI, Ctrl+Z **or** a direct `t.undo()` | ❌ same as C |
+
+So the break happens BETWEEN the edit and the undo, and only when the app's
+own flush path runs: `flushToCanvas` → `onOplogFlush` (persistence writer) and
+`blitLiveEngine`. `try_oplog_undo` refuses and `oplog_engine_in_sync()` fails,
+although the log's base (keyframe 0) is still the untouched photo and one
+correct op is recorded. Ruled out: tiles flush (returns early on a 2-layer
+document), `calculate_histogram` (read-only), the PageUp and Ctrl+Z key
+handlers (a focused range slider returns early; undo is a bare `t.undo()`),
+`restoreOplog` (only on photo open).
+
+**Why every gate is green:** the Rust parity tests and the op-log undo tests
+drive the engine directly and never run the app's flush or persistence path —
+vacuous-checks family 3, "the observation was never taken".
+
+**Next step:** replay run A with `blitLiveEngine` and `onOplogFlush` added one
+at a time to find the call that desyncs the log, then an e2e that paints and
+undoes through the UI and asserts `oplog_is_broken() === false`.
+
+## OPEN — mobile Download saves a file with no extension (2026-09-15)
+
+Noticed while fixing the pasted-export name (`fix/pasted-export-name`), not
+touched by it. `MobileShell.tsx:176` downloads the stored ORIGINAL as
+`a.download = photo.name`, and gallery names are stored with the extension
+stripped (`useImageSession.ts:401`). So a pasted image would save as `pasted`
+and `beach.jpg` as `beach` — no `.png` / `.jpg`. Read from the code only; not
+yet observed on a phone. The desktop export paths append `-revised` + the real
+extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
+decide first whether mobile should save the original (as now) or the edit.
+
+## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+
+Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
+is a plain `#[wasm_bindgen]` export in `src/settings.rs:62`, not feature-gated,
+and its own doc comment says JS is meant to read it: "JS estimates the depth
+from the live document size and this number; hardcoding 512 MB there would be a
+second copy of a value that already lives here" (ADR-052). There is no caller in
+`app/`.
+
+⚠️ **Do not delete it on the strength of "zero references."** That is the
+`useRealTier` shape — a zero-reference export that was a MISSING WIRE, not dead
+code. Run the pickaxe first (`git log --all -G "history_max_bytes"`) to tell
+"never connected" from "lost", and read ADR-052 for what the undo-depth
+estimate was supposed to do.
+
+## OPEN — the `guardrails` CI job never builds wasm (2026-09-12)
+
+So the dead-exports engine half counts **0** in CI and cannot fail there; it is
+vacuous check #15 in `docs/vacuous-checks.md`. Fixing it is a one-line job
+change (build wasm before the script), but it turns CI **red** on the export
+above the moment it lands — so the two are one decision, not two. Sequence:
+resolve `history_max_bytes`, then make the gate able to see it.
+
+## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
+
+Every **scheduled** run of `ci.yml` in the last eight weeks concluded `failure`,
+and it was never a vulnerability. Read from the 2026-09-14 run's log:
+
+| | |
+|---|---|
+| Vulnerabilities | **0** — "No vulnerabilities were found" |
+| Warnings | 2 unmaintained (`atomic-polyfill` RUSTSEC-2023-0089, `spin`), 1 yanked (`ttf-parser`) |
+| What fails | `rustsec/audit-check@v2` then tries to open a GitHub issue: `Resource not accessible by integration` |
+| Why | the `cargo-audit` job grants `contents: read` and `checks: write` — no `issues: write` |
+
+Push and PR runs of the same job pass, so a red is only ever visible on the
+cron — which is also the run nobody opens. Two ways out, one decision: grant
+`issues: write` (this repo has **zero** issues on purpose, so weekly auto-issues
+may be unwanted), or stop the action from filing issues and read the warnings
+from the check-run. Separately, the three warnings deserve a look on their own.
+
 ## OPEN — should cut-to-layer produce a FULL-CANVAS layer? (2026-09-06)
 
 Split out of the closed #72 below, which proved the engine is correctly scoped
@@ -328,6 +470,20 @@ systematically optimistic about where work lives.** Check the engine surface
 before estimating — grep the exported method list, not the issue title.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
+
+**Update 2026-09-14 — measured on the live responses, not the config.** The
+headers shipped in v8.70 (ADR-048) and are on all three origins. What is still
+open:
+
+| Item | State |
+|---|---|
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
+| CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+
+The table below is the state before v8.70, kept for history.
 
 Found by the night-0902 security pass. Live responses from **both** the app and
 the marketing site carry exactly one security header:
@@ -2767,3 +2923,19 @@ GREEN on prose (quiet, and it is the direction that lets things through).
 Fix when someone is next in that file: strip `//` and `/* */` before matching,
 then re-baseline. Expect the count to RISE, and expect some of the new entries
 to be real.
+
+## `history_max_bytes` is exported and never called (found 2026-09-12)
+
+`src/settings.rs:62` exports it through `wasm_bindgen`, and its own doc comment
+says why: *"JS estimates the depth from the live document size and this number;
+hardcoding 512 MB there would be a second copy of a value that already lives
+here."* That JS never arrived — `git log --all -G "history_max_bytes" -- app/src`
+returns nothing, so the wire was **never connected**, not lost.
+
+It came in with #127 (the undo-degradation warning, ADR-052). So either the
+warning is computing its depth from a hardcoded number after all — the exact
+duplication the export exists to prevent — or it is not computing it at all.
+**Check which before deciding**: wire the caller up, or delete the export.
+
+Not fixed here because it is another feature's decision, and because the gate
+that should have caught it cannot — see `docs/vacuous-checks.md`.

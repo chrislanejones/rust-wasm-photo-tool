@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -29,6 +30,14 @@ import {
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
+
+/** A Minus stood on end — the vertical guide's glyph. A named component
+ *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
+ *  the old inline `<Minus className="rotate-90" />` cannot be handed over as
+ *  it stands. */
+function MinusVertical({ className }: { className?: string }) {
+  return <Minus className={cn("rotate-90", className)} />;
+}
 
 /** The house section separator (Select / Paint / Shapes all use this exact
  *  rule + padding above a SectionHeader). Named rather than inlined so the
@@ -509,37 +518,53 @@ export function LayerSettings({
             </>
           }
         />
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-          <ToolButton
-            disabled={disabled}
-            onClick={() => addGuide("h", imgW, imgH)}
-            title="Add horizontal guide"
-          >
-            <Minus /> H
-          </ToolButton>
-          <ToolButton
-            disabled={disabled}
-            onClick={() => addGuide("v", imgW, imgH)}
-            title="Add vertical guide"
-          >
-            <Minus className="rotate-90" /> V
-          </ToolButton>
-          <ToolButton
-            disabled={disabled || guides.length === 0}
-            onClick={clearGuides}
-            title="Remove all guides"
-          >
-            <Trash2 /> Clear
-          </ToolButton>
-          <ToolButton
-            active={guidesLocked}
-            disabled={disabled}
-            onClick={toggleGuidesLock}
-            title="Prevent guides from being moved"
-          >
-            {guidesLocked ? <Lock /> : <LockOpen />} Lock
-          </ToolButton>
-        </div>
+        {/* The same declarative group the Wand → Selection grid uses, so the
+            two 2×2 tile grids in this app finally read as one control family
+            instead of one hand-rolled grid and one primitive. Lock is the
+            reason `ToolButtonOption.active` exists: three of these four are
+            one-shot actions and the fourth is an independent on/off, which a
+            single-select `value` cannot say. */}
+        <ToolButtonGroup<"h" | "v" | "clear" | "lock">
+          // FOUR ACROSS, matching the Wand → Selection grid's stacked tiles.
+          // Measured at the real 226px sidebar column: 51×71 tiles, nothing
+          // clipped (scrollWidth == width on all four), and one clean row
+          // instead of two — 79px of sidebar back for the colour grid and the
+          // guide list below. Three across reproduces the Wand tile size
+          // exactly (70×71) but strands Lock alone on a row with two dead
+          // cells; two across doubles the tile width for four small jobs.
+          columns={4}
+          stacked
+          disabled={disabled}
+          onChange={(id) => {
+            if (id === "h") addGuide("h", imgW, imgH);
+            else if (id === "v") addGuide("v", imgW, imgH);
+            else if (id === "clear") clearGuides();
+            else toggleGuidesLock();
+          }}
+          options={[
+            { id: "h", label: "H", icon: Minus, title: "Add horizontal guide" },
+            {
+              id: "v",
+              label: "V",
+              icon: MinusVertical,
+              title: "Add vertical guide",
+            },
+            {
+              id: "clear",
+              label: "Clear",
+              icon: Trash2,
+              disabled: guides.length === 0,
+              title: "Remove all guides",
+            },
+            {
+              id: "lock",
+              label: "Lock",
+              icon: guidesLocked ? Lock : LockOpen,
+              active: guidesLocked,
+              title: "Prevent guides from being moved",
+            },
+          ]}
+        />
 
         <ColorSwatchGrid
           label="Guide Color"

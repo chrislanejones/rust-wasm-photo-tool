@@ -769,10 +769,15 @@ impl ImageHorseTool {
         self.paint_raw = (x, y);
         let (r, g, b) = self.paint_color;
         let radius = self.paint_radius;
-        let leash = 0.0; // carried on paint_stab now
         let op = self.paint_opacity as f64;
-        if leash > 0.0 {
-            return self.paint_stab_to(x, y, leash, radius, r, g, b, op);
+        // The same test `paint_up` uses. This read `let leash = 0.0; if leash
+        // > 0.0` from #122 (v8.75) to v8.77, so the stabilized branch could
+        // never run: moves painted the raw path, the tip stayed at the press
+        // point, and `paint_up`'s flush closed every stabilized stroke with a
+        // straight line back to where it began. tests/paint_stabilized.rs.
+        // The leash argument is ignored — `paint_stab` carries it.
+        if self.paint_stab.is_on() {
+            return self.paint_stab_to(x, y, 0.0, radius, r, g, b, op);
         }
         if let Some((lx, ly)) = self.paint_last {
             self.paint_stroke_to(lx, ly, x, y, radius, r, g, b, op);
