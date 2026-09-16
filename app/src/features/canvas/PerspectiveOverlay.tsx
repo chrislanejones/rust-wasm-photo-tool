@@ -29,6 +29,11 @@ import {
   type Pt,
   type Quad,
 } from "@/lib/perspective";
+import {
+  sameTarget,
+  type PerspectiveTarget,
+  type PerspectiveTargetBox,
+} from "@/lib/perspectiveTarget";
 
 interface Props {
   /** Live screen rect of the <canvas> (already reflects zoom + pan). */
@@ -46,11 +51,16 @@ interface Props {
   /** Fired once on pointer-up, so the caller can push ONE history step for the
    *  whole drag rather than one per frame. */
   onCommit: () => void;
-  /** Live text annotations, so the tool can be pointed at one by clicking it.
-   *  This is the canvas-side twin of picking it out of Review → Reselect. */
-  annotations: { id: number; x: number; y: number; tile_w: number; tile_h: number }[];
-  targetId: number | null;
-  onTargetChange: (id: number | null) => void;
+  /** Every VECTOR OBJECT on the active layer — text annotations and shapes
+   *  alike — so the tool can be pointed at one by clicking it. This is the
+   *  canvas-side twin of picking it out of Review → Reselect.
+   *
+   *  Shapes joined the list in v8.76. Before that the only thing you could
+   *  point this tool at was text, which is why warping a square you had just
+   *  drawn silently fell through to the destructive pixel path. */
+  targets: PerspectiveTargetBox[];
+  target: PerspectiveTarget | null;
+  onTargetChange: (t: PerspectiveTarget | null) => void;
 }
 
 /** Handle hit radius in SCREEN px — deliberately not scaled by zoom. A handle
@@ -68,8 +78,8 @@ export function PerspectiveOverlay({
   vector,
   onChange,
   onCommit,
-  annotations,
-  targetId,
+  targets,
+  target,
   onTargetChange,
 }: Props) {
   const { left, top } = rect;
@@ -205,18 +215,22 @@ export function PerspectiveOverlay({
         overflow: "hidden",
       }}
     >
-      {/* TARGET PICKERS — one transparent rect per text annotation, BELOW the
+      {/* TARGET PICKERS — one transparent rect per vector object, BELOW the
           quad so a handle grab always wins over a target switch. Clicking an
-          annotation points the tool at it (non-destructive path); clicking the
-          one already targeted releases it back to the destructive pixel path,
-          so both directions are reachable without a second control. */}
-      {annotations.map((a) => {
-        const p0 = toScreen({ x: a.x, y: a.y });
-        const p1 = toScreen({ x: a.x + a.tile_w, y: a.y + a.tile_h });
-        const targeted = a.id === targetId;
+          object points the tool at it (non-destructive path); clicking the one
+          already targeted releases it back to the destructive pixel path, so
+          both directions are reachable without a second control.
+
+          Text AND shapes, since v8.76: the pick is keyed by (kind, id) because
+          the engine keeps two id spaces, and a bare number would have made
+          "square 3" and "text 3" the same target. */}
+      {targets.map((o) => {
+        const p0 = toScreen({ x: o.x, y: o.y });
+        const p1 = toScreen({ x: o.x + o.w, y: o.y + o.h });
+        const targeted = sameTarget(target, o);
         return (
           <rect
-            key={`t${a.id}`}
+            key={`${o.kind}${o.id}`}
             x={Math.min(p0.x, p1.x)}
             y={Math.min(p0.y, p1.y)}
             width={Math.abs(p1.x - p0.x)}
@@ -230,9 +244,11 @@ export function PerspectiveOverlay({
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onTargetChange(targeted ? null : a.id);
+              onTargetChange(targeted ? null : { kind: o.kind, id: o.id });
             }}
-          />
+          >
+            <title>{`Warp this ${o.label}`}</title>
+          </rect>
         );
       })}
 

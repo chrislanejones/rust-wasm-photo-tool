@@ -783,7 +783,22 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // un-awaited boolean is a Promise and always truthy, so a hover that never
     // changed anything would still flush and a stale preview would never
     // re-begin. Remaining stays 5 and un-awaited stays 0.
-    expect(gate.awaited, "cumulative converted sites").toBe(144);
+    // Perspective on SHAPES (#130) — 144 -> 146: rebased onto Levels and
+    // Presets, so this pair stacks on 144 rather than the 137 it was written
+    // against. The Perspective tool reaching SHAPES adds TWO
+    // awaited sites in `usePerspectiveTool`, both born awaited rather than
+    // converted and both the exact twins of the text pair already counted
+    // above: `shape_perspective_of` (the reselect seed — it CONSUMES the
+    // stored quad, so it could never have been fire-and-forget; un-awaited it
+    // hands `fromFlat` a Promise, whose `.length` is undefined, and every
+    // reselect would silently restart from a plain rectangle) and
+    // `set_shape_perspective` (the commit, whose boolean decides whether the
+    // canvas is flushed and the history re-synced — and an un-awaited Promise
+    // is truthy, so a refused quad would still repaint and log a step). The
+    // gate numbers below (5 exempt / 0 unawaited / 0 truthy) are again
+    // unchanged, which is the point of updating this number deliberately
+    // instead of loosening the assertion.
+    expect(gate.awaited, "cumulative converted sites").toBe(146);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
