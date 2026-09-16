@@ -16,7 +16,7 @@
  * every frame at once. The pictures are ours; the provenance is the link.
  *
  * ── the size budget ────────────────────────────────────────────────────────
- * ~550 KB for the seven historical frames, and the page downloads NONE of it
+ * ~600 KB for the seven historical frames, and the page downloads NONE of it
  * until someone reaches for the rail (see ShotTimeline). Already-WebP captures
  * were copied byte-for-byte rather than re-encoded — a round trip through a
  * second encoder cost quality and ADDED ~15% to every one of them. Only the two
@@ -50,15 +50,15 @@ const REPO = "https://github.com/chrislanejones/rust-wasm-photo-tool/commit";
 
 export const SHOTS: Shot[] = [
   {
-    src: "/shots/2025-09-tanstack.webp",
-    width: 1300,
-    height: 782,
-    date: "2025-09-02",
-    dateLabel: "2 Sep 2025",
-    note: "Before there was an engine. A batch compressor on TanStack Start, with a Resize & Optimize rail and a Core Web Vitals meter grading the result.",
-    href: "https://github.com/chrislanejones/multi-image-compress-and-edit/commit/a5d726eff4ad5983032a7fd5cf39dea31b52b076",
+    src: "/shots/2025-08-tanstack.webp",
+    width: 1491,
+    height: 1056,
+    date: "2025-08-29",
+    dateLabel: "29 Aug 2025",
+    note: "Before there was an engine, and back when it was blue. A batch compressor on TanStack Start whose whole argument was the Core Web Vitals meter grading what came out.",
+    href: "https://github.com/chrislanejones/multi-image-compress-and-edit/commit/28088f6ec093794be2b6064e936f6ed4a42415d3",
     sourceLabel: "multi-image-compress-and-edit",
-    alt: "The 2025 app: a strip of photo thumbnails across the top, each badged with a compression percentage, a photo of a city at sunset on the canvas, and a Resize & Optimize panel on the right carrying width, height, compression and output-format controls.",
+    alt: "The 2025 app in a navy-blue theme: twelve photo thumbnails across the top, each badged with a compression percentage, a photo of a city at sunset on the canvas, and a Resize & Optimize panel on the right with width and height sliders, an Aggressive compression level, a Core Web Vitals meter reading “Needs Improvement”, and a bulk zip download.",
   },
   {
     src: "/shots/2026-01-yet-another.webp",

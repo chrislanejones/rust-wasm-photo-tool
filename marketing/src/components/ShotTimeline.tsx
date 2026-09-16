@@ -62,7 +62,7 @@ export default function ShotTimeline({ shots }: ShotTimelineProps) {
   };
 
   // First touch of the rail buys the whole run — but on idle time, after the
-  // page has finished the work that matters. ~550 KB of small WebPs is a cheap
+  // page has finished the work that matters. ~600 KB of small WebPs is a cheap
   // thing to have ready; it is only expensive if it competes with first paint.
   useEffect(() => {
     if (wanted.length <= 1 || idle.current !== null) return;
