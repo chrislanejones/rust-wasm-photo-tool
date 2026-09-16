@@ -2,6 +2,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
+import { Analytics } from "@vercel/analytics/react";
 import { ConvexClerkProvider } from "@/components/ConvexClerkProvider";
 import { setupServiceWorker } from "@/lib/pwa/swBoot";
 import "./styles.css";
@@ -60,10 +61,19 @@ installUploadBudgetProbe();
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.
 setupServiceWorker();
 
+// Vercel Web Analytics. Mounted OUTSIDE ConvexClerkProvider on purpose: demo
+// mode is the default path and must never depend on auth, so the pageview
+// counter cannot sit inside a provider that goes inert when Clerk/Convex are
+// absent. In production the script and its beacon are both same-origin
+// (`/_vercel/insights/script.js` and `/_vercel/insights/event`), which is why
+// the CSP needed no new origin — but see vercel.json: the SPA catch-all
+// rewrite had to stop swallowing `/_vercel/*` first, or the script tag
+// silently loads index.html and reports nothing.
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ConvexClerkProvider>
       <App />
     </ConvexClerkProvider>
+    <Analytics />
   </React.StrictMode>,
 );
