@@ -6,6 +6,7 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { DIALOG_OVERLAY } from "@/lib/styles"
 
 const Dialog = DialogPrimitive.Root
 
@@ -19,10 +20,7 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn(
-      "fixed inset-0 z-[var(--z-dialog)] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
+    className={cn(DIALOG_OVERLAY, "z-[var(--z-dialog)]", className)}
     {...props}
   />
 ))
