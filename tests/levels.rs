@@ -49,19 +49,19 @@ fn hash(t: &mut ImageHorseTool) -> u64 {
 fn preview_then_cancel_restores_every_pixel() {
     let mut t = tool();
     let before = hash(&mut t);
-    assert!(t.levels_preview_begin());
+    assert!(t.tonal_preview_begin());
     assert!(t.levels_preview_set(40, 200, 1.6));
     assert_ne!(hash(&mut t), before, "the preview changed the picture");
-    assert!(t.levels_preview_cancel(), "cancel restored pixels");
+    assert!(t.tonal_preview_cancel(), "cancel restored pixels");
     assert_eq!(hash(&mut t), before, "cancel put back every pixel");
-    assert!(!t.levels_preview_active());
+    assert!(!t.tonal_preview_active());
 }
 
 #[test]
 fn a_preview_is_never_an_undo_step() {
     let mut t = tool();
     let undos = t.undo_count();
-    t.levels_preview_begin();
+    t.tonal_preview_begin();
     t.levels_preview_set(10, 240, 1.2);
     t.levels_preview_set(60, 180, 0.7);
     t.levels_preview_set(0, 255, 1.0);
@@ -70,7 +70,7 @@ fn a_preview_is_never_an_undo_step() {
         undos,
         "moving the sliders adds no undo steps"
     );
-    t.levels_preview_cancel();
+    t.tonal_preview_cancel();
     assert_eq!(t.undo_count(), undos, "cancelling adds none either");
 }
 
@@ -89,7 +89,7 @@ fn apply_is_exactly_one_undo_step_and_undo_restores() {
 #[test]
 fn apply_after_a_preview_remaps_the_untouched_pixels_once() {
     let mut previewed = tool();
-    previewed.levels_preview_begin();
+    previewed.tonal_preview_begin();
     previewed.levels_preview_set(30, 220, 0.8);
     assert!(previewed.levels_apply(30, 220, 0.8));
 
@@ -102,7 +102,7 @@ fn apply_after_a_preview_remaps_the_untouched_pixels_once() {
         "the preview must not be applied a second time on top of itself"
     );
     assert!(
-        !previewed.levels_preview_active(),
+        !previewed.tonal_preview_active(),
         "apply closes the preview"
     );
 }
@@ -111,7 +111,7 @@ fn apply_after_a_preview_remaps_the_untouched_pixels_once() {
 fn moves_recompute_from_the_copy_and_never_compound() {
     let mut t = tool();
     let before = hash(&mut t);
-    t.levels_preview_begin();
+    t.tonal_preview_begin();
     t.levels_preview_set(50, 200, 1.0);
     t.levels_preview_set(80, 150, 2.0);
     t.levels_preview_set(0, 255, 1.0); // identity, from the copy
@@ -120,7 +120,7 @@ fn moves_recompute_from_the_copy_and_never_compound() {
         before,
         "back at the identity means back at the original"
     );
-    t.levels_preview_cancel();
+    t.tonal_preview_cancel();
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn a_stale_preview_is_dropped_never_written_back() {
     let mut t = tool();
     assert!(t.levels_apply(20, 235, 1.0)); // step A: undo depth 1
 
-    t.levels_preview_begin(); // copy taken at depth 1
+    t.tonal_preview_begin(); // copy taken at depth 1
     t.levels_preview_set(80, 180, 1.0);
 
     // Undo, then a different edit: undo depth is back to 1 with other pixels.
@@ -151,7 +151,7 @@ fn a_stale_preview_is_dropped_never_written_back() {
         !t.levels_preview_set(10, 250, 1.0),
         "stale: nothing to preview"
     );
-    assert!(!t.levels_preview_cancel(), "stale: nothing restored");
+    assert!(!t.tonal_preview_cancel(), "stale: nothing restored");
     assert_eq!(hash(&mut t), after_edit, "the brightness edit survived");
 }
 
@@ -159,10 +159,10 @@ fn a_stale_preview_is_dropped_never_written_back() {
 fn begin_twice_keeps_the_first_copy() {
     let mut t = tool();
     let before = hash(&mut t);
-    assert!(t.levels_preview_begin());
+    assert!(t.tonal_preview_begin());
     t.levels_preview_set(60, 190, 1.4);
-    assert!(!t.levels_preview_begin(), "a second begin is refused");
-    assert!(t.levels_preview_cancel());
+    assert!(!t.tonal_preview_begin(), "a second begin is refused");
+    assert!(t.tonal_preview_cancel());
     assert_eq!(
         hash(&mut t),
         before,

@@ -766,12 +766,24 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // number this change exists to stop reporting.
     // Levels (#87) — 137 -> 141: `useTransforms`' Levels controls, born
     // awaited. `levels_preview_set` (twice: the move, and the retry after a
-    // re-begin), `levels_preview_cancel` and `levels_apply` all return a
+    // re-begin), `tonal_preview_cancel` and `levels_apply` all return a
     // boolean that decides whether to flush or re-begin, and under the worker
     // an un-awaited boolean is a Promise, which is always truthy: a stale
     // preview would never re-begin and every cancel would flush for nothing.
     // Remaining stays 5 and un-awaited stays 0, so nothing new is unconverted.
-    expect(gate.awaited, "cumulative converted sites").toBe(141);
+    // Presets (#88) — 141 -> 144: `useTransforms`' preset controls add SIX
+    // engine calls, of which three are counted here and three are not. The
+    // three inside the hover loop (`preset_preview_set` twice and the
+    // `tonal_preview_begin` that retries after a stale drop) classify as
+    // `c-hot-path`, the same bucket Levels' own `levels_preview_set` sits in,
+    // because they run per pointer-move. The three counted are the discrete
+    // ones: `tonal_preview_begin` opening the slot, `tonal_preview_cancel`
+    // deciding whether to flush on leave, and `preset_apply` returning whether
+    // pixels changed. Born awaited for the usual reason — under the worker an
+    // un-awaited boolean is a Promise and always truthy, so a hover that never
+    // changed anything would still flush and a stale preview would never
+    // re-begin. Remaining stays 5 and un-awaited stays 0.
+    expect(gate.awaited, "cumulative converted sites").toBe(144);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

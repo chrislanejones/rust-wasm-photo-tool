@@ -4,6 +4,65 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
+
+Found by the records audit while retiring the Quick Adjust grid for the Presets
+tile (#88), and **caused by that retirement** — flagged rather than fixed,
+because marketing copy is Margot's lane and the call is Chris's.
+
+| Where | Line | Claim |
+|---|---|---|
+| `marketing/src/pages/Pricing.tsx` | 66, 144 | "4× upscale" listed as a Pro feature |
+| `marketing/src/seo.ts` | 97, 221 | same, in the SEO copy |
+
+Until this session the editor had a **greyed 4x Upscale tile** sitting in the
+Quick Adjust grid's empty fifth cell, captioned "isn't connected yet — it needs
+a model". Selling it on the Pricing page was a stretch, but the app at least
+said "not yet" out loud. Retiring the grid removed that tile, and it existed
+nowhere else — so the editor now has no 4× upscale affordance at all, greyed or
+otherwise, while the Pricing page still lists it as something Pro buys.
+
+Three ways out, in rough order of honesty: build it; drop the claim from
+Pricing + SEO; or re-home the greyed tile somewhere (Enhance › Presets has no
+natural slot for it, which is part of why it went).
+
+Related: [[project_paid_tier_gating_bug]] is the same family — a tier claim with
+no wire behind it.
+
+## OPEN — 2,351 wasm bytes are reclaimable from the tonal filters (2026-09-15)
+
+Measured while building the Presets tile (#88), not taken in that diff.
+
+`presets::apply_stack` calls the five `filters::adjust_*` delegators, and the
+optimiser inlines all five SIMD filter bodies into it — code that already
+exists behind the Adjustments sliders. Cost, measured on the pinned build:
+
+| build | wasm bytes | SIMD opcodes |
+|---|---|---|
+| master (Levels, `b19a45a9`) | 829,481 | 5563 |
+| with Presets | 832,962 | 5765 |
+| **+ `#[inline(never)]` on the 5 delegators** | **830,611** | **5563** |
+
+So the attribute reclaims **2,351 B** and returns the SIMD opcode count to
+*exactly* the baseline — no duplicated SIMD code at all. Two dead ends already
+ruled out: `#[inline(never)]` on `apply_stack` itself produces a byte-identical
+build (it stops the wrong inlining), and wrapping the calls in `#[inline(never)]`
+helpers inside `presets.rs` makes it *worse* (833,200 B / 5781) because the real
+filter is then inlined into the wrapper anyway.
+
+**Why it was parked rather than taken.** It edits five shared functions that the
+six Adjustments sliders also call, and `filters` is named as a hot path by the
+`rust-wasm-loop` skill, so the change needs a bench. The only bench harness here
+is criterion on the host, where `cfg(target_feature = "simd128")` is false — it
+would measure the scalar mirror while the change affects the wasm SIMD build.
+Greening a hot-path edit on a bench that cannot execute the path in question is
+the vacuous-check pattern (`docs/vacuous-checks.md`), so the honest order is:
+get a wasm-level bench first, then take the 2,351 B.
+
+The overhead in question is one function call per WHOLE-BUFFER pass, so the
+expected cost is nil — but "expected" is the word doing the work, which is
+exactly why it wants a measurement.
+
 ## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
 
 Found while testing the Levels tile, and **not caused by it**. Undo still shows

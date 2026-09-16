@@ -27,6 +27,28 @@ export interface LevelsControls {
   histogram: () => Promise<Uint32Array | null>;
 }
 
+/** One colour preset's five components, in the engine's own units: brightness
+ *  is a -1..1 fraction, contrast and saturation are factors (1 = as-is), and
+ *  shadows/highlights are ABSOLUTE 8-bit (-255..255) — see src/presets.rs. */
+export interface PresetStack {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  shadows: number;
+  highlights: number;
+}
+
+export interface PresetControls {
+  /** Open a live preview on the active layer. Resolves false with no engine. */
+  begin: () => Promise<boolean>;
+  /** Show a preset on the photo. Latest wins; never an undo step. */
+  preview: (p: PresetStack) => void;
+  /** Close the preview and put the photo back. */
+  cancel: () => Promise<void>;
+  /** Commit as ONE undo step. Resolves whether pixels changed. */
+  apply: (p: PresetStack) => Promise<boolean>;
+}
+
 export function useTransforms(engine: EngineCore) {
   const {
     toolRef,
@@ -461,7 +483,7 @@ export function useTransforms(engine: EngineCore) {
         const t = toolRef.current;
         if (!t) return false;
         levelsOpenRef.current = true;
-        await t.levels_preview_begin();
+        await t.tonal_preview_begin();
         return true;
       },
       preview: (black, white, gamma) => {
@@ -479,7 +501,7 @@ export function useTransforms(engine: EngineCore) {
               if (!ok && levelsOpenRef.current) {
                 // The engine dropped a stale preview: history moved under it
                 // (an undo, say). Start again from the document as it is now.
-                await t.levels_preview_begin();
+                await t.tonal_preview_begin();
                 ok = await t.levels_preview_set(b, w, g);
               }
               if (ok) levelsFlushRef.current();
@@ -494,7 +516,7 @@ export function useTransforms(engine: EngineCore) {
         levelsPendingRef.current = null;
         const t = toolRef.current;
         if (!t) return;
-        if (await t.levels_preview_cancel()) levelsFlushRef.current();
+        if (await t.tonal_preview_cancel()) levelsFlushRef.current();
       },
       apply: async (black, white, gamma) => {
         levelsOpenRef.current = false;
@@ -509,6 +531,95 @@ export function useTransforms(engine: EngineCore) {
       histogram: async () => {
         const t = toolRef.current;
         return t ? await t.calculate_histogram() : null;
+      },
+    }),
+    [toolRef],
+  );
+
+  // Colour presets share ONE preview slot with Levels (src/tonal_preview.rs),
+  // so only one of the two panels may hold a preview open at a time. The panel
+  // opens on first hover and closes when the pointer leaves the grid.
+  //
+  // LATEST WINS, same as Levels: sweeping the pointer across the grid outruns
+  // the worker, so at most one `preset_preview_set` is in flight and a newer
+  // preset overwrites the unsent one. `open` gates the loop so a queued hover
+  // cannot reopen a preview after the panel has cancelled or applied.
+  const presetsFlushRef = useRef(flushToCanvas);
+  presetsFlushRef.current = flushToCanvas;
+  const presetsSyncRef = useRef(syncState);
+  presetsSyncRef.current = syncState;
+  const presetsOpenRef = useRef(false);
+  const presetsPendingRef = useRef<PresetStack | null>(null);
+  const presetsBusyRef = useRef(false);
+
+  const presets = useMemo<PresetControls>(
+    () => ({
+      begin: async () => {
+        const t = toolRef.current;
+        if (!t) return false;
+        presetsOpenRef.current = true;
+        await t.tonal_preview_begin();
+        return true;
+      },
+      preview: (p) => {
+        presetsPendingRef.current = p;
+        if (presetsBusyRef.current) return;
+        presetsBusyRef.current = true;
+        void (async () => {
+          try {
+            while (presetsPendingRef.current && presetsOpenRef.current) {
+              const q = presetsPendingRef.current;
+              presetsPendingRef.current = null;
+              const t = toolRef.current;
+              if (!t) break;
+              let ok = await t.preset_preview_set(
+                q.brightness,
+                q.contrast,
+                q.saturation,
+                q.shadows,
+                q.highlights,
+              );
+              if (!ok && presetsOpenRef.current) {
+                // The engine dropped a stale preview: history moved under it
+                // (an undo, say). Start again from the document as it is now.
+                await t.tonal_preview_begin();
+                ok = await t.preset_preview_set(
+                  q.brightness,
+                  q.contrast,
+                  q.saturation,
+                  q.shadows,
+                  q.highlights,
+                );
+              }
+              if (ok) presetsFlushRef.current();
+            }
+          } finally {
+            presetsBusyRef.current = false;
+          }
+        })();
+      },
+      cancel: async () => {
+        presetsOpenRef.current = false;
+        presetsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return;
+        if (await t.tonal_preview_cancel()) presetsFlushRef.current();
+      },
+      apply: async (p) => {
+        presetsOpenRef.current = false;
+        presetsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        const changed = await t.preset_apply(
+          p.brightness,
+          p.contrast,
+          p.saturation,
+          p.shadows,
+          p.highlights,
+        );
+        presetsFlushRef.current();
+        presetsSyncRef.current();
+        return changed;
       },
     }),
     [toolRef],
@@ -535,6 +646,7 @@ export function useTransforms(engine: EngineCore) {
       adjustHighlights,
       adjustSharpen,
       levels,
+      presets,
     }),
     [
       copyRegion,
@@ -556,6 +668,7 @@ export function useTransforms(engine: EngineCore) {
       adjustHighlights,
       adjustSharpen,
       levels,
+      presets,
     ],
   );
 }

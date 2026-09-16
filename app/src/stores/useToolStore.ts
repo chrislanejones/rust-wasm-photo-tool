@@ -40,7 +40,7 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
  *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
  *  `partialize` allowlist, so a reload reopens Adjustments (the long-standing
  *  default) and no storage schema changes. */
-export type EffectsMode = "adjust" | "levels";
+export type EffectsMode = "adjust" | "levels" | "presets";
 /** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
  *  behind it, `ocr` = read text out of the image. Lifted here out of
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
