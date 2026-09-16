@@ -200,8 +200,17 @@ check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
 # document — moved out to `ops::annotation_sync_ops`, beside the `Op` variants
 # it emits and the `#[serde(skip)]` fields whose hazards it has to remember.
 # Lowered in the same commit as the extraction, per the rule above.
+# 4798 -> 4808 (merging master into shape perspective, 2026-09-16). ⚠️ READ THIS
+# BEFORE CONCLUDING THE RATCHET WAS RAISED TO GO GREEN. It was not: measured
+# against MASTER this is a LOWERING of 4912 -> 4808, which is the ratchet doing
+# its job. The 4798 above was set on this branch while it was 30 commits behind,
+# against a lib.rs that contained neither Levels (#152) nor Presets (#153); both
+# add engine surface to lib.rs, and merging brought those lines in legitimately.
+# Two branches ratcheting the same counter independently is the only way this
+# number can move UP without new slop, and the check for it is the one below:
+# 4808 must be lower than the baseline on the branch you are merging INTO.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4798 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4808 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
