@@ -4,6 +4,26 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — `testReplicate` deploys to prod by default, and calls itself temporary (2026-09-17)
+
+Noticed while wiring the Convex deploy into CI (step 0.5, PR #165). Not a bug,
+a decision nobody has made.
+
+`convex/testReplicate.ts` opens with *"TEMPORARY diagnostics … Safe to delete."*
+Every export in it is `internalAction` / `internalMutation` / `internalQuery`,
+so **no client can reach it** and this is not an exposure. But `convex deploy`
+pushes everything in `convex/`, so once CI deploys, a module that describes
+itself as temporary is live in production permanently.
+
+It also holds `devFixUser`, which mutates the first row of `users`. Internal,
+so only reachable from the dashboard — still not something to carry in prod
+without meaning to.
+
+Three options, none urgent: delete it, move it behind a dev-only path, or
+decide it stays and drop the "safe to delete" line so the next reader does not
+have to re-ask. `scripts/convex-deploy-check.mjs` lists it as expected today,
+so whichever way it goes, that list changes with it.
+
 ## OPEN — marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
 
 Found by the records audit while retiring the Quick Adjust grid for the Presets
@@ -63,9 +83,17 @@ The overhead in question is one function call per WHOLE-BUFFER pass, so the
 expected cost is nil — but "expected" is the word doing the work, which is
 exactly why it wants a measurement.
 
-## OPEN — ⚠️ UNDO IS NOT DURABLE: a reload silently puts the undone edit back (2026-09-16)
+## RESOLVED — ⚠️ UNDO IS NOT DURABLE: a reload silently puts the undone edit back (2026-09-16)
 
-**Live on production. Found while auditing persistence for sync (step 0,
+> **Fixed by PR #161 (`2e6c5f32`), merged 2026-09-16.** The dirty rule could
+> not tell *edited back to where it was saved* from *never edited*: undoing to
+> zero made `undoCount === 0`, the session read as clean, and no write was
+> asked for. It now compares against the undo count at the last successful
+> write, captured before the await. `app/src/lib/dirtyRule.test.ts` pins it in
+> 11 cases and 3 go red against the old rule. Kept here because the entry below
+> — the op-log breakage — is still open and reads as its sibling.
+
+**Was live on production. Found while auditing persistence for sync (step 0,
 `docs/sync-audit.md`), not caused by it.** This is the entry below made worse:
 that one says "undo still shows the right pixels, so nothing is lost", which is
 true within a session and **false across a reload**.
