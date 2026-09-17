@@ -11,6 +11,9 @@
  */
 
 import { external, repoFile } from "../config";
+import WorkerScene from "../components/figures/WorkerScene";
+import PayloadBars from "../components/figures/PayloadBars";
+import QueueDrain from "../components/figures/QueueDrain";
 
 export default function EngineInAWorker() {
   return (
@@ -50,6 +53,18 @@ export default function EngineInAWorker() {
         thread boundary, and what we did instead.
       </p>
 
+      {/* The geography, before the argument. Everything below refers back to
+          this arrangement, and it is worth a reader ten seconds up front to see
+          which side of the boundary each piece is on. */}
+      <figure className="post__figure">
+        <WorkerScene kind="threads" placeholder="Where the engine, its memory and the canvas surface live after v8.32" />
+        <figcaption className="post__caption">
+          Where things live now. The engine, its linear memory and the canvas surface all sit in the
+          worker. Calls carry a request id and get a reply; the per-frame <em>blit</em> is
+          fire-and-forget and bypasses the queue entirely.
+        </figcaption>
+      </figure>
+
       <h2 id="impossible">The obvious way is impossible</h2>
 
       <p>
@@ -59,12 +74,55 @@ export default function EngineInAWorker() {
         that is only meaningful next to the memory it points at.
       </p>
 
+      {/* Three doors and the wall. The fourth row is the one that matters and
+          is not in the paragraph above it: WASM linear memory cannot be
+          transferred at all, and the browsers do not even agree on how it
+          fails. The caption carries that, because it is the reason the naive
+          port passes review in Chrome and dies in Safari. */}
+      <figure className="post__figure">
+        <WorkerScene
+          kind="doors"
+          placeholder="Copy, move and share across a thread boundary — and WASM memory, which does none of them"
+        />
+        <figcaption className="post__caption">
+          The three ways a value crosses a thread boundary, and the one that is closed to us. Copy
+          duplicates and pays by the byte. Move is size-independent and leaves the sender detached. Share
+          is one block visible from both sides, and needs cross-origin isolation to exist at all. WASM
+          linear memory is chained to its own realm: the spec stamps its buffer with an internal detach
+          key that <code>postMessage</code> does not carry (
+          <a href="https://github.com/whatwg/html/issues/4601" {...external}>
+            whatwg/html&nbsp;#4601
+          </a>
+          ), so it strains and snaps back. Firefox and Safari throw; Chrome has silently copied instead
+          since 2014, which is why the obvious port looks like it works right up until someone opens
+          Safari.
+        </figcaption>
+      </figure>
+
       <p>
         The sharpest case was <code>flushToCanvas</code>. It reads the canvas width and height, then
         recomposites against them — per frame, in the hot path. Split that across a boundary and it stops
         being one operation and becomes a read, a wait, and a write against numbers that may have changed
         while you waited. There were nine sites shaped like that. This was the worst of them.
       </p>
+
+      {/* The other half of "impossible": even with a door open, the payload is
+          the wrong order of magnitude. This is the figure that closes off
+          copying before the post moves on to what we did instead. */}
+      <figure className="post__figure">
+        <PayloadBars />
+        <figcaption className="post__caption">
+          Copying pixels per stroke is off the table before we start. The budgets are the RAIL
+          guidelines' — 16 ms for a frame, 100 ms for a response to a gesture — converted to a
+          structured-clone payload at the rate Surma measured across five device and browser
+          combinations (
+          <a href="https://surma.dev/things/is-postmessage-slow/" {...external}>
+            <em>Is postMessage slow?</em>
+          </a>
+          ). One HD composite is 810× the per-frame budget, and transferring instead is closed by the
+          figure above. The pixels cannot make that trip at all.
+        </figcaption>
+      </figure>
 
       <h2 id="canvas">So the canvas went too</h2>
 
@@ -122,6 +180,22 @@ export default function EngineInAWorker() {
         </figcaption>
       </figure>
 
+      {/* The handover itself, in four beats. The diagram above says what the
+          arrangement IS; this one says how it gets there, which is the part
+          that surprises people — the surface moves once, and then nothing on
+          the render path crosses the boundary again. */}
+      <figure className="post__figure">
+        <WorkerScene
+          kind="canvas"
+          placeholder="transferControlToOffscreen, in four beats: the surface leaves the element and lands beside the engine"
+        />
+        <figcaption className="post__caption">
+          The transfer, in four beats. The surface leaves the element and lands beside the engine; from
+          then on pixels flow memory → canvas without leaving the worker, and the only per-frame traffic
+          is a blit message that nobody waits for.
+        </figcaption>
+      </figure>
+
       <h2 id="one-port">One port per document</h2>
 
       <p>
@@ -136,6 +210,25 @@ export default function EngineInAWorker() {
         Open a second port, or reach the engine anywhere outside the queue, and that guarantee is gone
         without a single error in the console.
       </p>
+
+      {/* The gate that could have said no, run as it was actually run: sixteen
+          mutations in flight at once, because awaiting each one would have made
+          post order trivially equal to call order and proven nothing. The
+          numbers in the footer are a12's. */}
+      <figure className="post__figure">
+        <QueueDrain />
+        <figcaption className="post__caption">
+          The burst that tested it. Sixteen mutations posted with no <code>await</code> between them land
+          in the worker's queue in post order and drain one at a time into the op log; a cancelled id is
+          rejected when its turn comes rather than quietly dropped, so the ids that do land stay a
+          contiguous run. Against the local engine the result was identical on every axis — ids{" "}
+          <code>1..16</code> in order, 7 ops, 910 bytes, and the same op-log SHA-256 (
+          <a href={repoFile("docs/engine-worker-a12-design.md")} {...external}>
+            a12 design, gate 3
+          </a>
+          ).
+        </figcaption>
+      </figure>
 
       <p>
         Which makes it the wrong kind of thing to remember and the right kind of thing to test.{" "}

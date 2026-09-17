@@ -2974,6 +2974,331 @@ a { color: inherit; }
   color: var(--color-ink-3);
 }
 
+/* ── the engine-in-a-worker figures ───────────────────────────
+ * Five figures for one post: three WebGL scenes, a payload chart and the queue
+ * drain. They share this section because they share a frame — every one of them
+ * is a paper-2 panel with a hairline rule and a 10px radius, the same object
+ * the boundary diagram above is, so a reader scrolling the post sees one family
+ * of figures rather than five widgets.
+ *
+ * The figures are NOT held to --measure (see the rule at the top of .post:
+ * only running text is), so they get the full content column. That is
+ * deliberate — a 16:9 scene at 65 characters wide is unreadable.
+ */
+
+/* ── the 3D scenes ──────────────────────────────────────────── */
+
+.fig-scene {
+  position: relative;
+  /* Reserved before anything loads, so the lazy scene arriving cannot shift the
+     paragraph under it. The three scenes and their placeholder all sit at this
+     ratio; CLS on this post is 0 either way. */
+  aspect-ratio: 16 / 9;
+  inline-size: 100%;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+/* What the prerender writes, what a crawler reads, and what a reader without
+   WebGL keeps. Hatched rather than blank so it reads as a diagram that did not
+   load rather than as a hole in the layout. */
+.fig-scene__placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-lg);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  text-align: center;
+  text-wrap: pretty;
+  color: var(--color-ink-3);
+  background: repeating-linear-gradient(135deg, transparent 0 14px, var(--color-paper-3) 14px 16px);
+}
+
+.fig-scene__labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* The scenes are not interactive and the labels must never eat a scroll. */
+  pointer-events: none;
+}
+
+/* A label is placed by the projector, every frame, in px — `inset-inline-start`
+   and `inset-block-start` are written from JS and are deliberately absent here.
+   `transform` is written inline by React (the per-label dx/dy nudge), so this
+   rule must not set it either.
+
+   `visibility: hidden` is the initial state on purpose: a label has no correct
+   position until the first frame has projected it, and without this all of them
+   paint stacked in the top-left corner for that frame. */
+.fig-scene__label {
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  max-inline-size: min(46%, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-family: var(--font-outlier);
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  /* Knocks a hole in the scene behind it, the way the boundary seam's labels
+     do — an unbacked label over a lit slab is unreadable at 11px. */
+  background: color-mix(in oklch, var(--color-paper-2) 78%, transparent);
+}
+
+/* The plane names, which are prose rather than wire format. */
+.fig-scene__label[data-sans] {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* The four-beat narration under the transfer scene. Its text is written from
+   the render loop, so it is sized for the longest of the four beats and holds
+   that height — a beat change must not resize the figure. */
+.fig-scene__beat {
+  position: absolute;
+  inset-inline: var(--space-md);
+  inset-block-end: 14px;
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--color-paper-2) 85%, transparent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  text-wrap: pretty;
+  color: var(--color-ink);
+}
+
+/* ── the payload chart ──────────────────────────────────────── */
+
+.fig-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg) clamp(var(--space-md), 3vw, var(--space-xl));
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+/* The axis declaration. A log scale that does not say so is a lie, so this line
+   is not optional furniture — it is the chart's units. */
+.fig-bars__axis {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+/* One grid for all five rows, so the tracks share a baseline and the bars are
+   actually comparable. The rows are `display: contents` to hand their three
+   children straight to this grid — a per-row grid would let each row size its
+   own value column and the bars would start at five different x. */
+.fig-bars__rows {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto;
+  gap: 10px var(--space-md);
+  align-items: center;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.fig-bars__row { display: contents; }
+
+.fig-bars__label { color: var(--color-ink-2); }
+/* The over-budget rows are the finding; they get the brighter ink. */
+.fig-bars__row[data-tone="over"] .fig-bars__label { color: var(--color-ink); }
+.fig-bars__note { color: var(--color-ink-3); }
+
+.fig-bars__track {
+  position: relative;
+  block-size: 22px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-3);
+}
+
+.fig-bars__fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-ink-2);
+}
+
+/* Tone is a three-state status encoding — what a message costs, what a frame
+   can afford, what will not fit — and never the only carrier: every row prints
+   its own value, and the two over-budget rows print the multiple too. */
+.fig-bars__row[data-tone="budget"] .fig-bars__fill { background: var(--color-accent-soft); }
+.fig-bars__row[data-tone="over"] .fig-bars__fill { background: var(--color-accent-2); }
+
+/* The 10 KiB budget, carried onto the bars that blow through it. Dashed and
+   dimmed: it is a reference line, not data. */
+.fig-bars__marker {
+  position: absolute;
+  inset-block: 0;
+  border-inline-start: var(--rule-hair) dashed var(--color-ink);
+  opacity: 0.6;
+}
+
+.fig-bars__value {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  color: var(--color-ink-2);
+}
+.fig-bars__row[data-tone="budget"] .fig-bars__value { color: var(--color-accent); font-weight: 700; }
+.fig-bars__row[data-tone="over"] .fig-bars__value { color: var(--color-accent-2); font-weight: 700; }
+
+.fig-bars__foot {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+/* ── the queue drain ───────────────────────────────────────── */
+
+.fig-queue {
+  position: relative;
+  inline-size: 100%;
+  /* Sixteen chips at a legible row pitch. The mock showed ten in 340px under a
+     header that said sixteen; the box is taller so the figure can show the
+     number it claims. The JS reads this height back to compute the pitch. */
+  min-block-size: 29rem;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.fig-queue__cols {
+  position: absolute;
+  inset-block-start: 14px;
+  inset-inline: 0;
+  display: grid;
+  grid-template-columns: 34% 34% 32%;
+  padding-inline: 10px;
+}
+
+.fig-queue__col {
+  margin: 0;
+  padding-inline-end: var(--space-xs);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.fig-queue__col--accent { color: var(--color-accent); }
+
+.fig-queue__col span {
+  display: block;
+  margin-block-start: 2px;
+  font-family: var(--font-outlier);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: var(--color-ink-3);
+}
+
+.fig-queue__seam {
+  position: absolute;
+  inset-block: 12px;
+  border-inline-start: var(--rule-hair) dashed var(--color-rule-strong);
+}
+.fig-queue__seam[data-at="queue"] { inset-inline-start: 32%; }
+.fig-queue__seam[data-at="log"] { inset-inline-start: 66%; }
+
+/* The thread boundary, named on the seam it runs along. */
+.fig-queue__boundary {
+  position: absolute;
+  inset-inline-start: 32%;
+  inset-block-start: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  padding: 2px var(--space-2xs);
+  background: var(--color-paper-2);
+  font-family: var(--font-outlier);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+/* A chip is placed by `transform` from the render loop, so no inset here.
+   `will-change` because sixteen of them move every frame. */
+.fig-queue__chip {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 62px;
+  block-size: 18px;
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-outlier);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--color-ink);
+  background: var(--color-paper-3);
+  opacity: 0;
+  will-change: transform;
+}
+
+/* The cancelled chip says "cancelled" once it is refused, which does not fit in
+   62px. */
+.fig-queue__chip[data-wide] { inline-size: 88px; }
+
+.fig-queue__chip[data-state="queued"] { background: var(--color-paper-4); }
+
+/* Appended: the amber the contribution grid uses for its first rung, which is
+   the site's existing "this landed" colour. */
+.fig-queue__chip[data-state="appended"] {
+  background: var(--color-grid-1);
+  border-color: var(--color-accent);
+}
+
+/* Rejected, not skipped — engine.worker.ts replies { ok: false } when the
+   cancelled id's turn comes, so the chip travels and is refused on arrival. */
+.fig-queue__chip[data-state="rejected"] {
+  background: color-mix(in oklch, var(--color-accent-2) 22%, var(--color-paper-2));
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-2);
+}
+
+.fig-queue__foot {
+  position: absolute;
+  inset-inline: 12px;
+  inset-block-end: 12px;
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  letter-spacing: 0.02em;
+  text-wrap: pretty;
+  color: var(--color-ink-2);
+}
+
 /* ── what to read next ────────────────────────────────────── */
 
 .post-next {

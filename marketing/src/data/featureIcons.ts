@@ -2,7 +2,7 @@
 // isn't. Add an entry here whenever a new feature lands; the sidebar falls
 // back to a plain dot for anything unmapped rather than erroring.
 
-import type { ElementType } from "react";
+import type { ComponentType } from "react";
 import { CpuIcon } from "../components/Icons";
 import {
   AppWindow,
@@ -57,13 +57,30 @@ import {
   CircleSmall,
 } from "lucide-react";
 
-export const GROUP_ICONS: Record<string, ElementType> = {
+/* What these maps hold: an icon, drawn at a size, wearing a class.
+ *
+ * This was `ElementType`, which is every intrinsic tag plus every component and
+ * is far wider than anything here — all of these are lucide glyphs or one local
+ * one from components/Icons.tsx, and they are all called as
+ * `<Icon className="…" size={16} />`.
+ *
+ * The width is not free. `ElementType` resolves its props against the whole of
+ * `JSX.IntrinsicElements`, so the moment anything in the project augments that
+ * namespace — @react-three/fiber adds a couple of hundred tags for the figures
+ * on /blog/engine-in-a-worker — the permissible-props union collapses to
+ * `never` and every call site fails to typecheck, several files away from the
+ * import that caused it. Naming the actual contract fixes that and documents
+ * what a new entry has to be.
+ */
+export type IconComponent = ComponentType<{ size?: number; className?: string }>;
+
+export const GROUP_ICONS: Record<string, IconComponent> = {
   // Same glyph as Home's "Your machine" tab — one meaning, one icon, site-wide.
   "Image Processing (Rust/WASM)": CpuIcon,
   "UI (React)": AppWindow,
 };
 
-export const FEATURE_ICONS: Record<string, ElementType> = {
+export const FEATURE_ICONS: Record<string, IconComponent> = {
   "Clone Stamp": Stamp,
   "Red Stamps": BadgeCheck,
   "Edit group (Crop · Transform · Color Picker · Resize Layer · Canvas Size · Guides)": Move,
@@ -125,11 +142,11 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
 // reads as "no icon yet" and matches what the header above has always claimed.
 const FALLBACK_ICON = CircleSmall;
 
-export function getFeatureIcon(name: string): ElementType {
+export function getFeatureIcon(name: string): IconComponent {
   return FEATURE_ICONS[name] ?? FALLBACK_ICON;
 }
 
-export function getGroupIcon(name: string): ElementType {
+export function getGroupIcon(name: string): IconComponent {
   return GROUP_ICONS[name] ?? AppWindow;
 }
 
