@@ -168,6 +168,72 @@ consistent with demo mode being the default path.
 
 ---
 
+## 4. ⚠️ STOP CONDITION HIT — undo is not durable
+
+**This outranks the sync plan, and it is not a sync bug. It is live on
+production today.**
+
+PARKING_LOT's flush-path entry says *"Undo still shows the right pixels, so
+nothing is lost."* That is true **within a session** and false **across a
+reload**. Measured on `edit.imagehorse.app`, production, twice (Vivid, then
+Warm), on a 1385×2068 sample photo:
+
+| Step | Screen | Archive on disk |
+|---|---|---|
+| Apply preset | `8ed2e567` | `5b389c67` — written ✅ |
+| **Ctrl+Z** | **`77686a30`** — undo visibly worked | `5b389c67` — **unchanged** |
+| Wait 35 s | `77686a30` | `5b389c67` — still unchanged |
+| **Reload → Resume editing** | **`8ed2e567`** | — |
+
+**The reload silently put the undone edit back.** The user pressed undo, saw it
+work, reloaded, and got the change they had just removed.
+
+### It is not a stale-pixel capture. No save fires at all.
+
+`window.__ihSaveGuard()` counts every archive write. Across a clean run:
+
+| | `allowedKnown` | Δ |
+|---|---|---|
+| Baseline | 1 | — |
+| After applying a preset | 2 | **+1** |
+| After Ctrl+Z (+8 s) | 2 | **0** |
+
+`refused` stayed **0** throughout, so this is not the ownership guard declining
+the write — the autosave never asks. Final state of that run: screen
+`77686a30`, archive `b6cb4374`, two different documents.
+
+### Why the debounce does not explain it
+
+`useImageSession.ts:256` returns early unless `dirtyRef.current`, and that is
+`undoCount > 0 || hasBeenModified || layerRevision > 0`. After an undo
+`hasBeenModified` is still true — the comment at line 264 notes it "cannot
+re-trigger once true" — so **dirty is true and the guard is not the cause
+either**. `autosaveDelayMs` returns 300 ms or 2500 ms, so a 35-second silence
+is not a long timer. The effect's dependency list includes
+`stamp.state.undoCount`, which *does* change on undo. Something between that
+effect firing and `savePhotoEdit` being called is dropping the write, and the
+next step is to instrument those four lines rather than reason about them.
+
+### Why no gate catches it
+
+Same shape as the flush-path entry: `saveOwnership.test.ts` drives
+`savePhotoEdit` directly, and the Rust tests drive the engine directly.
+**Nothing exercises edit → undo → reload.** Vacuous-checks family 3 — the
+observation was never taken.
+
+### What it means for sync
+
+A sync engine replicates **the archive**, not the screen. So on the evidence
+above, sync today would faithfully copy the *un-undone* document to the second
+device — and the first device would get it back on its next pull. Two devices
+disagreeing with the user instead of one.
+
+**This has to be fixed and covered by a test before any sync code is written.**
+It is also worth fixing regardless of sync: it is silent, it is on production
+now, and it costs the user work they explicitly asked to discard.
+
+---
+
 ## What this implies for the ADR (step 1)
 
 Not decisions — the questions step 0 says are now answerable:

@@ -63,6 +63,52 @@ The overhead in question is one function call per WHOLE-BUFFER pass, so the
 expected cost is nil — but "expected" is the word doing the work, which is
 exactly why it wants a measurement.
 
+## OPEN — ⚠️ UNDO IS NOT DURABLE: a reload silently puts the undone edit back (2026-09-16)
+
+**Live on production. Found while auditing persistence for sync (step 0,
+`docs/sync-audit.md`), not caused by it.** This is the entry below made worse:
+that one says "undo still shows the right pixels, so nothing is lost", which is
+true within a session and **false across a reload**.
+
+Measured on `edit.imagehorse.app`, twice (Vivid, then Warm), 1385x2068 sample:
+
+| Step | Screen | Archive on disk |
+| --- | --- | --- |
+| Apply preset | `8ed2e567` | `5b389c67` written ✅ |
+| **Ctrl+Z** | **`77686a30`** undo visibly worked | `5b389c67` **unchanged** |
+| Wait 35 s | `77686a30` | `5b389c67` still unchanged |
+| **Reload → Resume editing** | **`8ed2e567`** | — |
+
+The user pressed undo, watched it work, reloaded, and got the change back.
+
+**No save fires at all** — this is not a stale capture. `window.__ihSaveGuard()`
+across a clean run: baseline `allowedKnown` 1 → preset applied **2** → after
+Ctrl+Z + 8 s still **2**. `refused` stayed **0**, so the ownership guard is not
+declining it; the autosave never asks. End state: screen `77686a30`, archive
+`b6cb4374` — two different documents.
+
+**Ruled out.** `dirtyRef` (`useImageSession.ts:191`) is
+`undoCount > 0 || hasBeenModified || layerRevision > 0`, and `hasBeenModified`
+stays true after an undo — its own comment at line 264 says it "cannot
+re-trigger once true" — so the early return at line 256 is NOT the cause.
+`autosaveDelayMs` returns 300 ms or 2500 ms, so a 35-second silence is not a
+timer. `stamp.state.undoCount` IS in the effect's dependency list and DOES
+change on undo.
+
+**Next step:** instrument the four lines between that effect firing and
+`savePhotoEdit` being called — do not reason about them further. Then an e2e
+that edits, undoes, reloads and asserts the restored canvas hash equals the
+post-undo one.
+
+**Why no gate catches it:** `saveOwnership.test.ts` drives `savePhotoEdit`
+directly and the Rust tests drive the engine directly. Nothing exercises
+edit → undo → reload. Vacuous-checks family 3.
+
+⚠️ **This blocks cross-device sync.** A sync engine replicates the ARCHIVE, so
+on this evidence it would copy the un-undone document to the second device and
+hand it back to the first on the next pull — two devices disagreeing with the
+user instead of one. Fix and cover with a test before any sync code is written.
+
 ## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
 
 Found while testing the Levels tile, and **not caused by it**. Undo still shows
