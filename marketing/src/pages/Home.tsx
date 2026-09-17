@@ -165,13 +165,14 @@ export default function Home() {
         </section>
 
         {/* The tool run, deliberately a dense typographic list not an icon grid —
-            with the button set beside it, so the words have faces.
+            with the tile set beside it, so the words have faces.
 
             The set was an 832x859 WebP of the editor's toolbar until 09-16.
-            It is eight real buttons now: a picture of an interface asks to be
-            taken on trust, and these can be pressed. They select and nothing
-            else — see the note in ButtonSet.tsx for why "Apply" did not
-            survive the change. */}
+            It is twelve real tiles now, named, in the editor's own glyph-over-
+            label shape: a picture of an interface asks to be taken on trust,
+            and these can be pressed. They select and nothing else — see the
+            note in ButtonSet.tsx for why "Apply" did not survive the change
+            and Download did not survive the names. */}
         <section className="editor" id="editor">
           <div className="editor__shot">
             <ButtonSet />
