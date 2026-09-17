@@ -4,11 +4,17 @@
 // couple of dozen, they never change, and a dependency to draw a few paths is a
 // dependency to keep patched forever.
 //
-// The six below — brush, wand, crop, resize, undo, export — are the editor's
-// own tool glyphs, drawn to match `lucide-react`'s versions in the app so the
-// button set on the home page reads as the same software, not an approximation
-// of it. They are the only icons here that exist to depict the product rather
-// than to label this site.
+// The eleven below — brush, stamp, text, shapes, emoji, eraser, wand, crop,
+// resize, undo, export — are the editor's own tool glyphs, traced from the
+// `lucide-react` versions the app draws so the tile set on the home page reads
+// as the same software, not an approximation of it. They are the only icons
+// here that exist to depict the product rather than to label this site.
+//
+// Traced, not imported: `lucide-react` is already a dependency here (the
+// features table uses it), so pulling these five would have cost nothing new.
+// They are hand-written anyway to sit beside the six that came first, which
+// predate that dependency — one file, one way of drawing, rather than a set
+// where half the glyphs take `size` and half take lucide's props.
 
 interface IconProps {
   size?: number;
@@ -241,6 +247,60 @@ export function ExportIcon({ size = 20, className }: IconProps) {
       <path d="M12 3v12" />
       <path d="m8 7 4-4 4 4" />
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    </svg>
+  );
+}
+
+export function StampIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13" />
+      <path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z" />
+      <path d="M5 22h14" />
+    </svg>
+  );
+}
+
+export function TextIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M12 4v16" />
+      <path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2" />
+      <path d="M9 20h6" />
+    </svg>
+  );
+}
+
+export function ShapesIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <circle cx="17.5" cy="17.5" r="3.5" />
+    </svg>
+  );
+}
+
+/** The emoji tool. A drawn face, not an emoji character: a literal 🙂 would
+ *  render in the reader's own emoji font at whatever weight and hue that font
+ *  chooses, which is the one glyph on the tile that could not take the accent
+ *  color when the tile is pressed. */
+export function EmojiIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M15 10V9" />
+      <path d="M9 10V9" />
+      <path d="M16.472 15a6 6 0 0 1-8.943 0" />
+    </svg>
+  );
+}
+
+export function EraserIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21" />
+      <path d="m5.082 11.09 8.828 8.828" />
     </svg>
   );
 }

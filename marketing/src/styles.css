@@ -1015,18 +1015,23 @@ a { color: inherit; }
 }
 
 /* ── the button set ───────────────────────────────────────────────────────
-   Eight of the editor's controls, as real buttons. Replaced an 832x859 WebP
-   on 09-16; the aspect-ratio rule that reserved space for that image went with
-   it, because this grid has an intrinsic height and needs no placeholder.
+   Twelve of the editor's tools, as real buttons with their names on. Replaced
+   an 832x859 WebP on 09-16 as eight icon-only tiles; the names came the next
+   day, and Download left with them. The aspect-ratio rule that reserved space
+   for the image went with it, because this grid has an intrinsic height and
+   needs no placeholder.
 
-   The three states mirror the app's own `ToolButton` rather than approximating
+   The three states mirror the app's own tool tile rather than approximating
    it: idle is a muted surface on a plain border, hover lifts the ink, and
    pressed takes the accent on all three of border, tint and glyph. The app
    writes those as Tailwind utilities against the same design tokens this site
-   uses, so the values agree without sharing a stylesheet. */
+   uses, so the values agree without sharing a stylesheet.
+
+   Four columns. The number is repeated in ButtonSet.tsx as COLS, because the
+   arrow keys walk the grid by it — change one, change both. */
 .buttonset {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-sm);
   width: 100%;
 }
@@ -1035,10 +1040,15 @@ a { color: inherit; }
   display: grid;
   place-items: center;
   aspect-ratio: 1;
+  min-width: 0;
+  padding: var(--space-xs);
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   background: color-mix(in oklch, var(--color-rule) 25%, transparent);
-  color: var(--color-ink-3);
+  /* ink-2, not ink-3. The icon-only tile could sit at ink-3 because a glyph
+     needs 3:1; an 11px name needs 4.5:1, and ink-3 on this surface measures
+     3.8. One color for glyph and name, so they never read as two things. */
+  color: var(--color-ink-2);
   cursor: pointer;
   transition:
     color var(--dur-micro) var(--ease-out),
@@ -1081,12 +1091,74 @@ a { color: inherit; }
    of a button, which is what this used to be. */
 .buttonset__btn:active { transform: translateY(1px); }
 
-.buttonset__icon { width: 45%; height: 45%; }
+/* Glyph over name, the editor's own tile silhouette.
+   `width: 100%` is load-bearing and not decoration: the icon below is sized as
+   a percentage, and a percentage resolves against THIS box. Left to shrink-to-
+   fit, the face is only as wide as the word under it, so the glyph came out
+   at 9px — a third of the label rather than a third of the tile. Measured, in
+   the browser, before the fix. */
+.buttonset__face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+/* A share of the tile, not a fixed size, so the glyph scales with the column
+   from a 26rem desktop rail down to four-up on a phone. Smaller than the app's
+   own 55%, because those tiles carry no word underneath. */
+.buttonset__icon {
+  width: 40%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.buttonset__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform-origin: 50% 50%;
+}
+
+/* The press. The name lands like a stamp — it arrives large and faint and
+   settles into place — and the glyph dips under it as if it took the weight.
+   Both run once, on the tile that was just pressed, and are re-triggered by a
+   remount in ButtonSet.tsx rather than a class flip so a second press on the
+   same tile plays them again. */
+@keyframes buttonset-land {
+  0%   { transform: scale(1.4); opacity: 0.35; }
+  55%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes buttonset-dip {
+  0%   { transform: scale(0.86) translateY(2px); }
+  55%  { transform: scale(1.06) translateY(-1px); }
+  100% { transform: none; }
+}
+
+.buttonset__face.is-pop .buttonset__label {
+  animation: buttonset-land var(--dur-long) var(--ease-out) both;
+}
+
+.buttonset__face.is-pop .buttonset__icon {
+  animation: buttonset-dip var(--dur-long) var(--ease-out) both;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .buttonset__btn { transition: none; }
   .buttonset__btn:active { transform: none; }
+  .buttonset__face.is-pop .buttonset__label,
+  .buttonset__face.is-pop .buttonset__icon { animation: none; }
 }
+
 .editor__text {
   display: flex;
   flex-direction: column;
