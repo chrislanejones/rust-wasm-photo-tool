@@ -187,7 +187,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
         <a
           className="cta cta--fill nav-pill__cta"
           href={EDITOR_URL}
-          aria-label="Open the demo (Beta)"
+          aria-label="Open the beta"
           {...external}
         >
           Beta
@@ -235,6 +235,15 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
             {p.label}
           </NavLink>
         ))}
+        {/* The primary action, in the menu. On a phone this sheet IS the nav —
+            the pill has room for a burger and little else — so leaving the one
+            thing the site is asking people to do out of it meant closing the
+            menu and hunting for a CTA in the page. It sits after the links and
+            before the source icons: last in reading order because it is the
+            destination, not a section of this site. */}
+        <a className="nav-sheet__cta" href={EDITOR_URL} {...external}>
+          Open the beta
+        </a>
         <p className="nav-sheet__source">{sourceLinks}</p>
       </div>
     </>

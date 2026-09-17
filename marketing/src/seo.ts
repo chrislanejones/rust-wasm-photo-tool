@@ -101,14 +101,14 @@ export const ROUTES: readonly Route[] = [
     label: "Features",
     title: "Features — every tool in the Image Horse photo editor",
     description:
-      "Clone stamp, crop, layers, Bézier pen, text and shapes, background removal, OCR, batch rename, PNG/JPEG/WebP/AVIF export — the full list, grouped and searchable.",
+      "Clone stamp, crop, layers, Bézier pen, text, shapes, background removal, OCR, batch rename and PNG/JPEG/WebP/AVIF export — the full list, searchable.",
     ogImage: "/og/features.png",
     sources: ["marketing/src/pages/Features.tsx", "marketing/src/data/features.ts"],
   },
   {
     to: "/pricing",
     label: "Pricing",
-    title: "Pricing — free with no account, Pro at $10 a month",
+    title: "Image Horse pricing — free with no account, Pro at $10/mo",
     description:
       "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, 4× upscale and 5 GB of originals.",
     ogImage: "/og/pricing.png",
@@ -117,7 +117,7 @@ export const ROUTES: readonly Route[] = [
   {
     to: "/about",
     label: "About",
-    title: "About — who builds Image Horse",
+    title: "About Image Horse — the developer, and the horse",
     description:
       "Image Horse is built by Chris Lane Jones, a web developer in Jacksonville, Florida. This is who works on it, and the horse it is named after.",
     // No `ogImage` yet, for the same reason /blog has none: gen-og-images.mjs

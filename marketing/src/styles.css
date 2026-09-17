@@ -1381,6 +1381,52 @@ a { color: inherit; }
 }
 .nav-sheet[hidden] { display: none; }
 
+/* The sheet arrives instead of appearing. `hidden` is a binary and cannot be
+   transitioned, so the animation runs on the element when it mounts — there is
+   no exit half, which is correct here: a menu that lingers on the way out is a
+   menu that is still covering what you just tapped. */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-sheet:not([hidden]) {
+    animation: nav-sheet-in var(--dur-short) var(--ease-out) both;
+  }
+}
+
+@keyframes nav-sheet-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The primary action, given the weight it has everywhere else on the site.
+   Full width because it is the only thing in this sheet that leaves it, and a
+   48px target rather than the 44px the links use — it is the one control here
+   somebody is reaching for in a hurry. */
+/* ⚠️ `.nav-sheet .nav-sheet__cta`, not `.nav-sheet__cta`. The sibling rule
+   `.nav-sheet a` is (0,1,1) — a class plus an element — and beats a lone class
+   at (0,1,0), so a bare selector here silently inherited the links' 44px and
+   the 48px below never applied. Measured at 44px before this. Same trap as
+   `.person__role` on /about. */
+.nav-sheet .nav-sheet__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: var(--space-2xs) var(--space-xs) 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Beats `.nav-sheet a:hover`, which would otherwise repaint the fill as the
+   sheet's own hover surface and drop the label to body ink. */
+.nav-sheet .nav-sheet__cta:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  filter: brightness(1.08);
+}
+
 .nav-sheet a {
   display: flex;
   align-items: center;
