@@ -175,7 +175,7 @@ describe("pendingShapeType", () => {
   });
 
   it("falls back to the panel when nothing is pending — that is what picks the NEXT shape", () => {
-    expect(pendingShapeType(null, "handCircle")).toBe("handCircle");
+    expect(pendingShapeType(null, "diamond")).toBe("diamond");
     expect(pendingShapeType(undefined, "circle")).toBe("circle");
   });
 

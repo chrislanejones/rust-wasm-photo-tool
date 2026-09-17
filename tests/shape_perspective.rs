@@ -41,7 +41,7 @@ fn new_tool() -> ImageHorseTool {
 /// A red square filling the middle 40×40, stroke 4 so it survives sampling.
 fn add_square(t: &mut ImageHorseTool) -> u32 {
     t.add_shape_annotation(
-        0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     )
 }
 
@@ -175,7 +175,7 @@ fn a_warped_shape_can_still_be_restyled_and_keeps_its_warp() {
     // Exactly what a panel color click does — the same call `shape_recolour`
     // covers, on a shape that now carries a quad.
     assert!(t.update_shape_annotation(
-        id, 0, 20.0, 20.0, 60.0, 60.0, "#00ff00", 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        id, 0, 20.0, 20.0, 60.0, 60.0, "#00ff00", 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     ));
 
     assert_eq!(
@@ -195,7 +195,7 @@ fn resizing_a_warped_shape_keeps_the_same_transform() {
     // transform is unchanged while the pixels it describes are twice as big —
     // storing corners in pixels is what would break here.
     assert!(t.update_shape_annotation(
-        id, 0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        id, 0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     ));
     assert_eq!(stored_quad(&t, id), KEYSTONE.to_vec());
 }
@@ -250,7 +250,7 @@ fn a_circle_warps_too() {
     // pass every test above.
     let mut t = new_tool();
     let id = t.add_shape_annotation(
-        1, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 1, "#ff0000", "#000000", 0, 0,
+        1, 20.0, 20.0, 60.0, 60.0, "#ff0000", 4.0, 0, 1, "#ff0000", "#000000", 0, 0, 0,
     );
     let before = t.render_with_annotations();
     assert!(t.set_shape_perspective(id, &KEYSTONE));
@@ -272,7 +272,7 @@ fn the_stroke_is_not_shaved_off_by_the_tile() {
     // that notices if it stops being applied.
     let mut t = new_tool();
     let id = t.add_shape_annotation(
-        0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 10.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 10.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     let before = red_pixels(&t).len();
     // A gentle shear: the ink barely moves, so a big drop in coverage can only

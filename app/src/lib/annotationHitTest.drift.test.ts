@@ -101,7 +101,10 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // 6769816ca3a09358 → cd6a41ce328a78b2 (2026-08-28): the ring rule for
   // unfilled rect / circle / hand-circle. Port + tests updated FIRST, per the
   // order above.
-  shape_annotation_at: "cd6a41ce328a78b2",
+  // cd6a41ce328a78b2 → 2f58b7e76eb659d0 (2026-09-17): diamond (8) / star (9)
+  // route through an outline-edges test while unfilled, padded bbox when
+  // filled. Port + tests updated FIRST, per the order above.
+  shape_annotation_at: "2f58b7e76eb659d0",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

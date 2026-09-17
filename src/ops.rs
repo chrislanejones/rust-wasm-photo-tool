@@ -123,7 +123,22 @@ use serde::{Deserialize, Serialize};
 /// A v5 document decodes with every shape quad at the identity — "no
 /// perspective", which is exactly what a v5 document meant. Pinned by
 /// `v5_blobs_still_decode_under_v6` and `v5_op_bytes_still_decode_under_v6`.
-pub const OP_FORMAT_VERSION: u8 = 6;
+///
+/// **7** — v8.8x, shape stroke sloppiness: the same move a fifth time, so a
+/// firm-rendered shape can be re-rendered sketchy and survive replay.
+///
+///   * `sloppiness` is `#[serde(skip)]` on [`ShapeParams`] — the wire layout
+///     stays byte-identical to v6's, and the shape-add/edit payloads persisted
+///     since v2 still decode. Its semantic default (0 = firm) equals the
+///     skipped default, so no normalisation step is needed.
+///   * The value rides in an APPENDED variant ([`Op::ShapeSloppiness`]), after
+///     `ShapePerspective`, so no existing variant is renumbered.
+///   * `encode_annotations` gained an EIGHTH tuple element carrying the
+///     per-shape sloppiness, keeping v7 blobs a strict prefix-extension of v6.
+///
+/// A v6 document decodes with every shape firm — exactly what a v6 document
+/// meant.
+pub const OP_FORMAT_VERSION: u8 = 7;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -276,6 +291,18 @@ pub struct ShapeParams {
     pub b: u8,
     pub stroke_width: f64,
     pub arrow_style: u8,
+    /// Stroke sloppiness (0–100): how hand-drawn the outline is.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing for the identical reason it is on
+    /// [`TextParams::perspective`] / our own `perspective` field — read that
+    /// comment. `ShapeAdd`/`ShapeEdit` payloads have been persisted since v2
+    /// and postcard encodes struct fields positionally, so a new field here
+    /// would mis-decode every one already on disk. The value rides instead as
+    /// [`Op::ShapeSloppiness`], appended after [`Op::ShapePerspective`] so no
+    /// existing variant is renumbered. Deserialises to 0 — the "clean / firm"
+    /// default, which is exactly what every pre-sloppiness shape meant.
+    #[serde(skip)]
+    pub sloppiness: u8,
     pub number: u32,
     pub label_kind: u8,
     pub points: Vec<(f64, f64)>,
@@ -357,6 +384,7 @@ impl ShapeParams {
             b: s.b,
             stroke_width: s.stroke_width,
             arrow_style: s.arrow_style,
+            sloppiness: s.sloppiness,
             number: s.number,
             label_kind: s.label_kind,
             points: s.points.clone(),
@@ -390,6 +418,7 @@ impl ShapeParams {
             b: self.b,
             stroke_width: self.stroke_width,
             arrow_style: self.arrow_style,
+            sloppiness: self.sloppiness,
             number: self.number,
             label_kind: self.label_kind,
             points: self.points.clone(),
@@ -539,6 +568,7 @@ pub(crate) fn annotation_sync_ops(
         match log_doc.shapes.iter().find(|p| p.id == s.id) {
             None => {
                 let quad = params.perspective;
+                let sloppiness = params.sloppiness;
                 pending.push(Op::ShapeAdd(params));
                 // The "unset" sentinel is the IDENTITY, not zero —
                 // emitting nothing leaves replay at the identity, which
@@ -546,12 +576,27 @@ pub(crate) fn annotation_sync_ops(
                 if !crate::perspective::is_identity(&quad) {
                     pending.push(Op::ShapePerspective { id: s.id, quad });
                 }
+                // Sloppiness is `#[serde(skip)]`; emit its own appended op the
+                // same way the quad does. 0 (firm) needs no op — a shape
+                // decoded from a v6 keyframe is already firm.
+                if sloppiness != 0 {
+                    pending.push(Op::ShapeSloppiness {
+                        id: s.id,
+                        sloppiness,
+                    });
+                }
             }
             Some(p) => {
                 if p.perspective != params.perspective {
                     pending.push(Op::ShapePerspective {
                         id: s.id,
                         quad: params.perspective,
+                    });
+                }
+                if p.sloppiness != params.sloppiness {
+                    pending.push(Op::ShapeSloppiness {
+                        id: s.id,
+                        sloppiness: params.sloppiness,
                     });
                 }
                 // Compare everything EXCEPT the skipped quad, which the
@@ -671,6 +716,14 @@ pub enum Op {
     /// appending is invisible to every op already on a user's disk and
     /// inserting would renumber all of them.
     ShapePerspective { id: u32, quad: [(f32, f32); 4] },
+    /// v8.8x — a shape's stroke sloppiness (0–100): how hand-drawn its
+    /// outline is. The fifth of the appended family: `#[serde(skip)]` on
+    /// [`ShapeParams::sloppiness`] means `ShapeAdd`/`ShapeEdit` CANNOT carry
+    /// it, and without this op replay rebuilds the shape firm regardless of
+    /// what the user drew — a composite-hash divergence the log then marks
+    /// itself broken over. Reuse the rationale on [`Op::TextWrap`]: appended,
+    /// never inserted, so the variants already on disk keep their indices.
+    ShapeSloppiness { id: u32, sloppiness: u8 },
 }
 
 impl Op {
@@ -705,6 +758,9 @@ impl Op {
             Op::TextPerspective { .. } => "Perspective",
             Op::PerspectiveWarp { .. } => "Perspective",
             Op::ShapePerspective { .. } => "Perspective",
+            // Same reasoning as ShapePerspective: a sloppiness change is a
+            // style decision the user made in the panel, worth its own entry.
+            Op::ShapeSloppiness { .. } => "Edit Shape",
         }
     }
 }
@@ -869,10 +925,15 @@ pub fn encode_annotations(
     // v5 appends the corner quads one element further out again.
     // v6 appends the SHAPE quads, parallel to `shapes` by index — the seventh
     // element, and the same prefix-extension trick for the fourth time.
+    // v7 appends the per-shape SLOOPINESS (0–100), parallel to `shapes` by
+    // index — the eighth element, same trick. `ShapeParams::sloppiness` is
+    // `#[serde(skip)]`, so this tuple is the ONLY place a keyframe carries it:
+    // the op log still mirrors it with `Op::ShapeSloppiness` appended frames.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
     let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
     let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+    let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -881,6 +942,7 @@ pub fn encode_annotations(
         &heights,
         &quads,
         &shape_quads,
+        &shape_sloppiness,
     )) {
         out.extend_from_slice(&body);
     }
@@ -910,6 +972,44 @@ pub fn decode_annotations(
     // out of bytes at the element it never wrote, so the fallback fires and
     // the missing values default to 0 — "size the box to the text" on both
     // axes, which is precisely what a v2 or v3 document meant.
+    type V7 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u8>,
+    );
+    if let Ok((
+        mut texts,
+        mut shapes,
+        canvas,
+        wraps,
+        heights,
+        quads,
+        shape_quads,
+        shape_sloppiness,
+    )) = postcard::from_bytes::<V7>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
+        }
+        for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
+            sp.sloppiness = sl;
+        }
+        return Ok((texts, shapes, canvas));
+    }
     type V6 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -1373,6 +1473,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
                 sp.perspective = *quad;
             }
         }
+        Op::ShapeSloppiness { id, sloppiness } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                sp.sloppiness = *sloppiness;
+            }
+        }
         Op::PerspectiveWarp { rect, quad } => {
             let (w, h) = (doc.width(), doc.height());
             if w == 0 || h == 0 {
@@ -1746,6 +1851,7 @@ mod tests {
             b: 0,
             stroke_width: 2.0,
             arrow_style: 0,
+            sloppiness: 0,
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -1814,6 +1920,10 @@ mod tests {
             Op::TextRemove { id: 1 },
             Op::ShapeAdd(test_shape(2)),
             Op::ShapeRemove { id: 2 },
+            Op::ShapeSloppiness {
+                id: 2,
+                sloppiness: 65,
+            },
             Op::LayerMove {
                 layer: 0,
                 dx: -5,
@@ -2622,6 +2732,7 @@ mod v2_migration_tests {
             b: 7,
             stroke_width: 2.0,
             arrow_style: 0,
+            sloppiness: 0,
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -3003,5 +3114,176 @@ mod v2_migration_tests {
         // And the source rect was moved, not copied: nothing outside the quad
         // keeps the original fill.
         assert_eq!(at(28, 11)[3], 0, "top-right corner must be vacated too");
+    }
+
+    /// A v6 writer emitted `[6] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads))` — the 7-tuple, with no sloppiness.
+    /// Reconstructed byte-for-byte.
+    fn v6_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![6u8];
+        let texts: Vec<TextParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = Vec::new();
+        let heights: Vec<u32> = Vec::new();
+        let quads: Vec<[(f32, f32); 4]> = Vec::new();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts,
+                shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v6_blobs_still_decode_under_v7() {
+        // Fifth iteration of the load-bearing read. v6 blobs hold shapes whose
+        // sloppiness element simply does not exist — they meant "firm", and
+        // that must survive the step.
+        let mut sp = a_shape(3);
+        sp.perspective = a_quad();
+        let (_, shapes, _) = decode_annotations(&v6_annotation_blob(&[sp]))
+            .expect("a v6 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(
+            shapes[0].perspective,
+            a_quad(),
+            "the v6 shape quad survives the step"
+        );
+        assert_eq!(
+            shapes[0].sloppiness, 0,
+            "a v6 document meant 'firm' on its shapes — no sloppiness at all"
+        );
+    }
+
+    #[test]
+    fn v7_round_trips_the_shape_sloppiness() {
+        let mut sp = a_shape(2);
+        sp.sloppiness = 80;
+        let blob = encode_annotations(&[], &[sp], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(shapes[0].sloppiness, 80, "v7 carries the shape sloppiness");
+    }
+
+    #[test]
+    fn v6_op_bytes_still_decode_under_v7() {
+        // Appending `ShapeSloppiness` must not renumber the variants already
+        // on disk — `PerspectiveWarp` was appended last before it, so it is the
+        // one that would break first.
+        for op in [
+            Op::ShapeAdd(a_shape(2)),
+            Op::ShapeRemove { id: 2 },
+            Op::ShapePerspective {
+                id: 2,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+                quad: a_quad(),
+            },
+        ] {
+            let mut v6_bytes = vec![6u8];
+            v6_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v6_bytes)
+                .unwrap_or_else(|e| panic!("v6 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v6 op must mean the same thing under v7");
+        }
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_sloppiness() {
+        // Fifth instance of the measurement: ShapeAdd/ShapeEdit payloads have
+        // been persisted since v2, so sloppiness must not appear on the wire
+        // either — it rides in `encode_annotations` and `Op::ShapeSloppiness`.
+        let a = a_shape(4);
+        let mut b = a_shape(4);
+        b.sloppiness = 100;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "sloppiness must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn shape_sloppiness_op_applies_to_the_right_shape() {
+        let mut doc = Document::new(32, 32);
+        doc.shapes.push(a_shape(1));
+        doc.shapes.push(a_shape(2));
+        apply(
+            &Op::ShapeSloppiness {
+                id: 2,
+                sloppiness: 40,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.shapes[0].sloppiness, 0, "untouched");
+        assert_eq!(doc.shapes[1].sloppiness, 40);
+    }
+
+    #[test]
+    fn a_firm_shape_syncs_no_sloppiness_op() {
+        // `an_unwarped_shape_syncs_no_perspective_op` guards the quad's twin
+        // hazard; this one guards the sloppiness twin. A plain shape must
+        // produce exactly ShapeAdd and nothing else, or every recomposite
+        // grows the log by one op.
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "one ShapeAdd, no sloppiness op: {ops:?}");
+        // Feed it back and the log is now in sync — a second pass must be silent.
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "a synced shape must produce no further ops"
+        );
+    }
+
+    #[test]
+    fn a_sloppy_shape_syncs_its_sloppiness_as_its_own_op() {
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        s.sloppiness = 55;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert!(
+            ops.iter()
+                .any(|o| matches!(o, Op::ShapeSloppiness { id: 9, .. })),
+            "the sloppiness cannot ride on ShapeAdd — it must have its own op: {ops:?}"
+        );
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert_eq!(doc.shapes[0].sloppiness, 55, "replay carries it");
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "and a second pass is silent — the log must not grow on every sync"
+        );
     }
 }

@@ -71,7 +71,7 @@ fn exported_pixels(t: &ImageHorseTool, rgb: [u8; 3]) -> usize {
 /// A blue outlined rectangle, stroke 4 so it survives pixel sampling.
 fn add_blue_rect(t: &mut ImageHorseTool) -> u32 {
     t.add_shape_annotation(
-        0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     )
 }
 
@@ -79,7 +79,7 @@ fn add_blue_rect(t: &mut ImageHorseTool) -> u32 {
 /// produces once the reselected shape's id reaches `commitEdit`.
 fn recolour(t: &mut ImageHorseTool, id: u32, hex: &str) -> bool {
     t.update_shape_annotation(
-        id, 0, 8.0, 8.0, 32.0, 32.0, hex, 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        id, 0, 8.0, 8.0, 32.0, 32.0, hex, 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     )
 }
 

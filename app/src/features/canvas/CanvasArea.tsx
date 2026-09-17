@@ -45,6 +45,14 @@ import type { GridKind, RulerUnit } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
+import type { ShapeName } from "@/lib/types";
+import {
+  diamondVertices,
+  shapeWobbleSeed,
+  sloppyEllipsePoints,
+  sloppyPolylinePoints,
+  starVertices,
+} from "@/lib/shapeSloppiness";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -228,7 +236,10 @@ interface Props {
     strokeColor: string;
     strokeWidth: number;
     arrowStyle: "single" | "double";
-    shape: "rect" | "circle" | "handCircle" | "line";
+    shape: ShapeName;
+    /** Stroke sloppiness 0-100 (how hand-drawn the outline is), read live so
+     *  a panel tweak while the overlay is open immediately rewobbles it. */
+    sloppiness: number;
     fillMode: "none" | "solid" | "gradient" | "pixelate";
     fillColor: string;
     fillColor2: string;
@@ -322,14 +333,17 @@ function arrowGeometry(
 }
 
 /**
- * SVG path for the hand-drawn circle preview — a straight port of the
- * `handCircle` case in `drawShapePreview` (wobbly ellipse with a lead-in
- * tail, deterministic from the bbox coords). `toSX`/`toSY` map canvas
- * coords to screen so the path tracks zoom/pan exactly.
+ * SVG path for the sketchy shape preview (sloppiness > 0). Built from the
+ * same `shapeSloppiness` helpers `drawShapePreview` and the Rust engine use,
+ * so the overlay preview and the committed pixels are the same path
+ * (mirrors `sloppy_polyline_points` / `draw_sloppy_ellipse`, drawing.rs).
+ * `toSX`/`toSY` map canvas coords to screen so the path tracks zoom/pan.
  */
-function handCirclePath(
+function sloppyShapePath(
   from: Point,
   to: Point,
+  shape: ShapeName,
+  sloppiness: number,
   toSX: (x: number) => number,
   toSY: (y: number) => number,
 ): string {
@@ -337,47 +351,60 @@ function handCirclePath(
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const rx = w / 2;
-  const ry = h / 2;
-  const points = 60;
-
-  const startOffset = (from.x * 31.17 + from.y * 47.53) % (Math.PI * 2);
-  const mainArc = Math.PI * 2 - Math.PI * 0.15;
-  const seed = from.x * 31.17 + from.y * 47.53 + to.x * 13.91 + to.y * 67.37;
-
-  const getNoise = (angle: number) =>
-    Math.sin(angle * 2.3 + seed) * 3 +
-    Math.sin(angle * 1.1 + seed * 0.7) * 2 +
-    Math.cos(angle * 3.7 + seed * 1.3) * 1.5;
-
-  const tilt = (((seed * 1000) % 1000) / 1000 - 0.5) * 0.15;
-
-  const d: string[] = [];
-  // Tail
-  const tailLength = Math.PI * 0.3;
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10;
-    const angle = startOffset - tailLength * (1 - t);
-    const noise = getNoise(angle) * t;
-    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-    const inward = (1 - t) * (rx * 0.15);
-    const px = cx + (rx * squeeze - inward + noise) * Math.cos(angle + tilt);
-    const py = cy + (ry / squeeze - inward + noise) * Math.sin(angle + tilt);
-    d.push(`${i === 0 ? "M" : "L"}${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
+  const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
+  let pts;
+  switch (shape) {
+    case "rect":
+      pts = sloppyPolylinePoints(
+        [
+          { x, y },
+          { x: x + w, y },
+          { x: x + w, y: y + h },
+          { x, y: y + h },
+        ],
+        seed,
+        sloppiness,
+        true,
+      );
+      break;
+    case "diamond":
+      pts = sloppyPolylinePoints(
+        diamondVertices(from.x, from.y, to.x, to.y),
+        seed,
+        sloppiness,
+        true,
+      );
+      break;
+    case "star":
+      pts = sloppyPolylinePoints(
+        starVertices(from.x, from.y, to.x, to.y),
+        seed,
+        sloppiness,
+        true,
+      );
+      break;
+    case "line":
+      pts = sloppyPolylinePoints(
+        [
+          { x: from.x, y: from.y },
+          { x: to.x, y: to.y },
+        ],
+        seed,
+        sloppiness,
+        false,
+      );
+      break;
+    case "circle":
+      pts = sloppyEllipsePoints(from, to, sloppiness);
+      break;
   }
-  // Main circle
-  for (let i = 0; i <= points; i++) {
-    const t = i / points;
-    const angle = startOffset + t * mainArc;
-    const noise = getNoise(angle);
-    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-    const px = cx + (rx * squeeze + noise) * Math.cos(angle + tilt);
-    const py = cy + (ry / squeeze + noise) * Math.sin(angle + tilt);
-    d.push(`L${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
-  }
-  return d.join(" ");
+  if (!pts || pts.length === 0) return "";
+  return pts
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${toSX(p.x).toFixed(2)} ${toSY(p.y).toFixed(2)}`,
+    )
+    .join(" ");
 }
 
 /** The canvas cursor for the lit SUB-TOOL.
@@ -1861,6 +1888,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const EP_R = 6; // endpoint-circle radius — screen px
           const strokeW = Math.max(1, eff.strokeWidth * sx);
           const color = eff.strokeColor;
+          // Sketchy outline? Read live so a panel tweak while the overlay is
+          // open immediately rewobbles the preview. Mirrors the engine rule:
+          // 0 → clean strokes, > 0 → the wobbly path generator.
+          const sloppyAmt = eff.sloppiness ?? 0;
+          const sloppy = sloppyAmt > 0;
 
           // Live interior-fill preview. `eff` is the shape's captured style on
           // reselect, or the live panel for a new shape — both carry fill, so
@@ -1966,13 +1998,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
             );
           } else if (shape === "line") {
-            preview = (
+            const strokeLayer = sloppy ? (
+              <path
+                d={sloppyShapePath(start, end, "line", sloppyAmt, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round"
+              />
+            ) : (
               <line
                 x1={toSX(start.x)} y1={toSY(start.y)}
                 x2={toSX(end.x)}   y2={toSY(end.y)}
                 stroke={color} strokeWidth={strokeW} strokeLinecap="round"
               />
             );
+            preview = strokeLayer;
             bodyHit = (
               <line
                 x1={toSX(start.x)} y1={toSY(start.y)}
@@ -1986,39 +2025,77 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const cr = (Math.min(bx1 - bx0, by1 - by0) / 2) * sx;
             const ccx = vx + vw / 2;
             const ccy = vy + vh / 2;
+            // Fill stays a clean ellipse (Rust fills the bbox ellipse under the
+            // stroke even when the outline is sketchy); only the STROKE roams.
+            const fillLayer = (
+              <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} />
+            );
+            const strokeLayer = sloppy ? (
+              <path
+                d={sloppyShapePath(start, end, "circle", sloppyAmt, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            ) : (
+              <circle cx={ccx} cy={ccy} r={cr} fill="none" stroke={color} strokeWidth={strokeW} />
+            );
             preview = (
               <>
                 {gradientDef}
-                <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} stroke={color} strokeWidth={strokeW} />
+                {fillLayer}
+                {strokeLayer}
               </>
             );
             bodyHit = (
               <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
             );
-          } else if (shape === "handCircle") {
-            preview = (
+          } else if (shape === "diamond" || shape === "star") {
+            // Outline-only (the engine fills only kinds 0/1). Firm → clean
+            // polygon over the exact vertex list Rust rasterises; sketchy →
+            // the same vertices pushed through the wobble path generator.
+            const verts =
+              shape === "diamond"
+                ? diamondVertices(start.x, start.y, end.x, end.y)
+                : starVertices(start.x, start.y, end.x, end.y);
+            const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
+            const strokeLayer = sloppy ? (
               <path
-                d={handCirclePath(start, end, toSX, toSY)}
+                d={sloppyShapePath(start, end, shape, sloppyAmt, toSX, toSY)}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round" strokeLinejoin="round"
               />
-            );
-            bodyHit = (
-              <ellipse
-                cx={vx + vw / 2} cy={vy + vh / 2}
-                rx={Math.max(vw / 2, 8)} ry={Math.max(vh / 2, 8)}
-                fill="transparent" {...bodyProps}
+            ) : (
+              <polygon
+                points={pts}
+                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
               />
+            );
+            preview = strokeLayer;
+            bodyHit = (
+              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
             );
           } else {
             // rect
+            const fillLayer = (
+              <rect x={vx} y={vy} width={vw} height={vh} fill={fillAttr} />
+            );
+            const strokeLayer = sloppy ? (
+              <path
+                d={sloppyShapePath(start, end, "rect", sloppyAmt, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            ) : (
+              <rect
+                x={vx} y={vy} width={vw} height={vh}
+                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
+              />
+            );
             preview = (
               <>
                 {gradientDef}
-                <rect
-                  x={vx} y={vy} width={vw} height={vh}
-                  fill={fillAttr} stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
-                />
+                {fillLayer}
+                {strokeLayer}
               </>
             );
             bodyHit = (

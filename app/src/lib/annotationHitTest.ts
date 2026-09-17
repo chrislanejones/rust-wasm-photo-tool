@@ -31,6 +31,8 @@
 // `.rev()`, newest-added wins on overlap — because a disagreement about WHICH
 // annotation was hit is as wrong as disagreeing about whether one was.
 
+import { starVertices } from "./shapeSloppiness";
+
 /** The geometry subset of a text annotation this module needs. */
 export interface TextHitGeometry {
   id: number;
@@ -103,8 +105,10 @@ export function pointSegmentDistance(
  * Port of `shape_annotation_at` (annotations.rs).
  *
  * Kind codes: 2 = line, 4 = arrow (distance to segment); 6 = polyline
- * (distance to any segment). Closed kinds split on whether they are ink all
- * the way through (2026-08-28):
+ * (distance to any segment); 8 = diamond, 9 = star — the outline edges only
+ * while unfilled (a click inside an empty diamond selects whatever is behind
+ * it), padded bbox once filled, matching the engine. Closed kinds split on
+ * whether they are ink all the way through (2026-08-28):
  *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) is a RING — the
  *     padded outline minus the interior shrunk by the same pad, so a click in
  *     its empty middle is a miss and a shape can be drawn inside it;
@@ -123,7 +127,7 @@ export function shapeAnnotationAt(
     let hit: boolean;
     if (s.kind === 2 || s.kind === 4) {
       hit = pointSegmentDistance(x, y, s.x0, s.y0, s.x1, s.y1) <= pad + 4;
-    } else if (s.kind === 6) {
+    } else if (s.kind === 6 && (s.fill_kind ?? 0) === 0) {
       const pts = s.points ?? [];
       hit = false;
       for (let j = 0; j + 1 < pts.length; j++) {
@@ -132,6 +136,43 @@ export function shapeAnnotationAt(
         if (pointSegmentDistance(x, y, a[0], a[1], b[0], b[1]) <= pad + 4) {
           hit = true;
           break;
+        }
+      }
+    } else if ((s.fill_kind ?? 0) === 0 && (s.kind === 8 || s.kind === 9)) {
+      if (s.kind === 8) {
+        const minx = Math.min(s.x0, s.x1);
+        const maxx = Math.max(s.x0, s.x1);
+        const miny = Math.min(s.y0, s.y1);
+        const maxy = Math.max(s.y0, s.y1);
+        const cx = (minx + maxx) * 0.5;
+        const cy = (miny + maxy) * 0.5;
+        const tet: Array<[number, number, number, number]> = [
+          [cx, miny, maxx, cy],
+          [maxx, cy, cx, maxy],
+          [cx, maxy, minx, cy],
+          [minx, cy, cx, miny],
+        ];
+        hit = tet.some(([ax, ay, bx, by]) =>
+          pointSegmentDistance(x, y, ax, ay, bx, by) <= pad + 4,
+        );
+      } else {
+        // Close the loop so the last→first edge is hit-testable too (same as
+        // the engine pushing the first vertex onto the end).
+        const verts = starVertices(s.x0, s.y0, s.x1, s.y1);
+        if (verts.length === 0) {
+          hit = false;
+        } else {
+          const pts = [...verts, verts[0]];
+          hit = false;
+          for (let j = 0; j + 1 < pts.length; j++) {
+            if (
+              pointSegmentDistance(x, y, pts[j].x, pts[j].y, pts[j + 1].x, pts[j + 1].y) <=
+              pad + 4
+            ) {
+              hit = true;
+              break;
+            }
+          }
         }
       }
     } else {

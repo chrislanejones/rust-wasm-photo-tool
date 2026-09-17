@@ -109,6 +109,11 @@ describe("shapeKindLabel", () => {
     expect(shapeKindLabel(1)).toBe("Circle");
   });
 
+  it("names the diamond and star kinds the engine gained", () => {
+    expect(shapeKindLabel(8)).toBe("Diamond");
+    expect(shapeKindLabel(9)).toBe("Star");
+  });
+
   it("falls back to a real word for an unknown kind byte", () => {
     // A new shape kind in the engine must not make the panel say "undefined".
     expect(shapeKindLabel(99)).toBe("Shape");

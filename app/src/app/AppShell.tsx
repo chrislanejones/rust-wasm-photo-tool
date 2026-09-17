@@ -1590,6 +1590,8 @@ export function AppShell() {
       5: "Pin",
       6: "Pen",
       7: "Pen Path",
+      8: "Diamond",
+      9: "Star",
     };
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
@@ -3325,6 +3327,7 @@ export function AppShell() {
                             strokeWidth: toolSettings.strokeWidth,
                             arrowStyle: toolSettings.arrowStyle,
                             shape: toolSettings.shape ?? "rect",
+                            sloppiness: toolSettings.sloppiness ?? 0,
                             fillMode: toolSettings.fillMode,
                             fillColor: toolSettings.fillColor,
                             fillColor2: toolSettings.fillColor2,
@@ -3460,6 +3463,7 @@ export function AppShell() {
                         strokeWidth: toolSettings.strokeWidth,
                         arrowStyle: toolSettings.arrowStyle,
                         shape: toolSettings.shape ?? "rect",
+                        sloppiness: toolSettings.sloppiness ?? 0,
                         fillMode: toolSettings.fillMode,
                         fillColor: toolSettings.fillColor,
                         fillColor2: toolSettings.fillColor2,
