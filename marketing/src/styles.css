@@ -1369,10 +1369,18 @@ a { color: inherit; }
 
 /* ── statement footer ────────────────────────────────────── */
 
+/* The footer is the last row on every page, and it sits on the same lifted
+   panel as .editor and .notes rather than on the ground with a hairline alone:
+   the hairline (--color-rule on --color-paper) measures 1.37:1, and a 1px line
+   at that contrast is the boundary a reader with dyslexia loses first. A plate
+   is an area, not a line, and reads at far lower contrast. Every page's final
+   section (.close, .why, .principle, .fx, .log, .page-head) is on the ground,
+   so the plate is a real edge on all nine pages — no home-only scoping. */
 .foot-stmt {
   display: grid;
   gap: var(--space-lg);
   padding: var(--space-2xl) var(--page-gutter) var(--space-xl);
+  background: var(--color-paper-2);
   border-block-start: var(--rule-hair) solid var(--color-rule);
 }
 
@@ -2863,7 +2871,21 @@ a { color: inherit; }
 
 /* ── the home-page teaser ─────────────────────────────────── */
 
-.notes { padding: 0 var(--page-gutter) var(--space-3xl); }
+/* The same lifted panel as .editor, so the tail of the page alternates
+   ground / panel / ground / panel and every row boundary is a surface edge.
+   Measured before this (09-17, 1280px and 390px): the pixels either side of
+   gpu→notes and notes→close were identical, with 183–192px of bare paper
+   between one row's content and the next's — no boundary at all. .gpu stays
+   on the ground between the two panels on purpose (its own comment says why,
+   and --color-ink-3 on paper-2 is 4.46:1, under AA for the caveat). The three
+   surface declarations mirror .editor's; keep them in step. Bottom padding is
+   the panel's 2xl, not the ground row's 3xl, so the plate is the same object
+   as the editor's. */
+.notes {
+  background: var(--color-paper-2);
+  border-block: var(--rule-hair) solid var(--color-rule);
+  padding: 0 var(--page-gutter) var(--space-2xl);
+}
 /* Tighter than a top-level section head: this one is a signpost inside a long
    page, not the start of a new argument. */
 .notes .head-hang { padding-block: var(--space-2xl) var(--space-lg); }
