@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 import ShotTimeline from "../components/ShotTimeline";
 import ButtonSet from "../components/ButtonSet";
+import CubeLetters from "../components/CubeLetters";
 import { CpuIcon, ListIcon, ServerIcon } from "../components/Icons";
 import { SHOTS } from "../data/shots";
 import { POSTS, fmtPostDate, postPath } from "../data/posts";
@@ -192,6 +193,49 @@ export default function Home() {
               click.
             </p>
           </div>
+        </section>
+
+        {/* The GPU row.
+            Sits between what the editor does and what the blog argues, because
+            it is neither: it is the one measurement on this page that has not
+            shipped yet.
+
+            ⚠️ THE COPY HERE IS DELIBERATELY NOT "BLUR RUNS ON YOUR GPU". The
+            design this came from said exactly that, and the repository says
+            otherwise in its own words — featureFlags.ts calls the WebGPU flag
+            an opt-in that "attaches the GPU blur correctness harness. No pixel
+            in the app goes near the GPU yet", and ADR-030 is still a draft. A
+            home page selling a path no pixel takes is the font dropdown that
+            listed twelve families and rendered one (ADR-051), with a bigger
+            audience.
+
+            So the section sells the measurement, which is real and is better
+            than the vague claim anyway, and the cubes are the honest demo: they
+            ARE drawn by WebGPU when the machine has it, and the label under
+            them says which backend actually ran. */}
+        <section className="gpu" id="gpu" aria-labelledby="gpu-title">
+          <div className="gpu__text">
+            <h2 id="gpu-title" className="section__title section__title--sm">
+              Your GPU does this blur 17× faster.
+            </h2>
+            <p className="lede">
+              Measured against the engine's own SIMD blur on real hardware, not estimated:{" "}
+              <span className="fig">5.3×</span> at 512 pixels, <span className="fig">17.6×</span> at
+              2048, and <span className="fig">53.8×</span> once the radius gets wide. There is no
+              crossover — the GPU wins on a single image.
+            </p>
+            <p className="gpu__caveat">
+              None of it touches a pixel in the editor yet. It sits behind an opt-in flag while the
+              correctness harness runs, because the GPU library does not fit the engine's size
+              budget and the path has to live outside the WebAssembly boundary. When it lands it
+              will be the same picture, sooner.
+            </p>
+            <p className="gpu__hint">
+              The letters are the real thing. Click, drag or press a key — they spring back.
+            </p>
+          </div>
+
+          <CubeLetters />
         </section>
 
         {/* Field notes.
