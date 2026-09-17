@@ -37,5 +37,20 @@ export default {
       domain: "https://amazed-akita-72.clerk.accounts.dev",
       applicationID: "convex",
     },
+    {
+      // PRODUCTION. Clerk app "PhotoHorse", instance
+      // ins_3JSGfNWG1NeBeJxTp0jvaRdF8Hk, domain verified 2026-09-17. This is
+      // the one the cutover moves to, and the only entry here that is not a
+      // development instance.
+      //
+      // Its `convex` JWT template was created the same day, by hand, because
+      // cloning the development instance did NOT carry it — the clone copies
+      // authentication settings and theme, not templates and not users. A
+      // missing template is silent: Clerk's isSignedIn stays true while
+      // useConvexAuth().isAuthenticated never flips, which is the same shape
+      // as the issuer bug this file already documents above.
+      domain: "https://clerk.imagehorse.app",
+      applicationID: "convex",
+    },
   ],
 };
