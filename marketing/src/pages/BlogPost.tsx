@@ -105,7 +105,7 @@ export default function BlogPost() {
             </p>
             <div className="close__actions">
               <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the demo
+                Open the beta
               </a>
               <Link className="cta cta--outline cta--lg" to="/blog">
                 Read the rest

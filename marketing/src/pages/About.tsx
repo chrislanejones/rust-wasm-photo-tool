@@ -1,6 +1,24 @@
 import Footer from "../components/Footer";
+import NajiArabic from "../components/NajiArabic";
 import { PEOPLE } from "../data/people";
 import { EDITOR_URL, external } from "../config";
+
+/* The horse's name in Arabic is an OUTLINED SVG, not text — see
+ * components/NajiArabic.tsx for why (no font on this site covers Arabic, and
+ * adding one spends a third-party download on a single word).
+ *
+ * Swapped in by matching the Arabic run, so `data/people.ts` stays plain
+ * strings and no author has to remember a markup convention. The range is the
+ * Arabic block plus Arabic Supplement / Extended-A.
+ */
+const ARABIC = /([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+(?:\s+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+)*)/g;
+
+function withArabic(text: string) {
+  return text.split(ARABIC).map((part, i) => {
+    ARABIC.lastIndex = 0;
+    return ARABIC.test(part) ? <NajiArabic key={i} /> : part;
+  });
+}
 
 /* /about — who builds this.
  *
@@ -49,7 +67,7 @@ export default function About() {
                 <p className="person__role">{person.role}</p>
 
                 {person.bio.map((para, j) => (
-                  <p key={j}>{para}</p>
+                  <p key={j}>{withArabic(para)}</p>
                 ))}
 
                 {person.links && (
@@ -78,7 +96,7 @@ export default function About() {
             </p>
             <div className="close__actions">
               <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the demo
+                Open the beta
               </a>
             </div>
           </div>

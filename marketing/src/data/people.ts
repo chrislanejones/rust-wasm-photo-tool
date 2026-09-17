@@ -30,10 +30,14 @@ export const PEOPLE: Person[] = [
     id: "chris",
     name: "Chris Lane Jones",
     role: "Builds Image Horse",
-    image: "/Image-Horse-Logo.svg",
-    imageAlt: "",
-    width: 500,
-    height: 500,
+    image: "/chris-and-theo-renderatl.webp",
+    // A photo of two people needs both named — "Chris and a friend" tells a
+    // screen-reader user less than the sighted reader gets from the caption
+    // they can see on the badges.
+    imageAlt:
+      "Chris Lane Jones and Theo Browne at RenderATL, both wearing conference lanyards, in front of a pink-lit wall.",
+    width: 256,
+    height: 256,
     bio: [
       "I build web software, mostly in React and Next.js, and I still take WordPress work. Image Horse started because I wanted to crop and compress a photo without handing it to somebody else's server, and the browser turned out to be capable of far more than that.",
       "I graduated from the University of North Florida in 2013 after three communications internships, and started out editing video. Building my own site was more interesting than the editing, so I changed careers.",
@@ -53,9 +57,14 @@ export const PEOPLE: Person[] = [
       "Naji, a chestnut horse in a blue and patterned halter, standing under a tree in a fenced green pasture and looking straight at the camera.",
     width: 578,
     height: 778,
-    // Deliberately one line. Chris asked for the row now and the words later,
-    // and a placeholder that pretends to be a bio is worse than one that says
-    // what it is. Replace this array when there is something to say.
-    bio: ["Info coming soon."],
+    /* ناجي is Arabic for "survivor", and it is written here in Arabic script
+       because that is the name — the transliteration is the approximation.
+       `lang="ar"` and `dir="rtl"` are set on the span in About.tsx rather
+       than here: a screen reader that is told the language pronounces it,
+       and one that is not reads Arabic letters with an English voice. */
+    bio: [
+      'Naji — ناجي, Arabic for "survivor" — is an Arabian horse.',
+      "He can be ridden, though he does not make it easy. He lives in Louisa, Virginia, and we are hoping to bring him down to Florida.",
+    ],
   },
 ];

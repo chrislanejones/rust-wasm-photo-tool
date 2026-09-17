@@ -178,7 +178,7 @@ export default function Pricing() {
             you for a crop.
           </p>
           <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-            Open the demo
+            Open the beta
           </a>
         </header>
 
