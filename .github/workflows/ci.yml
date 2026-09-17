@@ -255,9 +255,22 @@ jobs:
         if: env.CONVEX_DEPLOY_KEY != ''
         run: node scripts/convex-deploy-check.mjs
 
-      - name: Skipped (no CONVEX_DEPLOY_KEY)
+      # ⚠️ NOT a skip. This job only runs on a push to master, so there is no
+      # legitimate reason for the secret to be missing here — a fork PR never
+      # reaches this job at all.
+      #
+      # It WAS a skip, for one night, and that was worse than useless: the
+      # secret was not set, all three steps above were skipped, and the job
+      # reported SUCCESS while deploying nothing. Prod stayed three modules
+      # short and master's CI said everything was fine. Green because it could
+      # not fail is the exact shape docs/vacuous-checks.md exists to name.
+      - name: Fail if the deploy key is missing
         if: env.CONVEX_DEPLOY_KEY == ''
-        run: echo "Skipping Convex deploy — add the CONVEX_DEPLOY_KEY repo secret to enable."
+        run: |
+          echo "::error::CONVEX_DEPLOY_KEY is not set, so nothing was deployed."
+          echo "Add it as a repository secret (Settings → Secrets and variables → Actions)."
+          echo "Get the value from the Convex dashboard: Settings → Deploy keys → Production."
+          exit 1
 
   uploadthing-leak-guard:
     name: UploadThing secret-leak guard
