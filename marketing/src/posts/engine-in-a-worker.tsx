@@ -12,13 +12,20 @@
  * The two outside citations — Surma's structured-clone benchmark and
  * whatwg/html#4601 — are the only claims here that did not come out of this
  * repository, and both are linked rather than summarised for that reason.
+ *
+ * Five figures. FIG 1, 2 and 4 are WebGL scenes and FIG 5 a DOM timeline,
+ * all in engine-in-a-worker.figures.tsx; FIG 3 is the log-scale bar table
+ * below, built from the data at the top of this file. The scenes load
+ * three.js lazily and only on this page — see figures.tsx for the how.
  */
 
 import type { CSSProperties } from "react";
 
 import { external, repoFile } from "../config";
+import { Queue, Scene } from "./engine-in-a-worker.figures";
+import "./engine-in-a-worker.figures.css";
 
-/* ── FIG 2's data ─────────────────────────────────────────────────────────
+/* ── FIG 3's data ─────────────────────────────────────────────────────────
  * Bytes per postMessage, on a log scale, because a linear axis would render
  * the first three rows as nothing at all — a 4096² layer is a million times a
  * pointer event, and the whole point of the figure is that the small ones are
@@ -115,37 +122,7 @@ export default function EngineInAWorker() {
       </p>
 
       <figure className="post__figure">
-        <div className="boundary">
-          <div className="boundary__plane">
-            <p className="boundary__name">Main thread</p>
-            <ul className="boundary__list">
-              <li>React, pointer input, layout</li>
-              <li>
-                <code>&lt;canvas&gt;</code> — the element stays, the surface is gone
-              </li>
-              <li>No engine. No WASM memory. Nothing to block on.</li>
-            </ul>
-          </div>
-
-          <div className="boundary__seam" aria-hidden="true">
-            <span className="boundary__port">one port</span>
-            <span className="boundary__msg">call &#123; id, method, args &#125; →</span>
-            <span className="boundary__msg">← reply &#123; id, ok, value &#125;</span>
-          </div>
-
-          <div className="boundary__plane boundary__plane--engine">
-            <p className="boundary__name">Engine worker</p>
-            <ul className="boundary__list">
-              <li>
-                <code>stamp_tool</code>, with its own WASM linear memory
-              </li>
-              <li>
-                <code>OffscreenCanvas</code> — the blit lands here, never crosses back
-              </li>
-              <li>One queue, drained one call at a time</li>
-            </ul>
-          </div>
-        </div>
+        <Scene kind="threads" />
         <figcaption className="post__caption post__caption--numbered">
           <span className="post__fignum">FIG 1</span>
           <span>
@@ -219,6 +196,18 @@ export default function EngineInAWorker() {
         </a>
         ). The engine's heap is not a buffer you may move. It is the running program's memory.
       </p>
+
+      <figure className="post__figure">
+        <Scene kind="doors" />
+        <figcaption className="post__caption post__caption--numbered">
+          <span className="post__fignum">FIG 2</span>
+          <span>
+            The three doors, and the wall. Copy duplicates and pays by the byte. Move is instant and
+            leaves the sender detached. Share is one block visible from both sides. WASM memory is
+            chained to its realm — it strains and snaps back.
+          </span>
+        </figcaption>
+      </figure>
 
       {/* The browser-disagreement note is a callout rather than another
           paragraph because it is the one thing here that will bite someone
@@ -342,7 +331,7 @@ export default function EngineInAWorker() {
           </p>
         </div>
         <figcaption className="post__caption post__caption--numbered">
-          <span className="post__fignum">FIG 2</span>
+          <span className="post__fignum">FIG 3</span>
           <span>
             Copying pixels per stroke is off the table before we start. A single HD composite is 810× the
             per-frame clone budget, and transferring is forbidden by the wall above. The pixels cannot
@@ -421,6 +410,19 @@ export default function EngineInAWorker() {
         </tbody>
       </table>
 
+      <figure className="post__figure">
+        <Scene kind="canvas" controls />
+        <figcaption className="post__caption post__caption--numbered">
+          <span className="post__fignum">FIG 4</span>
+          <span>
+            <strong>Yours to drive</strong> — play, scrub, or jump to any of the four beats. The
+            transfer, in four beats. The surface leaves the element and lands beside the engine; from
+            then on pixels flow memory → canvas without leaving the worker, and the only per-frame
+            traffic is a blit message that nobody waits for.
+          </span>
+        </figcaption>
+      </figure>
+
       <p>
         The worker-side blit is the same dozen lines the main thread used to run, and it carries the
         same two warnings. The view has to be rebuilt on every call, because a <code>memory.grow()</code>{" "}
@@ -472,6 +474,19 @@ export default function EngineInAWorker() {
         superseded request can be cancelled before it runs; and a Rust panic comes back as a rejection
         instead of a hang. Those are exactly what the original spike lacked.
       </p>
+
+      <figure className="post__figure">
+        <Queue />
+        <figcaption className="post__caption post__caption--numbered">
+          <span className="post__fignum">FIG 5</span>
+          <span>
+            The gate that could say no. Mutations posted with no await land in the worker's queue in
+            post order and drain one at a time into the op log; a canceled id is rejected, not
+            skipped. Run for real against 16 concurrent mutations, the worker's log came out
+            byte-identical to the local engine's.
+          </span>
+        </figcaption>
+      </figure>
 
       <table className="spec">
         <caption className="spec__caption">

@@ -1,0 +1,385 @@
+/* ── the animated figures of "The engine left the main thread" ────────────
+   Imported by the post file, so these rules ship in the site's one stylesheet
+   but live beside the components they style (engine-in-a-worker.figures.tsx).
+   Everything here is on the tokens; the WebGL side resolves the same tokens
+   at mount. No raw colors.
+
+   Two objects. `.scene` is the framed box a three.js scene renders into — a
+   16:9 canvas, a label layer over it, and for FIG 4 a step caption and a
+   transport bar under it. `.queue` is FIG 5, a DOM timeline with no WebGL.
+   Both are sized by CSS alone, so the prerendered HTML holds the space the
+   scene will take before any script runs.
+*/
+
+/* ── scene ─────────────────────────────────────────────────── */
+.scene {
+  --scene-bar: 65px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.scene__gl {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.scene__slot,
+.scene__canvas,
+.scene__labels {
+  position: absolute;
+  inset: 0;
+}
+
+.scene__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scene__labels {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* A label is pinned to a point in the scene and moved every frame; it is
+   hidden until its first placement so nothing flashes at the origin. Size
+   comes from the scene through a custom property rather than an inline
+   font-size, so the phone rule below can scale it. */
+.scene__label {
+  --label-size: 12px;
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  font-family: var(--font-outlier);
+  font-size: var(--label-size);
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: color-mix(in oklch, var(--color-paper-2) 78%, transparent);
+  max-width: min(46%, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+.scene__label--sans { font-family: var(--font-body); letter-spacing: -0.01em; }
+.scene__label--bare { background: transparent; }
+
+/* FIG 2's row captions hang off the sides of the staging, where the frame
+   leaves only a narrow gutter. Wrapping keeps the whole phrase — an ellipsis
+   through "[[ArrayBufferDetachKey]] · cannot detach" would drop the half that
+   carries the point. */
+.scene__label--wrap {
+  white-space: normal;
+  /* 180px, not 250: the rows recede, so the same world-space anchor projects
+     further toward the frame edge on each one — the nearest row's caption
+     starts 130px left of the farthest's and has that much less room. The cap
+     is sized for the tightest row, which is the only one that can overflow. */
+  max-width: min(22%, 180px);
+  text-wrap: balance;
+  /* Last resort ahead of the ellipsis: a token with no break opportunity that
+     still will not fit is broken rather than truncated. Losing the end of
+     "cannot detach" costs the reader the sentence; a hard break costs them
+     nothing. */
+  overflow-wrap: anywhere;
+}
+
+/* The centered variant: a label over the middle of a slab has the slab's width
+   to spend, not the frame's gutter. */
+.scene__label--wrap-wide { max-width: min(40%, 330px); text-align: center; }
+
+.scene__label--end { text-align: right; }
+.scene__label--ink { color: var(--color-ink); }
+.scene__label--ink2 { color: var(--color-ink-2); }
+.scene__label--ink3 { color: var(--color-ink-3); }
+.scene__label--accent { color: var(--color-accent); }
+.scene__label--accent2 { color: var(--color-accent-2); }
+
+/* FIG 4's step caption: the beat's own sentence, over the bottom of the
+   canvas on a wide screen and in flow beneath it on a phone, where four lines
+   of 13px would cover half the picture. Empty until the scene writes it. */
+.scene__step {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--scene-bar) + 14px);
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-ink);
+  text-wrap: pretty;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--color-paper-2) 85%, transparent);
+}
+
+.scene__step:empty { display: none; }
+
+/* The transport. In flow under the canvas, not floated over it, so the
+   prerendered box already reserves its height and nothing shifts when the
+   buttons arrive. */
+.scene__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--scene-bar);
+  padding: 10px 14px;
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+  background: var(--color-paper-2);
+}
+
+.scene__play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  cursor: pointer;
+  font: 700 13px/1 var(--font-outlier);
+}
+
+.scene__play:hover { border-color: var(--color-accent); }
+
+.scene__scrub {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.scene__steps {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.scene__chip {
+  width: 32px;
+  height: 44px;
+  border: 1px solid var(--color-rule);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-ink-2);
+  cursor: pointer;
+  font: 600 12px/1 var(--font-outlier);
+}
+
+.scene__chip:hover { border-color: var(--color-rule-strong); color: var(--color-ink); }
+
+.scene__chip[aria-current="step"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 14%, transparent);
+}
+
+.scene__readout {
+  flex: 0 0 auto;
+  min-width: 7ch;
+  text-align: right;
+  font: 500 11px/1 var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-2);
+}
+
+.scene__play:focus-visible,
+.scene__chip:focus-visible,
+.scene__scrub:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* No WebGL, or the chunk never arrived. The caption still says what the
+   figure shows; this just stops the box reading as a broken image. */
+.scene__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg);
+  text-align: center;
+  font: 500 13px/1.5 var(--font-outlier);
+  color: var(--color-ink-2);
+  background: repeating-linear-gradient(135deg, transparent 0 14px, var(--color-paper-3) 14px 16px);
+}
+
+@media (max-width: 40rem) {
+  /* A phone gives the scene about a third of the width it was composed for,
+     and a 16:9 box at 335px is 189px tall — too little for the staging to
+     read. 4:3 buys back a third of the height at no cost to the layout. */
+  .scene__gl { aspect-ratio: 4 / 3; }
+
+  .scene__label { font-size: calc(var(--label-size) * 0.85); padding: 2px 5px; }
+
+  /* The annotations come off. Twelve 11px labels pinned to a 335px frame
+     overlap into an unreadable pile — worse than no labels, because it reads
+     as broken rather than as a diagram. The headings stay, the picture stays,
+     and the figcaption below says everything the annotations did. It is
+     `!important` because the scene writes `display` inline on these elements
+     every frame as the beats turn them on and off, and an inline style beats
+     an ordinary rule. */
+  .scene__label--minor { display: none !important; }
+
+  .scene__step {
+    position: static;
+    margin: var(--space-xs) var(--space-sm) 0;
+  }
+  .scene__bar { flex-wrap: wrap; }
+  /* The scrubber takes its own row so the buttons keep their 44px targets. */
+  .scene__scrub { order: -1; flex-basis: 100%; }
+}
+
+/* ── queue ─────────────────────────────────────────────────── */
+.queue {
+  position: relative;
+  width: 100%;
+  min-height: 340px;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  font-family: var(--font-body);
+}
+
+/* Three column heads on the design's 30/30/32 grid with 4% gutters. A grid
+   rather than three absolutes so the block has a height the timeline can
+   measure and start below — the heads wrap to three lines on a phone. */
+.queue__head {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 30% 30% 32%;
+  column-gap: 4%;
+}
+
+.queue__col {
+  padding: 0 10px;
+  font: 700 13px/1.3 var(--font-body);
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.queue__col--worker { color: var(--color-accent); }
+
+.queue__sub {
+  display: block;
+  margin-block-start: 2px;
+  font: 500 11px/1.4 var(--font-outlier);
+  letter-spacing: 0.04em;
+  color: var(--color-ink-3);
+}
+
+.queue__seam {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  border-inline-start: 1px dashed var(--color-rule-strong);
+}
+
+.queue__seam--a { left: 32%; }
+.queue__seam--b { left: 66%; }
+
+.queue__boundary {
+  position: absolute;
+  left: 32%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  padding: 2px 6px;
+  font: 500 10px/1 var(--font-outlier);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  background: var(--color-paper-2);
+}
+
+.queue__chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 62px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 6px;
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  font: 600 11px/1 var(--font-outlier);
+  letter-spacing: 0.02em;
+  opacity: 0;
+  will-change: transform;
+}
+
+.queue__chip[data-cancel] { width: 88px; }
+
+.queue__key { color: var(--color-ink-3); }
+.queue__x { display: none; color: var(--color-accent-2); }
+.queue__done { display: none; }
+
+/* The canceled id: flagged while it waits, then rejected at the log. */
+.queue__chip[data-state="flagged"] .queue__x { display: inline; }
+.queue__chip[data-state="done"] .queue__key,
+.queue__chip[data-state="done"] .queue__num,
+.queue__chip[data-state="done"] .queue__x { display: none; }
+.queue__chip[data-state="done"] .queue__done { display: inline; }
+
+.queue__chip[data-phase="queued"] { background: var(--color-paper-4); }
+
+/* Landed. --color-grid-1 is the design's appended tint exactly (oklch 34%
+   0.07 48); the rejected tint is the same idea on the second accent. */
+.queue__chip[data-phase="logged"] {
+  background: var(--color-grid-1);
+  border-color: var(--color-accent);
+}
+
+.queue__chip[data-phase="rejected"] {
+  background: color-mix(in oklch, var(--color-accent-2) 22%, var(--color-paper-2));
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-2);
+}
+
+.queue__foot {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  justify-content: space-between;
+  font: 500 12px/1.4 var(--font-outlier);
+  letter-spacing: 0.02em;
+  color: var(--color-ink-2);
+}
+
+.queue__sha { color: var(--color-accent); }
+.queue__sha:empty { display: none; }
+
+@media (max-width: 40rem) {
+  /* Three columns in 335px leave each heading about 87px of text width, and
+     "OpLog::append" needs 95 at 13px — it ran into the frame edge. A rung down
+     on both lines buys the fit; the timeline below is unchanged. */
+  .queue__col { padding: 0 6px; font-size: 11px; }
+  .queue__sub { font-size: 10px; }
+  .queue__foot { font-size: 11px; }
+}
