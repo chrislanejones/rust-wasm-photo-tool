@@ -1,10 +1,9 @@
 // Settings → Dev Tests. A small harness to open dialogs in isolation so they
 // can be previewed/tweaked without having to trigger their real conditions
-// (an actual idle timeout, or a returning anonymous session).
+// (an actual idle timeout).
 import { useState } from "react";
-import { MonitorPause, RotateCcw } from "lucide-react";
+import { MonitorPause } from "lucide-react";
 import { IdleScreenDialog } from "@/components/IdleScreenDialog";
-import { ResumeDialog } from "@/components/ResumeDialog";
 
 // Declared at module scope, not inside DevTestsPane: a component defined during
 // render gets a fresh type identity every render, so React unmounts and remounts
@@ -32,7 +31,6 @@ const Row = ({
 
 export function DevTestsPane() {
   const [idleOpen, setIdleOpen] = useState(false);
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -50,26 +48,12 @@ export function DevTestsPane() {
           label="Idle Screen"
           onClick={() => setIdleOpen(true)}
         />
-        <Row
-          icon={RotateCcw}
-          label="Welcome Back"
-          onClick={() => setWelcomeOpen(true)}
-        />
       </div>
 
       <IdleScreenDialog
         open={idleOpen}
         dismissible
         onContinue={() => setIdleOpen(false)}
-      />
-      <ResumeDialog
-        open={welcomeOpen}
-        dismissible
-        className="bg-black text-zinc-100"
-        photos={[]}
-        onResume={() => setWelcomeOpen(false)}
-        onStartFresh={() => setWelcomeOpen(false)}
-        onClose={() => setWelcomeOpen(false)}
       />
     </div>
   );
