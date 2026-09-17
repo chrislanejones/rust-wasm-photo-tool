@@ -170,8 +170,14 @@ consistent with demo mode being the default path.
 
 ## 4. ⚠️ STOP CONDITION HIT — undo is not durable
 
-**This outranks the sync plan, and it is not a sync bug. It is live on
-production today.**
+> **RESOLVED 09-16 by PR #161 (`2e6c5f32`), after this section was written.**
+> The gate this section raises is cleared and sync work may proceed. The
+> section is kept as written, because the reasoning below is what found the
+> bug and one paragraph of it turned out to be wrong — see *What actually
+> fixed it* at the end.
+
+**This outranks the sync plan, and it is not a sync bug. It was live on
+production when this was written.**
 
 PARKING_LOT's flush-path entry says *"Undo still shows the right pixels, so
 nothing is lost."* That is true **within a session** and false **across a
@@ -231,6 +237,37 @@ disagreeing with the user instead of one.
 **This has to be fixed and covered by a test before any sync code is written.**
 It is also worth fixing regardless of sync: it is silent, it is on production
 now, and it costs the user work they explicitly asked to discard.
+
+### What actually fixed it — and the paragraph above that was wrong
+
+PR **#161** (`2e6c5f32`), merged 09-16. Both conditions are met: fixed, and
+covered by a test that fails against the old rule.
+
+⚠️ **"Why the debounce does not explain it" reasons from a false premise.** It
+argues the early return cannot be the cause because `hasBeenModified` is still
+true after an undo. A probe said otherwise: `hasBeenModified` read **false**
+during editing, so the early return *was* the cause. The lesson is the one this
+audit keeps finding — take the observation, do not reason about the code from
+a comment.
+
+The dirty rule had no way to tell *edited back to where it was saved* from
+*never edited*. Undoing to zero made `undoCount === 0`, the session read as
+clean, and no write was asked for. The fix compares against the undo count at
+the moment of the last successful write:
+
+| | Old rule | New rule |
+|---|---|---|
+| Never edited | clean | clean |
+| Edited, unsaved | dirty | dirty |
+| **Undone back to zero after a save** | **clean — the bug** | **dirty** |
+
+`app/src/lib/dirtyRule.test.ts` pins it in 11 cases; reverting the old rule
+turns **3** of them red. The count is captured *before* the `await`, so a save
+that lands late cannot record a number the session has already moved past.
+
+**For sync this matters more than it looks.** The archive is now consistent
+with what the user sees, which is the precondition for replicating the archive
+rather than the screen. Without it, §"What it means for sync" above stands.
 
 ---
 
