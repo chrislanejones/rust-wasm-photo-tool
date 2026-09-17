@@ -58,6 +58,15 @@
   --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
   --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
 
+  /* Long-form reading, and only that. --text-base is sized for prose that sits
+     beside controls and gets scanned; an article is read start to finish, and
+     at 16px/1.55 a 68-character line asks the eye to track further than it
+     comfortably can for ten minutes. These two are referenced by .post and
+     nothing else — a page of UI copy that reaches for them is a page that
+     should have been an article. */
+  --text-prose:    1.125rem;
+  --leading-prose: 1.7;
+
   --leading-display: 1.0;
   --leading-tight:   1.05;
   --leading-snug:    1.25;

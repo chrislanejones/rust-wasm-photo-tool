@@ -1,8 +1,14 @@
 // The site's icons, in one place.
 //
-// Inlined as components rather than pulled from an icon package: there are nine
-// of them, they never change, and a dependency to draw nine paths is a
+// Inlined as components rather than pulled from an icon package: there are a
+// couple of dozen, they never change, and a dependency to draw a few paths is a
 // dependency to keep patched forever.
+//
+// The six below — brush, wand, crop, resize, undo, export — are the editor's
+// own tool glyphs, drawn to match `lucide-react`'s versions in the app so the
+// button set on the home page reads as the same software, not an approximation
+// of it. They are the only icons here that exist to depict the product rather
+// than to label this site.
 
 interface IconProps {
   size?: number;
@@ -170,6 +176,71 @@ export function BurgerIcon() {
         <line x1="6" y1="6" x2="18" y2="18" />
         <line x1="6" y1="18" x2="18" y2="6" />
       </g>
+    </svg>
+  );
+}
+
+export function BrushIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08" />
+      <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" />
+    </svg>
+  );
+}
+
+export function WandIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="m3 21 9-9" />
+      <path d="M15 4V2" />
+      <path d="M15 16v-2" />
+      <path d="M8 9h2" />
+      <path d="M20 9h2" />
+      <path d="M17.8 11.8 19 13" />
+      <path d="M15 9h.01" />
+      <path d="M17.8 6.2 19 5" />
+      <path d="m11 13 1.2-1.2" />
+      <path d="M11 5l1.2 1.2" />
+    </svg>
+  );
+}
+
+export function CropIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+      <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+    </svg>
+  );
+}
+
+export function ResizeIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M15 3h6v6" />
+      <path d="M9 21H3v-6" />
+      <path d="M21 3l-7 7" />
+      <path d="M3 21l7-7" />
+    </svg>
+  );
+}
+
+export function UndoIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M3 7v6h6" />
+      <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+    </svg>
+  );
+}
+
+export function ExportIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...line(size)} className={className}>
+      <path d="M12 3v12" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     </svg>
   );
 }

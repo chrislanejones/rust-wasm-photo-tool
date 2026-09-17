@@ -2939,3 +2939,23 @@ duplication the export exists to prevent — or it is not computing it at all.
 
 Not fixed here because it is another feature's decision, and because the gate
 that should have caught it cannot — see `docs/vacuous-checks.md`.
+
+---
+
+## The long-form date formatter is written twice
+
+`fmtDate` in `marketing/src/pages/Trail.tsx` and `fmtPostDate` in
+`marketing/src/data/posts.ts` are the same eight lines: parse `YYYY-MM-DD` off
+the string and render `13 August 2026`. Both parse from the string rather than
+through `new Date(iso)` on purpose — a bare ISO date is read as UTC midnight and
+rendered in the reader's local zone, so anyone west of Greenwich sees a release
+land a day early — and that reasoning is now also written out twice.
+
+**Left duplicated deliberately.** The blog session's scope was the blog, and
+`posts.ts` has to stay importable by `seo.ts` (which the prerender loads under
+Node), so the shared home is a new module rather than either existing file. Two
+copies with a pointer comment is not yet worth a third file.
+
+**Do it when a third caller appears** — that is the point at which "they might
+drift" stops being hypothetical. `marketing/src/lib/date.ts` is the obvious
+home; `lib/` already exists for `analytics.ts`.

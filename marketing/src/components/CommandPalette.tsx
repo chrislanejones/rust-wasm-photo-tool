@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EDITOR_URL, GITHUB_URL, CODEBERG_URL } from "../config";
 import { FEATURES } from "../data/features";
+import { POSTS, postPath } from "../data/posts";
 import { featureSlug } from "../data/featureIcons";
 import { SearchIcon } from "./Icons";
 
@@ -36,6 +37,7 @@ interface Item {
 const ITEMS: Item[] = [
   { group: "Pages", label: "Home", hint: "The engine, and what runs where", href: "/", kind: "route" },
   { group: "Pages", label: "Architecture", hint: "The two planes, and the seam between them", href: "/architecture", kind: "route" },
+  { group: "Pages", label: "Blog", hint: "Why it is built the way it is", href: "/blog", kind: "route" },
   { group: "Pages", label: "Features", hint: "The whole list — engine and interface", href: "/features", kind: "route" },
   { group: "Pages", label: "Pricing", hint: "Three tiers, and the access matrix", href: "/pricing", kind: "route" },
   { group: "Pages", label: "Trail Log", hint: "Every release, and the commits behind them", href: "/trail-log", kind: "route" },
@@ -48,6 +50,19 @@ const ITEMS: Item[] = [
   { group: "Open", label: "Open the demo", hint: "No account, no upload", href: EDITOR_URL, kind: "external" },
   { group: "Open", label: "Source on GitHub", hint: "chrislanejones/rust-wasm-photo-tool", href: GITHUB_URL, kind: "external" },
   { group: "Open", label: "Source on Codeberg", hint: "chrislanejones/rust-wasm-photo-tool", href: CODEBERG_URL, kind: "external" },
+
+  // Every post, derived from data/posts.ts for the same reason the features
+  // below are derived from features.ts: a hand-typed entry per post is an entry
+  // that goes stale the first time a headline is edited, and a post that can be
+  // found here but not on /blog is worse than one that cannot be found at all.
+  ...POSTS.map((post) => ({
+    group: "Blog",
+    label: post.headline,
+    hint: post.deck.length > 96 ? `${post.deck.slice(0, 95).trimEnd()}…` : post.deck,
+    href: postPath(post),
+    kind: "route" as const,
+    search: `${post.deck} ${post.tag} ${post.version ?? ""}`,
+  })),
 
   // Every feature on /features, deep-linked to its own anchor. Grouped by the
   // same two headings the page uses, so a search for "clone stamp" or "pen"

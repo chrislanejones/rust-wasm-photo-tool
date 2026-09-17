@@ -37,4 +37,16 @@ export function render(url: string): string {
  * seo.ts into a .mjs script directly is not an option (it is TypeScript), and
  * hand-maintaining a parallel JS copy is the drift this whole arrangement is
  * built to prevent. */
-export { ROUTES, headTagsFor, robotsTxt, sitemapXml, SITE_URL, NOT_FOUND_HEAD } from "./seo";
+export {
+  ROUTES,
+  headTagsFor,
+  postHeadTagsFor,
+  robotsTxt,
+  sitemapXml,
+  SITE_URL,
+  NOT_FOUND_HEAD,
+} from "./seo";
+
+/* The posts, for the same reason as ROUTES: prerender.mjs writes one file per
+ * post and needs the list, and the list is TypeScript. */
+export { POSTS, postPath } from "./data/posts";

@@ -909,11 +909,183 @@ a { color: inherit; }
 /* on a solid panel the hairline frame is enough — no cast shadow (it would read
    as a card floating inside a card) */
 .editor__shot { margin: 0; width: 100%; }
-.editor__shot img {
+
+/* ── about: one row per person ────────────────────────────────────────────
+   The same two-column shape as .editor, alternating sides so the page has a
+   rhythm rather than a left rail of portraits. `.person--flip` swaps the order
+   via grid placement, NOT `direction: rtl` or a reversed source order: the
+   reading order has to stay name-then-bio for a screen reader and for anyone
+   tabbing, and only the visual columns should move.
+
+   Collapses at 60rem, the breakpoint the rest of this stylesheet already uses.
+   On one column the portrait goes first for everybody, because an alternating
+   stack reads as a mistake once the columns are gone. */
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+  padding-inline: var(--page-gutter);
+  padding-block-end: var(--space-2xl);
+}
+
+.person {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+/* ⚠️ THE COLUMN SIZES HAVE TO SWAP WITH THE CONTENT, not just the placement.
+   Moving the portrait to column 2 while the track sizes stay
+   `20rem 1fr` puts it in the WIDE column and squeezes the prose into the
+   narrow one — Naji's row rendered with a portrait four times the size of
+   Chris's and "Info coming soon" in a 20rem gutter. The portrait track is
+   20rem on whichever side it lands. */
+.person--flip { grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); }
+.person--flip .person__shot { grid-column: 2; grid-row: 1; }
+.person--flip .person__text { grid-column: 1; grid-row: 1; }
+
+.person__shot { margin: 0; }
+
+.person__shot img {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 832 / 859;
+  border-radius: var(--radius-md);
+}
+
+.person__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: var(--measure);
+}
+
+.person__name {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  margin: 0;
+}
+
+/* The role sits under the name and is the only thing on the page set in the
+   mono face — it is a label, not a sentence, and the face is how the site
+   already marks that difference (.postcard__date, .spec captions). */
+.person__role {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0;
+}
+
+/* :not() excludes the role — `.person__text p` (0,1,1) would otherwise beat
+   `.person__role` (0,1,0) on specificity and repaint the accent line as body
+   ink. It measured 10.03:1 instead of the accent's value, which passes
+   contrast and so would never have been caught by a gate; it was only visible
+   as a gray line where an amber one was specified. */
+.person__text p:not(.person__role) { color: var(--color-ink-2); margin: 0; }
+
+.person__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person__links a {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.person__links a:hover { color: var(--color-accent); }
+
+@media (max-width: 60rem) {
+  .person { grid-template-columns: 1fr; gap: var(--space-lg); }
+  /* Undo the flip: with one column an alternating order is just inconsistent. */
+  .person--flip .person__shot,
+  .person--flip .person__text { grid-column: 1; grid-row: auto; }
+  .person__shot { max-width: 20rem; }
+}
+
+/* ── the button set ───────────────────────────────────────────────────────
+   Eight of the editor's controls, as real buttons. Replaced an 832x859 WebP
+   on 09-16; the aspect-ratio rule that reserved space for that image went with
+   it, because this grid has an intrinsic height and needs no placeholder.
+
+   The three states mirror the app's own `ToolButton` rather than approximating
+   it: idle is a muted surface on a plain border, hover lifts the ink, and
+   pressed takes the accent on all three of border, tint and glyph. The app
+   writes those as Tailwind utilities against the same design tokens this site
+   uses, so the values agree without sharing a stylesheet. */
+.buttonset {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.buttonset__btn {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--color-rule) 25%, transparent);
+  color: var(--color-ink-3);
+  cursor: pointer;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-micro) var(--ease-out);
+}
+
+.buttonset__btn:hover {
+  color: var(--color-ink);
+  background: color-mix(in oklch, var(--color-rule) 40%, transparent);
+}
+
+/* The ring is on `aria-pressed`, not on a class, so the thing a screen reader
+   is told and the thing a sighted reader sees cannot drift apart — there is
+   one source for "this one is selected" and both readings come from it. */
+.buttonset__btn[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-accent) 45%, transparent);
+}
+
+/* Keyboard focus. This site has no global :focus-visible rule — every
+   component declares its own against --color-focus (.skip, .nav-pill__mark,
+   .seg) — so omitting it here does not fall back to something sensible: it
+   falls back to the UA default, which measured as a 1px rgb(16,16,16) outline
+   on this near-black surface. Invisible, on a control that is only reachable
+   by keyboard for some readers.
+
+   outline-offset is positive, unlike .seg's -2px: that one sits inside a group
+   with overflow clipping and these are free-standing tiles, so the ring can
+   breathe outside the border where it is easiest to see. */
+.buttonset__btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Held down. A press that only changes state on release feels like a picture
+   of a button, which is what this used to be. */
+.buttonset__btn:active { transform: translateY(1px); }
+
+.buttonset__icon { width: 45%; height: 45%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .buttonset__btn { transition: none; }
+  .buttonset__btn:active { transform: none; }
 }
 .editor__text {
   display: flex;
@@ -2266,6 +2438,588 @@ a { color: inherit; }
   padding-block: var(--space-3xl);
   color: var(--color-ink-2);
   text-align: center;
+}
+
+/* ── the blog ──────────────────────────────────────────────────────────────
+ * Two surfaces, and they share a card.
+ *
+ *   .postlist / .postcard   the index (/blog) and the three-post teaser on the
+ *                           home page — the SAME card at both sizes, because
+ *                           they are the same object and a bespoke home-page
+ *                           variant is two things to keep in step for nothing.
+ *   .post-head / .post      one article.
+ *
+ * The card is laid out on the Trail Log's grid — a dated meta column, then the
+ * writing. Not reuse for its own sake: /trail-log and /blog answer the same
+ * question in two registers, and a reader who has scanned one should not have
+ * to learn a second layout to scan the other.
+ */
+
+.postlist { padding: 0 var(--page-gutter) var(--space-3xl); }
+
+.postlist__count {
+  padding-block-end: var(--space-md);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.postlist__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.postcard {
+  display: grid;
+  /* Same two tracks as .release. minmax(0, …) on both, never a bare 1fr: the
+     right-hand track holds a headline that can carry a long unbroken token, and
+     a bare 1fr refuses to shrink below its content and pushes the page wide. */
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  gap: var(--space-md) var(--space-xl);
+  padding-block: var(--space-xl);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+}
+.postcard:first-child { border-block-start: 0; }
+
+.postcard__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--space-2xs);
+}
+
+.postcard__date {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.postcard__version {
+  font-family: var(--font-outlier);   /* outlier slot: a version is a figure */
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.postcard__latest {
+  margin-block-start: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: var(--rule-hair) solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--color-accent);
+}
+
+.postcard__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  /* A headline is the one place a long unbroken token is likely, and at this
+     size one is enough to push a phone sideways. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+  margin-block-end: var(--space-sm);
+}
+
+/* The whole heading is the target, so there is no "Read more" underneath it
+   giving one destination two links. The underline is drawn at rest rather than
+   only on hover — color alone is not an affordance, and a heading that is
+   sometimes a link and sometimes not is exactly where that matters. */
+.postcard__title a {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+  text-decoration-color: var(--color-rule-strong);
+  transition:
+    color var(--dur-short) var(--ease-out),
+    text-decoration-color var(--dur-short) var(--ease-out);
+}
+.postcard__title a:hover {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
+}
+.postcard__title a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.postcard__deck {
+  color: var(--color-ink-2);
+  max-width: 68ch;
+  line-height: var(--leading-body);
+}
+
+.postcard__tags { margin-block-start: var(--space-md); }
+
+/* ── the home-page teaser ─────────────────────────────────── */
+
+.notes { padding: 0 var(--page-gutter) var(--space-3xl); }
+/* Tighter than a top-level section head: this one is a signpost inside a long
+   page, not the start of a new argument. */
+.notes .head-hang { padding-block: var(--space-2xl) var(--space-lg); }
+
+.notes__more { padding-block-start: var(--space-lg); }
+.notes__more a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.notes__more a:hover { text-decoration: underline; }
+.notes__more a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ── one article ──────────────────────────────────────────── */
+
+.post-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  /* Same clearance expression as .hero and .page-head, so an article's headline
+     starts at the height every other page's does. */
+  padding: calc(var(--banner-height) + var(--space-2xl)) var(--page-gutter) var(--space-xl);
+  /* clip, never hidden: `hidden` on an ancestor silently turns every
+     scroll-into-view on the page into a scroll of THIS box. */
+  overflow: clip;
+}
+
+/* The warm cast behind the headline. Two offset radial stops rather than one,
+   so it reads as light falling across the corner instead of a circle sitting
+   behind the text — and mixed down hard, because this sits under body copy and
+   a bloom you can name is a bloom that is too strong. */
+.post-head__bloom {
+  position: absolute;
+  z-index: 0;
+  inset-block-start: -40%;
+  inset-inline-start: -10%;
+  inline-size: 85%;
+  block-size: 150%;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      55% 50% at 30% 40%,
+      color-mix(in oklch, var(--color-bloom-1) 20%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 45% at 78% 18%,
+      color-mix(in oklch, var(--color-bloom-2) 16%, transparent),
+      transparent 70%
+    );
+  filter: blur(50px);
+}
+
+/* The bloom is a sibling of the text, not a parent, so the text has to be
+   lifted over it explicitly — a z-index:-1 on the bloom would put it behind
+   the page background instead. */
+.post-head__up,
+.post-head__title,
+.post-head__deck,
+.post-head__meta {
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.post-head__up { font-size: var(--text-sm); }
+.post-head__up a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  /* A real link to the index, not a history step — this page is reachable from
+     a search result, where there is nothing behind it. */
+  padding-block: var(--space-xs);
+  color: var(--color-ink-2);
+  text-decoration: none;
+}
+.post-head__up a::before {
+  content: "←";
+  color: var(--color-accent);
+}
+.post-head__up a:hover { color: var(--color-ink); }
+.post-head__up a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.post-head__title {
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  /* Headlines here run to two sentences, so the measure is set for three lines
+     of display type rather than the one --page-head allows. */
+  max-width: 22ch;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.post-head__deck {
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  color: var(--color-ink-2);
+  max-width: 52ch;
+}
+
+.post-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.post-head__sep { color: var(--color-rule-strong); }
+.post-head__version {
+  font-family: var(--font-outlier);
+  color: var(--color-accent);
+}
+
+/* ── the body ─────────────────────────────────────────────── */
+
+.post {
+  padding: 0 var(--page-gutter) var(--space-2xl);
+  font-size: var(--text-prose);
+  line-height: var(--leading-prose);
+  color: var(--color-ink-2);
+}
+
+/* The measure is on the text, not on the article: a figure and a table are
+   read by scanning rather than by tracking a line, and holding them to 65
+   characters wastes the width they need. */
+.post > p,
+.post > h2,
+.post > h3,
+.post > ul,
+.post > ol,
+.post > blockquote {
+  max-width: var(--measure);
+}
+
+.post p { margin-block-end: var(--space-lg); }
+.post > :last-child { margin-block-end: 0; }
+
+.post h2 {
+  margin-block: var(--space-2xl) var(--space-md);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  /* Roman, always. An italicised heading is the most reliable tell there is. */
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.post code {
+  font-family: var(--font-outlier);
+  /* em, not a token: this has to track whatever size it is sitting in — body
+     copy, a table cell, or a figure caption — and a fixed rung would be right
+     in exactly one of the three. */
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.post a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in oklch, var(--color-accent) 45%, transparent);
+  transition: text-decoration-color var(--dur-short) var(--ease-out);
+}
+.post a:hover { text-decoration-color: currentColor; }
+.post a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Italic survives here and only here — as emphasis inside running copy. */
+.post em { color: var(--color-ink); }
+.post strong { color: var(--color-ink); font-weight: 700; }
+
+/* The receipts line, between the deck and the argument. */
+.post__sourcenote {
+  margin-block-end: var(--space-2xl);
+  padding-block-end: var(--space-lg);
+  border-block-end: var(--rule-hair) solid var(--color-rule);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+  max-width: var(--measure);
+}
+
+.post__figure { margin: var(--space-xl) 0; }
+
+/* ── quotations ───────────────────────────────────────────────────────────
+   Two jobs, one object. `.post__quote` is someone else's sentence, cited to
+   the file it came from. `--pull` is the post's own, lifted out of a paragraph
+   because it is the line a reader should leave with.
+
+   The rule is on the INLINE-START edge rather than a pair of oversized curly
+   quotes: a quotation mark glyph is decoration that has to be hidden from a
+   screen reader to avoid being read aloud, and the <blockquote> element has
+   already said what this is. The rule says it visually and says nothing twice.
+
+   No italics. The body face is set for long reading and its italic is a
+   different color of ink at this size; a three-line quote in italic is
+   measurably slower to read than the paragraph it interrupts, which is the
+   opposite of what pulling it out was for. */
+.post__quote {
+  margin: var(--space-xl) 0;
+  padding-inline-start: var(--space-lg);
+  border-inline-start: 2px solid var(--color-rule-strong);
+  color: var(--color-ink-2);
+}
+
+.post__quote p {
+  font-size: var(--text-prose);
+  line-height: var(--leading-prose);
+  margin: 0;
+}
+
+.post__quote-cite {
+  display: block;
+  margin-block-start: var(--space-sm);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-style: normal;
+  color: var(--color-ink-3);
+}
+
+.post__quote-cite a { color: inherit; }
+.post__quote-cite a:hover { color: var(--color-accent); }
+
+/* The pull-quote is the post's own voice, so it takes the accent rule and the
+   brighter ink the figures use — it is a signpost, not a citation. Kept at the
+   same measure as the body rather than allowed to bleed into the margin: this
+   column is already narrow enough that a wider quote would be the widest thing
+   on the page and read as a heading. */
+.post__quote--pull {
+  border-inline-start-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.post__quote--pull p { font-size: var(--text-xl); line-height: var(--leading-snug); }
+
+
+.post__caption {
+  margin-block-start: var(--space-md);
+  max-width: var(--measure);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+/* The spec sheet is the site's own table; an article just needs it to breathe,
+   and to be scrollable rather than page-widening on a phone. */
+.post .spec { margin-block: var(--space-xl); }
+.post .spec__caption { margin-block-end: var(--space-md); }
+
+/* ── the thread boundary ──────────────────────────────────────
+ * Two planes and the seam between them, which is the post's whole argument in
+ * one picture: pixels never cross, only calls and replies do. The engine plane
+ * carries the accent because it is the side that moved.
+ */
+
+.boundary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+.boundary__plane {
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  padding: var(--space-lg);
+}
+.boundary__plane--engine {
+  border-color: color-mix(in oklch, var(--color-accent) 45%, var(--color-rule-strong));
+  background: color-mix(in oklch, var(--color-accent) 7%, var(--color-paper-2));
+}
+
+.boundary__name {
+  margin-block-end: var(--space-md);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.boundary__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-2);
+}
+
+.boundary__seam {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding-inline: var(--space-md);
+  min-inline-size: 13rem;
+}
+/* The dashed line the labels sit on. Dashed is semantic here the way it is on
+   the architecture map: it marks a boundary that is crossed by messages, not a
+   wall. */
+.boundary__seam::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  border-inline-start: var(--rule-hair) dashed var(--color-rule-strong);
+}
+
+.boundary__port,
+.boundary__msg {
+  position: relative;
+  /* Each label knocks a hole in the dashed rule rather than sitting over it. */
+  background: var(--color-paper);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  text-align: center;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
+.boundary__port {
+  padding: var(--space-2xs) var(--space-xs);
+  border: var(--rule-hair) solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.boundary__msg {
+  padding-inline: var(--space-2xs);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+/* ── what to read next ────────────────────────────────────── */
+
+.post-next {
+  display: grid;
+  /* min() so the track can go narrower than 22rem on a phone instead of
+     overflowing it. */
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-md);
+  padding: 0 var(--page-gutter) var(--space-2xl);
+}
+
+.post-next__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  text-decoration: none;
+  transition:
+    border-color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out);
+}
+.post-next__link:hover {
+  border-color: var(--color-rule-strong);
+  background: var(--color-paper-3);
+}
+.post-next__link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+/* Newer reads right-to-left, the way a "next" control does. */
+.post-next__link--newer { text-align: end; }
+
+.post-next__label {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.post-next__title {
+  color: var(--color-ink);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* ── blog · narrow ────────────────────────────────────────── */
+
+@media (max-width: 60rem) {
+  /* The meta column stops being a column. Date and version read as one line
+     above the headline rather than as a 10rem gutter that has nothing else in
+     it. */
+  .postcard {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding-block: var(--space-lg);
+  }
+  .postcard__meta {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-sm);
+  }
+  .postcard__latest { margin-block-start: 0; }
+  .postcard__title { font-size: var(--text-lg); }
+
+  /* The headline gets the full width — 22ch of display type on a 375px screen
+     is four words a line. */
+  .post-head__title { max-width: none; }
+
+  .post { font-size: var(--text-base); }
+
+  /* The three planes stack, and the seam turns with them: the dashed rule goes
+     horizontal so it still reads as the thing between the two boxes rather
+     than as a stray vertical line beside them. */
+  .boundary { grid-template-columns: minmax(0, 1fr); }
+  .boundary__seam {
+    min-inline-size: 0;
+    padding-inline: 0;
+    padding-block: var(--space-md);
+  }
+  .boundary__seam::before {
+    inset-block: 50% auto;
+    inset-inline: 0;
+    border-inline-start: 0;
+    border-block-start: var(--rule-hair) dashed var(--color-rule-strong);
+  }
+
+  .post-next__link--newer { text-align: start; }
 }
 
 /* ── responsive ───────────────────────────────────────────── */

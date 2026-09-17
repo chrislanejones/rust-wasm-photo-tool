@@ -4,6 +4,9 @@ import Nav from "./components/Nav";
 import CommandPalette from "./components/CommandPalette";
 import Home from "./pages/Home";
 import Architecture from "./pages/Architecture";
+import About from "./pages/About";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import Trail from "./pages/Trail";
@@ -76,8 +79,15 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/architecture" element={<Architecture />} />
+        <Route path="/blog" element={<Blog />} />
+        {/* The one parameterized route on the site. It is NOT in ROUTES — see
+            the note in seo.ts — so prerender.mjs writes these files from POSTS
+            instead, and an unknown slug renders NotFound rather than a blank
+            article. */}
+        <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/features" element={<Features />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/about" element={<About />} />
         <Route path="/trail-log" element={<Trail />} />
         {/* A catch-all, so an unknown URL gets a page that says so instead of a
             bare nav over empty space. Paired with a real 404 status from the

@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 import ShotTimeline from "../components/ShotTimeline";
+import ButtonSet from "../components/ButtonSet";
 import { CpuIcon, ListIcon, ServerIcon } from "../components/Icons";
 import { SHOTS } from "../data/shots";
+import { POSTS, fmtPostDate, postPath } from "../data/posts";
 import { EDITOR_URL, GITHUB_URL, external } from "../config";
 
 type Where = "all" | "local" | "server";
@@ -162,19 +165,17 @@ export default function Home() {
         </section>
 
         {/* The tool run, deliberately a dense typographic list not an icon grid —
-            with the button set beside it, so the words have faces. The shot is
-            rendered from the app's own stylesheet, not redrawn. */}
+            with the button set beside it, so the words have faces.
+
+            The set was an 832x859 WebP of the editor's toolbar until 09-16.
+            It is eight real buttons now: a picture of an interface asks to be
+            taken on trust, and these can be pressed. They select and nothing
+            else — see the note in ButtonSet.tsx for why "Apply" did not
+            survive the change. */}
         <section className="editor" id="editor">
-          <figure className="editor__shot shot-frame">
-            <img
-              src="/button-set.webp"
-              width={832}
-              height={859}
-              loading="lazy"
-              decoding="async"
-              alt="Nine of Image Horse's own controls — Paint, Magic Wand, Crop, Resize, Download, Undo, Layers, Apply and Export — some idle, some selected."
-            />
-          </figure>
+          <div className="editor__shot">
+            <ButtonSet />
+          </div>
           <div className="editor__text">
             <h2 className="section__title section__title--sm">In the editor</h2>
             <p className="editor__run">
@@ -191,6 +192,58 @@ export default function Home() {
             </p>
           </div>
         </section>
+
+        {/* Field notes.
+            Sits here, after the reader has been told what the thing is and what
+            is in it, and before being asked to open it — this is the section
+            for the reader who is convinced and now wants to know whether the
+            people building it know what they are doing.
+
+            It shows the three newest posts and no more. A home page that lists
+            every post becomes an index of the blog, and there is already one of
+            those; the job here is a sample and a way in. The same `.postcard`
+            as /blog rather than a bespoke home-page card, so the two surfaces
+            are the same object at two sizes. */}
+        {POSTS.length > 0 && (
+          <section className="notes" id="notes">
+            <header className="head-hang">
+              <h2 className="section__title section__title--sm">From the blog</h2>
+              <p className="lede">
+                The Trail Log says what shipped. These are the ones that needed the argument written
+                out — the decision, what it cost, and the measurements it was made on.
+              </p>
+            </header>
+
+            <ol className="postlist__list">
+              {POSTS.slice(0, 3).map((post) => (
+                <li className="postcard" key={post.slug}>
+                  <div className="postcard__meta">
+                    <time className="postcard__date" dateTime={post.published}>
+                      {fmtPostDate(post.published)}
+                    </time>
+                    {post.version && <span className="postcard__version">{post.version}</span>}
+                  </div>
+                  <div className="postcard__body">
+                    <h3 className="postcard__title">
+                      <Link to={postPath(post)}>{post.headline}</Link>
+                    </h3>
+                    <p className="postcard__deck">{post.deck}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            {/* Only worth showing once there is more on /blog than is already
+                on this page. */}
+            {POSTS.length > 3 && (
+              <p className="notes__more">
+                <Link to="/blog">
+                  All {POSTS.length} posts <span aria-hidden="true">→</span>
+                </Link>
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Two columns: the mark alone on the left, everything that can be read
             or clicked on the right. The mark is decorative — the sentence beside

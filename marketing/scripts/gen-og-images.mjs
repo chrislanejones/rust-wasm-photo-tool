@@ -51,7 +51,7 @@ try {
 
 // The route table is the source for the card text, same as for the <head>. It is
 // read from the SSR build so this script never needs its own TypeScript step.
-const { ROUTES } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
+const { ROUTES, POSTS } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
   console.error("gen-og-images: run `pnpm build` first — it needs dist-ssr/entry-server.js.");
   process.exit(1);
 });
@@ -121,6 +121,7 @@ const HEADLINE = {
   "/architecture": ["One plane is the editor.\nThe other is optional.", "How it fits together"],
   "/features": ["Every tool, and where it runs", "The full feature list"],
   "/pricing": ["Free with no account.\nPro at $10 a month.", "Pricing"],
+  "/blog": ["Why it is built\nthe way it is", "The blog"],
   "/trail-log": ["Every release, dated", "The trail log"],
 };
 
@@ -151,6 +152,30 @@ for (const route of ROUTES) {
   const file = join(outDir, `${name}.png`);
   writeFileSync(file, await page.screenshot({ type: "png" }));
   console.log(`  og/${name}.png`);
+}
+
+/* ── one card per post ────────────────────────────────────────────────────
+ * A post gets its own card because its headline IS the pitch — falling back to
+ * the site default would unfurl every article as the same generic tile, which
+ * is the one case where a share card actively costs you the click.
+ *
+ * The card takes the post's on-page headline rather than its <title>, for the
+ * same reason the routes above take HEADLINE: the brand is already the wordmark
+ * at the top of the image.
+ *
+ * Written to og/blog/<slug>.png, mirroring the URL, so a post's card is
+ * findable from its address without a lookup table.
+ */
+mkdirSync(join(outDir, "blog"), { recursive: true });
+
+for (const post of POSTS) {
+  await page.setViewportSize({ width: 1200, height: 630 });
+  await page.setContent(card(post.headline, `Blog · ${post.version ?? "Image Horse"}`), {
+    waitUntil: "load",
+  });
+  const file = join(outDir, "blog", `${post.slug}.png`);
+  writeFileSync(file, await page.screenshot({ type: "png" }));
+  console.log(`  og/blog/${post.slug}.png`);
 }
 
 /* ── icons ────────────────────────────────────────────────────────────────
