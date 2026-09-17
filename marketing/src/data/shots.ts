@@ -137,4 +137,15 @@ export const SHOTS: Shot[] = [
     sourceLabel: "4cd90e1",
     alt: "The Image Horse editor open on a photo of a white Mercedes SUV, a magic-wand selection marching around the bonnet, with the Wand and Selection panels on the left and History and Layers on the right — five photos in the gallery strip below, all held in the browser.",
   },
+  {
+    src: "/IH-Hero-Image-September-2026.webp",
+    width: 2000,
+    height: 1198,
+    date: "2026-09-17",
+    dateLabel: "17 Sep 2026",
+    note: "Today: presets you preview on the photo before you keep them, an Original / Edited split to see what changed, and a Viper shrunk 92% without leaving the tab.",
+    href: `${REPO}/cb614652ff77ab3e7a49d51b13455709540da7d3`,
+    sourceLabel: "v8.79",
+    alt: "The Image Horse editor open on a photo of a red Viper parked by the ocean, split down the middle between Original and Edited, with the Presets panel on the left previewing Enhance and History, Layers and a histogram on the right — eight cars in the gallery strip below, the Viper tagged −92%.",
+  },
 ];

@@ -121,6 +121,42 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(poly, 50, 50)).toBe(-1); // interior, not near either
   });
 
+  it("hit-tests an unfilled diamond (8) along its four edges only", () => {
+    // pad 6 → tolerance 10. The top→right edge runs (50,0)→(100,50); its
+    // 45° diagonal puts the center ~35px from every edge, so the hollow
+    // middle is a miss — a click selects whatever is behind it.
+    const dia = [shape({ id: 31, kind: 8, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(dia, 75, 25)).toBe(31);  // on the top→right edge
+    expect(shapeAnnotationAt(dia, 25, 25)).toBe(31);  // on the left→top edge
+    expect(shapeAnnotationAt(dia, 50, 50)).toBe(-1);  // empty middle
+    expect(shapeAnnotationAt(dia, 75, 50)).toBe(-1);  // just inside an edge
+    expect(shapeAnnotationAt(dia, 100, 100)).toBe(-1); // far outside
+  });
+
+  it("hit-tests an unfilled star (9) along its closed 10-vertex outline", () => {
+    const star = [shape({ id: 32, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    // Midpoint of the top tip's left edge (inner valley → outer tip).
+    expect(shapeAnnotationAt(star, 42.6, 14.9)).toBe(32);
+    expect(shapeAnnotationAt(star, 73.8, 57.7)).toBe(32); // inner valley vertex
+    expect(shapeAnnotationAt(star, 50, 50)).toBe(-1); // hollow middle
+  });
+
+  it("a FILLED diamond/star falls back to its padded bounding box", () => {
+    // The engine only routes 8/9 through the edge test while UNFILLED;
+    // filled, it uses the same in_outer box rule as a pin (never actually
+    // painted — the fill renderer handles kinds 0/1 — but the hit test
+    // answers the same way).
+    const dia = [
+      shape({ id: 33, kind: 8, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
+      shape({ id: 34, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
+    ];
+    expect(shapeAnnotationAt(dia, 50, 50)).toBe(34); // filled star covers center
+    const justStar = dia.slice(1);
+    expect(shapeAnnotationAt(justStar, 104, 50)).toBe(34); // inside pad
+    expect(shapeAnnotationAt(justStar, 108, 50)).toBe(-1); // past pad
+    expect(shapeAnnotationAt(dia.slice(0, 1), 50, 50)).toBe(33);
+  });
+
   it("pads the outline of a closed kind, INCLUSIVE both edges", () => {
     // Rust's box test is `>=` and `<=` on both sides — unlike the text tile,
     // which is half-open. The asymmetry is real; keep it.

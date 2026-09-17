@@ -95,7 +95,8 @@ pub struct TextAnnotation {
 pub struct ShapeAnnotation {
     pub id: u32,
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
-    /// 7=bezier (cubic pen path; `points` holds the flat control sequence).
+    /// 7=bezier (cubic pen path; `points` holds the flat control sequence),
+    /// 8=diamond, 9=star.
     pub kind: u8,
     pub x0: f64,
     pub y0: f64, // start point / bbox corner (canvas coords)
@@ -107,6 +108,10 @@ pub struct ShapeAnnotation {
     pub stroke_width: f64,
     /// Arrows only: 0=single-headed, 1=double-headed. Ignored for shapes.
     pub arrow_style: u8,
+    /// Sketchiness of the stroke: 0 = clean geometric, up to 100 = increasingly
+    /// hand-drawn (bowed edges, wobble, gaps). Applies to rect, circle, line,
+    /// diamond (8) and star (9). Ignored for arrow/pin/polyline/bezier.
+    pub sloppiness: u8,
     /// Numbered callout pins (kind 5): the 1-based sequence index. 0 otherwise.
     pub number: u32,
     /// Pin label style (kind 5): 0 = number (1, 2, 3…), 1 = letter (A, B, C…).
@@ -383,12 +388,13 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"sloppiness\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
             s.stroke_width,
             s.arrow_style,
+            s.sloppiness,
             s.number,
             s.label_kind,
             s.fill_kind,
@@ -655,6 +661,7 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             s.kind as u32,
             color,
             s.stroke_width,
+            s.sloppiness as f64,
         ),
     }
 }
@@ -769,6 +776,7 @@ impl ImageHorseTool {
             shape,
             color,
             stroke_width,
+            0.0,
         );
     }
 
@@ -782,8 +790,8 @@ impl ImageHorseTool {
     }
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
-    /// 3=handCircle,4=arrow. Pushes an "Add Shape"/"Add Arrow" snapshot so
-    /// undo removes it. Returns the new id.
+    /// 3=handCircle,4=arrow,8=diamond,9=star. Pushes an "Add Shape"/"Add
+    /// Arrow" snapshot so undo removes it. Returns the new id.
     pub fn add_shape_annotation(
         &mut self,
         kind: u8,
@@ -799,6 +807,7 @@ impl ImageHorseTool {
         fill2_hex: &str,
         fill_angle: u16,
         fill_block: u32,
+        sloppiness: u8,
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
@@ -820,6 +829,7 @@ impl ImageHorseTool {
                 b: c[2],
                 stroke_width,
                 arrow_style,
+                sloppiness,
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -866,6 +876,7 @@ impl ImageHorseTool {
         fill2_a: u8,
         fill_angle: u16,
         fill_block: u32,
+        sloppiness: u8,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
@@ -883,6 +894,7 @@ impl ImageHorseTool {
                 b,
                 stroke_width,
                 arrow_style,
+                sloppiness,
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -1216,6 +1228,7 @@ impl ImageHorseTool {
         fill2_hex: &str,
         fill_angle: u16,
         fill_block: u32,
+        sloppiness: u8,
     ) -> bool {
         if !self.layers[self.active]
             .shape_annotations
@@ -1243,6 +1256,7 @@ impl ImageHorseTool {
             s.b = c[2];
             s.stroke_width = stroke_width;
             s.arrow_style = arrow_style;
+            s.sloppiness = sloppiness;
             s.fill_kind = fill_kind;
             s.fill_r = f[0];
             s.fill_g = f[1];
@@ -1547,8 +1561,9 @@ impl ImageHorseTool {
     ///
     /// Three rules, by what the user can actually see:
     /// - lines / arrows / polylines → distance to the stroke;
-    /// - an UNFILLED rect / circle / hand-circle → the stroke RING only. Its
-    ///   empty interior is not ink, so a click there is a click on whatever is
+    /// - an UNFILLED rect / circle / hand-circle / diamond / star → the ink
+    ///   RING only (rect: box ring, diamond/star: outline edges). Its empty
+    ///   interior is not ink, so a click there is a click on whatever is
     ///   behind it — which is what lets a shape be drawn inside another shape
     ///   instead of every such drag re-selecting the outer one;
     /// - everything else (filled shapes, pins, bézier) → padded bounding box.
@@ -1559,14 +1574,47 @@ impl ImageHorseTool {
     pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
         for s in self.layers[self.active].shape_annotations.iter().rev() {
             let pad = (s.stroke_width * 0.5).max(6.0);
-            let hit = if s.kind == 2 || s.kind == 4 {
-                // line / arrow → distance to the segment
-                point_segment_distance(x, y, s.x0, s.y0, s.x1, s.y1) <= pad + 4.0
-            } else if s.kind == 6 {
-                // polyline → distance to any segment
-                s.points.windows(2).any(|p| {
-                    point_segment_distance(x, y, p[0].0, p[0].1, p[1].0, p[1].1) <= pad + 4.0
-                })
+            let hit = if s.kind == 2
+                || s.kind == 4
+                || (s.fill_kind == 0 && (s.kind == 8 || s.kind == 9))
+            {
+                // line / arrow → distance to the segment; diamond (8) / star (9)
+                // stroke is the outline edges only when unfilled (a click inside
+                // an empty diamond selects whatever is behind it).
+                if s.kind == 8 {
+                    let (minx, miny, maxx, maxy) = (
+                        s.x0.min(s.x1),
+                        s.y0.min(s.y1),
+                        s.x0.max(s.x1),
+                        s.y0.max(s.y1),
+                    );
+                    let cx = (minx + maxx) * 0.5;
+                    let cy = (miny + maxy) * 0.5;
+                    let tet = [
+                        (cx, miny, maxx, cy),
+                        (maxx, cy, cx, maxy),
+                        (cx, maxy, minx, cy),
+                        (minx, cy, cx, miny),
+                    ];
+                    tet.iter().any(|&(ax, ay, bx, by)| {
+                        point_segment_distance(x, y, ax, ay, bx, by) <= pad + 4.0
+                    })
+                } else if s.kind == 9 {
+                    // Close the loop so the last→first edge is hit-testable too.
+                    let mut verts = crate::drawing::star_vertices(s.x0, s.y0, s.x1, s.y1);
+                    if let Some(&first) = verts.first() {
+                        verts.push(first);
+                    }
+                    verts.windows(2).any(|p| {
+                        point_segment_distance(x, y, p[0].0, p[0].1, p[1].0, p[1].1) <= pad + 4.0
+                    })
+                } else if s.kind == 6 {
+                    s.points.windows(2).any(|p| {
+                        point_segment_distance(x, y, p[0].0, p[0].1, p[1].0, p[1].1) <= pad + 4.0
+                    })
+                } else {
+                    point_segment_distance(x, y, s.x0, s.y0, s.x1, s.y1) <= pad + 4.0
+                }
             } else {
                 let minx = s.x0.min(s.x1);
                 let maxx = s.x0.max(s.x1);
@@ -2351,7 +2399,7 @@ mod hit_test_tests {
         let mut t = ImageHorseTool::new(200, 200);
         let [x0, y0, x1, y1] = bbox;
         let id = t.add_shape_annotation(
-            kind, x0, y0, x1, y1, "#ff0000", 2.0, 0, fill_kind, "#00ff00", "#0000ff", 0, 0,
+            kind, x0, y0, x1, y1, "#ff0000", 2.0, 0, fill_kind, "#00ff00", "#0000ff", 0, 0, 0,
         );
         (t, id as i32)
     }
@@ -2451,7 +2499,7 @@ mod hit_test_tests {
     fn inner_shape_is_selectable_through_the_outer_ones_interior() {
         let (mut t, outer) = tool_with(0, [10.0, 10.0, 190.0, 190.0], 0);
         let inner = t.add_shape_annotation(
-            0, 60.0, 60.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000", "#000", 0, 0,
+            0, 60.0, 60.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000", "#000", 0, 0, 0,
         ) as i32;
         assert_eq!(t.shape_annotation_at(60.0, 90.0), inner, "inner stroke");
         assert_eq!(t.shape_annotation_at(10.0, 90.0), outer, "outer stroke");

@@ -649,6 +649,7 @@ pub fn draw_shape(
     shape: u32,
     color: [u8; 4],
     stroke_width: f64,
+    sloppiness: f64,
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -659,53 +660,80 @@ pub fn draw_shape(
             let y0 = from_y.min(to_y);
             let x1 = from_x.max(to_x);
             let y1 = from_y.max(to_y);
-            draw_line_thick(data, wi, hi, x0, y0, x1, y0, color, stroke_width);
-            draw_line_thick(data, wi, hi, x1, y0, x1, y1, color, stroke_width);
-            draw_line_thick(data, wi, hi, x1, y1, x0, y1, color, stroke_width);
-            draw_line_thick(data, wi, hi, x0, y1, x0, y0, color, stroke_width);
+            if sloppiness > 0.0 {
+                let pts = sloppy_polyline_points(
+                    &[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
+                    shape_wobble_seed(from_x, from_y, to_x, to_y),
+                    sloppiness,
+                    true,
+                );
+                draw_polyline(data, w, h, &pts, color, stroke_width);
+            } else {
+                draw_line_thick(data, wi, hi, x0, y0, x1, y0, color, stroke_width);
+                draw_line_thick(data, wi, hi, x1, y0, x1, y1, color, stroke_width);
+                draw_line_thick(data, wi, hi, x1, y1, x0, y1, color, stroke_width);
+                draw_line_thick(data, wi, hi, x0, y1, x0, y0, color, stroke_width);
+            }
         }
-        // 1 = Circle (clean)
+        // 1 = Circle (clean) or sketchy (sloppiness > 0)
         1 => {
             let cx = (from_x + to_x) / 2.0;
             let cy = (from_y + to_y) / 2.0;
             let rw = (to_x - from_x).abs() / 2.0;
             let rh = (to_y - from_y).abs() / 2.0;
             let r = rw.min(rh);
-            let segments = (r * 4.0).max(60.0) as i32;
-            for i in 0..segments {
-                let a0 = 2.0 * PI * (i as f64) / (segments as f64);
-                let a1 = 2.0 * PI * ((i + 1) as f64) / (segments as f64);
-                let x0 = cx + r * a0.cos();
-                let y0 = cy + r * a0.sin();
-                let x1 = cx + r * a1.cos();
-                let y1 = cy + r * a1.sin();
-                draw_line_thick(data, wi, hi, x0, y0, x1, y1, color, stroke_width);
+            if sloppiness > 0.0 {
+                draw_sloppy_ellipse(
+                    data,
+                    wi,
+                    hi,
+                    from_x,
+                    from_y,
+                    to_x,
+                    to_y,
+                    color,
+                    stroke_width,
+                    sloppiness,
+                );
+            } else {
+                let segments = (r * 4.0).max(60.0) as i32;
+                for i in 0..segments {
+                    let a0 = 2.0 * PI * (i as f64) / (segments as f64);
+                    let a1 = 2.0 * PI * ((i + 1) as f64) / (segments as f64);
+                    let x0 = cx + r * a0.cos();
+                    let y0 = cy + r * a0.sin();
+                    let x1 = cx + r * a1.cos();
+                    let y1 = cy + r * a1.sin();
+                    draw_line_thick(data, wi, hi, x0, y0, x1, y1, color, stroke_width);
+                }
             }
         }
         // 2 = Line
         2 => {
-            draw_line_thick(
-                data,
-                wi,
-                hi,
-                from_x,
-                from_y,
-                to_x,
-                to_y,
-                color,
-                stroke_width,
-            );
+            if sloppiness > 0.0 {
+                let pts = sloppy_polyline_points(
+                    &[(from_x, from_y), (to_x, to_y)],
+                    shape_wobble_seed(from_x, from_y, to_x, to_y),
+                    sloppiness,
+                    false,
+                );
+                draw_polyline(data, w, h, &pts, color, stroke_width);
+            } else {
+                draw_line_thick(
+                    data,
+                    wi,
+                    hi,
+                    from_x,
+                    from_y,
+                    to_x,
+                    to_y,
+                    color,
+                    stroke_width,
+                );
+            }
         }
-        // 3 = Hand-drawn circle
-        //
-        // Ported from drawShape.ts handCircle case.
-        // Uses sinusoidal noise for wobble, a slight random tilt,
-        // a lead-in tail, and a main arc that's slightly less than
-        // a full rotation — giving it a natural, sketched look.
-        //
-        // Since WASM has no Math.random(), we derive a seed from
-        // the bounding box coordinates so each position produces
-        // a unique but deterministic shape.
+        // 3 = Hand-drawn circle (legacy — superseded by sloppiness on a plain
+        // circle, kept so old documents with kind 3 still render identically)
         3 => {
             draw_hand_circle(
                 data,
@@ -719,8 +747,257 @@ pub fn draw_shape(
                 stroke_width,
             );
         }
+        // 8 = Diamond
+        8 => {
+            draw_polygon_shape(
+                data,
+                wi,
+                hi,
+                &diamond_vertices(from_x, from_y, to_x, to_y),
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                color,
+                stroke_width,
+                sloppiness,
+            );
+        }
+        // 9 = Star
+        9 => {
+            draw_polygon_shape(
+                data,
+                wi,
+                hi,
+                &star_vertices(from_x, from_y, to_x, to_y),
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                color,
+                stroke_width,
+                sloppiness,
+            );
+        }
         _ => {}
     }
+}
+
+/// A closed polygonal shape (diamond / star): clean straight edges, or its
+/// wobbly sketchy outline when `sloppiness` > 0.
+fn draw_polygon_shape(
+    data: &mut [u8],
+    w: i32,
+    h: i32,
+    verts: &[(f64, f64)],
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+    color: [u8; 4],
+    stroke_width: f64,
+    sloppiness: f64,
+) {
+    if sloppiness > 0.0 {
+        let pts = sloppy_polyline_points(
+            verts,
+            shape_wobble_seed(from_x, from_y, to_x, to_y),
+            sloppiness,
+            true,
+        );
+        draw_polyline(data, w as u32, h as u32, &pts, color, stroke_width);
+    } else {
+        for i in 0..verts.len() {
+            let (ax, ay) = verts[i];
+            let (bx, by) = verts[(i + 1) % verts.len()];
+            draw_line_thick(data, w, h, ax, ay, bx, by, color, stroke_width);
+        }
+    }
+}
+
+/// Diamond vertices filling the drag bbox — (cx, top), (right, cy),
+/// (cx, bottom), (left, cy). Mirrored by hand in drawShapePreview /
+/// sloppyShapePath (CanvasArea).
+pub fn diamond_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+    let minx = x0.min(x1);
+    let maxx = x0.max(x1);
+    let miny = y0.min(y1);
+    let maxy = y0.max(y1);
+    let cx = (minx + maxx) * 0.5;
+    let cy = (miny + maxy) * 0.5;
+    vec![(cx, miny), (maxx, cy), (cx, maxy), (minx, cy)]
+}
+
+/// Five-pointed star vertices filling the drag bbox: 5 outer tips at even
+/// indices, 5 inner valleys at odd indices, 36° apart, starting at 12 o'clock.
+/// Outer radii are the bbox half-extents (elliptical star); inner is 0.5×.
+/// Mirrored by hand in drawShapePreview / sloppyShapePath (CanvasArea).
+pub fn star_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+    let minx = x0.min(x1);
+    let maxx = x0.max(x1);
+    let miny = y0.min(y1);
+    let maxy = y0.max(y1);
+    let cx = (minx + maxx) * 0.5;
+    let cy = (miny + maxy) * 0.5;
+    let orx = (maxx - minx) * 0.5;
+    let ory = (maxy - miny) * 0.5;
+    let irx = orx * 0.5;
+    let iry = ory * 0.5;
+    let mut verts = Vec::with_capacity(10);
+    for i in 0..10 {
+        let (rx, ry) = if i % 2 == 0 { (orx, ory) } else { (irx, iry) };
+        let a = -PI / 2.0 + i as f64 * PI / 5.0;
+        verts.push((cx + rx * a.cos(), cy + ry * a.sin()));
+    }
+    verts
+}
+
+/* ------------------------------------------------------------------ */
+/* Sloppiness — the hand-drawn stroke engine                           */
+/* ------------------------------------------------------------------ */
+
+/// Deterministic seed for a shape's sketch wobble — derived from the drag
+/// endpoints so the same shape always redraws identically (WASM has no
+/// Math.random, and the preview/overlay/raster layers must agree pixel-for-
+/// pixel). Mirrored by hand in `shapeWobbleSeed` (useDrawingTools).
+fn shape_wobble_seed(x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
+    x0 * 31.17 + y0 * 47.53 + x1 * 13.91 + y1 * 67.37
+}
+
+/// Smooth pseudo-random "hair" noise in ≈[-1, 1] — a sum of sines with
+/// incommensurate frequencies, so consecutive points along a stroke get fresh
+/// but continuous values. Mirrored by hand in `hairNoise` (useDrawingTools).
+fn hair_noise(p: f64, seed: f64) -> f64 {
+    (p * 2.3 + seed).sin() * 0.5
+        + (p * 1.1 + seed * 0.7).sin() * 0.3
+        + (p * 3.7 + seed * 1.3).cos() * 0.2
+}
+
+/// Turn the clean vertices of a shape's outline into a sketchy polyline.
+/// Works per-edge: each edge is subdivided and its points are pushed sideways
+/// (perpendicular to the edge) by `hair_noise` scaled by `sloppiness`, plus a
+/// gentle per-edge "bow". Edges end with a small residual offset so corners
+/// meet just slightly off — the hand-drawn look. `closed` wraps the last edge
+/// back to the first vertex. When `sloppiness` is 0 the vertices pass through
+/// untouched, so clean shapes pay nothing.
+///
+/// Mirrored by hand — `sloppyPolylinePoints` (useDrawingTools) — so the canvas
+/// preview and the committed pixels are the same path.
+fn sloppy_polyline_points(
+    pts: &[(f64, f64)],
+    seed: f64,
+    sloppiness: f64,
+    closed: bool,
+) -> Vec<(f64, f64)> {
+    if sloppiness <= 0.0 || pts.len() < 2 {
+        return pts.to_vec();
+    }
+    // Sloppiness is 0..=100; scale to a 0..=10 strength for the wobble math.
+    let s = sloppiness / 10.0;
+    let amp = (s * 0.55).min(7.0);
+    let bow = (s * 0.04).min(2.6);
+    let n = if closed { pts.len() } else { pts.len() - 1 };
+    let mut out: Vec<(f64, f64)> = Vec::with_capacity(n * 12);
+    let mut phase = seed * 0.31;
+    for e in 0..n {
+        let (ax, ay) = pts[e];
+        let (bx, by) = pts[(e + 1) % pts.len()];
+        let dx = bx - ax;
+        let dy = by - ay;
+        let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+        let steps = ((len / 6.0).ceil() as usize).clamp(6, 24);
+        let ux = dx / len;
+        let uy = dy / len;
+        let px = -uy;
+        let py = ux;
+        let bow_amt = bow * len * 0.22 * hair_noise(phase, seed);
+        for i in 0..=steps {
+            let t = i as f64 / steps as f64;
+            let fade = t * (1.0 - t) * 4.0;
+            let nv = hair_noise(phase * 1.7 + t * 3.1, seed);
+            // Corners hold 35% of the wobble at every sloppiness so adjacent
+            // edges still meet recognizably; the middle of each edge wobbles
+            // hardest.
+            let off = nv * amp * (0.35 + 0.65 * fade) + bow_amt * fade;
+            out.push((ax + dx * t + px * off, ay + dy * t + py * off));
+        }
+        phase += 1.3;
+    }
+    if out.is_empty() {
+        out.push(pts[0]);
+    }
+    out
+}
+
+/// Sketchy circle — the "fin documents" look: a wobbly ellipse whose ends do
+/// NOT quite meet, plus a short lead-in tail. Amplitude, gap and tail length
+/// all scale with `sloppiness`; at the top of the range it reproduces the old
+/// handCircle character. Mirrored by hand in drawShapePreview.
+fn draw_sloppy_ellipse(
+    data: &mut [u8],
+    w: i32,
+    h: i32,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+    color: [u8; 4],
+    stroke_width: f64,
+    sloppiness: f64,
+) {
+    let x = from_x.min(to_x);
+    let y = from_y.min(to_y);
+    let bw = (to_x - from_x).abs();
+    let bh = (to_y - from_y).abs();
+    if bw < 4.0 || bh < 4.0 {
+        return;
+    }
+    let cx = x + bw / 2.0;
+    let cy = y + bh / 2.0;
+    let rx = bw / 2.0;
+    let ry = bh / 2.0;
+    let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
+    let strength = (sloppiness / 100.0).clamp(0.0, 1.0);
+    // Only very slight randomness below about "half way"; grew the tilt cover.
+    let amp = 0.4 + sloppiness * 0.062;
+    let start_offset = pseudo_rand(seed) * 2.0 * PI;
+    // The gap where the ends don't meet widens with sloppiness.
+    let gap = PI * (0.05 + strength * 0.22);
+    let main_arc = 2.0 * PI - gap;
+    let tilt = (pseudo_rand(seed + 2.0) - 0.5) * 0.15;
+    let tail_len = PI * (0.12 + 0.12 * strength + pseudo_rand(seed + 3.0) * 0.15);
+
+    let noise = |angle: f64| -> f64 {
+        (angle * 2.3 + seed).sin() * amp
+            + (angle * 1.1 + seed * 0.7).sin() * amp * 0.7
+            + (angle * 3.7 + seed * 1.3).cos() * amp * 0.5
+    };
+
+    // Lead-in tail (fades to a point at its tip).
+    let tail_steps = 10usize;
+    let mut path: Vec<(f64, f64)> = Vec::with_capacity(tail_steps + 62);
+    for i in 0..=tail_steps {
+        let t = i as f64 / tail_steps as f64;
+        let angle = start_offset - tail_len * (1.0 - t);
+        let n = noise(angle) * t;
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
+        let inward = (1.0 - t) * (rx * 0.15);
+        let px = cx + (rx * squeeze - inward + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze - inward + n) * (angle + tilt).sin();
+        path.push((px, py));
+    }
+    // Main arc — stops shy of a full turn so the ends visibly miss each other.
+    let num_points = 60usize;
+    for i in 0..=num_points {
+        let t = i as f64 / num_points as f64;
+        let angle = start_offset + t * main_arc;
+        let n = noise(angle);
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
+        let px = cx + (rx * squeeze + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze + n) * (angle + tilt).sin();
+        path.push((px, py));
+    }
+    draw_polyline(data, w as u32, h as u32, &path, color, stroke_width);
 }
 
 /* ------------------------------------------------------------------ */

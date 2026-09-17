@@ -1,6 +1,6 @@
 # Image Horse
 
-![Image Horse](public/IH-Hero-Image-August-2026.webp)
+![Image Horse](public/IH-Hero-Image-September-2026.webp)
 
 **Live:** [imagehorse.app](https://imagehorse.app/) &nbsp;·&nbsp; **Editor:** [edit.imagehorse.app](https://edit.imagehorse.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 

@@ -56,6 +56,8 @@ const SHAPE_KIND_LABEL: Record<number, string> = {
   5: "Pin",
   6: "Pen",
   7: "Pen Path",
+  8: "Diamond",
+  9: "Star",
 };
 
 /** The name for a shape's `kind` byte; "Shape" for anything unrecognised. */

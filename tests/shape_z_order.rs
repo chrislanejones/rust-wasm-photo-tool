@@ -30,7 +30,22 @@ fn three(t: &mut ImageHorseTool) -> (u32, u32, u32) {
     // other — an outline-only shape would leave the composite nearly identical
     // after a reorder and the last test here would pass for the wrong reason.
     let mut add = |x: f64, y: f64, col: &str| {
-        t.add_shape_annotation(0, x, y, x + 20.0, y + 20.0, col, 2.0, 0, 1, col, col, 0, 0)
+        t.add_shape_annotation(
+            0,
+            x,
+            y,
+            x + 20.0,
+            y + 20.0,
+            col,
+            2.0,
+            0,
+            1,
+            col,
+            col,
+            0,
+            0,
+            0,
+        )
     };
     let a = add(2.0, 2.0, "#ff0000");
     let b = add(6.0, 6.0, "#00ff00");
@@ -164,6 +179,7 @@ fn three_same_colour(t: &mut ImageHorseTool) -> (u32, u32, u32) {
             1,
             "#ff0000",
             "#ff0000",
+            0,
             0,
             0,
         )

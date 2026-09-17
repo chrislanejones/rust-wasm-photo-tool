@@ -1183,7 +1183,8 @@ declare module "stamp_tool" {
     finish_layer_restore(active_index: number): void;
 
     // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
-    // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
+    // kind: 0=rect, 1=circle, 2=line, 3=handCircle(legacy), 4=arrow, 5=pin,
+    //       6=polyline, 7=bezier, 8=diamond, 9=star.
     // arrow_style (arrows only): 0=single, 1=double.
     shape_annotation_count(): number;
     /** Add a numbered callout pin (kind 5): circle bbox + label. Pushes "Add Pin". */
@@ -1256,6 +1257,7 @@ declare module "stamp_tool" {
       fill2_hex: string,
       fill_angle: number,
       fill_block: number,
+      sloppiness: number,
     ): number;
     /** Restore a persisted shape WITHOUT pushing history (load path). Colors are raw bytes. */
     restore_shape_annotation(
@@ -1280,6 +1282,7 @@ declare module "stamp_tool" {
       fill2_a: number,
       fill_angle: number,
       fill_block: number,
+      sloppiness: number,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -1297,6 +1300,7 @@ declare module "stamp_tool" {
       fill2_hex: string,
       fill_angle: number,
       fill_block: number,
+      sloppiness: number,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;
