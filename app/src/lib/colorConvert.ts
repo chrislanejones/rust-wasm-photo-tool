@@ -1,4 +1,4 @@
-// Pure colour-space maths for the colour picker dialog. Everything here is
+// Pure color-space maths for the color picker dialog. Everything here is
 // synchronous and allocation-light because the wheel / rectangle call it on
 // every pointer-move frame — round-tripping through the Rust `parse_color`
 // WASM export for that would mean an `await` per drag sample.
@@ -8,7 +8,7 @@
 //   h        0–360 degrees       s, v, l  0–100 percent
 //
 // Hex output is `#rrggbb` when opaque and `#rrggbbaa` otherwise — the same
-// shape `lib/colorParser.ts` emits, so a colour picked here de-dups against
+// shape `lib/colorParser.ts` emits, so a color picked here de-dups against
 // one typed as text.
 
 export interface RGB {

@@ -124,9 +124,9 @@ describe("useExportDimensions — cancellation flag (#67)", () => {
       height: 480,
     });
 
-    // And the cancelled path must still free its boxed allocation — wasm
+    // And the canceled path must still free its boxed allocation — wasm
     // memory never shrinks, so dropping it on the floor leaks (ADR-024 a11).
-    expect(freed, "both dims objects freed, cancelled path included").toContain(1080);
+    expect(freed, "both dims objects freed, canceled path included").toContain(1080);
   });
 
   it("falls back to the document size until a composite lands", async () => {

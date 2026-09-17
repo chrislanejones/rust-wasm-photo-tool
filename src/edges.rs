@@ -232,7 +232,7 @@ mod tests {
         // And the ordering that the path finder actually relies on.
         assert!(
             cost[2 * w + 3] < cost[2 * w + 1],
-            "travelling along the edge must beat crossing open space"
+            "traveling along the edge must beat crossing open space"
         );
     }
 

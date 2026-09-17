@@ -121,7 +121,7 @@ export function useExportDimensions({ stamp, active, excludeBackground }: Option
     let cancelled = false;
     void (async () => {
       const dims = await t.export_dims_excluding_background();
-      // `free()` on BOTH paths — a cancelled effect still owns the boxed
+      // `free()` on BOTH paths — a canceled effect still owns the boxed
       // allocation, and dropping it on the floor leaks wasm memory, which never
       // shrinks (ADR-024 a11).
       if (cancelled) {

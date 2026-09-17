@@ -96,7 +96,7 @@ interface UIState {
   // A/B compare: the "before" original blob URL, whether the slider is on, and
   // where the divider sits (0..1). The handle position lives here rather than in
   // CompareSlider's own useState so it survives a CanvasArea remount and so the
-  // "reset to centre when compare closes" rule has ONE home — the setter below —
+  // "reset to center when compare closes" rule has ONE home — the setter below —
   // instead of being re-implemented by every caller that turns compare off.
   originalUrl: string | null;
   compareActive: boolean;
@@ -263,7 +263,7 @@ export const useUIStore = create<UIState>()(
       setCompareActive: (v) =>
         set((s) => {
           const next = resolveSet(v, s.compareActive);
-          // Turning compare OFF re-centres the divider, so the next open starts
+          // Turning compare OFF re-centers the divider, so the next open starts
           // from the middle instead of wherever it was abandoned.
           return next
             ? { compareActive: true }

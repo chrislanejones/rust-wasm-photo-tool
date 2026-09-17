@@ -205,8 +205,8 @@ export function useLayers(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
 
-  // ── Layer colour overlay (Photoshop's Color Overlay style) ──
-  // Non-destructive: a solid colour tinting the layer's pixels at composite
+  // ── Layer color overlay (Photoshop's Color Overlay style) ──
+  // Non-destructive: a solid color tinting the layer's pixels at composite
   // time, under the mask. `set` doubles as "add" and "adjust" — the engine
   // snaps history only on the first set, so dragging the opacity slider gives
   // ONE undo entry rather than one per pointer move.
@@ -292,10 +292,10 @@ export function useLayers(engine: EngineCore) {
 
 /** `#rgb` / `#rrggbb` → [r,g,b], or null if it isn't one.
  *
- * The engine takes three bytes, not a CSS string — the Rust colour parser is a
- * separate, async path (`lib/colorParser`) used where the user TYPES a colour.
+ * The engine takes three bytes, not a CSS string — the Rust color parser is a
+ * separate, async path (`lib/colorParser`) used where the user TYPES a color.
  * Every value that reaches here comes from `ColorSwatchGrid`, which only ever
- * emits hex (its custom-colour flow stores `parsed.hex`), so a local parse is
+ * emits hex (its custom-color flow stores `parsed.hex`), so a local parse is
  * the whole job and keeps the slider drag synchronous.
  */
 function hexToRgb(hex: string): [number, number, number] | null {

@@ -34,14 +34,14 @@ export interface DrawEditState {
   end: Point;
   /** The shape type this pending NEW shape was drawn as, pinned at mouse-up.
    *
-   *  The type used to be read live from `ToolSettings.shape` like the colour
+   *  The type used to be read live from `ToolSettings.shape` like the color
    *  and the stroke width, and that made picking a different shape in the
    *  panel RETYPE the shape already on the canvas: draw a circle, click
    *  Square, and the circle became a square. Chris's report — "clicking
    *  another shape should not change the last shape created on the canvas,
    *  let it just allow a new shape to be added."
    *
-   *  Type is not like colour. A colour tweak is an edit to the thing in front
+   *  Type is not like color. A color tweak is an edit to the thing in front
    *  of you; a shape click is the choice of what you are about to draw NEXT,
    *  which is why `panelStylePatch` already refuses to carry `shape` across to
    *  a RESELECTED shape. This pins the same rule for a freshly drawn one, so
@@ -101,13 +101,13 @@ export function pendingShapeType(
 /**
  * Which style fields the user just changed in the Shapes panel.
  *
- * This is the fix for the seven-week "a placed square cannot be recoloured"
+ * This is the fix for the seven-week "a placed square cannot be recolored"
  * bug. `selectShape` snapshots a reselected shape's own style into
  * `editState.style` so clicking a red square shows it red rather than
  * repainting it with whatever the panel happens to hold. But that snapshot
  * then outranked the panel everywhere (`es.style?.strokeColor ?? s.strokeColor`
- * in `commitEdit`), so a colour change could never reach the shape — and
- * because only a handle drag set `editDirtyRef`, a colour-only edit also took
+ * in `commitEdit`), so a color change could never reach the shape — and
+ * because only a handle drag set `editDirtyRef`, a color-only edit also took
  * `commitEdit`'s no-op early exit and never called `update_shape_annotation`
  * at all. Two blockers, one symptom.
  *
@@ -115,7 +115,7 @@ export function pendingShapeType(
  * as a DEFAULT rather than an override: diff the panel against its own
  * PREVIOUS value and carry across only what actually changed. Comparing
  * against the shape instead would repaint it the moment it was selected,
- * which is the behaviour the snapshot exists to prevent.
+ * which is the behavior the snapshot exists to prevent.
  *
  * Returns `null` when nothing changed, so the caller can skip the re-render
  * and — more importantly — avoid marking the edit dirty, which would push a
@@ -123,7 +123,7 @@ export function pendingShapeType(
  *
  * `shape` is deliberately absent: `kindByte` preserves a pin's real kind
  * across an edit, so retyping a committed shape is a separate operation and
- * not something a colour click should trigger.
+ * not something a color click should trigger.
  */
 export function panelStylePatch(
   prev: ToolSettings,
@@ -576,13 +576,13 @@ export function useDrawingTools({
       // Without this the panel keeps whatever was last used, which made
       // `panelStylePatch` unable to see a real edit: reselect an orange shape
       // while the panel still reads purple, click purple because that is the
-      // colour you want, and the panel's value does not change — so the diff
+      // color you want, and the panel's value does not change — so the diff
       // returned null, the shape stayed orange, and nothing reached history.
       // Syncing here makes "the panel value changed" mean exactly "the user
       // changed a control", which is the invariant the diff depends on. It also
       // stops the panel lying about what is selected, and makes the baseline
       // the SHAPE's style, so changing only the width can no longer drag a
-      // stale panel colour along with it.
+      // stale panel color along with it.
       const synced: ToolSettings = {
         ...settingsRef.current,
         strokeColor: next.style!.strokeColor,

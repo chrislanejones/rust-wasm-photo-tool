@@ -7,7 +7,7 @@
 //   structurally; worker ON is accepted behaviorally only after local and
 //   worker implementations pass the same contract.
 //
-// This file proves the STRUCTURAL half. It cannot prove the behavioural half —
+// This file proves the STRUCTURAL half. It cannot prove the behavioral half —
 // that needs a running worker and an op-log equivalence run, which is a12/a13.
 //
 // WHY A RATCHET AND NOT A BOOLEAN. Value-consuming sites start un-awaited

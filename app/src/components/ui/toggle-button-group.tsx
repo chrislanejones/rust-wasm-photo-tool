@@ -19,7 +19,7 @@ export interface ToggleGroupItem {
   /** Whether this button is currently on (multiple may be on at once). */
   active: boolean;
   onToggle: () => void;
-  /** Greys the button out and drops it from the tab order. Added for the top
+  /** Grays the button out and drops it from the tab order. Added for the top
    *  bar's Export, which was an ACTION sitting in a group of toggles and
    *  needed a way to say "not yet" when there was no image to export. Export
    *  left for the right cluster's icon pair on 2026-09-11, so no caller passes
@@ -113,7 +113,7 @@ export function ToggleButtonGroup({
             // #64: an `aria-label` REPLACES the accessible name, so it goes on
             // icon-only buttons and nowhere else. This component is both:
             // `compact` hides the <span>{label}</span> below, and only then is
-            // there no visible name to read. Labelled, the visible text IS the
+            // there no visible name to read. Labeled, the visible text IS the
             // name — and today every caller happens to pass a tooltip equal to
             // its label, so the old unconditional form was correct by luck. The
             // first descriptive tooltip anyone writes would have silently
@@ -141,15 +141,15 @@ export function ToggleButtonGroup({
               // itself — same rule as IconButton's `standalone`.
               bare && !active && "bg-bg-tertiary",
               // Disabled wins over the hover styles above — without this the
-              // ring and colour shift still fire on a button that does nothing.
+              // ring and color shift still fire on a button that does nothing.
               disabled && "pointer-events-none opacity-40",
             )}
           >
-            {/* ONE glyph size, labelled or not: 18px, matching the top bar's
+            {/* ONE glyph size, labeled or not: 18px, matching the top bar's
                 IconButton. The top bar's Tools/Gallery/Review and the
                 Review panel's History/Layers/Reselect/Histogram are the same
                 component, and they now read at the same weight whether or not
-                the label is showing. (14px here made the labelled ones look
+                the label is showing. (14px here made the labeled ones look
                 like a different, smaller control than their icon-only twins.) */}
             {!noIcons && (
               <motion.span

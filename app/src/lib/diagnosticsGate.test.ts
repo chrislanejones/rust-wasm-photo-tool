@@ -1,6 +1,6 @@
 // The per-frame diagnostics gate.
 //
-// What this pins is a COST, not a behaviour — the app renders identically
+// What this pins is a COST, not a behavior — the app renders identically
 // whether or not these instruments are collected, which is exactly why the
 // regression would be silent. `flushToCanvas` published the tile-dirty count
 // and the op-log stats on every frame for a window that is closed almost

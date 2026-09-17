@@ -52,7 +52,7 @@ Shape of it:
   returns the deduped union of both stores' keys.
 - The adapter presents the **legacy `StoredOriginal` signature** (converting
   Dexie's Blob at the boundary), so the four/five call sites cut over by a pure
-  import-path swap — no behaviour change. `db.ts`'s native Blob API is untouched
+  import-path swap — no behavior change. `db.ts`'s native Blob API is untouched
   for future gallery/working-copy work.
 - A single kill-switch const, `USE_DEXIE_ORIGINALS` in
   `app/src/lib/dexie/flags.ts` (default `true`), routes everything back to
@@ -71,7 +71,7 @@ Shape of it:
   stall and a naturally crash-safe copy.
 - **Swap call sites directly onto `db.ts`'s Blob-based `getOriginal`.** Rejected:
   it does not typecheck (call sites read `.bytes`, Dexie has `.blob`) and would
-  be a behaviour change dressed as an import swap — exactly what we want to avoid
+  be a behavior change dressed as an import swap — exactly what we want to avoid
   on unbacked data. The adapter's shape-preserving boundary keeps the cut-over
   mechanical and reviewable.
 - **Dual-write (write every new original to both stores) instead of
@@ -137,5 +137,5 @@ Follow-ups (NOT part of this ADR):
   Dexie path healthy and the kill switch has not been needed. Deleting it earlier
   forfeits the rollback.
 - Gallery manifest → `db.photos`, working-copy consolidation, and edit-history
-  modelling are later steps (see `dexie/USAGE.md`), out of scope here.
+  modeling are later steps (see `dexie/USAGE.md`), out of scope here.
 - `imagehorse-qc` is required before the next release: persistence was touched.

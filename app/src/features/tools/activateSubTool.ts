@@ -9,7 +9,7 @@
 // already use — `setActiveTool`, `setModeOf`, `setColorPickerActive`,
 // `setToolSettings`. There is no privileged path: activating a sub-tool does
 // exactly what a user clicking the equivalent controls by hand would do, which
-// is what keeps the restructure behaviour-preserving.
+// is what keeps the restructure behavior-preserving.
 import { useCallback } from "react";
 import { useToolStore } from "@/stores/useToolStore";
 import type { ToolState } from "@/stores/useToolStore";

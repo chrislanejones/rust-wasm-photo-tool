@@ -21,7 +21,7 @@
 //! and allocates only its output buffer, the same contract `transform.rs` and
 //! `text::rotate_pixels` keep.
 
-/// A 3×3 projective transform in row-major order, normalised so `m[8] == 1`.
+/// A 3×3 projective transform in row-major order, normalized so `m[8] == 1`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Homography {
     m: [f64; 9],
@@ -35,14 +35,14 @@ pub struct Homography {
 /// it is a convention, so it is stated once here and never re-decided.
 pub type Quad = [(f64, f64); 4];
 
-/// The identity quad in NORMALISED space: the unit square.
+/// The identity quad in NORMALIZED space: the unit square.
 ///
-/// Corners are stored normalised (0..1 across the tile) rather than in pixels
+/// Corners are stored normalized (0..1 across the tile) rather than in pixels
 /// — see [`warp_normalised`] for why that is what makes the transform survive
 /// a text edit.
 pub const IDENTITY_QUAD: [(f32, f32); 4] = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
 
-/// A normalised quad that defaults to the IDENTITY rather than to all-zero.
+/// A normalized quad that defaults to the IDENTITY rather than to all-zero.
 ///
 /// WHY A NEWTYPE FOR FOUR PAIRS OF FLOATS. `[(f32, f32); 4]`'s `Default` is
 /// four corners at the origin — a COLLAPSED POINT, which is not what "no
@@ -196,9 +196,9 @@ impl Homography {
 ///
 /// The test is scale-free on purpose. The cross product is divided by the two
 /// edge lengths, making it `sin(angle)` — dimensionless — so the SAME
-/// threshold is correct for a normalised quad in 0..1 and an absolute one
+/// threshold is correct for a normalized quad in 0..1 and an absolute one
 /// spanning thousands of pixels. An absolute epsilon cannot be: 1e-9 is
-/// enormous next to a normalised quad's areas and invisible next to a
+/// enormous next to a normalized quad's areas and invisible next to a
 /// pixel-space one.
 pub fn is_valid_quad(q: &Quad) -> bool {
     let mut sign = 0i32;
@@ -260,9 +260,9 @@ pub struct Warped {
 ///
 /// Bilinear, alpha-weighted. The weighting matters: text tiles and layer
 /// content are mostly transparent, and interpolating straight RGB across a
-/// transparent neighbour drags that neighbour's undefined colour into the
+/// transparent neighbour drags that neighbour's undefined color into the
 /// visible edge as a dark or white fringe. Weighting each sample by its own
-/// alpha and dividing back out at the end keeps the edge the colour the
+/// alpha and dividing back out at the end keeps the edge the color the
 /// opaque side actually is.
 ///
 /// Returns `None` for a degenerate or self-crossing quad — the caller keeps
@@ -296,7 +296,7 @@ pub fn warp_rgba(src: &[u8], w: u32, h: u32, quad: &Quad) -> Option<Warped> {
             let Some((sx, sy)) = inv.apply(dx, dy) else {
                 continue;
             };
-            // Sample at pixel centres — subtract the half-pixel added above.
+            // Sample at pixel centers — subtract the half-pixel added above.
             let sx = sx - 0.5;
             let sy = sy - 0.5;
             let x0 = sx.floor() as i32;
@@ -340,7 +340,7 @@ pub fn warp_rgba(src: &[u8], w: u32, h: u32, quad: &Quad) -> Option<Warped> {
             out[di] = (acc[0] * inv_a).round().clamp(0.0, 255.0) as u8;
             out[di + 1] = (acc[1] * inv_a).round().clamp(0.0, 255.0) as u8;
             out[di + 2] = (acc[2] * inv_a).round().clamp(0.0, 255.0) as u8;
-            // Alpha itself is a plain bilinear blend of coverage, normalised
+            // Alpha itself is a plain bilinear blend of coverage, normalized
             // by the geometric weight rather than by alpha.
             out[di + 3] = (acc[3] / wsum).round().clamp(0.0, 255.0) as u8;
         }
@@ -355,9 +355,9 @@ pub fn warp_rgba(src: &[u8], w: u32, h: u32, quad: &Quad) -> Option<Warped> {
     })
 }
 
-/// Warp using a NORMALISED quad — corners in 0..1 across the source buffer.
+/// Warp using a NORMALIZED quad — corners in 0..1 across the source buffer.
 ///
-/// WHY NORMALISED IS THE STORED FORM, and the single most important decision
+/// WHY NORMALIZED IS THE STORED FORM, and the single most important decision
 /// in this module: it is what makes the transform VECTOR rather than baked.
 /// A text annotation's tile is rebuilt from scratch whenever the words, the
 /// font size, the wrap width or the box height change, and it comes back a
@@ -552,7 +552,7 @@ mod tests {
     fn validity_threshold_is_scale_free() {
         // The same shape at two wildly different scales must get the same
         // answer — this is why the cross product is divided by the edge
-        // lengths. A normalised quad (0..1) and a pixel-space one are both
+        // lengths. A normalized quad (0..1) and a pixel-space one are both
         // real inputs: text uses the former, the region warp the latter.
         let small: Quad = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
         let large: Quad = [(0.0, 0.0), (4000.0, 0.0), (4000.0, 3000.0), (0.0, 3000.0)];
@@ -584,7 +584,7 @@ mod tests {
     #[test]
     fn warp_preserves_a_solid_colour_in_the_interior() {
         // A keystone of a flat red field must stay flat red where it covers —
-        // any colour drift here is a resampling bug.
+        // any color drift here is a resampling bug.
         let src = solid(32, 32, [200, 40, 60, 255]);
         let quad: Quad = [(8.0, 0.0), (24.0, 0.0), (32.0, 32.0), (0.0, 32.0)];
         let out = warp_rgba(&src, 32, 32, &quad).unwrap(); // allow: rust-panic
@@ -594,7 +594,7 @@ mod tests {
         assert_eq!(
             &out.pixels[i..i + 3],
             &[200, 40, 60],
-            "interior colour drifted"
+            "interior color drifted"
         );
         assert_eq!(out.pixels[i + 3], 255, "interior alpha dropped");
     }
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn transparent_neighbours_do_not_fringe_the_edge() {
         // Half opaque white, half fully transparent BLACK. A naive bilinear
-        // blend pulls that black into the visible edge as a grey halo; the
+        // blend pulls that black into the visible edge as a gray halo; the
         // alpha-weighted blend must not.
         let (w, h) = (16u32, 16u32);
         let mut src = vec![0u8; (w * h * 4) as usize];

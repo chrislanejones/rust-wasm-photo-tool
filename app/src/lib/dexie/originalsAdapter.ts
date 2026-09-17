@@ -4,7 +4,7 @@
 // WHY A SEPARATE FILE (not db.ts's getOriginal): the legacy `originalsStore`
 // returns `StoredOriginal { bytes: ArrayBuffer, ... }`, but the Dexie
 // `OriginalRecord` stores `blob: Blob`. Every call site reads `.bytes`. To keep
-// the cut-over a mechanical import-path swap (no behaviour change at call
+// the cut-over a mechanical import-path swap (no behavior change at call
 // sites), this adapter presents the *legacy* `StoredOriginal` signature and
 // converts Dexie's Blob at the boundary. `db.ts`'s native (Blob-based) API is
 // left untouched for the future gallery / working-copy work.

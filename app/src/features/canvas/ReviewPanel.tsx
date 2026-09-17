@@ -531,7 +531,7 @@ export function ReviewPanel({
                       title={`Select ${layer.name}`}
                       onSelect={() => {
                         // #57: mark the pick BEFORE delegating, so the swap
-                        // this causes is recognised as the user's own and
+                        // this causes is recognized as the user's own and
                         // stays quiet. Only a selection nobody asked for
                         // flashes.
                         markUserSelection(layer.id);
@@ -615,7 +615,7 @@ export function ReviewPanel({
                 eight of them.
                 
                 Reads as prose ("2 shapes · 1 text") rather than icon+number
-                chips, because at this size a labelled word is faster than an
+                chips, because at this size a labeled word is faster than an
                 icon you have to decode. Empty layers say so explicitly — the
                 blank a zero-count row used to leave was indistinguishable from
                 a row that had not loaded. */}

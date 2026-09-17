@@ -157,7 +157,7 @@ needs real gestures.
 | Click an existing path while idle | it re-opens, no stray anchor left behind | the speculative-anchor cleanup |
 | Two fast clicks on two different paths | the **second** one opens | the `hitSeq` guard |
 | Draw a path, switch tool mid-draw | path is committed, not lost | the unmount cleanup |
-| Draw a path, switch **photo** mid-draw | commits to the outgoing photo (today's behaviour), new photo unaffected | FIFO + a13's liveness guard |
+| Draw a path, switch **photo** mid-draw | commits to the outgoing photo (today's behavior), new photo unaffected | FIFO + a13's liveness guard |
 | Click first anchor to close a loop | fills, stays selected | caller #4, the one that actually fires |
 
 **Mutation targets** (each must be killed by a test above): drop the

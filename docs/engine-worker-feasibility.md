@@ -127,7 +127,7 @@ Two observations worth carrying into the design:
   forbids touching is, encouragingly, the *least* affected by async.
 - **The pain is concentrated in four places** — `useSelectionActions` (18 b),
   `editPersistence` (18 b), `openraster/export` (14 b), `useLayers` (13 b).
-  Those four hold 63 of the 117. They are batch/serialisation paths, not
+  Those four hold 63 of the 117. They are batch/serialization paths, not
   interaction paths, which is the good case: they can `await` freely.
 
 ### The most-repeated synchronous reads
@@ -246,7 +246,7 @@ Constraints found:
   worker as messages. This is the concrete work item, not a blocker.
 - `desynchronized: true` is already in use on every main-canvas context, which
   suggests latency was already being tuned there; worth confirming OffscreenCanvas
-  keeps that behaviour.
+  keeps that behavior.
 - `OffscreenCanvas` is **already used** in `useEngineCore` (a decode helper), so
   the API is available and understood in this codebase.
 

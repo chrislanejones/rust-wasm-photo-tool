@@ -40,7 +40,7 @@ const DEFAULT_PATTERN = "{desc}-{n}";
  *  (where nothing else in the loop awaits). */
 const YIELD_EVERY = 8;
 
-/** The engine's read of one image, for the preview tooltip. Axes are LABELLED:
+/** The engine's read of one image, for the preview tooltip. Axes are LABELED:
  *  several of them share vocabulary — a head-and-shoulders shot in a tall frame
  *  is `subject portrait` and `orientation portrait` — and an unlabelled join
  *  renders that as the baffling "portrait, portrait". */
@@ -49,7 +49,7 @@ function describedAs(d: ImageDescription): string {
     [
       ["kind", d.kind],
       ["subject", d.subject],
-      ["colour", d.color],
+      ["color", d.color],
       ["tone", d.tone],
       ["palette", d.palette],
       ["contrast", d.contrast],

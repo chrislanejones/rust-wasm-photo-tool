@@ -15,7 +15,7 @@ const KEY = "ih_selection_bool";
 
 // Install our OWN storage rather than using the ambient one. Under Node 25 the
 // runtime's experimental built-in localStorage shadows jsdom's and arrives
-// half-initialised — the test run emits
+// half-initialized — the test run emits
 //   Warning: `--localstorage-file` was provided without a valid path
 // and `window.localStorage.removeItem` is not a function. Depending on which
 // localStorage implementation wins is not something this test should care

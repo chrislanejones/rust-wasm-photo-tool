@@ -21,8 +21,8 @@ fixes are dark by construction, not by flag.
 
 ## Decision
 Reclassify the artboard fill OUT of the document:
-- **Canvas** — a fill (colour or blank), present on every document.
-  DOCUMENT METADATA: size, pad, colour. Not a logged pixel layer.
+- **Canvas** — a fill (color or blank), present on every document.
+  DOCUMENT METADATA: size, pad, color. Not a logged pixel layer.
 - **Background** — the imported/pasted image (empty on a new canvas).
 - **Layer 3+** — pastes, shapes, text, everything else.
 
@@ -84,7 +84,7 @@ export.** This knowingly **REVERSES a shipped default** —
 `exportCanvasBackground` was `false` (app/src/lib/preferences.ts:104-106)
 with the rationale "the backing canvas is a compositional guide, not real
 content". The reversal was put to Chris explicitly, with the consequence
-named: existing users get padded, coloured exports where they previously
+named: existing users get padded, colored exports where they previously
 got a tight crop. He confirmed. It does not follow from the layer model —
 it is an independent product call, recorded here because it belongs to the
 same decision surface.
@@ -195,7 +195,7 @@ that is indistinguishable from an artboard document, and reading it as a
 Canvas hands the op log the wrong content plane. The restore therefore also
 requires the layer to be a **uniform fill** (which every artboard fill is by
 construction and a photo is not). Its only misfire — a bottom content layer
-that is a perfectly solid colour — is harmless, since the Canvas metadata
+that is a perfectly solid color — is harmless, since the Canvas metadata
 reproduces that exact plane at composite.
 
 **Found and fixed in passing (it was live):** `composite_excluding_background`

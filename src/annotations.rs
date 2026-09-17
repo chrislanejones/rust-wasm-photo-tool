@@ -1,6 +1,6 @@
 //! Live (non-destructive) text and shape/arrow annotations: the data types,
-//! JSON (de)serialisation, rasterisation helpers, and the annotation CRUD impl
-//! blocks. Split out of `lib.rs`; behaviour is unchanged.
+//! JSON (de)serialization, rasterisation helpers, and the annotation CRUD impl
+//! blocks. Split out of `lib.rs`; behavior is unchanged.
 
 use crate::layer::build_annotation_tile;
 use crate::utils::{
@@ -27,17 +27,17 @@ pub struct TextAnnotation {
     pub wrap_width: u32,
     /// Box height in px; 0 = size the box to the text. The other axis of the
     /// same box: `wrap_width` decides where the lines break, this decides how
-    /// tall the box those lines sit in is, and the text is centred in it
+    /// tall the box those lines sit in is, and the text is centered in it
     /// (`text::box_top_inset`). Height cannot drive reflow — the line count is
     /// an OUTPUT of wrapping — so it drives layout instead: a taller box means
     /// a taller background/bubble with the type in the middle of it. v8.41.
     pub box_height: u32,
-    /// Projective corner quad, NORMALISED to 0..1 across the finished tile, in
+    /// Projective corner quad, NORMALIZED to 0..1 across the finished tile, in
     /// the winding `perspective::Quad` documents (TL, TR, BR, BL).
     /// [`perspective::IDENTITY_QUAD`] means "no perspective" and is what every
     /// annotation written before v8.42 means.
     ///
-    /// Normalised, not pixels — that is the whole reason the transform stays
+    /// Normalized, not pixels — that is the whole reason the transform stays
     /// VECTOR across an edit. Read the essay on `perspective::warp_normalised`
     /// before changing the units here; storing pixels would make the warp drift
     /// off the tile the first time somebody fixes a typo.
@@ -118,7 +118,7 @@ pub struct ShapeAnnotation {
     /// for rect (0) and circle (1); ignored for line/arrow/pin/polyline. The
     /// fill is painted BEFORE the stroke so the outline sits on top.
     pub fill_kind: u8,
-    /// Solid fill colour, or gradient stop 0 (RGBA, straight alpha).
+    /// Solid fill color, or gradient stop 0 (RGBA, straight alpha).
     pub fill_r: u8,
     pub fill_g: u8,
     pub fill_b: u8,
@@ -132,19 +132,19 @@ pub struct ShapeAnnotation {
     pub fill_angle: u16,
     /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
     pub fill_block: u32,
-    /// Normalised projective corner quad (TL, TR, BR, BL) over the shape's own
+    /// Normalized projective corner quad (TL, TR, BR, BL) over the shape's own
     /// bbox — `(0,0)` is `(min x0/x1, min y0/y1)` and `(1,1)` the opposite
     /// corner. [`perspective::IDENTITY_QUAD`] means "no perspective" and is
     /// what every constructor starts from. v8.76.
     ///
-    /// NORMALISED FOR THE SAME REASON TEXT IS (see [`TextAnnotation::perspective`]
+    /// NORMALIZED FOR THE SAME REASON TEXT IS (see [`TextAnnotation::perspective`]
     /// and `perspective::warp_normalised`): the quad has to survive the shape
     /// being moved, resized or restyled. A rect dragged twice as wide keeps the
     /// perspective it was given rather than having it drift off the geometry,
     /// because the corners describe the SHAPE of the transform, not pixels.
     ///
     /// This is what makes Distort / Perspective / Skew vector operations on a
-    /// square or a circle: the shape is still a shape afterwards — recoloured,
+    /// square or a circle: the shape is still a shape afterwards — recolored,
     /// re-filled, re-selected, undone — and the warp is applied at render time.
     ///
     /// Wrapped in [`perspective::NormQuad`] so the struct's derived `Default`
@@ -183,7 +183,7 @@ pub(crate) fn build_text_annotation(
     // px; 0 = size the box to the text. The other axis of the same box — see
     // `TextAnnotation::box_height`.
     box_height: u32,
-    // Normalised projective quad — see `TextAnnotation::perspective`. Applied
+    // Normalized projective quad — see `TextAnnotation::perspective`. Applied
     // as the LAST stage of the tile pipeline (after rotation), so a dragged
     // corner lands under the cursor rather than under the cursor-rotated-back.
     perspective: [(f32, f32); 4],
@@ -316,7 +316,7 @@ pub(crate) fn quad_from_flat(v: &[f32]) -> Option<[(f32, f32); 4]> {
     Some([(v[0], v[1]), (v[2], v[3]), (v[4], v[5]), (v[6], v[7])])
 }
 
-/// A normalised corner quad as a flat JSON array of 8 numbers,
+/// A normalized corner quad as a flat JSON array of 8 numbers,
 /// `[x0,y0,x1,y1,x2,y2,x3,y3]` in TL,TR,BR,BL order.
 ///
 /// Flat rather than nested pairs because every consumer on the JS side — the
@@ -403,13 +403,13 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
     out.push(']');
     out
 }
-/// The rectangle a shape's [`ShapeAnnotation::perspective`] quad is normalised
+/// The rectangle a shape's [`ShapeAnnotation::perspective`] quad is normalized
 /// against: its plain bbox, `(x, y, w, h)`, with no stroke padding.
 ///
 /// ⚠️ MIRRORED BY HAND in `app/src/lib/perspectiveTarget.ts` (`basisOfShape`),
 /// and the two MUST agree
 /// to the pixel. The overlay draws the handles by denormalising the quad onto
-/// this rect and the engine re-normalises against it on commit, so a basis
+/// this rect and the engine re-normalizes against it on commit, so a basis
 /// that differs by even the stroke width would make the committed warp land
 /// somewhere other than where the user dragged it. That is why this is the
 /// bare bbox and not the ink bounds: the bbox is the one rectangle both sides
@@ -429,7 +429,7 @@ pub(crate) fn shape_basis_rect(s: &ShapeAnnotation) -> (f64, f64, f64, f64) {
 /// A stroke straddles the path (half of it outside), an arrowhead is drawn
 /// past the endpoint, and both get an anti-aliased edge on top. Warping a tile
 /// cropped to the bare bbox would shave all of that off, so the tile is grown
-/// by this much on every side — while the quad stays normalised against the
+/// by this much on every side — while the quad stays normalized against the
 /// un-padded bbox, so the padding never shifts the transform. It cannot: the
 /// padded tile's corners are mapped through the SAME homography the bbox
 /// defines (see `render_shape_warped`), and a projective map is fixed by four
@@ -585,7 +585,7 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 /// of the Perspective tool, and the shape twin of what a text annotation's
 /// tile has done since v8.42. The shape itself is untouched by it: the quad is
 /// a property applied at render time, so a warped square is still a square
-/// that can be recoloured, re-filled, moved and re-warped.
+/// that can be recolored, re-filled, moved and re-warped.
 pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     if !crate::perspective::is_identity(&s.perspective.0) && render_shape_warped(data, w, h, s) {
         return;
@@ -659,8 +659,8 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     }
 }
 /// Render a callout pin: a filled disc (from the bbox) with its label —
-/// a number (1, 2, 3…) or a letter (A, B, C…) — centred on it in a
-/// contrasting colour.
+/// a number (1, 2, 3…) or a letter (A, B, C…) — centered on it in a
+/// contrasting color.
 pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let cx = (s.x0 + s.x1) * 0.5;
     let cy = (s.y0 + s.y1) * 0.5;
@@ -682,8 +682,8 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let chars = label.chars().count().max(1) as f64;
     let font_size = (radius * if chars <= 1.0 { 1.2 } else { 1.9 / chars }).max(9.0) as f32;
     let rendered = crate::text::render_text(&label, font_size, nr, ng, nb, true);
-    // Centre by the glyph's visual ink box, not the padded line box, so it sits
-    // dead-centre regardless of font ascent/descent padding.
+    // Center by the glyph's visual ink box, not the padded line box, so it sits
+    // dead-center regardless of font ascent/descent padding.
     let (dx, dy) = match ink_bounds(&rendered.pixels, rendered.width, rendered.height) {
         Some((min_x, min_y, max_x, max_y)) => {
             let box_cx = (min_x + max_x + 1) as f64 * 0.5;
@@ -840,7 +840,7 @@ impl ImageHorseTool {
     }
 
     /// Restore a persisted shape annotation WITHOUT pushing history (used by
-    /// the load path — the undo/redo stacks are injected separately). Colour is
+    /// the load path — the undo/redo stacks are injected separately). Color is
     /// passed as raw r,g,b (the persisted JSON stores bytes, not hex). Returns
     /// the new id.
     pub fn restore_shape_annotation(
@@ -902,7 +902,7 @@ impl ImageHorseTool {
         id
     }
 
-    /// Add a numbered callout pin (kind 5): a filled circle + centred number,
+    /// Add a numbered callout pin (kind 5): a filled circle + centered number,
     /// stored as a circle-style bbox plus its label. Pushes "Add Pin".
     pub fn add_pin_annotation(
         &mut self,
@@ -940,7 +940,7 @@ impl ImageHorseTool {
         id
     }
 
-    /// Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b.
+    /// Restore a persisted pin WITHOUT pushing history. Color is raw r,g,b.
     pub fn restore_pin_annotation(
         &mut self,
         x0: f64,
@@ -1013,7 +1013,7 @@ impl ImageHorseTool {
         id
     }
 
-    /// Restore a persisted polyline WITHOUT pushing history. Colour is raw r,g,b.
+    /// Restore a persisted polyline WITHOUT pushing history. Color is raw r,g,b.
     pub fn restore_polyline_annotation(
         &mut self,
         points: &[f64],
@@ -1155,8 +1155,8 @@ impl ImageHorseTool {
 
     /// Commit a reshape of an existing Bézier path: pushes one "Edit Pen Path"
     /// snapshot (so undo restores the prior shape), then replaces its control
-    /// points. Style (colour / width / fill) is left untouched.
-    /// Update a Bézier pen path's geometry AND style (stroke colour/width +
+    /// points. Style (color / width / fill) is left untouched.
+    /// Update a Bézier pen path's geometry AND style (stroke color/width +
     /// solid Background fill), so reselecting a committed path and changing the
     /// Paint→Pen panel re-styles it — including filling a path that was drawn
     /// without a Background. `fill_kind`: 0 = no fill, 1 = solid `fill_color_hex`.
@@ -1362,7 +1362,7 @@ impl ImageHorseTool {
     ///
     /// CLONES THE STRUCT rather than re-adding from its fields, and that is
     /// the whole point of doing this in the engine. `TextAnnotation` carries
-    /// 34 fields — perspective quad, three background colours, six shadow
+    /// 34 fields — perspective quad, three background colors, six shadow
     /// parameters, the built tile and its offsets. Rebuilding one through
     /// `add_text_annotation` means restating every one of them across the
     /// JS boundary, and the day a 35th field is added, every such call site
@@ -1504,7 +1504,7 @@ impl ImageHorseTool {
         //
         // ADR-044 argued the pixel-hash guard (`oplog_engine_in_sync`) made
         // this safe. It does not: reordering shapes that share a stroke/fill
-        // colour leaves the composite byte-identical, the guard sees nothing,
+        // color leaves the composite byte-identical, the guard sees nothing,
         // and the op-log path proceeds on a broken lockstep. That is the exact
         // case the ADR dismissed as "did not matter".
         //
@@ -1834,7 +1834,7 @@ impl ImageHorseTool {
 
     /// Set (or clear) the soft drop shadow on a text annotation and rebuild its
     /// tile. `on_box` / `on_text` choose which silhouette casts the shadow;
-    /// colour / offset / blur are shared. Both toggles false (or `alpha` 0)
+    /// color / offset / blur are shared. Both toggles false (or `alpha` 0)
     /// clears it. Pushes a "Text Shadow" snapshot. Returns true if found.
     #[allow(clippy::too_many_arguments)]
     /// Set a text annotation's reflow width in px (0 = don't wrap) and rebuild
@@ -1871,7 +1871,7 @@ impl ImageHorseTool {
             box_height,
             // Carry the quad through. Resizing the box must not silently drop a
             // perspective the user applied — "edit it and it re-warps" is the
-            // whole reason the quad is stored normalised.
+            // whole reason the quad is stored normalized.
             a.perspective,
             fs,
             a.r,
@@ -1914,7 +1914,7 @@ impl ImageHorseTool {
     ///
     /// Height is NOT symmetric with width in what it does. Width re-breaks the
     /// lines; height cannot, because the line count is an OUTPUT of wrapping.
-    /// So height lays out instead: the text is centred in the taller box
+    /// So height lays out instead: the text is centered in the taller box
     /// (`text::box_top_inset`) and the background/bubble grows with it.
     pub fn set_text_box_height(&mut self, id: u32, box_height: u32) -> bool {
         let Some(idx) = self.layers[self.active]
@@ -1940,7 +1940,7 @@ impl ImageHorseTool {
             box_height,
             // Carry the quad through. Resizing the box must not silently drop a
             // perspective the user applied — "edit it and it re-warps" is the
-            // whole reason the quad is stored normalised.
+            // whole reason the quad is stored normalized.
             a.perspective,
             fs,
             a.r,
@@ -1973,7 +1973,7 @@ impl ImageHorseTool {
         true
     }
 
-    /// Set a text annotation's projective corner quad (normalised, TL/TR/BR/BL)
+    /// Set a text annotation's projective corner quad (normalized, TL/TR/BR/BL)
     /// and rebuild its tile through it. Returns false if `id` isn't on the
     /// active layer.
     ///
@@ -2077,7 +2077,7 @@ impl ImageHorseTool {
             .unwrap_or_default()
     }
 
-    /// Set a SHAPE's projective corner quad (normalised over its own bbox,
+    /// Set a SHAPE's projective corner quad (normalized over its own bbox,
     /// TL/TR/BR/BL). Returns false if `id` isn't on the active layer, or if
     /// the quad isn't 8 finite floats.
     ///
@@ -2164,7 +2164,7 @@ impl ImageHorseTool {
         // this on every text commit cheaply.
         //
         // "Unchanged" means VISIBLY unchanged. A shadow that is off before and
-        // off after is the same picture whatever its dormant colour, alpha,
+        // off after is the same picture whatever its dormant color, alpha,
         // offset and blur say — and those always differ on a fresh commit: a
         // new annotation is built with every shadow field zeroed, while the
         // panel's defaults sit at 60% alpha, a 2 px offset and some blur even
@@ -2365,7 +2365,7 @@ mod hit_test_tests {
         assert_eq!(
             t.shape_annotation_at(60.0, 60.0),
             -1,
-            "dead centre is empty"
+            "dead center is empty"
         );
         assert_eq!(
             t.shape_annotation_at(30.0, 30.0),
@@ -2398,9 +2398,9 @@ mod hit_test_tests {
 
     #[test]
     fn unfilled_circle_is_a_ring() {
-        // bbox 20..120 → centre (70,70), radius 50; pad 6 → ring radii 44..56
+        // bbox 20..120 → center (70,70), radius 50; pad 6 → ring radii 44..56
         let (t, id) = tool_with(1, [20.0, 20.0, 120.0, 120.0], 0);
-        assert_eq!(t.shape_annotation_at(70.0, 70.0), -1, "centre is empty");
+        assert_eq!(t.shape_annotation_at(70.0, 70.0), -1, "center is empty");
         assert_eq!(t.shape_annotation_at(70.0, 40.0), -1, "r=30, well inside");
         assert_eq!(
             t.shape_annotation_at(70.0, 20.0),
@@ -2504,7 +2504,7 @@ mod text_shadow_history_tests {
         assert_eq!(
             t.undo_count(),
             3,
-            "a visible colour change on a live shadow snaps"
+            "a visible color change on a live shadow snaps"
         );
         assert!(t.set_text_shadow(id, false, false, "#ff0000", 153, 2, 2, 4));
         assert_eq!(t.undo_count(), 4, "on → off snaps");

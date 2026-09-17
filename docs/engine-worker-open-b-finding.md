@@ -19,7 +19,7 @@ The app splits two things that usually move together:
 | **Zoom / pan** | CSS — `transform: translate(Xpx, Ypx) scale(Z)` (`CanvasArea.tsx:1262`) | user-driven |
 
 `transferControlToOffscreen` hands the drawing buffer to a worker. The worry
-was that it also takes the element's layout behaviour with it.
+was that it also takes the element's layout behavior with it.
 
 The harness reproduces that exact split — the app's real CSS rules copied
 verbatim, a 1600×1200 backing store in a 400×300 stage — and reads numbers back
@@ -39,7 +39,7 @@ from the DOM rather than looking at the screen.
 | 8 | Pan `translate(37px)` → rect shift | 37.0 | PASS |
 | 9 | Worker sets backing store 800×600 | 800×600 | PASS |
 | 10 | Display size after worker resize | 400.0×300.0 — **did not move** | PASS |
-| 11 | Worker pixel readback | the drawn colour | PASS |
+| 11 | Worker pixel readback | the drawn color | PASS |
 
 ## What each one settles
 
@@ -96,7 +96,7 @@ pixel comparison in this repo is unreliable on Brave.
   the only remaining gap.**
 - **No Safari / WebKit.** Third engine, untested, no machine to hand. Lower risk
   than it was: the two engines that were tested agree exactly, including on the
-  error behaviour.
+  error behavior.
 
 ### Closed since first writing
 

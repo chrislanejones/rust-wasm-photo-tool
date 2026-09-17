@@ -43,7 +43,7 @@ export const ALPHA_CAPABLE_FORMATS: ReadonlySet<ExportFormat> = new Set([
  * Should the artboard's backing canvas be baked into THIS export?
  *
  * "Include canvas" (ADR-016) ships the padded backing with the image, which is
- * what you want when the fill is a colour you can see. It is NOT what you want
+ * what you want when the fill is a color you can see. It is NOT what you want
  * when the fill is transparent and the target format has no alpha: there is
  * nothing to include, the encoder cannot write "nothing", so it writes black —
  * and every JPEG comes out framed in a border that was never on screen. The
@@ -63,7 +63,7 @@ export function formatCarriesAlpha(format: ExportFormat): boolean {
   return ALPHA_CAPABLE_FORMATS.has(format);
 }
 
-/** The colour a transparent pixel becomes in a format that cannot store one.
+/** The color a transparent pixel becomes in a format that cannot store one.
  *
  *  WHITE, deliberately. The browser's own answer is opaque BLACK — measured,
  *  rgba(0,0,5,255) out of `convertToBlob` for image/jpeg — and black is not a
@@ -75,7 +75,7 @@ export function formatCarriesAlpha(format: ExportFormat): boolean {
  *  backends read it through `matteOntoOpaque` below. */
 export const JPEG_MATTE: readonly [number, number, number] = [255, 255, 255];
 
-/** Composite straight-alpha RGBA onto an opaque colour, in place.
+/** Composite straight-alpha RGBA onto an opaque color, in place.
  *
  *  WHY THIS EXISTS (#46). JPEG has no alpha channel, so every transparent
  *  pixel has to be composited onto something before encoding. Nothing on the

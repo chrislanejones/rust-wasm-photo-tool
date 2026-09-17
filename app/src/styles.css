@@ -161,7 +161,7 @@
   /* Keyboard-focus indicator — deliberately NOT --accent. See the
      `:focus-visible` rule below for the full reasoning; the short version is
      that the accent already means "this is the live/selected thing", and a
-     focus ring in the same colour made the UI assert two live tiles at once.
+     focus ring in the same color made the UI assert two live tiles at once.
      Neutral ink instead: 14.3:1 against the sidebar (#fbf9f5) and 11.8:1
      against a tile fill (#e9e3d8), where the accent managed only 2.67:1. */
   --focus-ring: #2a2622;
@@ -211,7 +211,7 @@
   --accent-ui-foreground: #eeeeee;
   /* Dark counterpart — neutral ink, 15.3:1 against the sidebar (#181818).
      Contrast was never the dark theme's problem (the cream accent is 13.9:1
-     here); the problem was that cream and "selected" were the same colour. */
+     here); the problem was that cream and "selected" were the same color. */
   --focus-ring: #eeeeee;
   --destructive: #e55032;
   --destructive-foreground: #ffffff;
@@ -282,11 +282,11 @@
   --color-theme-muted-foreground: var(--muted-foreground);
   --color-theme-sidebar-border: var(--border);
   /* The border on TEXT FIELDS (width/height, the New-dialog fields) and the
-     colour swatches. It was never defined, so `border-theme-border` generated
+     color swatches. It was never defined, so `border-theme-border` generated
      no rule and the bare `border` utility beside it fell back to currentColor:
      near-white in dark (which read as a deliberate cream outline and hid the
      bug) and #2a2622 in light, i.e. a black box. --ring is #c98f3f light and
-     #fcdfc2 dark, so light gets the colour Chris asked for and dark keeps what
+     #fcdfc2 dark, so light gets the color Chris asked for and dark keeps what
      it already looked like. (Chris, 2026-09-08.)
      The three real siblings are now defined below. --color-theme-chart was
      also listed here and is NOT a gap: nothing references it, so no rule was
@@ -318,7 +318,7 @@
      Likewise --color-theme-sidebar-muted is --muted-foreground, NOT the
      name-matching --text-muted: that one is #8a8175 in light and measures
      **3.65:1** on the sidebar, which fails AA for the `text-xs` helper line it
-     would have coloured. --muted-foreground is 6.99:1 light / 8.56:1 dark.
+     would have colored. --muted-foreground is 6.99:1 light / 8.56:1 dark.
      The token whose NAME matches is not always the token whose CONTRAST does.
 
      The five `bg-theme-accent` references moved to `bg-theme-muted` instead of
@@ -529,7 +529,7 @@ body {
    z-index auto and later in tree order, so it paints over this; .main-canvas is
    z-index var(--z-canvas) = 1 and paints over both. Pattern, vignette, image.
    `position: absolute` also keeps it out of the wrapper's flex flow, so it is
-   never a flex item and the canvas stays centred. */
+   never a flex item and the canvas stays centered. */
 .canvas-wrapper::before {
   content: "";
   position: absolute;
@@ -641,7 +641,7 @@ body {
    SKELETON LOADING (single source of truth — components/ui/skeleton.tsx)
 
    The `.skeleton` class supplies only the shimmer machinery (a clipped sweep
-   via ::after); the base surface colour comes from the `bg-muted` token in
+   via ::after); the base surface color comes from the `bg-muted` token in
    SKELETON_BASE (lib/styles.ts) so it re-themes with the palette. Under
    reduced-motion the sweep is removed and the placeholder degrades to a static
    muted block (Refactor-Playbook §3).
@@ -760,7 +760,7 @@ html.reduce-motion .canvas-spinner {
    `aria-pressed=false` — it is NOT the active group — yet it still paints
    `solid 2px rgb(252,223,194) off:2px`, because it matches `:focus-visible`.
    Create, the group that IS active, paints `border-color rgb(252,223,194)`.
-   Same colour, both 2px, one tile outside-the-box and one on the edge: two
+   Same color, both 2px, one tile outside-the-box and one on the edge: two
    tiles claiming to be current. Verified with the pointer moved off the tile,
    so `:hover` is not involved.
 
@@ -769,9 +769,9 @@ html.reduce-motion .canvas-spinner {
    re-evaluates the heuristic when keyboard input arrives, so the shortcut that
    moves the active state to another tile is the same event that lights a focus
    ring on the old one. So "switch to `focus-visible:`" was already done — it is
-   not the fix. Making focus a different COLOUR is.
+   not the fix. Making focus a different COLOR is.
 
-   Now the vocabulary is three affordances on three channels in two colours:
+   Now the vocabulary is three affordances on three channels in two colors:
      · SELECTED → border-color / box-shadow, warm accent
      · HOVER    → box-shadow halo, warm accent at 60%
      · FOCUS    → outline, neutral ink, DASHED
@@ -1123,7 +1123,7 @@ textarea:focus-visible {
   margin-left: auto;
 }
 
-/* The ONE dialog backdrop. Colour and radius come from --overlay-scrim and
+/* The ONE dialog backdrop. Color and radius come from --overlay-scrim and
    --overlay-blur; this class exists so the pair is applied identically
    everywhere and so a non-Radix overlay can reach it too.
 
@@ -1444,7 +1444,7 @@ textarea:focus-visible {
   opacity: 0;
   background: none;
   border: none;
-  /* Matches .history-zmove — one colour for every row action. */
+  /* Matches .history-zmove — one color for every row action. */
   color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
@@ -1915,7 +1915,7 @@ input[type="range"].slider-overlay::-moz-range-thumb {
    itself be a two-part shadow.
 
    INSIDE vs OUTSIDE is the whole reason both stay readable in one accent
-   colour: current hugs the image, selected floats off it. Same argument the
+   color: current hugs the image, selected floats off it. Same argument the
    tool tiles settled on — differ by channel and shape, not only hue. */
 .photo-thumb {
   --thumb-ring-inner: 0 0 #0000;
@@ -1956,7 +1956,7 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 /* Hover is the WEAKEST claim, so it yields to either real state. It still
    fires on an `.active` thumb (that tile is hoverable and should say so) but
    never on a `.selected` one, whose outer accent it would otherwise overwrite
-   with muted grey — which is exactly the bug the border comment below
+   with muted gray — which is exactly the bug the border comment below
    describes, and it is one `:not()` away from happening again. */
 .photo-thumb:hover:not(.selected) {
   --thumb-ring-outer: 0 0 0 2px var(--text-muted);
@@ -2459,10 +2459,10 @@ input[type="range"]:focus::-webkit-slider-thumb {
   filter: invert(1);
 }
 /* ═══════════════════════════════════════════════════════════════════════════
-   COLOUR PICKER DIALOG (components/ColorPickerDialog.tsx)
+   COLOR PICKER DIALOG (components/ColorPickerDialog.tsx)
    The hue / brightness / alpha sliders are native range inputs laid over a
    gradient <div>, so the track is transparent and the thumb is a hollow ring:
-   a ring reads on any colour the gradient happens to show under it, where the
+   a ring reads on any color the gradient happens to show under it, where the
    accent-filled default thumb vanishes on an orange hue and the checkerboard
    fights an opaque one.
    ═══════════════════════════════════════════════════════════════════════════ */

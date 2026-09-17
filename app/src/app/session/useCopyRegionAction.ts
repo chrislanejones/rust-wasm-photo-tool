@@ -20,7 +20,7 @@
 // REVERSED 2026-07-22: copies were ACTIVE-LAYER pixels via `copy_region`,
 // justified above by "live text/shape annotations are composite-time renders
 // and masked extraction would need a new engine API". That API now exists, so
-// the justification is gone. Two things were wrong with the old behaviour:
+// the justification is gone. Two things were wrong with the old behavior:
 // selecting over a caption and copying pasted a BLANK rectangle (text is an
 // overlay, never layer pixels — pinned in tests/copy_region_composited.rs),
 // and this was the only export/share/copy path ignoring the "Canvas background

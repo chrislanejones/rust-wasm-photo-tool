@@ -1,6 +1,6 @@
 //! `photo_bounds` — the PHOTO's size, not the document's (#81).
 //!
-//! A default import is an artboard: a Canvas fill with the photo centred on
+//! A default import is an artboard: a Canvas fill with the photo centered on
 //! it, so the document is `photo + 2 * canvasPadding`. Reporting the document
 //! told the user a number 20px larger than the file they opened, and the
 //! resize panel then sized its aspect lock from it — type 400 and get a height
@@ -27,7 +27,7 @@ fn photo(w: u32, h: u32) -> Vec<u8> {
     px
 }
 
-/// The default import path: photo centred on a TRANSPARENT canvas.
+/// The default import path: photo centered on a TRANSPARENT canvas.
 fn artboard() -> ImageHorseTool {
     let mut t = ImageHorseTool::new(PW + 2 * PAD, PH + 2 * PAD);
     t.load_image_artboard(&photo(PW, PH), PW, PH, PAD, 0, 0, 0, 0);

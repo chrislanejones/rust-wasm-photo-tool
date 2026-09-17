@@ -27,7 +27,7 @@ const NO_TOOL: MutableRefObject<ImageHorseTool | null> = { current: null };
  *
  * LEFT of the divider is the ORIGINAL (the before layer is clipped from the
  * right, so what survives is the left band); RIGHT is the EDITED canvas showing
- * through. Every part of the labelling below exists to say that without being
+ * through. Every part of the labeling below exists to say that without being
  * read twice — see the label block.
  */
 export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProps) {
@@ -37,7 +37,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
   const active = useUIStore((s) => s.compareActive);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
   // Divider position lives in the store (see useUIStore) — it is the thing the
-  // "re-centre on close" rule resets, and a CanvasArea remount must not silently
+  // "re-center on close" rule resets, and a CanvasArea remount must not silently
   // move the handle back to the middle mid-comparison.
   const position = useUIStore((s) => s.comparePosition);
   const setPosition = useUIStore((s) => s.setComparePosition);
@@ -205,18 +205,18 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
       />
 
       {/*
-        SIDE LABELS. They used to be children of the divider and centred on it
+        SIDE LABELS. They used to be children of the divider and centered on it
         (`left-1/2 -translate-x-1/2`), which is why they could not be read: each
         chip sat half over the original and half over the edit, so it named
         NEITHER side — and stacked diagonally (one top, one bottom) there was
-        nothing left tying either word to a picture. Centred on the line they
+        nothing left tying either word to a picture. Centered on the line they
         also hung off the photo onto the workspace backdrop once the handle
         neared an edge.
 
         Now each chip lives inside its OWN half and says so four ways at once:
         position (fully on its side), a chevron pointing out into that side, a
         tab shape squared off against the divider and rounded on the outside,
-        and colour (plain white = untouched, warm accent = the edit). Each half
+        and color (plain white = untouched, warm accent = the edit). Each half
         is its own overflow-clipped box, so a chip can never cross the divider
         or leave the image — the thing that put text on the canvas backdrop.
       */}

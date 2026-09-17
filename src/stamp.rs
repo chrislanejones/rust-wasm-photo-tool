@@ -76,7 +76,7 @@ impl StampState {
     /// Begin a clone-stamp stroke. `pre_snapshot` is a full layer-stack snapshot
     /// of the state before the stroke, built by the caller; it is held until
     /// `end_stroke` pushes it onto the undo stack (so a stroke that is started
-    /// and immediately cancelled leaves no history). Returns `true` if the
+    /// and immediately canceled leaves no history). Returns `true` if the
     /// stroke actually began (a source point was set).
     pub fn begin_stroke(
         &mut self,

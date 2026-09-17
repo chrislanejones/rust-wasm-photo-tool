@@ -22,14 +22,14 @@ export const HOVER_RING =
    feature the others do not.
 
    ⚠️ AND THE FEATURE THE FOUR WERE MISSING WAS THE FOCUS RING. They set a
-   background, a border and a text colour, and stopped. Tabbing into the New
+   background, a border and a text color, and stopped. Tabbing into the New
    Canvas width box moved focus with nothing on screen to say so — a WCAG 2.1
    AA failure ("focus visible") on a field you are expected to type a number
    into. Consolidating here fixes that as a side effect, which is the argument
    for consolidating: one definition can be made correct once.
 
    Uses `theme-ring`, the same warm accent Chris asked for on field borders,
-   so the ring and the border are the same colour family rather than two
+   so the ring and the border are the same color family rather than two
    accents fighting.
 
    NOT a `ui/input` component, deliberately — there is no input primitive in
@@ -38,7 +38,7 @@ export const HOVER_RING =
    incrementally, and the five that share a look today already have.
    ────────────────────────────────────────────────────────────────────────── */
 
-/** Every text field: surface, border, type colour, and a visible focus ring.
+/** Every text field: surface, border, type color, and a visible focus ring.
  *  Not exported — the two below are the ones components use, and a third
  *  spelling of "a field" is how the drift this replaces started. */
 const FIELD_BASE =
@@ -69,7 +69,7 @@ export const FIELD_TEXTAREA = `${FIELD_BASE} resize-none px-3 py-2 text-sm`;
    tile clicked with the mouse and then abandoned by a keyboard shortcut kept an
    accent ring while the newly-active tile grew one too — two tiles claiming to
    be live. Channel-and-shape did not save it, because the stale ring was the
-   OUTSIDE one and sat on the tile that was no longer active. Colour is what
+   OUTSIDE one and sat on the tile that was no longer active. Color is what
    separates "the keyboard is here" from "this is the current tool"; the full
    measurement is in the styles.css `:focus-visible` comment.
 
@@ -83,19 +83,19 @@ export const FIELD_TEXTAREA = `${FIELD_BASE} resize-none px-3 py-2 text-sm`;
    `ring-offset-2` extends 4px, so a PERMANENT accent halo would also eat half
    the gutter and butt straight into a hovered neighbour's halo.
 
-   Colour: BOTH selected and hover are the warm accent (`theme-primary` —
+   Color: BOTH selected and hover are the warm accent (`theme-primary` —
    #c98f3f on light, #fcdfc2 on dark). An earlier pass made selected a neutral
    ink instead, on the theory that a separate hue keeps it from being mistaken
    for hover; Chris asked for the accent in both, and the states stay legible
    without the hue split because they were never relying on it — they differ by
    CHANNEL and SHAPE: selected is a solid border hugging the tile edge at 0px
    outward, hover is a 60%-opacity halo sitting 2–4px OUTSIDE it. Solid-and-
-   inside vs soft-and-outside reads even in one colour.
+   inside vs soft-and-outside reads even in one color.
 
    KNOWN, ACCEPTED: at #c98f3f on the light sidebar this is 2.67:1, under the
    3:1 WCAG 1.4.11 asks of a non-text indicator. The hover ring and the global
    focus outline already had exactly this shortfall — it comes from `--accent`
-   itself, so fixing it means recolouring the light theme, not patching here.
+   itself, so fixing it means recoloring the light theme, not patching here.
    Selected now shares it. If it needs solving, the fix is a darker light-mode
    accent token, applied once at the source.
 
@@ -176,11 +176,11 @@ export const CONFIRM_AFFIRMATIVE =
 /**
  * Base class-string for every Skeleton placeholder — the ONE definition site
  * behind the `Skeleton` / `SkeletonText` / `SkeletonCircle` primitives
- * (components/ui/skeleton.tsx). `bg-muted` is the semantic token base colour
- * (Refactor-Playbook §2 — no raw colours); the `.skeleton` class (styles.css)
+ * (components/ui/skeleton.tsx). `bg-muted` is the semantic token base color
+ * (Refactor-Playbook §2 — no raw colors); the `.skeleton` class (styles.css)
  * layers the shimmer sweep on top and degrades to this static muted block under
  * `prefers-reduced-motion` / Reduce Motion (§3). Keep the token here so the
- * shimmer's colour isn't hard-coded inside the component.
+ * shimmer's color isn't hard-coded inside the component.
  */
 export const SKELETON_BASE = "skeleton block bg-muted";
 
@@ -195,7 +195,7 @@ export const SKELETON_BASE = "skeleton block bg-muted";
    `overlayClassName` prop — still there for a genuine z-index override, but a
    scrim or blur passed through it is now drift, not configuration.
 
-   The colours live in styles.css (`--overlay-scrim`, `--overlay-blur`) and are
+   The colors live in styles.css (`--overlay-scrim`, `--overlay-blur`) and are
    applied by the `.dialog-scrim` class. Tune the look there; this constant only
    decides WHERE the scrim sits. Note it carries no z-index — dialogs stack on
    different rungs of the ladder, so each overlay still supplies its own

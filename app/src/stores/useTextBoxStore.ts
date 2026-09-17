@@ -8,7 +8,7 @@
 // paint value) is already a slice for exactly that reason — see
 // `useGuidesStore`, which this mirrors deliberately.
 //
-// NOT persisted: unlike the guide colour, a wrap width belongs to ONE text
+// NOT persisted: unlike the guide color, a wrap width belongs to ONE text
 // annotation, not to the user's preferences. The engine is the durable home
 // for it (`TextParams::wrap_width`, carried through `Op::TextWrap`); this
 // slice only holds it for the span of an editing session.
@@ -26,7 +26,7 @@ interface TextBoxState {
    *  both ways instead of only left/right. It behaves differently from the
    *  width by necessity: width re-breaks the lines, height cannot (the line
    *  count is an OUTPUT of wrapping), so height lays out instead — the engine
-   *  centres the text in the taller box and grows the background with it. */
+   *  centers the text in the taller box and grows the background with it. */
   boxHeight: number;
   /** Seeded when an input opens (0 for new text, the annotation's own width
    *  when re-editing) and updated live while a box handle is dragged. */

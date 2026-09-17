@@ -42,7 +42,7 @@ export function useCanvasOps({
     async (w: number, h: number) => {
       if (w < 1 || h < 1) return;
       const bg = canvasBgToRgba(prefs.canvasBgColor);
-      stamp.resizeCanvas(w, h, 4 /* centre */, bg.r, bg.g, bg.b, bg.a);
+      stamp.resizeCanvas(w, h, 4 /* center */, bg.r, bg.g, bg.b, bg.a);
       setHasBeenModified(true);
       if (activePhotoId) {
         setModifiedPhotos((prev) =>
@@ -102,7 +102,7 @@ export function useCanvasOps({
   // toggling "Canvas on import" (canvasArtboard) on, while a photo is loaded
   // re-normalizes the CURRENT document to the artboard via the IDEMPOTENT,
   // ABSOLUTE Rust `set_artboard_border`: the doc becomes exactly photo + 2×pad,
-  // photo centred, backing refilled — regardless of the doc's current size. This
+  // photo centered, backing refilled — regardless of the doc's current size. This
   // is what kills the "jumbo" canvas: hitting 10px always yields a 10px border
   // (never a delta), and it applies to EVERY loaded doc (fresh, gallery, AI),
   // not just a fresh artboard import.

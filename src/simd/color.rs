@@ -1,4 +1,4 @@
-//! Explicit WebAssembly SIMD128 acceleration for the per-pixel colour filters
+//! Explicit WebAssembly SIMD128 acceleration for the per-pixel color filters
 //! `filters::adjust_brightness`, `filters::adjust_contrast`,
 //! `filters::adjust_saturation`, `filters::adjust_shadows`,
 //! `filters::adjust_highlights`, and the unsharp-mask combine step behind
@@ -22,7 +22,7 @@
 //!   * Saturation lerps each channel toward the pixel's own perceptual luminance
 //!     `L = 0.299R + 0.587G + 0.114B` (ITU-R BT.601 — the same weights already
 //!     used by `annotations::render_pin` for text-contrast decisions): `L + (c -
-//!     L) * factor`. `factor` 0 = grey, 1 = unchanged, >1 = more saturated.
+//!     L) * factor`. `factor` 0 = gray, 1 = unchanged, >1 = more saturated.
 //!   * Shadows/Highlights are luminance-masked additive brightness shifts: the
 //!     same delta is added to R, G, and B (never scaled per-channel), so hue is
 //!     preserved and only luminance moves. Shadows peaks in dark tones
@@ -367,7 +367,7 @@ mod simd {
     }
 
     /// Per-pixel BT.601 luminance: lane-multiply against `[0.299, 0.587,
-    /// 0.114, 0.0]` (alpha weight zeroed) and sum the three colour lanes.
+    /// 0.114, 0.0]` (alpha weight zeroed) and sum the three color lanes.
     /// Three lane-extracts + two adds is cheap next to the surrounding
     /// load/store and keeps this in lockstep with the scalar `f64` formula
     /// (to within f32 precision).

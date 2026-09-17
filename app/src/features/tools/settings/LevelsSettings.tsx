@@ -25,7 +25,7 @@ const GAMMA = 100;
 // attached. Matching the stack's height lets the two halves read as one block.
 // Kept in sync with the `h-30` below so the viewBox maps 1:1 to rendered
 // pixels — `preserveAspectRatio="none"` means the SHAPE is identical at any
-// HIST_H (the path is normalised against `max`), so this value exists to keep
+// HIST_H (the path is normalized against `max`), so this value exists to keep
 // stroke widths and the midtone dash predictable, not to change the curve.
 const HIST_H = 120;
 
@@ -53,7 +53,7 @@ function histogramPath(bins: Uint32Array | null): string | null {
 }
 
 /** Where the midtones marker sits: the input value that the curve maps to
- *  mid-grey, i.e. `black + (white - black) · 0.5^gamma`. */
+ *  mid-gray, i.e. `black + (white - black) · 0.5^gamma`. */
 function midtoneX(black: number, white: number, gamma: number): number {
   return black + (white - black) * Math.pow(0.5, gamma);
 }

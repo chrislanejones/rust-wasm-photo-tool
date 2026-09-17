@@ -16,7 +16,7 @@ import { denormalise, normalise, type Quad } from "./perspective";
  * of implementations that cannot be compiled against each other, so the way
  * they stay honest is a test that states the contract in both directions.
  */
-describe("basisOfShape — the quad's normalisation rect", () => {
+describe("basisOfShape — the quad's normalization rect", () => {
   it("is the plain bbox, with no stroke padding", () => {
     // The bbox and NOTHING else is the contract. Padding it here (by the
     // stroke, by the arrowhead, by anything) without padding the crate's copy
@@ -30,7 +30,7 @@ describe("basisOfShape — the quad's normalisation rect", () => {
     });
   });
 
-  it("normalises a shape dragged right-to-left the same as left-to-right", () => {
+  it("normalizes a shape dragged right-to-left the same as left-to-right", () => {
     // `x0,y0` is where the pointer went down, so a shape dragged up-and-left
     // has x1 < x0. The engine's `shape_basis_rect` takes the min/abs for
     // exactly this reason; a basis that inherited the drag direction would
@@ -66,7 +66,7 @@ describe("basisOfShape — the quad's normalisation rect", () => {
   });
 
   it("describes the SHAPE, not its pixels — the same quad re-applies after a resize", () => {
-    // This is the whole reason the stored form is normalised. Drag the square
+    // This is the whole reason the stored form is normalized. Drag the square
     // twice as wide afterwards and the stored corners still mean "the top edge
     // is the middle half", so the warp scales with the shape instead of
     // sliding off it.

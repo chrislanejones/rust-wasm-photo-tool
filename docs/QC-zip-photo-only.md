@@ -48,7 +48,7 @@ the composite path.
 
 - **A legacy pre-v5 archive** (no `layers` array). The code returns the flat
   canvas unchanged and skips the exclude branch, which is the intended
-  behaviour, but I had no pre-v5 edit to test against. If you have an old photo
+  behavior, but I had no pre-v5 edit to test against. If you have an old photo
   in your gallery from before archive v5, exporting it is the real test.
 - **Signed in.** The signed-in app hangs ~118s on a fresh origin (master too),
   so everything here was logged out. `compositeSavedEdit` doesn't touch auth,

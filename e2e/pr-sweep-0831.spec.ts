@@ -71,8 +71,8 @@ async function blockExternalNetwork(page: Page): Promise<void> {
   });
 }
 
-/** The gallery's per-photo tiles. Each rendered photo gets an element labelled
- *  "Select photo <name>"; a tile still decoding shows a Skeleton labelled
+/** The gallery's per-photo tiles. Each rendered photo gets an element labeled
+ *  "Select photo <name>"; a tile still decoding shows a Skeleton labeled
  *  "Loading <name>". Counting the landed tiles is exactly the signal M2 is
  *  about.
  *
@@ -142,7 +142,7 @@ test.describe("PR sweep 08-31 — section M (upload dialog progress)", () => {
 
     await input.setInputFiles(photos);
     // The logged-out gallery caps at DEFAULT_PHOTO_LIMIT (12, lib/photoLimits.ts),
-    // so dropping 22 lands 12 and that is correct behaviour — the first draft of
+    // so dropping 22 lands 12 and that is correct behavior — the first draft of
     // this row waited for all 22 and reported the cap as a failure.
     const expected = Math.min(photos.length, 12);
     await expect

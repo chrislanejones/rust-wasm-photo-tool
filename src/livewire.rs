@@ -56,7 +56,7 @@ const NEIGHBOURS: [(i32, i32, u32); 8] = [
     (-1, -1, STEP_DIAG),
 ];
 
-// Two invariants the wire's behaviour rests on, checked at COMPILE time so
+// Two invariants the wire's behavior rests on, checked at COMPILE time so
 // they can't be "simplified" away in a later refactor:
 //   · a diagonal must cost more than an orthogonal step, or the wire zig-zags
 //     instead of running straight;
@@ -398,8 +398,8 @@ mod tests {
         }
         let mask = mask_from_loop(&loop_px, w, h);
 
-        // The disc's centre is in.
-        assert!(mask[40 * w + 40], "the disc centre must be selected");
+        // The disc's center is in.
+        assert!(mask[40 * w + 40], "the disc center must be selected");
         // The far background corners are out.
         assert!(!mask[2 * w + 2], "background corner must not be selected");
         assert!(!mask[77 * w + 77], "background corner must not be selected");

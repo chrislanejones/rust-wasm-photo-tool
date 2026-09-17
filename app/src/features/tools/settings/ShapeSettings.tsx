@@ -104,7 +104,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
-    // shape edit, so stroke/colour/shape tweaks live-update the overlay.
+    // shape edit, so stroke/color/shape tweaks live-update the overlay.
     <div className="space-y-3 -mt-2" data-draw-panel>
       <ToolModeToggle
         modes={SHAPES_TOOL_MODES}
@@ -228,7 +228,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
               );
 
             // ── Pins ── click the image to drop an auto-sequenced callout
-            // disc. A static body: pin label style → size → colour.
+            // disc. A static body: pin label style → size → color.
             case "pens":
               return (
                 <>
@@ -267,7 +267,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 </>
               );
 
-            // ── Arrows ── mirrors Pins: style toggle → size → colour.
+            // ── Arrows ── mirrors Pins: style toggle → size → color.
             case "arrows":
               return (
                 <>

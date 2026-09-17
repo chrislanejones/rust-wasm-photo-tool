@@ -268,7 +268,7 @@ function hotByName(name) {
   return HOT_SEGMENT.test(segs[segs.length - 1] ?? "");
 }
 
-// Receivers this audit used to recognise. It only ever matched these three
+// Receivers this audit used to recognize. It only ever matched these three
 // literal names, so `const t = toolRef.current; t.width()` — the dominant shape
 // in useTransforms, editPersistence, useLayers and usePaintTool — was invisible.
 // That hid 93 of 285 call sites (33%), and ADR-024 Stage 3.5 was scoped off the

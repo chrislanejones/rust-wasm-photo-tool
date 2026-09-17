@@ -5,7 +5,7 @@ and getting it wrong would cause a regression rather than prevent one.**
 Measured 2026-08-07 against `3f6fc6f`.
 
 ADR-024 Stage 1 carries a stop condition: *"If the call sites don't factor
-cleanly into one port without behaviour change, stop and report the shape."*
+cleanly into one port without behavior change, stop and report the shape."*
 This is that report, done before the session rather than during it.
 
 ## Three ways code reaches the engine
@@ -52,7 +52,7 @@ Routing them through the live port would be wrong twice over:
 
 - **Semantically** — their ops would land in the live document's log, and undo
   would start replaying edits to a photo the user never opened.
-- **In performance** — a 40-photo batch export would serialise behind the live
+- **In performance** — a 40-photo batch export would serialize behind the live
   document's queue, which is the thing this whole arc exists to stop.
 
 ## The correction
@@ -100,9 +100,9 @@ part of the file rather than a footnote.
 
 **Do not stop.** The call sites factor. The work is a mechanical substitution
 across ~15 files plus a typed port, with two documented exclusions — no
-behaviour change, no async, no worker, revertible with `git revert`.
+behavior change, no async, no worker, revertible with `git revert`.
 
-The one judgement call to make in-session: whether the port is a module-level
+The one judgment call to make in-session: whether the port is a module-level
 singleton or threaded through the existing `stamp` object. The second keeps the
 existing 62-key facade intact and touches fewer call sites; the first is easier
 to test structurally. **Not decided here.**

@@ -66,10 +66,10 @@ export const SHOTS: Shot[] = [
     height: 1106,
     date: "2026-01-28",
     dateLabel: "28 Jan 2026",
-    note: "The rewrite that still called itself Yet Another Image App: ten colour-coded tool squares, a text tool with three recent-text slots, and everything in JavaScript.",
+    note: "The rewrite that still called itself Yet Another Image App: ten color-coded tool squares, a text tool with three recent-text slots, and everything in JavaScript.",
     href: "https://github.com/chrislanejones/yet-another-image-app/commit/bbf175815e6cdcd56e58a194922aab12e271c480",
     sourceLabel: "yet-another-image-app",
-    alt: "An early browser editor: a Tools panel of bright coloured squares on the left over Font Size, Font Weight and Text Colour controls, a photo captioned “The 90s” on the canvas, and a nine-photo gallery along the bottom.",
+    alt: "An early browser editor: a Tools panel of bright colored squares on the left over Font Size, Font Weight and Text Color controls, a photo captioned “The 90s” on the canvas, and a nine-photo gallery along the bottom.",
   },
   {
     src: "/shots/2026-03-rust-wasm.webp",
@@ -80,7 +80,7 @@ export const SHOTS: Shot[] = [
     note: "Three weeks into the Rust engine, on a Netlify subdomain and under the working title Clone Stamp Tool. The tool squares survived the rewrite; almost nothing else did.",
     href: `${REPO}/c3c4b5ca0b820b24702475b7da6ec29656e0c74e`,
     sourceLabel: "c3c4b5c",
-    alt: "A browser window at rust-wasm-photo-tool.netlify.app: a Tools panel of coloured squares with an Arrow & Pointer section — stroke width, arrow style, a ten-swatch colour grid — a street photo on the canvas, and a gallery of twelve.",
+    alt: "A browser window at rust-wasm-photo-tool.netlify.app: a Tools panel of colored squares with an Arrow & Pointer section — stroke width, arrow style, a ten-swatch color grid — a street photo on the canvas, and a gallery of twelve.",
   },
   {
     src: "/shots/2026-06-clone-review.webp",
@@ -102,7 +102,7 @@ export const SHOTS: Shot[] = [
     note: "A week later the text tool grows speech bubbles — style, padding, corners, tail direction — and the layer stack goes behind a sign-in.",
     href: `${REPO}/bc50e80e6c9b06611baff5f8b415c3717becb88c`,
     sourceLabel: "bc50e80",
-    alt: "The editor's Text panel open on Background settings — bubble style, colour swatches, padding, corners and tail direction — beside a Tokyo street photo carrying two speech-bubble captions.",
+    alt: "The editor's Text panel open on Background settings — bubble style, color swatches, padding, corners and tail direction — beside a Tokyo street photo carrying two speech-bubble captions.",
   },
   {
     src: "/shots/2026-07-ai-tools.webp",
@@ -113,7 +113,7 @@ export const SHOTS: Shot[] = [
     note: "The server-side work gets a panel of its own — background removal, text extraction, object removal — and it is the only panel that reaches a server.",
     href: `${REPO}/035db9e7875e01d3dc3ed6adfd7e395c2af353c0`,
     sourceLabel: "v7.36",
-    alt: "The editor with an AI Tools panel on the left — Remove Background, Extract Text, Remove Object, and a greyed-out 4× Upscale marked Coming Soon — a white Fiat 500 ringed in red and labelled “Window Repair” on the canvas, with History and Layers on the right.",
+    alt: "The editor with an AI Tools panel on the left — Remove Background, Extract Text, Remove Object, and a grayed-out 4× Upscale marked Coming Soon — a white Fiat 500 ringed in red and labeled “Window Repair” on the canvas, with History and Layers on the right.",
   },
   {
     src: "/shots/2026-07-paint-stabilizer.webp",
@@ -121,10 +121,10 @@ export const SHOTS: Shot[] = [
     height: 992,
     date: "2026-07-27",
     dateLabel: "27 Jul 2026",
-    note: "The toolbar settles into five groups and stops being a colour chart. Paint gains the Stroke Stabilizer; the whole interface goes quiet so the photo can be loud.",
+    note: "The toolbar settles into five groups and stops being a color chart. Paint gains the Stroke Stabilizer; the whole interface goes quiet so the photo can be loud.",
     href: `${REPO}/767d42af15d9f3d7a5517af54fcea04adf0f435c`,
     sourceLabel: "v7.54",
-    alt: "The editor in its quiet dark palette: a monochrome tool rail, a Paint panel with brush size, opacity, hardness, a colour row and Stroke Stabilizer set to Off, a Tokyo crossing on the canvas, and twelve photos in the gallery strip.",
+    alt: "The editor in its quiet dark palette: a monochrome tool rail, a Paint panel with brush size, opacity, hardness, a color row and Stroke Stabilizer set to Off, a Tokyo crossing on the canvas, and twelve photos in the gallery strip.",
   },
   {
     src: "/IH-Hero-Image-August-2026.webp",

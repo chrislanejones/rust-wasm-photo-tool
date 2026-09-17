@@ -35,7 +35,7 @@ interface Props<T extends string> {
   /** The selected id. OMIT IT for an ACTION group — buttons that do something
    *  rather than pick something, so no tile is ever lit (the gallery's
    *  Auto Compress scope). `undefined === opt.id` is false for every option,
-   *  which is exactly the wanted behaviour. */
+   *  which is exactly the wanted behavior. */
   value?: T;
   onChange: (id: T) => void;
   /** Column count for the grid. Defaults to 2. */
@@ -43,7 +43,7 @@ interface Props<T extends string> {
   /** Optional small label rendered above the grid. A ReactNode, not a string,
    *  so a caller can put an icon and a lightbulb beside the words. */
   label?: React.ReactNode;
-  /** Centre the label over the grid instead of aligning it left. */
+  /** Center the label over the grid instead of aligning it left. */
   labelAlign?: "start" | "center";
   /** Icon-on-top, text-below tiles (vs the default icon-left row). */
   stacked?: boolean;

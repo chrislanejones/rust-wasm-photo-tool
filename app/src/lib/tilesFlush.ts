@@ -127,7 +127,7 @@ export async function tryTilesFlush(tool: object): Promise<number | null> {
 // NOT fixed here, deliberately: this batch converts, it does not redesign, and
 // the honest options (one `capture_oplog_stats()` on the Rust side, the a3/a5
 // atomic-capture pattern; or throttling to a few Hz; or only running it while
-// the panel is open) each change behaviour and deserve their own decision.
+// the panel is open) each change behavior and deserve their own decision.
 // Recorded in PARKING_LOT.md so Stage 5's frame timeline is read with it in
 // mind rather than blamed on the architecture.
 export async function syncOplog(

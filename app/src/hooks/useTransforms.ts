@@ -27,7 +27,7 @@ export interface LevelsControls {
   histogram: () => Promise<Uint32Array | null>;
 }
 
-/** One colour preset's five components, in the engine's own units: brightness
+/** One color preset's five components, in the engine's own units: brightness
  *  is a -1..1 fraction, contrast and saturation are factors (1 = as-is), and
  *  shadows/highlights are ABSOLUTE 8-bit (-255..255) — see src/presets.rs. */
 export interface PresetStack {
@@ -206,7 +206,7 @@ export function useTransforms(engine: EngineCore) {
 
   /**
    * Photoshop-style **Canvas Size**: resize the document WITHOUT resampling any
-   * layer. Re-blits each layer's native pixels at the anchor (4 = centre) and
+   * layer. Re-blits each layer's native pixels at the anchor (4 = center) and
    * refills the backing layer with the given color (a = 0 ⇒ transparent ⇒
    * checkerboard). Undoable; mirrors `resize`/`resizeWithFilter` bookkeeping.
    */
@@ -231,7 +231,7 @@ export function useTransforms(engine: EngineCore) {
 
   /**
    * Normalize the CURRENT document to an artboard: the photo at native size,
-   * centred, with a `pad`-px border filled with (r,g,b,a) (a = 0 ⇒ transparent
+   * centered, with a `pad`-px border filled with (r,g,b,a) (a = 0 ⇒ transparent
    * ⇒ checkerboard). ABSOLUTE + IDEMPOTENT — the doc becomes exactly
    * photo + 2×pad no matter its current size, so it both shrinks a "jumbo"
    * canvas back to size and re-applies cleanly without accumulating. Backs the
@@ -265,7 +265,7 @@ export function useTransforms(engine: EngineCore) {
   );
 
   /**
-   * Adjusts contrast by `factor` (0 = grey, 1 = original, 2 = doubled).
+   * Adjusts contrast by `factor` (0 = gray, 1 = original, 2 = doubled).
    * Each call is individually undo-able.
    */
   const adjustContrast = useCallback(
@@ -298,10 +298,10 @@ export function useTransforms(engine: EngineCore) {
       if (!t) return;
       const kernelRadius = Math.max(1, Math.round(intensity * 30));
       // ADR-024 Stage 2. This was four crossings — read width, read height,
-      // compute the centre and radius here, then hand them back to
+      // compute the center and radius here, then hand them back to
       // blur_region. That is a read-modify-write: synchronously nothing can
       // change in between, but once the reads resolve on a later task a resize
-      // landing in the gap blurs the new image around the old image's centre.
+      // landing in the gap blurs the new image around the old image's center.
       // `blur_whole_image` computes the geometry where the dimensions live, so
       // there is no gap to narrow. Same snapshot, same kernel, same result.
       const cpu = () => {
@@ -536,14 +536,14 @@ export function useTransforms(engine: EngineCore) {
     [toolRef],
   );
 
-  // Colour presets share ONE preview slot with Levels (src/tonal_preview.rs),
+  // Color presets share ONE preview slot with Levels (src/tonal_preview.rs),
   // so only one of the two panels may hold a preview open at a time. The panel
   // opens on first hover and closes when the pointer leaves the grid.
   //
   // LATEST WINS, same as Levels: sweeping the pointer across the grid outruns
   // the worker, so at most one `preset_preview_set` is in flight and a newer
   // preset overwrites the unsent one. `open` gates the loop so a queued hover
-  // cannot reopen a preview after the panel has cancelled or applied.
+  // cannot reopen a preview after the panel has canceled or applied.
   const presetsFlushRef = useRef(flushToCanvas);
   presetsFlushRef.current = flushToCanvas;
   const presetsSyncRef = useRef(syncState);

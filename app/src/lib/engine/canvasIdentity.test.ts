@@ -1,6 +1,6 @@
 // ADR-024 a11.1 — canvas mount/unmount bookkeeping.
 //
-// The behaviour under test is small, and every assertion here exists because
+// The behavior under test is small, and every assertion here exists because
 // getting it wrong breaks a11.2 in a specific way:
 //
 //   generation must advance on a NEW element   -> otherwise a stale handle is
@@ -11,7 +11,7 @@
 //   the sink must stay populated               -> the whole app reads
 //                                                 canvasRef.current
 //
-// Element identity is modelled with plain objects: this is pure bookkeeping and
+// Element identity is modeled with plain objects: this is pure bookkeeping and
 // vitest runs in the `node` environment, so there is no DOM and none is needed.
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";

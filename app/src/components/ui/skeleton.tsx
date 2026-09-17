@@ -5,7 +5,7 @@ import { SKELETON_BASE } from "@/lib/styles";
 
 /**
  * Token-driven loading placeholder — the single source of truth for "this
- * content isn't ready yet" UI, modelled on Chakra UI's Skeleton. Replaces the
+ * content isn't ready yet" UI, modeled on Chakra UI's Skeleton. Replaces the
  * repo's scattered `animate-pulse` / `Loader2` / bespoke `canvas-spinner`
  * loading blocks.
  *

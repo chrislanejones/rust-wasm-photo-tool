@@ -120,9 +120,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
               .filter(Boolean)
               .join(" "),
         !active && HOVER_RING,
-        // DISABLED IS A COLOUR, NOT AN OPACITY. `opacity-30` over the pill
+        // DISABLED IS A COLOR, NOT AN OPACITY. `opacity-30` over the pill
         // rendered 1.33:1 in light mode and 1.56:1 in dark — invisible, not
-        // dimmed. Opacity could never fix it either: the old enabled colour
+        // dimmed. Opacity could never fix it either: the old enabled color
         // was 3.00:1 at FULL strength, so every reduction of it lands below
         // the floor. Enabled is secondary now and disabled is muted at full
         // opacity — 3.00:1 light / 4.61:1 dark, clearly quieter than enabled

@@ -2,7 +2,7 @@
 //! engine API (`levels.rs` owns the math and its unit tests).
 //!
 //! What a user relies on, each pinned here:
-//!   1. dragging a slider and then cancelling leaves the photo exactly as it was
+//!   1. dragging a slider and then canceling leaves the photo exactly as it was
 //!   2. a preview is never an undo step, however many times it moves
 //!   3. Apply is exactly one undo step, and undo puts every pixel back
 //!   4. Apply after a preview remaps the untouched pixels ONCE, not on top of
@@ -71,7 +71,7 @@ fn a_preview_is_never_an_undo_step() {
         "moving the sliders adds no undo steps"
     );
     t.tonal_preview_cancel();
-    assert_eq!(t.undo_count(), undos, "cancelling adds none either");
+    assert_eq!(t.undo_count(), undos, "canceling adds none either");
 }
 
 #[test]

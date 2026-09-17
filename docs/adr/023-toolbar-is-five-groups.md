@@ -33,7 +33,7 @@ exclusive set of sub-tools. 34 sub-tools at the time of writing.
   per-group canvas dispatch all DERIVE from it. Derived-or-nothing is the rule.
 - **A sub-tool carries its own stable id**, rather than being derived from
   `(tool, mode)`. 27 of the 34 are uniquely identified by that pair; six are not
-  (Crop / Transform / Colour Picker all resolve to `crop` with no mode; Resize
+  (Crop / Transform / Color Picker all resolve to `crop` with no mode; Resize
   Layer / Canvas Size / Guides all resolve to `arrow`), and deriving identity
   would light those tiles three at a time.
 - **Legacy tool ids are load-bearing and are NOT renamed here.** A sub-tool is a

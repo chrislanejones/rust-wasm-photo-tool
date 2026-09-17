@@ -242,7 +242,7 @@ describe("round-trip stability", () => {
     }
   });
 
-  it("a legacy hash normalises to the canonical form in ONE hop", () => {
+  it("a legacy hash normalizes to the canonical form in ONE hop", () => {
     const once = parse("#/tool/paint/blur");
     expect(formatRoute(once!)).toBe("#/create/blur-brush");
     expect(formatRoute(parse(formatRoute(once!))!)).toBe("#/create/blur-brush");

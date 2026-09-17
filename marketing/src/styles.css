@@ -1,6 +1,6 @@
 /* Image Horse — the marketing site.
  *
- * One stylesheet for all five pages. Plain CSS, no framework: every colour,
+ * One stylesheet for all five pages. Plain CSS, no framework: every color,
  * size, and duration is a token from tokens.css, and nothing here reaches for
  * a raw value. If you need a value that isn't a token, add the token.
  *
@@ -180,7 +180,7 @@ a { color: inherit; }
    ideal; the bar is at its 720px ceiling, so the affordance compresses to its
    keycap — the shortcut IS the icon.
    
-   Its colour is the same token as the GitHub and Codeberg marks — but text at
+   Its color is the same token as the GitHub and Codeberg marks — but text at
    13px is thin, anti-aliased strokes, while those are solid filled shapes, so
    the identical value still reads lighter. The weight closes the gap; the hue
    never needed to move. */
@@ -429,7 +429,7 @@ a { color: inherit; }
  * but the RENDERING was not: an animating transform promotes the bar to its own
  * compositor layer, which is rasterized at the element's layout size — one
  * pixel wide — and then stretched by the GPU. A stretched 1px texture is a
- * smear, so the bar arrived soft and unevenly lit while it travelled and only
+ * smear, so the bar arrived soft and unevenly lit while it traveled and only
  * snapped crisp once the animation settled and Chrome re-rastered.
  *
  * The bar is out of flow (`position: absolute`), so animating its width lays
@@ -541,7 +541,7 @@ a { color: inherit; }
 .hero__shot {
   margin: 0;
   width: 100%;
-  max-width: var(--page-max);   /* never wider than the column that centres it */
+  max-width: var(--page-max);   /* never wider than the column that centers it */
   box-shadow: var(--shadow-float);
 }
 .hero__shot img {
@@ -1042,7 +1042,7 @@ a { color: inherit; }
   font-size: var(--text-sm);
 }
 
-/* the closing mark — same size, voice and behaviour as the nav's */
+/* the closing mark — same size, voice and behavior as the nav's */
 .foot-stmt__mark {
   display: inline-flex;
   align-items: center;
@@ -1430,7 +1430,7 @@ a { color: inherit; }
 }
 .legend__scale { display: flex; gap: 3px; }
 
-/* the All reset — same behaviour the month pills had */
+/* the All reset — same behavior the month pills had */
 .reset {
   display: inline-flex;
   align-items: center;
@@ -1782,7 +1782,7 @@ a { color: inherit; }
   gap: var(--space-md);
   padding-block-start: var(--space-sm);
 }
-/* The icon and its label share a centred line box, so an 18px glyph beside
+/* The icon and its label share a centered line box, so an 18px glyph beside
    16px text doesn't make one button taller than its neighbour */
 .why__actions .cta { align-items: center; line-height: 1; }
 
@@ -1795,7 +1795,7 @@ a { color: inherit; }
 .seg--tier {
   gap: var(--space-xs);
   padding: var(--space-md) var(--space-lg);
-  justify-content: center;   /* icon + label centre as a pair */
+  justify-content: center;   /* icon + label center as a pair */
 }
 .seg__icon {
   display: block;
@@ -2045,7 +2045,7 @@ a { color: inherit; }
 }
 .ach__grid .month__col { gap: 5px; }
 /* Bigger than the legend's 11px squares on purpose: in the card the graph is
-   the evidence the counts summarise, not a key. A month is ~5 columns, so it
+   the evidence the counts summarize, not a key. A month is ~5 columns, so it
    can afford the size; the All card's 20 columns scroll if they must. */
 .ach__grid .day { width: 20px; height: 20px; border-radius: 4px; }
 

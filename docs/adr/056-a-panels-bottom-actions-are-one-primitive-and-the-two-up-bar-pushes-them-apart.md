@@ -78,7 +78,7 @@ and both clear 4.5.
   three lines) but it is ragged. Three options are on the table — leave it, add
   a stacked full-width `layout` for that panel, or drop the redundant dimension
   suffix — and **Chris picks, this ADR does not**.
-- **Rulers & Grid changes behaviour**, not just looks: 4 buttons (two segmented
+- **Rulers & Grid changes behavior**, not just looks: 4 buttons (two segmented
   Off/On groups) become 2 toggles, and `onChange` fires unconditionally, so
   **clicking a lit toggle now turns it OFF**. The old "On" was idempotent.
 - **Tab order flipped in Canvas Size** — Remove now precedes Resize. That is a

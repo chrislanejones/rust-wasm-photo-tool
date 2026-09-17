@@ -70,7 +70,7 @@ export default tseslint.config(
 
       // The two classic hook rules. `rules-of-hooks` is a hard error because a
       // conditional hook is always a bug; `exhaustive-deps` is a warning
-      // because its autofix can change behaviour and each case wants a human.
+      // because its autofix can change behavior and each case wants a human.
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
 

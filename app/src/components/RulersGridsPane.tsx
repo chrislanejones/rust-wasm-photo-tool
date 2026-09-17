@@ -10,7 +10,7 @@ import type { GridKind, Preferences, RulerUnit } from "@/lib/preferences";
  * `lib/preferences.ts` (`usePreferences`, localStorage `image-horse-prefs`):
  * - Rulers — top + left rulers whose tick labels track the zoom level.
  * - Grid — a composition overlay: uniform squares, golden-ratio guides, or an
- *   N×M division. Colour + opacity apply to every layout.
+ *   N×M division. Color + opacity apply to every layout.
  *
  * ⚠️ RENDERED IN TWO PLACES AT TWO WIDTHS: the Settings modal (wide) and the
  * tool sidebar (narrow, Edit → Rulers and Grid). It is built for the NARROW
@@ -21,7 +21,7 @@ import type { GridKind, Preferences, RulerUnit } from "@/lib/preferences";
  * So it uses the same primitives every other tool panel uses rather than its
  * own: `SectionHeader` for the title + lightbulb, `ToolButtonGroup` for the
  * pick-one rows (the Stroke Stabilizer pattern — it wraps on a `columns` grid
- * instead of one squeezed row), and `ColorSwatchGrid` for the colour.
+ * instead of one squeezed row), and `ColorSwatchGrid` for the color.
  *
  * And the prose is in the lightbulbs, not the panel. A tool panel is
  * button-only; the explanation hides behind the info icon (`SectionHeader`'s
@@ -49,7 +49,7 @@ const GRID_LAYOUTS: { id: GridKind; label: string; icon: typeof Grid3x3 }[] = [
 
 /** Fixed, high-contrast set — a grid overlay has to read against an arbitrary
  *  photo, so this is a functional palette, not a creative one. `allowCustom`
- *  is off for that reason: the user's saved paint colours are the wrong list
+ *  is off for that reason: the user's saved paint colors are the wrong list
  *  to offer here. */
 const GRID_COLORS: readonly string[] = [
   "#ffffff",

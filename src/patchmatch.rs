@@ -449,7 +449,7 @@ pub fn compute_nnf(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -
 /// masked pixel with a real match gets at least one vote; pixels with no
 /// valid vote at all (the fully-degenerate "no source anywhere" case from
 /// [`compute_nnf`]'s doc comment) are left byte-identical to the input — a
-/// safe no-op rather than a fabricated colour.
+/// safe no-op rather than a fabricated color.
 ///
 /// Returns a NEW `w*h*4` RGBA buffer, same dimensions as `image`; unmasked
 /// pixels are copied through unchanged. Malformed input (dimension
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn flat_color_source_converges_to_that_color() {
         // The whole image is flat blue, EXCEPT the hole itself is filled with
-        // a garbage colour standing in for "the object being removed" — its
+        // a garbage color standing in for "the object being removed" — its
         // value must never leak into the match (masked pixels are skipped on
         // both sides of every distance comparison). If the NNF is correct,
         // every masked pixel's match lands on a genuinely blue source pixel.
@@ -751,8 +751,8 @@ mod tests {
 
     #[test]
     fn filled_region_contains_zero_original_hole_pixels() {
-        // Every masked pixel starts as an obvious garbage colour; after
-        // inpainting, NONE of them may still hold that exact colour — every
+        // Every masked pixel starts as an obvious garbage color; after
+        // inpainting, NONE of them may still hold that exact color — every
         // one must have actually changed.
         const GARBAGE: [u8; 4] = [255, 0, 255, 255];
         let (w, h) = (24, 24);
@@ -774,7 +774,7 @@ mod tests {
                 let px = &out[i * 4..i * 4 + 4];
                 assert_ne!(
                     px, &GARBAGE,
-                    "masked pixel ({x},{y}) still holds its original garbage colour"
+                    "masked pixel ({x},{y}) still holds its original garbage color"
                 );
             }
         }
@@ -854,7 +854,7 @@ mod tests {
     fn whole_image_masked_is_a_safe_no_op_fill() {
         // No source pixel exists anywhere — `compute_nnf`'s one documented
         // exception. `fill_from_nnf` must leave every pixel exactly as it
-        // was rather than fabricate a colour from nothing.
+        // was rather than fabricate a color from nothing.
         let (w, h) = (6, 6);
         let image = rgba(w, h, |x, y| [(x * 40) as u8, (y * 40) as u8, 5, 255]);
         let mask = vec![true; w * h];
@@ -890,7 +890,7 @@ mod tests {
     fn fill_from_nnf_matches_exactly_for_a_single_isolated_hole_pixel() {
         // Only ONE pixel is masked, so the only patch that "covers" it is
         // its own (dx=dy=0) — no neighbouring masked pixel exists to also
-        // vote. The expected output is therefore EXACTLY the colour at its
+        // vote. The expected output is therefore EXACTLY the color at its
         // own nnf match, not an average of several contributions — a
         // maximally precise check of the voting arithmetic, decoupled from
         // `compute_nnf`'s randomness (this test hand-builds the NNF).

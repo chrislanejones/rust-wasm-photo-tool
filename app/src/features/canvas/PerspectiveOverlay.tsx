@@ -10,7 +10,7 @@
 // touched. Guides set the precedent; the note in `useEffectiveTool` explains
 // it at the dispatch site.
 //
-// COLOUR IS STATE, not decoration. Green = the quad is convex and the engine
+// COLOR IS STATE, not decoration. Green = the quad is convex and the engine
 // will accept it; red = the corners have crossed and Apply is refused. Getting
 // that feedback DURING the drag rather than on the click is why
 // `isValidQuad` is duplicated into TS at all (see lib/perspective.ts).
@@ -45,7 +45,7 @@ interface Props {
   quad: Quad;
   mode: PerspectiveMode;
   /** True while the quad targets an annotation (non-destructive). Only changes
-   *  the accent colour — the geometry is identical either way. */
+   *  the accent color — the geometry is identical either way. */
   vector: boolean;
   onChange: (q: Quad) => void;
   /** Fired once on pointer-up, so the caller can push ONE history step for the
@@ -147,7 +147,7 @@ export function PerspectiveOverlay({
 
   const valid = isValidQuad(quad);
   // Green when the engine will take it, red when the corners have crossed.
-  // The screenshot's two colours are this one state, not two separate quads.
+  // The screenshot's two colors are this one state, not two separate quads.
   const accent = !valid ? "#ef4444" : vector ? "#22c55e" : "#f43f5e";
 
   const toScreen = (p: Pt) => ({ x: left + p.x * sx, y: top + p.y * sy });

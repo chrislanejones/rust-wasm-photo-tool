@@ -64,7 +64,7 @@ export interface ExportDecision<TEdit> {
  * both cases that reach it: never edited (the original is the upload) and
  * compressed-only (the original key already holds the processed bytes). Those
  * two branches being byte-identical is why the deleted gate was only ever an
- * optimisation — it decided whether to spend one read, never what to ship.
+ * optimization — it decided whether to spend one read, never what to ship.
  */
 export async function resolveExportSource<TEdit>(
   photoId: string,

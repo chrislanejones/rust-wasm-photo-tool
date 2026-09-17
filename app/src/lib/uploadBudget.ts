@@ -42,7 +42,7 @@
 /** Kill switch for the deferred retry (see the caller in useEditPersistence).
  *
  *  Default ON. `localStorage.ih_upload_retry = "0"` disables it, and the
- *  behaviour falls back to what shipped in v7.67: a denied upload is skipped
+ *  behavior falls back to what shipped in v7.67: a denied upload is skipped
  *  and never retried. Worth having a switch because the retry schedules a timer
  *  that touches the save path, and the save path is where this repo's
  *  expensive bugs live. */

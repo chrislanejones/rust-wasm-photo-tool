@@ -6,7 +6,7 @@
 // now — so the switch gates ONLY the Smart Brush (usePaintTool.ts +
 // PaintSettings.tsx). What nobody has verified for the brush is still the
 // FEEL — does the stroke stop where a human expects. That is a canvas
-// judgement, so its UI stays behind this switch until a human makes it.
+// judgment, so its UI stays behind this switch until a human makes it.
 //
 // Runtime toggle: `localStorage.setItem("ih_smart_edge", "1")` in DevTools,
 // then reload. Same pattern as `ih_tiles_flush` / `ih_oplog_undo` — there is

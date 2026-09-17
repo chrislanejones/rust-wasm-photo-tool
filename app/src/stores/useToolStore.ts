@@ -85,7 +85,7 @@ export type SelectionShape = "rect" | "ellipse";
  *  - `wand`       — 4-connected flood fill within tolerance (the original).
  *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
  *                   at the object outline instead of leaking through gradients.
- *  - `colorRange` — every pixel within tolerance of the clicked colour anywhere
+ *  - `colorRange` — every pixel within tolerance of the clicked color anywhere
  *                   in the image (Photoshop's Select → Color Range).
  *  Session — many clicks, then a close:
  *  - `lasso`      — magnetic lasso: click anchors, the wire path-finds along the
@@ -156,7 +156,7 @@ export interface ToolState {
    *  stays out of it: a pad open across a reload would point at whatever
    *  shape happened to get that id. */
   duplicatePadId: number | null;
-  /** Recently eyedroppered colours, newest first, de-duplicated, capped.
+  /** Recently eyedroppered colors, newest first, de-duplicated, capped.
    *
    *  NOT PERSISTED — same reasoning as `activeSubTool`: `partialize` below is
    *  an explicit allowlist and this is kept out of it, so adding the feature
@@ -201,7 +201,7 @@ export interface ToolState {
 
   setActiveTool: (v: SetArg<ToolType>) => void;
   setActiveSubTool: (v: SetArg<string>) => void;
-  /** Record a picked colour at the head of the history. */
+  /** Record a picked color at the head of the history. */
   pushPickedColor: (hex: string) => void;
   removePickedColor: (hex: string) => void;
   clearPickedColors: () => void;
@@ -274,7 +274,7 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       // Newest first, case-insensitively de-duplicated (the engine hands back
       // uppercase hex, hand-typed swatches are lowercase — without this the
-      // same colour lands twice and looks like a bug). Capped at 12: it is a
+      // same color lands twice and looks like a bug). Capped at 12: it is a
       // recall list, not a log, and the panel column is 252px.
       pushPickedColor: (hex) =>
         set((s) => {
@@ -370,7 +370,7 @@ export const useToolStore = create<ToolState>()(
           batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
           // Both tolerate a blob written before these keys existed: `undefined`
           // fails every check and falls back to the freshly-constructed default,
-          // which is exactly the pre-#14 behaviour. No version bump, no
+          // which is exactly the pre-#14 behavior. No version bump, no
           // migration — the allowlist grew, the schema did not.
           exportFormat: validated(p.exportFormat, EXPORT_FORMATS, current.exportFormat),
           quality: validatedNumberInRange(p.quality, 1, 100, current.quality),

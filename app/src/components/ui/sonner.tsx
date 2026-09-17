@@ -9,7 +9,7 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
       position="top-center"
       // 80 -> 12. Eighty was chosen to CLEAR the TopBar (`fixed top-3`, ~58
       // tall, so 12..70) and landed at 80..170 — squarely on the header of any
-      // `size="xl"` dialog, whose 80vh centred body starts at 10vh: 90px on a
+      // `size="xl"` dialog, whose 80vh centered body starts at 10vh: 90px on a
       // 900 viewport, 122px on a 1222. Chris hit it on Settings.
       //
       // TOP-RIGHT WAS THE OBVIOUS ALTERNATIVE AND IS WORSE. A viewport-anchored
@@ -19,7 +19,7 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
       // header is cosmetic; covering the way out is not, and "depends on your
       // monitor" is not a resolution.
       //
-      // Top-centre at 12 spans W/2±265, and the close button sits at W/2+364,
+      // Top-center at 12 spans W/2±265, and the close button sits at W/2+364,
       // so it never reaches it. What it does cover is the TopBar — which is
       // `--z-topbar: 30`, behind the `--z-modal: 60` overlay whenever a dialog
       // is open, i.e. inert in exactly the situation that prompted this. With

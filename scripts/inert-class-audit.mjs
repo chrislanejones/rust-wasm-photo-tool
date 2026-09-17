@@ -10,10 +10,10 @@
 // references across five files, one of them an input that had silently had no
 // fill for weeks.
 //
-// A colour utility is the dangerous kind. A missing SPACING utility is obvious
-// the moment you look at the page; a missing COLOUR utility inherits something
+// A color utility is the dangerous kind. A missing SPACING utility is obvious
+// the moment you look at the page; a missing COLOR utility inherits something
 // plausible in one theme and reads as a deliberate choice in the other. That is
-// why this only checks colour-carrying prefixes.
+// why this only checks color-carrying prefixes.
 //
 // ⚠️ NOT WIRED INTO CI, deliberately. It needs a production build to read the
 // emitted CSS, which `guardrails.sh` (a fast grep ratchet) is not allowed to
@@ -35,7 +35,7 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const SRC = join(ROOT, "app/src");
 const ASSETS = join(ROOT, "www-dist/assets");
 
-// Colour-carrying utilities only. See the header for why.
+// Color-carrying utilities only. See the header for why.
 const PREFIXES = new Set([
   "bg", "text", "border", "ring", "fill", "stroke", "outline",
   "decoration", "placeholder", "caret", "accent", "shadow",
@@ -119,7 +119,7 @@ console.log(`scanned ${files.length} source files`);
 console.log(`colour-utility candidates: ${seen.size}  ·  allowlisted: ${ALLOW.size}`);
 
 if (!inert.length) {
-  console.log("\nNo inert colour utilities. TOTAL: 0");
+  console.log("\nNo inert color utilities. TOTAL: 0");
   process.exit(0);
 }
 

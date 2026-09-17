@@ -1,6 +1,6 @@
-/* Design tokens — the single source for colour, type, space and motion.
+/* Design tokens — the single source for color, type, space and motion.
  *
- * Every value the stylesheet uses lives here. Rule: no raw colours, no raw
+ * Every value the stylesheet uses lives here. Rule: no raw colors, no raw
  * font-families, no magic durations anywhere else. A new value becomes a
  * token first, then gets referenced.
  */
@@ -27,9 +27,9 @@
   --color-bloom-2:      oklch(60% 0.220 15);
 
   /* Contribution-grid ramp — an amber intensity scale off --color-accent.
-   * L0 is an empty day (a tinted surface, never a pure grey); L1–L4 climb
+   * L0 is an empty day (a tinted surface, never a pure gray); L1–L4 climb
    * toward the accent. Named tokens because the grid must not improvise
-   * colour mid-render. */
+   * color mid-render. */
   --color-grid-0:       oklch(20% 0.012 40);
   --color-grid-1:       oklch(34% 0.070 48);
   --color-grid-2:       oklch(48% 0.115 50);

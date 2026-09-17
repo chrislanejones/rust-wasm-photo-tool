@@ -64,12 +64,12 @@ export function shapeKindLabel(kind: number): string {
 }
 
 /**
- * The rectangle a SHAPE's perspective quad is normalised against: its plain
+ * The rectangle a SHAPE's perspective quad is normalized against: its plain
  * bounding box, with no stroke padding.
  *
  * ⚠️ THIS MIRRORS `shape_basis_rect` IN `src/annotations.rs` AND THE TWO MUST
  * AGREE TO THE PIXEL. The overlay denormalises the stored quad onto this rect
- * to place its handles, and `set_shape_perspective` re-normalises against the
+ * to place its handles, and `set_shape_perspective` re-normalizes against the
  * engine's copy on commit. A basis that differs by even the stroke width would
  * put the committed warp somewhere other than where the user dragged it — and
  * worse, it would drift a little further on every reselect, because each round

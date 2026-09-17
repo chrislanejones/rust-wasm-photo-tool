@@ -14,7 +14,7 @@ Thirteen months of releases later, three things are known that were not then:
 
 1. **The Settings copy never followed.** Both the panel text and the file
    header still said *"Photo only … the default"*. So the UI described the old
-   behaviour while the code did the new one, and each looked correct on its own.
+   behavior while the code did the new one, and each looked correct on its own.
    Nobody chose "Include canvas"; it simply arrived.
 2. **It produced a visible defect.** ADR-039: JPEG has no alpha, so a
    transparent backing was written as an opaque black frame around every JPEG
@@ -45,7 +45,7 @@ ADR-039 stays in force: it governs the case where a user *has* opted into
 
 **Existing installs are not migrated.** `normalize()` only supplies the default
 when the key is absent, so anyone who has the preference stored keeps their
-current behaviour. This is a change for new users and fresh profiles.
+current behavior. This is a change for new users and fresh profiles.
 
 ## Consequences
 
@@ -55,7 +55,7 @@ current behaviour. This is a change for new users and fresh profiles.
   both this and ADR-039.
 + The blast radius of ADR-039 shrinks to an opt-in path.
 - **A default reversed twice is a default nobody can predict from memory.**
-  Anyone reasoning about export behaviour must read the current value rather
+  Anyone reasoning about export behavior must read the current value rather
   than recall it, and old sessions/notes describing "include is the default"
   are now wrong without saying so.
 - Someone who liked the padded export and never touched the setting loses it on
@@ -66,7 +66,7 @@ current behaviour. This is a change for new users and fresh profiles.
 1. **Keep the ADR-016 default, fix only the copy.** What v8.53 did hours before
    this. Defensible, and rejected by the person whose exports they are.
 2. **Drop the artboard import too.** Conflates two decisions. The two-layer
-   import is useful; only its export behaviour was unwanted.
+   import is useful; only its export behavior was unwanted.
 3. **Make the export default depend on the fill** (opaque ⇒ include,
    transparent ⇒ exclude). Clever, and it would have masked the JPEG bug
    entirely — a default that changes with another setting is one nobody can
@@ -75,7 +75,7 @@ current behaviour. This is a change for new users and fresh profiles.
 ## Pre-mortem
 
 It is six months later and this was a mistake. The likely reason: someone sets
-a coloured backing canvas, designs a bordered image on screen, exports, and
+a colored backing canvas, designs a bordered image on screen, exports, and
 gets the photo without its border — because the export default no longer
 matches what the canvas is being used for. ADR-016's original instinct was
 right for *that* user; this ADR bets they are the minority.

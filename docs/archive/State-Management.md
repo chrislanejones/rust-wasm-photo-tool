@@ -70,7 +70,7 @@ Every store action is `setX: (v) => set((s) => ({ x: resolveSet(v, s.x) }))`. Se
 2. Replace each `useState` with the two same-name selector bindings.
 3. **Typecheck after every store**: `cd app && pnpm exec tsc -b` (the project-references build the pre-push hook runs) must stay green.
 4. Build-gate before committing: `pnpm --filter stamp-tool build`.
-5. Because AppShell is a singleton (one instance, never unmounts in practice), lifting its state to module-level stores is behaviour-preserving — the only change is that state is now global rather than per-instance, which is exactly what lets sibling components read it without props.
+5. Because AppShell is a singleton (one instance, never unmounts in practice), lifting its state to module-level stores is behavior-preserving — the only change is that state is now global rather than per-instance, which is exactly what lets sibling components read it without props.
 
 ---
 

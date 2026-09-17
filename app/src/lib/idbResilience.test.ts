@@ -11,7 +11,7 @@
 //     for the rest of the session.
 //
 // These drive the REAL store modules against fake-indexeddb, faulting
-// `indexedDB.open` to produce each shape, because the interesting behaviour is
+// `indexedDB.open` to produce each shape, because the interesting behavior is
 // in the module-level cache and a re-implementation here would prove nothing.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

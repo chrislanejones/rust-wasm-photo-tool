@@ -112,7 +112,7 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
   "Five-group toolbar": PanelLeft,
   "Sub-tool routing": Route,
   "Sub-tool canvas dispatch": MousePointerClick,
-  "Colour picker history": Palette,
+  "Color picker history": Palette,
   OCR: ScanText,
   "Directional duplicate pad": CopyPlus,
   "Duplicate from the Reselect row": Copy,

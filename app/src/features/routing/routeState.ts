@@ -95,7 +95,7 @@ export const currentHash = (): string => formatRoute(readRoute());
  * value actually CHANGES. That is the loop guard (no "am I writing?" boolean,
  * which is the classic way this feature rots: a stale flag and the hash and
  * the state stop agreeing). It also keeps a redundant re-apply from re-firing
- * AppShell's activeTool effects (which reset colour-picker / move / selection
+ * AppShell's activeTool effects (which reset color-picker / move / selection
  * modes).
  */
 export function applyRoute(route: Route): void {

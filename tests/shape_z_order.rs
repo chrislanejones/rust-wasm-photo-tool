@@ -9,7 +9,7 @@
 //! op log BROKEN so undo takes the snapshot path.
 //!
 //! The ADR originally argued the composite pixel hash made that unnecessary.
-//! It does not: two shapes sharing a colour composite identically, so the hash
+//! It does not: two shapes sharing a color composite identically, so the hash
 //! guard sees nothing while the snapshot/op lockstep is already broken — and
 //! the undo then destroys the newest shape. See the ADR's Correction section
 //! and `op_log_undo_of_a_reorder_keeps_every_shape` at the bottom of this file.
@@ -123,10 +123,10 @@ fn a_real_move_is_undoable() {
 }
 
 /// The property the whole feature exists for: reordering OVERLAPPING shapes of
-/// DIFFERENT colours changes the rendered pixels.
+/// DIFFERENT colors changes the rendered pixels.
 ///
 /// Note what this does NOT establish: that the composite hash is a sufficient
-/// guard for the op-log path. Same-coloured shapes reorder to an identical
+/// guard for the op-log path. Same-colored shapes reorder to an identical
 /// composite — that case is covered separately below.
 #[test]
 fn reordering_overlapping_shapes_changes_the_composite() {
@@ -146,7 +146,7 @@ fn reordering_overlapping_shapes_changes_the_composite() {
     );
 }
 
-/// Three overlapping shapes in ONE colour. Reordering them leaves the composite
+/// Three overlapping shapes in ONE color. Reordering them leaves the composite
 /// byte-identical, which is precisely the case `oplog_engine_in_sync` cannot
 /// see — `three()` above uses three different solid fills, so every reorder
 /// there trips the hash guard and never reaches the op-log undo branch.

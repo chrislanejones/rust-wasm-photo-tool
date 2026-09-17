@@ -8,8 +8,8 @@
 // of bug to attribute months later.
 //
 // Source-level on purpose. A second owner is not a wrong value yet; it is a
-// wrong value waiting for someone to add a call. Behaviour cannot see it, and
-// by the time behaviour can, the arc is already built on top. Same reasoning as
+// wrong value waiting for someone to add a call. Behavior cannot see it, and
+// by the time behavior can, the arc is already built on top. Same reasoning as
 // `toolSurfaces.contract.test.ts`, which caught the toolbar drift's cause
 // rather than its symptom.
 import { describe, it, expect } from "vitest";
@@ -168,7 +168,7 @@ describe("throwaway engines are declared, not incidental", () => {
       expect(
         code(full),
         `${f} calls attachLivePort — a throwaway document must NOT share the live queue: ` +
-          "its ops would enter the live op log and it would serialise behind the open photo",
+          "its ops would enter the live op log and it would serialize behind the open photo",
       ).not.toContain("attachLivePort");
     }
   });

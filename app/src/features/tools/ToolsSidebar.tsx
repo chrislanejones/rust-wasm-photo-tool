@@ -125,7 +125,7 @@ interface ToolsSidebarProps {
   hasCompareBaseline: boolean;
   compressProgress: { completed: number; total: number };
   onApplyCrop?: () => void;
-  /** Allows the Crop tool ratio buttons to drop a centred crop selection
+  /** Allows the Crop tool ratio buttons to drop a centered crop selection
    *  computed in Rust. Optional — omit to disable ratio buttons. */
   onSetCropSelection?: (
     sel: { x: number; y: number; width: number; height: number } | null,
@@ -142,7 +142,7 @@ interface ToolsSidebarProps {
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
-  /** Re-apply a colour from the Color Picker history. */
+  /** Re-apply a color from the Color Picker history. */
   onPickColor?: (hex: string) => void;
   onGlobalBlur?: (intensity: number) => void;
   // Shapes sub-mode
@@ -286,7 +286,7 @@ export function ToolsSidebar({
       exit={embedded ? undefined : "exit"}
       role="region"
       aria-label="Tool options"
-      // Clicking in here operates ON the current selection — the pen's colour
+      // Clicking in here operates ON the current selection — the pen's color
       // and Background controls live in this panel — so it must not count as
       // "clicked away" and end that selection. See PenOverlay's off-canvas
       // finish, which reads raw coordinates and cannot tell panel from page.

@@ -30,7 +30,7 @@ Stage 6 has to beat something, and this is it. From the QC pass over 12 photos
 |---|---|
 | Names containing any true subject word | **2 / 12** |
 | `{kind}` slot | said `photo` **12 / 12** |
-| Skin heuristic | labelled a car, a house and a volcano `portrait` |
+| Skin heuristic | labeled a car, a house and a volcano `portrait` |
 | The one actual person in the set | came back **empty** |
 
 The skin-ratio row is the sharpest one: the heuristic is not merely weak, it is

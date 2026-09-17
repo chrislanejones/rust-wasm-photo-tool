@@ -183,20 +183,20 @@ export const thumbEnter = (i: number) => ({
 
 /**
  * THUMBNAIL "DEVELOP" — the picture arrives black and white, HOLDS there long
- * enough to be read as a black-and-white photo, then comes into colour.
+ * enough to be read as a black-and-white photo, then comes into color.
  *
  * ⚠️ THE HOLD IS THE WHOLE POINT, and its absence is why the first cut looked
  * broken. That version faded straight from grayscale(1) to grayscale(0) over
- * 240 ms, so the image was fully grey for about 33 ms — measured, frame by
+ * 240 ms, so the image was fully gray for about 33 ms — measured, frame by
  * frame — and spent the rest mid-wash. On a 99 px tile that is not a black and
- * white photo turning colour; it is a flicker nobody sees. Holding first is
+ * white photo turning color; it is a flicker nobody sees. Holding first is
  * what makes it legible.
  *
  *  - LEAD: the gallery draws, THEN the pictures start. Without it the first
  *    tile develops in the same frame the panel appears and the two read as one
  *    muddled event.
  *  - HOLD: fully black and white, and long enough to register.
- *  - FADE: the colouring itself.
+ *  - FADE: the coloring itself.
  *  - HANDOFF: tile N starts when tile N-1 is this far through — left to right,
  *    succession rather than a wall.
  *
@@ -214,7 +214,7 @@ export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_TOTAL_MS * THUM
 export const thumbDevelop: { mono: TargetAndTransition; colour: TargetAndTransition } = {
   /** Where every tile starts, and where it stays until its turn. */
   mono: { filter: "grayscale(1)" },
-  /** Hold, then colour. Two keyframes at the same value give the hold; `times`
+  /** Hold, then color. Two keyframes at the same value give the hold; `times`
    *  puts the second at HOLD/TOTAL so the fade owns only the remainder. */
   colour: {
     filter: ["grayscale(1)", "grayscale(1)", "grayscale(0)"],

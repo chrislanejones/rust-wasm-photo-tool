@@ -77,7 +77,7 @@ export function LassoOverlay({
       }}
     >
       {/* Doubled stroke — a dark casing under a light core — so the wire stays
-          legible over both a bright sky and a black shadow. A single-colour
+          legible over both a bright sky and a black shadow. A single-color
           line disappears into half the photos you'd want to trace. */}
       {committedPts && (
         <>

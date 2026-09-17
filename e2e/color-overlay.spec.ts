@@ -62,7 +62,7 @@ async function pickTool(page: Page, group: string, subTool: string): Promise<voi
   await page.waitForTimeout(500);
 }
 
-/** Sample the centre pixel of the visible composite.
+/** Sample the center pixel of the visible composite.
  *
  * The display canvas is worker-owned (ADR-024 put the engine in a worker and
  * transferred control to an OffscreenCanvas), so `getContext("2d")` on it
@@ -106,7 +106,7 @@ test("Color Overlay: swatch tints, strength blends, undo reverses, apply bakes",
   const before = await centrePixel(page);
   console.log("[smoke] before overlay:", before);
 
-  // 2. Picking a swatch IS the on-switch. Full strength → the exact colour.
+  // 2. Picking a swatch IS the on-switch. Full strength → the exact color.
   await page.getByRole("button", { name: `Color ${RED}`, exact: true }).first().click();
   const tinted = await centrePixel(page);
   console.log("[smoke] after red swatch:", tinted);

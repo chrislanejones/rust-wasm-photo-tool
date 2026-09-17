@@ -37,18 +37,18 @@ no effect; the text sets the real floor. So `box_height == 0` — every
 annotation written before v8.41 — means exactly what it meant before, and a
 drag that undershoots cannot crop words away.
 
-**2. The text is top-aligned, not centred.** Centring reads better in a bubble
+**2. The text is top-aligned, not centered.** Centering reads better in a bubble
 and was the first implementation. It was reversed before it shipped, because
-the handles are the feature and centring breaks them: with the text pinned to
+the handles are the feature and centering breaks them: with the text pinned to
 the middle, dragging the top edge up by N lifts that edge by N/2 unless the
 anchor is also walked, and the type slides under the cursor while you resize.
 Top-aligned, the text is glued to the box's top-left exactly the way
 `wrap_width` already glues it to the left — every handle moves its own edge
 1:1, the opposite edge stays, and the vertical axis behaves identically to the
 horizontal one that already shipped. Consistency with the axis that already
-worked beat prettier default centring.
+worked beat prettier default centering.
 
-It also keeps the anchor mapping honest for free. Centring moves every glyph
+It also keeps the anchor mapping honest for free. Centering moves every glyph
 down, so `annotation_ink_offset` would have needed the height, and the overlay
 would have needed a matching JS estimate of the text's natural height to cancel
 it — two numbers computed by two different rasterisers, differing by about
@@ -98,9 +98,9 @@ eight.
 ## Alternatives rejected
 
 - **Overlay-only height** (the dashed box grows, the commit ignores it).
-  Rejected as a lie: it is precisely the "handle that promises a behaviour the
+  Rejected as a lie: it is precisely the "handle that promises a behavior the
   model cannot express" the v8.40 comment refused to ship.
-- **Centred text.** See Decision 2 — reversed mid-implementation, before it
+- **Centered text.** See Decision 2 — reversed mid-implementation, before it
   shipped, on the handle feel.
 - **Eight handles** (adding N/S for height-only). Six is what was asked for and
   six is how Chris pictures the box.
@@ -126,7 +126,7 @@ extends itself; the enumerated list was a thing somebody had to remember.
 **A future step that is NOT append-only must narrow that range deliberately
 rather than inherit it.**
 
-**The thing to watch:** if the layout ever goes centred, three places become
+**The thing to watch:** if the layout ever goes centered, three places become
 wrong at once and none of them fails loudly — `annotation_ink_offset` (needs
 the height), `textInkOffsetBgAwaited`'s cache key (needs the height, or every
 re-edit of a resized box serves a stale offset and the text walks up the canvas

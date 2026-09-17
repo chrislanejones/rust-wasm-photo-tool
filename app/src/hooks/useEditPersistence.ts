@@ -26,7 +26,7 @@ import { mayUpload, recordUpload, isUploadRetryEnabled } from "@/lib/uploadBudge
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
-// Convex storage upload preserves everything, matching IDB behaviour.
+// Convex storage upload preserves everything, matching IDB behavior.
 //
 // Format (all little-endian u32):
 //   magic(4) version(4) canvas_w(4) canvas_h(4)
@@ -275,7 +275,7 @@ async function archiveHash(archive: Uint8Array): Promise<string | null> {
   // `crypto.subtle` only exists in a secure context. A dev server reached over
   // a LAN IP is not one, and there this would throw — into the catch that
   // reports "cloud save failed", silently disabling sync altogether. Null means
-  // "cannot tell", and the caller uploads, which is the shipped behaviour.
+  // "cannot tell", and the caller uploads, which is the shipped behavior.
   if (typeof crypto === "undefined" || !crypto.subtle) return null;
   const buf = archive.buffer.slice(
     archive.byteOffset,
@@ -372,7 +372,7 @@ export function useEditPersistence() {
           const cap = decodeCapture(await tool.capture_state());
           const { canvasW, canvasH, canvasPng, undoStack, redoStack, layers, activeLayerId } = cap;
 
-          // Serialised here rather than in the decoder: the archive wants JSON
+          // Serialized here rather than in the decoder: the archive wants JSON
           // strings, the local IDB path wants parsed objects, and `decodeCapture`
           // returns the parsed form both share. Strip semantics are identical —
           // `decodeCapture` applies `stripLiveAnnotations` for us, which is what

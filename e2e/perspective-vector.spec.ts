@@ -166,7 +166,7 @@ async function storedQuad(page: Page, id: number): Promise<number[]> {
 const IDENTITY = [0, 0, 1, 0, 1, 1, 0, 1];
 
 test.describe("Perspective reaches the objects the app draws", () => {
-  test("a square can be warped, and the box can be cancelled", async ({ page }) => {
+  test("a square can be warped, and the box can be canceled", async ({ page }) => {
     await blockExternalNetwork(page);
     await page.goto("/");
     await importFixture(page);

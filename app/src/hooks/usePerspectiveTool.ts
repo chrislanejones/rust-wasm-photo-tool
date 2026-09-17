@@ -21,11 +21,11 @@ import type { PerspectiveTargetBox } from "@/lib/perspectiveTarget";
  *
  *   • A selected OBJECT — a text annotation, a square, a circle, any shape the
  *     app draws — warps NON-DESTRUCTIVELY. The engine stores the corners on
- *     the annotation itself, normalised across its own box, and renders
+ *     the annotation itself, normalized across its own box, and renders
  *     through them. Edit the words or restyle the square afterwards and it
  *     re-renders and re-warps together — this is what "works with vector
  *     objects, just like Photoshop" actually requires, and it is why the
- *     corners are normalised rather than baked into a raster.
+ *     corners are normalized rather than baked into a raster.
  *
  *   • With nothing selected the quad warps PIXELS, which is destructive: the
  *     region is lifted, resampled and put back, as one op in the log.
@@ -54,7 +54,7 @@ interface Opts {
   /** Plain composite blit — cheap, safe to call after a warp lands. */
   flushToCanvas: () => void;
   /** The selected vector object with its basis rect, or null for the pixel
-   *  path. The basis is where the quad starts and what it is normalised
+   *  path. The basis is where the quad starts and what it is normalized
    *  against — see `lib/perspectiveTarget.ts` for the shape rule, which the
    *  engine mirrors. */
   target: PerspectiveTargetBox | null;
@@ -100,7 +100,7 @@ export function usePerspectiveTool({
   const arm = usePerspectiveStore((s) => s.arm);
   const setTarget = usePerspectiveStore((s) => s.setTarget);
   // The rectangle the quad started from. Reset returns here, and it is also
-  // the box the corners are normalised against for the vector path.
+  // the box the corners are normalized against for the vector path.
   const baseRef = useRef<{ x: number; y: number; w: number; h: number } | null>(
     null,
   );
@@ -198,7 +198,7 @@ export function usePerspectiveTool({
       if (cancelled) return;
       const stored = fromFlat(flat);
       // No stored quad, or a stored identity, both mean "start from the
-      // rectangle" — the identity IS the rectangle, expressed normalised.
+      // rectangle" — the identity IS the rectangle, expressed normalized.
       if (!stored || isIdentity(stored)) {
         setQuad(fresh);
         return;
@@ -206,7 +206,7 @@ export function usePerspectiveTool({
       // ⚠️ RECOVER THE UNWARPED RECT FIRST, for TEXT. `frame` is the
       // annotation's LIVE bounds, and once a warp is applied those are the
       // bounding box of the WARPED tile — while the engine stores corners
-      // normalised against the UNWARPED one (the warp is the last stage of the
+      // normalized against the UNWARPED one (the warp is the last stage of the
       // tile pipeline, so the quad describes the input to it, not the output).
       //
       // Denormalising straight onto `frame` therefore draws the handles in the
@@ -216,7 +216,7 @@ export function usePerspectiveTool({
       //
       // No engine round trip is needed to fix it: the warped bbox IS the
       // bounding box of the stored quad, so the unwarped rect falls straight
-      // out of the two. Scale `frame` up by the quad's own normalised extent
+      // out of the two. Scale `frame` up by the quad's own normalized extent
       // and shift its origin back by the quad's offset.
       //
       // A SHAPE NEEDS NONE OF THIS, and that is a property of the basis, not
@@ -225,7 +225,7 @@ export function usePerspectiveTool({
       // not. Recovering a "pre-warp" rect from it would be undoing a transform
       // that was never applied — the handles would land off the shape.
       const base = target.kind === "shape" ? frame : unwarpedBase(frame, stored);
-      // Apply normalises against THIS, so a re-applied quad replaces the stored
+      // Apply normalizes against THIS, so a re-applied quad replaces the stored
       // one rather than stacking on top of it.
       baseRef.current = base;
       const local = denormalise(stored, base.w, base.h);
@@ -404,10 +404,10 @@ export function usePerspectiveTool({
 }
 
 /**
- * The UNWARPED rect a stored text quad was normalised against, recovered from
+ * The UNWARPED rect a stored text quad was normalized against, recovered from
  * the annotation's current (warped) bounds and the quad itself.
  *
- * `frame` is the bounding box of the warped tile, and the quad's own normalised
+ * `frame` is the bounding box of the warped tile, and the quad's own normalized
  * extent is the ratio between the two — so the original rect falls straight out
  * without asking the engine anything. Extracted from the seed effect because it
  * is pure arithmetic and the effect around it is not.

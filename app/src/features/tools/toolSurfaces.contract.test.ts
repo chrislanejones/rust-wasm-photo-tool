@@ -106,7 +106,7 @@ describe("ShortcutModal — the surface that has already drifted once", () => {
 // the only module in the tree that names the five groups as string literals —
 // verified 2026-08-07 — and this fails the moment that stops being true.
 //
-// It reads source rather than behaviour on purpose. A second copy is not a
+// It reads source rather than behavior on purpose. A second copy is not a
 // wrong value yet; it is a wrong value waiting for someone to edit one side.
 describe("no surface keeps its own copy of the tool table", () => {
   it("only toolGroups.ts names the five group labels", async () => {

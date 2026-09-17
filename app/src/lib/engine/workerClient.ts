@@ -228,7 +228,7 @@ export class EngineWorkerClient {
   private onReply(r: EngineReply) {
     if (r.id === 0) return; // init handshake, handled in init()
     const p = this.pending.get(r.id);
-    if (!p) return; // already timed out or cancelled — dropping it is correct
+    if (!p) return; // already timed out or canceled — dropping it is correct
     clearTimeout(p.timer);
     this.pending.delete(r.id);
     if (typeof r.ms === "number") this.engineMs += r.ms;

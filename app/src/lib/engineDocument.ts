@@ -36,7 +36,7 @@
 // actually did, which is worse than the corruption it prevents. So this refuses
 // ONLY when it positively knows the engine holds a different photo. Unknown
 // ownership (`null`) always allows the save. A missed `setEngineDocument` call
-// therefore degrades to today's behaviour, never to data loss.
+// therefore degrades to today's behavior, never to data loss.
 //
 // WHICH IS EXACTLY WHY THE COUNTERS EXIST
 //

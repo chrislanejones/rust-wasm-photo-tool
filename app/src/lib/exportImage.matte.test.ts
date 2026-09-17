@@ -73,7 +73,7 @@ describe("#46 — an interior hole must not encode as black", () => {
 
   it("a half-transparent pixel blends toward the matte, not to black", () => {
     // 50% alpha red over white → a pink, and specifically not darker than the
-    // source. The old behaviour drove it toward 0.
+    // source. The old behavior drove it toward 0.
     const px = new Uint8Array([200, 30, 30, 128]);
     matteOntoOpaque(px);
     const [r, g, b, a] = [px[0], px[1], px[2], px[3]];

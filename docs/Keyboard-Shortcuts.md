@@ -25,7 +25,7 @@
 | `1`       | Enhance group (Resize & Compress · Adjustments · AI) |
 | `2`       | Select group (Marquee · Magic Wand · Lasso · …) |
 | `3`       | Create group (Brush · Pen · Clone Stamp · Text · Shapes · …) |
-| `4`       | Edit group (Crop · Transform · Colour Picker · …) |
+| `4`       | Edit group (Crop · Transform · Color Picker · …) |
 | `5`       | Batch group (Logo · Text · Rename · AI Rename) |
 
 The digits select a **tool group**, not an individual tool — that changed when

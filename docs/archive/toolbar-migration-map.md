@@ -42,7 +42,7 @@ sub-tool the total would be 35.
 **Adjustments** = "everything currently in Effects: brightness, contrast, etc."
 The spec moves the 4× Upscale card out of Effects and into AI, so Adjustments is
 EffectsSettings *minus* that one card. That is a spec-sanctioned structural
-change, not behaviour drift.
+change, not behavior drift.
 
 **AI** is one sub-tool spanning **two** existing eraser modes (`rembg` =
 Background Removal, `inpaint` = Object Removal). Entry mode is `rembg`;
@@ -87,7 +87,7 @@ Zero risk group: it is a straight re-parent of a set that already existed.
 | Emoji | `smile` | `stamp` | `emojis` | `StampSettings` |
 | Stamps | `stamp` | `stamp` | `red` | `StampSettings` |
 
-**Pins** resolves cleanly despite the label: `shapesMode: "pens"` is labelled
+**Pins** resolves cleanly despite the label: `shapesMode: "pens"` is labeled
 "Pens" in `toolModes.ts` but carries a `MapPin` icon and drives `PIN_LABELS`
 (Numbers / Letters) in `ShapeSettings`. It is the pin-drop feature, not the
 Bézier pen. The Bézier pen is `brushMode: "pen"`, which is Create's **Pen**.
@@ -119,7 +119,7 @@ this group — see **Design note** below.
 
 **Color Picker** maps to `crop` *plus* setting `colorPickerActive: true`. That
 is precisely what clicking the existing Color Picker toggle does today, so it is
-behaviour-preserving rather than a new activation path.
+behavior-preserving rather than a new activation path.
 
 ---
 
@@ -149,7 +149,7 @@ deleted, hidden, or unwired. Listed for Chris to decide on.
 | O-4 | Shape kinds `rect`, `circle`, `handCircle` | `ShapeSettings` SHAPES row | Panel-internal kinds. Only `line` was promoted to a sub-tool by the spec; the other three stay as in-panel buttons. |
 | O-5 | `eraserMode: "inpaint"` | `AISettings` toggle | Folded into the single **AI** sub-tool with `rembg`. Reachable via the panel's own toggle. |
 | O-6 | "Remove canvas" action | `LayerSettings` | Panel-internal, sits under Canvas Size. |
-| O-7 | Effects' 4× Upscale card | `EffectsSettings` | Spec relocates it to Enhance → AI. Already a disabled "Coming Soon" placeholder; no behaviour to preserve beyond rendering it in its new home. |
+| O-7 | Effects' 4× Upscale card | `EffectsSettings` | Spec relocates it to Enhance → AI. Already a disabled "Coming Soon" placeholder; no behavior to preserve beyond rendering it in its new home. |
 
 ---
 
@@ -165,7 +165,7 @@ Two live features are called Eraser:
 
 - `brushMode: "erase"` — scrubs the active layer's alpha (Paint tool). **Already
   unreachable**, see O-1.
-- `eraserMode: "brush"` — labelled exactly "Eraser" in `AISettings`, sits
+- `eraserMode: "brush"` — labeled exactly "Eraser" in `AISettings`, sits
   directly beside "Magic Eraser".
 
 Implemented as `ai` / `brush`, because the spec lists **Eraser** and **Magic
@@ -201,7 +201,7 @@ Side effect worth knowing: `AISettings` has a single 4-way mode toggle
 (`brush`, `magic`, `rembg`, `inpaint`) and the spec splits it across **two
 groups** — `brush`/`magic` to Create, `rembg`/`inpaint` to Enhance. So using
 that in-panel toggle can move you to a mode belonging to the other group, and
-the lit group tile will follow. Coherent and behaviour-preserving, but it is the
+the lit group tile will follow. Coherent and behavior-preserving, but it is the
 one place where a panel control crosses a group boundary.
 
 **Decision needed:** split `AISettings` into two panels along the group line, or

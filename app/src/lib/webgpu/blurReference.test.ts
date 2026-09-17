@@ -4,7 +4,7 @@
 // (`selfTest.ts`) — these tests pin the parts that CAN be checked in node, and
 // they are the parts most likely to drift away from the Rust:
 //
-//   • the kernel (sigma = max(r,1)/2, normalised, symmetric)
+//   • the kernel (sigma = max(r,1)/2, normalized, symmetric)
 //   • clamp-to-edge at the boundary
 //   • the u8 quantisation BETWEEN passes, which is the detail a GPU port
 //     silently "improves" and thereby breaks
@@ -22,14 +22,14 @@ describe("buildGaussianKernel", () => {
     expect(buildGaussianKernel(30)).toHaveLength(61);
   });
 
-  it("normalises to 1", () => {
+  it("normalizes to 1", () => {
     for (const r of [1, 2, 5, 13, 30]) {
       const sum = [...buildGaussianKernel(r)].reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1, 5);
     }
   });
 
-  it("is symmetric and peaks in the centre", () => {
+  it("is symmetric and peaks in the center", () => {
     const k = buildGaussianKernel(7);
     for (let i = 0; i < k.length; i++) {
       expect(k[i]).toBeCloseTo(k[k.length - 1 - i], 6);
@@ -39,7 +39,7 @@ describe("buildGaussianKernel", () => {
 
   it("uses sigma = max(r,1)/2 — NOT r/3", () => {
     // Pins the constant against the Rust. With sigma = r/2 the ratio of the
-    // edge tap to the centre tap is exp(-r^2 / (2*(r/2)^2)) = exp(-2).
+    // edge tap to the center tap is exp(-r^2 / (2*(r/2)^2)) = exp(-2).
     const r = 6;
     const k = buildGaussianKernel(r);
     expect(k[0] / k[r]).toBeCloseTo(Math.exp(-2), 6);
@@ -70,7 +70,7 @@ describe("gaussianBlurCpu", () => {
   };
 
   it("leaves a uniform image untouched", () => {
-    // A normalised kernel over a constant field is the identity — and because
+    // A normalized kernel over a constant field is the identity — and because
     // edges CLAMP rather than fading to transparent, that holds at the border
     // too. If edge handling ever became zero-padding, this test goes red.
     const w = 16, h = 9;

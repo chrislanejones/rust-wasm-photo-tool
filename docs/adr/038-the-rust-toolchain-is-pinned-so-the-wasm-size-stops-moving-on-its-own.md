@@ -62,7 +62,7 @@ It is six months later and this was a mistake. Most likely reason: the pin was
 never bumped. Rust moved five or six releases, a contributor hit a dependency
 that needed a newer compiler, and rather than bump the channel and re-measure,
 someone deleted `rust-toolchain.toml` "temporarily" to unblock a build — which
-silently restored floating behaviour, and the next size surprise took just as
+silently restored floating behavior, and the next size surprise took just as
 long to diagnose as this one did, only now with an ADR claiming it could not
 happen.
 

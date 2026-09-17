@@ -279,7 +279,7 @@ describe("worker lifecycle — the wasm-memory guard", () => {
     // The saving is illusory anyway: without a transfer `postMessage`
     // structured-clones the array, which is one copy; copying defensively and
     // then transferring is also one copy. Pinned here because the comment alone
-    // did not survive a mutation run — it looked like a free optimisation.
+    // did not survive a mutation run — it looked like a free optimization.
     setFlag(true);
     const { FakeWorker } = fakeWorkerClass();
     vi.stubGlobal("Worker", FakeWorker);

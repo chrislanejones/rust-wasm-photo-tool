@@ -6,7 +6,7 @@
 // and the Diagnostics Window renders it.
 //
 // IT DOES NOT REIMPLEMENT THE READS. Each entry points at the module's own
-// exported predicate, so the panel cannot disagree with the behaviour — a
+// exported predicate, so the panel cannot disagree with the behavior — a
 // second copy of `getItem(...) !== "0"` here would be a new source of truth
 // that silently drifts, which is the exact failure this repo keeps hitting.
 // Adding a flag means adding a row here; the compiler will not force you, so
@@ -95,7 +95,7 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     kind: "kill",
     isOn: isUploadRetryEnabled,
     effect:
-      "Re-attempts a cloud upload the rate limiter denied, once, after the interval expires. Off restores v7.67 behaviour: a denied upload is skipped and never retried. The local copy is written either way, so this only affects cloud freshness.",
+      "Re-attempts a cloud upload the rate limiter denied, once, after the interval expires. Off restores v7.67 behavior: a denied upload is skipped and never retried. The local copy is written either way, so this only affects cloud freshness.",
     source: "lib/uploadBudget.ts",
   },
   {
