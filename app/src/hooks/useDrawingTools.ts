@@ -8,7 +8,7 @@ import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import {
   diamondVertices,
   shapeWobbleSeed,
-  sloppyEllipsePoints,
+  sloppyCirclePoints,
   sloppyPolylinePoints,
   starVertices,
 } from "@/lib/shapeSloppiness";
@@ -1258,16 +1258,23 @@ function drawShapePreview(
           { x: x + w, y: y + h },
           { x, y: y + h },
         ];
-        pts = sloppyPolylinePoints(verts, shapeWobbleSeed(from.x, from.y, to.x, to.y), sloppiness, true);
+        pts = sloppyPolylinePoints(
+          verts,
+          shapeWobbleSeed(from.x, from.y, to.x, to.y),
+          sloppiness,
+          width,
+          true,
+        );
         break;
       case "circle":
-        pts = sloppyEllipsePoints(from, to, sloppiness);
+        pts = sloppyCirclePoints(from, to, sloppiness, width);
         break;
       case "diamond":
         pts = sloppyPolylinePoints(
           diamondVertices(from.x, from.y, to.x, to.y),
           shapeWobbleSeed(from.x, from.y, to.x, to.y),
           sloppiness,
+          width,
           true,
         );
         break;
@@ -1276,6 +1283,7 @@ function drawShapePreview(
           starVertices(from.x, from.y, to.x, to.y),
           shapeWobbleSeed(from.x, from.y, to.x, to.y),
           sloppiness,
+          width,
           true,
         );
         break;
@@ -1287,6 +1295,7 @@ function drawShapePreview(
           ],
           shapeWobbleSeed(from.x, from.y, to.x, to.y),
           sloppiness,
+          width,
           false,
         );
         break;
@@ -1296,8 +1305,10 @@ function drawShapePreview(
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
+      return;
     }
-    return;
+    // No sketchy path (a circle too small to wobble) — fall through to the
+    // clean branches, which is what the engine does.
   }
 
   ctx.beginPath();
