@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.79",
+    date: "2026-09-16",
+    headline: "Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop",
+    entries: [
+      {
+        tag: "feature",
+        text: "Perspective, Distort and Skew work on the things you drew. Point the tool at a square, a circle, a line, an arrow, a pin, a pen path or a piece of text and the warp happens to that object, not to the photo underneath it. Text was the only thing that worked that way before. The warped object stays an object: recolour it, move it, drag it to a new size, undo it, or re-select it and adjust the same corners. Apply, Reset and Cancel sit on the canvas under the box, and Esc takes the whole frame away.",
+      },
+      {
+        tag: "feature",
+        text: "Enhance has a Presets tile. One click applies a whole look, and hovering one previews it on your own photo before you commit. A preset is a named stack of adjustments the app already had, so applying it is a single undo step. The Quick Adjust grid it grew out of is gone, and Adjustments is sliders only.",
+      },
+      {
+        tag: "ui",
+        text: "Every dialog has the same backdrop. Export, Settings, the Command Palette, Diagnostics and Shortcuts had none at all while the New dialog had one, and the rest had drifted to four different shades. The New dialog also opens without its stutter, because the backdrop no longer re-blurs the whole screen on every frame of the animation.",
+      },
+      {
+        tag: "ui",
+        text: "The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Colour Picker and Remove Object are one shape instead of four. In Rulers & Grid, clicking a lit toggle now turns it off, where before clicking it again did nothing.",
+      },
+      {
+        tag: "ui",
+        text: "The Levels histogram is tall enough to read, and the New dialog has a switch. Off, which is the default, everything stays in your browser. On adds Create AI Image, which sends your prompt to a server.",
+      },
+      {
+        tag: "infra",
+        text: "The site and the editor both run Google Analytics, and the editor also reports to Vercel Web Analytics. The tab icon on imagehorse.app is the horse.",
+      },
+    ],
+  },
+  {
     version: "v8.78",
     date: "2026-09-15",
     headline: "The Stroke Stabilizer steadies your line again, and a pasted picture saves as pasted-revised",

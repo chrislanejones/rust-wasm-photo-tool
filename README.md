@@ -85,32 +85,44 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.78 — 2026-09-15
+### v8.79 — 2026-09-16
 
-**The Stroke Stabilizer steadies your line again, and a pasted picture saves as `pasted-revised`.**
+**Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop.**
 
-The Stroke Stabilizer had been doing worse than nothing since v8.75. With it
-on, a stroke drew your raw line, then closed itself with a straight line back to
-where you started: an L came out as a triangle, a U as a box. It happened on
-every setting, on the Paint brush, the Eraser, mask painting and the Magic
-Eraser brush. One line in the engine had the leash stuck at zero. Your line
-trails the cursor again, and a new test fails if a stroke ever closes itself.
+Point Perspective at a square, a circle, a line, an arrow, a pin, a pen path or
+a piece of text and the warp happens to *that object*, not to the photo
+underneath it. Text was the only thing that worked that way before; everything
+else fell through to the pixel warp, so a square you had just drawn sat still
+while the picture under it moved. The warped object stays an object — recolour
+it, move it, drag it to a new size, undo it, or re-select it and adjust the same
+corners. Apply, Reset and Cancel sit on the canvas under the box now, and Esc
+takes the whole frame away.
 
-A picture you paste in, like a screenshot or "Copy image" from a web page, now
-exports as `pasted-revised` instead of `image-revised`. The browser calls every
-pasted picture `image.png`, so that's what the file ended up named. Copy an
-actual file in File Explorer and paste it, and it keeps its own name.
+Enhance has a Presets tile. One click applies a whole look, and hovering one
+previews it on your own photo before you commit. A preset is a named stack of
+adjustments the app already had, so applying it is a single undo step. The Quick
+Adjust grid it grew out of is gone, and Adjustments is sliders only.
 
-Create AI Image is hidden until it works. It opened a dialog you could fill in
-and then couldn't generate from.
+Every dialog has the same backdrop. Export, Settings, the Command Palette,
+Diagnostics and Shortcuts had none at all while the New dialog had one, and the
+rest had drifted to four different shades. The New dialog also opens without its
+stutter — the backdrop used to re-blur the whole screen on every frame of the
+animation.
 
-If you're still on the old Netlify address, you'll see a notice that the editor
-moved to edit.imagehorse.app, and that on September 29 the old address starts
-forwarding there. Photos saved there without signing in live in your browser
-for that address only, so download them first with Alt+Shift+E.
+The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Colour Picker
+and Remove Object are one shape instead of four. In Rulers & Grid, clicking a
+lit toggle now turns it off, where before clicking it again did nothing.
 
-The website link on the start screen goes to imagehorse.app instead of an old
-host.
+The Levels histogram is tall enough to read.
+
+The New dialog has a switch. Off, which is the default, everything stays in your
+browser. On adds Create AI Image, which sends your prompt to a server. It is
+named for what it does rather than for AI, because it is where anything that
+leaves your tab will live.
+
+The site and the editor both run Google Analytics now.
+
+The tab icon on imagehorse.app is the horse.
 
 ## License
 
