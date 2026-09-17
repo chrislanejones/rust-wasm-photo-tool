@@ -1,8 +1,13 @@
 # #131 runtime fonts — what has to be decided before it merges
 
-Written 2026-09-16 against master `34351cfa`. **Not a merge plan.** #131 has
-been open since 09-11 and is now blocked on three things, only one of which is
-a conflict. The other two are decisions.
+Written 2026-09-16 against master `34351cfa`; **§3 rewritten 2026-09-17**
+against `2d4fd1dc` after reading the branch and measuring the live engine.
+**Not a merge plan.**
+
+#131 has been open since 09-11. It was blocked on three things — an ADR number
+collision, a real rebase, and a design question. **The design question is now
+answered by measurement** (§3), and the recommendation is written down. The
+other two are still mechanical work waiting to be done.
 
 ## Where it stands
 
@@ -17,7 +22,8 @@ a conflict. The other two are decisions.
 
 It touches the engine (`src/fonts.rs`, `text.rs`, `annotations.rs`, `layer.rs`,
 `history.rs`, `lib.rs`, `ops.rs`), ships **six Liberation TTFs** into
-`app/public/fonts/`, and moves the sentinel band.
+`app/public/fonts/`, and moves the sentinel band — see §3 for what that band
+move actually pays for, which is not what the title implies.
 
 ---
 
@@ -54,39 +60,111 @@ for the final number — resolve it by arithmetic, then let the test confirm.
 
 ---
 
-## 3. ⚠️ The real question: the band moved tonight, for a different reason
+## 3. The question, answered by measurement — 2026-09-17
 
-#131's own title is *"fonts arrive at runtime and **the sentinel ceiling moves
-to pay for it**"*.
+**The earlier draft of this section framed the choice as "runtime OR embedded"
+and told the reader the PR was the only place the answer lived. Both halves
+were wrong.** The PR was read, the branch was measured, and the live engine was
+measured with the sentinel. What follows replaces that framing.
 
-The ceiling moved tonight, in #160 — but **not for fonts**:
+### Embedding is the status quo, not an option
+
+`src/text.rs:13-14` on **master** already compiles two Liberation Sans faces
+into the engine with `include_bytes!`. #131 keeps the **byte-identical blobs**
+(verified by object hash, both `SAME BLOB`). So no decision moves the engine
+from "no fonts" to "fonts" — it already has them.
 
 | | Bytes |
 |---|---|
-| Old ceiling | 840,000 |
-| **New ceiling** (#160) | **860,000** |
-| Live engine | 845,156 |
-| **Headroom** | **~14,800** |
-| One Liberation TTF | **61,972** |
+| Live engine (`deploy-sentinel.sh`, 09-17, PASS) | **845,156** |
+| Font data already inside it | **123,492** |
+| Font share of the engine | **14.6%** |
+| Ceiling (#160) | 860,000 |
+| Headroom | 14,844 |
+| Floor — the featureless-build detector | 800,000 |
+| #131 sets `MAX_WASM` to | 872,000 (**+12,000** over today) |
 
-That headroom is **deliberately smaller than one font file**, and #160 says so
-explicitly. ADR-051's finding — a font cannot be embedded without moving this
-band — has to keep failing loudly, so #160 was careful not to pre-authorise
-what #131 wants.
+⚠️ 872,000 was written when the ceiling was 840,000, so the branch asked for
++32,000 at the time. Against today's 860,000 the ask is +12,000. **The branch
+has not been built, so #131's actual wasm size is still unmeasured** — the
+figure above is what it requests, not what it needs.
 
-**So #131 needs the band moved again, on purpose this time.** That is the
-decision, and it is Chris's:
+### What #131 actually implements: both
 
-| Option | Consequence |
+It keeps the embedded pair as the always-available baseline AND adds
+`register(font_id, bold, bytes)` so four more faces (Mono, Serif, each in
+regular and bold) arrive from `app/public/fonts/` at runtime. That is why its
+title says "runtime" while it also edits `deploy-sentinel.sh` — the two facts
+never disagreed, they describe different halves of one design.
+
+| Added to the branch | Size |
 |---|---|
-| **Fonts load at runtime from `/fonts/*.ttf`** | wasm unchanged, band untouched — six TTFs become static assets, ~372 KB of downloads, and the engine gets `FontRef::try_from_slice` bytes it did not compile in |
-| **Embed and raise the ceiling again** | every embedded face costs ~62 KB of band; the featureless detector's useful range narrows each time |
-| **Ship the selector cosmetic** | status quo — the 12-entry dropdown that renders in Liberation regardless, which ADR-051 already calls a shipped vacuous control |
+| Rust, across 8 files incl. a new 361-line `src/fonts.rs` | ~999 lines |
+| Six Liberation TTFs as static assets | 181,928 B |
+| **New font bytes inside the wasm** | **0** |
 
-⚠️ Read the PR before assuming which one it implements. Its title says
-"arrive at runtime", which points at option 1 — but it also edits
-`deploy-sentinel.sh`, which only makes sense for option 2. Those two facts
-disagree and the PR is the only place the answer is.
+The size growth pays for registry code, not typefaces.
+
+### The three options, with their real costs
+
+**A — Runtime only, dropping the embedded pair**
+
+| Benefit | Cost |
+|---|---|
+| Engine sheds ~123,492 B | Lands near **721,664 — under the 800,000 floor** |
+| Adding a face never touches the band again | The floor is the featureless-build detector, and it STAYS at 800,000 (Chris, 09-15) |
+| Faces cache separately from the engine | A 404 on a `.ttf` means no text renders at all, with no fallback |
+
+Tripping the floor is the blocker. That detector exists because Netlify shipped
+a featureless wasm for ten releases (v7.36–45) and nothing noticed.
+
+**B — Embed all six**
+
+| Benefit | Cost |
+|---|---|
+| Works offline, no fetch, no 404 path | **+120,000 to +246,000 B**, depending on which build |
+| One code path, no registry | Ceiling moves by ~105,000 to ~231,000 |
+| Nothing to precache in the service worker | Every future face costs band again, narrowing the detector each time |
+
+**C — Hybrid, which is what the PR does**
+
+| Benefit | Cost |
+|---|---|
+| Embedded pair guarantees text always renders | Two code paths to reason about |
+| Extra faces cost **zero** wasm bytes | 181,928 B of TTF become assets to precache |
+| Band ask is **+12,000**, not +105,000 | Registration is order-dependent: register before measure |
+| Floor stays satisfied | A missing file silently narrows the dropdown |
+
+### ⚠️ The finding that changes the arithmetic
+
+The embedded and shipped copies of the same face are not the same build:
+
+| | Embedded (`src/fonts`) | Shipped (`app/public/fonts`) |
+|---|---|---|
+| Size | 61,972 | **29,748** |
+| Glyphs | 460 | **458** |
+| `glyf` table | 53,752 | 25,120 |
+| Hinting (`fpgm` / `prep`) | present | **absent** |
+
+The engine rasterizes with **`ab_glyph`** (`Cargo.toml:51`, `text.rs:10`),
+a pure outline rasterizer that never executes TrueType hinting bytecode. So
+roughly **64,000 bytes** of the embedded pair is instruction data nothing runs,
+for a difference of two glyphs.
+
+That is over four times the headroom available now, and five times what #131
+asks for. **Swapping the embedded pair for the unhinted build would likely let
+#131 land with no ceiling move at all.**
+
+### Recommendation
+
+Take **C**, and swap the embedded pair to the unhinted build in the same
+commit. Text still renders with nothing fetched, the engine stops carrying
+bytecode `ab_glyph` ignores, and ADR-051's argument — that a font cannot be
+embedded without moving this band — keeps failing loudly, because the band will
+not have moved.
+
+**Not yet verified**: the unhinted swap needs a visual check that rendered text
+is unchanged. The comparison above is of tables and glyph counts, not pixels.
 
 ---
 
@@ -110,12 +188,13 @@ disagree and the PR is the only place the answer is.
 
 ## Recommended sequence
 
-1. Chris answers §3 — runtime or embedded.
+1. Chris confirms §3 — recommendation is hybrid + unhinted swap, measured.
 2. Renumber the ADR to **057**, fix `INDEX.md`.
 3. Merge master into the branch (not rebase — it is pushed), resolve the four
    Rust files and the async counter.
-4. Rebuild the engine and re-run the sentinel; if the answer was "embedded",
-   move the ceiling in the **same commit** with the reasoning written down, the
+4. Rebuild the engine and re-run the sentinel. With the unhinted swap the
+   ceiling may not need to move at all — measure before raising it, and if it
+   does move, do it in the **same commit** with the reasoning written down, the
    way #160 did.
 5. Full gates: `cargo fmt`, `clippy --all-targets` (no features — the
    documented trap), `cargo test --features tiles,patchmatch`, tsc, vitest,
