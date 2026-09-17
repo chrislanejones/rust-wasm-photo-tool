@@ -63,8 +63,9 @@ export const PEOPLE: Person[] = [
        than here: a screen reader that is told the language pronounces it,
        and one that is not reads Arabic letters with an English voice. */
     bio: [
-      'Naji — ناجي, Arabic for "survivor" — is an Arabian horse.',
+      'Naji — ناجي, Arabic for "survivor" — is an Arabian horse. He is the only horse of his herd who survived, which is what the name means.',
       "He can be ridden, though he does not make it easy. He lives in Louisa, Virginia, and we are hoping to bring him down to Florida.",
+      "He is why the editor is named after a horse. A workhorse is a tool that does the job and does not fuss. Image Horse.",
     ],
   },
 ];
