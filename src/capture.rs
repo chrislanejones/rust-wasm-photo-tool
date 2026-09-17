@@ -93,7 +93,7 @@ impl ImageHorseTool {
     /// of `width` (`self.width()`) and one of the layer metadata
     /// (`self.get_layers()`); each capture reads them, neither redefines them.
     /// Keeping both as aggregations is what makes the overlap safe, so do not
-    /// "optimise" either into computing a field for itself.
+    /// "optimize" either into computing a field for itself.
     ///
     /// Neither can be built from the other, which is why there are two. This
     /// one carries every undo/redo snapshot PNG — megabytes — so deriving a
@@ -271,7 +271,7 @@ pub struct UiStateCapture {
 /// The overlap is safe for the same reason `capture_state` and
 /// `capture_ui_state`'s is: all three are pure aggregations of the same public
 /// getters, so there is exactly one definition of `width` and one of the layer
-/// metadata. Do not "optimise" any of them into computing a field for itself.
+/// metadata. Do not "optimize" any of them into computing a field for itself.
 #[wasm_bindgen(getter_with_clone)]
 pub struct LayerStackCapture {
     pub width: u32,
@@ -625,7 +625,7 @@ mod capture_tests {
         assert_eq!(r.text(), t.get_text_annotations(), "live text overlays");
         let shapes = r.text();
         assert_eq!(shapes, t.get_shape_annotations(), "live shape overlays");
-        // The colour is stored as numeric r/g/b, not the "#ff0000" that was
+        // The color is stored as numeric r/g/b, not the "#ff0000" that was
         // passed in — assert on what the serialiser actually emits rather than
         // on the input, or this passes for the wrong reason.
         assert_eq!(t.shape_annotation_count(), 1, "the shape was added");
@@ -652,7 +652,7 @@ mod capture_tests {
     }
 
     /// The point of the whole exercise: one call, and the engine cannot change
-    /// under it. Guards against someone later "optimising" this into helpers
+    /// under it. Guards against someone later "optimizing" this into helpers
     /// that take `&mut self`, which would reopen the interleaving hole.
     #[test]
     fn capture_state_does_not_mutate_the_document() {
@@ -1148,7 +1148,7 @@ mod capture_tests {
 
     #[test]
     fn capture_pen_hit_is_topmost_then_check_not_find_a_bezier() {
-        // THE BEHAVIOUR-PRESERVING CASE, and the one a "smarter" implementation
+        // THE BEHAVIOR-PRESERVING CASE, and the one a "smarter" implementation
         // breaks. `shape_annotation_at` returns the newest shape of ANY kind;
         // the caller then required kind 7. So a rectangle drawn OVER a pen path
         // means "no pen path here". An implementation that filtered to kind 7
@@ -1237,7 +1237,7 @@ mod capture_tests {
             0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
         );
 
-        // Probe the rect's LEFT STROKE (x = 20), not its centre: an unfilled
+        // Probe the rect's LEFT STROKE (x = 20), not its center: an unfilled
         // rect's empty interior stopped counting as a hit on 2026-08-28 (so a
         // shape can be drawn inside another), and the control below is about
         // the rect being found at all, not about where.

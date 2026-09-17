@@ -21,7 +21,7 @@ const FILTERS = [
  *   1. `app/index.html` <link>ed fonts.googleapis.com on every load, so every
  *      demo visitor's IP reached Google before touching anything. FIXED — the
  *      two UI faces are self-hosted now (v8.72).
- *   2. Clerk's SDK initialises on load even signed out. STILL TRUE. Measured
+ *   2. Clerk's SDK initializes on load even signed out. STILL TRUE. Measured
  *      on production, logged out, 2026-09-11: 7 requests to
  *      `<instance>.clerk.accounts.dev` and 2 to `clerk-telemetry.com` before
  *      any interaction.
@@ -448,7 +448,7 @@ export default function Architecture() {
             Live, a VS&nbsp;Code preview, your own docs.
           </p>
           <div className="why__actions">
-            {/* A download rather than a live render: mermaid's colour parser
+            {/* A download rather than a live render: mermaid's color parser
                 rejects OKLCH outright, so theming it from these tokens would
                 mean a second hex palette plus ~1MB of CDN to draw what the
                 hand-built map above already says. */}

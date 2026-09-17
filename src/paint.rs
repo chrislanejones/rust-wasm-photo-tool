@@ -1,5 +1,5 @@
 //! Paint / brush engine: the paint, eraser, mask-paint and stabiliser-stab
-//! state machine. Split out of `lib.rs`; behaviour is unchanged.
+//! state machine. Split out of `lib.rs`; behavior is unchanged.
 
 use crate::parse_hex;
 use crate::ImageHorseTool;
@@ -100,10 +100,10 @@ pub(crate) fn dab_coverage(
     Some((min_x, min_y, max_x, max_y))
 }
 
-/// Recomposite `base` + a stroke (brush colour at coverage×opacity) over
+/// Recomposite `base` + a stroke (brush color at coverage×opacity) over
 /// `bbox` into `data`. Porter-Duff source-over; idempotent for a given
 /// coverage, so re-running over overlapping regions is safe. `erase` scrubs
-/// alpha toward transparent instead of laying colour.
+/// alpha toward transparent instead of laying color.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn composite_stroke_bbox(
     data: &mut [u8],
@@ -141,7 +141,7 @@ pub(crate) fn composite_stroke_bbox(
             if erase {
                 // Eraser: scrub the base alpha down by the stroke strength
                 // (sa = 1 fully clears it). RGB is carried over untouched so a
-                // partial erase just fades to transparent — no colour fringe.
+                // partial erase just fades to transparent — no color fringe.
                 // Recomputed from `base` each move, so it's idempotent over
                 // overlapping coverage exactly like the paint path.
                 let out_a = ba * (1.0 - sa);
@@ -177,7 +177,7 @@ pub(crate) fn composite_stroke_bbox(
 // — which is exactly why the two features can never disagree about where an
 // object stops.
 //
-// Region-grow from the dab centre, bounded to the dab's own bbox: coverage the
+// Region-grow from the dab center, bounded to the dab's own bbox: coverage the
 // grow can't reach is rolled back to what it was before this dab. Bounding it
 // to the footprint is what keeps the brush O(dab area) instead of O(image) per
 // dab — a full-image flood on every dab of a 60/s stroke would be unusable.
@@ -187,14 +187,14 @@ pub(crate) fn composite_stroke_bbox(
 // gap to the other arm, which a line test would happily do.
 
 /// Roll back the coverage this dab just laid wherever the paint could not
-/// *reach* from the dab centre without crossing a strong edge.
+/// *reach* from the dab center without crossing a strong edge.
 ///
 /// `prev` is the bbox-local snapshot of `cov` from immediately before the dab
 /// (see [`dab_bbox`]); `reach` and `stack` are caller-owned scratch, reused
 /// across dabs so a stroke allocates nothing per dab. `reach` must be `w*h`;
 /// only the bbox region is touched (and cleared) here.
 ///
-/// If the dab centre is itself a wall — the user painted right on an outline —
+/// If the dab center is itself a wall — the user painted right on an outline —
 /// the dab is left unconstrained. Same rule the edge-aware wand uses for a seed
 /// on an edge: doing *something* beats mysteriously doing nothing.
 #[allow(clippy::too_many_arguments)]
@@ -216,7 +216,7 @@ pub(crate) fn constrain_dab_to_region(
     if cost.len() != reach.len() || cost.len() != cov.len() {
         return; // mismatched planes: paint normally rather than corrupt the stroke
     }
-    // Centre outside its own bbox (dab clipped by the canvas edge) or standing
+    // Center outside its own bbox (dab clipped by the canvas edge) or standing
     // on a wall: leave the dab alone.
     if cx < x0 || cx > x1 || cy < y0 || cy > y1 {
         return;
@@ -252,7 +252,7 @@ pub(crate) fn constrain_dab_to_region(
     }
 }
 
-/// Interpolated dab centres for one stroke segment, exactly as
+/// Interpolated dab centers for one stroke segment, exactly as
 /// `paint_stroke_to` lays them: step = max(radius/4, 1px), dabs at
 /// t = 0..=steps inclusive. Shared with op-log replay so the dab placement
 /// formula exists once.
@@ -326,7 +326,7 @@ impl ImageHorseTool {
     /// (paint_begin not run).
     ///
     /// With the Smart Brush on, the dab is additionally contained by the shared
-    /// edge cost map: coverage the paint can't reach from the dab centre without
+    /// edge cost map: coverage the paint can't reach from the dab center without
     /// crossing a strong edge is rolled back (see [`constrain_dab_to_region`]).
     fn accumulate_dab(&mut self, cx: f64, cy: f64, radius: f64) -> Option<(i32, i32, i32, i32)> {
         let w = self.width as i32;
@@ -388,7 +388,7 @@ impl ImageHorseTool {
         )
     }
 
-    /// Recomposite `paint_base` + the stroke (brush colour at coverage*opacity)
+    /// Recomposite `paint_base` + the stroke (brush color at coverage*opacity)
     /// over `bbox` into the active layer. Porter-Duff source-over; idempotent for
     /// a given coverage, so re-running over overlapping regions is safe.
     fn recomposite_stroke_bbox(&mut self, min_x: i32, min_y: i32, max_x: i32, max_y: i32) {
@@ -427,7 +427,7 @@ impl ImageHorseTool {
         // Mask stroke: scrub the dab's coverage×opacity toward `paint_mask_value`
         // over the mask snapshot, writing the active layer's grayscale mask. The
         // compositor (render_layer) turns that into a live reveal/hide. Handled
-        // first + returns, so the colour/erase path below stays untouched.
+        // first + returns, so the color/erase path below stays untouched.
         if self.paint_mask {
             let op = self.paint_opacity.clamp(0.0, 1.0);
             let value = self.paint_mask_value as f32;
@@ -453,7 +453,7 @@ impl ImageHorseTool {
             return;
         }
 
-        // Colour / erase path: delegate to the pure kernel (shared with
+        // Color / erase path: delegate to the pure kernel (shared with
         // op-log replay — see the module doc on `composite_stroke_bbox`).
         composite_stroke_bbox(
             &mut self.layers[active].buf.data,
@@ -503,7 +503,7 @@ impl ImageHorseTool {
         // Accumulate every dab's coverage first, then recomposite the union bbox
         // once — correct per-stroke opacity, and far fewer recomposites per move.
         // Dab placement comes from the shared `segment_dab_centers` iterator so
-        // replay lays dabs at the exact same centres.
+        // replay lays dabs at the exact same centers.
         let mut bbox: Option<(i32, i32, i32, i32)> = None;
         for (cx, cy) in segment_dab_centers(x0, y0, x1, y1, radius) {
             if let Some(bb) = self.accumulate_dab(cx, cy, radius) {
@@ -519,7 +519,7 @@ impl ImageHorseTool {
     }
 
     // ── High-level brush driver — the whole stroke lives in Rust ───────────
-    // JS just forwards pointer coords. `paint_down` parses the hex colour, maps
+    // JS just forwards pointer coords. `paint_down` parses the hex color, maps
     // the stabilizer level → leash, snapshots the layer, and lays the first dab;
     // `paint_move` continues the stroke (stabilized or raw); `paint_up` flushes
     // the stabilizer catch-up and frees the stroke buffers. Each returns whether
@@ -571,9 +571,9 @@ impl ImageHorseTool {
 
     /// Eraser driver — the mirror of `paint_down`, sharing the dab / coverage /
     /// stabilizer machinery. The stroke clears the active layer's alpha instead
-    /// of laying down colour (see `recomposite_stroke_bbox`'s erase branch), so
+    /// of laying down color (see `recomposite_stroke_bbox`'s erase branch), so
     /// it reveals whatever is below the active layer (or transparency). There's
-    /// no colour: coverage × opacity drives how hard each pixel is scrubbed.
+    /// no color: coverage × opacity drives how hard each pixel is scrubbed.
     /// `erase_move` / `erase_up` just delegate to the paint stroke continuation
     /// (the erase semantics live entirely in the recomposite step).
     pub fn erase_down(
@@ -625,9 +625,9 @@ impl ImageHorseTool {
     }
 
     /// Mask brush driver — paints the active layer's grayscale MASK with the very
-    /// same dab / coverage / stabilizer engine as the colour brush, but the
+    /// same dab / coverage / stabilizer engine as the color brush, but the
     /// recomposite writes into the mask instead of the pixels (see the
-    /// `paint_mask` branch of `recomposite_stroke_bbox`). `value` is the grey
+    /// `paint_mask` branch of `recomposite_stroke_bbox`). `value` is the gray
     /// laid down: 0 hides the layer there, 255 reveals it, in-between is partial.
     /// `opacity` and `hardness` are 0..1. If the active layer has no mask yet a
     /// fully-revealed one is created first (so the first stroke "just works").
@@ -676,7 +676,7 @@ impl ImageHorseTool {
         self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
-        // Colour is irrelevant when masking; paint_dab sets paint_opacity and
+        // Color is irrelevant when masking; paint_dab sets paint_opacity and
         // recomposites through the paint_mask branch.
         self.paint_dab(x, y, radius, 0, 0, 0, opacity);
         if self.paint_stab.is_on() {
@@ -738,7 +738,7 @@ impl ImageHorseTool {
         self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
-        // Colour/opacity are irrelevant when marking a selection; paint_dab
+        // Color/opacity are irrelevant when marking a selection; paint_dab
         // still routes through recomposite_stroke_bbox, which the
         // paint_selection_mask branch intercepts before any pixel math runs.
         self.paint_dab(x, y, radius, 0, 0, 0, 1.0);
@@ -970,7 +970,7 @@ mod smart_brush_tests {
 
     #[test]
     fn a_stroke_in_one_region_does_not_bleed_into_the_other() {
-        // A fat dab centred in the DARK region, close enough to the seam that a
+        // A fat dab centered in the DARK region, close enough to the seam that a
         // normal brush would spill well across it.
         let (cx, cy, r) = (24.0, 16.0, 14.0);
 
@@ -995,7 +995,7 @@ mod smart_brush_tests {
         // ...and it still painted its own side (containment, not suppression).
         assert!(
             smart[16 * W + 24] > 0,
-            "the dab must still paint the region it was centred in"
+            "the dab must still paint the region it was centered in"
         );
     }
 
@@ -1022,13 +1022,13 @@ mod smart_brush_tests {
 
     #[test]
     fn painting_on_the_edge_still_paints() {
-        // Centre the dab ON the seam. The centre is a wall, so containment backs
+        // Center the dab ON the seam. The center is a wall, so containment backs
         // off entirely rather than mysteriously painting nothing — the same rule
         // the edge-aware wand uses for a seed that lands on an outline.
         let smart = smart_dab(SEAM as f64, 16.0, 8.0, 128);
         assert!(
             smart.iter().any(|&c| c > 0),
-            "a dab centred on an edge must still paint something"
+            "a dab centered on an edge must still paint something"
         );
     }
 
@@ -1209,7 +1209,7 @@ mod magic_eraser_brush_tests {
         t.load_image(&solid(40, 40, [200, 100, 50, 255]));
         let clean = t.get_image_data();
 
-        // A filled rectangle in a colour nothing else in the image uses.
+        // A filled rectangle in a color nothing else in the image uses.
         t.add_shape_annotation(
             0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 2.0, 0, 1, "#0000ff", "#0000ff", 0, 0,
         );

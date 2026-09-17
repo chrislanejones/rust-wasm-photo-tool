@@ -21,7 +21,7 @@
 //!      the failure mode a bbox-tight tile produces, and the reason
 //!      `shape_ink_pad` exists.
 //!
-//! Geometry note: every quad here is NORMALISED over the shape's own bbox
+//! Geometry note: every quad here is NORMALIZED over the shape's own bbox
 //! (0,0 = its top-left, 1,1 = its bottom-right), which is the contract
 //! `set_shape_perspective` documents and `app/src/lib/shapeBasis.ts` mirrors.
 
@@ -45,7 +45,7 @@ fn add_square(t: &mut ImageHorseTool) -> u32 {
     )
 }
 
-/// The identity: no perspective, expressed normalised.
+/// The identity: no perspective, expressed normalized.
 const IDENTITY: [f32; 8] = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
 /// A keystone: the top edge pulled in to the middle half, bottom edge left
 /// alone. The classic "lay it on a receding surface" gesture.
@@ -172,7 +172,7 @@ fn a_warped_shape_can_still_be_restyled_and_keeps_its_warp() {
     let id = add_square(&mut t);
     t.set_shape_perspective(id, &KEYSTONE);
 
-    // Exactly what a panel colour click does — the same call `shape_recolour`
+    // Exactly what a panel color click does — the same call `shape_recolour`
     // covers, on a shape that now carries a quad.
     assert!(t.update_shape_annotation(
         id, 0, 20.0, 20.0, 60.0, 60.0, "#00ff00", 4.0, 0, 0, "#000000", "#000000", 0, 0,
@@ -191,7 +191,7 @@ fn resizing_a_warped_shape_keeps_the_same_transform() {
     let id = add_square(&mut t);
     t.set_shape_perspective(id, &KEYSTONE);
 
-    // Drag it to twice the size. The quad is NORMALISED over the bbox, so the
+    // Drag it to twice the size. The quad is NORMALIZED over the bbox, so the
     // transform is unchanged while the pixels it describes are twice as big —
     // storing corners in pixels is what would break here.
     assert!(t.update_shape_annotation(

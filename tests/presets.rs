@@ -1,4 +1,4 @@
-//! The colour-preset contract, driven through the public engine API
+//! The color-preset contract, driven through the public engine API
 //! (`presets.rs` owns the stack and its unit tests).
 //!
 //! What a user relies on, each pinned here:

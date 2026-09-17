@@ -43,7 +43,7 @@ fn stroke_parity() {
 #[test]
 fn stroke_parity_soft_translucent() {
     // The hard cases for coverage math: soft edge (falloff band) and
-    // sub-unity opacity, crossing the fixture's colour bands.
+    // sub-unity opacity, crossing the fixture's color bands.
     let fx = fixture("gradient_128");
     let ops = [Op::Stroke {
         points: vec![(10.0, 100.0), (100.0, 20.0), (120.0, 90.0)],
@@ -83,7 +83,7 @@ fn erase_stroke_parity() {
 #[test]
 fn blur_parity() {
     let fx = fixture("edge_96x64");
-    // Dab centres in stamp order across the sharp edge — order-dependent by
+    // Dab centers in stamp order across the sharp edge — order-dependent by
     // construction (each dab reads the previous dabs' output).
     let ops = [Op::Blur {
         points: vec![(44.0, 20.0), (48.0, 26.0), (52.0, 32.0)],

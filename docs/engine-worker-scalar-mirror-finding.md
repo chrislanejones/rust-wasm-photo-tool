@@ -81,8 +81,8 @@ Freshness here is load-bearing. The mirror is only as current as the last
 `syncState()`, and `syncState()` is invoked by **71 hand-placed calls across 12
 files** — a discipline, not a structure. Repointing a mutation-adjacent read
 moves it from "always correct" to "correct if someone remembered". That is a
-behaviour change wearing a refactor's clothes, and the brief required
-behaviour-preserving throughout.
+behavior change wearing a refactor's clothes, and the brief required
+behavior-preserving throughout.
 
 This is the honest version of the drift worry. The publisher is single; the
 *invocation* of the publisher is not structural. That distinction is what makes
@@ -106,7 +106,7 @@ modules, both of which the mirror strategy was never able to touch.
 ## 5. What was not done, and why
 
 No mirror, no repoint, no test — deliberately. Eight sites is not worth a
-behaviour-change risk taken at 4am on top of a night that included archive
+behavior-change risk taken at 4am on top of a night that included archive
 corruption and a disabled Convex account. The brief anticipated exactly this and
 asked for a written finding and a clean stop; this is it.
 

@@ -55,7 +55,7 @@ on new records and `undefined` on old ones.
 It is six months later and this decision was a mistake. Most likely reason: it
 established that the Snapshot is where UI parameters go to become undoable, and
 the argument that won here — "the user expects it to be undoable" — is equally
-true of export format, of the resize filter, of the artboard colour. Each one
+true of export format, of the resize filter, of the artboard color. Each one
 individually looks like the same small addition. Three of them in and the
 `Snapshot` is a settings bag, the archive is at v9, every version bump is a
 migration against user data with no backup, and the engine serializes a growing

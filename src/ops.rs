@@ -24,7 +24,7 @@
 //!   three functions).
 //! - `Blur` → `filters::gaussian_blur_region` with the same
 //!   `build_gaussian_kernel` the live blur-brush uses; `points` are the
-//!   exact dab centres in stamp order (blur dabs are order-dependent).
+//!   exact dab centers in stamp order (blur dabs are order-dependent).
 //! - `Crop` → `transform::crop` + the same annotation-offset shift as
 //!   `crop_in_place`.
 //! - `LayerMove` → `transform::translate` + the same annotation shift as
@@ -138,7 +138,7 @@ pub struct Rect {
     pub h: u32,
 }
 
-/// Straight (non-premultiplied) RGBA colour.
+/// Straight (non-premultiplied) RGBA color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rgba {
     pub r: u8,
@@ -162,7 +162,7 @@ pub struct Brush {
     pub hardness: f32,
     /// 0.0 .. 1.0.
     pub opacity: f32,
-    /// Eraser stroke: scrubs alpha instead of laying colour — the same
+    /// Eraser stroke: scrubs alpha instead of laying color — the same
     /// coverage machinery with `recomposite`'s erase branch.
     pub erase: bool,
 }
@@ -212,7 +212,7 @@ pub struct TextParams {
     pub shadow_blur: u32,
     /// Reflow width in px (0 = don't wrap — size the box to the text). v8.40.
     ///
-    /// ⚠️ `#[serde(skip)]` is LOAD-BEARING, not an optimisation. postcard
+    /// ⚠️ `#[serde(skip)]` is LOAD-BEARING, not an optimization. postcard
     /// writes struct fields positionally with no names and no length prefix,
     /// so a real field here would shift every byte after it in the
     /// `Op::TextAdd` / `Op::TextEdit` payloads already persisted in users'
@@ -231,7 +231,7 @@ pub struct TextParams {
     /// `encode_annotations`, and as [`Op::TextBoxHeight`] in the log.
     #[serde(skip)]
     pub box_height: u32,
-    /// Normalised projective corner quad (TL, TR, BR, BL). v8.42.
+    /// Normalized projective corner quad (TL, TR, BR, BL). v8.42.
     ///
     /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
     /// on `wrap_width` and `box_height` above — read that comment, it applies
@@ -290,7 +290,7 @@ pub struct ShapeParams {
     pub fill2_a: u8,
     pub fill_angle: u16,
     pub fill_block: u32,
-    /// Normalised projective corner quad (TL, TR, BR, BL) over the shape's own
+    /// Normalized projective corner quad (TL, TR, BR, BL) over the shape's own
     /// bbox. v8.76 — the vector Perspective tool reaching squares and circles.
     ///
     /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
@@ -583,9 +583,9 @@ pub enum Op {
         points: Vec<(f64, f64)>,
         brush: Brush,
     },
-    /// Fill a rectangle with a flat colour.
+    /// Fill a rectangle with a flat color.
     FillRegion { rect: Rect, color: Rgba },
-    /// Gaussian-blur brush stroke: `points` are the EXACT dab centres in
+    /// Gaussian-blur brush stroke: `points` are the EXACT dab centers in
     /// stamp order (blur dabs read already-blurred pixels, so order
     /// matters), `radius` the brush radius, `intensity` the kernel radius.
     Blur {
@@ -643,7 +643,7 @@ pub enum Op {
     /// all. Same argument for carrying it here instead of as a `TextParams`
     /// field.
     TextBoxHeight { id: u32, box_height: u32 },
-    /// v8.42 — a text annotation's projective corner quad, normalised 0..1
+    /// v8.42 — a text annotation's projective corner quad, normalized 0..1
     /// across its tile in TL/TR/BR/BL order.
     ///
     /// Appended, for the third time, for the reason spelled out on
@@ -657,11 +657,11 @@ pub enum Op {
     TextPerspective { id: u32, quad: [(f32, f32); 4] },
     /// v8.42 — the DESTRUCTIVE half of the Perspective tool: lift the pixels
     /// in `rect` and resample them into `quad` (absolute canvas coords, not
-    /// normalised — a pixel warp has no tile to be a fraction of).
+    /// normalized — a pixel warp has no tile to be a fraction of).
     ///
     /// Appended after [`Op::TextPerspective`]; same rule, same reason.
     PerspectiveWarp { rect: Rect, quad: [(f32, f32); 4] },
-    /// v8.76 — a SHAPE's projective corner quad, normalised 0..1 across its
+    /// v8.76 — a SHAPE's projective corner quad, normalized 0..1 across its
     /// own bbox in TL/TR/BR/BL order. The square/circle twin of
     /// [`Op::TextPerspective`], and what makes Distort / Perspective / Skew
     /// non-destructive on everything the app draws rather than on text alone.
@@ -1031,7 +1031,7 @@ pub fn decode_annotations(
 /// Ops never touch this. It is refreshed from the engine (`canvas_params`) and
 /// applied uniformly across the log's base, keyframes and live document —
 /// metadata is not versioned by the op stream, so undo does not rewind the
-/// canvas colour.
+/// canvas color.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CanvasParams {
     pub r: u8,
@@ -1552,7 +1552,7 @@ impl OpLog {
     ///
     /// Uniform on purpose: the Canvas is metadata, not content, so it is not
     /// versioned by the op stream. Storing it only on `live` would mean a seek
-    /// back to a keyframe resurrects an old canvas colour (undo silently
+    /// back to a keyframe resurrects an old canvas color (undo silently
     /// repainting the artboard); storing it only on the base would mean replay
     /// from a keyframe loses it. Writing all three keeps replay from ANY
     /// position byte-identical to the engine, which is what the sync check
@@ -1960,7 +1960,7 @@ mod tests {
             },
             &mut doc,
         );
-        // A hard, opaque brush lays pure colour on the stroke line...
+        // A hard, opaque brush lays pure color on the stroke line...
         assert_eq!(doc.pixels.get_pixel(30, 32), [20, 200, 60, 255]);
         // ...and leaves pixels beyond the radius untouched.
         assert_eq!(doc.pixels.get_pixel(30, 45), [200, 200, 200, 255]);
@@ -2001,7 +2001,7 @@ mod tests {
             },
             &mut doc,
         );
-        assert_eq!(doc.pixels.get_pixel(16, 16)[3], 0, "centre fully erased");
+        assert_eq!(doc.pixels.get_pixel(16, 16)[3], 0, "center fully erased");
         assert_eq!(
             doc.pixels.get_pixel(2, 2),
             [50, 60, 70, 255],

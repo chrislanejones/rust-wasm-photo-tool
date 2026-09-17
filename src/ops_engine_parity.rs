@@ -11,7 +11,7 @@
 //! The ops are constructed the way the Stage-4 recorder records them:
 //! - Stroke: the down point + each `paint_move` point (stabilizer off ⇒ the
 //!   painted polyline IS the input polyline).
-//! - Blur: every dab centre, including `effect_move`'s interpolated ones
+//! - Blur: every dab center, including `effect_move`'s interpolated ones
 //!   (recomputed here with the same formula `effect_move` uses; the live
 //!   recorder hooks `apply_effect_dab` itself, so it can't drift).
 //! - Text: the exact parameter set passed to `add_text_annotation`.

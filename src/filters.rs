@@ -249,7 +249,7 @@ pub fn pixelate_region(
     }
 }
 
-/// Paint an opaque solid colour over a circular brush region (redaction).
+/// Paint an opaque solid color over a circular brush region (redaction).
 pub fn redact_region(
     data: &mut [u8],
     width: u32,
@@ -304,7 +304,7 @@ mod sharpen_tests {
 
     #[test]
     fn sharpen_flat_image_is_unchanged() {
-        // A uniform-colour image blurs to itself (every kernel tap samples the
+        // A uniform-color image blurs to itself (every kernel tap samples the
         // same value, edge-clamped or not), so `orig - blurred == 0`
         // everywhere and the unsharp-mask combine is a no-op regardless of
         // `amount`.

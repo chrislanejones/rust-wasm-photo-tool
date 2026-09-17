@@ -128,7 +128,7 @@ impl History {
 
     /// Undo: pops the most recent undo snapshot and returns it for the caller
     /// to restore. `current` is the live state; it is pushed onto the redo
-    /// stack (re-labelled with the popped snapshot's label so the History panel
+    /// stack (re-labeled with the popped snapshot's label so the History panel
     /// reads naturally). Returns `None` when there is nothing to undo.
     pub fn undo(&mut self, current: Snapshot) -> Option<Snapshot> {
         if let Some(snap) = self.undo_stack.pop_back() {
@@ -170,7 +170,7 @@ impl History {
         self.redo_stack.len()
     }
 
-    /// Serialise history labels as "type:label|type:label|…" for the JS side.
+    /// Serialize history labels as "type:label|type:label|…" for the JS side.
     pub fn labels(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
         for s in &self.undo_stack {

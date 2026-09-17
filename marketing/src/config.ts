@@ -13,6 +13,17 @@ export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo
  *  nav is in the sitemap, always; there is no longer a second place to forget. */
 export const PAGES = ROUTES.map(({ to, label }) => ({ to, label }));
 
+/** A file in the repository, on GitHub's default branch.
+ *
+ *  Posts cite the decision records and findings they are drawn from, and a
+ *  hand-written absolute URL per citation is how those rot silently after a
+ *  rename. Built from GITHUB_URL so the org and repo are written once.
+ *
+ *  `blob/main` and not a tag: the point of the link is to show the reader what
+ *  the document says now, including the corrections it picked up afterwards —
+ *  several of which the posts are about. */
+export const repoFile = (path: string) => `${GITHUB_URL}/blob/main/${path}`;
+
 /** Props for an off-site link. `noopener` is not optional — without it the
  *  opened page gets a handle on ours through window.opener. */
 export const external = { target: "_blank", rel: "noopener noreferrer" } as const;

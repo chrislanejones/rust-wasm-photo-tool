@@ -75,7 +75,7 @@ export function useRedStampTool({
       const b = parseInt(hex.slice(4, 6), 16);
 
       // Rust renders the label (bordered, tilted by STAMP_ANGLE_DEG), scales to
-      // brush size, composites centred on the click point, and pushes history.
+      // brush size, composites centered on the click point, and pushes history.
       const targetSize = Math.max(40, brushSizeRef.current * 4);
       tool.commit_red_stamp(
         label, r, g, b,

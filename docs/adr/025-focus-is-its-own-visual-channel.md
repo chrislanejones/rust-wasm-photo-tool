@@ -12,11 +12,11 @@ focus**. `lib/styles.ts` had already given each its own CSS property so they
 could all be lit at once and still be told apart — selection on `border-color`,
 hover on `box-shadow`, focus on `outline`. All three used `--accent`.
 
-Three channels turned out not to be enough, because they were one colour.
+Three channels turned out not to be enough, because they were one color.
 Measured in a real browser: click the Enhance tile, press `3`. Enhance goes
 `aria-pressed=false` — it is not the active group — and still paints
 `solid 2px rgb(252,223,194) off:2px`, because it matches `:focus-visible`.
-Create, the group that IS active, paints the same colour as `border-color`. Two
+Create, the group that IS active, paints the same color as `border-color`. Two
 tiles claiming to be current, in one hue at one width.
 
 The gallery was worse: `.photo-thumb.selected` declared
@@ -32,13 +32,13 @@ another tile is what lights a focus ring on the one being left.
 
 ## Decision
 
-**Focus gets its own colour and its own stroke: `2px dashed var(--focus-ring)`,
+**Focus gets its own color and its own stroke: `2px dashed var(--focus-ring)`,
 a neutral ink token** (`#2a2622` light / `#eeeeee` dark), defined once and used
 by the global `:focus-visible` rule.
 
-The vocabulary is now three channels in two colours:
+The vocabulary is now three channels in two colors:
 
-| affordance | property | colour |
+| affordance | property | color |
 | --- | --- | --- |
 | selected | `border-color` / `box-shadow` | warm accent |
 | hover | `box-shadow` halo | warm accent @ 60% |
@@ -77,9 +77,9 @@ takes the global outline.
   problem is ambiguity, not presence.
 - **Move to `focus-visible:`.** Already done. Measured `false` on mouse click —
   it cannot fix a ring that appears only once the keyboard is used.
-- **A cool "system blue" focus colour.** Maximally distinct, but it imports a hue
+- **A cool "system blue" focus color.** Maximally distinct, but it imports a hue
   the palette does not have; the header of `styles.css` commits to the warm
   accent in both themes. Neutral ink is already in the palette.
 - **Move DOM focus to the newly-active tile on a keyboard shortcut.** Would make
   the two rings coincide, but steals focus from wherever the user actually put it
-  (a text field, the canvas) and is a behaviour change to fix a paint problem.
+  (a text field, the canvas) and is a behavior change to fix a paint problem.

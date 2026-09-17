@@ -22,12 +22,12 @@
 // all. Which is the whole point of `resolveExportSource` taking no session
 // state — the post-reload condition is its ONLY condition.
 //
-// TWO HALVES, AND BOTH ARE LOAD-BEARING. The behavioural tests prove the
+// TWO HALVES, AND BOTH ARE LOAD-BEARING. The behavioral tests prove the
 // decision reads storage. They cannot see a gate re-added UPSTREAM of the
 // call — `if (!modifiedPhotos.has(id)) continue;` in AppShell would restore the
 // bug with every test here still green. The source-level test covers that, in
 // the same style and for the same reason as `engineOwnership.contract.test.ts`:
-// the failure is silent, and by the time behaviour can see it the archives are
+// the failure is silent, and by the time behavior can see it the archives are
 // already wrong.
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";

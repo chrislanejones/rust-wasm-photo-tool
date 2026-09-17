@@ -24,7 +24,7 @@ interface Props {
  * {@link DimensionFields} (Scale %, W×H, aspect lock) so it matches that panel
  * exactly, plus an Apply button. This is a Photoshop-style **Canvas Size**
  * change (the backing document grows/shrinks, the photo stays at its native
- * resolution, centred, and the new area fills with the backing color) — it does
+ * resolution, centered, and the new area fills with the backing color) — it does
  * NOT resample the image. The work runs in Rust (`resize_canvas`); this only
  * collects the target dimensions.
  */

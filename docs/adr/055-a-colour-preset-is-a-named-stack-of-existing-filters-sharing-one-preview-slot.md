@@ -1,4 +1,4 @@
-# ADR-055: A colour preset is a named stack of filters the engine already has, previewed from the slot Levels now shares
+# ADR-055: A color preset is a named stack of filters the engine already has, previewed from the slot Levels now shares
 Date: 2026-09-15   Status: draft (extended 2026-09-16 — the Quick Adjust grid is retired)
 
 > **Numbering.** 054 is the highest ADR on master, so 055 is the next one — but
@@ -24,9 +24,9 @@ ADR-054 built exactly that preview machinery for Levels a day earlier.
   calls `filters::adjust_brightness → adjust_contrast → adjust_highlights →
   adjust_shadows → adjust_saturation`, skipping any component at its identity.
   No new pixel math, no new `Op`. Sharpen stays out: it is a convolution with
-  two full-buffer scratch allocations, it is not colour, and a hover would pay
+  two full-buffer scratch allocations, it is not color, and a hover would pay
   for it every pass.
-- **The order is part of the definition** — tone first, colour last. Pinned by
+- **The order is part of the definition** — tone first, color last. Pinned by
   `a_preset_equals_its_filters_applied_in_the_documented_order` (a preset must
   equal the five raw filter calls) and `the_stacks_order_is_load_bearing` in
   `tests/presets.rs`.

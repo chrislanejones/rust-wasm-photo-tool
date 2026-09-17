@@ -24,7 +24,7 @@
 // separate documents with their own lifetimes and no op log. They are out of
 // scope and MUST NOT be routed through the live port: their ops would land in
 // the live document's log (undo would replay edits to a photo nobody opened),
-// and a 40-photo batch export would serialise behind the live queue — the exact
+// and a 40-photo batch export would serialize behind the live queue — the exact
 // stall this whole arc exists to remove.
 //
 // WHY THIS IS A SEAM AND NOT A REWRITE. The ownership invariant already holds:
@@ -32,7 +32,7 @@
 // all inside `useEngineCore`; every other module receives it read-only as a
 // `RefObject` and reads `.current`. Routing all ~152 call sites through a
 // hand-written facade over 231 engine members would be an enormous diff that
-// changes no behaviour and adds no guarantee the ref does not already give.
+// changes no behavior and adds no guarantee the ref does not already give.
 // What was actually missing is a named swap point and a test that stops the
 // ownership eroding — `engineOwnership.contract.test.ts` is the other half of
 // this stage and the more important one.
@@ -44,7 +44,7 @@ import { NO_CANVAS } from "./canvasGeneration";
 /**
  * Hand a freshly-constructed engine to the live document's port.
  *
- * Identity today, deliberately: Stage 1 changes no behaviour. What it buys is
+ * Identity today, deliberately: Stage 1 changes no behavior. What it buys is
  * that every live-document engine now enters the app through ONE named
  * function, so Stage 3 has exactly one body to replace and one place to add
  * request ids, queueing, cancellation and errors — the four things the Phase 3
@@ -131,7 +131,7 @@ let livePort: EngineWorkerClient | null = null;
  * that is ready the instant it exists. A fake that cannot refuse cannot
  * reproduce a refusal.
  *
- * Serialising here rather than inside `EngineWorkerClient` is deliberate — the
+ * Serializing here rather than inside `EngineWorkerClient` is deliberate — the
  * client has the same shape internally (`this.worker = w` precedes its await),
  * but this module is where ONE PORT PER DOCUMENT is decided, so this is where
  * "which document is starting" belongs. */
@@ -167,7 +167,7 @@ export function liveEnginePort(): EngineWorkerClient | null {
  * divergence `engineAsyncMigration.contract.test.ts` forbids.
  *
  * `Tool` is passed in rather than imported here so the local path keeps using
- * the module the caller already initialised — the same instance whose
+ * the module the caller already initialized — the same instance whose
  * `memory` it hands to `registerWasmMemory` for the zero-copy blit.
  *
  * ⚠️ WITH THE FLAG ON, THE LOCAL BRANCH NEVER RUNS, which is the point: no
@@ -572,7 +572,7 @@ export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
  *  rewrite is "storage unreadable → default → true", and it is wrong: a
  *  partitioned context that cannot READ the kill switch cannot SET it either,
  *  and a user must never be stranded on the path whose escape hatch is
- *  unreachable. Storage broken → local engine, yesterday's behaviour.
+ *  unreachable. Storage broken → local engine, yesterday's behavior.
  *
  *  The flip shipped on the evidence, all of it in this ADR's Stage 5 section:
  *  a13's frame timeline (blocking 129–137 ms → 0, long tasks 1 → 0), the v8.29
@@ -647,7 +647,7 @@ export function engineWorkerEnabled(): boolean {
  *  tree, leaving `#root` empty.
  *
  *  `blitLiveEngine` now branches on where the engine LIVES rather than on the
- *  flag, so that crash is gone. What remains is the honest behaviour, and it is
+ *  flag, so that crash is gone. What remains is the honest behavior, and it is
  *  the same as every other flag in this repo: **`ih_engine_worker` takes effect
  *  on the NEXT LOAD.** A mid-session flip remounts this element, the worker
  *  keeps the surface it was given, and the canvas stops updating until reload —
@@ -668,7 +668,7 @@ export function engineWorkerEnabled(): boolean {
  *  would be a call site branching on the flag, which
  *  `engineAsyncMigration.contract.test.ts` forbids for good reason — every such
  *  branch is a place the two implementations can diverge. The flag stays here;
- *  callers get an opaque identity token and cannot infer behaviour from it.
+ *  callers get an opaque identity token and cannot infer behavior from it.
  */
 export function canvasSurfaceKey(): string {
   return engineWorkerEnabled() ? "canvas-worker" : "canvas-local";

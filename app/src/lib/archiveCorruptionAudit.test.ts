@@ -3,7 +3,7 @@
 // The read-only detector for archives holding another photo's canvas.
 //
 // This is the artifact Chris runs against a real production profile, so its
-// behaviour matters in both directions: it has to fire on the shape the live
+// behavior matters in both directions: it has to fire on the shape the live
 // bug actually produced, and it has to stay quiet on ordinary galleries. A
 // detector that cries wolf on a burst of same-shaped photos is worse than none,
 // because the next real finding gets ignored.

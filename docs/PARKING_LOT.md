@@ -15,15 +15,15 @@ because marketing copy is Margot's lane and the call is Chris's.
 | `marketing/src/pages/Pricing.tsx` | 66, 144 | "4× upscale" listed as a Pro feature |
 | `marketing/src/seo.ts` | 97, 221 | same, in the SEO copy |
 
-Until this session the editor had a **greyed 4x Upscale tile** sitting in the
+Until this session the editor had a **grayed 4x Upscale tile** sitting in the
 Quick Adjust grid's empty fifth cell, captioned "isn't connected yet — it needs
 a model". Selling it on the Pricing page was a stretch, but the app at least
 said "not yet" out loud. Retiring the grid removed that tile, and it existed
-nowhere else — so the editor now has no 4× upscale affordance at all, greyed or
+nowhere else — so the editor now has no 4× upscale affordance at all, grayed or
 otherwise, while the Pricing page still lists it as something Pro buys.
 
 Three ways out, in rough order of honesty: build it; drop the claim from
-Pricing + SEO; or re-home the greyed tile somewhere (Enhance › Presets has no
+Pricing + SEO; or re-home the grayed tile somewhere (Enhance › Presets has no
 natural slot for it, which is part of why it went).
 
 Related: [[project_paid_tier_gating_bug]] is the same family — a tier claim with
@@ -650,7 +650,7 @@ the production build:
 | fresh text, shadow **off** (the default) | `Add Text` + phantom `Text Shadow` = **2** | **1** |
 | fresh text, shadow **on** | `Add Text` + `Text Shadow` = **2** | still **2** |
 
-The off case was a comparison bug (`set_text_shadow` compared dormant colour /
+The off case was a comparison bug (`set_text_shadow` compared dormant color /
 alpha / offset while the shadow was invisible on both sides) and is fixed in
 the engine. The on case is structural: `commitText` is `add_text_annotation`
 followed by three setters, each of which is its own snap, and the op log's
@@ -684,7 +684,7 @@ snapshot) — it is only the reload boundary that drops it.
 The `.ora` row is the same root cause as the reload row: `get_layer_png(i)`
 returns `layer.buf` — raw pixels — while the flat composite paths all route
 through `render_layer`, which applies mask then overlay. Verified in code
-2026-08-28, not inferred. It is pre-existing behaviour for masks; Color Overlay
+2026-08-28, not inferred. It is pre-existing behavior for masks; Color Overlay
 simply inherits it.
 
 Not fixed here: persisting either one is an IndexedDB schema change, so it goes
@@ -886,7 +886,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   `canvasSurfaceKey.contract.test.ts` pins it (mutation-tested: restoring the
   flag branch turns both new guards red).
 
-  **The honest behaviour, now stated everywhere:** `ih_engine_worker` takes
+  **The honest behavior, now stated everywhere:** `ih_engine_worker` takes
   effect on the NEXT LOAD, like `ih_tiles_flush` / `ih_oplog_undo` /
   `ih_patchmatch`. A mid-session flip is inert — the app keeps working, the
   canvas stops updating until reload. Verified in the browser both directions.
@@ -978,7 +978,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   the worker that is nine round trips per frame — roughly 0.9 ms of a
   16.7 ms budget spent answering a question nobody is looking at unless the
   diagnostics window is open. Converted faithfully in v8.22 and deliberately
-  NOT redesigned; the honest options each change behaviour: one
+  NOT redesigned; the honest options each change behavior: one
   `capture_oplog_stats()` on the Rust side (the a3/a5 atomic-capture
   pattern), throttling to a few Hz, or only running it while the panel is
   open. **Read Stage 5's frame timeline with this in mind rather than
@@ -1201,7 +1201,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   "Original" stops being the true original after the first run. Measured on
   Toyota-Florida-Woods during QC: **`.webp` 87,642 B → `.jpg` 105,547 B** — a
   button called "Auto Compress" made the file 20% BIGGER and switched format,
-  because it re-encodes an already-optimised WebP as JPEG at the export
+  because it re-encodes an already-optimized WebP as JPEG at the export
   format/quality. The prior bytes survive (content-addressed dedupe means
   nothing is overwritten) but nothing references them and there is no UI to get
   back. Fix candidates: keep a pristine-original pointer separate from the
@@ -1350,7 +1350,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   every tool panel and the routing layer. Per the project's definition of done
   that flags a QC pass before the next release, and one was already outstanding
   from v7.44–46.
-- **Colour-picker history is per-session by design.** Persisting it means
+- **Color-picker history is per-session by design.** Persisting it means
   adding `pickedColorHistory` to `useToolStore`'s `partialize`, which is an
   IndexedDB schema change and therefore goes through the `dexie-migration`
   skill. Not a one-liner.
@@ -1750,7 +1750,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `"Edit Shape"`, so a recolour, a move and a resize all write the same row.
   Recolour a square then drag it and History shows two identical `Edit Shape`
   entries with nothing to tell them apart — in the one place you'd look for
-  "the step where I changed the colour". Fix is to pass the label in from the
+  "the step where I changed the color". Fix is to pass the label in from the
   call site (`Recolour Shape` / `Move Shape` / `Resize Shape`); small, but it
   touches the Rust crate so it needs a wasm rebuild and a size note. Same
   applies to text annotations if it's done.
@@ -1767,7 +1767,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 ## Docs cleanup (2026-08-04)
 
 - **RESOLVED, not OPEN: the auth doc is not radioactive — forward-only move is
-  enough, filter-repo is not warranted.** The brief asked for a judgement call
+  enough, filter-repo is not warranted.** The brief asked for a judgment call
   and offered to log it OPEN. Measured instead, against the shipped client
   bundle: the Convex deployment URL, the Clerk issuer and the Clerk
   publishable key are **all already in `www-dist/assets/index-*.js`** — public
@@ -1868,7 +1868,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `setEngineDocument(entry.id)` runs when the engine has been *handed* the
   pixels, not when it has taken them. A failed load would leave the marker
   naming a photo the engine never got — which is precisely the unguarded
-  behaviour shipping today, so it degrades to the status quo rather than to a
+  behavior shipping today, so it degrades to the status quo rather than to a
   refusal. Making the engine load awaitable would let ownership follow the
   document instead of the intent. The other three sites (op-log restore,
   `loadFromSaved`, fresh import) are all recorded after a real await.
@@ -1876,7 +1876,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `handleDeleteSelected` and `confirmDeleteAll` (AppShell.tsx ~638 and ~1075)
   null the active photo without a `setEngineDocument(null)`. Skipped on purpose:
   CLAUDE.md says do not add to AppShell, and the omission only ever produces
-  `unknown → allow`, i.e. today's behaviour, never a false refusal. It leaves a
+  `unknown → allow`, i.e. today's behavior, never a false refusal. It leaves a
   stale marker naming a deleted photo, which is harmless now (nothing is left to
   save under it) and a latent trap for any future path that saves without
   loading. Wire it when those handlers move out of AppShell.
@@ -1945,7 +1945,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 - **NOTE — `crypto.subtle` is secure-context only.** A dev server reached over a
   LAN IP has no `crypto.subtle`, where the hash would throw into the catch that
   reports "cloud save failed" and silently disable sync altogether. `archiveHash`
-  returns null there and the caller uploads — shipped behaviour.
+  returns null there and the caller uploads — shipped behavior.
 - **OPEN — the sync record is session-lived and per-tab.** `lastUploadedRef` is
   a ref, so a reload re-uploads once per photo, and two tabs do not share it.
   Cheap direction to be wrong in, but it means the 28→4 number will look
@@ -2614,7 +2614,7 @@ undercounts this file: it is four of five, not one.
 
 ## ✅ RESOLVED v7.96 — `has_transparency()` cost a full composite, on every sync
 
-**Found a5 (2026-08-09), fixed 2026-08-10 by DELETION, not optimisation.**
+**Found a5 (2026-08-09), fixed 2026-08-10 by DELETION, not optimization.**
 Nothing consumed the value: `CanvasArea` was its only reader and stopped gating
 on it in `5e46921` (2026-06-27) when the checkerboard became unconditional CSS.
 Removed from `UiStateCapture`; `has_transparency()` stays as a method.
@@ -2715,7 +2715,7 @@ had a fallback before this module existed."* Nobody had tested it. It is false.
 
 | Call site | Kind | On a miss |
 |---|---|---|
-| `CanvasArea:2118` | render | ✅ JS-measured box centre |
+| `CanvasArea:2118` | render | ✅ JS-measured box center |
 | `CanvasArea:2288` | render | ✅ `sx - bgPad` |
 | `useTextTool:251` | commit | tolerates — commits at the **uncorrected anchor** |
 | `useTextTool:368` | re-edit | tolerates — the re-edit cycle **drifts** |
@@ -2862,7 +2862,7 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   panel gutters shrink the bar's inner box to ~532px, so each `1fr` column is
   ~130px while the left cluster's own content (Undo pill 84 + divider + Zoom
   pill 84 + two 12px gaps) is **193px**. Grid does not shrink it — it spills
-  right, under the centre column, and the centre column is later in the DOM so
+  right, under the center column, and the center column is later in the DOM so
   it paints on top and takes the clicks.
 
   Measured on master with the component changes stashed, at 1100px, Tools +
@@ -2873,14 +2873,14 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   | Left column width | 130px | 143px |
   | Left cluster content | 193px | 193px |
   | Zoom ↔ toggle-group overlap | **38px** | **26px** |
-  | `elementFromPoint` at Zoom-in's centre | **"New"** | **"New"** |
+  | `elementFromPoint` at Zoom-in's center | **"New"** | **"New"** |
 
   So **the Zoom-in button is unclickable in that band** — the click activates
-  New. The oval pass narrowed the centre pill (188 → 164) and therefore reduced
+  New. The oval pass narrowed the center pill (188 → 164) and therefore reduced
   the overlap, but did not remove it and was not its cause.
 
   The fix is a layout decision, not a size tweak: either drop the `1fr_auto_1fr`
-  grid for a flex row that lets the centre move off-centre under pressure, or
+  grid for a flex row that lets the center move off-center under pressure, or
   extend the existing `compact` collapse so the Undo/Redo pill (or the divider
   and gaps) also drops in the BP_TIGHT band, the way `narrow` already does.
   Both change where the toggles sit — Chris's call, not a passing edit.
@@ -2939,3 +2939,23 @@ duplication the export exists to prevent — or it is not computing it at all.
 
 Not fixed here because it is another feature's decision, and because the gate
 that should have caught it cannot — see `docs/vacuous-checks.md`.
+
+---
+
+## The long-form date formatter is written twice
+
+`fmtDate` in `marketing/src/pages/Trail.tsx` and `fmtPostDate` in
+`marketing/src/data/posts.ts` are the same eight lines: parse `YYYY-MM-DD` off
+the string and render `13 August 2026`. Both parse from the string rather than
+through `new Date(iso)` on purpose — a bare ISO date is read as UTC midnight and
+rendered in the reader's local zone, so anyone west of Greenwich sees a release
+land a day early — and that reasoning is now also written out twice.
+
+**Left duplicated deliberately.** The blog session's scope was the blog, and
+`posts.ts` has to stay importable by `seo.ts` (which the prerender loads under
+Node), so the shared home is a new module rather than either existing file. Two
+copies with a pointer comment is not yet worth a third file.
+
+**Do it when a third caller appears** — that is the point at which "they might
+drift" stops being hypothetical. `marketing/src/lib/date.ts` is the obvious
+home; `lib/` already exists for `analytics.ts`.

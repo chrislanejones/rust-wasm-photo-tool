@@ -42,7 +42,7 @@ const PRESETS: Preset[] = [
   {
     label: "Vivid",
     Icon: Flame,
-    blurb: "Pushes contrast and colour hard",
+    blurb: "Pushes contrast and color hard",
     brightness: 0,
     contrast: 1.5,
     saturation: 1.35,
@@ -82,7 +82,7 @@ const PRESETS: Preset[] = [
   {
     label: "Cool",
     Icon: Snowflake,
-    blurb: "Pulls colour back for a cleaner, cooler picture",
+    blurb: "Pulls color back for a cleaner, cooler picture",
     brightness: 0.02,
     contrast: 1.18,
     saturation: 0.78,

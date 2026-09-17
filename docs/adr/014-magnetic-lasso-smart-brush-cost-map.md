@@ -29,7 +29,7 @@ Both features are then a different *reading* of that one map:
   you dragged, not how big the image is. Closing the loop rasterizes it as a
   barrier and floods inward — reusing the wands' existing mask representation
   (`selection: Option<Vec<bool>>` + the same overlay RGBA).
-- **Smart Brush** (`src/paint.rs`) — a region-grow from the dab centre over the
+- **Smart Brush** (`src/paint.rs`) — a region-grow from the dab center over the
   same map, **bounded to the dab's bbox**, rolling back coverage the paint can't
   reach. O(dab area) per dab, not O(image).
 

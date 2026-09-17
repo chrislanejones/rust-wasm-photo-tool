@@ -320,7 +320,7 @@ export function useImageSession({
       // The engine has been handed THIS photo's pixels. `loadImageFromPixels`
       // is fire-and-forget (it voids the engine promise), so this is "committed
       // to", not "finished". If that load were to fail the marker would name a
-      // photo the engine never got — which is exactly the unguarded behaviour
+      // photo the engine never got — which is exactly the unguarded behavior
       // shipping today, so it degrades to the status quo rather than to a
       // refusal. Parked as OPEN: making the engine load awaitable would let
       // ownership follow the document instead of the intent.

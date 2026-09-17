@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * Review each carry one. It is the Layers list's own X (`Button size="xs"`,
  * 20px), so the panels close with the control their rows already use.
  *
- * ON THE CORNER, not in it: -10px on both axes centres the 20px button on the
+ * ON THE CORNER, not in it: -10px on both axes centers the 20px button on the
  * panel's top-left vertex, half outside. Inside the panel it sat over whatever
  * control was first. 20px rather than the 24px `tiny` on purpose: a panel
  * whose edge is 12px from the screen's put a 24px button at 0–24, touching the

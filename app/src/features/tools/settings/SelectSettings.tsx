@@ -27,7 +27,7 @@
 //                    default since the selection-tool overhaul — the
 //                    `ih_smart_edge` switch now gates ONLY the Paint Smart
 //                    Brush (see lib/smartEdge.ts).
-//   Color Range    — every pixel within tolerance of the clicked colour,
+//   Color Range    — every pixel within tolerance of the clicked color,
 //                    anywhere in the image (Photoshop's Select → Color Range).
 //                    One click takes all the sky, not just the connected patch.
 //   Rectangle      — drag-swept marquee rect. Ignores clicks.
@@ -98,7 +98,7 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
     id: "wand",
     label: "Wand",
     icon: Wand2,
-    info: "Flood-selects the connected region of similar colour around your click.",
+    info: "Flood-selects the connected region of similar color around your click.",
   },
   {
     id: "edge",
@@ -116,7 +116,7 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
     id: "colorRange",
     label: "Color Range",
     icon: BoxSelect,
-    info: "Takes every pixel of that colour anywhere in the image — not just the patch you clicked.",
+    info: "Takes every pixel of that color anywhere in the image — not just the patch you clicked.",
   },
   {
     id: "rect",
@@ -176,7 +176,7 @@ export function SelectSettings({
       >
         {(kind) => (
           <>
-            {/* Tolerance drives the flood/colour-match kinds only. The marquee
+            {/* Tolerance drives the flood/color-match kinds only. The marquee
                 kinds sweep pure geometry, so it is hidden for them rather than
                 shown disabled — same rule as Edge sensitivity below. */}
             {!isMarqueeKind(kind) && (

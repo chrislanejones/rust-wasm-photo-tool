@@ -25,7 +25,7 @@ const Switch = React.forwardRef<
     {...props}
     ref={ref}
   >
-    {/* The thumb's fill is PER-STATE, and a single colour genuinely cannot
+    {/* The thumb's fill is PER-STATE, and a single color genuinely cannot
         work. A white thumb disappears twice: on light mode's #e9e3d8 track when
         off, and on dark mode's #fcdfc2 accent when on. So each state uses the
         token already paired with what sits under it — primary-foreground

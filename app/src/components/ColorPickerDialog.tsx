@@ -1,4 +1,4 @@
-// The colour dialog behind every "+" swatch in the app.
+// The color dialog behind every "+" swatch in the app.
 //
 // Layout (stacks to one column at phone width):
 //   ┌──────────────────────────┬────────────────────────┐
@@ -8,16 +8,16 @@
 //   │   hue + brightness       │ H  S  L                │
 //   │   alpha                  │ Palette  ● ● ● ● (+)   │
 //   └──────────────────────────┴────────────────────────┘
-//                                          [Cancel] [Use colour]
+//                                          [Cancel] [Use color]
 //
 // State model: HSV + alpha are the source of truth and RGB / HSL / hex are
 // DERIVED on every render. Storing RGB instead would lose the hue the moment
 // the user drags to black or white (rgb(0,0,0) has no hue), which snaps the
 // wheel marker to red on the way back up — the classic picker bug.
 //
-// "Use colour" hands the picked colour to the control that opened the dialog
-// (a stroke, fill, guide colour…). The palette row's own "+" is separate and
-// SAVES the colour to the global user palette (hooks/useUserColors.ts) —
+// "Use color" hands the picked color to the control that opened the dialog
+// (a stroke, fill, guide color…). The palette row's own "+" is separate and
+// SAVES the color to the global user palette (hooks/useUserColors.ts) —
 // localStorage when signed out, the Convex `user_colors` table when signed in
 // — so it shows up on every swatch grid in the app.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -71,16 +71,16 @@ function loadMode(): PickerMode {
   }
 }
 
-/** Colours a control may hold that aren't real colours. Treated as "start
+/** Colors a control may hold that aren't real colors. Treated as "start
  *  from the default" rather than crashing the parser. */
 const FALLBACK: { hsv: HSV; a: number } = { hsv: { h: 0, s: 0, v: 100 }, a: 1 };
 
 export interface ColorPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Colour the dialog opens on — normally the control's current value. */
+  /** Color the dialog opens on — normally the control's current value. */
   initialColor: string;
-  /** Receives the normalised `#rrggbb` / `#rrggbbaa` on "Use colour". */
+  /** Receives the normalized `#rrggbb` / `#rrggbbaa` on "Use color". */
   onPick: (hex: string) => void;
   title?: string;
 }
@@ -90,7 +90,7 @@ export function ColorPickerDialog({
   onOpenChange,
   initialColor,
   onPick,
-  title = "Pick a colour",
+  title = "Pick a color",
 }: ColorPickerDialogProps) {
   const { userColors, addColor, removeColor } = useUserColors();
   const [mode, setModeState] = useState<PickerMode>(loadMode);
@@ -108,7 +108,7 @@ export function ColorPickerDialog({
   // What the control held when we opened — the "current" half of the preview.
   const [startHex, setStartHex] = useState<string | null>(null);
 
-  // Seed from the opening colour each time the dialog opens. The hex branch
+  // Seed from the opening color each time the dialog opens. The hex branch
   // is sync; anything else (rgb(), rgba()) goes through the Rust parser.
   useEffect(() => {
     if (!open) return;
@@ -184,7 +184,7 @@ export function ColorPickerDialog({
           <DialogTitle className="text-base">{title}</DialogTitle>
           <DialogDescription className="text-2xs">
             Drag on the {mode === "wheel" ? "wheel" : "square"}, or type a value. Save it to your
-            palette to reuse it on every colour picker.
+            palette to reuse it on every color picker.
           </DialogDescription>
         </DialogHeader>
 
@@ -267,7 +267,7 @@ export function ColorPickerDialog({
             <div className="space-y-2 border-t border-border pt-3">
               <FieldLabel
                 title={`Palette (${userColors.length}/32)`}
-                info="Colours you save here show up on every colour picker in the app — stroke, fill, guides, text. They stay in this browser until you sign in, then follow your account."
+                info="Colors you save here show up on every color picker in the app — stroke, fill, guides, text. They stay in this browser until you sign in, then follow your account."
               />
               <div className="flex flex-wrap gap-2">
                 {userColors.map((c) => (
@@ -301,8 +301,8 @@ export function ColorPickerDialog({
                 </button>
               </div>
               <p className="text-2xs leading-relaxed text-text-muted">
-                Saved colours appear on every picker.{" "}
-                {userColors.length === 0 && "Press + to save the current colour."}
+                Saved colors appear on every picker.{" "}
+                {userColors.length === 0 && "Press + to save the current color."}
               </p>
             </div>
           </div>
@@ -321,7 +321,7 @@ export function ColorPickerDialog({
             >
               <span className="block h-full w-full" style={{ backgroundColor: css }} />
             </span>
-            Use colour
+            Use color
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -365,7 +365,7 @@ function useDragSurface(onPoint: (fx: number, fy: number) => void) {
 
 const WHEEL_PX = 220;
 
-/** Hue around the rim, saturation from the centre, at the current brightness.
+/** Hue around the rim, saturation from the center, at the current brightness.
  *  Painted into a canvas with ImageData — ~50k pixels, a millisecond, redrawn
  *  only when V changes. Hue 0 sits at 3 o'clock and increases anticlockwise,
  *  the maths convention, so the marker position is a plain cos/sin. */
@@ -512,7 +512,7 @@ function SvSquare({ hsv, onChange }: { hsv: HSV; onChange: (h: HSV) => void }) {
   );
 }
 
-/** The ring that marks the picked point. Filled with the colour under it so
+/** The ring that marks the picked point. Filled with the color under it so
  *  the user sees what they will get; white + dark outline so it reads on
  *  every backdrop. `x`/`y` are percentages of the surface. */
 function Marker({ x, y, color }: { x: number; y: number; color: string }) {
@@ -526,7 +526,7 @@ function Marker({ x, y, color }: { x: number; y: number; color: string }) {
 }
 
 /** A native range input over a gradient track. Native so it's keyboard-
- *  reachable and screen-reader-labelled for free; `.color-range` (styles.css)
+ *  reachable and screen-reader-labeled for free; `.color-range` (styles.css)
  *  hides the track and draws a hollow-ring thumb. */
 function GradientSlider({
   label,
@@ -587,14 +587,14 @@ function ColorPreview({ before, after }: { before: string | null; after: string 
           className="flex-1"
           style={{ backgroundColor: before }}
           title={`Current: ${before}`}
-          aria-label={`Current colour ${before}`}
+          aria-label={`Current color ${before}`}
         />
       )}
       <div
         className="flex-1"
         style={{ backgroundColor: after }}
         title={`New: ${after}`}
-        aria-label={`New colour ${after}`}
+        aria-label={`New color ${after}`}
       />
     </div>
   );
@@ -638,7 +638,7 @@ function HexField({ hex, onChange }: { hex: string; onChange: (hex: string) => v
   );
 }
 
-/** A labelled row of channel fields with the CSS string underneath (select-all
+/** A labeled row of channel fields with the CSS string underneath (select-all
  *  so it can be copied out in one click). */
 function FieldGroup({
   label,

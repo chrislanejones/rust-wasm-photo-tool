@@ -1441,7 +1441,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // reading `engineWorkerEnabled()` would be a call site branching on
           // the flag, which `engineAsyncMigration.contract.test.ts` forbids;
           // this is an opaque identity string that says nothing about
-          // behaviour. Its value is stable for any tab that never touches the
+          // behavior. Its value is stable for any tab that never touches the
           // flag, so ordinary use sees the same reconciliation as before.
           key={surfaceKey}
           ref={attachCanvas}
@@ -2271,7 +2271,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // The height the TEXT needs. v8.41 makes this a floor rather than
           // the answer: a dragged box height overrides it when it is taller,
           // mirroring the engine, where `box_height` is a minimum and the type
-          // is centred in whatever surplus there is (`text::box_top_inset`).
+          // is centered in whatever surplus there is (`text::box_top_inset`).
           const naturalH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
           const boxH = Math.max(naturalH, Math.ceil(textBoxHeight * scaleY));
 
@@ -2286,7 +2286,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // must change with it; `scripts/guardrails.sh` enforces that the two
           // files move together.
           //
-          // This used to be the tile CENTRE, measured out of the engine through
+          // This used to be the tile CENTER, measured out of the engine through
           // `measureText` so the two agreed. That read is gone with it — the
           // top-left is (0, 0) in the box's own frame, so nothing needs
           // measuring. It was one of the two RENDER-PASS engine reads the
@@ -2316,7 +2316,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // ── v8.37 — ONE handle changes the font size, and it is not a corner.
           //
           // Until now EIGHT box handles (corners + edges) all ran the same
-          // drag: proportional font scaling from the box centre. Chris's
+          // drag: proportional font scaling from the box center. Chris's
           // report: "corners need to be reserved for changing the size of the
           // bounding box, not the font size inside the box." The dedicated
           // font-size affordance is the square-on-a-stem on the LEFT edge
@@ -2333,11 +2333,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // IndexedDB that holds one), i.e. an ADR plus the dexie-migration
           // procedure, not a handler swap. Filed in PARKING_LOT with the two
           // candidate designs. Until that lands, a rendered corner handle
-          // would promise a behaviour the model cannot express — so none is
+          // would promise a behavior the model cannot express — so none is
           // rendered, and the dashed border alone delineates the derived box.
 
           // Font-size handle drag — scales font size proportionally with the
-          // pointer's distance from the box centre (the same feel the old
+          // pointer's distance from the box center (the same feel the old
           // eight handles had, now living on exactly one handle).
           const handleFontSizePointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
@@ -2372,7 +2372,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // is derived from wrapping. The first half was right and the
           // conclusion was wrong: height cannot drive reflow, but it can drive
           // LAYOUT. v8.41 gave the engine a real `box_height` (a minimum, with
-          // the text centred in the surplus and the background growing to it),
+          // the text centered in the surplus and the background growing to it),
           // so dragging up and down now means something all the way through to
           // the committed pixels. Chris's report was simply "not just left and
           // right".
@@ -2478,7 +2478,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
-          // Rotate drag — orbit the handle around the box centre. We track the
+          // Rotate drag — orbit the handle around the box center. We track the
           // ANGULAR DELTA from where the user grabbed (not the absolute mouse
           // angle): the handle rests below the box, so reading the absolute
           // angle snapped the text ~180° the instant it was grabbed. Starting
@@ -2562,7 +2562,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
           // Triangle tail rendered as an SVG inside the rotated wrapper so it
           // tracks the textarea's orientation. Geometry matches the Rust path:
-          // project a ray from the rect centre at `tailAngle`° onto the rect's
+          // project a ray from the rect center at `tailAngle`° onto the rect's
           // bounding edge; that exit point is the base, apex sits tailLen past.
           const tailSvg = (() => {
             if (tailAngle === null) return null;
@@ -2716,7 +2716,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 }}
                 autoFocus
               />
-              {/* SVG overlay — all elements grouped and rotated around box centre */}
+              {/* SVG overlay — all elements grouped and rotated around box center */}
               <svg
                 data-text-overlay
                 style={{

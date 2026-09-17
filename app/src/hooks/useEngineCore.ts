@@ -75,7 +75,7 @@ export interface LayerInfo {
   /** Whether this layer has a non-destructive mask (paint it in Edit-mask mode). */
   hasMask: boolean;
   /** The layer's non-destructive Color Overlay style (Photoshop's), or `null`
-   *  when it has none. A solid colour tinting the layer's own pixels at
+   *  when it has none. A solid color tinting the layer's own pixels at
    *  composite time — clipped to its alpha, applied UNDER the mask, reversible
    *  until Applied. Session-lived: like `hasMask`, it does not survive a reload
    *  (`push_restored_layer` restores pixels + annotations only). */
@@ -372,7 +372,7 @@ export function useEngineCore(
     // but the original reset it to 0 when the layer array failed to parse, and
     // that pairing is the self-consistent one: an empty `layers` beside a
     // non-zero `activeLayerId` describes a layer that is not in the list, and
-    // anything downstream doing a lookup would find nothing. Same behaviour as
+    // anything downstream doing a lookup would find nothing. Same behavior as
     // before this became a capture.
     let layers: LayerInfo[];
     let activeLayerId = 0;

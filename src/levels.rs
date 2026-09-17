@@ -7,7 +7,7 @@
 //! a recorder for a feature the engine did not have.
 //!
 //! PREVIEW WORKS FROM A COPY. `tonal_preview_begin` copies the active layer
-//! once (the slot is shared with colour presets — see `tonal_preview.rs`, which
+//! once (the slot is shared with color presets — see `tonal_preview.rs`, which
 //! also documents why a stale copy is never written back). Every slider move
 //! recomputes the layer FROM that copy, through a 256-entry LUT on the stack
 //! with no allocation per move, so moves never compound. `tonal_preview_cancel`
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn transparent_pixels_and_alpha_are_never_remapped() {
         let lut = levels_lut(50, 150, 1.5);
-        // An alpha-0 pixel with non-zero colour, and a half-transparent one.
+        // An alpha-0 pixel with non-zero color, and a half-transparent one.
         let src = [10u8, 20, 30, 0, 100, 100, 100, 128];
         let mut dst = [0u8; 8];
         remap_into(&mut dst, &src, &lut);

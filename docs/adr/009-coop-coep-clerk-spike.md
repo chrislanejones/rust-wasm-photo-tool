@@ -112,7 +112,7 @@ served: `Cross-Origin-Opener-Policy: same-origin`,
   spike could only infer.
 - A **real sign-in completed.** The session authenticated; the app did not
   degrade.
-- Clerk loaded and initialised clean. The only console output was the routine
+- Clerk loaded and initialized clean. The only console output was the routine
   "loaded with development keys" warning and a `setTimeout` performance
   violation — neither is an isolation signal.
 - **Zero errors mentioning COEP, CORP, `SharedArrayBuffer`, blocked resources,

@@ -101,7 +101,7 @@ export type ResizeSurface =
  *  **Region surfaces default to FREE.** Crop is choosing a rectangle, not
  *  scaling a picture; an arbitrary rectangle is the common case, and a
  *  constrained one is the exception. Shift constrains. This is the classic
- *  design-tool behaviour and crop keeps it.
+ *  design-tool behavior and crop keeps it.
  *
  *  The asymmetry is deliberate and is the whole reason this function exists
  *  instead of an inline `if (e.shiftKey)` at each call site: the two surfaces

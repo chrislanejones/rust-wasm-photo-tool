@@ -12,6 +12,8 @@
  * `window`, `document` or `matchMedia`.
  */
 
+import { POSTS, postPath, type Post } from "./data/posts";
+
 /** Canonical origin. No trailing slash — every helper here joins paths onto it,
  *  and a doubled slash is a different URL to a crawler than the one we claim. */
 export const SITE_URL = "https://imagehorse.app";
@@ -81,6 +83,20 @@ export const ROUTES: readonly Route[] = [
     sources: ["marketing/src/pages/Architecture.tsx", "marketing/src/data/schema.ts"],
   },
   {
+    to: "/blog",
+    label: "Blog",
+    title: "Blog — how Image Horse is built, in detail",
+    description:
+      "Long-form notes on how Image Horse is built: what shipped, what it cost, and the measurements behind each decision. No roadmaps, no announcements.",
+    // No `ogImage` yet, so this falls back to /og/default.png, which exists.
+    // scripts/gen-og-images.mjs derives its filename from `to`, so running
+    // `pnpm gen:og` writes public/og/blog.png — point this at it once that
+    // file is committed. A route claiming a card that is not in the repo
+    // unfurls as a broken image, which is worse than the generic one.
+    sources: ["marketing/src/pages/Blog.tsx", "marketing/src/data/posts.ts"],
+    ogType: "website",
+  },
+  {
     to: "/features",
     label: "Features",
     title: "Features — every tool in the Image Horse photo editor",
@@ -97,6 +113,17 @@ export const ROUTES: readonly Route[] = [
       "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, 4× upscale and 5 GB of originals.",
     ogImage: "/og/pricing.png",
     sources: ["marketing/src/pages/Pricing.tsx"],
+  },
+  {
+    to: "/about",
+    label: "About",
+    title: "About — who builds Image Horse",
+    description:
+      "Image Horse is built by Chris Lane Jones, a web developer in Jacksonville, Florida. This is who works on it, and the horse it is named after.",
+    // No `ogImage` yet, for the same reason /blog has none: gen-og-images.mjs
+    // derives the filename from `to`, so `pnpm gen:og` writes
+    // public/og/about.png — point this at it once that file is committed.
+    sources: ["marketing/src/pages/About.tsx", "marketing/src/data/people.ts"],
   },
   {
     to: "/trail-log",
@@ -256,6 +283,124 @@ const webPage = (route: Route) => ({
   inLanguage: "en",
 });
 
+/* ── the blog ───────────────────────────────────────────────────────────────
+ * A post is not a Route, and making it one was the first thing tried. Routes
+ * are the five things in the nav: they have a label, they are in the sitemap in
+ * nav order, and the ⌘K palette lists every one of them. Posts have an author,
+ * two dates and a body, they are not in the nav, and there will be more of them
+ * than a nav could hold. Forcing both into one array meant `label` was dead
+ * weight on posts and `datePublished` was dead weight on pages.
+ *
+ * So there are two lists, and they meet in exactly three places — the sitemap
+ * below, `useHead`, and scripts/prerender.mjs. All three are in this file's
+ * import graph or read from it, which is what keeps a post from existing in the
+ * router and not in the sitemap.
+ */
+
+export const BLOG_BASE = "/blog";
+
+/** The byline. One constant rather than a string per post: every post here is
+ *  written by the person who wrote the code it describes, and a name typed six
+ *  times is a name that will be spelled two ways by the tenth post. */
+export const AUTHOR = {
+  name: "Chris Lane Jones",
+  url: "https://github.com/chrislanejones",
+} as const;
+
+const AUTHOR_ID = `${SITE_URL}/#author`;
+const BLOG_ID = `${SITE_URL}${BLOG_BASE}#blog`;
+
+const person = () => ({
+  "@type": "Person",
+  "@id": AUTHOR_ID,
+  name: AUTHOR.name,
+  url: AUTHOR.url,
+});
+
+/** The <title> for a post. The suffix is appended here rather than typed into
+ *  every entry, so it cannot drift on one post — and `Post.title` stays short
+ *  enough that the pair still clears ~60 characters. */
+export const postTitle = (post: Post) => `${post.title} — ${SITE_NAME}`;
+
+export const postUrl = (post: Post) => abs(postPath(post));
+
+/** The blog itself, listing its posts. Goes on /blog only. `blogPost` is a bare
+ *  list of `@id` references rather than inlined articles: each post describes
+ *  itself in full on its own page, and repeating the whole record here would be
+ *  two sources for one fact. */
+const blogNode = () => ({
+  "@type": "Blog",
+  "@id": BLOG_ID,
+  name: `${SITE_NAME} — Blog`,
+  url: abs(BLOG_BASE),
+  publisher: { "@id": ORGANIZATION_ID },
+  author: { "@id": AUTHOR_ID },
+  inLanguage: "en",
+  blogPost: POSTS.map((post) => ({ "@id": `${postUrl(post)}#post` })),
+});
+
+/** One post.
+ *
+ *  `dateModified` is emitted only when the post actually declares one. The
+ *  tempting alternative — falling back to the build time, or to `datePublished`
+ *  — is the same mistake as a sitemap that stamps every URL with today: a field
+ *  that moves on every deploy tells a crawler nothing except that this site's
+ *  dates are not worth reading. */
+const blogPosting = (post: Post) => ({
+  "@type": "BlogPosting",
+  "@id": `${postUrl(post)}#post`,
+  headline: post.headline,
+  name: postTitle(post),
+  description: post.description,
+  url: postUrl(post),
+  datePublished: post.published,
+  ...(post.updated ? { dateModified: post.updated } : {}),
+  author: { "@id": AUTHOR_ID },
+  publisher: { "@id": ORGANIZATION_ID },
+  isPartOf: { "@id": BLOG_ID },
+  mainEntityOfPage: { "@type": "WebPage", "@id": `${postUrl(post)}#webpage` },
+  image: { "@type": "ImageObject", url: abs(post.ogImage ?? DEFAULT_OG_IMAGE) },
+  about: { "@id": `${SITE_URL}/#app` },
+  inLanguage: "en",
+  keywords: post.tag,
+});
+
+/** Home → Blog → the post. Three deep, so unlike the subpages it is worth
+ *  emitting in full. */
+const postBreadcrumbs = (post: Post) => ({
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+    { "@type": "ListItem", position: 2, name: "Blog", item: abs(BLOG_BASE) },
+    { "@type": "ListItem", position: 3, name: post.title, item: postUrl(post) },
+  ],
+});
+
+export const jsonLdForPost = (post: Post) =>
+  JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [
+      organization(),
+      website(),
+      person(),
+      blogPosting(post),
+      {
+        "@type": "WebPage",
+        "@id": `${postUrl(post)}#webpage`,
+        url: postUrl(post),
+        name: postTitle(post),
+        description: post.description,
+        isPartOf: { "@id": WEBSITE_ID },
+        primaryImageOfPage: {
+          "@type": "ImageObject",
+          url: abs(post.ogImage ?? DEFAULT_OG_IMAGE),
+        },
+        inLanguage: "en",
+      },
+      postBreadcrumbs(post),
+    ],
+  });
+
 /** One `@graph` per page rather than a stack of separate <script> blocks: the
  *  nodes cross-reference each other by `@id`, and a single graph is the only
  *  shape where those references are guaranteed to resolve. */
@@ -268,6 +413,9 @@ export const jsonLdFor = (route: Route) =>
       softwareApplication(),
       webPage(route),
       breadcrumbs(route),
+      // /blog is the one route that is also a container of other documents.
+      route.to === BLOG_BASE ? blogNode() : null,
+      route.to === BLOG_BASE ? person() : null,
     ].filter(Boolean),
   });
 
@@ -311,6 +459,47 @@ export function headTagsFor(route: Route): string {
   return tags.join("\n    ");
 }
 
+/** The same job for a post. Not a branch inside `headTagsFor`, because the
+ *  differences are not cosmetic: `og:type` is `article` rather than `website`,
+ *  the `article:*` properties only exist here, and the JSON-LD is a different
+ *  graph entirely. A shared function with five conditionals would be harder to
+ *  read than two that each say one thing. */
+export function postHeadTagsFor(post: Post): string {
+  const url = postUrl(post);
+  const image = abs(post.ogImage ?? DEFAULT_OG_IMAGE);
+  const title = postTitle(post);
+  const tags = [
+    `<title>${esc(title)}</title>`,
+    `<meta name="description" content="${esc(post.description)}" />`,
+    `<link rel="canonical" href="${url}" />`,
+    `<meta property="og:type" content="article" />`,
+    `<meta property="og:site_name" content="${esc(SITE_NAME)}" />`,
+    `<meta property="og:title" content="${esc(title)}" />`,
+    `<meta property="og:description" content="${esc(post.description)}" />`,
+    `<meta property="og:url" content="${url}" />`,
+    `<meta property="og:image" content="${image}" />`,
+    `<meta property="og:image:width" content="${OG_IMAGE_WIDTH}" />`,
+    `<meta property="og:image:height" content="${OG_IMAGE_HEIGHT}" />`,
+    `<meta property="og:image:alt" content="${esc(post.headline)}" />`,
+    `<meta property="og:locale" content="en_US" />`,
+    // Facebook and LinkedIn read these; Google reads the JSON-LD below and
+    // ignores them. Both are cheap, and the pair disagreeing is the failure
+    // mode worth avoiding — so both are built from the same two fields.
+    `<meta property="article:published_time" content="${post.published}" />`,
+    ...(post.updated
+      ? [`<meta property="article:modified_time" content="${post.updated}" />`]
+      : []),
+    `<meta property="article:author" content="${esc(AUTHOR.name)}" />`,
+    `<meta property="article:section" content="${esc(post.tag)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${esc(title)}" />`,
+    `<meta name="twitter:description" content="${esc(post.description)}" />`,
+    `<meta name="twitter:image" content="${image}" />`,
+    `<script type="application/ld+json">${jsonLdForPost(post)}</script>`,
+  ];
+  return tags.join("\n    ");
+}
+
 /* ── sitemap.xml / robots.txt ───────────────────────────────────────────── */
 
 /** `lastmod` per route, supplied by the caller (the prerender script reads it
@@ -318,11 +507,15 @@ export function headTagsFor(route: Route): string {
  *  than with today's — an invented date is the thing that gets the file
  *  ignored. */
 export function sitemapXml(lastmod: Record<string, string | undefined>): string {
-  const entries = ROUTES.map((r) => {
-    const date = lastmod[r.to];
+  // Pages first, in nav order, then the posts newest-first — the same order a
+  // reader meets them in. A sitemap carries no ranking weight by position, but
+  // a file a human can diff against the nav is one whose mistakes get noticed.
+  const locs = [...ROUTES.map((r) => r.to), ...POSTS.map(postPath)];
+  const entries = locs.map((to) => {
+    const date = lastmod[to];
     return [
       "  <url>",
-      `    <loc>${abs(r.to)}</loc>`,
+      `    <loc>${abs(to)}</loc>`,
       ...(date ? [`    <lastmod>${date}</lastmod>`] : []),
       "  </url>",
     ].join("\n");

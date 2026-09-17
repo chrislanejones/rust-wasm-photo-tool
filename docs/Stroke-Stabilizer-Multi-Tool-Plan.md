@@ -126,7 +126,7 @@ that the extraction changed nothing.
    taking `value` / `onChange`. Four panels will render it; none of them should
    own a copy of `STABILIZER_LEVELS`.
 2. `PaintSettings` renders `<StabilizerRow>` instead of its inline block (no
-   behaviour change).
+   behavior change).
 3. `AISettings.tsx` renders it in the **Brush Eraser** section (after Hardness,
    ~line 200) and in the **Magic Eraser** section (after Hardness, ~line 228).
    Both already forward the setting to the engine; nothing else changes.
@@ -155,9 +155,9 @@ call gains a `stab: &str` argument, the `*_move` call filters through it, and th
 * `effect_up` → `flush()` and stamp the final segment before taking `rec_effect`.
 
 **Op-log:** safe by construction. `Op::Blur.points` is documented as "the EXACT
-dab centres in stamp order" (`src/ops.rs:396`) and `apply_effect_dab` pushes each
-centre as it stamps — so a stabilized stroke records its *post*-stabilizer
-centres, exactly as `Op::Stroke` already does for paint (`ops.rs:386`). Replay
+dab centers in stamp order" (`src/ops.rs:396`) and `apply_effect_dab` pushes each
+center as it stamps — so a stabilized stroke records its *post*-stabilizer
+centers, exactly as `Op::Stroke` already does for paint (`ops.rs:386`). Replay
 needs no knowledge of the stabilizer at all.
 
 **Free win:** `effect_move` already returns `bool` and the shared coalescer skips
@@ -281,7 +281,7 @@ Steps 3-5 are independent of each other once 2 lands.
 * **Regressing paint.** The one real risk, and the extraction in Phase 0 is
   gated on replay parity precisely to catch it. The math is moved, not rewritten.
 * **Blur dab order.** Blur dabs read already-blurred pixels, so order matters
-  (`ops.rs:396`). The stabilizer only *chooses* centres; it never reorders them.
+  (`ops.rs:396`). The stabilizer only *chooses* centers; it never reorders them.
 * **Undo granularity on the clone stamp.** Flush before the history push, or a
   stabilized stroke's tail lands outside its own undo step. Covered by a test.
 * **Not in scope:** the adaptive 6-level rewrite (velocity filtering, corner

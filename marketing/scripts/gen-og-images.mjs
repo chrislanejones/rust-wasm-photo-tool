@@ -51,7 +51,7 @@ try {
 
 // The route table is the source for the card text, same as for the <head>. It is
 // read from the SSR build so this script never needs its own TypeScript step.
-const { ROUTES } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
+const { ROUTES, POSTS } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
   console.error("gen-og-images: run `pnpm build` first — it needs dist-ssr/entry-server.js.");
   process.exit(1);
 });
@@ -60,7 +60,7 @@ const { ROUTES } = await import(join(marketing, "dist-ssr", "entry-server.js")).
  * domain. No screenshot — a 1200×630 crop of a dark editor UI reads as noise at
  * the size these actually appear, and it would go stale on every UI change.
  *
- * Colours are the literal oklch values from src/tokens.css rather than a second
+ * Colors are the literal oklch values from src/tokens.css rather than a second
  * palette. Fonts fall back to the system stack: Geist is not installed on the
  * machine running this, and a card is not worth a webfont fetch here — the
  * weight and size carry it.
@@ -77,7 +77,7 @@ const card = (title, kicker) => `<!doctype html>
     display: flex; flex-direction: column; justify-content: space-between;
     position: relative; overflow: hidden;
   }
-  /* The accent bloom, same idea as the site's hero: a warm off-centre glow so
+  /* The accent bloom, same idea as the site's hero: a warm off-center glow so
      the card isn't a flat rectangle in a feed. */
   body::before {
     content: ""; position: absolute; inset: -30% -10% auto auto;
@@ -121,6 +121,7 @@ const HEADLINE = {
   "/architecture": ["One plane is the editor.\nThe other is optional.", "How it fits together"],
   "/features": ["Every tool, and where it runs", "The full feature list"],
   "/pricing": ["Free with no account.\nPro at $10 a month.", "Pricing"],
+  "/blog": ["Why it is built\nthe way it is", "The blog"],
   "/trail-log": ["Every release, dated", "The trail log"],
 };
 
@@ -153,6 +154,30 @@ for (const route of ROUTES) {
   console.log(`  og/${name}.png`);
 }
 
+/* ── one card per post ────────────────────────────────────────────────────
+ * A post gets its own card because its headline IS the pitch — falling back to
+ * the site default would unfurl every article as the same generic tile, which
+ * is the one case where a share card actively costs you the click.
+ *
+ * The card takes the post's on-page headline rather than its <title>, for the
+ * same reason the routes above take HEADLINE: the brand is already the wordmark
+ * at the top of the image.
+ *
+ * Written to og/blog/<slug>.png, mirroring the URL, so a post's card is
+ * findable from its address without a lookup table.
+ */
+mkdirSync(join(outDir, "blog"), { recursive: true });
+
+for (const post of POSTS) {
+  await page.setViewportSize({ width: 1200, height: 630 });
+  await page.setContent(card(post.headline, `Blog · ${post.version ?? "Image Horse"}`), {
+    waitUntil: "load",
+  });
+  const file = join(outDir, "blog", `${post.slug}.png`);
+  writeFileSync(file, await page.screenshot({ type: "png" }));
+  console.log(`  og/blog/${post.slug}.png`);
+}
+
 /* ── icons ────────────────────────────────────────────────────────────────
  * public/favicon.svg stays the favicon — SVG is the better format there and
  * every browser that matters takes it. These PNGs exist for the two places that
@@ -162,7 +187,7 @@ for (const route of ROUTES) {
  *
  * Same two shapes as favicon.svg, scaled — a rounded square of paper with an
  * accent tile inside — so the home-screen icon and the tab favicon are visibly
- * the same mark rather than two designs that happen to share a colour.
+ * the same mark rather than two designs that happen to share a color.
  */
 const icon = (px) => `<!doctype html>
 <html><head><meta charset="utf-8"><style>

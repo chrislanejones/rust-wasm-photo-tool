@@ -65,7 +65,7 @@ The claim was: `oplog_engine_in_sync` compares the composite pixel hash, so a
 reorder that changes what the user sees is caught and falls back to snapshot
 undo, and one that does not change the composite "did not matter".
 
-The second half is false. Reordering two shapes that share a stroke/fill colour
+The second half is false. Reordering two shapes that share a stroke/fill color
 leaves the composite **byte-identical** — the guard sees nothing and op-log undo
 proceeds. And it proceeds on a broken invariant: `move_shape_annotation` calls
 `snap()` (one snapshot) while the reconciler emits **zero ops**, which breaks the

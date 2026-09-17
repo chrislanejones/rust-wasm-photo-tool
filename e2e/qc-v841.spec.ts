@@ -14,7 +14,7 @@ import { join } from "node:path";
 //     still bracket a stroke exactly.
 //   • text (op-log v4 / box_height) committing onto the canvas.
 //   • shapes: picking a different shape must not retype the one already drawn.
-//   • guides: the colour is a preference and survives a reload.
+//   • guides: the color is a preference and survives a reload.
 //   • export still produces real bytes.
 //
 // Section 5 of the skill (visual polish, contrast) is NOT covered here — that
@@ -114,7 +114,7 @@ async function redo(page: Page): Promise<void> {
 }
 
 test.describe("imagehorse-qc v8.41", () => {
-  test("§1 boot + demo mode: engine initialises logged-out, no app console errors", async ({
+  test("§1 boot + demo mode: engine initializes logged-out, no app console errors", async ({
     page,
   }) => {
     const errors = watchConsole(page);
@@ -295,7 +295,7 @@ test.describe("imagehorse-qc v8.41", () => {
     }
   });
 
-  test("§4 Guides: the colour is a preference and survives a reload", async ({ page }) => {
+  test("§4 Guides: the color is a preference and survives a reload", async ({ page }) => {
     await blockExternalNetwork(page);
     await page.goto("/");
     await importFixture(page);
@@ -305,7 +305,7 @@ test.describe("imagehorse-qc v8.41", () => {
     await page.waitForTimeout(2500);
 
     const kept = await page.evaluate(() => localStorage.getItem("image-horse-guide-color"));
-    expect(kept, "guide colour survived the reload").toBe("#22c55e");
+    expect(kept, "guide color survived the reload").toBe("#22c55e");
 
     // And the default is the documented cyan on a origin that never set one.
     const fresh = await page.evaluate(() => {

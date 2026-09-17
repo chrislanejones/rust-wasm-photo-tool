@@ -28,7 +28,7 @@ ratchet stays the scoreboard either way.
 + The inventory numbers are recorded, so the next session does not re-derive them.
 - #45 stays open longer, and #74 stays blocked behind it longer, because the
   unblocking work is now larger than "one more extraction".
-- Both named changes alter behaviour surface (rendering order, subscription
+- Both named changes alter behavior surface (rendering order, subscription
   granularity) where extraction did not, so neither is a green-gates-only job.
 - The ceiling estimate assumes the current shape; a burst of accretion into
   AppShell moves it, and nothing currently reports that except the ratchet.

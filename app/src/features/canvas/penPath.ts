@@ -88,7 +88,7 @@ export function deserialize(flat: number[]): { anchors: Anchor[]; closed: boolea
  *
  * The flag is passed in as a ref rather than closed over, deliberately. `finish`
  * is a `useCallback` whose deps include `onCommit`, which changes identity every
- * time the Pen panel's colour or width changes — a flag owned by the wrapper
+ * time the Pen panel's color or width changes — a flag owned by the wrapper
  * would be reset by that re-creation, and resetting it mid-flight is exactly the
  * overlap the guard exists to prevent. A `useRef` outlives the re-creation.
  *

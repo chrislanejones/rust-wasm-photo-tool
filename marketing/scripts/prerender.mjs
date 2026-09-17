@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Turns the client build into five real HTML documents.
+// Turns the client build into one real HTML document per page and per post.
 //
 //   dist/index.html            ← "/"          (overwritten, was the empty shell)
 //   dist/architecture/index.html
+//   dist/blog/index.html
+//   dist/blog/<slug>/index.html      one per post in data/posts.ts
 //   dist/features/index.html
 //   dist/pricing/index.html
 //   dist/trail-log/index.html
@@ -48,9 +50,17 @@ const marketing = resolve(here, "..");
 const repoRoot = resolve(marketing, "..");
 const dist = join(marketing, "dist");
 
-const { render, ROUTES, headTagsFor, robotsTxt, sitemapXml, NOT_FOUND_HEAD } = await import(
-  join(marketing, "dist-ssr", "entry-server.js")
-);
+const {
+  render,
+  ROUTES,
+  POSTS,
+  postPath,
+  headTagsFor,
+  postHeadTagsFor,
+  robotsTxt,
+  sitemapXml,
+  NOT_FOUND_HEAD,
+} = await import(join(marketing, "dist-ssr", "entry-server.js"));
 
 // ── the template ──────────────────────────────────────────────────────────
 // index.html as the client build left it: correct <script>/<link> tags with the
@@ -81,15 +91,34 @@ for (const marker of [SEO_START, SEO_END, ROOT_DIV]) {
 const headStart = template.indexOf(SEO_START);
 const headEnd = template.indexOf(SEO_END) + SEO_END.length;
 
-/** Splice one route's <head> and rendered body into the shell. */
-function documentFor(route) {
-  const head = headTagsFor(route);
-  const body = render(route.to);
+/** Splice one page's <head> and rendered body into the shell.
+ *
+ *  Takes the head as a string rather than a route, because a post builds its
+ *  own (`postHeadTagsFor` — different og:type, `article:*` properties, a
+ *  BlogPosting graph) and the splice is identical for both. */
+function documentFor(to, head) {
+  const body = render(to);
   return (
     template.slice(0, headStart) +
     head +
     template.slice(headEnd)
   ).replace(ROOT_DIV, `<div id="root">${body}</div>`);
+}
+
+/** Where a path's file goes. "/" is the shell's own path so it overwrites
+ *  dist/index.html; everything else becomes a directory index, which is what
+ *  lets /features and /blog/engine-in-a-worker be served as static files with
+ *  no rewrite. */
+const fileFor = (to) => (to === "/" ? join(dist, "index.html") : join(dist, to, "index.html"));
+
+/** Write one document and log its size and date. */
+function emit(to, head, lastmodDate) {
+  const out = fileFor(to);
+  const html = documentFor(to, head);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, html);
+  const size = (Buffer.byteLength(html) / 1024).toFixed(1);
+  console.log(`  ${to.padEnd(28)} → ${size} kB  ${lastmodDate ?? "(no lastmod)"}`);
 }
 
 // ── lastmod, from git ─────────────────────────────────────────────────────
@@ -155,20 +184,21 @@ function lastCommitDate(paths) {
 
 // ── write ─────────────────────────────────────────────────────────────────
 const lastmod = {};
+
 for (const route of ROUTES) {
   lastmod[route.to] = lastCommitDate(route.sources);
+  emit(route.to, headTagsFor(route), lastmod[route.to]);
+}
 
-  // "/" is the shell's own path, so it overwrites dist/index.html. Everything
-  // else becomes a directory index, which is what lets /features be served as a
-  // static file without a rewrite.
-  const out =
-    route.to === "/" ? join(dist, "index.html") : join(dist, route.to, "index.html");
-  const html = documentFor(route);
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, html);
-
-  const size = (Buffer.byteLength(html) / 1024).toFixed(1);
-  console.log(`  ${route.to.padEnd(14)} → ${size} kB  ${lastmod[route.to] ?? "(no lastmod)"}`);
+// The posts. Same shell, same renderer, same lastmod rule — a post's `sources`
+// list its body file and the decision records it cites, so a post whose
+// evidence was corrected reads as freshly touched and one nobody edited does
+// not. These paths are NOT in ROUTES (see the note in seo.ts), which is why
+// they are written here from POSTS rather than falling out of the loop above.
+for (const post of POSTS) {
+  const to = postPath(post);
+  lastmod[to] = lastCommitDate(post.sources);
+  emit(to, postHeadTagsFor(post), lastmod[to]);
 }
 
 // The 404 renders through the same router, on a path guaranteed not to match a
@@ -192,5 +222,8 @@ console.log("  404            → dist/404.html (noindex)");
 
 writeFileSync(join(dist, "sitemap.xml"), sitemapXml(lastmod));
 writeFileSync(join(dist, "robots.txt"), robotsTxt());
-console.log(`  sitemap.xml    → ${ROUTES.length} URLs`);
-console.log("  robots.txt     → written");
+console.log(
+  `  sitemap.xml                  → ${ROUTES.length + POSTS.length} URLs ` +
+    `(${ROUTES.length} pages, ${POSTS.length} ${POSTS.length === 1 ? "post" : "posts"})`,
+);
+console.log("  robots.txt                   → written");

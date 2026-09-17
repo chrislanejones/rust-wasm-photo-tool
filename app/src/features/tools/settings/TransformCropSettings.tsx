@@ -88,9 +88,9 @@ interface TransformCropSettingsProps {
    *  rather than the whole panel three times over.
    *
    *  Omitted renders all three, stacked with separators — the pre-restructure
-   *  behaviour, kept so any other caller is unaffected. */
+   *  behavior, kept so any other caller is unaffected. */
   section?: "crop" | "transform" | "colorPicker";
-  /** Re-apply a colour from the picker history (sets brush + text colour, the
+  /** Re-apply a color from the picker history (sets brush + text color, the
    *  same two fields a fresh pick writes). */
   onPickColor?: (hex: string) => void;
 }
@@ -133,7 +133,7 @@ export function TransformCropSettings({
     const [rw, rh] = RATIO_DIMS[id];
     onCropRatioChange([rw, rh]);
     if (!imageWidth || !imageHeight || !onSetCropSelection) return;
-    // Delegate the centred-crop math to Rust so it stays consistent with
+    // Delegate the centered-crop math to Rust so it stays consistent with
     // the drag-snap math driven by `constrain_crop_to_ratio`.
     const mod = await import("stamp_tool");
     await mod.default();
@@ -281,7 +281,7 @@ export function TransformCropSettings({
             </div>
           )}
 
-          {/* ── Picked-colour history ──────────────────────────────────────
+          {/* ── Picked-color history ──────────────────────────────────────
               Same UI vocabulary as the Guides list in LayerSettings: a
               `.history-list` of ReselectBar rows, click to re-apply, ✕ to
               forget. Reusing ReselectBar rather than rolling a swatch list

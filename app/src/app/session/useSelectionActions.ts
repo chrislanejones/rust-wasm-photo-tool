@@ -149,7 +149,7 @@ export function useSelectionActions(
   // SILENTLY behind the worker. `!tool.lasso_active()` is the sharper one: a
   // Promise is truthy, so `!Promise` is `false` and the guard stops refusing —
   // the live wire would keep drawing after the lasso had been committed or
-  // cancelled. `lasso_path_to`'s result went straight into `setLassoPreview`,
+  // canceled. `lasso_path_to`'s result went straight into `setLassoPreview`,
   // so React would have been handed a Promise to render.
   //
   // DROP-STALE, not run-exclusive. Two pointermoves can now be in flight at

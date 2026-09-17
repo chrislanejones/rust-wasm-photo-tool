@@ -1,5 +1,5 @@
 //! Layer stack: the `Layer` type, the composite/render pipeline, and the layer
-//! CRUD / mask / merge impl block. Split out of `lib.rs`; behaviour is unchanged.
+//! CRUD / mask / merge impl block. Split out of `lib.rs`; behavior is unchanged.
 
 use crate::annotations::{
     annotations_to_json, build_text_annotation, render_shape_into, shapes_to_json, ShapeAnnotation,
@@ -34,13 +34,13 @@ pub enum LayerKind {
 }
 
 /// A non-destructive Photoshop-style **Color Overlay** layer style: a solid
-/// colour laid over the layer's own pixels at composite time, clipped to the
+/// color laid over the layer's own pixels at composite time, clipped to the
 /// layer's existing alpha so it tints what is there rather than filling the
 /// frame.
 ///
 /// Normal blend only (Photoshop's default for this effect). `opacity` is
 /// 0.0..=1.0; the layer's alpha is never changed, so a fully-opaque overlay
-/// recolours the layer and leaves its silhouette exactly as it was.
+/// recolors the layer and leaves its silhouette exactly as it was.
 ///
 /// `Copy` because it is four small scalars — snapshots and `Layer::clone`
 /// carry it for free, which is what makes undo/redo reverse it.
@@ -77,7 +77,7 @@ pub struct Layer {
     /// touching `buf`, so masking is fully reversible until "Apply Mask" bakes
     /// it in. `None` when the layer has no mask.
     pub mask: Option<Vec<u8>>,
-    /// Optional non-destructive colour overlay (see [`ColorOverlay`]). Applied
+    /// Optional non-destructive color overlay (see [`ColorOverlay`]). Applied
     /// in `render_layer` AFTER the shape/text overlays and BEFORE the mask —
     /// the Photoshop order, where a layer style tints the whole styled layer
     /// and the mask then hides the styled result. `None` when unset.
@@ -106,7 +106,7 @@ impl Layer {
 
     /// The single flattened `Content` layer a restored op-log snapshot is made
     /// of: id 1, named "Background", fully visible and opaque, carrying `data`
-    /// verbatim, with no mask, no colour overlay and no live annotations.
+    /// verbatim, with no mask, no color overlay and no live annotations.
     ///
     /// Both `inject_undo_snapshot` and `inject_redo_snapshot` built this by
     /// hand, identically. Naming it means a new `Layer` field is set in ONE
@@ -169,12 +169,12 @@ impl Layer {
 /// a flattened stack, a restored snapshot).
 pub(crate) const CANVAS_LAYER_NAME: &str = "Canvas";
 /// Tint `rgba` in place with a [`ColorOverlay`] — Photoshop's Color Overlay at
-/// Normal blend. Pure per-channel lerp toward the overlay colour, weighted by
+/// Normal blend. Pure per-channel lerp toward the overlay color, weighted by
 /// `opacity`; the alpha byte is never touched, so the layer keeps its exact
 /// silhouette.
 ///
 /// Fully-transparent pixels are skipped rather than tinted. Their RGB is
-/// invisible either way, but writing colour into them bleeds a halo the moment
+/// invisible either way, but writing color into them bleeds a halo the moment
 /// anything downsamples the buffer (export, thumbnail, layer resize).
 ///
 /// Shared by `render_layer` (the live, non-destructive path) and the two bake
@@ -236,9 +236,9 @@ pub(crate) fn render_layer(
             a.y + a.tile_offset_y,
         );
     }
-    // Colour overlay BEFORE the mask: a layer style tints the styled layer
+    // Color overlay BEFORE the mask: a layer style tints the styled layer
     // (pixels + shapes + text), and the mask then hides the styled result —
-    // Photoshop's order. Clipped to the layer's own alpha, so it recolours
+    // Photoshop's order. Clipped to the layer's own alpha, so it recolors
     // what is there instead of flooding the frame.
     if let Some(ov) = layer.overlay {
         apply_color_overlay(&mut out, ov);
@@ -333,7 +333,7 @@ pub(crate) fn composite_layers_into(
     if move_preview.is_none() && hide_layer.is_none() {
         let mut visible = layers.iter().filter(|l| l.visible);
         if let (Some(only), None) = (visible.next(), visible.next()) {
-            // A masked or colour-overlaid layer isn't a straight copy — it must
+            // A masked or color-overlaid layer isn't a straight copy — it must
             // go through render_layer so the mask scales its alpha and the
             // overlay tints it; so opt both out here. (Missing the overlay
             // guard would make the style invisible on exactly the common
@@ -389,10 +389,10 @@ pub(crate) fn composite_layers(
 }
 
 /// Build the cached tile (rotated if needed) for an annotation's current
-/// text / font / colour / rotation, optionally including a filled
+/// text / font / color / rotation, optionally including a filled
 /// background (rect or speech bubble). Returns (pixels, w, h, off_x, off_y).
 /// `off_x/off_y` are the offsets of the rotated bounding box relative to
-/// the unrotated top-left (x,y) so that rotation pivots around the centre
+/// the unrotated top-left (x,y) so that rotation pivots around the center
 /// of the unrotated tile.
 ///
 /// `background_kind`: 0 = none, 1 = filled rounded rect, 2 = rounded rect
@@ -400,7 +400,7 @@ pub(crate) fn composite_layers(
 /// Paint a soft drop shadow into `tile` from the given silhouette(s): an
 /// optional box coverage mask and/or an optional text-alpha source. The union is
 /// offset by (dx,dy), blurred twice (≈ Gaussian), and composited as the shadow
-/// colour — call it BEFORE drawing the box/text so it sits behind them.
+/// color — call it BEFORE drawing the box/text so it sits behind them.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn composite_drop_shadow(
     tile: &mut [u8],
@@ -485,7 +485,7 @@ pub(crate) fn build_annotation_tile(
     font_size: f32,
     // Minimum BOX height in px; 0 = size the box to the text, which is what
     // every annotation written before v8.41 means. When it exceeds the
-    // rendered text's own height the block is grown and the text centred in it
+    // rendered text's own height the block is grown and the text centered in it
     // (`text::grow_to_box_height`) BEFORE anything else looks at the
     // dimensions — so the background rect, the bubble tail, the shadow and the
     // rotation bounds all follow the box for free, with no second place to
@@ -578,7 +578,7 @@ pub(crate) fn build_annotation_tile(
         }
         // `rotate_pixels(+θ)` is clockwise — matches the CSS preview.
         let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
-        // TOP-LEFT anchor, not centre — see `text::rotated_tile_offset` (ADR-050).
+        // TOP-LEFT anchor, not center — see `text::rotated_tile_offset` (ADR-050).
         let (off_x, off_y) = crate::text::rotated_tile_offset(
             tile_w,
             tile_h,
@@ -607,7 +607,7 @@ pub(crate) fn build_annotation_tile(
     let rect_y1 = origin + (raw_h + pad * 2) as i32;
 
     // Build the bubble as a single coverage mask (rect ∪ tail), then composite
-    // the colour ONCE. This keeps the tail flush with the body — no AA seam at
+    // the color ONCE. This keeps the tail flush with the body — no AA seam at
     // the join, and translucent fills don't double up where the two overlap.
     let mut cov = vec![0f32; (tile_w * tile_h) as usize];
     crate::drawing::rounded_rect_coverage(
@@ -622,7 +622,7 @@ pub(crate) fn build_annotation_tile(
     );
 
     // Speech-bubble tail at `bg_tail` degrees. Project a ray from the rect
-    // centre (CW from +x, screen coords with y down) onto the bounding edge;
+    // center (CW from +x, screen coords with y down) onto the bounding edge;
     // the exit point picks WHICH edge the tail leaves from. The base runs
     // straight ALONG that edge (not perpendicular to the ray) so it's always
     // flush — both base corners sit on the body. The base is clamped to the
@@ -742,7 +742,7 @@ pub(crate) fn build_annotation_tile(
     // Rotate the composed tile (background + text together). Pass the angle
     // as-is: rotate_pixels(+θ) is clockwise, matching the CSS preview.
     let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
-    // TOP-LEFT anchor, not centre — see `text::rotated_tile_offset` (ADR-050).
+    // TOP-LEFT anchor, not center — see `text::rotated_tile_offset` (ADR-050).
     let (off_x, off_y) = crate::text::rotated_tile_offset(
         tile_w,
         tile_h,
@@ -792,7 +792,7 @@ pub(crate) fn annotation_ink_offset(
     // taller box moves no glyph and the ink offset is genuinely independent of
     // it. Pinned by the sweep in `ink_offset_matches_tile_geometry`, which
     // varies the height and asserts this answer does not move — if the layout
-    // ever goes centred, that test fails first and this comment is the reason
+    // ever goes centered, that test fails first and this comment is the reason
     // why.
     (ink_x + margin, ink_y + margin)
 }
@@ -862,7 +862,7 @@ impl ImageHorseTool {
     ///
     /// This is what "how big is my picture" means, and it is NOT the document
     /// size. A default import is an artboard — a Canvas fill with the photo
-    /// centred on it — so the document is `photo + 2 * canvasPadding`, and
+    /// centered on it — so the document is `photo + 2 * canvasPadding`, and
     /// reporting the document told the user a number 20px larger than the file
     /// they opened and then sized their resizes from it (#81).
     ///
@@ -1543,7 +1543,7 @@ impl ImageHorseTool {
                     a.y + a.tile_offset_y,
                 );
             }
-            // Bake the lower layer's colour overlay into its pixels and drop it —
+            // Bake the lower layer's color overlay into its pixels and drop it —
             // BEFORE the mask, the same order render_layer uses for the upper
             // layer. Skipping this would silently discard the lower layer's
             // style at merge time (the upper layer's is already baked in by
@@ -1672,16 +1672,16 @@ impl ImageHorseTool {
         self.layers.iter().any(|l| l.id == id && l.mask.is_some())
     }
 
-    // ── Layer colour overlay (non-destructive style) ──────────────────────
-    // Photoshop's Color Overlay: a solid colour tinting the layer's own pixels
+    // ── Layer color overlay (non-destructive style) ──────────────────────
+    // Photoshop's Color Overlay: a solid color tinting the layer's own pixels
     // at composite time (`render_layer`), clipped to its alpha and sitting
     // UNDER the mask. Reversible until `apply_layer_color_overlay` bakes it.
 
-    /// Set (or update) layer `id`'s colour overlay. `opacity` is 0..=1 and is
+    /// Set (or update) layer `id`'s color overlay. `opacity` is 0..=1 and is
     /// clamped. Returns false only if the layer isn't found.
     ///
     /// ## History: one snap on the first set, none on adjustment
-    /// The colour swatches and the opacity slider both land here, and a slider
+    /// The color swatches and the opacity slider both land here, and a slider
     /// drag fires this on every pointer move — snapping each one would bury the
     /// undo stack under a hundred identical "Color Overlay" entries. So the
     /// None → Some transition snaps (undo removes the overlay outright) and
@@ -1706,7 +1706,7 @@ impl ImageHorseTool {
         true
     }
 
-    /// Discard layer `id`'s colour overlay (back to its true colours). False if
+    /// Discard layer `id`'s color overlay (back to its true colors). False if
     /// it had none.
     pub fn remove_layer_color_overlay(&mut self, id: u32) -> bool {
         let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
@@ -1721,7 +1721,7 @@ impl ImageHorseTool {
         true
     }
 
-    /// Bake layer `id`'s colour overlay into its pixels permanently, then drop
+    /// Bake layer `id`'s color overlay into its pixels permanently, then drop
     /// the style. False if it had none. Uses the same `apply_color_overlay` the
     /// live render does, so the baked pixels match what was on screen.
     pub fn apply_layer_color_overlay(&mut self, id: u32) -> bool {
@@ -1739,7 +1739,7 @@ impl ImageHorseTool {
         true
     }
 
-    /// Whether layer `id` currently carries a colour overlay.
+    /// Whether layer `id` currently carries a color overlay.
     pub fn has_layer_color_overlay(&self, id: u32) -> bool {
         self.layers
             .iter()
@@ -1832,7 +1832,7 @@ impl ImageHorseTool {
             buf,
             mask: None,
             // Not persisted — same as `mask` directly above. The layer archive
-            // carries pixels + overlays only, so a colour overlay is a
+            // carries pixels + overlays only, so a color overlay is a
             // session-lived, undoable style until the user Applies it.
             overlay: None,
             text_annotations: Vec::new(),
@@ -1947,7 +1947,7 @@ impl ImageHorseTool {
     /// uniform fill, which every `load_image_artboard` / `set_artboard_border`
     /// canvas is by construction and a photograph is not. The only documents
     /// this can misread are ones whose bottom layer is a perfectly solid
-    /// colour — and there the misreading is harmless, because the Canvas
+    /// color — and there the misreading is harmless, because the Canvas
     /// metadata reproduces that exact plane at composite time.
     pub fn finish_layer_restore(&mut self, active_index: usize) {
         if self.layers.is_empty() {
@@ -2028,7 +2028,7 @@ mod tests {
     }
 
     /// THE ADR-050 REGRESSION. Rotation used to pivot about the unrotated
-    /// tile's CENTRE, and that centre is `tile_w / 2` — a function of the
+    /// tile's CENTER, and that center is `tile_w / 2` — a function of the
     /// text's own length. So typing moved the committed ink: measured at 30°,
     /// ink minX/minY went (107, 104) -> (118, 67) for the same text getting
     /// four times longer.
@@ -2075,7 +2075,7 @@ mod tests {
         );
     }
 
-    // ── Colour overlay (Photoshop's Color Overlay layer style) ───────────
+    // ── Color overlay (Photoshop's Color Overlay layer style) ───────────
 
     /// THE trap this feature had: `composite_layers_into`'s fast path copies a
     /// lone opaque un-overlaid layer straight out without calling
@@ -2094,7 +2094,7 @@ mod tests {
         assert_eq!(
             px(&t, 1, 1),
             [255, 0, 0, 255],
-            "a full-opacity overlay recolours the layer"
+            "a full-opacity overlay recolors the layer"
         );
     }
 
@@ -2119,7 +2119,7 @@ mod tests {
         );
     }
 
-    /// Half opacity is a straight lerp toward the overlay colour, and it is the
+    /// Half opacity is a straight lerp toward the overlay color, and it is the
     /// SAME arithmetic on the live path and the bake path — `apply` must not
     /// shift the image it was previewing.
     #[test]
@@ -2130,7 +2130,7 @@ mod tests {
 
         assert!(t.set_layer_color_overlay(id, 255, 255, 255, 0.5));
         let live = px(&t, 2, 2);
-        assert_eq!(live, [128, 128, 128, 255], "black + 50% white = mid grey");
+        assert_eq!(live, [128, 128, 128, 255], "black + 50% white = mid gray");
 
         assert!(t.apply_layer_color_overlay(id));
         assert_eq!(px(&t, 2, 2), live, "bake must not move the pixels");
@@ -2145,7 +2145,7 @@ mod tests {
     }
 
     /// History contract (documented on `set_layer_color_overlay`): the first
-    /// set snaps so undo can remove the style, and adjusting colour/opacity
+    /// set snaps so undo can remove the style, and adjusting color/opacity
     /// afterwards rides on that one entry rather than flooding the undo stack
     /// — the opacity slider fires this on every pointer move.
     #[test]
@@ -2194,7 +2194,7 @@ mod tests {
 
     /// The UI decides between "Add color overlay" and the live controls from
     /// this JSON, so `overlay` must be present as an explicit `null` when unset
-    /// and carry colour + opacity when set.
+    /// and carry color + opacity when set.
     #[test]
     fn get_layers_reports_the_color_overlay() {
         let mut t = ImageHorseTool::new(4, 4);
@@ -2203,7 +2203,7 @@ mod tests {
 
         assert!(
             t.get_layers().contains("\"overlay\":null"),
-            "unset must serialise as null, not a missing key: {}",
+            "unset must serialize as null, not a missing key: {}",
             t.get_layers()
         );
 

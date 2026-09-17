@@ -469,7 +469,7 @@ export function AppShell() {
   // CSS transitions; the <MotionConfig> wrapper below handles framer-motion.
   useReduceMotion(prefs.reduceMotion);
   // Shared responsive breakpoints (one resize listener) — drives the top bar's
-  // compact collapse, the narrow overlay-drawer behaviour for the side panels,
+  // compact collapse, the narrow overlay-drawer behavior for the side panels,
   // and the too-small notice.
   const bp = useBreakpoint();
   // Canvas "Rulers & Grids" overlay config (Settings → Rulers & Grids). Inline
@@ -1288,7 +1288,7 @@ export function AppShell() {
   const selectionTolerance = useToolStore((s) => s.selectionTolerance);
   const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
   const selectionMask = useToolStore((s) => s.selectionMask);
-  // Which engine call a canvas click makes (wand / edge-aware / colour range /
+  // Which engine call a canvas click makes (wand / edge-aware / color range /
   // lasso / rect / ellipse) — one exclusive mode, gesture included.
   const selectionKind = useToolStore((s) => s.selectionKind);
   const setSelectionKind = useToolStore((s) => s.setSelectionKind);
@@ -1791,7 +1791,7 @@ export function AppShell() {
   });
 
   /**
-   * Paste a bitmap from the clipboard into the **active layer**, centred on the
+   * Paste a bitmap from the clipboard into the **active layer**, centered on the
    * canvas. Accepts either the `clipboardData.items` from a native paste event
    * or, when called without them, falls back to the async Clipboard API (for an
    * explicit button/menu invocation). Decodes the image to RGBA and composites
@@ -2182,7 +2182,7 @@ export function AppShell() {
   /**
    * Photoshop-style **Canvas Size** apply (the "Resize canvas" control in Layer
    * Settings). Resizes the backing document WITHOUT resampling the photo — the
-   * layer content keeps its native resolution, centred, the new area filled with
+   * layer content keeps its native resolution, centered, the new area filled with
    * the user's chosen backing color (transparent ⇒ checkerboard). Undoable
    * (resize_canvas pushes history) and persisted like any other canvas edit.
    */
@@ -2393,7 +2393,7 @@ export function AppShell() {
     // intermittent because edit-then-export-immediately is correct — only a
     // reload in between breaks it.
     //
-    // The gate was never load-bearing, only an optimisation: BOTH of its
+    // The gate was never load-bearing, only an optimization: BOTH of its
     // "ship the original" branches were byte-identical, so all it ever decided
     // was whether to spend one IndexedDB read. The presence of a saved edit is
     // the real question, and `loadPhotoEdit` answers it directly from storage

@@ -31,10 +31,10 @@ impl ImageBuffer {
     ///
     /// Interpolation happens in **linear light** (sRGB gamma removed) with
     /// **premultiplied alpha**, then the result is un-premultiplied and
-    /// re-encoded to sRGB. This avoids the two classic downscaling artefacts:
+    /// re-encoded to sRGB. This avoids the two classic downscaling artifacts:
     /// averaging in gamma space darkens midtones/edges, and interpolating
     /// straight (non-premultiplied) RGB lets fully-transparent pixels bleed
-    /// their colour into the result (edge fringing).
+    /// their color into the result (edge fringing).
     pub fn sample_bilinear(&self, fx: f64, fy: f64) -> [u8; 4] {
         if self.width == 0 || self.height == 0 {
             return [0, 0, 0, 0];
@@ -141,7 +141,7 @@ mod core_tests {
         assert!((126..=129).contains(&a), "a={a} (expected ~128)");
     }
 
-    /// Downscaling a solid colour must return that exact colour (round-trip
+    /// Downscaling a solid color must return that exact color (round-trip
     /// through linear/premultiplied space introduces no drift).
     #[test]
     fn bilinear_solid_color_is_stable() {

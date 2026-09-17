@@ -2,7 +2,7 @@
 //
 // This module is a deliberate second definition of a rule that lives in
 // annotations.rs (see that file's header for why). These tests are what stops
-// the two drifting: each one states the Rust behaviour it is holding the TS to,
+// the two drifting: each one states the Rust behavior it is holding the TS to,
 // so a future change to either side fails here rather than in someone's canvas.
 import { describe, it, expect } from "vitest";
 import {
@@ -130,7 +130,7 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(rect, 3, 30)).toBe(-1);
   });
 
-  it("normalises an inverted rect (x1 < x0)", () => {
+  it("normalizes an inverted rect (x1 < x0)", () => {
     const rect = [shape({ id: 14, kind: 0, x0: 50, y0: 50, x1: 10, y1: 10 })];
     expect(shapeAnnotationAt(rect, 10, 30)).toBe(14); // on its left stroke
     expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // hollow middle
@@ -142,7 +142,7 @@ describe("shapeAnnotationAt", () => {
   it("REGRESSION: an unfilled rect's empty interior is a MISS, its stroke a hit", () => {
     // pad 6 on a 20..100 box → ring is 14..26 and 94..106 on each axis.
     const rect = [shape({ id: 20, kind: 0, x0: 20, y0: 20, x1: 100, y1: 100 })];
-    expect(shapeAnnotationAt(rect, 60, 60)).toBe(-1); // dead centre
+    expect(shapeAnnotationAt(rect, 60, 60)).toBe(-1); // dead center
     expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // just inside the ring
     expect(shapeAnnotationAt(rect, 20, 60)).toBe(20); // on the left stroke
     expect(shapeAnnotationAt(rect, 15, 60)).toBe(20); // outer pad
@@ -159,9 +159,9 @@ describe("shapeAnnotationAt", () => {
   });
 
   it("an unfilled circle is a ring, and its bbox corner is not ink", () => {
-    // 20..120 → centre (70,70), r 50; pad 6 → ring radii 44..56.
+    // 20..120 → center (70,70), r 50; pad 6 → ring radii 44..56.
     const circ = [shape({ id: 22, kind: 1, x0: 20, y0: 20, x1: 120, y1: 120 })];
-    expect(shapeAnnotationAt(circ, 70, 70)).toBe(-1); // centre
+    expect(shapeAnnotationAt(circ, 70, 70)).toBe(-1); // center
     expect(shapeAnnotationAt(circ, 70, 40)).toBe(-1); // r=30
     expect(shapeAnnotationAt(circ, 70, 20)).toBe(22); // on the stroke
     expect(shapeAnnotationAt(circ, 70, 25)).toBe(22); // r=45

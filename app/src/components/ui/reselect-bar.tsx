@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-actions";
 
 /**
- * A full-width, clickable "reselect" bar — a labelled row with an optional
+ * A full-width, clickable "reselect" bar — a labeled row with an optional
  * trailing ✕ delete affordance — extracted from the History/Reselect list so
- * the same look (token colours, height, hover, hover-revealed ✕) is the single
+ * the same look (token colors, height, hover, hover-revealed ✕) is the single
  * source of truth wherever we list re-selectable things (History entries,
  * placed text/shapes, guides…).
  *
@@ -18,8 +18,8 @@ import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-action
  * `.history-delete` classes (styles.css), plus an `.is-selected` highlight
  * for lists that keep a persistent selection.
  *
- * The coloured dot is gone (2026-09-11): the leading slot is the INDEX, and a
- * dot beside a number said the same thing twice. `type-*` still colours the
+ * The colored dot is gone (2026-09-11): the leading slot is the INDEX, and a
+ * dot beside a number said the same thing twice. `type-*` still colors the
  * row itself, so the state it carried is not lost.
  *
  * Trailing buttons live in one `.row-actions` cluster, hidden until the row is
@@ -46,7 +46,7 @@ export interface ReselectBarProps {
   /** Rendered below the row inside the same badge — the Layers opacity
    *  slider. It stays inside so it inherits the row's selected/hover state. */
   children?: ReactNode;
-  /** Row colour/dot variant — `.full-width-badge.type-*`. Default "redo". */
+  /** Row color/dot variant — `.full-width-badge.type-*`. Default "redo". */
   type?: "undo" | "redo" | "current";
   /** Persistent-selection highlight (lists without selection just omit it). */
   selected?: boolean;
@@ -62,7 +62,7 @@ export interface ReselectBarProps {
   /** Directional (d-pad) affordance, leftmost of the trailing three. Pass
    *  `true` to render it DISABLED — a placeholder for nudging the object from
    *  the row, which has no handler yet. Passing a function is not supported on
-   *  purpose: a live control should arrive with its behaviour, not be switched
+   *  purpose: a live control should arrive with its behavior, not be switched
    *  on by a caller guessing what it does. */
   showDirectional?: boolean;
   /** LIVE directional control — opens/closes the duplicate pad for this row.

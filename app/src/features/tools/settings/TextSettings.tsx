@@ -88,7 +88,7 @@ const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
     id: "text",
     label: "Text",
     icon: Type,
-    info: "Font, weight and colour for the text itself.",
+    info: "Font, weight and color for the text itself.",
   },
   {
     id: "background",

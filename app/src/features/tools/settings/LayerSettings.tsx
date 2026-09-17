@@ -58,7 +58,7 @@ const MASK_SECTION_SEP = SECTION_SEP;
 export interface LayerMaskControls {
   /** Whether brush strokes currently paint the active layer's mask. */
   editing: boolean;
-  /** Grey laid down while painting the mask: 0 = hide, 255 = reveal. */
+  /** Gray laid down while painting the mask: 0 = hide, 255 = reveal. */
   value: number;
   onAdd: (id: number) => void;
   onRemove: (id: number) => void;
@@ -77,7 +77,7 @@ export interface LayerOverlayControls {
    *  grid and the opacity slider are the same engine call. The engine snaps
    *  history only on the first set, so a slider drag is one undo step. */
   onSet: (id: number, color: string, opacity: number) => void;
-  /** Discard the style; the layer's true colours come back untouched. */
+  /** Discard the style; the layer's true colors come back untouched. */
   onRemove: (id: number) => void;
   /** Bake the tint into the layer's pixels permanently. */
   onApply: (id: number) => void;
@@ -125,7 +125,7 @@ interface LayerSettingsProps {
   /** Which section to render. Edit gives Resize Layer, Guides and Canvas Size
    *  each their own sub-tool tile, so each shows ONLY its own section rather
    *  than the whole panel three times over. Omitted renders all three with
-   *  separators — the pre-restructure behaviour. Mirrors the same prop on
+   *  separators — the pre-restructure behavior. Mirrors the same prop on
    *  TransformCropSettings. */
   section?: "layer" | "guides" | "canvas";
 }
@@ -414,8 +414,8 @@ export function LayerSettings({
               }
             />
             {/* The swatch grid IS the on-switch — no separate "Add" tile.
-                Picking a colour with no overlay yet creates one at full
-                strength (Photoshop's default); picking another recolours the
+                Picking a color with no overlay yet creates one at full
+                strength (Photoshop's default); picking another recolors the
                 existing one. `value` is "" when unset so no circle reads as
                 selected, which is what makes "pick one to start" legible. */}
             <ColorSwatchGrid
@@ -431,7 +431,7 @@ export function LayerSettings({
                 )
               }
             />
-            {/* #71 — the reason, not just the grey. An overlay is clipped to
+            {/* #71 — the reason, not just the gray. An overlay is clipped to
                 the layer's own alpha (ADR-041 "tints, never fills"), so on a
                 layer with no pixels it is a no-op: the swatch would light up
                 and nothing would happen. Only shown when the engine has
@@ -528,7 +528,7 @@ export function LayerSettings({
           // FOUR ACROSS, matching the Wand → Selection grid's stacked tiles.
           // Measured at the real 226px sidebar column: 51×71 tiles, nothing
           // clipped (scrollWidth == width on all four), and one clean row
-          // instead of two — 79px of sidebar back for the colour grid and the
+          // instead of two — 79px of sidebar back for the color grid and the
           // guide list below. Three across reproduces the Wand tile size
           // exactly (70×71) but strands Lock alone on a row with two dead
           // cells; two across doubles the tile width for four small jobs.
@@ -601,7 +601,7 @@ export function LayerSettings({
       <div className={cn("space-y-3", sep)}>
         <SectionHeader
           title="Background Canvas Size"
-          info="Resizes the backing canvas, not the photo — content keeps its native resolution, centred; new area uses the backing color."
+          info="Resizes the backing canvas, not the photo — content keeps its native resolution, centered; new area uses the backing color."
         />
         <CanvasResize
           width={canvasWidth}
@@ -617,8 +617,8 @@ export function LayerSettings({
   );
 }
 
-/** The swatch grid's `value`: the layer's overlay colour, or `""` when it has
- *  none so NO circle renders as selected. Returning a default colour instead
+/** The swatch grid's `value`: the layer's overlay color, or `""` when it has
+ *  none so NO circle renders as selected. Returning a default color instead
  *  would ring a swatch for a style that isn't applied — the control would look
  *  on while the layer is untinted. */
 function overlayColorOf(layer: LayerInfo): string {

@@ -11,7 +11,7 @@
 //                 projective freedom, and the only mode that can produce a
 //                 quad the other two cannot.
 //   Perspective — the dragged corner's edge partner mirrors it, so the edge
-//                 narrows or widens about its own centre and the shape stays a
+//                 narrows or widens about its own center and the shape stays a
 //                 symmetric trapezoid. This is the keystone gesture; doing it
 //                 by eye in Distort is fiddly, which is why it has its own
 //                 mode rather than being a modifier key.
@@ -21,7 +21,7 @@
 // TWO TARGETS, ONE GESTURE. With a vector object selected — a text annotation,
 // a square, a circle, any shape the app draws — the quad warps THAT,
 // non-destructively: the engine stores the corners on the annotation
-// (normalised, so they survive an edit or a resize) and re-renders through
+// (normalized, so they survive an edit or a resize) and re-renders through
 // them. With nothing selected the quad warps the PIXELS under it, which is
 // destructive and lands as one "Perspective" step in Review → History. The
 // panel says which is about to happen rather than making the user infer it
@@ -71,7 +71,7 @@ export const PERSPECTIVE_MODES: readonly (ToolMode<PerspectiveMode> & {
     id: "perspective",
     label: "Perspective",
     icon: Scan,
-    info: "Drag a corner and its neighbour mirrors it, so the edge narrows about its centre. This is the keystone — the gesture that makes a flat thing sit on a receding surface.",
+    info: "Drag a corner and its neighbour mirrors it, so the edge narrows about its center. This is the keystone — the gesture that makes a flat thing sit on a receding surface.",
   },
   {
     id: "distort",

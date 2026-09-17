@@ -162,7 +162,7 @@ baseline to ratchet down from". This document is that baseline:
    overlay drawing, and cursor management go to
    `features/canvas/hooks/usePointerRouting.ts`, `useOverlayPainting.ts`,
    `useCanvasCursor.ts`, mirroring how `useCanvasCoords.ts` was cut loose.
-   Behaviour-preserving by construction: same callbacks, same dep arrays.
+   Behavior-preserving by construction: same callbacks, same dep arrays.
 2. **AppShell stage-3**: it grew 387 lines and 19 imports since the last
    report *during* its own dismantle, so extraction has to outpace accretion
    or stop pretending. The 84 `useEffect`/`useCallback` sites and 108-import
@@ -184,7 +184,7 @@ baseline to ratchet down from". This document is that baseline:
 
 ## Order of operations & verification
 
-Phase 1 and 2 are one PR each, behaviour-preserving, verifiable by:
+Phase 1 and 2 are one PR each, behavior-preserving, verifiable by:
 `cargo test --all-features` + `cargo check` staying warning-free,
 `pnpm --filter stamp-tool test`, `pnpm lint`, and — because two deletions
 touch the wasm export list — a `build:wasm` + grep of `pkg/stamp_tool.d.ts`

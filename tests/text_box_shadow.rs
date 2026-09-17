@@ -9,7 +9,7 @@ use stamp_tool::ImageHorseTool;
 fn background_box_casts_a_visible_drop_shadow() {
     let (w, h) = (200u32, 120u32);
     let mut t = ImageHorseTool::new(w, h);
-    // White base so a coloured shadow stands out.
+    // White base so a colored shadow stands out.
     let base = vec![255u8; (w * h * 4) as usize];
     t.load_image(&base);
     t.recomposite();

@@ -36,7 +36,7 @@ interface PenOverlayProps {
   /** Commit a NEW path: flat control sequence + whether it closes. Returns the
    *  new annotation's id so the overlay can KEEP it selected — without that id
    *  a finished path went straight back to nothing selected, and the only route
-   *  to its colour was the Reselect list. */
+   *  to its color was the Reselect list. */
   onCommit: (flatPoints: number[], close: boolean) => Promise<number | void>;
   /** Hit-test an image-space point against committed kind-7 paths. */
   onHitTest?: (
@@ -141,7 +141,7 @@ export function PenOverlay({
    *
    *  `keepSelection` is the difference between "I'm done with this path" and
    *  "I've finished drawing it and now I want to style it". Finishing used to
-   *  always drop the selection, which is why changing a pen path's colour meant
+   *  always drop the selection, which is why changing a pen path's color meant
    *  hunting for the Reselect list: the path you had just drawn was already
    *  deselected by the time you reached for a swatch. Enter and closing the
    *  loop now keep it live; Escape and clicking away still let go, so there is
@@ -354,7 +354,7 @@ export function PenOverlay({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
-        // Closes the loop AND keeps it selected, so the panel's colour and
+        // Closes the loop AND keeps it selected, so the panel's color and
         // Background controls are pointing at the path you just drew.
         e.preventDefault();
         // Fire-and-forget, and the re-entrancy guard inside `finish` is what
@@ -367,8 +367,8 @@ export function PenOverlay({
         // Escape used to CANCEL whenever a path was selected, which was right
         // when the only way to be selected was to deliberately re-open a
         // committed path. Now that drawing one leaves it selected, that rule
-        // threw away every restyle: pick a colour, press Escape, and the path
-        // snapped back to the colour it was drawn in — the exact frustration
+        // threw away every restyle: pick a color, press Escape, and the path
+        // snapped back to the color it was drawn in — the exact frustration
         // this change is meant to remove. Escape commits; Ctrl+Z is how you
         // take back a reshape you didn't want.
         e.preventDefault();
@@ -426,7 +426,7 @@ export function PenOverlay({
   //
   // EXCEPT on the tool panel. This listener fires on raw coordinates, so every
   // click on the Pen panel counted as "off the canvas" and finished the path —
-  // including the click on the colour swatch you opened the panel to reach. The
+  // including the click on the color swatch you opened the panel to reach. The
   // path was gone by the time the picker appeared, which is what made Reselect
   // feel mandatory. Panels marked `data-pen-keep-selection` operate ON the
   // selection, so they must not end it; the workspace around the canvas still

@@ -25,7 +25,7 @@ interface RadioCardsProps<T extends string> {
  * of N (e.g. export format). Each card shows a checkbox square, but it's a
  * single-select: checking one unchecks the rest. Built on native radio inputs
  * under the hood, so it keeps real radiogroup semantics + arrow-key navigation
- * (the correct "only one can be checked" behaviour), no extra dependency.
+ * (the correct "only one can be checked" behavior), no extra dependency.
  */
 export function RadioCards<T extends string>({
   name,

@@ -2,7 +2,7 @@
 // Replicate + Convex pipeline (useAIJob). Text Extract (OCR) moved to the
 // Text tool (TextSettings.tsx) — it's a text-shaped feature, not an
 // image-shaped one, and it has its own dedicated useAIJob instance there now.
-// 4x Upscale has NO placeholder anywhere any more: its greyed tile lived in
+// 4x Upscale has NO placeholder anywhere any more: its grayed tile lived in
 // the Quick Adjust grid, and that grid was retired when Enhance › Presets
 // landed. There is no surface for it in the editor until it is built.
 import { useState } from "react";
@@ -275,7 +275,7 @@ export function AISettings({
           {/* The same stacked tile group Select → Wand's Selection row uses,
               in ACTION mode (no `value`, so nothing ever lights). These were
               two hand-rolled `bg-purple-600` buttons with white text — a
-              colour that is in no theme token and a shape that matched nothing
+              color that is in no theme token and a shape that matched nothing
               else in the sidebar, which is why they read as a different app.
               The key badge replaces the inline `Lock` glyph: same message,
               same corner as `Create AI Image`, and it no longer competes with

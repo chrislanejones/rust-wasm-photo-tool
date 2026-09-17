@@ -81,7 +81,7 @@ Two consequences, both fatal to converting it:
 
 1. The id is read from the pre-commit state and the geometry from the
    post-commit state **on purpose**. A single atomic call would have to sit on
-   one side of `commitText` or the other, and both change behaviour.
+   one side of `commitText` or the other, and both change behavior.
 2. `find` returning `undefined` is a **handled** case here, not a silent
    failure. It falls through to opening a fresh text input — which is the
    correct response to emptying a text and clicking where it used to be.
@@ -148,4 +148,4 @@ a second one before its output is trusted**, which is what caught this.
 |---|---|---|
 | a7–a9 | "ordinary conversions, batched by file, size unknown" | ~4 capture conversions first (~11 sites), then genuinely one-at-a-time |
 | a10 | 27 hot-path sites | unchanged — `useSelectionActions` confirmed as the bulk |
-| `openraster/export.ts` | "needs its own design call" | confirmed, and now it is clear *which* part: captures 1–2 are ordinary capture work, the mutate-mid-export behaviour is the part needing a decision |
+| `openraster/export.ts` | "needs its own design call" | confirmed, and now it is clear *which* part: captures 1–2 are ordinary capture work, the mutate-mid-export behavior is the part needing a decision |

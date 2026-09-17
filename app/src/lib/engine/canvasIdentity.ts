@@ -34,7 +34,7 @@
 //
 // a11.2 turns this generation into a protocol field so the worker can REFUSE a
 // draw aimed at a dead element instead of performing it into the void. This
-// step only makes the fact observable; it changes no behaviour.
+// step only makes the fact observable; it changes no behavior.
 //
 // WHY A SEPARATE MODULE. vitest runs in the `node` environment here, so a React
 // component test is not available. The bookkeeping is pure — "an element

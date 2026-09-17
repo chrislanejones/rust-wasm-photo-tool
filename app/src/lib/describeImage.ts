@@ -38,7 +38,7 @@ export const UNKNOWN_DESCRIPTION: ImageDescription = {
   tone: "",
   contrast: "normal",
   palette: "",
-  color: "grey",
+  color: "gray",
   orientation: "square",
   detail: "",
   transparent: false,
@@ -51,7 +51,7 @@ export const UNKNOWN_DESCRIPTION: ImageDescription = {
  *  `{palette}` / `{contrast}` worked while being documented nowhere. */
 export const DESCRIBE_TOKENS = [
   { token: "{desc}", hint: "what the engine saw, e.g. dark-blue-portrait" },
-  { token: "{color}", hint: "dominant colour" },
+  { token: "{color}", hint: "dominant color" },
   { token: "{subject}", hint: "portrait / nature / sky / screenshot" },
   { token: "{kind}", hint: "photo / graphic / screenshot" },
   { token: "{tone}", hint: "dark / bright" },
@@ -172,7 +172,7 @@ export function applyDescriptionPattern(pattern: string, input: PatternInput): s
   const expanded = pattern.replace(/\{[a-z]+\}/g, (tok) =>
     tok in values ? values[tok] : tok,
   );
-  // Slug AFTER substitution so the separators the user typed are normalised
+  // Slug AFTER substitution so the separators the user typed are normalized
   // along with the values, and empty tokens leave no orphan dashes behind.
   const slug = slugify(expanded);
   // Never blank a name: fall back to the engine's slug, then the original.

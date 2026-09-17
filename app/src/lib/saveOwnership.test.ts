@@ -199,7 +199,7 @@ describe("the guard does not refuse legitimate work", () => {
   it("allows the save when ownership is UNKNOWN", async () => {
     // The deliberate one-directional bias, and the opposite of the collector's
     // "when in doubt, keep the bytes". A missed setEngineDocument call must
-    // degrade to the shipped behaviour, never to a refusal.
+    // degrade to the shipped behavior, never to a refusal.
     __resetEngineDocument(); // holding === null
     const toolRef = { current: fakeTool(B_W, B_H) };
 

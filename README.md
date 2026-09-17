@@ -93,7 +93,7 @@ Point Perspective at a square, a circle, a line, an arrow, a pin, a pen path or
 a piece of text and the warp happens to *that object*, not to the photo
 underneath it. Text was the only thing that worked that way before; everything
 else fell through to the pixel warp, so a square you had just drawn sat still
-while the picture under it moved. The warped object stays an object — recolour
+while the picture under it moved. The warped object stays an object — recolor
 it, move it, drag it to a new size, undo it, or re-select it and adjust the same
 corners. Apply, Reset and Cancel sit on the canvas under the box now, and Esc
 takes the whole frame away.
@@ -109,7 +109,7 @@ rest had drifted to four different shades. The New dialog also opens without its
 stutter — the backdrop used to re-blur the whole screen on every frame of the
 animation.
 
-The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Colour Picker
+The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Color Picker
 and Remove Object are one shape instead of four. In Rulers & Grid, clicking a
 lit toggle now turns it off, where before clicking it again did nothing.
 

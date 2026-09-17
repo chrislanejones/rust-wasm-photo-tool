@@ -1,4 +1,4 @@
-//! Colour presets: one named stack of the tonal filters the engine already has.
+//! Color presets: one named stack of the tonal filters the engine already has.
 //!
 //! A PRESET IS NOT A NEW OPERATION. Each one is a set of values for five
 //! filters in `filters` — the same functions the Adjustments sliders call — so
@@ -7,7 +7,7 @@
 //! called `adjust_brightness` and then `adjust_contrast`, each snapshotting, so
 //! one click cost two undos and neither half meant anything alone.
 //!
-//! ORDER IS PART OF THE DEFINITION. Tone first, colour last: brightness and
+//! ORDER IS PART OF THE DEFINITION. Tone first, color last: brightness and
 //! contrast set the overall curve, highlights and shadows recover its ends, and
 //! saturation acts on the tones that result. The same five numbers in another
 //! order give different pixels, so the order lives here, once, and the preview
@@ -21,7 +21,7 @@
 //! |------------|----------|-----------------------------------|
 //! | brightness | `0.0`    | fraction, `-1.0 ..= 1.0`          |
 //! | contrast   | `1.0`    | factor, `0.0 ..= 4.0`             |
-//! | saturation | `1.0`    | factor, `0` = grey, `1` = as-is   |
+//! | saturation | `1.0`    | factor, `0` = gray, `1` = as-is   |
 //! | shadows    | `0.0`    | **absolute 8-bit, `-255 ..= 255`**|
 //! | highlights | `0.0`    | **absolute 8-bit, `-255 ..= 255`**|
 //!
@@ -32,7 +32,7 @@
 //! Shadows: positive RECOVERS, i.e. darkens, blown highlights.)
 //!
 //! SHARPEN IS DELIBERATELY NOT IN THE STACK. It is a convolution with two
-//! full-buffer scratch allocations, it is not colour, and a hover preview would
+//! full-buffer scratch allocations, it is not color, and a hover preview would
 //! pay for it on every pass.
 use wasm_bindgen::prelude::*;
 
@@ -41,7 +41,7 @@ use crate::ImageHorseTool;
 /// Below this, a component is its own identity and is skipped.
 const EPS: f64 = 1e-6;
 
-/// The five colour filters a preset can set. Identity is
+/// The five color filters a preset can set. Identity is
 /// `brightness 0, contrast 1, saturation 1, shadows 0, highlights 0`.
 pub(crate) struct PresetStack {
     pub(crate) brightness: f64,
@@ -155,9 +155,9 @@ impl ImageHorseTool {
 mod tests {
     use super::*;
 
-    /// Coloured pixels well off the mid-point. Mid-grey is exactly the WRONG
+    /// Colored pixels well off the mid-point. Mid-gray is exactly the WRONG
     /// fixture here: it is the fixed point of contrast (which pivots on 128)
-    /// and of saturation (which cannot desaturate a grey), so both components
+    /// and of saturation (which cannot desaturate a gray), so both components
     /// would read as no-ops against it.
     fn px(n: usize) -> Vec<u8> {
         [
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn an_identity_component_is_skipped_without_changing_the_result() {
-        // Skipping is an optimisation, not a behaviour change: a stack with
+        // Skipping is an optimization, not a behavior change: a stack with
         // three components at identity must equal the two that are not.
         let sparse = PresetStack {
             contrast: 1.4,

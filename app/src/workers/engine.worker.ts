@@ -111,11 +111,11 @@ async function drain() {
     while (queue.length) {
       const req = queue.shift()!;
       if (cancelled.delete(req.id)) {
-        reply({ id: req.id, ok: false, error: "cancelled" });
+        reply({ id: req.id, ok: false, error: "canceled" });
         continue;
       }
       if (!tool) {
-        reply({ id: req.id, ok: false, error: "engine not initialised" });
+        reply({ id: req.id, ok: false, error: "engine not initialized" });
         continue;
       }
       // ADR-024 a11.2 — refuse work aimed at a canvas that is gone.
@@ -342,7 +342,7 @@ self.onmessage = async (e: MessageEvent) => {
       }
       // Free the outgoing document rather than leaking it: this worker's linear
       // memory is reused by the incoming one, which is strictly better than the
-      // old behaviour of stranding a whole instance (wasm memory never shrinks —
+      // old behavior of stranding a whole instance (wasm memory never shrinks —
       // ~75 MB observed in a11.0).
       tool?.free();
       // Anything still queued belongs to the document that just went away.

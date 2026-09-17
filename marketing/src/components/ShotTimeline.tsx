@@ -92,7 +92,7 @@ export default function ShotTimeline({ shots }: ShotTimelineProps) {
                 width={s.width}
                 height={s.height}
                 /* Today's frame is the LCP image and keeps exactly the loading
-                   behaviour it had before the rail existed. */
+                   behavior it had before the rail existed. */
                 loading={n === last ? "eager" : "lazy"}
                 fetchPriority={n === last ? "high" : "low"}
                 decoding="async"

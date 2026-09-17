@@ -46,12 +46,12 @@ describe("quad round trips", () => {
   it("normalise and denormalise are inverses", () => {
     const q = box();
     expect(denormalise(normalise(q, 100, 100), 100, 100)).toEqual(q);
-    // A zero-sized box cannot be normalised against; identity is the only safe
+    // A zero-sized box cannot be normalized against; identity is the only safe
     // answer, since dividing would produce Infinity and poison the engine call.
     expect(normalise(q, 0, 100)).toEqual(IDENTITY_QUAD);
   });
 
-  it("recognises the identity within f32 tolerance", () => {
+  it("recognizes the identity within f32 tolerance", () => {
     expect(isIdentity(IDENTITY_QUAD)).toBe(true);
     // A corner nudged by less than the f32 round-trip error still counts.
     expect(
@@ -99,11 +99,11 @@ describe("drag rules — the difference between the three sub-tools", () => {
 
   it("perspective mirrors the edge partner, keeping the keystone symmetric", () => {
     // Pull the top-left corner 30px inward; the top-right must come 30px
-    // inward too, so the top edge narrows about its own centre.
+    // inward too, so the top edge narrows about its own center.
     const q = dragCorner(box(), TL, { x: 30, y: 0 }, "perspective");
     expect(q[TL].x).toBeCloseTo(30, 6);
     expect(q[TR].x).toBeCloseTo(70, 6);
-    // The centre of the top edge has not moved — that is what "symmetric"
+    // The center of the top edge has not moved — that is what "symmetric"
     // means here, and it is the property that makes the result read as a
     // keystone rather than a lopsided trapezoid.
     expect((q[TL].x + q[TR].x) / 2).toBeCloseTo(50, 6);
@@ -151,9 +151,9 @@ describe("drag rules — the difference between the three sub-tools", () => {
     expect(q[TR]).toEqual({ x: 120, y: 40 });
   });
 
-  it("perspective edge handles widen the edge about its centre", () => {
+  it("perspective edge handles widen the edge about its center", () => {
     const q = dragEdge(box(), 0, { x: 10, y: 0 }, "perspective");
-    // Grew outward by 10 on each side; centre unmoved.
+    // Grew outward by 10 on each side; center unmoved.
     expect(q[TL].x).toBeCloseTo(-10, 6);
     expect(q[TR].x).toBeCloseTo(110, 6);
     expect((q[TL].x + q[TR].x) / 2).toBeCloseTo(50, 6);
@@ -218,14 +218,14 @@ describe("forward homography (the overlay's preview grid)", () => {
   });
 
   it("bends a straight interior line — the projective divide is doing work", () => {
-    // A keystone maps the unit square's horizontal centre line to something
+    // A keystone maps the unit square's horizontal center line to something
     // that is NOT at the trapezoid's vertical midpoint. If this ever comes out
     // AT the midpoint, the map has silently degraded to an affine one and the
     // tool is just an expensive shear.
     //
     // Direction: the narrow edge is the FAR one, and the far half of a
     // perspective view is the compressed half. The top edge here is narrow, so
-    // the centre line lands above the geometric middle (y < 50, screen coords
+    // the center line lands above the geometric middle (y < 50, screen coords
     // being y-down) — nearer the far edge, exactly as a receding plane looks.
     const quad: Quad = [
       { x: 25, y: 0 },
@@ -235,7 +235,7 @@ describe("forward homography (the overlay's preview grid)", () => {
     ];
     const map = unitSquareTo(quad)!;
     const mid = map(0.5, 0.5);
-    expect(mid.x).toBeCloseTo(50, 6); // symmetric quad — centre stays centred in x
+    expect(mid.x).toBeCloseTo(50, 6); // symmetric quad — center stays centered in x
     expect(mid.y).toBeLessThan(50);
     expect(mid.y).toBeCloseTo(100 / 3, 6);
   });

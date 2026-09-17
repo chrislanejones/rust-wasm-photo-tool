@@ -42,7 +42,7 @@ function deferred() {
 const OPEN_PATH = [10, 10, 20, 10, 40, 10, 50, 10];
 
 /** The same, closed: a third anchor coincident with the first, which is how
- *  `deserialize` recognises a loop (it pops the repeat and moves its in-handle
+ *  `deserialize` recognizes a loop (it pops the repeat and moves its in-handle
  *  onto anchor 0). Two anchors + `closed: true` come back out. */
 const CLOSED_PATH = [10, 10, 20, 10, 40, 10, 50, 10, 60, 10, 10, 20, 10, 10];
 

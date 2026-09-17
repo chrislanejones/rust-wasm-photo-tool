@@ -38,7 +38,7 @@ the batch ZIP, and the export dialog's predicted size.
 
 This is deliberately the narrowest possible exception to ADR-016:
 
-| Case | Behaviour |
+| Case | Behavior |
 |---|---|
 | Opaque fill, JPEG | **unchanged** — that border is visible content |
 | Transparent fill, PNG / WebP / AVIF | **unchanged** — the format can carry it |
@@ -48,7 +48,7 @@ This is deliberately the narrowest possible exception to ADR-016:
 The rationale is that "include" has no meaning here. A transparent artboard
 shows as checkerboard, which is the UI for *nothing*. Asked to bake nothing into
 a format that cannot express nothing, the honest answers are to drop it or to
-invent a colour; dropping it is the one that matches what was on the screen.
+invent a color; dropping it is the one that matches what was on the screen.
 
 The Settings copy is corrected to state the real default rather than flipping
 the default to match the stale text — the default is ADR-016's decision, not a
@@ -60,7 +60,7 @@ typo, and reversing it belongs in its own ADR.
 + The rule lives in one function, so the dialog's predicted size cannot disagree
   with the file that gets written.
 + Verified in the running app under the real defaults: PNG 320×240 with a
-  transparent border, JPEG 240×160 with the photo's own colour in the corner.
+  transparent border, JPEG 240×160 with the photo's own color in the corner.
 - **A JPEG export can now differ in DIMENSIONS from a PNG export of the same
   document**, silently. That is the cost: the format now changes the framing,
   not just the compression.
@@ -72,9 +72,9 @@ typo, and reversing it belongs in its own ADR.
 ## Alternatives rejected
 
 1. **Flatten onto a white matte.** Turns a black border into a white border. The
-   complaint was the border, not its colour.
+   complaint was the border, not its color.
 2. **Flip the export default back to "Photo only".** Fixes the symptom for JPEG
-   by changing behaviour for every format, and silently reverses an accepted
+   by changing behavior for every format, and silently reverses an accepted
    ADR. If that default is wrong it deserves its own decision.
 3. **Refuse to export, or warn.** A dialog explaining alpha to someone who
    wanted a JPEG.

@@ -1,5 +1,5 @@
 //! Selection tool: magic-wand flood fill, select-all, and the marching-ants
-//! overlay. Split out of `lib.rs`; behaviour is unchanged.
+//! overlay. Split out of `lib.rs`; behavior is unchanged.
 
 use crate::ImageHorseTool;
 use wasm_bindgen::prelude::*;
@@ -91,7 +91,7 @@ pub(crate) fn preview_overlay_rgba(mask: &[bool], w: usize, h: usize, tint: u8) 
     out
 }
 /// 4-connected flood fill from `start` over `buf`, taking every pixel within
-/// `tol` (per channel) of the seed colour. When `edges` is `Some((map, wall))`
+/// `tol` (per channel) of the seed color. When `edges` is `Some((map, wall))`
 /// the fill also refuses to cross a pixel whose edge strength exceeds `wall` —
 /// the seed itself is exempt, so clicking directly on an outline still selects
 /// something instead of nothing.
@@ -155,15 +155,15 @@ fn flood_select(
 /// plane the caller owns) and reuses the caller's `stack` — so a per-dab caller
 /// on the brush's hot path allocates **nothing** after the first stroke.
 ///
-/// Deliberately NOT folded into `flood_select` above. That one is colour-keyed
-/// (seed colour + tolerance over RGBA); both new consumers need "flood the
-/// complement of a boundary set", which has no colour term at all. It *can* be
+/// Deliberately NOT folded into `flood_select` above. That one is color-keyed
+/// (seed color + tolerance over RGBA); both new consumers need "flood the
+/// complement of a boundary set", which has no color term at all. It *can* be
 /// faked — pass `tol = 255` and the boundary as the edge map — but that routes
 /// the shipped wands' fill through a path it never actually runs, to save
 /// twenty lines. This shares the pattern, not the punning. Used by the lasso's
 /// interior fill (loop as barrier, flood from the border, invert) and by the
 /// Smart Brush's containment (strong edges as barrier, flood from the dab
-/// centre).
+/// center).
 ///
 /// `bounds` is inclusive `(x0, y0, x1, y1)`. The caller must have cleared
 /// `reach` over that region first — clearing only the bounded window is the
@@ -255,7 +255,7 @@ impl ImageHorseTool {
     /// 1 = edge-aware (same flood, walled by the Sobel map at `edge_threshold`),
     /// 2 = color range (every pixel within tolerance, anywhere). `None` when
     /// the click is out of bounds / the image is empty — callers preserve
-    /// their no-op-on-OOB behaviour by short-circuiting on it.
+    /// their no-op-on-OOB behavior by short-circuiting on it.
     fn selection_mask_for(
         &self,
         kind: u8,
@@ -330,7 +330,7 @@ impl ImageHorseTool {
 
     /// Store a freshly-produced tool mask per the current combine mode and
     /// return the resulting selection overlay RGBA (the SAME shape every
-    /// producer returns). Replace (0) is the historical behaviour; add (1) /
+    /// producer returns). Replace (0) is the historical behavior; add (1) /
     /// subtract (2) compose, and the combine mode also picks the history
     /// label over the producer's `label`. Every ACTUAL change is one undo
     /// step (`snap_selection`); a click that reproduces the current selection
@@ -354,7 +354,7 @@ impl ImageHorseTool {
 #[wasm_bindgen]
 impl ImageHorseTool {
     /// Magic-wand select: 4-connected flood fill from (x,y) over the composite,
-    /// taking every pixel whose colour is within `tolerance` (per channel) of the
+    /// taking every pixel whose color is within `tolerance` (per channel) of the
     /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
     /// JS selection layer to draw. Empty Vec if the click is out of bounds.
     pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
@@ -390,9 +390,9 @@ impl ImageHorseTool {
     }
 
     /// Color-range select (Photoshop's Select → Color Range). Takes EVERY pixel
-    /// within `tolerance` of the clicked colour, anywhere in the image — not
+    /// within `tolerance` of the clicked color, anywhere in the image — not
     /// just the connected blob the wand would reach. That's the whole point:
-    /// one click grabs all the sky, or every instance of a logo colour, without
+    /// one click grabs all the sky, or every instance of a logo color, without
     /// shift-clicking each island.
     pub fn color_range_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
         let Some(mask) = self.selection_mask_for(2, x, y, tolerance, 0) else {
@@ -429,12 +429,12 @@ impl ImageHorseTool {
     }
 
     /// Rectangular marquee select over the drag rect `(x0,y0)-(x1,y1)` in
-    /// canvas px (any corner order). The rect is normalised, snapped outward
+    /// canvas px (any corner order). The rect is normalized, snapped outward
     /// (floor/ceil — a sub-pixel drag still lands one full pixel), and clamped
     /// to the canvas. Rides the same combine pipeline as every producer, so
     /// Shift/Alt add/subtract compose. A degenerate or fully off-canvas rect
     /// produces an all-false mask: replace mode then reads as "deselect"
-    /// (Photoshop's empty-marquee behaviour); add/subtract no-op.
+    /// (Photoshop's empty-marquee behavior); add/subtract no-op.
     pub fn rect_select(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<u8> {
         let (w, h) = (self.width as usize, self.height as usize);
         let (rx0, ry0, rx1, ry1) = clamp_drag_rect(x0, y0, x1, y1, w, h);
@@ -447,7 +447,7 @@ impl ImageHorseTool {
 
     /// Elliptical marquee: the ellipse inscribed in the drag rect
     /// `(x0,y0)-(x1,y1)` — same gesture as `rect_select`, same normalise/
-    /// clamp/combine behaviour. A pixel is in when its CENTRE satisfies
+    /// clamp/combine behavior. A pixel is in when its CENTER satisfies
     /// `(dx/rx)² + (dy/ry)² <= 1`, so a full-canvas drag touches the edge
     /// pixels and a 1×1 drag still selects its pixel.
     pub fn ellipse_select(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<u8> {
@@ -512,14 +512,14 @@ impl ImageHorseTool {
     /// Set how the NEXT tool-produced selection combines with the current one:
     /// 0 = replace (default), 1 = add (union), 2 = subtract. Clamped to 0..=2.
     /// JS sets this from the Shift/Alt modifier when the `ih_selection_bool`
-    /// flag is on; it stays 0 otherwise, so behaviour is unchanged.
+    /// flag is on; it stays 0 otherwise, so behavior is unchanged.
     pub fn set_selection_combine(&mut self, mode: u8) {
         self.selection_combine = mode.min(2);
     }
 
     /// OR `mask` into the current selection (boolean add). With no current
     /// selection, the mask BECOMES the selection. An all-false result is
-    /// normalised to `None` ("no selection"). No-ops (returns the current
+    /// normalized to `None` ("no selection"). No-ops (returns the current
     /// state, no panic across the wasm boundary) when `mask` isn't
     /// canvas-sized. Returns whether anything is selected afterwards.
     ///
@@ -924,10 +924,10 @@ mod lasso_session_tests {
         );
         assert_eq!(overlay.len(), (w * h * 4) as usize);
 
-        // The overlay marks alpha>0 wherever selected. Disc centre selected,
+        // The overlay marks alpha>0 wherever selected. Disc center selected,
         // background corner not.
         let alpha_at = |x: u32, y: u32| overlay[((y * w + x) * 4 + 3) as usize];
-        assert!(alpha_at(40, 40) > 0, "disc centre must be selected");
+        assert!(alpha_at(40, 40) > 0, "disc center must be selected");
         assert_eq!(alpha_at(2, 2), 0, "background corner must not be selected");
         assert_eq!(
             alpha_at(77, 77),
@@ -942,7 +942,7 @@ mod lasso_session_tests {
         let center_alpha = data[((40 * w + 40) * 4 + 3) as usize];
         assert_eq!(
             center_alpha, 0,
-            "deleting the lasso selection must erase the disc centre"
+            "deleting the lasso selection must erase the disc center"
         );
     }
 
@@ -966,7 +966,7 @@ mod lasso_session_tests {
         // The wand selection from before the lasso session must be untouched.
         assert!(
             t.delete_selection(),
-            "the pre-existing wand selection must survive an Esc-cancelled lasso"
+            "the pre-existing wand selection must survive an Esc-canceled lasso"
         );
     }
 

@@ -3,7 +3,7 @@ Date: 2026-08-17   Status: superseded by 036 (same day, v8.46)
 
 Supersedes **ADR-034 decision 1** (Perspective ships as three Edit sub-tools).
 ADR-034's decisions 2–4 — rules in TypeScript, resampling in Rust, text storing
-normalised corners — stand unchanged.
+normalized corners — stand unchanged.
 
 ## Context
 
@@ -65,7 +65,7 @@ instead of four.
 ## Pre-mortem
 
 It is six months later and this was a mistake. Most likely reason: "siblings
-versus facets" turned out to be a judgement call nobody applies the same way
+versus facets" turned out to be a judgment call nobody applies the same way
 twice, so panels drifted one at a time — each with a plausible header comment —
 until the toolbar had no predictable answer to "where are this tool's modes?"
 and the consistency ADR-023 bought was spent. The rule reads crisp here because

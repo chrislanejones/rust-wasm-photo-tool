@@ -2,7 +2,7 @@
 // The SUB-TOOL GRID — the active group's exclusive set.
 //
 // WHAT CHANGED AND WHY: sub-modes used to render inside each settings panel as
-// wide labelled tiles (ToolModeToggle -> ToolButtonGroup stacked). That put two
+// wide labeled tiles (ToolModeToggle -> ToolButtonGroup stacked). That put two
 // different button vocabularies in one 252px column — square icon tiles up top,
 // wide word-tiles below — and it meant the sub-mode row scrolled away with the
 // panel body. Now the sub-tools sit directly under the rail in the header, in
@@ -44,7 +44,7 @@ interface Props {
  *  50%) but a step down in radius so the two rows read as parent and child
  *  rather than one undifferentiated field of squares.
  *
- *  THE TIE TO THE RAIL. This used to be colour: the active sub-tile wore the
+ *  THE TIE TO THE RAIL. This used to be color: the active sub-tile wore the
  *  PARENT tool's gradient, so you matched the two lit tiles by hue. With the
  *  gradients gone the tie is structural instead — the rail and this row each
  *  light exactly one tile, in the SAME accent vocabulary, stacked 12px apart

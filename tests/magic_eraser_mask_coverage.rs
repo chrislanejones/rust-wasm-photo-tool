@@ -40,7 +40,7 @@ fn hash01(x: i64, y: i64, salt: u64) -> f64 {
 }
 
 /// Smoothly-interpolated noise — gives the background real low-frequency
-/// texture, so a fill cannot pass just by averaging a flat colour.
+/// texture, so a fill cannot pass just by averaging a flat color.
 fn smooth_noise(x: usize, y: usize, cell: usize, salt: u64) -> f64 {
     let (fx, fy) = (x as f64 / cell as f64, y as f64 / cell as f64);
     let (x0, y0) = (fx.floor() as i64, fy.floor() as i64);

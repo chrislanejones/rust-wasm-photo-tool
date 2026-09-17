@@ -144,7 +144,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   }
 
   // ── Tools: one entry per SUB-TOOL ────────────────────────────────────────
-  // Labelled "Create › Brush", not "Paint › Paint". The old loop walked TOOLS
+  // Labeled "Create › Brush", not "Paint › Paint". The old loop walked TOOLS
   // and the sub-mode table, so it spoke in legacy tool names and printed the
   // tool's label twice for any tool whose first mode shared its name. One
   // source now: the group registry.

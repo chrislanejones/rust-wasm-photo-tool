@@ -66,7 +66,7 @@ export interface ToolSettings extends StampSettings {
   blurSize: number;          // brush footprint (shared by all blur-brush modes)
   blurIntensity: number;     // gaussian kernel radius (px)
   pixelSize: number;         // mosaic block size (px) for "pixelate"
-  redactColor: string;       // opaque fill colour for "solid"
+  redactColor: string;       // opaque fill color for "solid"
   effectBrightness: number;  // -100 to +100, applied on commit
   effectContrast: number;    // 0 to 300, applied on commit (100 = neutral)
 

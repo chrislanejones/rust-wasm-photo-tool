@@ -4,7 +4,7 @@ Date: 2026-07-31 (written after the fact — records v7.61 as shipped)   Status:
 ## Context
 
 v7.61 added Batch → AI Rename, which needs to name every loaded photo from what
-is in it. Two ways to know that: analyse the pixels locally, or send each image
+is in it. Two ways to know that: analyze the pixels locally, or send each image
 to a vision caption model. The Replicate path was already half-built — the `alt`
 job type exists in `convex/ai.ts` with no model registered — but Replicate AI is
 paid-tier only (`TIERS.replicateAI`), and the project's first invariant is that
@@ -18,7 +18,7 @@ palette diversity and skin/foliage/sky ratios as tags plus a ready-made slug.
 Sampling is capped at a ~160×160 grid, so a 24MP photo costs the same as a
 thumbnail. JSON is hand-rolled rather than serde, because serde is gated behind
 the `tiles` feature and this module should not inherit that coupling. The result
-**describes** an image and does not recognise objects in it, and the panel says
+**describes** an image and does not recognize objects in it, and the panel says
 so rather than implying otherwise.
 
 ## Consequences
@@ -31,7 +31,7 @@ so rather than implying otherwise.
   tests, all offline.
 - **It will never say "golden retriever."** The feature is named AI Rename and
   produces `dark-blue-portrait`. That gap has to be managed in copy forever, and
-  copy is a weak defence against an expectation set by the word "AI".
+  copy is a weak defense against an expectation set by the word "AI".
 - The heuristics misfire and cannot be threshold-tuned out of it. Measured
   2026-08-01 against the 12 bundled samples: `portrait` fires on warm stone and
   beige stucco, and raising the skin threshold 0.14 → 0.18 plus two guards moved

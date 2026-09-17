@@ -1,8 +1,8 @@
-# ADR-053: A shape's perspective is normalised over its bbox, and the tile it warps through is padded
+# ADR-053: A shape's perspective is normalized over its bbox, and the tile it warps through is padded
 Date: 2026-09-11   Status: draft
 
 Extends [ADR-034](034-perspective-is-projective-and-text-keeps-its-corners.md)
-(one quad, three drag rules, normalised corners on the annotation) to every
+(one quad, three drag rules, normalized corners on the annotation) to every
 vector object the app draws. Takes `OP_FORMAT_VERSION` 5 → 6 by the same
 prefix-extension recipe as [ADR-033](033-the-text-box-has-a-height-and-the-op-log-goes-to-v4.md).
 Supersedes nothing.
@@ -37,12 +37,12 @@ genuinely new, and both are places to get it wrong.
 
 ## Decision
 
-**Give `ShapeAnnotation` a `perspective` quad normalised over its BARE BBOX,
+**Give `ShapeAnnotation` a `perspective` quad normalized over its BARE BBOX,
 and render it by warping a tile that is PADDED past that bbox.**
 
 ### 1. The basis is the bbox — `(min(x0,x1), min(y0,y1))` to the opposite corner
 
-A text annotation's quad is normalised over its **tile**, which is the only
+A text annotation's quad is normalized over its **tile**, which is the only
 rectangle text has. A shape has two candidates, and they are not the same:
 
 | candidate | what it is | why not |
@@ -51,10 +51,10 @@ rectangle text has. A shape has two candidates, and they are not the same:
 | ink bounds | what the shape actually rasterises to | needs stroke width, arrowhead geometry, pin label metrics — all engine-internal |
 
 The overlay draws its handles by denormalising the stored quad onto the basis,
-and the engine re-normalises against its own copy on commit. So the basis is a
+and the engine re-normalizes against its own copy on commit. So the basis is a
 number **two implementations have to agree on to the pixel**:
 `basisOfShape` in `app/src/lib/perspectiveTarget.ts` and `shape_basis_rect` in
-`src/annotations.rs`. Every round trip re-normalises, so a disagreement does not
+`src/annotations.rs`. Every round trip re-normalizes, so a disagreement does not
 merely offset the warp once — it compounds on each reselect.
 
 The bbox is the only rectangle both sides can compute from the shape JSON
@@ -69,7 +69,7 @@ are anti-aliased. Warping a tile cropped to the bare bbox shaves all of that
 off, so a warped square comes back visibly thinner than it was drawn.
 
 The tile is therefore grown by `shape_ink_pad` on every side — and the quad
-stays normalised against the **un-padded** bbox. Those two facts coexist
+stays normalized against the **un-padded** bbox. Those two facts coexist
 because of a property of projective maps, not by approximation:
 
 > A homography is fixed by four correspondences. The bbox→quad correspondence
@@ -116,9 +116,9 @@ of them. Pinned by `v5_blobs_still_decode_under_v6` and
 
 + Distort, Perspective and Skew work on squares, circles, lines, arrows, pins
   and pen paths, non-destructively — the shape stays a shape, so it can be
-  recoloured, moved, resized, duplicated and re-warped afterwards, and the warp
+  recolored, moved, resized, duplicated and re-warped afterwards, and the warp
   comes along. `tests/shape_perspective.rs` pins each of those.
-+ Because the quad is normalised, resizing a warped shape keeps the same
++ Because the quad is normalized, resizing a warped shape keeps the same
   transform rather than sliding it off the geometry.
 + Layer separation is free and not a new rule: `get_text_annotations` and
   `get_shape_annotations` answer for the ACTIVE layer only, so the pickable

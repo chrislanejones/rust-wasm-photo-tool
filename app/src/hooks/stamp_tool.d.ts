@@ -77,7 +77,7 @@ declare module "stamp_tool" {
    *
    * Offline and account-free: it measures the pixels (hue histogram, luma
    * mean/variance, gradient energy, palette diversity, skin/foliage/sky
-   * ratios). It describes an image; it does not recognise objects in it.
+   * ratios). It describes an image; it does not recognize objects in it.
    */
   export function describe_image(
     pixels: Uint8Array,
@@ -259,7 +259,7 @@ declare module "stamp_tool" {
   ): Float32Array;
 
   /**
-   * Compute the largest centred rectangle with the given aspect ratio
+   * Compute the largest centered rectangle with the given aspect ratio
    * that fits inside an `image_w` × `image_h` image. Returns `[x, y, w, h]`
    * as a Uint32Array, or `undefined` if any input is 0.
    */
@@ -446,7 +446,7 @@ declare module "stamp_tool" {
      * Photoshop-style **Canvas Size** — change the document to new_w × new_h
      * WITHOUT resampling any layer (re-blits each layer's native pixels at the
      * anchor; crops where smaller, transparent pad where larger). `anchor` is a
-     * 0..=8 nine-grid (4 = centre, the UI default). The bottom Background layer
+     * 0..=8 nine-grid (4 = center, the UI default). The bottom Background layer
      * of a multi-layer doc is refilled with bg_* (bg_a = 0 ⇒ transparent ⇒
      * checkerboard). Pushes one "Canvas Size" history step.
      */
@@ -460,7 +460,7 @@ declare module "stamp_tool" {
       bg_a: number,
     ): void;
     /**
-     * Normalize the doc to an artboard: photo at native size, centred, with a
+     * Normalize the doc to an artboard: photo at native size, centered, with a
      * uniform `pad`-px border filled with bg_* (bg_a = 0 ⇒ transparent ⇒
      * checkerboard). ABSOLUTE and IDEMPOTENT — always yields exactly
      * photoW + 2*pad × photoH + 2*pad regardless of the current size, so a
@@ -500,7 +500,7 @@ declare module "stamp_tool" {
     /** Unsharp-mask sharpen over the whole active layer. 0 = no sharpening. */
     adjust_sharpen(amount: number): void;
     /** Open a live tonal preview on the active layer (one copy of its pixels).
-     *  ONE slot, shared by Levels and colour presets — `false` if one is
+     *  ONE slot, shared by Levels and color presets — `false` if one is
      *  already open. See src/tonal_preview.rs. */
     tonal_preview_begin(): boolean;
     /** Whether a tonal preview is open. */
@@ -514,7 +514,7 @@ declare module "stamp_tool" {
     /** Commit Levels as ONE undo step and ONE recorded `Op::Levels`. The
      *  identity (0, 255, 1) changes nothing. `true` when pixels changed. */
     levels_apply(black: number, white: number, gamma: number): boolean;
-    /** Preview a colour preset from the copy. Never an undo step. `false`
+    /** Preview a color preset from the copy. Never an undo step. `false`
      *  means there is no live preview, so begin again. Units differ per
      *  component: brightness -1..1, contrast/saturation are factors (1 =
      *  as-is), shadows/highlights are ABSOLUTE 8-bit (-255..255). */
@@ -525,7 +525,7 @@ declare module "stamp_tool" {
       shadows: number,
       highlights: number,
     ): boolean;
-    /** Commit a colour preset as ONE undo step (the old Quick Adjust grid
+    /** Commit a color preset as ONE undo step (the old Quick Adjust grid
      *  cost two). An all-identity preset changes nothing and costs none.
      *  `true` when pixels changed. See src/presets.rs. */
     preset_apply(
@@ -550,7 +550,7 @@ declare module "stamp_tool" {
      *  storing that back as the layer bakes them into the photo. */
     /** The engine's Gaussian kernel for `radius`. A method as well as the free
      *  `gaussian_kernel` so the WORKER path can reach it — the main thread holds
-     *  only this proxy, and using the free function there would initialise a
+     *  only this proxy, and using the free function there would initialize a
      *  second wasm instance for 61 floats. */
     gaussian_kernel(radius: number): Float32Array;
     active_layer_rgba(): Uint8Array;
@@ -567,7 +567,7 @@ declare module "stamp_tool" {
       block_size: number,
     ): void;
     begin_pixelate_stroke(): void;
-    /** Paint an opaque solid colour over a circular brush region (redaction). */
+    /** Paint an opaque solid color over a circular brush region (redaction). */
     redact_region(
       cx: number,
       cy: number,
@@ -636,7 +636,7 @@ declare module "stamp_tool" {
     ): void;
     /** Returns [width, height] in pixels for the given text, without committing. */
     measure_text(text: string, font_size: number, bold: boolean): Uint32Array;
-    /** Render a stamp label (bordered, rotated) entirely in Rust and composite centred on dest. */
+    /** Render a stamp label (bordered, rotated) entirely in Rust and composite centered on dest. */
     commit_red_stamp(
       label: string,
       r: number,
@@ -694,8 +694,8 @@ declare module "stamp_tool" {
     /** End the active stroke (stabilizer catch-up) + free buffers; true if painted. */
     paint_up(): boolean;
     /** Eraser driver — mirror of paint_down sharing the dab/coverage/stabilizer
-     *  engine, but clears the active layer's alpha instead of laying down colour
-     *  (no colour arg; hardness is 0..1). */
+     *  engine, but clears the active layer's alpha instead of laying down color
+     *  (no color arg; hardness is 0..1). */
     erase_down(
       x: number, y: number, size: number,
       opacity: number, hardness: number, stab: string,
@@ -915,11 +915,11 @@ declare module "stamp_tool" {
      *  generated types, so a drift here type-checks and dies at runtime. */
     set_text_box_height(id: number, box_height: number): boolean;
     /** Set a text annotation's projective corner quad and rebuild its tile
-     *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALISED 0..1
+     *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALIZED 0..1
      *  across the tile, in TL/TR/BR/BL order. Returns false for a wrong-length
      *  quad or an id that isn't on the active layer. v8.42.
      *
-     *  Normalised, not pixels — that is what keeps the warp attached to the
+     *  Normalized, not pixels — that is what keeps the warp attached to the
      *  text through an edit. See `perspective::warp_normalised` in the crate.
      *
      *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
@@ -946,7 +946,7 @@ declare module "stamp_tool" {
       quad: Float32Array,
     ): boolean;
     /** Set a SHAPE's projective corner quad. `quad` is 8 floats,
-     *  `[x0,y0,…,x3,y3]`, NORMALISED 0..1 across the shape's own BBOX
+     *  `[x0,y0,…,x3,y3]`, NORMALIZED 0..1 across the shape's own BBOX
      *  (`min(x0,x1), min(y0,y1)` → the opposite corner), in TL/TR/BR/BL order.
      *  Returns false for a wrong-length quad or an id that isn't on the active
      *  layer. Pushes one "Perspective" history step. v8.76.
@@ -954,7 +954,7 @@ declare module "stamp_tool" {
      *  The square/circle twin of `set_text_perspective`, and non-destructive in
      *  the same way: nothing is rasterised: the quad is stored on the
      *  annotation and applied at render time, so the shape stays a shape and
-     *  can be recoloured, moved, resized and re-warped afterwards.
+     *  can be recolored, moved, resized and re-warped afterwards.
      *
      *  ⚠️ The BASIS IS THE BBOX, mirrored in `lib/perspectiveTarget.ts`
      *  (`basisOfShape`) and `src/annotations.rs` (`shape_basis_rect`). The two
@@ -995,7 +995,7 @@ declare module "stamp_tool" {
     /** The PHOTO's bounds inside the document: `[x, y, w, h]` in image px.
      *
      *  NOT the document size. A default import is an artboard — a Canvas fill
-     *  with the photo centred — so the document is `photo + 2 * canvasPadding`.
+     *  with the photo centered — so the document is `photo + 2 * canvasPadding`.
      *
      *  Decided STRUCTURALLY: a Canvas layer present means the photo is mounted
      *  and its own bounds are the answer; no Canvas means the document was
@@ -1073,18 +1073,18 @@ declare module "stamp_tool" {
     /** End the active mask stroke + free buffers; true if it changed the mask. */
     mask_paint_up(): boolean;
 
-    // ── Layer colour overlay (Photoshop's Color Overlay layer style) ──
-    // A solid colour tinting the layer's pixels at composite time, clipped to
+    // ── Layer color overlay (Photoshop's Color Overlay layer style) ──
+    // A solid color tinting the layer's pixels at composite time, clipped to
     // the layer's alpha and sitting UNDER the mask. Non-destructive until
     // applied. Like masks, it is session-lived — `push_restored_layer` does not
     // carry it back across a reload.
-    /** Set/update a layer's colour overlay. `opacity` 0..1 (clamped). False if
+    /** Set/update a layer's color overlay. `opacity` 0..1 (clamped). False if
      *  the layer isn't found. Snaps history ONLY on the first set, so a slider
      *  drag doesn't flood the undo stack. */
     set_layer_color_overlay(
       id: number, r: number, g: number, b: number, opacity: number,
     ): boolean;
-    /** Discard the overlay (true colours back). False if it had none. */
+    /** Discard the overlay (true colors back). False if it had none. */
     remove_layer_color_overlay(id: number): boolean;
     /** Bake the overlay into the layer's pixels permanently, then drop it.
      *  False if it had none. */
@@ -1193,7 +1193,7 @@ declare module "stamp_tool" {
       color_hex: string,
       label_kind: number,
     ): number;
-    /** Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b. */
+    /** Restore a persisted pin WITHOUT pushing history. Color is raw r,g,b. */
     restore_pin_annotation(
       x0: number, y0: number, x1: number, y1: number,
       number: number, r: number, g: number, b: number,
@@ -1205,7 +1205,7 @@ declare module "stamp_tool" {
       color_hex: string,
       stroke_width: number,
     ): number;
-    /** Restore a persisted polyline WITHOUT pushing history. Colour is raw r,g,b. */
+    /** Restore a persisted polyline WITHOUT pushing history. Color is raw r,g,b. */
     restore_polyline_annotation(
       points: Float64Array,
       r: number, g: number, b: number,
@@ -1220,7 +1220,7 @@ declare module "stamp_tool" {
       fill_kind: number,
       fill_color_hex: string,
     ): number;
-    /** Restore a persisted Bézier path WITHOUT pushing history. Colour is raw r,g,b. */
+    /** Restore a persisted Bézier path WITHOUT pushing history. Color is raw r,g,b. */
     restore_bezier_annotation(
       points: Float64Array,
       r: number, g: number, b: number,
@@ -1231,7 +1231,7 @@ declare module "stamp_tool" {
     /** Replace just the control points of an annotation (no history) — live drag-edit. */
     set_annotation_points(id: number, points: Float64Array): void;
     /** Commit a Bézier-path reshape + restyle: snapshot "Edit Pen Path", replace
-     *  points, and apply stroke colour/width + solid Background fill (fill_kind
+     *  points, and apply stroke color/width + solid Background fill (fill_kind
      *  0 = none, 1 = solid fill_color_hex) so reselecting a path can fill it. */
     update_bezier_annotation(
       id: number,
@@ -1257,7 +1257,7 @@ declare module "stamp_tool" {
       fill_angle: number,
       fill_block: number,
     ): number;
-    /** Restore a persisted shape WITHOUT pushing history (load path). Colours are raw bytes. */
+    /** Restore a persisted shape WITHOUT pushing history (load path). Colors are raw bytes. */
     restore_shape_annotation(
       kind: number,
       x0: number,
@@ -1333,7 +1333,7 @@ declare module "stamp_tool" {
       edge_threshold: number,
     ): Uint8Array;
     /** Color Range (Photoshop's Select → Color Range): every pixel within
-     *  `tolerance` of the clicked colour, anywhere in the image — not just the
+     *  `tolerance` of the clicked color, anywhere in the image — not just the
      *  connected blob the wand reaches. */
     color_range_select(x: number, y: number, tolerance: number): Uint8Array;
     /** Non-committing hover preview: the tinted FILLED overlay of the region a
@@ -1351,15 +1351,15 @@ declare module "stamp_tool" {
       tint: number,
     ): Uint8Array;
     /** Rectangular marquee over the drag rect (any corner order, canvas px).
-     *  Normalised, snapped outward (floor/ceil), clamped to the canvas; rides
+     *  Normalized, snapped outward (floor/ceil), clamped to the canvas; rides
      *  the same combine pipeline as every producer. A degenerate or fully
      *  off-canvas drag replaces with NO selection (Photoshop's empty-marquee
      *  deselect); under combine 1/2 it no-ops. Returns the overlay RGBA. */
     rect_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
     /** Elliptical marquee: the ellipse inscribed in the same drag rect. A
-     *  pixel is in when its centre satisfies (dx/rx)² + (dy/ry)² <= 1; a drag
+     *  pixel is in when its center satisfies (dx/rx)² + (dy/ry)² <= 1; a drag
      *  past the canvas edge keeps its shape and is cropped, not squashed.
-     *  Same normalise/clamp/combine behaviour as `rect_select`. */
+     *  Same normalise/clamp/combine behavior as `rect_select`. */
     ellipse_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
     /** Select the whole canvas; returns the overlay RGBA. */
     select_all(): Uint8Array;

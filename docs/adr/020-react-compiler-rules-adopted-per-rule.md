@@ -48,7 +48,7 @@ re-render one); the `import("stamp_tool")` cache-warm in
 ## Why 32 candidates were declined — file:line as of `e88a0d8`
 This is the decision, not a backlog. Every rewrite below is a timing or
 visible-output change, and the bar for this pass was *provably*
-behaviour-preserving.
+behavior-preserving.
 
 **The "latest ref" mirror — 18 sites**, all `ref.current = v` written in
 the render body, all commented in place, all read from pointer handlers

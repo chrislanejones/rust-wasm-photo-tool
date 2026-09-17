@@ -382,7 +382,7 @@ mod tests {
         let mut tb = TileBuffer::new(side, side);
 
         // A write that straddles the boundary of tiles (0,0),(1,0),(0,1),(1,1):
-        // a 4x4 block centred on (256,256).
+        // a 4x4 block centered on (256,256).
         let (rx, ry, rw, rh) = (254i32, 254i32, 4u32, 4u32);
         let src = vec![200u8; (rw as usize) * (rh as usize) * 4];
         assert!(tb.set_region(rx, ry, rw, rh, &src));

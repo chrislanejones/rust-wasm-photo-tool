@@ -1,9 +1,9 @@
-//! Regression suite for: "draw a square, click it again, change the colour —
+//! Regression suite for: "draw a square, click it again, change the color —
 //! nothing happens." Seven weeks old, reproduced on production 2026-08-03.
 //!
 //! The defect was entirely in the React layer (`useDrawingTools`): reselecting
 //! a shape snapshots its style, that snapshot outranked the live panel, and a
-//! colour-only edit never marked the edit dirty so `commitEdit` took its no-op
+//! color-only edit never marked the edit dirty so `commitEdit` took its no-op
 //! early exit. The engine call it should have been reaching —
 //! `update_shape_annotation` — was already complete and already correct.
 //!
@@ -11,9 +11,9 @@
 //! fix makes the panel reach this call; what makes the fix *durable* is proof
 //! that arriving here gives you the three things a user will check next:
 //!
-//!   1. undo puts the old colour back (and costs exactly one step),
-//!   2. the new colour lives in the annotation DATA, so a reload restores it
-//!      rather than resurrecting the old colour from the op log,
+//!   1. undo puts the old color back (and costs exactly one step),
+//!   2. the new color lives in the annotation DATA, so a reload restores it
+//!      rather than resurrecting the old color from the op log,
 //!   3. the exported artifact shows it — not just the on-screen canvas.
 //!
 //! If a future refactor introduces a second, thinner recolour path (a
@@ -48,7 +48,7 @@ fn num(json: &str, key: &str) -> f64 {
     rest[..end].parse().unwrap()
 }
 
-/// The stroke colour currently recorded for the one shape on the canvas.
+/// The stroke color currently recorded for the one shape on the canvas.
 fn stored_rgb(t: &ImageHorseTool) -> [u8; 3] {
     let j = t.get_shape_annotations();
     [
@@ -58,7 +58,7 @@ fn stored_rgb(t: &ImageHorseTool) -> [u8; 3] {
     ]
 }
 
-/// How many pixels of an exact colour the EXPORTED image contains.
+/// How many pixels of an exact color the EXPORTED image contains.
 /// `render_with_annotations` is the same buffer the download path writes, so
 /// this is the artifact, not the preview.
 fn exported_pixels(t: &ImageHorseTool, rgb: [u8; 3]) -> usize {
@@ -75,7 +75,7 @@ fn add_blue_rect(t: &mut ImageHorseTool) -> u32 {
     )
 }
 
-/// Recolour in place, geometry untouched — exactly what a panel colour click
+/// Recolour in place, geometry untouched — exactly what a panel color click
 /// produces once the reselected shape's id reaches `commitEdit`.
 fn recolour(t: &mut ImageHorseTool, id: u32, hex: &str) -> bool {
     t.update_shape_annotation(
@@ -94,13 +94,9 @@ fn recolour_lands_in_the_annotation_data() {
     assert!(recolour(&mut t, id, "#00ff00"), "known id must be accepted");
 
     // Persistence and op-log restore both rebuild from this JSON. A recolour
-    // that only repainted pixels would leave this blue and the old colour
+    // that only repainted pixels would leave this blue and the old color
     // would come back on reload.
-    assert_eq!(
-        stored_rgb(&t),
-        GREEN,
-        "new colour is in the annotation data"
-    );
+    assert_eq!(stored_rgb(&t), GREEN, "new color is in the annotation data");
 }
 
 #[test]
@@ -147,7 +143,7 @@ fn recolour_is_one_undo_step_and_restores_the_old_colour() {
     );
 
     assert!(t.undo(), "undo must be available after a recolour");
-    assert_eq!(stored_rgb(&t), BLUE, "undo puts the original colour back");
+    assert_eq!(stored_rgb(&t), BLUE, "undo puts the original color back");
 }
 
 #[test]
@@ -159,7 +155,7 @@ fn undoing_a_recolour_is_redoable() {
     assert_eq!(stored_rgb(&t), BLUE);
 
     assert!(t.redo(), "redo must be available after undoing a recolour");
-    assert_eq!(stored_rgb(&t), GREEN, "redo restores the new colour");
+    assert_eq!(stored_rgb(&t), GREEN, "redo restores the new color");
 }
 
 #[test]
@@ -201,7 +197,7 @@ fn recolour_shows_in_the_exported_artifact() {
     assert_eq!(
         exported_pixels(&t, GREEN),
         blue_before,
-        "the exported stroke is the new colour, same pixel count"
+        "the exported stroke is the new color, same pixel count"
     );
 }
 

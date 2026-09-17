@@ -57,7 +57,7 @@ describe("parseDescription", () => {
 
   it("repairs a payload with missing or wrongly-typed fields", () => {
     const d = parseDescription('{"color":123,"slug":"x","transparent":"yes"}');
-    expect(d.color).toBe("grey"); // number rejected, fallback used
+    expect(d.color).toBe("gray"); // number rejected, fallback used
     expect(d.slug).toBe("x");
     expect(d.transparent).toBe(false); // only a real `true` counts
     expect(d.subject).toBe("");

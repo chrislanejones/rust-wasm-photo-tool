@@ -1,5 +1,5 @@
 //! Effects brush: Gaussian blur, pixelate, and redaction strokes. Split out of
-//! `lib.rs`; behaviour is unchanged.
+//! `lib.rs`; behavior is unchanged.
 
 use crate::ImageHorseTool;
 use crate::{filters, parse_hex};
@@ -58,7 +58,7 @@ impl ImageHorseTool {
     /// That is a read-modify-write: the geometry is measured on the JS side
     /// and handed back. Synchronously nothing can change in between; once the
     /// reads resolve on a later task, a resize landing in the gap blurs the new
-    /// image around the old image's centre. Computing the geometry where the
+    /// image around the old image's center. Computing the geometry where the
     /// dimensions live removes the gap rather than narrowing it — and is the
     /// project's standing rule anyway: the engine owns pixels.
     ///
@@ -67,7 +67,7 @@ impl ImageHorseTool {
     pub fn blur_whole_image(&mut self, intensity: u32) {
         self.snap("Blur");
         let (w, h) = (self.width as f64, self.height as f64);
-        // Radius covers the far corner from the centre, matching the previous
+        // Radius covers the far corner from the center, matching the previous
         // `max(width, height)` — which already over-covered, and still does.
         // `blur_region` does not snap — the snapshot is `begin_blur_stroke`'s
         // job, done above — so this is exactly the old two-call sequence with
@@ -86,7 +86,7 @@ impl ImageHorseTool {
     // ⚠️ WHY NOT `get_image_data()` FOR THE READ. That returns the COMPOSITE —
     // artboard underneath, annotations rendered over. `blur_region` writes the
     // ACTIVE LAYER's raw buffer. Blurring the composite and storing it as the
-    // layer would bake the canvas colour and every annotation into the photo,
+    // layer would bake the canvas color and every annotation into the photo,
     // which looks right on screen exactly until you hide a layer.
     //
     // ⚠️ WHY NOT `get_layer_png()`. It is the only existing layer read, and a
@@ -98,10 +98,10 @@ impl ImageHorseTool {
     ///
     /// ⚠️ A METHOD AS WELL AS THE FREE `gaussian_kernel`, and the duplication is
     /// deliberate rather than sloppy. The free function is what the harnesses
-    /// use: they `import("stamp_tool")` directly and already initialise it. The
+    /// use: they `import("stamp_tool")` directly and already initialize it. The
     /// PRODUCTION caller cannot — under ADR-024's worker the engine lives on
     /// another thread, and the only handle the main thread holds is this tool's
-    /// proxy. Reaching the free function from there would mean initialising a
+    /// proxy. Reaching the free function from there would mean initializing a
     /// SECOND wasm instance on the main thread, ~800 KB of linear memory, to
     /// compute 61 floats.
     ///
@@ -165,7 +165,7 @@ impl ImageHorseTool {
         self.snap("Pixelate");
     }
 
-    /// Paint an opaque solid colour over a circular brush region (redaction).
+    /// Paint an opaque solid color over a circular brush region (redaction).
     /// Call from JS: tool.redact_region(cx, cy, brush_radius, r, g, b)
     pub fn redact_region(&mut self, cx: f64, cy: f64, brush_radius: f64, r: u8, g: u8, b: u8) {
         filters::redact_region(
@@ -218,7 +218,7 @@ impl ImageHorseTool {
             2 => self.begin_redact_stroke(),
             _ => self.begin_blur_stroke(),
         }
-        // Op-log recorder: collect the exact dab centres (apply_effect_dab
+        // Op-log recorder: collect the exact dab centers (apply_effect_dab
         // pushes each one, interpolated moves included). Only blur (mode 0)
         // becomes an op at effect_up — pixelate/redact are unrecorded and
         // the undo-time sync check handles them.

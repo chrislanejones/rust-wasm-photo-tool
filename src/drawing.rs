@@ -489,7 +489,7 @@ pub fn draw_arrow(
     }
 }
 
-/// Per-channel linear interpolation of two straight-alpha RGBA colours.
+/// Per-channel linear interpolation of two straight-alpha RGBA colors.
 fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
     let l = |x: u8, y: u8| {
         (x as f64 + (y as f64 - x as f64) * t)
@@ -600,7 +600,7 @@ pub fn fill_shape(
         return;
     }
 
-    // Gradient axis: project pixel centres onto the unit direction and
+    // Gradient axis: project pixel centers onto the unit direction and
     // normalise against the bbox's projected span so t spans 0..1 edge-to-edge.
     let ang = (angle_deg as f64) * PI / 180.0;
     let (ax, ay) = (ang.cos(), ang.sin());

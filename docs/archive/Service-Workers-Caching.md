@@ -129,6 +129,6 @@ The SW update flow matters more here than on a typical site because a stale WASM
 2. **Phase 1 — shell + WASM precache.** Add `vite-plugin-pwa` with `registerType: "prompt"`, precache the hashed shell + `.wasm`, `NetworkOnly` for Convex/Clerk/PostHog/Replicate. Verify offline boot + instant repeat load.
 3. **Phase 2 — update UX.** Wire the "update available" prompt into the `ui/dialog` `size="sm"` notice card; `skipWaiting` only on user click.
 4. **Phase 3 — installable PWA.** Web manifest + icons; test install on desktop + mobile.
-5. **Future — threads.** If WASM threads are adopted, add COOP/COEP headers on both hosts and re-validate the SW's cross-origin behaviour (§5).
+5. **Future — threads.** If WASM threads are adopted, add COOP/COEP headers on both hosts and re-validate the SW's cross-origin behavior (§5).
 
 **Bottom line:** high value, low-to-moderate cost via `vite-plugin-pwa`. The only sharp edges are the WASM/glue pairing and the realtime/auth deny-list — both are well-understood and handled by the config in §4. Recommend proceeding to Phase 1 when the `zustand-build` refactor settles.

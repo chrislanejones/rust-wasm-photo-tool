@@ -38,7 +38,7 @@ Don't `git push`/merge without asking.
 
 # 0. The one rule [generic]
 
-> **ARCHIVED 2026-08-04 — reference, not public docs.** Still the canonical source for the single-source-of-truth conventions (colour / type / z-index tokens) that the CI `guardrails` job enforces; see `docs/CI.md` for the checks themselves. Moved out of the README index because it is a contributor playbook, not a question a visitor has.
+> **ARCHIVED 2026-08-04 — reference, not public docs.** Still the canonical source for the single-source-of-truth conventions (color / type / z-index tokens) that the CI `guardrails` job enforces; see `docs/CI.md` for the checks themselves. Moved out of the README index because it is a contributor playbook, not a question a visitor has.
 
 
 Each fact lives in exactly one place:
@@ -537,7 +537,7 @@ size=$(du -b www-dist/assets/index-*.js 2>/dev/null | sort -rn | head -1 | cut -
 
 # 5a. Skeleton / loading-state SSOT [IH]
 
-Same idea as color/type: **one source of truth for "this content isn't ready yet" UI**, modelled on
+Same idea as color/type: **one source of truth for "this content isn't ready yet" UI**, modeled on
 [Chakra UI's Skeleton](https://chakra-ui.com/docs/components/skeleton). No more scattered bespoke
 `Loading…` text nodes, ad-hoc `animate-pulse` placeholder blocks, or the `.canvas-spinner` doing
 double duty as a content placeholder.
@@ -551,7 +551,7 @@ double duty as a content placeholder.
 | Shimmer machinery + a11y/motion  | `app/src/styles.css` — `.skeleton` + `@keyframes skeleton-shimmer`     |
 
 `SKELETON_BASE` mirrors the existing `HOVER_RING` SSOT convention in `lib/styles.ts`: the base surface
-colour is the **`bg-muted` semantic token** (§2 — no raw colours), so the placeholder re-themes with
+color is the **`bg-muted` semantic token** (§2 — no raw colors), so the placeholder re-themes with
 the palette. The `.skeleton` class layers a clipped shimmer sweep (`::after`) on top and degrades to a
 static muted block under `prefers-reduced-motion` / `html.reduce-motion` (§3). The component is an
 `aria-busy` live region announcing "Loading" to screen readers (§8).

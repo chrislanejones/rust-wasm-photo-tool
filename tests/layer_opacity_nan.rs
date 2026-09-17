@@ -100,7 +100,7 @@ fn opacity_of(json: &str, id: u32) -> String {
 #[test]
 fn ordinary_opacities_are_unchanged() {
     // The guard must not disturb the values that were always fine, including
-    // the clamping behaviour that already worked.
+    // the clamping behavior that already worked.
     let mut t = tool();
     let id = t.add_layer("L");
 

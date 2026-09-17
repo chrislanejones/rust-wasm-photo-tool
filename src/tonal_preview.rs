@@ -1,7 +1,7 @@
 //! The shared preview slot: showing a tonal edit on the photo before it costs
 //! an undo step.
 //!
-//! ONE SLOT, NOT ONE PER TOOL. Levels and colour presets both preview by
+//! ONE SLOT, NOT ONE PER TOOL. Levels and color presets both preview by
 //! recomputing the active layer from an untouched copy of it. Two independent
 //! slots could both be open at once, and whichever closed second would put
 //! ITS copy back — silently erasing what the other had committed. There is one

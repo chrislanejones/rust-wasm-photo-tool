@@ -37,7 +37,7 @@ export const BL = 3;
  *  one of them. */
 export type PerspectiveMode = "distort" | "perspective" | "skew";
 
-/** The identity quad in normalised (0..1) space — matches the crate's
+/** The identity quad in normalized (0..1) space — matches the crate's
  *  `IDENTITY_QUAD` exactly, and means "no perspective applied". */
 export const IDENTITY_QUAD: Quad = [
   { x: 0, y: 0 },
@@ -106,8 +106,8 @@ export function isValidQuad(q: Quad): boolean {
     // long note on the crate's `is_valid_quad`, which this mirrors line for
     // line. Skipping them let a fully collapsed quad read as convex.
     if (l1 < 1e-12 || l2 < 1e-12) return false;
-    // Normalised by both edge lengths, so this is sin(angle): dimensionless,
-    // and therefore the same threshold works for a 0..1 normalised quad and a
+    // Normalized by both edge lengths, so this is sin(angle): dimensionless,
+    // and therefore the same threshold works for a 0..1 normalized quad and a
     // pixel-space one thousands of units across.
     const sin = (e1x * e2y - e1y * e2x) / (l1 * l2);
     if (Math.abs(sin) < 1e-6) return false;
@@ -130,7 +130,7 @@ const EDGE_PARTNER = [TR, TL, BL, BR] as const;
  * |---------------|-----------------------------------------------------------|
  * | `distort`     | moves only that corner — full projective freedom          |
  * | `perspective` | mirrors its edge partner, so the shape stays a symmetric   |
- * |               | trapezoid (a keystone) about the vertical centre line     |
+ * |               | trapezoid (a keystone) about the vertical center line     |
  * | `skew`        | slides the corner ALONG its own edge, and its partner with |
  * |               | it — a shear, so opposite edges stay parallel              |
  *
@@ -155,8 +155,8 @@ export function dragCorner(
 
   if (mode === "perspective") {
     // Keystone: the dragged corner and its edge partner move symmetrically
-    // about the quad's vertical centre line, so the edge shortens or widens
-    // while staying centred. This is Photoshop's Perspective handle, and the
+    // about the quad's vertical center line, so the edge shortens or widens
+    // while staying centered. This is Photoshop's Perspective handle, and the
     // reason it exists is that free-dragging four corners into a believable
     // keystone by eye is fiddly.
     const partner = EDGE_PARTNER[index];
@@ -166,7 +166,7 @@ export function dragCorner(
     // Mirror the horizontal move; the partner keeps the dragged corner's new
     // vertical so the edge stays straight.
     q[partner] = { x: base[partner].x - dx, y: to.y };
-    // Keep the mirror honest even if the base edge was already off-centre.
+    // Keep the mirror honest even if the base edge was already off-center.
     const newCx = (q[index].x + q[partner].x) / 2;
     const shift = cx - newCx;
     q[index].x += shift;
@@ -219,7 +219,7 @@ export function dragEdge(
   }
 
   if (mode === "perspective") {
-    // Widen or narrow the edge about its own centre — the keystone gesture
+    // Widen or narrow the edge about its own center — the keystone gesture
     // driven from the edge instead of a corner.
     const spread = horizontal ? delta.x : delta.y;
     const sa = base[a];
@@ -309,7 +309,7 @@ function solve(src: Quad, dst: Quad): number[] | null {
   return m.every(Number.isFinite) ? m : null;
 }
 
-/** Map a quad expressed in one box's local pixel space into normalised 0..1
+/** Map a quad expressed in one box's local pixel space into normalized 0..1
  *  coordinates across that box — the form the engine stores. */
 export function normalise(q: Quad, w: number, h: number): Quad {
   if (w <= 0 || h <= 0) return IDENTITY_QUAD;
