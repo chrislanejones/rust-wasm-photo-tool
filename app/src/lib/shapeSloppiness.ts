@@ -18,7 +18,7 @@ export function shapeWobbleSeed(x0: number, y0: number, x1: number, y1: number):
 
 /** Smooth pseudo-random "hair" noise in ≈[-1, 1] — a sum of sines with
  *  incommensurate frequencies. Mirrors `hair_noise` (drawing.rs). */
-export function hairNoise(p: number, seed: number): number {
+function hairNoise(p: number, seed: number): number {
   return (
     Math.sin(p * 2.3 + seed) * 0.5 +
     Math.sin(p * 1.1 + seed * 0.7) * 0.3 +
@@ -28,7 +28,7 @@ export function hairNoise(p: number, seed: number): number {
 
 /** Simple pseudo-random number in [0, 1) from a seed — the f64-bits hash Rust
  *  uses (`pseudo_rand`, drawing.rs), so the preview shares its noise. */
-export function pseudoRand(seed: number): number {
+function pseudoRand(seed: number): number {
   const buf = new Float64Array(1);
   const bits = new BigUint64Array(buf.buffer);
   buf[0] = seed * 1000 + 0.5;
