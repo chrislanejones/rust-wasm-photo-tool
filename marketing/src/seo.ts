@@ -110,7 +110,7 @@ export const ROUTES: readonly Route[] = [
     label: "Pricing",
     title: "Image Horse pricing — free with no account, Pro at $10/mo",
     description:
-      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, 4× upscale and 5 GB of originals.",
+      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, text extraction and 5 GB of originals.",
     ogImage: "/og/pricing.png",
     sources: ["marketing/src/pages/Pricing.tsx"],
   },
@@ -245,7 +245,7 @@ const softwareApplication = () => ({
         price: "10",
         priceCurrency: "USD",
         description:
-          "Cloud originals (5 GB), 16 layers, background and object removal, 4× upscale, unlimited AI passes.",
+          "Cloud originals (5 GB), 16 layers, background and object removal, text extraction, 50 AI passes a day.",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
           price: "10",

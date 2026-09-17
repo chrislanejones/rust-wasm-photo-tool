@@ -119,7 +119,7 @@ export default function Architecture() {
                   <li>AppShell — composition and layout only</li>
                   <li>Tool registry — 5 modules registered, routing still in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask</li>
-                  <li>Zustand stores — UI · tool · gallery · annotation · guides</li>
+                  <li>Zustand stores — UI · tool · gallery · annotation · guides · perspective · text box</li>
                 </ul>
               </article>
 
@@ -206,7 +206,7 @@ export default function Architecture() {
           <div className="stack__grid">
             <article className={node("demo free pro")}>
               <h4 className="node__title">React App</h4>
-              <p className="node__sub">Vite + React 19 · Netlify static SPA</p>
+              <p className="node__sub">Vite + React 19 · Vercel static SPA</p>
             </article>
             <article className={node("demo free pro")}>
               <h4 className="node__title">Canvas Engine</h4>
@@ -471,7 +471,7 @@ export default function Architecture() {
           </div>
           <p className="diagram__foot muted">
             <span className="mono">system-architecture.mermaid</span> · Mermaid{" "}
-            <span className="mono">flowchart TB</span> · <span className="fig">79</span> lines · the
+            <span className="mono">flowchart TB</span> · <span className="fig">113</span> lines · the
             dashed subgraph is the plane you can cut.
           </p>
         </section>

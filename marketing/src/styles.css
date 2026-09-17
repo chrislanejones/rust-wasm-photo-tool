@@ -1176,6 +1176,120 @@ a { color: inherit; }
 
 .editor__lede { max-width: 52ch; }
 
+/* ── the GPU row ──────────────────────────────────────────────
+   Two columns like .editor, but on the page's own ground rather than the
+   lifted surface: this section is a claim about hardware, not a part of the
+   product tour, and the rhythm break reads better without a second panel
+   immediately after .editor's.
+
+   Collapses at 60rem, the breakpoint the rest of this stylesheet uses. The
+   letters go BELOW the words on one column — they are the illustration, and an
+   illustration above its own heading reads as a banner. */
+.gpu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-2xl);
+  align-items: center;
+  padding: var(--space-3xl) var(--page-gutter);
+}
+
+.gpu__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.gpu .lede { max-width: 52ch; }
+
+/* The honest half. Smaller and cooler than the lede on purpose — it is the
+   qualification, and a qualification set at the same weight as the claim reads
+   as though the page is arguing with itself. */
+.gpu__caveat {
+  max-width: 52ch;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+  padding-inline-start: var(--space-md);
+  border-inline-start: var(--rule-hair) solid var(--color-rule);
+}
+
+/* Breathes, because it is an invitation and a static line of mono type next to
+   a toy does not read as one. Motion-safe: the animation is only declared
+   inside the no-preference query, so reduced-motion gets the line at full
+   opacity with nothing to opt out of. */
+.gpu__hint {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  color: var(--color-ink-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes gpu-hint {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  .gpu__hint { animation: gpu-hint 3.2s var(--ease-in-out) infinite; }
+}
+
+/* ── the cube letters ─────────────────────────────────────────
+   A 16:9 box that owns its own canvas. `touch-action: none` is load-bearing on
+   a phone: without it the first drag scrolls the page instead of pushing the
+   cubes, and the toy looks broken rather than absent.
+
+   Focusable, because the whole interaction is pointer-driven and a keyboard
+   user would otherwise have no way in. The focus ring is the site's own token;
+   there is no global :focus-visible rule here, so omitting it falls back to the
+   UA default, which measured invisible on this surface. */
+.cubes {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-width: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.cubes:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.cubes__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Both labels sit ON the canvas box and must never eat a pointer event — the
+   whole surface is the control. */
+.cubes__backend,
+.cubes__count {
+  position: absolute;
+  bottom: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.cubes__backend {
+  left: 0;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+.cubes__count {
+  right: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
 /* ── close / CTA ──────────────────────────────────────────── */
 
 .close {
@@ -1653,15 +1767,6 @@ a { color: inherit; }
 .day[data-level="4"] { background: var(--color-grid-4); }
 .day--pad { background: transparent; }
 
-.graph__year {
-  padding-block-end: var(--space-sm);
-  font-family: var(--font-outlier);
-  font-size: var(--text-sm);
-  letter-spacing: 0.12em;
-  color: var(--color-ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Month name and count are STACKED, never inline: "Jul 34" side by side reads
  * as July 34th — a date — on a page whose every other number is a date. */
 .month__label {
@@ -1690,6 +1795,84 @@ a { color: inherit; }
 
 /* text-only segments don't need the squares' generous block padding */
 .seg--month { padding: var(--space-md) var(--space-lg); }
+
+/* ── the month picker, chunked by year ────────────────────────
+   One flat strip worked while the log was eight months long inside a single
+   year. It does not scale: a second year turns it into twenty segments that
+   either squeeze past legibility or scroll sideways, and neither answers the
+   question a reader actually has, which is what happened in a given year.
+
+   So a year is a heading, and its months sit four to a row beneath it. The
+   year comes from the data (see `years` in Trail.tsx) — it used to be a
+   hardcoded <p>2026</p>, which would have been quietly wrong every January.
+
+   The months are their own bordered tiles here rather than segments sharing
+   one clipped group, because a grid has no single edge to hang dividers on:
+   `border-inline-start` on every cell draws a stray rule down the left column.
+   Same treatment the home page's tool tiles use, for the same reason. */
+.year { margin-block-start: var(--space-xl); }
+
+.year__label {
+  margin-block-end: var(--space-sm);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-3);
+}
+
+.year__months {
+  display: grid;
+  /* Four to a row, as asked. `minmax(0, 1fr)` and not `1fr`: a bare 1fr uses
+     min-content as its floor, and the widest label would push the row past the
+     page on a phone instead of shrinking. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+/* Inside the grid each month is a free-standing tile: its own border and
+   radius, and none of the shared-edge machinery the old strip needed. */
+.year__months .seg {
+  flex: initial;
+  justify-content: center;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.year__months .seg:hover { border-color: var(--color-rule-strong); }
+
+.year__months .seg[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  /* The strip drew selection as an inset bar along a shared bottom edge. On a
+     tile that bar reads as an underline on one card in a grid, so selection
+     moves to the border — the same channel the tool tiles use. */
+  box-shadow: none;
+}
+
+.year__months .seg:focus-visible { outline-offset: 2px; }
+
+/* All spans every year, so it sits above them and is sized to its content
+   rather than stretched across a row it does not belong to. */
+.seg--reset {
+  align-self: start;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.seg--reset[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  box-shadow: none;
+}
+
+/* Two to a row on a phone. Four 3-letter labels with a count under each fit at
+   375px, but only just, and the count is the part that would clip. */
+@media (max-width: 30rem) {
+  .year__months { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
 
 /* the "what runs where" filter — the same group, icon over label like the
    Architecture tiers, so all three filters on the site read as one component */

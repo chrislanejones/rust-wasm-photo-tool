@@ -191,6 +191,30 @@ export default function Trail() {
     return [...per.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, []);
 
+  /* The same months, grouped by the year they belong to.
+   *
+   * One flat row worked while the log was one year old and eight months long.
+   * It does not scale: a second year turns the strip into twenty months that
+   * either squeeze past legibility or scroll sideways, and neither answers the
+   * question a reader actually has, which is "what happened in 2027".
+   *
+   * So the year is a heading and its months sit in rows of four underneath.
+   * DERIVED from the keys, never written down — the year label used to be a
+   * hardcoded <p>2026</p>, which would have been quietly wrong every January. */
+  const years = useMemo(() => {
+    const by = new Map<string, [string, number][]>();
+    for (const [key, total] of months) {
+      const y = key.slice(0, 4);
+      const list = by.get(y) ?? [];
+      list.push([key, total]);
+      by.set(y, list);
+    }
+    // Newest year first: the reader is far more likely to want this year than
+    // the first one. Months stay oldest-first inside a year, because a year
+    // reads left to right as it happened.
+    return [...by.entries()].sort(([a], [b]) => b.localeCompare(a));
+  }, [months]);
+
   const shown = active === "all" ? RELEASES : RELEASES.filter((r) => r.date.startsWith(active));
   const latest = RELEASES.length ? RELEASES[0].version : null;
 
@@ -223,47 +247,57 @@ export default function Trail() {
           <h2 className="visually-hidden" id="graph-h">
             Filter releases by month
           </h2>
-          <p className="graph__year">2026</p>
-          <div className="graph__scroll">
-            <div className="graph__group" role="group" aria-label="Filter releases by month">
-              {/* All carries the total, so it reads as a peer of the months */}
-              <button
-                className="seg seg--reset"
-                type="button"
-                aria-pressed={active === "all"}
-                onClick={() => setActive("all")}
-              >
-                <span className="month__label">
-                  <span>All</span>
-                  <span className="month__count">{RELEASES.length} rel</span>
-                </span>
-              </button>
+          {/* All sits above the years rather than inside one: it spans every
+              year, so putting it in the newest year's grid would say it belongs
+              to that year. */}
+          <button
+            className="seg seg--reset"
+            type="button"
+            aria-pressed={active === "all"}
+            onClick={() => setActive("all")}
+          >
+            <span className="month__label">
+              <span>All</span>
+              <span className="month__count">{RELEASES.length} rel</span>
+            </span>
+          </button>
 
-              {months.map(([key, total]) => {
-                const mi = parseInt(key.slice(5, 7), 10) - 1;
-                return (
-                  <button
-                    key={key}
-                    className="seg month seg--month"
-                    type="button"
-                    aria-pressed={active === key}
-                    aria-label={`${FULL[mi]} ${key.slice(0, 4)} — ${plural(total, "release", "releases")}`}
-                    // The whole segment is one control, so its title describes
-                    // the month — per-day titles taught the wrong target.
-                    title={`${plural(total, "release", "releases")} in ${FULL[mi]} ${key.slice(0, 4)}`}
-                    onClick={() => setActive(active === key ? "all" : key)}
-                  >
-                    <span className="month__label">
-                      {/* Name and count are stacked, not inline: "Jul 34" on one
-                          line reads as a date. */}
-                      <span>{MONTHS[mi]}</span>
-                      <span className="month__count">{total === 1 ? "1 rel" : `${total} rel`}</span>
-                    </span>
-                  </button>
-                );
-              })}
+          {years.map(([year, list]) => (
+            <div className="year" key={year}>
+              <h3 className="year__label">{year}</h3>
+              <div
+                className="year__months"
+                role="group"
+                aria-label={`Filter releases by month in ${year}`}
+              >
+                {list.map(([key, total]) => {
+                  const mi = parseInt(key.slice(5, 7), 10) - 1;
+                  return (
+                    <button
+                      key={key}
+                      className="seg month seg--month"
+                      type="button"
+                      aria-pressed={active === key}
+                      aria-label={`${FULL[mi]} ${year} — ${plural(total, "release", "releases")}`}
+                      // The whole segment is one control, so its title describes
+                      // the month — per-day titles taught the wrong target.
+                      title={`${plural(total, "release", "releases")} in ${FULL[mi]} ${year}`}
+                      onClick={() => setActive(active === key ? "all" : key)}
+                    >
+                      <span className="month__label">
+                        {/* Name and count are stacked, not inline: "Jul 34" on
+                            one line reads as a date. */}
+                        <span>{MONTHS[mi]}</span>
+                        <span className="month__count">
+                          {total === 1 ? "1 rel" : `${total} rel`}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ))}
           <div className="graph__foot">
             <p className="legend">
               <span>Commits per day</span>
