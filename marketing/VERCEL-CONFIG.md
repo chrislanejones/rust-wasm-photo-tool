@@ -91,3 +91,20 @@ The share cards and icons change only when `scripts/gen-og-images.mjs` is re-run
 and a scraper refetching one on every unfurl is waste. A day, not a year: unlike
 `/assets/` these filenames are NOT content-hashed, so a stale copy is possible
 and should expire on its own.
+
+## `headers` — `/shots/(.*)`
+
+The hero's time-machine frames, and the one place on this site that gets a YEAR
+without a content hash in the filename. The rule that buys it: **a file under
+`/shots/` is never rewritten.** Each name carries the date of the capture it
+holds, so a new capture is a new file and a superseded one is deleted, never
+edited in place. That makes the URL as stable as a hashed asset in practice.
+
+It earns the year rather than the day the og cards get because of WHEN these are
+fetched: not on load — the page downloads exactly one screenshot and none of
+these — but mid-drag, while someone is scrubbing the slider. A revalidation
+round-trip there is a stall the reader can feel, and `immutable` is what stops
+the browser making one on every reload.
+
+If you ever do need to change what a frame shows, change the filename and the
+entry in `src/data/shots.ts` with it.

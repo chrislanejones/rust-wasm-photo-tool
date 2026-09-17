@@ -578,6 +578,188 @@ a { color: inherit; }
   max-width: 18ch;
 }
 
+/* ── the time machine: one frame, scrubbed ────────────────── */
+
+/* Every shot in the run is stacked in the SAME box, and the box's aspect ratio
+ * is fixed by the hero's own capture — so scrubbing swaps pixels and never
+ * geometry. That is the whole CLS story: the frames are absolutely positioned,
+ * take no part in layout, and `contain` letterboxes the older captures (which
+ * are not all 2048×1219) against the frame's own paper instead of resizing the
+ * page around them. Nothing below the hero moves, at any stop, ever.
+ */
+.shot-stack {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2048 / 1219;
+  background: var(--color-paper-2);
+}
+.shot-stack__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  /* A crossfade, not a cut — but only the opacity animates, so the compositor
+     does the whole thing and the scrub stays at frame rate while dragging. */
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.shot-stack__frame[data-current] { opacity: 1; }
+
+/* The frame and its rail are one unit, at the frame's own measure. */
+.shot-run {
+  display: grid;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: var(--page-max);
+}
+
+.timeline {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* Rail on the left, the stop's own label on the right. The label is the reason
+   the slider is legible at all: a bare track would be scrubbing through
+   anonymous pictures. */
+.timeline__scrub {
+  display: grid;
+  /* The label's column is a FIXED width, not `auto`. Sized to content it grew
+     and shrank with the date in it ("2 Sep 2025" is two characters short of
+     "18 Mar 2026"), and every character of that came off the rail beside it —
+     a track that changes length while you drag it. */
+  grid-template-columns: minmax(0, 1fr) 11.5rem;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.timeline__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.timeline__now {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;   /* the stamp hangs off the right edge of its column */
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.timeline__stamp {
+  font-family: var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+.timeline__count { color: var(--color-ink-3); font-size: var(--text-xs); }
+
+/* Every caption in one cell: the block is as tall as the longest of them at
+   whatever width the reader is on, so scrubbing never moves the page below. */
+.timeline__caption {
+  display: grid;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+.timeline__line {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  visibility: hidden;
+}
+.timeline__line[data-current] { visibility: visible; }
+.timeline__source {
+  color: var(--color-ink-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.timeline__source:hover { color: var(--color-accent); }
+
+/* ── slider (shadcn / Base UI anatomy) ────────────────────── */
+
+.slider {
+  display: block;
+  width: 100%;
+  touch-action: none;   /* the drag is ours; the page must not pan under it */
+}
+
+/* The hit area is deliberately taller than the track — 44px of press target
+   around a 6px line, which is the difference between a control you can use on
+   a phone and one you can only look at. */
+.slider__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  cursor: pointer;
+}
+
+.slider__track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-4);
+  overflow: clip;   /* keeps the indicator's square end inside the pill */
+}
+
+.slider__indicator {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+/* One mark per release in the run. They are a picture of how many stops there
+   are, not targets — the control above takes every pointer. */
+.slider__ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+.slider__tick {
+  width: 2px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-ink) 28%, transparent);
+}
+.slider__tick[data-passed] {
+  background: color-mix(in oklch, var(--color-accent-ink) 55%, transparent);
+}
+
+.slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  translate: -50% -50%;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-accent);
+  background: var(--color-paper);
+  cursor: grab;
+  transition: box-shadow var(--dur-micro) var(--ease-out);
+}
+.slider__thumb:hover {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-accent) 18%, transparent);
+}
+.slider__thumb:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.slider__control:active .slider__thumb { cursor: grabbing; }
+
 /* ── rules ────────────────────────────────────────────────── */
 
 .rule-thick {
@@ -2167,6 +2349,12 @@ a { color: inherit; }
 
   .editor { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
   .editor__run { font-size: var(--text-lg); }
+
+  /* The stop's label drops under the rail rather than squeezing it: a 375px
+     viewport has no room for both, and the rail is the thing being used. */
+  .timeline__scrub { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+  .timeline__now { justify-content: flex-start; }
+  .timeline__caption { font-size: var(--text-xs); }
 }
 
 /* ── reduced motion ───────────────────────────────────────── */
@@ -2184,6 +2372,8 @@ a { color: inherit; }
     --my: 30%;
   }
   .cta:active { transform: none; }
+  /* The scrub is a state change, not a journey: keep the swap, drop the fade. */
+  .shot-stack__frame { transition: none; }
   /* The glide and the condense are spatial: keep the state change, drop the
      travel. The rule still marks the current page and still lands under what
      you point at — it just doesn't slide there. */

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Footer from "../components/Footer";
+import ShotTimeline from "../components/ShotTimeline";
 import { CpuIcon, ListIcon, ServerIcon } from "../components/Icons";
+import { SHOTS } from "../data/shots";
 import { EDITOR_URL, GITHUB_URL, external } from "../config";
 
 type Where = "all" | "local" | "server";
@@ -86,18 +88,12 @@ export default function Home() {
 
           {/* A real browser capture, not a redrawn frame — and it happens to show
               the "annotate it" beat in the headline actually happening: a photo
-              marked up in the tab, nothing uploaded. It's the LCP, so it loads
-              eagerly and carries its own dimensions to hold layout. */}
-          <figure className="hero__shot shot-frame">
-            <img
-              src="/IH-Hero-Image-August-2026.webp"
-              width={2048}
-              height={1219}
-              fetchPriority="high"
-              decoding="async"
-              alt="The Image Horse editor open on a photo of a white Mercedes SUV, a magic-wand selection marching around the bonnet, with the Wand and Selection panels on the left and History and Layers on the right — five photos in the gallery strip below, all held in the browser."
-            />
-          </figure>
+              marked up in the tab, nothing uploaded. It's still the LCP and it
+              still loads eagerly; the rail underneath it only ever reaches for
+              an older frame once someone drags it. See ShotTimeline for what
+              that costs (nothing, until it's asked for) and src/data/shots.ts
+              for where each older frame was recovered from. */}
+          <ShotTimeline shots={SHOTS} />
         </header>
 
         <hr className="rule-thick" />
