@@ -665,6 +665,7 @@ pub fn draw_shape(
                     &[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
                     shape_wobble_seed(from_x, from_y, to_x, to_y),
                     sloppiness,
+                    stroke_width,
                     true,
                 );
                 draw_polyline(data, w, h, &pts, color, stroke_width);
@@ -682,8 +683,11 @@ pub fn draw_shape(
             let rw = (to_x - from_x).abs() / 2.0;
             let rh = (to_y - from_y).abs() / 2.0;
             let r = rw.min(rh);
-            if sloppiness > 0.0 {
-                draw_sloppy_ellipse(
+            // `r >= 2.0` matches the old "bbox at least 4 px" guard, but it now
+            // FALLS THROUGH to the clean arc instead of drawing nothing — a
+            // sub-4-px circle used to vanish the moment sloppiness left 0.
+            if sloppiness > 0.0 && r >= 2.0 {
+                draw_sloppy_circle(
                     data,
                     wi,
                     hi,
@@ -715,6 +719,7 @@ pub fn draw_shape(
                     &[(from_x, from_y), (to_x, to_y)],
                     shape_wobble_seed(from_x, from_y, to_x, to_y),
                     sloppiness,
+                    stroke_width,
                     false,
                 );
                 draw_polyline(data, w, h, &pts, color, stroke_width);
@@ -803,6 +808,7 @@ fn draw_polygon_shape(
             verts,
             shape_wobble_seed(from_x, from_y, to_x, to_y),
             sloppiness,
+            stroke_width,
             true,
         );
         draw_polyline(data, w as u32, h as u32, &pts, color, stroke_width);
@@ -873,29 +879,122 @@ fn hair_noise(p: f64, seed: f64) -> f64 {
         + (p * 3.7 + seed * 1.3).cos() * 0.2
 }
 
+/* --- the sloppiness curve ------------------------------------------------ */
+/* Every constant below is reachable across the 0..=100 slider, and every
+ * feature scales from EXACTLY zero, so sloppiness 1 renders the firm shape and
+ * the `if sloppiness > 0.0` branches in `draw_shape` are an optimization
+ * rather than a change of behavior. The previous curve had constant floors
+ * (a 0.05π circle gap, a lead-in tail, a tilt, a squeeze) that switched on
+ * whole at the first non-zero value, so a shape was either computer-drawn or
+ * hand-drawn with nothing in between. */
+
+/// Full-strength wobble as a fraction of the shape's bounding-box diagonal.
+const WOBBLE_FRAC: f64 = 0.020;
+/// Floor on the wobble, in stroke widths — a wobble narrower than the pen
+/// cannot be seen. Binds on small shapes and fat pens (the width slider is
+/// 1..=10 IMAGE px, so this reaches up to a ~550 px diagonal).
+const WOBBLE_MIN_STROKES: f64 = 1.10;
+/// Ceiling on the wobble, as a fraction of the diagonal, so a fat pen on a
+/// small shape stays a shape. Binds below a ~147 px diagonal at width 10.
+const WOBBLE_MAX_FRAC: f64 = 0.075;
+/// Per-edge bow at full strength, as a fraction of the edge's length.
+const BOW_FRAC: f64 = 0.050;
+/// How far past its corner an edge may run, in wobble-amplitudes. Signed by
+/// the noise, so some corners overshoot and some fall short.
+const CORNER_RUN: f64 = 3.0;
+/// …but never more than this fraction of the edge, which keeps a star's short
+/// inner edges from running into each other.
+const CORNER_RUN_MAX: f64 = 0.12;
+/// Share of the wobble that survives at a vertex. Below 1 the middle of an
+/// edge roams furthest, which is how a hand actually draws a straight line.
+const CORNER_HOLD: f64 = 0.35;
+
+/// The 0..=100 slider as a 0..=1 sketch strength, eased so the middle of the
+/// travel is a visibly intermediate amount of hand-drawn-ness rather than
+/// "on, but small": 25 → 0.35, 50 → 0.59, 100 → 1.
+///
+/// The ease is `s^0.75`, written as `sqrt(s) * sqrt(sqrt(s))` on purpose.
+/// IEEE-754 requires `sqrt` to be correctly rounded, so Rust and JS agree
+/// bit-for-bit; `powf`/`Math.pow` carry no such guarantee and would let the
+/// preview drift from the committed pixels. `.max(0.0)` also launders NaN
+/// (`f64::max` returns the non-NaN operand), so a junk value draws firm
+/// instead of NaN coordinates.
+///
+/// Mirrored by hand in `sketchStrength` (shapeSloppiness.ts).
+fn sketch_strength(sloppiness: f64) -> f64 {
+    // NOT `clamp`: clippy's own note says "clamp returns NaN if the input is
+    // NaN", and NaN here becomes NaN coordinates across the WASM boundary.
+    // `f64::max` returns the non-NaN operand, so junk lands on 0.0 = firm.
+    #[allow(clippy::manual_clamp)]
+    let s = (sloppiness / 100.0).max(0.0).min(1.0);
+    let r = s.sqrt();
+    r * r.sqrt()
+}
+
+/// How far, in image pixels, a full-strength wobble moves the pen.
+///
+/// The wobble is RELATIVE to the shape, not an absolute pixel count. Image
+/// Horse draws in IMAGE pixels while the user sees the image scaled to fit,
+/// so a fixed pixel count renders differently on every photo: the old 5.5 px
+/// cap was ~2 screen px on a 1385 px-wide image shown at 461 px, and would be
+/// a wild scribble on a 300 px thumbnail. A fraction of the shape is what the
+/// eye actually reads, and it is what the hand does — tremor is a share of
+/// what you are drawing, not a count of pixels.
+///
+/// Mirrored by hand in `wobbleAmp` (shapeSloppiness.ts).
+fn wobble_amp(diag: f64, stroke_width: f64, strength: f64) -> f64 {
+    // .max() then .min() (never `clamp`) — `f64::clamp` PANICS when the
+    // computed floor exceeds the computed ceiling, and this crosses the WASM
+    // boundary.
+    let base = (diag * WOBBLE_FRAC).max(stroke_width * WOBBLE_MIN_STROKES);
+    base.min(diag * WOBBLE_MAX_FRAC) * strength
+}
+
+/// Bounding-box diagonal of a point list — the shape's own scale, which is
+/// what the wobble is measured against. Mirrored in `pointsDiag`.
+fn points_diag(pts: &[(f64, f64)]) -> f64 {
+    let mut minx = f64::INFINITY;
+    let mut maxx = f64::NEG_INFINITY;
+    let mut miny = f64::INFINITY;
+    let mut maxy = f64::NEG_INFINITY;
+    for &(x, y) in pts {
+        minx = minx.min(x);
+        maxx = maxx.max(x);
+        miny = miny.min(y);
+        maxy = maxy.max(y);
+    }
+    let dx = maxx - minx;
+    let dy = maxy - miny;
+    (dx * dx + dy * dy).sqrt().max(1e-6)
+}
+
 /// Turn the clean vertices of a shape's outline into a sketchy polyline.
 /// Works per-edge: each edge is subdivided and its points are pushed sideways
-/// (perpendicular to the edge) by `hair_noise` scaled by `sloppiness`, plus a
-/// gentle per-edge "bow". Edges end with a small residual offset so corners
-/// meet just slightly off — the hand-drawn look. `closed` wraps the last edge
-/// back to the first vertex. When `sloppiness` is 0 the vertices pass through
-/// untouched, so clean shapes pay nothing.
+/// (perpendicular to the edge) by `hair_noise` scaled by the wobble amplitude,
+/// plus a gentle per-edge "bow", plus a signed overrun so the pen slides past
+/// some corners and stops short of others. `closed` wraps the last edge back
+/// to the first vertex.
 ///
-/// Mirrored by hand — `sloppyPolylinePoints` (useDrawingTools) — so the canvas
-/// preview and the committed pixels are the same path.
+/// Every one of those terms is multiplied by the sketch strength, so as
+/// sloppiness approaches 0 the output converges on the clean vertices (with
+/// collinear subdivision points, which rasterize identically) and clean shapes
+/// pay nothing.
+///
+/// Mirrored by hand — `sloppyPolylinePoints` (shapeSloppiness.ts) — so the
+/// canvas preview and the committed pixels are the same path.
 fn sloppy_polyline_points(
     pts: &[(f64, f64)],
     seed: f64,
     sloppiness: f64,
+    stroke_width: f64,
     closed: bool,
 ) -> Vec<(f64, f64)> {
-    if sloppiness <= 0.0 || pts.len() < 2 {
+    let strength = sketch_strength(sloppiness);
+    if strength <= 0.0 || pts.len() < 2 {
         return pts.to_vec();
     }
-    // Sloppiness is 0..=100; scale to a 0..=10 strength for the wobble math.
-    let s = sloppiness / 10.0;
-    let amp = (s * 0.55).min(7.0);
-    let bow = (s * 0.04).min(2.6);
+    let amp = wobble_amp(points_diag(pts), stroke_width, strength);
+    let bow = BOW_FRAC * strength;
     let n = if closed { pts.len() } else { pts.len() - 1 };
     let mut out: Vec<(f64, f64)> = Vec::with_capacity(n * 12);
     let mut phase = seed * 0.31;
@@ -910,15 +1009,19 @@ fn sloppy_polyline_points(
         let uy = dy / len;
         let px = -uy;
         let py = ux;
-        let bow_amt = bow * len * 0.22 * hair_noise(phase, seed);
+        let bow_amt = bow * len * hair_noise(phase, seed);
+        // Signed corner overrun, as a share of the edge. Proportional to `amp`,
+        // so it vanishes with everything else at sloppiness 0.
+        let run = amp * CORNER_RUN / len;
+        let t0 = -(run * hair_noise(phase + 0.7, seed)).clamp(-CORNER_RUN_MAX, CORNER_RUN_MAX);
+        let t1 = 1.0 + (run * hair_noise(phase + 2.9, seed)).clamp(-CORNER_RUN_MAX, CORNER_RUN_MAX);
         for i in 0..=steps {
-            let t = i as f64 / steps as f64;
-            let fade = t * (1.0 - t) * 4.0;
+            let t = t0 + (t1 - t0) * (i as f64 / steps as f64);
+            // Clamped at 0 so the overrun tails past a vertex keep the corner
+            // offset instead of flipping sign.
+            let fade = (t * (1.0 - t) * 4.0).max(0.0);
             let nv = hair_noise(phase * 1.7 + t * 3.1, seed);
-            // Corners hold 35% of the wobble at every sloppiness so adjacent
-            // edges still meet recognizably; the middle of each edge wobbles
-            // hardest.
-            let off = nv * amp * (0.35 + 0.65 * fade) + bow_amt * fade;
+            let off = nv * amp * (CORNER_HOLD + (1.0 - CORNER_HOLD) * fade) + bow_amt * fade;
             out.push((ax + dx * t + px * off, ay + dy * t + py * off));
         }
         phase += 1.3;
@@ -929,11 +1032,32 @@ fn sloppy_polyline_points(
     out
 }
 
-/// Sketchy circle — the "fin documents" look: a wobbly ellipse whose ends do
-/// NOT quite meet, plus a short lead-in tail. Amplitude, gap and tail length
-/// all scale with `sloppiness`; at the top of the range it reproduces the old
-/// handCircle character. Mirrored by hand in drawShapePreview.
-fn draw_sloppy_ellipse(
+/// Widest the ends may miss each other by, at full strength.
+const CIRCLE_GAP: f64 = 0.30;
+/// Lead-in tail at full strength: a fixed part plus a seeded part, in turns.
+const CIRCLE_TAIL: f64 = 0.18;
+const CIRCLE_TAIL_RAND: f64 = 0.24;
+/// How far the whole circle may lean at full strength, in radians.
+const CIRCLE_TILT: f64 = 0.22;
+/// How far out of round the circle may go at full strength.
+const CIRCLE_SQUEEZE: f64 = 0.05;
+
+/// Sketchy circle — the "fin documents" look: a wobbly ring whose ends do NOT
+/// quite meet, plus a short lead-in tail. At the top of the range it matches
+/// the character of the retired `draw_hand_circle` (kind 3); at the bottom it
+/// converges on the clean arc `draw_shape` draws at sloppiness 0.
+///
+/// Two things here used to be wrong, and both of them were the step Chris saw:
+///
+///  * It drew the bbox ELLIPSE (`rx = bw/2`, `ry = bh/2`) while the clean
+///    branch — and the interior fill, and the SVG preview — all use a CIRCLE of
+///    `min(bw, bh) / 2`. On any non-square drag the outline changed shape and
+///    size the instant the slider left 0, and the fill no longer sat under it.
+///  * The gap, tail, tilt and squeeze all had constant floors, so they arrived
+///    whole at sloppiness 1. They are multiplied by the strength now.
+///
+/// Mirrored by hand in `sloppyCirclePoints` (shapeSloppiness.ts).
+fn draw_sloppy_circle(
     data: &mut [u8],
     w: i32,
     h: i32,
@@ -949,52 +1073,51 @@ fn draw_sloppy_ellipse(
     let y = from_y.min(to_y);
     let bw = (to_x - from_x).abs();
     let bh = (to_y - from_y).abs();
-    if bw < 4.0 || bh < 4.0 {
-        return;
-    }
     let cx = x + bw / 2.0;
     let cy = y + bh / 2.0;
-    let rx = bw / 2.0;
-    let ry = bh / 2.0;
+    // The SAME circle the clean branch and `fill_shape` use.
+    let r = bw.min(bh) / 2.0;
     let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
-    let strength = (sloppiness / 100.0).clamp(0.0, 1.0);
-    // Only very slight randomness below about "half way"; grew the tilt cover.
-    let amp = 0.4 + sloppiness * 0.062;
+    let strength = sketch_strength(sloppiness);
+    let diag = (bw * bw + bh * bh).sqrt().max(1e-6);
+    let amp = wobble_amp(diag, stroke_width, strength);
     let start_offset = pseudo_rand(seed) * 2.0 * PI;
-    // The gap where the ends don't meet widens with sloppiness.
-    let gap = PI * (0.05 + strength * 0.22);
+    let gap = PI * CIRCLE_GAP * strength;
     let main_arc = 2.0 * PI - gap;
-    let tilt = (pseudo_rand(seed + 2.0) - 0.5) * 0.15;
-    let tail_len = PI * (0.12 + 0.12 * strength + pseudo_rand(seed + 3.0) * 0.15);
+    let tilt = (pseudo_rand(seed + 2.0) - 0.5) * CIRCLE_TILT * strength;
+    let tail_len = PI * (CIRCLE_TAIL + pseudo_rand(seed + 3.0) * CIRCLE_TAIL_RAND) * strength;
+    let squeeze_amt = CIRCLE_SQUEEZE * strength;
 
-    let noise = |angle: f64| -> f64 {
-        (angle * 2.3 + seed).sin() * amp
-            + (angle * 1.1 + seed * 0.7).sin() * amp * 0.7
-            + (angle * 3.7 + seed * 1.3).cos() * amp * 0.5
-    };
+    // `hair_noise` is the same three incommensurate frequencies the inline
+    // closure here used, already normalized to a peak of 1, so `amp` means
+    // what it says and the polyline and the circle wobble by the same amount.
+    let noise = |angle: f64| -> f64 { hair_noise(angle, seed) * amp };
 
+    // Segment count tracks the radius the way the clean branch does; a fixed
+    // 60 showed its corners on a big circle, which was one more way the
+    // outline changed the moment the slider left 0.
+    let num_points = ((r * 4.0).ceil() as usize).clamp(60, 480);
     // Lead-in tail (fades to a point at its tip).
     let tail_steps = 10usize;
-    let mut path: Vec<(f64, f64)> = Vec::with_capacity(tail_steps + 62);
+    let mut path: Vec<(f64, f64)> = Vec::with_capacity(tail_steps + num_points + 2);
     for i in 0..=tail_steps {
         let t = i as f64 / tail_steps as f64;
         let angle = start_offset - tail_len * (1.0 - t);
         let n = noise(angle) * t;
-        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
-        let inward = (1.0 - t) * (rx * 0.15);
-        let px = cx + (rx * squeeze - inward + n) * (angle + tilt).cos();
-        let py = cy + (ry / squeeze - inward + n) * (angle + tilt).sin();
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * squeeze_amt;
+        let inward = (1.0 - t) * (r * 0.15) * strength;
+        let px = cx + (r * squeeze - inward + n) * (angle + tilt).cos();
+        let py = cy + (r / squeeze - inward + n) * (angle + tilt).sin();
         path.push((px, py));
     }
     // Main arc — stops shy of a full turn so the ends visibly miss each other.
-    let num_points = 60usize;
     for i in 0..=num_points {
         let t = i as f64 / num_points as f64;
         let angle = start_offset + t * main_arc;
         let n = noise(angle);
-        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
-        let px = cx + (rx * squeeze + n) * (angle + tilt).cos();
-        let py = cy + (ry / squeeze + n) * (angle + tilt).sin();
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * squeeze_amt;
+        let px = cx + (r * squeeze + n) * (angle + tilt).cos();
+        let py = cy + (r / squeeze + n) * (angle + tilt).sin();
         path.push((px, py));
     }
     draw_polyline(data, w as u32, h as u32, &path, color, stroke_width);

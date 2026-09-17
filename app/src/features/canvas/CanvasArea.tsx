@@ -49,7 +49,7 @@ import type { ShapeName } from "@/lib/types";
 import {
   diamondVertices,
   shapeWobbleSeed,
-  sloppyEllipsePoints,
+  sloppyCirclePoints,
   sloppyPolylinePoints,
   starVertices,
 } from "@/lib/shapeSloppiness";
@@ -336,14 +336,17 @@ function arrowGeometry(
  * SVG path for the sketchy shape preview (sloppiness > 0). Built from the
  * same `shapeSloppiness` helpers `drawShapePreview` and the Rust engine use,
  * so the overlay preview and the committed pixels are the same path
- * (mirrors `sloppy_polyline_points` / `draw_sloppy_ellipse`, drawing.rs).
+ * (mirrors `sloppy_polyline_points` / `draw_sloppy_circle`, drawing.rs).
  * `toSX`/`toSY` map canvas coords to screen so the path tracks zoom/pan.
+ * `strokeWidth` is in IMAGE pixels (it floors the wobble, so the preview and
+ * the engine must be handed the same units).
  */
 function sloppyShapePath(
   from: Point,
   to: Point,
   shape: ShapeName,
   sloppiness: number,
+  strokeWidth: number,
   toSX: (x: number) => number,
   toSY: (y: number) => number,
 ): string {
@@ -364,6 +367,7 @@ function sloppyShapePath(
         ],
         seed,
         sloppiness,
+        strokeWidth,
         true,
       );
       break;
@@ -372,6 +376,7 @@ function sloppyShapePath(
         diamondVertices(from.x, from.y, to.x, to.y),
         seed,
         sloppiness,
+        strokeWidth,
         true,
       );
       break;
@@ -380,6 +385,7 @@ function sloppyShapePath(
         starVertices(from.x, from.y, to.x, to.y),
         seed,
         sloppiness,
+        strokeWidth,
         true,
       );
       break;
@@ -391,11 +397,12 @@ function sloppyShapePath(
         ],
         seed,
         sloppiness,
+        strokeWidth,
         false,
       );
       break;
     case "circle":
-      pts = sloppyEllipsePoints(from, to, sloppiness);
+      pts = sloppyCirclePoints(from, to, sloppiness, strokeWidth);
       break;
   }
   if (!pts || pts.length === 0) return "";
@@ -2000,7 +2007,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           } else if (shape === "line") {
             const strokeLayer = sloppy ? (
               <path
-                d={sloppyShapePath(start, end, "line", sloppyAmt, toSX, toSY)}
+                d={sloppyShapePath(start, end, "line", sloppyAmt, eff.strokeWidth, toSX, toSY)}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round"
               />
@@ -2025,14 +2032,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const cr = (Math.min(bx1 - bx0, by1 - by0) / 2) * sx;
             const ccx = vx + vw / 2;
             const ccy = vy + vh / 2;
-            // Fill stays a clean ellipse (Rust fills the bbox ellipse under the
-            // stroke even when the outline is sketchy); only the STROKE roams.
+            // Fill stays a clean circle of that same radius; only the STROKE
+            // roams, and it now roams around the SAME circle (it used to wobble
+            // around the bbox ellipse, so fill and outline disagreed).
             const fillLayer = (
               <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} />
             );
-            const strokeLayer = sloppy ? (
+            // An empty sketchy path means the circle is too small to wobble;
+            // fall back to the clean arc, which is what the engine does.
+            const sloppyD = sloppy
+              ? sloppyShapePath(start, end, "circle", sloppyAmt, eff.strokeWidth, toSX, toSY)
+              : "";
+            const strokeLayer = sloppyD ? (
               <path
-                d={sloppyShapePath(start, end, "circle", sloppyAmt, toSX, toSY)}
+                d={sloppyD}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round" strokeLinejoin="round"
               />
@@ -2060,7 +2073,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
             const strokeLayer = sloppy ? (
               <path
-                d={sloppyShapePath(start, end, shape, sloppyAmt, toSX, toSY)}
+                d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY)}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round" strokeLinejoin="round"
               />
@@ -2081,7 +2094,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             );
             const strokeLayer = sloppy ? (
               <path
-                d={sloppyShapePath(start, end, "rect", sloppyAmt, toSX, toSY)}
+                d={sloppyShapePath(start, end, "rect", sloppyAmt, eff.strokeWidth, toSX, toSY)}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round" strokeLinejoin="round"
               />
