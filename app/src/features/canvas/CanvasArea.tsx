@@ -27,6 +27,7 @@ import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { PerspectiveLayer } from "./PerspectiveLayer";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
 import type { OverlayFrame } from "./overlayFrame";
@@ -1574,6 +1575,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               zoom={zoom}
             />
           )}
+
+        {/* AI Object Removal's mask brush — self-gated on the tool store (it is
+            the one overlay here that TAKES the pointer, so it must not linger,
+            and this file is line-capped). */}
+        <ObjectRemovalOverlay {...overlayFrame} />
 
         {/* ── Rulers & Grids overlay (non-destructive; grid geometry from Rust) ── */}
         {guides &&

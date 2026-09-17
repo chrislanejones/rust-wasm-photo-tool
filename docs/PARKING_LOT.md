@@ -3033,3 +3033,23 @@ copies with a pointer comment is not yet worth a third file.
 **Do it when a third caller appears** — that is the point at which "they might
 drift" stops being hypothetical. `marketing/src/lib/date.ts` is the obvious
 home; `lib/` already exists for `analytics.ts`.
+
+---
+
+## `dialogZoom` is down to one consumer
+
+Retiring `ObjectRemovalModal` (its mask painter moved onto the canvas) left
+`dialogZoom` in `app/src/lib/animations.ts` with exactly one caller,
+`UploadDialog`. That file's own comment says a variant used once is
+indirection rather than a single source of truth — so by its own rule the
+variant should now be inlined, or kept only because a second dialog is
+expected back.
+
+**Left alone deliberately.** The variant exists because the two dialogs had
+already drifted (`scale: 0.95` vs `0.96`) and nobody could see it; deleting the
+record of that is how it comes back. It is also out of scope for the session
+that removed the modal — a one-line animation change in an unrelated feature is
+exactly the "clean up while I'm here" edit the rules forbid.
+
+**Do it when** a modal primitive consolidation happens anyway — the three-modal
+convergence onto `ui/dialog` already tracked above is the natural moment.

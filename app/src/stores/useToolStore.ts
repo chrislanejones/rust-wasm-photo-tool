@@ -12,6 +12,7 @@ import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
 import { resolveSet, validated, validatedNumberInRange, type SetArg } from "./_shared";
 import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
+import type { MaskPoint, MaskStroke } from "@/lib/objectRemovalMask";
 import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
@@ -196,6 +197,32 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
+  /** AI › Object Removal is painting its mask ON the canvas right now.
+   *
+   *  This replaced a portal-mounted popup that painted on its own private
+   *  copy of the frame. The three fields below are what the popup used to
+   *  hold in local `useState`; they live here because the paint surface
+   *  (`features/canvas/ObjectRemovalOverlay`) and the controls that drive it
+   *  (`features/tools/settings/AISettings`) are in different subtrees, and a
+   *  store action is the only sanctioned way across (no new CustomEvents).
+   *
+   *  DELIBERATELY NOT PERSISTED — `partialize` below is an allowlist and all
+   *  three are kept out of it, same as `activeSubTool` and `selectionMask`.
+   *  So: no IndexedDB schema change, no version bump, and the
+   *  `dexie-migration` gate is not triggered. A half-painted mask surviving a
+   *  reload would also point at whatever image happened to load next. */
+  objectRemovalMasking: boolean;
+  /** The painted strokes, in IMAGE-space pixels (see `lib/objectRemovalMask`).
+   *  Image space, not screen space, is what makes the uploaded mask land in
+   *  register at any zoom. */
+  objectRemovalStrokes: MaskStroke[];
+  /** Mask brush diameter in IMAGE pixels. Same range and default the popup's
+   *  slider had (8–120, 40). */
+  objectRemovalBrush: number;
+  /** The inpaint job is in flight. The paint stays on screen over the object
+   *  being removed, but the overlay stops taking the pointer — a stroke added
+   *  now could not reach the model that is already running on the mask. */
+  objectRemovalBusy: boolean;
   stampSettings: StampSettings;
   toolSettings: ToolSettings;
 
@@ -225,6 +252,19 @@ export interface ToolState {
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
+   *  the mask describes one object on one image, so carrying it into the next
+   *  visit to the panel could only ever remove the wrong thing. */
+  setObjectRemovalMasking: (v: SetArg<boolean>) => void;
+  setObjectRemovalBrush: (v: SetArg<number>) => void;
+  setObjectRemovalBusy: (v: SetArg<boolean>) => void;
+  /** Pointer down — opens a stroke at `p` with the current brush size. */
+  beginObjectRemovalStroke: (p: MaskPoint) => void;
+  /** Pointer move — appends to the open stroke. A no-op when none is open. */
+  extendObjectRemovalStroke: (p: MaskPoint) => void;
+  /** Drop the most recent stroke (the popup had Clear only). */
+  undoObjectRemovalStroke: () => void;
+  clearObjectRemovalStrokes: () => void;
   setExportFormat: (v: SetArg<ExportFormat>) => void;
   setQuality: (v: SetArg<number>) => void;
   setStampSettings: (v: SetArg<StampSettings>) => void;
@@ -266,6 +306,10 @@ export const useToolStore = create<ToolState>()(
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
+      objectRemovalMasking: false,
+      objectRemovalStrokes: [],
+      objectRemovalBrush: 40,
+      objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
 
@@ -321,6 +365,48 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setObjectRemovalMasking: (v) =>
+        set((s) => {
+          const next = resolveSet(v, s.objectRemovalMasking);
+          // Leaving clears. Entering clears too, so the panel never opens onto
+          // paint left over from a mask that was cancelled or already sent.
+          // Busy is a property of the mode, so it goes with it — otherwise a
+          // job that ended by leaving the mode would leave the next mask
+          // un-paintable.
+          return {
+            objectRemovalMasking: next,
+            objectRemovalStrokes: [],
+            objectRemovalBusy: false,
+          };
+        }),
+      setObjectRemovalBrush: (v) =>
+        set((s) => ({ objectRemovalBrush: resolveSet(v, s.objectRemovalBrush) })),
+      setObjectRemovalBusy: (v) =>
+        set((s) => ({ objectRemovalBusy: resolveSet(v, s.objectRemovalBusy) })),
+      beginObjectRemovalStroke: (p) =>
+        set((s) => ({
+          objectRemovalStrokes: [
+            ...s.objectRemovalStrokes,
+            { size: s.objectRemovalBrush, points: [p] },
+          ],
+        })),
+      extendObjectRemovalStroke: (p) =>
+        set((s) => {
+          const open = s.objectRemovalStrokes[s.objectRemovalStrokes.length - 1];
+          if (!open) return {};
+          // New array + new stroke object: the overlay re-renders off identity,
+          // and mutating in place would paint nothing until the next unrelated
+          // state change.
+          return {
+            objectRemovalStrokes: [
+              ...s.objectRemovalStrokes.slice(0, -1),
+              { ...open, points: [...open.points, p] },
+            ],
+          };
+        }),
+      undoObjectRemovalStroke: () =>
+        set((s) => ({ objectRemovalStrokes: s.objectRemovalStrokes.slice(0, -1) })),
+      clearObjectRemovalStrokes: () => set({ objectRemovalStrokes: [] }),
       setExportFormat: (v) =>
         set((s) => ({ exportFormat: resolveSet(v, s.exportFormat) })),
       setQuality: (v) => set((s) => ({ quality: resolveSet(v, s.quality) })),
