@@ -31,11 +31,25 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
  *    SmallDialog look): narrow, extra-rounded, centered text, card surface.
  *  - `default` — the standard editor dialog (max-w-lg).
  *  - `xl` — the large editor sheet (Settings, Diagnostics; the old Modal
- *    width): ≤760px wide, consumers add their own height/flex classes. */
+ *    width): ≤760px wide, consumers add their own height/flex classes.
+ *  - `sheet` — a bottom sheet, edge to edge, for the PHONE surface. Same
+ *    dialog: same overlay, same focus trap, same Escape. Only the anchor moves,
+ *    from the center of the viewport to the bottom edge, so the controls land
+ *    in the thumb's reach instead of under it. It lives here rather than as a
+ *    class incantation at the call site because the base string above already
+ *    pins `left/top/translate/max-w/rounded`, and overriding five positioning
+ *    utilities from outside is exactly the drift `ui/dialog` is converging to
+ *    prevent. Column FLEX rather than the base's grid, so a consumer that caps
+ *    the sheet's height can hand the leftover room to one scrolling child
+ *    (`min-h-0 flex-1`); grid's auto rows size to content and simply overflow a
+ *    max-height instead of shrinking. Consumers set that cap — the content
+ *    decides how tall a sheet should be. */
 const dialogContentSizes = {
   sm: "block max-w-xs rounded-2xl bg-card p-6 text-center shadow-panel",
   default: "",
   xl: "max-w-[760px]",
+  sheet:
+    "bottom-0 left-0 top-auto flex max-w-none translate-x-0 translate-y-0 flex-col rounded-b-none rounded-t-2xl",
 } as const
 
 interface DialogContentProps

@@ -85,6 +85,13 @@ interface UIState {
    *  Transient — never persisted. */
   settingsOpen: boolean;
   settingsTab: SettingsTab;
+  /** Mobile settings sheet (MobileShell's gear). A SEPARATE flag from
+   *  `settingsOpen` on purpose: that one drives the desktop Settings modal —
+   *  760px of tab rail plus ten panes — and dialogs portal ABOVE `--z-mobile`,
+   *  so reusing it at phone width would drop that modal on top of MobileShell
+   *  rather than opening the phone surface. One flag per surface.
+   *  Transient — never persisted (same class as every other dialog flag). */
+  mobileSettingsOpen: boolean;
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -131,6 +138,7 @@ interface UIState {
   openSettings: (tab?: SettingsTab) => void;
   closeSettings: () => void;
   setSettingsTab: (v: SettingsTab) => void;
+  setMobileSettingsOpen: (v: SetArg<boolean>) => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -173,6 +181,7 @@ export const useUIStore = create<UIState>()(
       commandUsage: {},
       settingsOpen: false,
       settingsTab: "general",
+      mobileSettingsOpen: false,
 
       booting: true,
       firstRun: true,
@@ -227,6 +236,8 @@ export const useUIStore = create<UIState>()(
       // where you were, and the route stays stable across an open/close/open.
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsTab: (v) => set({ settingsTab: v }),
+      setMobileSettingsOpen: (v) =>
+        set((s) => ({ mobileSettingsOpen: resolveSet(v, s.mobileSettingsOpen) })),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
