@@ -26,7 +26,12 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## DECISION NEEDED — shape rotation takes the engine 4,146 B over the sentinel ceiling (2026-09-18)
+## RESOLVED — shape rotation takes the engine 4,146 B over the sentinel ceiling (2026-09-18)
+
+> **DECIDED 2026-09-18 (Chris): raise `MAX_WASM` 860,000 → 880,000**, the 09-16
+> pattern — attributable, reviewed growth. ~15,850 B of headroom, still under
+> one embedded TTF (61,972 B). Landed in `scripts/deploy-sentinel.sh` with the
+> reason beside the number.
 
 Branch `feat/shapes-triangle-rotate`. Not a bug; a number Chris set.
 
