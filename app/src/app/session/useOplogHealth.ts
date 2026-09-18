@@ -65,10 +65,18 @@ export function useOplogHealth(
         const broken = await tool.oplog_is_broken!();
         if (cancelled || !broken) return;
         warnedFor.current = activePhotoId;
-        toast("Undo history is shallower now", {
+        // Plain words on purpose. "The fast log" and "full snapshots" are
+        // engine internals, and the reader does not have them — what they need
+        // is what changed and what it costs. The five things that land here
+        // (reorder a shape, a layer-structure change, a snapshot restore, and
+        // either direction of an out-of-sync op-log undo) have no single name
+        // a reader would recognise, so this says what undo does now rather
+        // than naming the trigger.
+        toast("Fewer undo steps from here", {
           description:
-            "That edit isn't one the fast log records, so undo falls back to " +
-            "full snapshots — fewer steps on a large photo.",
+            "Undo can no longer record that kind of change as a small step, " +
+            "so it now keeps a whole copy of the image for each step. On a " +
+            "large photo that can mean a few steps rather than hundreds.",
         });
       } catch {
         // A build without the op log answers nothing. Stay quiet.
