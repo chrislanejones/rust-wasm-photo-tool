@@ -11,7 +11,7 @@
 //! The ops are constructed the way the Stage-4 recorder records them:
 //! - Stroke: the down point + each `paint_move` point (stabilizer off ⇒ the
 //!   painted polyline IS the input polyline).
-//! - Blur: every dab centre, including `effect_move`'s interpolated ones
+//! - Blur: every dab center, including `effect_move`'s interpolated ones
 //!   (recomputed here with the same formula `effect_move` uses; the live
 //!   recorder hooks `apply_effect_dab` itself, so it can't drift).
 //! - Text: the exact parameter set passed to `add_text_annotation`.
@@ -1310,4 +1310,75 @@ fn oplog_undo_restores_export_quality_too() {
 
     assert!(t.redo());
     assert_eq!(t.export_quality(), 40, "redo restores it as well");
+}
+
+// ── Levels: the live tool against `Op::Levels` ─────────────────────────────
+
+/// The live Levels tool and the op it records produce the same pixels. They
+/// share one LUT function, so this pins the part that could still differ: which
+/// pixels each one walks and what it leaves alone.
+#[test]
+fn levels_replay_matches_live_levels_apply() {
+    let (mut t, px) = seeded_tool(64, 64);
+    assert!(t.levels_apply(24, 210, 1.35));
+    t.recomposite();
+
+    let mut doc = seeded_doc(&px, 64, 64);
+    apply(
+        &Op::Levels(crate::ops::LevelsParams {
+            black: 24,
+            white: 210,
+            gamma: 1.35,
+        }),
+        &mut doc,
+    );
+
+    assert_flat_identical(&t.composite_cache, &doc.composite_flat(), 64, "levels");
+}
+
+/// Levels is the first tonal adjustment that RECORDS instead of breaking the
+/// log (ADR-052's six adjustments all break it). A preview must record nothing;
+/// the commit records exactly one op; op-log undo and redo are byte-exact.
+///
+/// ⚠️ ENGINE-LEVEL ONLY. This drives the engine directly. In the running app,
+/// undo of ANY recorded op — a plain paint stroke too — currently falls back to
+/// snapshot undo and breaks the log, because something in the app's flush path
+/// (never run here) desyncs it. So green here does NOT mean Levels keeps undo
+/// depth for users yet. See docs/PARKING_LOT.md and ADR-054.
+#[test]
+fn levels_records_one_op_and_oplog_undo_restores_it() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+
+    assert!(t.tonal_preview_begin());
+    t.levels_preview_set(10, 240, 0.9);
+    t.levels_preview_set(30, 220, 1.3);
+    assert!(t.levels_apply(30, 220, 1.3));
+    let h1 = composite_hash(&mut t);
+    assert_ne!(h0, h1);
+
+    assert_eq!(
+        t.oplog_op_count(),
+        1,
+        "the preview recorded nothing; apply recorded one"
+    );
+    assert!(t.oplog_active());
+    assert!(
+        !t.oplog_is_broken(),
+        "recording Levels leaves the engine's log healthy (engine-level; see the note above)"
+    );
+
+    assert!(t.undo());
+    assert_eq!(
+        composite_hash(&mut t),
+        h0,
+        "op-log undo restores the original"
+    );
+    assert!(t.redo());
+    assert_eq!(
+        composite_hash(&mut t),
+        h1,
+        "op-log redo restores the levels"
+    );
 }

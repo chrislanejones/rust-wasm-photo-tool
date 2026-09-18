@@ -15,7 +15,7 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 | `layers` | per-image layer rows |
 | `annotations` | shapes / text / pins attached to an image |
 | `history` | persisted undo history |
-| `recent_texts` | the text tool's reuse list — each string with the font family / size / weight / colour it was last used at |
+| `recent_texts` | the text tool's reuse list — each string with the font family / size / weight / color it was last used at |
 | `user_colors` | the global "+" palette — one row per saved swatch, newest first, capped at 32. Anonymous users keep the same list in localStorage; this is where it lives once they sign in |
 | `photo_edits` | per-photo canvas archive: canvas dimensions plus a `_storage` id — the bytes live in Convex file storage, not in the row. What makes a signed-in user's edit state survive across devices |
 | `shares` | share-link tokens and their expiry |

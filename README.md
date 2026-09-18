@@ -1,8 +1,8 @@
 # Image Horse
 
-![Image Horse](public/IH-Hero-Image-August-2026.webp)
+![Image Horse](public/IH-Hero-Image-September-2026.webp)
 
-**Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
+**Live:** [imagehorse.app](https://imagehorse.app/) &nbsp;·&nbsp; **Editor:** [edit.imagehorse.app](https://edit.imagehorse.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 
 A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** with **Zustand** state stores for the UI, and **Convex** for optional cloud persistence. Edits run locally in WebAssembly and your originals + edits live in the browser's **IndexedDB** — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **batch editor** that works across a whole gallery in one pass — stamp a logo, apply text, bulk-rename by pattern, or name every photo from what is actually in it with a local describer that needs no account and no per-image cost.
 
@@ -36,6 +36,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
 - **[OpenRaster (.ora)](docs/OpenRaster-Export-Import.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
+- **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and the in-progress move of the editor off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
@@ -62,7 +63,7 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 
 ## The marketing site
 
-`marketing/` — the five-page site at **[image-horse.vercel.app](https://image-horse.vercel.app/)**:
+`marketing/` — the five-page site at **[imagehorse.app](https://imagehorse.app/)**:
 home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
 plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
 Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what
@@ -84,59 +85,44 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.75 — 2026-09-11
+### v8.79 — 2026-09-16
 
-**Shapes duplicate in any direction, the Stroke Stabilizer steadies every
-brush, and the lists stop disagreeing with each other.**
+**Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop.**
 
-Pick a rectangle or a circle out of Review → Reselect and press the d-pad on
-its row: four ⊕ appear around the shape on the canvas. Press one and you get
-another copy of the same size, clear of the original, in that direction. Press
-the left one twice and you get two marching left. Each side counts on its own,
-so a press upward afterwards goes above the original rather than above the
-last copy — which is what you want when you are building a diagram out of
-repeated boxes.
+Point Perspective at a square, a circle, a line, an arrow, a pin, a pen path or
+a piece of text and the warp happens to *that object*, not to the photo
+underneath it. Text was the only thing that worked that way before; everything
+else fell through to the pixel warp, so a square you had just drawn sat still
+while the picture under it moved. The warped object stays an object — recolor
+it, move it, drag it to a new size, undo it, or re-select it and adjust the same
+corners. Apply, Reset and Cancel sit on the canvas under the box now, and Esc
+takes the whole frame away.
 
-Any placed text or shape can also be duplicated straight from its row. The
-copy is made inside the engine by cloning the object rather than rebuilding it
-from a list of properties, so nothing about it can be quietly left behind — a
-shadow, a rotation, a background, a perspective warp all come with it.
+Enhance has a Presets tile. One click applies a whole look, and hovering one
+previews it on your own photo before you commit. A preset is a named stack of
+adjustments the app already had, so applying it is a single undo step. The Quick
+Adjust grid it grew out of is gone, and Adjustments is sliders only.
 
-The Stroke Stabilizer used to reach only the Paint brush. It now steadies the
-Eraser, the blur brush, pixelate, redact and the clone stamp, from the one
-setting — turn it on because your hand shakes and it is on everywhere. The
-Eraser had in fact been honouring it all along; there was simply no control in
-the panel to switch it on. On the clone stamp the source offset is kept
-exactly, so the smoothing changes the path and nothing else.
+Every dialog has the same backdrop. Export, Settings, the Command Palette,
+Diagnostics and Shortcuts had none at all while the New dialog had one, and the
+rest had drifted to four different shades. The New dialog also opens without its
+stutter — the backdrop used to re-blur the whole screen on every frame of the
+animation.
 
-History, Reselect and the Layers list are one component now instead of three
-that had drifted apart. Row buttons sit together in one cluster, the coloured
-dots are gone in favour of the numbers that were already beside them, and
-Reselect rows are numbered too. History and Reselect keep their buttons out of
-sight until you hover or tab into a row; the Layers list keeps its visible,
-because those get used constantly and the eye is reporting a state, not just
-offering an action.
+The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Color Picker
+and Remove Object are one shape instead of four. In Rulers & Grid, clicking a
+lit toggle now turns it off, where before clicking it again did nothing.
 
-The gallery bar's header is three columns — the count on the left, the
-compress buttons centred, the actions on the right — and the compress pair is
-centred on the bar rather than on the space left over, so it stops shifting
-when a selection appears.
+The Levels histogram is tall enough to read.
 
-The "+" on any colour swatch opens a real colour picker — a hue wheel or a
-saturation/brightness rectangle, with hex, RGB and HSL fields that all track
-each other. Colours you keep land in a palette that follows you: saved locally
-when you are logged out, synced to your account when you are signed in.
+The New dialog has a switch. Off, which is the default, everything stays in your
+browser. On adds Create AI Image, which sends your prompt to a server. It is
+named for what it does rather than for AI, because it is where anything that
+leaves your tab will live.
 
-Smaller things: dropping an image with nothing open goes straight to the
-gallery instead of asking a question with one possible answer; the status
-bar's second number is labelled; the Eraser panel says "Eraser" rather than
-"Brush" above a field called Brush Size; and the mobile version can save a
-photo to your device, which the notice now says.
+The site and the editor both run Google Analytics now.
 
-Known and open: on a freshly imported photo the status bar reports the
-document size, which includes the canvas border, and a resize to an exact
-width applies that width to the document rather than the picture. Export of an
-untouched photo is correct.
+The tab icon on imagehorse.app is the horse.
 
 ## License
 

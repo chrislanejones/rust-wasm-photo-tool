@@ -39,6 +39,15 @@ interface UIState {
   showTopBar: boolean;
   masterTab: MasterTab;
   showTools: boolean;
+  /** The New dialog's "does this leave the tab" switch. OFF (default) keeps
+   *  the marketing promise — nothing leaves the tab — by hiding the tiles whose
+   *  job is to send data to a server. ON adds `Create AI Image` to the grid.
+   *  A remembered choice, so it persists like masterTab.
+   *
+   *  Named for the AXIS, not for AI: this is a persisted key, so the name had
+   *  to be right before it shipped. AI is the first thing behind it, not the
+   *  only candidate — index.html's Google Fonts are the other live example. */
+  onlineFeaturesEnabled: boolean;
   showGallery: boolean;
   showHistory: boolean;
   /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
@@ -76,6 +85,13 @@ interface UIState {
    *  Transient — never persisted. */
   settingsOpen: boolean;
   settingsTab: SettingsTab;
+  /** Mobile settings sheet (MobileShell's gear). A SEPARATE flag from
+   *  `settingsOpen` on purpose: that one drives the desktop Settings modal —
+   *  760px of tab rail plus ten panes — and dialogs portal ABOVE `--z-mobile`,
+   *  so reusing it at phone width would drop that modal on top of MobileShell
+   *  rather than opening the phone surface. One flag per surface.
+   *  Transient — never persisted (same class as every other dialog flag). */
+  mobileSettingsOpen: boolean;
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -87,7 +103,7 @@ interface UIState {
   // A/B compare: the "before" original blob URL, whether the slider is on, and
   // where the divider sits (0..1). The handle position lives here rather than in
   // CompareSlider's own useState so it survives a CanvasArea remount and so the
-  // "reset to centre when compare closes" rule has ONE home — the setter below —
+  // "reset to center when compare closes" rule has ONE home — the setter below —
   // instead of being re-implemented by every caller that turns compare off.
   originalUrl: string | null;
   compareActive: boolean;
@@ -103,6 +119,7 @@ interface UIState {
   setShowTopBar: (v: SetArg<boolean>) => void;
   setMasterTab: (v: SetArg<MasterTab>) => void;
   setShowTools: (v: SetArg<boolean>) => void;
+  setOnlineFeaturesEnabled: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
   setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
@@ -121,6 +138,7 @@ interface UIState {
   openSettings: (tab?: SettingsTab) => void;
   closeSettings: () => void;
   setSettingsTab: (v: SettingsTab) => void;
+  setMobileSettingsOpen: (v: SetArg<boolean>) => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -146,6 +164,7 @@ export const useUIStore = create<UIState>()(
       showTopBar: false,
       masterTab: "tools",
       showTools: false,
+      onlineFeaturesEnabled: false,
       showGallery: false,
       showHistory: false,
       mobileNoticeDismissed: false,
@@ -162,6 +181,7 @@ export const useUIStore = create<UIState>()(
       commandUsage: {},
       settingsOpen: false,
       settingsTab: "general",
+      mobileSettingsOpen: false,
 
       booting: true,
       firstRun: true,
@@ -179,6 +199,8 @@ export const useUIStore = create<UIState>()(
       setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
       setMasterTab: (v) => set((s) => ({ masterTab: resolveSet(v, s.masterTab) })),
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
+      setOnlineFeaturesEnabled: (v) =>
+        set((s) => ({ onlineFeaturesEnabled: resolveSet(v, s.onlineFeaturesEnabled) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
       setMobileNoticeDismissed: (v) =>
@@ -214,6 +236,8 @@ export const useUIStore = create<UIState>()(
       // where you were, and the route stays stable across an open/close/open.
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsTab: (v) => set({ settingsTab: v }),
+      setMobileSettingsOpen: (v) =>
+        set((s) => ({ mobileSettingsOpen: resolveSet(v, s.mobileSettingsOpen) })),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
@@ -250,7 +274,7 @@ export const useUIStore = create<UIState>()(
       setCompareActive: (v) =>
         set((s) => {
           const next = resolveSet(v, s.compareActive);
-          // Turning compare OFF re-centres the divider, so the next open starts
+          // Turning compare OFF re-centers the divider, so the next open starts
           // from the middle instead of wherever it was abandoned.
           return next
             ? { compareActive: true }
@@ -284,6 +308,8 @@ export const useUIStore = create<UIState>()(
         // same class as masterTab. The palette OPEN flag stays transient.
         recentCommands: s.recentCommands,
         commandUsage: s.commandUsage,
+        // The AI switch is a remembered choice, same class as masterTab.
+        onlineFeaturesEnabled: s.onlineFeaturesEnabled,
       }),
       // Same hydration guard as useToolStore: runs every rehydrate, not just
       // on a version bump. masterTab is checked against its current union;
@@ -302,6 +328,10 @@ export const useUIStore = create<UIState>()(
           commandUsage: p.commandUsage
             ? validatedNumberRecord(p.commandUsage)
             : current.commandUsage,
+          onlineFeaturesEnabled:
+            typeof p.onlineFeaturesEnabled === "boolean"
+              ? p.onlineFeaturesEnabled
+              : current.onlineFeaturesEnabled,
         };
       },
     },

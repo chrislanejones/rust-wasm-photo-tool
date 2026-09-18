@@ -33,7 +33,7 @@ text" actually demands of the storage format.
 
 **Ship one four-corner quad with three drag rules, surfaced as three group
 sub-tools; resample pixels in Rust; and store a text annotation's corners as
-NORMALISED fractions on the annotation itself rather than baking them into its
+NORMALIZED fractions on the annotation itself rather than baking them into its
 tile.**
 
 Four parts, each chosen against a specific alternative.
@@ -72,7 +72,7 @@ come from?", which normally means solving src→dst and inverting a 3×3 — ins
 the solver is handed the correspondences the other way round, so there is one
 solve, no matrix inverse and no second source of numerical error.
 
-**4. Text corners are stored NORMALISED (0..1) on the annotation, and the warp
+**4. Text corners are stored NORMALIZED (0..1) on the annotation, and the warp
 is the last stage of the tile pipeline.** This is what makes the tool vector
 rather than a raster effect, and it is the decision with the longest tail.
 
@@ -96,7 +96,7 @@ key paths are unchanged, ADR-031's precedent.
 `wrap_width` and `box_height` both get away with `#[serde(skip)]` because their
 skipped default (`0`) *is* their meaning ("size the box to the text"). An
 all-zero QUAD is a collapsed point, not "no perspective" — the identity is.
-`decode_op` therefore normalises `TextAdd`/`TextEdit` on the way in. Without
+`decode_op` therefore normalizes `TextAdd`/`TextEdit` on the way in. Without
 that step `oplog_sync_annotations` diffs a decoded all-zero quad against the
 engine's identity, finds them unequal on EVERY sync, and appends a fresh
 `Op::TextPerspective` each time: an op log that grows forever while the user
@@ -114,9 +114,9 @@ through the worker — and the feature did nothing. The effect now keys on a
 primitive string, and that is load-bearing.
 
 The second: once a warp is applied, the annotation's reported bounds are the
-bounding box of the WARPED tile, while the stored corners are normalised
+bounding box of the WARPED tile, while the stored corners are normalized
 against the UNWARPED one. Denormalising onto the live bounds draws the handles
-in the wrong place and — worse — a second Apply re-normalises against the
+in the wrong place and — worse — a second Apply re-normalizes against the
 warped box and COMPOUNDS the transform, shearing further on every visit with no
 way back. No engine round trip is needed to fix it: the warped bbox *is* the
 bounding box of the stored quad, so the unwarped rect falls out of the two.
@@ -127,7 +127,7 @@ a fully collapsed quad read as convex; the pixel path survived only because the
 solver refused the singular system a moment later — after the caller had
 already pushed a history step for a warp that never happened. The check is now
 scale-free (the cross product is divided by both edge lengths, making it
-`sin θ`), so one threshold serves a normalised quad in 0..1 and an absolute one
+`sin θ`), so one threshold serves a normalized quad in 0..1 and an absolute one
 spanning thousands of pixels.
 
 **One resampler, called by both the engine and replay.**
@@ -168,8 +168,8 @@ Reachable later as a fourth rule over the same quad.
 **Storing a 3×3 matrix instead of four corners.** Equivalent information, worse
 ergonomics: the overlay would have to invert it to place handles, the op log
 would carry nine floats instead of eight, and a matrix has no natural
-normalised form, so it would re-acquire exactly the rebuild-drift problem
-normalised corners solve.
+normalized form, so it would re-acquire exactly the rebuild-drift problem
+normalized corners solve.
 
 **A `showModeRow` in-panel mode row.** See decision 1 — it works, and it
 disagrees with every other multi-mode tool about where sub-modes live.

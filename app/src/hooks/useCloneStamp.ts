@@ -111,6 +111,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustShadows,
     adjustHighlights,
     adjustSharpen,
+    levels,
+    presets,
   } = useTransforms(engine);
 
   // ── Mouse / stroke handlers ───────────────────────────────────────────────
@@ -302,6 +304,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustShadows,
     adjustHighlights,
     adjustSharpen,
+    levels,
+    presets,
     // Layers
     addLayer,
     removeLayer,

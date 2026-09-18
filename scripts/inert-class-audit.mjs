@@ -10,10 +10,10 @@
 // references across five files, one of them an input that had silently had no
 // fill for weeks.
 //
-// A colour utility is the dangerous kind. A missing SPACING utility is obvious
-// the moment you look at the page; a missing COLOUR utility inherits something
+// A color utility is the dangerous kind. A missing SPACING utility is obvious
+// the moment you look at the page; a missing COLOR utility inherits something
 // plausible in one theme and reads as a deliberate choice in the other. That is
-// why this only checks colour-carrying prefixes.
+// why this only checks color-carrying prefixes.
 //
 // ⚠️ NOT WIRED INTO CI, deliberately. It needs a production build to read the
 // emitted CSS, which `guardrails.sh` (a fast grep ratchet) is not allowed to
@@ -35,7 +35,7 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const SRC = join(ROOT, "app/src");
 const ASSETS = join(ROOT, "www-dist/assets");
 
-// Colour-carrying utilities only. See the header for why.
+// Color-carrying utilities only. See the header for why.
 const PREFIXES = new Set([
   "bg", "text", "border", "ring", "fill", "stroke", "outline",
   "decoration", "placeholder", "caret", "accent", "shadow",
@@ -50,6 +50,15 @@ const ALLOW = new Map([
   ["ring-vs-box", "prose — a comment contrasting ring hit-testing with box hit-testing"],
   ["text-annotations-changed", "a window CustomEvent name (CLAUDE.md Stage 3 is removing it)"],
   ["text-to-image", "prose — the job type the AI dialog does not have yet"],
+  // The switch thumb writes this ONLY as `data-[state=unchecked]:bg-text-secondary`.
+  // That variant IS emitted — `.data-\[state\=unchecked\]\:bg-text-secondary{
+  // background-color:var(--text-secondary)}` is in the built sheet — but CANDIDATE's
+  // character set stops at `[`, so the matcher is handed the bare tail and looks for a
+  // bare `.bg-text-secondary` rule that correctly does not exist. Widening CANDIDATE to
+  // cover `data-[…]` was tried and traded this for the same half-capture on
+  // command.tsx's `[&_[cmdk-group-heading]]:` classes, so the character set stays as the
+  // header describes and this one class is named here instead.
+  ["bg-text-secondary", "emitted only behind a data-[state] variant the matcher cannot capture whole"],
 ]);
 
 function sourceFiles(dir) {
@@ -110,7 +119,7 @@ console.log(`scanned ${files.length} source files`);
 console.log(`colour-utility candidates: ${seen.size}  ·  allowlisted: ${ALLOW.size}`);
 
 if (!inert.length) {
-  console.log("\nNo inert colour utilities. TOTAL: 0");
+  console.log("\nNo inert color utilities. TOTAL: 0");
   process.exit(0);
 }
 

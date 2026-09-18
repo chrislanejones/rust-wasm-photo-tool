@@ -22,7 +22,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** Screen px from the shape's edge to the centre of each ⊕. Kept small on
+/** Screen px from the shape's edge to the center of each ⊕. Kept small on
  *  purpose — the brief was "smaller and closer to the rectangle" than the
  *  mock, so the pad reads as part of the shape, not furniture around it. */
 const PUSH_PX = 16;
@@ -118,9 +118,9 @@ export function DuplicatePadOverlay({
             e.stopPropagation();
             onDuplicate(dir);
           }}
-          // Opacity is a core utility, so it always emits. The colour comes
+          // Opacity is a core utility, so it always emits. The color comes
           // from the theme CSS variable directly rather than a generated
-          // colour utility, which can silently emit no rule at all when its
+          // color utility, which can silently emit no rule at all when its
           // token does not exist (see CLAUDE.md on inert classes).
           className="opacity-60 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
           style={{
@@ -134,7 +134,7 @@ export function DuplicatePadOverlay({
             borderRadius: "9999px",
             border: "none",
             // Near-black, NOT the theme accent. These sit on top of the user's
-            // photo, and an accent-coloured disc competes with the image and
+            // photo, and an accent-colored disc competes with the image and
             // with the shape's own stroke; a dark neutral disc reads as a
             // control without claiming to be part of the picture.
             background: "#111",
@@ -149,7 +149,7 @@ export function DuplicatePadOverlay({
         >
           {/* A real icon, not a "+" glyph: the text plus rendered at whatever
               weight and baseline the host font happened to give it, so it sat
-              visibly off-centre in the disc. */}
+              visibly off-center in the disc. */}
           <Plus size={12} strokeWidth={2.5} aria-hidden="true" />
         </button>
       ))}

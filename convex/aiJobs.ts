@@ -6,17 +6,93 @@ import {
 } from "./_generated/server";
 import { getUserId, requireUser } from "./users";
 
-// ── Per-tier daily job caps (rate limiting via users.dailyUsage) ───────────
-// free can't reach here (UI + startJob both gate on tier), but keep it 0 so a
-// stale client can't sneak a job through.
+/* ── Per-tier AI job caps ──────────────────────────────────────────────────
+ *
+ * ⚠️ THIS IS THE ONE PLACE THE NUMBERS LIVE. The settings pane reads them back
+ * through the `usage` query below rather than keeping its own copy — a second
+ * copy of a limit is how the pricing page ended up advertising "unlimited AI
+ * passes" against a 50-a-day cap.
+ *
+ * TWO WINDOWS, because they do different jobs:
+ *
+ *   daily    stops a burst. One user cannot empty the month in an afternoon.
+ *   monthly  bounds what the plan COSTS. A daily cap alone does not: 50 a day
+ *            is 1,500 a month, and every one is a Replicate invoice against a
+ *            $10 subscription. The monthly number is the margin.
+ *
+ * The monthly figures are set so the daily cap is the one a normal user meets
+ * and the monthly cap is the one only an outlier does. Pro at 300 is ten a day
+ * every day, or the full 50 on six separate days — comfortably more than the
+ * usage these tools actually see, and far below the 1,500 the daily cap alone
+ * would have allowed.
+ *
+ * free can't reach here (UI + startJob both gate on tier), but keep it 0 so a
+ * stale client can't sneak a job through. */
 const TIER_DAILY_CAP: Record<string, number> = {
   free: 0,
   pro: 50,
   team: 200,
 };
+const TIER_MONTHLY_CAP: Record<string, number> = {
+  free: 0,
+  pro: 300,
+  team: 1500,
+};
 const ONE_DAY_MS = 86_400_000;
+const ONE_MONTH_MS = 30 * ONE_DAY_MS;
+
+/** Usage in a rolling window, with the window rolled forward if it is stale.
+ *
+ *  Rolling, not calendar: a calendar month needs a timezone to be meaningful
+ *  and this backend has no opinion about the user's. Thirty days from first
+ *  use is a window every reader can check against their own clock. */
+function windowUsage(used: number | undefined, resetAt: number | undefined, span: number, now: number) {
+  const started = resetAt ?? now;
+  const expired = now - started > span;
+  return {
+    used: expired ? 0 : (used ?? 0),
+    resetAt: expired ? now : started,
+    expired,
+    /** When this window next empties. */
+    resetsAt: (expired ? now : started) + span,
+  };
+}
 
 // ── Client-facing queries (UI subscribes to these) ─────────────────────────
+
+/** What Settings → AI Usage draws.
+ *
+ *  Returns the caps as well as the counts, so the pane never hardcodes a
+ *  number. Returns `null` rather than throwing when signed out: the pane is
+ *  reachable in demo mode, and a query that throws there would take the
+ *  settings dialog down with it. */
+export const usage = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const now = Date.now();
+    const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
+    const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
+
+    return {
+      tier: user.tier,
+      daily: {
+        used: day.used,
+        cap: TIER_DAILY_CAP[user.tier] ?? 0,
+        resetsAt: day.resetsAt,
+      },
+      monthly: {
+        used: month.used,
+        cap: TIER_MONTHLY_CAP[user.tier] ?? 0,
+        resetsAt: month.resetsAt,
+      },
+    };
+  },
+});
 
 /** Single job by id, with a signed output URL once the webhook has written
  *  the result. Returns null if the job isn't the caller's. */
@@ -82,17 +158,28 @@ export const startJob = internalMutation({
       throw new Error("AI tools require a paid plan");
     }
 
-    // Roll the daily window forward if it's stale, mirroring incrementUsage.
+    // Roll both windows forward if they're stale, mirroring incrementUsage.
     const now = Date.now();
-    const windowExpired = now - user.usageResetAt > ONE_DAY_MS;
-    const usedToday = windowExpired ? 0 : user.dailyUsage;
-    if (usedToday >= cap) {
+    const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
+    const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
+
+    if (day.used >= cap) {
       throw new Error(`Daily AI limit reached (${cap}/day on ${user.tier})`);
     }
+    const monthCap = TIER_MONTHLY_CAP[user.tier] ?? 0;
+    if (month.used >= monthCap) {
+      throw new Error(
+        `Monthly AI limit reached (${monthCap}/month on ${user.tier})`,
+      );
+    }
 
+    // Both counters move in the same patch as the insert's transaction, so a
+    // job can never be created without being counted.
     await ctx.db.patch(user._id, {
-      dailyUsage: usedToday + 1,
-      usageResetAt: windowExpired ? now : user.usageResetAt,
+      dailyUsage: day.used + 1,
+      usageResetAt: day.resetAt,
+      monthlyUsage: month.used + 1,
+      monthResetAt: month.resetAt,
       updatedAt: now,
     });
 

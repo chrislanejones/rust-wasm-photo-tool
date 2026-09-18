@@ -33,6 +33,7 @@
 // store tracks the active one. See docs/toolbar-migration-map.md § Design note.
 import type { ToolType } from "@/lib/types";
 import {
+  Aperture,
   ArrowUpRight,
   Bot,
   Brush,
@@ -70,6 +71,7 @@ import {
   SwatchBook,
   Type,
   BroomSparkles,
+  Sparkles,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -80,7 +82,7 @@ export type ToolGroupId = "enhance" | "select" | "create" | "edit" | "batch";
  *
  *  Deliberately a tiny closed set rather than a general "run this side effect"
  *  escape hatch — every field here is a control the user could click by hand
- *  today, so activating the sub-tool stays behaviour-preserving rather than
+ *  today, so activating the sub-tool stays behavior-preserving rather than
  *  becoming a second, privileged way to drive the app. */
 export interface SubToolPreselect {
   /** Edit › Color Picker. Exactly what the panel's existing toggle sets. */
@@ -198,7 +200,7 @@ const enhanceGroup: ToolGroupDefinition = {
       icon: FileArchive,
       tool: "compress",
       keywords: [
-        "compress", "file size", "quality", "shrink", "optimise",
+        "compress", "file size", "quality", "shrink", "optimize",
         "resize", "dimensions", "scale", "pixels", "width", "height",
       ],
     },
@@ -208,9 +210,44 @@ const enhanceGroup: ToolGroupDefinition = {
       description: "Brightness, contrast, saturation, shadows and sharpen",
       icon: SunDim,
       tool: "effects",
+      // Adjustments and Levels share the `effects` tool id, so each carries a
+      // mode — it is what selects the panel (toolModes.ts MODE_ACCESS).
+      mode: "adjust",
       keywords: [
         "brightness", "contrast", "saturation", "shadows", "highlights",
         "sharpen", "effects", "adjust",
+      ],
+    },
+    {
+      // Its own tile because it is a different job: set the black and white
+      // points and the midtones against the histogram, with the photo updating
+      // as you drag. It also records into the op log as `Op::Levels`, which the
+      // Adjustments sliders do not (ADR-052).
+      id: "levels",
+      label: "Levels",
+      description: "Set the black point, white point and midtones, with a live preview",
+      icon: Aperture,
+      tool: "effects",
+      mode: "levels",
+      keywords: [
+        "levels", "black point", "white point", "midtones", "gamma",
+        "histogram", "tones", "exposure",
+      ],
+    },
+    {
+      // Its own tile because it is a different job again: one click for a whole
+      // look, rather than five sliders. Each preset is a named stack of the
+      // Adjustments filters (src/presets.rs) and commits as ONE undo step —
+      // the four-button Quick Adjust grid inside Adjustments cost two.
+      id: "presets",
+      label: "Presets",
+      description: "One-click color looks, previewed on your photo before you commit",
+      icon: Sparkles,
+      tool: "effects",
+      mode: "presets",
+      keywords: [
+        "presets", "looks", "filters", "vivid", "fade", "warm", "cool",
+        "one click", "color", "color", "style",
       ],
     },
     {
@@ -237,18 +274,18 @@ const enhanceGroup: ToolGroupDefinition = {
 // ── Select ───────────────────────────────────────────────────────────────────
 // The existing six, unchanged — already one exclusive set (`SelectionKind`,
 // collapsed onto one axis in v7.47 / ADR-022). A straight re-parent: zero
-// behaviour change, zero new state.
+// behavior change, zero new state.
 const selectGroup: ToolGroupDefinition = {
   id: "select",
   label: "Select",
   icon: SquareMousePointer,
-  description: "Wand, edge-aware, lasso, colour range or marquee",
+  description: "Wand, edge-aware, lasso, color range or marquee",
   shortcutKey: "2",
   subTools: [
     {
       id: "magic-wand",
       label: "Magic Wand",
-      description: "Flood-fill a region within a colour tolerance",
+      description: "Flood-fill a region within a color tolerance",
       icon: Wand2,
       tool: "select",
       mode: "wand",
@@ -278,12 +315,12 @@ const selectGroup: ToolGroupDefinition = {
     {
       id: "color-range",
       label: "Color Range",
-      description: "Every pixel near the clicked colour, anywhere in the image",
+      description: "Every pixel near the clicked color, anywhere in the image",
       icon: SwatchBook,
       tool: "select",
       mode: "colorRange",
       cursor: "crosshair",
-      keywords: ["colour range", "color range", "similar", "hue", "sample"],
+      keywords: ["color range", "color range", "similar", "hue", "sample"],
     },
     {
       id: "rectangle",
@@ -410,7 +447,7 @@ const createGroup: ToolGroupDefinition = {
       icon: ScanText,
       tool: "text",
       mode: "ocr",
-      keywords: ["ocr", "read text", "extract", "scan", "recognise"],
+      keywords: ["ocr", "read text", "extract", "scan", "recognize"],
       // Replicate-backed too — `useAIJob`'s "ocr" job. Easy to miss, because
       // it lives under Create with the drawing tools rather than next to AI.
       tier: "pro",
@@ -427,7 +464,7 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["shape", "rectangle", "circle", "box", "hand-drawn"],
     },
     {
-      // `shapesMode: "pens"` is labelled "Pens" in toolModes.ts but carries a
+      // `shapesMode: "pens"` is labeled "Pens" in toolModes.ts but carries a
       // MapPin icon and drives PIN_LABELS (Numbers / Letters) — it is the
       // pin-drop feature, not the Bézier pen. The brief separates the two
       // correctly; the stale label is what made them look like one thing.
@@ -484,7 +521,7 @@ const editGroup: ToolGroupDefinition = {
   id: "edit",
   label: "Edit",
   icon: SquarePen,
-  description: "Crop, transform, pick colours, and size the layer or canvas",
+  description: "Crop, transform, pick colors, and size the layer or canvas",
   shortcutKey: "4",
   subTools: [
     {
@@ -574,12 +611,12 @@ const editGroup: ToolGroupDefinition = {
       // an existing state rather than a new activation path.
       id: "color-picker",
       label: "Color Picker",
-      description: "Eyedropper — sample a pixel into the brush and text colour",
+      description: "Eyedropper — sample a pixel into the brush and text color",
       icon: Pipette,
       tool: "crop",
       preselect: { colorPicker: true },
       cursor: "crosshair",
-      keywords: ["colour picker", "color picker", "eyedropper", "sample", "pick"],
+      keywords: ["color picker", "color picker", "eyedropper", "sample", "pick"],
     },
     {
       // Label went "Resize Layer" -> "Layers" in v8.38 when the panel grew

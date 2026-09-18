@@ -5,7 +5,7 @@ Date: 2026-08-28   Status: draft
 ## Context
 
 The first non-destructive layer STYLE enters the engine: Photoshop's Color
-Overlay, a solid colour tinting a layer's own pixels. A style needs four
+Overlay, a solid color tinting a layer's own pixels. A style needs four
 things decided at once — where it lives, where in the composite it applies,
 when it snaps history, and what happens on every path that flattens pixels by
 hand. Each fails silently; the worst is `composite_layers_into`'s fast path,
@@ -41,7 +41,7 @@ UI: Layers panel, directly under Layer Mask (the same kind of thing), reusing
   with them the op log's view of the document, stay exactly as they were.
 + 7 engine tests (178 lib total) + `e2e/color-overlay.spec.ts`; wasm
   812,652 → **815,801 B** local (+3,149, inside ADR-037's 780–850k band).
-- **One undo removes the whole overlay**, intermediate colour choices
+- **One undo removes the whole overlay**, intermediate color choices
   included — the cost of the single snap.
 - **A reload silently drops the style** (as it already drops the mask) until
   the shared persistence migration lands.

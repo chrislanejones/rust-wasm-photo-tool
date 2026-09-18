@@ -1,6 +1,6 @@
 /* Image Horse — the marketing site.
  *
- * One stylesheet for all five pages. Plain CSS, no framework: every colour,
+ * One stylesheet for all five pages. Plain CSS, no framework: every color,
  * size, and duration is a token from tokens.css, and nothing here reaches for
  * a raw value. If you need a value that isn't a token, add the token.
  *
@@ -180,7 +180,7 @@ a { color: inherit; }
    ideal; the bar is at its 720px ceiling, so the affordance compresses to its
    keycap — the shortcut IS the icon.
    
-   Its colour is the same token as the GitHub and Codeberg marks — but text at
+   Its color is the same token as the GitHub and Codeberg marks — but text at
    13px is thin, anti-aliased strokes, while those are solid filled shapes, so
    the identical value still reads lighter. The weight closes the gap; the hue
    never needed to move. */
@@ -429,7 +429,7 @@ a { color: inherit; }
  * but the RENDERING was not: an animating transform promotes the bar to its own
  * compositor layer, which is rasterized at the element's layout size — one
  * pixel wide — and then stretched by the GPU. A stretched 1px texture is a
- * smear, so the bar arrived soft and unevenly lit while it travelled and only
+ * smear, so the bar arrived soft and unevenly lit while it traveled and only
  * snapped crisp once the animation settled and Chrome re-rastered.
  *
  * The bar is out of flow (`position: absolute`), so animating its width lays
@@ -541,7 +541,7 @@ a { color: inherit; }
 .hero__shot {
   margin: 0;
   width: 100%;
-  max-width: var(--page-max);   /* never wider than the column that centres it */
+  max-width: var(--page-max);   /* never wider than the column that centers it */
   box-shadow: var(--shadow-float);
 }
 .hero__shot img {
@@ -577,6 +577,188 @@ a { color: inherit; }
   line-height: var(--leading-tight);
   max-width: 18ch;
 }
+
+/* ── the time machine: one frame, scrubbed ────────────────── */
+
+/* Every shot in the run is stacked in the SAME box, and the box's aspect ratio
+ * is fixed by the hero's own capture — so scrubbing swaps pixels and never
+ * geometry. That is the whole CLS story: the frames are absolutely positioned,
+ * take no part in layout, and `contain` letterboxes the older captures (which
+ * are not all 2048×1219) against the frame's own paper instead of resizing the
+ * page around them. Nothing below the hero moves, at any stop, ever.
+ */
+.shot-stack {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2048 / 1219;
+  background: var(--color-paper-2);
+}
+.shot-stack__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  /* A crossfade, not a cut — but only the opacity animates, so the compositor
+     does the whole thing and the scrub stays at frame rate while dragging. */
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.shot-stack__frame[data-current] { opacity: 1; }
+
+/* The frame and its rail are one unit, at the frame's own measure. */
+.shot-run {
+  display: grid;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: var(--page-max);
+}
+
+.timeline {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* Rail on the left, the stop's own label on the right. The label is the reason
+   the slider is legible at all: a bare track would be scrubbing through
+   anonymous pictures. */
+.timeline__scrub {
+  display: grid;
+  /* The label's column is a FIXED width, not `auto`. Sized to content it grew
+     and shrank with the date in it ("2 Sep 2025" is two characters short of
+     "18 Mar 2026"), and every character of that came off the rail beside it —
+     a track that changes length while you drag it. */
+  grid-template-columns: minmax(0, 1fr) 11.5rem;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.timeline__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.timeline__now {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;   /* the stamp hangs off the right edge of its column */
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.timeline__stamp {
+  font-family: var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+.timeline__count { color: var(--color-ink-3); font-size: var(--text-xs); }
+
+/* Every caption in one cell: the block is as tall as the longest of them at
+   whatever width the reader is on, so scrubbing never moves the page below. */
+.timeline__caption {
+  display: grid;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+.timeline__line {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  visibility: hidden;
+}
+.timeline__line[data-current] { visibility: visible; }
+.timeline__source {
+  color: var(--color-ink-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.timeline__source:hover { color: var(--color-accent); }
+
+/* ── slider (shadcn / Base UI anatomy) ────────────────────── */
+
+.slider {
+  display: block;
+  width: 100%;
+  touch-action: none;   /* the drag is ours; the page must not pan under it */
+}
+
+/* The hit area is deliberately taller than the track — 44px of press target
+   around a 6px line, which is the difference between a control you can use on
+   a phone and one you can only look at. */
+.slider__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  cursor: pointer;
+}
+
+.slider__track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-4);
+  overflow: clip;   /* keeps the indicator's square end inside the pill */
+}
+
+.slider__indicator {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+/* One mark per release in the run. They are a picture of how many stops there
+   are, not targets — the control above takes every pointer. */
+.slider__ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+.slider__tick {
+  width: 2px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-ink) 28%, transparent);
+}
+.slider__tick[data-passed] {
+  background: color-mix(in oklch, var(--color-accent-ink) 55%, transparent);
+}
+
+.slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  translate: -50% -50%;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-accent);
+  background: var(--color-paper);
+  cursor: grab;
+  transition: box-shadow var(--dur-micro) var(--ease-out);
+}
+.slider__thumb:hover {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-accent) 18%, transparent);
+}
+.slider__thumb:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.slider__control:active .slider__thumb { cursor: grabbing; }
 
 /* ── rules ────────────────────────────────────────────────── */
 
@@ -727,12 +909,256 @@ a { color: inherit; }
 /* on a solid panel the hairline frame is enough — no cast shadow (it would read
    as a card floating inside a card) */
 .editor__shot { margin: 0; width: 100%; }
-.editor__shot img {
+
+/* ── about: one row per person ────────────────────────────────────────────
+   The same two-column shape as .editor, alternating sides so the page has a
+   rhythm rather than a left rail of portraits. `.person--flip` swaps the order
+   via grid placement, NOT `direction: rtl` or a reversed source order: the
+   reading order has to stay name-then-bio for a screen reader and for anyone
+   tabbing, and only the visual columns should move.
+
+   Collapses at 60rem, the breakpoint the rest of this stylesheet already uses.
+   On one column the portrait goes first for everybody, because an alternating
+   stack reads as a mistake once the columns are gone. */
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+  padding-inline: var(--page-gutter);
+  padding-block-end: var(--space-2xl);
+}
+
+.person {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+/* ⚠️ THE COLUMN SIZES HAVE TO SWAP WITH THE CONTENT, not just the placement.
+   Moving the portrait to column 2 while the track sizes stay
+   `20rem 1fr` puts it in the WIDE column and squeezes the prose into the
+   narrow one — Naji's row rendered with a portrait four times the size of
+   Chris's and "Info coming soon" in a 20rem gutter. The portrait track is
+   20rem on whichever side it lands. */
+.person--flip { grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); }
+.person--flip .person__shot { grid-column: 2; grid-row: 1; }
+.person--flip .person__text { grid-column: 1; grid-row: 1; }
+
+.person__shot { margin: 0; }
+
+.person__shot img {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 832 / 859;
+  border-radius: var(--radius-md);
 }
+
+.person__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: var(--measure);
+}
+
+.person__name {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  margin: 0;
+}
+
+/* The role sits under the name and is the only thing on the page set in the
+   mono face — it is a label, not a sentence, and the face is how the site
+   already marks that difference (.postcard__date, .spec captions). */
+.person__role {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0;
+}
+
+/* :not() excludes the role — `.person__text p` (0,1,1) would otherwise beat
+   `.person__role` (0,1,0) on specificity and repaint the accent line as body
+   ink. It measured 10.03:1 instead of the accent's value, which passes
+   contrast and so would never have been caught by a gate; it was only visible
+   as a gray line where an amber one was specified. */
+.person__text p:not(.person__role) { color: var(--color-ink-2); margin: 0; }
+
+.person__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person__links a {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.person__links a:hover { color: var(--color-accent); }
+
+@media (max-width: 60rem) {
+  .person { grid-template-columns: 1fr; gap: var(--space-lg); }
+  /* Undo the flip: with one column an alternating order is just inconsistent. */
+  .person--flip .person__shot,
+  .person--flip .person__text { grid-column: 1; grid-row: auto; }
+  .person__shot { max-width: 20rem; }
+}
+
+/* ── the button set ───────────────────────────────────────────────────────
+   Twelve of the editor's tools, as real buttons with their names on. Replaced
+   an 832x859 WebP on 09-16 as eight icon-only tiles; the names came the next
+   day, and Download left with them. The aspect-ratio rule that reserved space
+   for the image went with it, because this grid has an intrinsic height and
+   needs no placeholder.
+
+   The three states mirror the app's own tool tile rather than approximating
+   it: idle is a muted surface on a plain border, hover lifts the ink, and
+   pressed takes the accent on all three of border, tint and glyph. The app
+   writes those as Tailwind utilities against the same design tokens this site
+   uses, so the values agree without sharing a stylesheet.
+
+   Four columns. The number is repeated in ButtonSet.tsx as COLS, because the
+   arrow keys walk the grid by it — change one, change both. */
+.buttonset {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.buttonset__btn {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: var(--space-xs);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--color-rule) 25%, transparent);
+  /* ink-2, not ink-3. The icon-only tile could sit at ink-3 because a glyph
+     needs 3:1; an 11px name needs 4.5:1, and ink-3 on this surface measures
+     3.8. One color for glyph and name, so they never read as two things. */
+  color: var(--color-ink-2);
+  cursor: pointer;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-micro) var(--ease-out);
+}
+
+.buttonset__btn:hover {
+  color: var(--color-ink);
+  background: color-mix(in oklch, var(--color-rule) 40%, transparent);
+}
+
+/* The ring is on `aria-pressed`, not on a class, so the thing a screen reader
+   is told and the thing a sighted reader sees cannot drift apart — there is
+   one source for "this one is selected" and both readings come from it. */
+.buttonset__btn[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-accent) 45%, transparent);
+}
+
+/* Keyboard focus. This site has no global :focus-visible rule — every
+   component declares its own against --color-focus (.skip, .nav-pill__mark,
+   .seg) — so omitting it here does not fall back to something sensible: it
+   falls back to the UA default, which measured as a 1px rgb(16,16,16) outline
+   on this near-black surface. Invisible, on a control that is only reachable
+   by keyboard for some readers.
+
+   outline-offset is positive, unlike .seg's -2px: that one sits inside a group
+   with overflow clipping and these are free-standing tiles, so the ring can
+   breathe outside the border where it is easiest to see. */
+.buttonset__btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Held down. A press that only changes state on release feels like a picture
+   of a button, which is what this used to be. */
+.buttonset__btn:active { transform: translateY(1px); }
+
+/* Glyph over name, the editor's own tile silhouette.
+   `width: 100%` is load-bearing and not decoration: the icon below is sized as
+   a percentage, and a percentage resolves against THIS box. Left to shrink-to-
+   fit, the face is only as wide as the word under it, so the glyph came out
+   at 9px — a third of the label rather than a third of the tile. Measured, in
+   the browser, before the fix. */
+.buttonset__face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+/* A share of the tile, not a fixed size, so the glyph scales with the column
+   from a 26rem desktop rail down to four-up on a phone. Smaller than the app's
+   own 55%, because those tiles carry no word underneath. */
+.buttonset__icon {
+  width: 40%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.buttonset__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform-origin: 50% 50%;
+}
+
+/* The press. The name lands like a stamp — it arrives large and faint and
+   settles into place — and the glyph dips under it as if it took the weight.
+   Both run once, on the tile that was just pressed, and are re-triggered by a
+   remount in ButtonSet.tsx rather than a class flip so a second press on the
+   same tile plays them again. */
+@keyframes buttonset-land {
+  0%   { transform: scale(1.4); opacity: 0.35; }
+  55%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes buttonset-dip {
+  0%   { transform: scale(0.86) translateY(2px); }
+  55%  { transform: scale(1.06) translateY(-1px); }
+  100% { transform: none; }
+}
+
+.buttonset__face.is-pop .buttonset__label {
+  animation: buttonset-land var(--dur-long) var(--ease-out) both;
+}
+
+.buttonset__face.is-pop .buttonset__icon {
+  animation: buttonset-dip var(--dur-long) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buttonset__btn { transition: none; }
+  .buttonset__btn:active { transform: none; }
+  .buttonset__face.is-pop .buttonset__label,
+  .buttonset__face.is-pop .buttonset__icon { animation: none; }
+}
+
 .editor__text {
   display: flex;
   flex-direction: column;
@@ -749,6 +1175,120 @@ a { color: inherit; }
 }
 
 .editor__lede { max-width: 52ch; }
+
+/* ── the GPU row ──────────────────────────────────────────────
+   Two columns like .editor, but on the page's own ground rather than the
+   lifted surface: this section is a claim about hardware, not a part of the
+   product tour, and the rhythm break reads better without a second panel
+   immediately after .editor's.
+
+   Collapses at 60rem, the breakpoint the rest of this stylesheet uses. The
+   letters go BELOW the words on one column — they are the illustration, and an
+   illustration above its own heading reads as a banner. */
+.gpu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-2xl);
+  align-items: center;
+  padding: var(--space-3xl) var(--page-gutter);
+}
+
+.gpu__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.gpu .lede { max-width: 52ch; }
+
+/* The honest half. Smaller and cooler than the lede on purpose — it is the
+   qualification, and a qualification set at the same weight as the claim reads
+   as though the page is arguing with itself. */
+.gpu__caveat {
+  max-width: 52ch;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+  padding-inline-start: var(--space-md);
+  border-inline-start: var(--rule-hair) solid var(--color-rule);
+}
+
+/* Breathes, because it is an invitation and a static line of mono type next to
+   a toy does not read as one. Motion-safe: the animation is only declared
+   inside the no-preference query, so reduced-motion gets the line at full
+   opacity with nothing to opt out of. */
+.gpu__hint {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  color: var(--color-ink-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes gpu-hint {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  .gpu__hint { animation: gpu-hint 3.2s var(--ease-in-out) infinite; }
+}
+
+/* ── the cube letters ─────────────────────────────────────────
+   A 16:9 box that owns its own canvas. `touch-action: none` is load-bearing on
+   a phone: without it the first drag scrolls the page instead of pushing the
+   cubes, and the toy looks broken rather than absent.
+
+   Focusable, because the whole interaction is pointer-driven and a keyboard
+   user would otherwise have no way in. The focus ring is the site's own token;
+   there is no global :focus-visible rule here, so omitting it falls back to the
+   UA default, which measured invisible on this surface. */
+.cubes {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-width: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.cubes:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.cubes__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Both labels sit ON the canvas box and must never eat a pointer event — the
+   whole surface is the control. */
+.cubes__backend,
+.cubes__count {
+  position: absolute;
+  bottom: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.cubes__backend {
+  left: 0;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+.cubes__count {
+  right: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
 
 /* ── close / CTA ──────────────────────────────────────────── */
 
@@ -829,10 +1369,18 @@ a { color: inherit; }
 
 /* ── statement footer ────────────────────────────────────── */
 
+/* The footer is the last row on every page, and it sits on the same lifted
+   panel as .editor and .notes rather than on the ground with a hairline alone:
+   the hairline (--color-rule on --color-paper) measures 1.37:1, and a 1px line
+   at that contrast is the boundary a reader with dyslexia loses first. A plate
+   is an area, not a line, and reads at far lower contrast. Every page's final
+   section (.close, .why, .principle, .fx, .log, .page-head) is on the ground,
+   so the plate is a real edge on all nine pages — no home-only scoping. */
 .foot-stmt {
   display: grid;
   gap: var(--space-lg);
   padding: var(--space-2xl) var(--page-gutter) var(--space-xl);
+  background: var(--color-paper-2);
   border-block-start: var(--rule-hair) solid var(--color-rule);
 }
 
@@ -860,7 +1408,7 @@ a { color: inherit; }
   font-size: var(--text-sm);
 }
 
-/* the closing mark — same size, voice and behaviour as the nav's */
+/* the closing mark — same size, voice and behavior as the nav's */
 .foot-stmt__mark {
   display: inline-flex;
   align-items: center;
@@ -946,6 +1494,41 @@ a { color: inherit; }
   max-width: 18ch;
 }
 
+/* ── 404 ───────────────────────────────────────────────────────
+ * Shares .page-head above, so a wrong URL lands with its heading at exactly the
+ * same height as a right one — the page should read as part of the site, not as
+ * the server falling over. Only the link list below it is new.
+ */
+
+.notfound__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-lg);
+  list-style: none;
+  padding: 0 var(--page-gutter) var(--space-3xl);
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.notfound__links a {
+  color: var(--color-ink-2);
+  text-decoration: none;
+  padding: var(--space-2xs) 0;
+  border-bottom: 1px solid var(--color-rule-strong);
+  transition: color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+}
+
+.notfound__links a:hover {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.notfound__links a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
 /* ── mobile collapse — burger + sheet ──────────────────────────
  * The links are now real pages, not same-page anchors: hiding them on mobile
  * with no replacement would strand every sub-page. So below the breakpoint
@@ -991,6 +1574,52 @@ a { color: inherit; }
   border-radius: var(--radius-md);
 }
 .nav-sheet[hidden] { display: none; }
+
+/* The sheet arrives instead of appearing. `hidden` is a binary and cannot be
+   transitioned, so the animation runs on the element when it mounts — there is
+   no exit half, which is correct here: a menu that lingers on the way out is a
+   menu that is still covering what you just tapped. */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-sheet:not([hidden]) {
+    animation: nav-sheet-in var(--dur-short) var(--ease-out) both;
+  }
+}
+
+@keyframes nav-sheet-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The primary action, given the weight it has everywhere else on the site.
+   Full width because it is the only thing in this sheet that leaves it, and a
+   48px target rather than the 44px the links use — it is the one control here
+   somebody is reaching for in a hurry. */
+/* ⚠️ `.nav-sheet .nav-sheet__cta`, not `.nav-sheet__cta`. The sibling rule
+   `.nav-sheet a` is (0,1,1) — a class plus an element — and beats a lone class
+   at (0,1,0), so a bare selector here silently inherited the links' 44px and
+   the 48px below never applied. Measured at 44px before this. Same trap as
+   `.person__role` on /about. */
+.nav-sheet .nav-sheet__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: var(--space-2xs) var(--space-xs) 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Beats `.nav-sheet a:hover`, which would otherwise repaint the fill as the
+   sheet's own hover surface and drop the label to body ink. */
+.nav-sheet .nav-sheet__cta:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  filter: brightness(1.08);
+}
 
 .nav-sheet a {
   display: flex;
@@ -1146,15 +1775,6 @@ a { color: inherit; }
 .day[data-level="4"] { background: var(--color-grid-4); }
 .day--pad { background: transparent; }
 
-.graph__year {
-  padding-block-end: var(--space-sm);
-  font-family: var(--font-outlier);
-  font-size: var(--text-sm);
-  letter-spacing: 0.12em;
-  color: var(--color-ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Month name and count are STACKED, never inline: "Jul 34" side by side reads
  * as July 34th — a date — on a page whose every other number is a date. */
 .month__label {
@@ -1183,6 +1803,84 @@ a { color: inherit; }
 
 /* text-only segments don't need the squares' generous block padding */
 .seg--month { padding: var(--space-md) var(--space-lg); }
+
+/* ── the month picker, chunked by year ────────────────────────
+   One flat strip worked while the log was eight months long inside a single
+   year. It does not scale: a second year turns it into twenty segments that
+   either squeeze past legibility or scroll sideways, and neither answers the
+   question a reader actually has, which is what happened in a given year.
+
+   So a year is a heading, and its months sit four to a row beneath it. The
+   year comes from the data (see `years` in Trail.tsx) — it used to be a
+   hardcoded <p>2026</p>, which would have been quietly wrong every January.
+
+   The months are their own bordered tiles here rather than segments sharing
+   one clipped group, because a grid has no single edge to hang dividers on:
+   `border-inline-start` on every cell draws a stray rule down the left column.
+   Same treatment the home page's tool tiles use, for the same reason. */
+.year { margin-block-start: var(--space-xl); }
+
+.year__label {
+  margin-block-end: var(--space-sm);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-3);
+}
+
+.year__months {
+  display: grid;
+  /* Four to a row, as asked. `minmax(0, 1fr)` and not `1fr`: a bare 1fr uses
+     min-content as its floor, and the widest label would push the row past the
+     page on a phone instead of shrinking. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+/* Inside the grid each month is a free-standing tile: its own border and
+   radius, and none of the shared-edge machinery the old strip needed. */
+.year__months .seg {
+  flex: initial;
+  justify-content: center;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.year__months .seg:hover { border-color: var(--color-rule-strong); }
+
+.year__months .seg[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  /* The strip drew selection as an inset bar along a shared bottom edge. On a
+     tile that bar reads as an underline on one card in a grid, so selection
+     moves to the border — the same channel the tool tiles use. */
+  box-shadow: none;
+}
+
+.year__months .seg:focus-visible { outline-offset: 2px; }
+
+/* All spans every year, so it sits above them and is sized to its content
+   rather than stretched across a row it does not belong to. */
+.seg--reset {
+  align-self: start;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.seg--reset[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  box-shadow: none;
+}
+
+/* Two to a row on a phone. Four 3-letter labels with a count under each fit at
+   375px, but only just, and the count is the part that would clip. */
+@media (max-width: 30rem) {
+  .year__months { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
 
 /* the "what runs where" filter — the same group, icon over label like the
    Architecture tiers, so all three filters on the site read as one component */
@@ -1213,7 +1911,7 @@ a { color: inherit; }
 }
 .legend__scale { display: flex; gap: 3px; }
 
-/* the All reset — same behaviour the month pills had */
+/* the All reset — same behavior the month pills had */
 .reset {
   display: inline-flex;
   align-items: center;
@@ -1565,7 +2263,7 @@ a { color: inherit; }
   gap: var(--space-md);
   padding-block-start: var(--space-sm);
 }
-/* The icon and its label share a centred line box, so an 18px glyph beside
+/* The icon and its label share a centered line box, so an 18px glyph beside
    16px text doesn't make one button taller than its neighbour */
 .why__actions .cta { align-items: center; line-height: 1; }
 
@@ -1578,7 +2276,7 @@ a { color: inherit; }
 .seg--tier {
   gap: var(--space-xs);
   padding: var(--space-md) var(--space-lg);
-  justify-content: center;   /* icon + label centre as a pair */
+  justify-content: center;   /* icon + label center as a pair */
 }
 .seg__icon {
   display: block;
@@ -1828,7 +2526,7 @@ a { color: inherit; }
 }
 .ach__grid .month__col { gap: 5px; }
 /* Bigger than the legend's 11px squares on purpose: in the card the graph is
-   the evidence the counts summarise, not a key. A month is ~5 columns, so it
+   the evidence the counts summarize, not a key. A month is ~5 columns, so it
    can afford the size; the All card's 20 columns scroll if they must. */
 .ach__grid .day { width: 20px; height: 20px; border-radius: 4px; }
 
@@ -2051,6 +2749,848 @@ a { color: inherit; }
   text-align: center;
 }
 
+/* ── the blog ──────────────────────────────────────────────────────────────
+ * Two surfaces, and they share a card.
+ *
+ *   .postlist / .postcard   the index (/blog) and the three-post teaser on the
+ *                           home page — the SAME card at both sizes, because
+ *                           they are the same object and a bespoke home-page
+ *                           variant is two things to keep in step for nothing.
+ *   .post-head / .post      one article.
+ *
+ * The card is laid out on the Trail Log's grid — a dated meta column, then the
+ * writing. Not reuse for its own sake: /trail-log and /blog answer the same
+ * question in two registers, and a reader who has scanned one should not have
+ * to learn a second layout to scan the other.
+ */
+
+.postlist { padding: 0 var(--page-gutter) var(--space-3xl); }
+
+.postlist__count {
+  padding-block-end: var(--space-md);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.postlist__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.postcard {
+  display: grid;
+  /* Same two tracks as .release. minmax(0, …) on both, never a bare 1fr: the
+     right-hand track holds a headline that can carry a long unbroken token, and
+     a bare 1fr refuses to shrink below its content and pushes the page wide. */
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  gap: var(--space-md) var(--space-xl);
+  padding-block: var(--space-xl);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+}
+.postcard:first-child { border-block-start: 0; }
+
+.postcard__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--space-2xs);
+}
+
+.postcard__date {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.postcard__version {
+  font-family: var(--font-outlier);   /* outlier slot: a version is a figure */
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.postcard__latest {
+  margin-block-start: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: var(--rule-hair) solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--color-accent);
+}
+
+.postcard__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  /* A headline is the one place a long unbroken token is likely, and at this
+     size one is enough to push a phone sideways. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+  margin-block-end: var(--space-sm);
+}
+
+/* The whole heading is the target, so there is no "Read more" underneath it
+   giving one destination two links. The underline is drawn at rest rather than
+   only on hover — color alone is not an affordance, and a heading that is
+   sometimes a link and sometimes not is exactly where that matters. */
+.postcard__title a {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+  text-decoration-color: var(--color-rule-strong);
+  transition:
+    color var(--dur-short) var(--ease-out),
+    text-decoration-color var(--dur-short) var(--ease-out);
+}
+.postcard__title a:hover {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
+}
+.postcard__title a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.postcard__deck {
+  color: var(--color-ink-2);
+  max-width: 68ch;
+  line-height: var(--leading-body);
+}
+
+.postcard__tags { margin-block-start: var(--space-md); }
+
+/* ── the home-page teaser ─────────────────────────────────── */
+
+/* The same lifted panel as .editor, so the tail of the page alternates
+   ground / panel / ground / panel and every row boundary is a surface edge.
+   Measured before this (09-17, 1280px and 390px): the pixels either side of
+   gpu→notes and notes→close were identical, with 183–192px of bare paper
+   between one row's content and the next's — no boundary at all. .gpu stays
+   on the ground between the two panels on purpose (its own comment says why,
+   and --color-ink-3 on paper-2 is 4.46:1, under AA for the caveat). The three
+   surface declarations mirror .editor's; keep them in step. Bottom padding is
+   the panel's 2xl, not the ground row's 3xl, so the plate is the same object
+   as the editor's. */
+.notes {
+  background: var(--color-paper-2);
+  border-block: var(--rule-hair) solid var(--color-rule);
+  padding: 0 var(--page-gutter) var(--space-2xl);
+}
+/* Tighter than a top-level section head: this one is a signpost inside a long
+   page, not the start of a new argument. */
+.notes .head-hang { padding-block: var(--space-2xl) var(--space-lg); }
+
+.notes__more { padding-block-start: var(--space-lg); }
+.notes__more a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.notes__more a:hover { text-decoration: underline; }
+.notes__more a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ── one article ──────────────────────────────────────────── */
+
+.post-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  /* Same clearance expression as .hero and .page-head, so an article's headline
+     starts at the height every other page's does. */
+  padding: calc(var(--banner-height) + var(--space-2xl)) var(--page-gutter) var(--space-xl);
+  /* clip, never hidden: `hidden` on an ancestor silently turns every
+     scroll-into-view on the page into a scroll of THIS box. */
+  overflow: clip;
+}
+
+/* The warm cast behind the headline. Two offset radial stops rather than one,
+   so it reads as light falling across the corner instead of a circle sitting
+   behind the text — and mixed down hard, because this sits under body copy and
+   a bloom you can name is a bloom that is too strong. */
+.post-head__bloom {
+  position: absolute;
+  z-index: 0;
+  inset-block-start: -40%;
+  inset-inline-start: -10%;
+  inline-size: 85%;
+  block-size: 150%;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      55% 50% at 30% 40%,
+      color-mix(in oklch, var(--color-bloom-1) 20%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 45% at 78% 18%,
+      color-mix(in oklch, var(--color-bloom-2) 16%, transparent),
+      transparent 70%
+    );
+  filter: blur(50px);
+}
+
+/* The bloom is a sibling of the text, not a parent, so the text has to be
+   lifted over it explicitly — a z-index:-1 on the bloom would put it behind
+   the page background instead. */
+.post-head__up,
+.post-head__title,
+.post-head__deck,
+.post-head__meta {
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.post-head__up { font-size: var(--text-sm); }
+.post-head__up a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  /* A real link to the index, not a history step — this page is reachable from
+     a search result, where there is nothing behind it. */
+  padding-block: var(--space-xs);
+  color: var(--color-ink-2);
+  text-decoration: none;
+}
+.post-head__up a::before {
+  content: "←";
+  color: var(--color-accent);
+}
+.post-head__up a:hover { color: var(--color-ink); }
+.post-head__up a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.post-head__title {
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  /* Headlines here run to two sentences, so the measure is set for three lines
+     of display type rather than the one --page-head allows. */
+  max-width: 22ch;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.post-head__deck {
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  color: var(--color-ink-2);
+  max-width: 52ch;
+}
+
+.post-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.post-head__sep { color: var(--color-rule-strong); }
+.post-head__version {
+  font-family: var(--font-outlier);
+  color: var(--color-accent);
+}
+
+/* ── the body ─────────────────────────────────────────────── */
+
+.post {
+  padding: 0 var(--page-gutter) var(--space-2xl);
+  font-size: var(--text-prose);
+  line-height: var(--leading-prose);
+  color: var(--color-ink-2);
+}
+
+/* The measure is on the text, not on the article: a figure and a table are
+   read by scanning rather than by tracking a line, and holding them to 65
+   characters wastes the width they need. */
+.post > p,
+.post > h2,
+.post > h3,
+.post > ul,
+.post > ol,
+.post > blockquote {
+  max-width: var(--measure);
+}
+
+.post p { margin-block-end: var(--space-lg); }
+.post > :last-child { margin-block-end: 0; }
+
+.post h2 {
+  margin-block: var(--space-2xl) var(--space-md);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  /* Roman, always. An italicised heading is the most reliable tell there is. */
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.post code {
+  font-family: var(--font-outlier);
+  /* em, not a token: this has to track whatever size it is sitting in — body
+     copy, a table cell, or a figure caption — and a fixed rung would be right
+     in exactly one of the three. */
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.post a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in oklch, var(--color-accent) 45%, transparent);
+  transition: text-decoration-color var(--dur-short) var(--ease-out);
+}
+.post a:hover { text-decoration-color: currentColor; }
+.post a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Italic survives here and only here — as emphasis inside running copy. */
+.post em { color: var(--color-ink); }
+.post strong { color: var(--color-ink); font-weight: 700; }
+
+/* The receipts line, between the deck and the argument. */
+.post__sourcenote {
+  margin-block-end: var(--space-2xl);
+  padding-block-end: var(--space-lg);
+  border-block-end: var(--rule-hair) solid var(--color-rule);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+  max-width: var(--measure);
+}
+
+.post__figure { margin: var(--space-xl) 0; }
+
+/* ── quotations ───────────────────────────────────────────────────────────
+   Two jobs, one object. `.post__quote` is someone else's sentence, cited to
+   the file it came from. `--pull` is the post's own, lifted out of a paragraph
+   because it is the line a reader should leave with.
+
+   The rule is on the INLINE-START edge rather than a pair of oversized curly
+   quotes: a quotation mark glyph is decoration that has to be hidden from a
+   screen reader to avoid being read aloud, and the <blockquote> element has
+   already said what this is. The rule says it visually and says nothing twice.
+
+   No italics. The body face is set for long reading and its italic is a
+   different color of ink at this size; a three-line quote in italic is
+   measurably slower to read than the paragraph it interrupts, which is the
+   opposite of what pulling it out was for. */
+.post__quote {
+  margin: var(--space-xl) 0;
+  padding-inline-start: var(--space-lg);
+  border-inline-start: 2px solid var(--color-rule-strong);
+  color: var(--color-ink-2);
+}
+
+.post__quote p {
+  font-size: var(--text-prose);
+  line-height: var(--leading-prose);
+  margin: 0;
+}
+
+.post__quote-cite {
+  display: block;
+  margin-block-start: var(--space-sm);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-style: normal;
+  color: var(--color-ink-3);
+}
+
+.post__quote-cite a { color: inherit; }
+.post__quote-cite a:hover { color: var(--color-accent); }
+
+/* The pull-quote is the post's own voice, so it takes the accent rule and the
+   brighter ink the figures use — it is a signpost, not a citation. Kept at the
+   same measure as the body rather than allowed to bleed into the margin: this
+   column is already narrow enough that a wider quote would be the widest thing
+   on the page and read as a heading. */
+.post__quote--pull {
+  border-inline-start-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.post__quote--pull p { font-size: var(--text-xl); line-height: var(--leading-snug); }
+
+
+.post__caption {
+  margin-block-start: var(--space-md);
+  max-width: var(--measure);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+/* The spec sheet is the site's own table; an article just needs it to breathe,
+   and to be scrollable rather than page-widening on a phone. */
+.post .spec { margin-block: var(--space-xl); }
+.post .spec__caption { margin-block-end: var(--space-md); }
+
+/* ── numbered figure captions ─────────────────────────────────
+   "FIG 1" hangs in its own column rather than running into the sentence, so
+   the eye can find a figure by number without reading the caption. A grid,
+   not a float: the caption text has to stay a single wrapping block, and a
+   float would let the second line slide under the label. */
+.post__caption--numbered {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+  /* Wider than --measure, because it belongs to the figure above it and a
+     caption narrower than what it describes reads as a stray paragraph. */
+  max-width: 62ch;
+}
+
+.post__fignum {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+/* ── the callout ──────────────────────────────────────────────
+   For the one paragraph in a post that a reader skimming the headings must
+   not miss. An <aside> because it is genuinely tangential to the argument —
+   the argument holds whether or not Chrome disagrees with the spec — while
+   still being the thing that wastes someone's afternoon.
+
+   Ink is --color-ink, one step up from body copy. The rule alone was not
+   enough separation at reading distance, and a tinted BACKGROUND would have
+   made it look like the code blocks, which are a different kind of object. */
+.post__callout {
+  margin-block: var(--space-xl);
+  padding: var(--space-lg);
+  max-width: var(--measure);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-inline-start: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+
+.post__callout p { margin-block-end: 0; }
+
+.post__callout-title {
+  margin-block-end: var(--space-sm);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+/* ── code blocks ──────────────────────────────────────────────
+   `.post code` already styles inline code as a tinted chip. That is wrong for
+   a block — a chip behind twelve lines is a box inside a box — so the padding
+   and background are reset off the inner <code> and put on the <pre>.
+
+   Scrolls rather than wraps. Wrapped code puts a line break in a place the
+   language does not have one, and the reader cannot tell which breaks are
+   real. `tab-size` matters because the source uses spaces but a copy-paste
+   into an editor may not. */
+.post__code {
+  margin-block: var(--space-xl);
+  padding: var(--space-lg);
+  max-width: 62ch;
+  overflow-x: auto;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  tab-size: 2;
+  color: var(--color-ink);
+}
+
+.post__code code {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font-size: inherit;
+  color: inherit;
+  /* The block scrolls; the code inside it must not also wrap. */
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+/* Three tokens, not a highlighter. A comment, a keyword and a string are the
+   only distinctions these two snippets need, and hand-marking them beats
+   shipping a syntax-highlighting dependency to colour twenty lines. */
+.post__code .tok-c { color: var(--color-ink-3); font-style: italic; }
+.post__code .tok-k { color: var(--color-accent); }
+.post__code .tok-s { color: var(--color-accent-soft); }
+
+/* ── the log-scale bar chart ──────────────────────────────────
+   Five payloads over sixteen powers of two. Linear would draw the first three
+   rows as nothing, which is the opposite of the point: the small ones are the
+   budgets and the big ones are the pixels that cannot fit inside them.
+
+   Built as a <table> because it IS tabular — label, magnitude, value — so a
+   screen reader gets three cells per row and the numbers in the third are the
+   real content. The bar is aria-hidden decoration.
+
+   Widths are computed in the component from `bytes`. Nothing here hardcodes a
+   percentage; this figure's whole claim is the ratio between the rows, and a
+   hand-typed width is a second copy of the data that stops agreeing. */
+.scale {
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.scale__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+}
+
+.scale__range { font-family: var(--font-outlier); color: var(--color-ink-3); }
+
+.scale__grid { width: 100%; border-collapse: collapse; }
+
+.scale__row > * { padding-block: var(--space-xs); vertical-align: middle; }
+
+.scale__label {
+  /* Left column stays readable at a phone width without squeezing the track
+     to nothing; the bars still carry their value as text on the right. */
+  width: 1%;
+  white-space: nowrap;
+  padding-inline-end: var(--space-md);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-align: start;
+  color: var(--color-ink);
+}
+
+.scale__note {
+  display: block;
+  font-family: var(--font-outlier);
+  font-weight: 400;
+  color: var(--color-ink-3);
+}
+
+/* The dashed rule is the 10 KiB frame budget. Its position comes from the
+   component, via --budget-at, computed by the same function that sizes the
+   bars — it was a literal 20.76% here first, which is the formula's answer
+   copied into a place that cannot recompute it. The fallback keeps the rule
+   somewhere sane if the property never lands. It is drawn on the TRACK rather
+   than across the whole figure so it starts and ends with the axis. */
+.scale__track {
+  position: relative;
+  width: 99%;
+  min-width: 6rem;
+}
+
+.scale__track::before {
+  content: "";
+  position: absolute;
+  inset-block: -2px;
+  inset-inline-start: var(--budget-at, 20.76%);
+  border-inline-start: 1px dashed var(--color-rule-strong);
+}
+
+.scale__bar {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+}
+
+/* Three readings, three treatments. A budget is a reference line and is drawn
+   hollow, because it is not a quantity anyone sends. A payload that fits is
+   solid soft. A payload that does not is the full accent.
+
+   The over/under distinction is carried by the value text too ("810× over"),
+   so it is never colour alone — WCAG 1.4.1. */
+.scale__row--budget .scale__bar {
+  background: none;
+  border: 1px dashed var(--color-rule-strong);
+}
+
+.scale__row--budget .scale__label { color: var(--color-ink-2); }
+
+.scale__row--over .scale__bar { background: var(--color-accent); }
+
+.scale__value {
+  width: 1%;
+  white-space: nowrap;
+  padding-inline-start: var(--space-md);
+  font-size: var(--text-xs);
+  text-align: end;
+}
+
+.scale__over {
+  display: block;
+  font-family: var(--font-outlier);
+  color: var(--color-accent);
+}
+
+.scale__foot {
+  margin-block: var(--space-md) 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* ── the close: actions, sources, kicker ──────────────────────── */
+
+.post__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-block: var(--space-xl);
+  max-width: var(--measure);
+}
+
+/* `.cta` is the site's button and it carries its own underline-free styling;
+   inside `.post` the generic `.post a` rule would put a link underline back
+   through the middle of a filled button. */
+.post__actions a { text-decoration: none; }
+
+.post__sources {
+  max-width: var(--measure);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+.post__kicker {
+  margin-block-start: var(--space-xl);
+  padding-block-start: var(--space-lg);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+  max-width: var(--measure);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+/* ── the thread boundary ──────────────────────────────────────
+ * Two planes and the seam between them, which is the post's whole argument in
+ * one picture: pixels never cross, only calls and replies do. The engine plane
+ * carries the accent because it is the side that moved.
+ */
+
+.boundary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+.boundary__plane {
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  padding: var(--space-lg);
+}
+.boundary__plane--engine {
+  border-color: color-mix(in oklch, var(--color-accent) 45%, var(--color-rule-strong));
+  background: color-mix(in oklch, var(--color-accent) 7%, var(--color-paper-2));
+}
+
+.boundary__name {
+  margin-block-end: var(--space-md);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.boundary__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-ink-2);
+}
+
+.boundary__seam {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding-inline: var(--space-md);
+  min-inline-size: 13rem;
+}
+/* The dashed line the labels sit on. Dashed is semantic here the way it is on
+   the architecture map: it marks a boundary that is crossed by messages, not a
+   wall. */
+.boundary__seam::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  border-inline-start: var(--rule-hair) dashed var(--color-rule-strong);
+}
+
+.boundary__port,
+.boundary__msg {
+  position: relative;
+  /* Each label knocks a hole in the dashed rule rather than sitting over it. */
+  background: var(--color-paper);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  text-align: center;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
+.boundary__port {
+  padding: var(--space-2xs) var(--space-xs);
+  border: var(--rule-hair) solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.boundary__msg {
+  padding-inline: var(--space-2xs);
+  line-height: var(--leading-body);
+  color: var(--color-ink-3);
+}
+
+/* ── what to read next ────────────────────────────────────── */
+
+.post-next {
+  display: grid;
+  /* min() so the track can go narrower than 22rem on a phone instead of
+     overflowing it. */
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-md);
+  padding: 0 var(--page-gutter) var(--space-2xl);
+}
+
+.post-next__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  text-decoration: none;
+  transition:
+    border-color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out);
+}
+.post-next__link:hover {
+  border-color: var(--color-rule-strong);
+  background: var(--color-paper-3);
+}
+.post-next__link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+/* Newer reads right-to-left, the way a "next" control does. */
+.post-next__link--newer { text-align: end; }
+
+.post-next__label {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.post-next__title {
+  color: var(--color-ink);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* ── blog · narrow ────────────────────────────────────────── */
+
+@media (max-width: 60rem) {
+  /* The meta column stops being a column. Date and version read as one line
+     above the headline rather than as a 10rem gutter that has nothing else in
+     it. */
+  .postcard {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding-block: var(--space-lg);
+  }
+  .postcard__meta {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-sm);
+  }
+  .postcard__latest { margin-block-start: 0; }
+  .postcard__title { font-size: var(--text-lg); }
+
+  /* The headline gets the full width — 22ch of display type on a 375px screen
+     is four words a line. */
+  .post-head__title { max-width: none; }
+
+  .post { font-size: var(--text-base); }
+
+  /* The three planes stack, and the seam turns with them: the dashed rule goes
+     horizontal so it still reads as the thing between the two boxes rather
+     than as a stray vertical line beside them. */
+  .boundary { grid-template-columns: minmax(0, 1fr); }
+  .boundary__seam {
+    min-inline-size: 0;
+    padding-inline: 0;
+    padding-block: var(--space-md);
+  }
+  .boundary__seam::before {
+    inset-block: 50% auto;
+    inset-inline: 0;
+    border-inline-start: 0;
+    border-block-start: var(--rule-hair) dashed var(--color-rule-strong);
+  }
+
+  .post-next__link--newer { text-align: start; }
+}
+
 /* ── responsive ───────────────────────────────────────────── */
 
 @media (max-width: 60rem) {
@@ -2132,6 +3672,12 @@ a { color: inherit; }
 
   .editor { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
   .editor__run { font-size: var(--text-lg); }
+
+  /* The stop's label drops under the rail rather than squeezing it: a 375px
+     viewport has no room for both, and the rail is the thing being used. */
+  .timeline__scrub { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+  .timeline__now { justify-content: flex-start; }
+  .timeline__caption { font-size: var(--text-xs); }
 }
 
 /* ── reduced motion ───────────────────────────────────────── */
@@ -2149,6 +3695,8 @@ a { color: inherit; }
     --my: 30%;
   }
   .cta:active { transform: none; }
+  /* The scrub is a state change, not a journey: keep the swap, drop the fade. */
+  .shot-stack__frame { transition: none; }
   /* The glide and the condense are spatial: keep the state change, drop the
      travel. The rule still marks the current page and still lands under what
      you point at — it just doesn't slide there. */

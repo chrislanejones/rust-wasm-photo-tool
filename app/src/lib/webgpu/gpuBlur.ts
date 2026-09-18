@@ -2,7 +2,7 @@
 //
 // CORRECTNESS BEFORE SPEED. This is written to produce byte-identical output to
 // `blurReference.ts` (and therefore to the Rust engine), not to be fast. The
-// obvious optimisations are all deliberately absent:
+// obvious optimizations are all deliberately absent:
 //
 //   • no shared-memory tiling (each invocation re-reads its whole kernel span)
 //   • no f16, no packed math
@@ -49,7 +49,7 @@ fn unpack(px : u32) -> vec4<f32> {
 
 // Round-half-up then clamp to 0..255, matching Rust's
 // \`f32::round().clamp(0.0, 255.0) as u8\` for the non-negative values a
-// normalised kernel can produce. WGSL's round() is round-half-to-EVEN, which
+// normalized kernel can produce. WGSL's round() is round-half-to-EVEN, which
 // disagrees on exact .5 — so floor(x + 0.5) is used instead, on purpose.
 fn pack(c : vec4<f32>) -> u32 {
   let r = clamp(floor(c.x + 0.5), 0.0, 255.0);
@@ -99,7 +99,7 @@ export interface GpuBlurResult {
  * WHY. Acquiring a `GPUDevice` and compiling the shader cost **25.9 ms** of a
  * 44.7 ms call, measured on Intel Xe-LPG — the single largest line in the
  * blur's budget and larger than the whole amortised call (8.0 ms at 1024²).
- * The header used to say a persistent pipeline was "a speed optimisation …
+ * The header used to say a persistent pipeline was "a speed optimization …
  * gated behind a zero-delta harness run". That gate has been met: five cases,
  * max channel delta 0, on real hardware (ADR-030's Measurements).
  *

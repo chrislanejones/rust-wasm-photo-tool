@@ -31,7 +31,7 @@
 // It follows that entries are valid across engine INSTANCES too, which is why
 // `BatchSettings` (a throwaway engine, per ONE PORT PER DOCUMENT) shares this
 // cache with the live document. If these functions ever start reading engine
-// state, that sharing becomes a correctness bug rather than an optimisation —
+// state, that sharing becomes a correctness bug rather than an optimization —
 // `textMetricsCache.contract.test.ts` fails if the Rust signatures gain `self`
 // access, so the assumption is checked rather than remembered.
 //
@@ -54,7 +54,7 @@
 // existed." THAT IS FALSE, and it was the stated basis for the whole approach.
 // Checked, all six callers:
 //
-//   CanvasArea:2118   render   ✅ falls back to the JS-measured box centre
+//   CanvasArea:2118   render   ✅ falls back to the JS-measured box center
 //   CanvasArea:2288   render   ✅ falls back to `sx - bgPad`
 //   useTextTool:251   commit   tolerates — but commits at the UNCORRECTED
 //                              anchor, i.e. text lands off its own preview
@@ -265,7 +265,7 @@ export async function textInkOffsetBgAwaited(
   // No `boxHeight` here, and that is a decision rather than an omission: the
   // v8.41 box grows BELOW top-aligned text, so a taller box moves no glyph and
   // this offset — and therefore this cache key — is genuinely independent of
-  // it. If the layout ever goes centred, the height becomes part of the answer
+  // it. If the layout ever goes centered, the height becomes part of the answer
   // and MUST join the key, or every re-edit of a resized box serves a stale
   // offset and the text walks up the canvas a little further each time.
   const font = fontKey(fontId);

@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Square,
   Circle,
-  PenLine,
   Minus,
   Hash,
   Type,
@@ -11,6 +10,8 @@ import {
   Shapes as ShapesIcon,
   MapPin,
   ArrowUpRight,
+  Diamond,
+  Star,
 } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -23,10 +24,11 @@ import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 
 const SHAPES = [
-  { id: "rect",       label: "Rectangle", icon: Square  },
-  { id: "circle",     label: "Circle",    icon: Circle  },
-  { id: "handCircle", label: "Hand-drawn", icon: PenLine },
-  { id: "line",       label: "Line",      icon: Minus   },
+  { id: "rect",    label: "Rectangle", icon: Square  },
+  { id: "circle",  label: "Circle",    icon: Circle  },
+  { id: "line",    label: "Line",      icon: Minus   },
+  { id: "diamond", label: "Diamond",   icon: Diamond },
+  { id: "star",    label: "Star",      icon: Star    },
 ] as const;
 
 const PIN_LABELS = [
@@ -40,6 +42,11 @@ const ARROW_STYLES = [
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
+
+// Sloppiness presets — numbers variant, same 4-above-the-track layout as the
+// Eraser's Opacity slider. 0 (firm) is a real preset, then 25/50/100, so the
+// hand-drawn range tops out at 100%.
+const SLOPPINESS_PRESETS = [0, 25, 50, 100] as const;
 
 const FILL_MODES = [
   { id: "none",     label: "None"     },
@@ -104,7 +111,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
-    // shape edit, so stroke/colour/shape tweaks live-update the overlay.
+    // shape edit, so stroke/color/shape tweaks live-update the overlay.
     <div className="space-y-3 -mt-2" data-draw-panel>
       <ToolModeToggle
         modes={SHAPES_TOOL_MODES}
@@ -145,6 +152,18 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     )}
                   />
 
+                  {/* Stroke Sloppiness — how hand-drawn the outline is. Same
+                      SizeSlider as Stroke Width/Opacity (numbers variant), so
+                      firm (0) → hand-drawn (100) with the max at the top. */}
+                  <SizeSlider
+                    label="Sloppiness"
+                    value={settings.sloppiness ?? 0}
+                    onChange={(v) => onChange({ ...settings, sloppiness: v })}
+                    presets={SLOPPINESS_PRESETS}
+                    variant="numbers"
+                    unit="%"
+                  />
+
                   {/* Stroke Color */}
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
@@ -152,7 +171,8 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     onChange={(color) => onChange({ ...settings, strokeColor: color })}
                   />
 
-                  {/* Fill — rectangle + circle only (line/hand-drawn have no area) */}
+                  {/* Fill — rect + circle only (line/diamond/star have no fill
+                      in the engine: `fill_shape` handles kinds 0/1 only) */}
                   {(currentShape === "rect" || currentShape === "circle") && (
                     <div className="space-y-4">
                       <label className="text-2xs font-bold text-theme-muted-foreground">
@@ -228,7 +248,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
               );
 
             // ── Pins ── click the image to drop an auto-sequenced callout
-            // disc. A static body: pin label style → size → colour.
+            // disc. A static body: pin label style → size → color.
             case "pens":
               return (
                 <>
@@ -267,7 +287,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 </>
               );
 
-            // ── Arrows ── mirrors Pins: style toggle → size → colour.
+            // ── Arrows ── mirrors Pins: style toggle → size → color.
             case "arrows":
               return (
                 <>

@@ -25,8 +25,9 @@ import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
-import { PerspectiveOverlay } from "./PerspectiveOverlay";
+import { PerspectiveLayer } from "./PerspectiveLayer";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
 import type { OverlayFrame } from "./overlayFrame";
@@ -39,8 +40,6 @@ import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
-import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
-import { usePerspectiveTool } from "@/hooks/usePerspectiveTool";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
@@ -49,6 +48,14 @@ import type { GridKind, RulerUnit } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
+import type { ShapeName } from "@/lib/types";
+import {
+  diamondVertices,
+  shapeWobbleSeed,
+  sloppyCirclePoints,
+  sloppyPolylinePoints,
+  starVertices,
+} from "@/lib/shapeSloppiness";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -210,6 +217,10 @@ interface Props {
    *  hover highlight is drawn over the one whose id matches
    *  `hoveredAnnotationId`. */
   annotations?: AnnotationBox[];
+  /** Live shape annotations on the active layer (bbox + id + kind). Only the
+   *  Perspective tool reads them here — it can be pointed at a square or a
+   *  circle the same way it can be pointed at text. */
+  shapes?: { id: number; kind: number; x0: number; y0: number; x1: number; y1: number }[];
   /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
   renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
   hoveredAnnotationId?: number | null;
@@ -232,7 +243,10 @@ interface Props {
     strokeColor: string;
     strokeWidth: number;
     arrowStyle: "single" | "double";
-    shape: "rect" | "circle" | "handCircle" | "line";
+    shape: ShapeName;
+    /** Stroke sloppiness 0-100 (how hand-drawn the outline is), read live so
+     *  a panel tweak while the overlay is open immediately rewobbles it. */
+    sloppiness: number;
     fillMode: "none" | "solid" | "gradient" | "pixelate";
     fillColor: string;
     fillColor2: string;
@@ -326,14 +340,20 @@ function arrowGeometry(
 }
 
 /**
- * SVG path for the hand-drawn circle preview — a straight port of the
- * `handCircle` case in `drawShapePreview` (wobbly ellipse with a lead-in
- * tail, deterministic from the bbox coords). `toSX`/`toSY` map canvas
- * coords to screen so the path tracks zoom/pan exactly.
+ * SVG path for the sketchy shape preview (sloppiness > 0). Built from the
+ * same `shapeSloppiness` helpers `drawShapePreview` and the Rust engine use,
+ * so the overlay preview and the committed pixels are the same path
+ * (mirrors `sloppy_polyline_points` / `draw_sloppy_circle`, drawing.rs).
+ * `toSX`/`toSY` map canvas coords to screen so the path tracks zoom/pan.
+ * `strokeWidth` is in IMAGE pixels (it floors the wobble, so the preview and
+ * the engine must be handed the same units).
  */
-function handCirclePath(
+function sloppyShapePath(
   from: Point,
   to: Point,
+  shape: ShapeName,
+  sloppiness: number,
+  strokeWidth: number,
   toSX: (x: number) => number,
   toSY: (y: number) => number,
 ): string {
@@ -341,47 +361,64 @@ function handCirclePath(
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const rx = w / 2;
-  const ry = h / 2;
-  const points = 60;
-
-  const startOffset = (from.x * 31.17 + from.y * 47.53) % (Math.PI * 2);
-  const mainArc = Math.PI * 2 - Math.PI * 0.15;
-  const seed = from.x * 31.17 + from.y * 47.53 + to.x * 13.91 + to.y * 67.37;
-
-  const getNoise = (angle: number) =>
-    Math.sin(angle * 2.3 + seed) * 3 +
-    Math.sin(angle * 1.1 + seed * 0.7) * 2 +
-    Math.cos(angle * 3.7 + seed * 1.3) * 1.5;
-
-  const tilt = (((seed * 1000) % 1000) / 1000 - 0.5) * 0.15;
-
-  const d: string[] = [];
-  // Tail
-  const tailLength = Math.PI * 0.3;
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10;
-    const angle = startOffset - tailLength * (1 - t);
-    const noise = getNoise(angle) * t;
-    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-    const inward = (1 - t) * (rx * 0.15);
-    const px = cx + (rx * squeeze - inward + noise) * Math.cos(angle + tilt);
-    const py = cy + (ry / squeeze - inward + noise) * Math.sin(angle + tilt);
-    d.push(`${i === 0 ? "M" : "L"}${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
+  const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
+  let pts;
+  switch (shape) {
+    case "rect":
+      pts = sloppyPolylinePoints(
+        [
+          { x, y },
+          { x: x + w, y },
+          { x: x + w, y: y + h },
+          { x, y: y + h },
+        ],
+        seed,
+        sloppiness,
+        strokeWidth,
+        true,
+      );
+      break;
+    case "diamond":
+      pts = sloppyPolylinePoints(
+        diamondVertices(from.x, from.y, to.x, to.y),
+        seed,
+        sloppiness,
+        strokeWidth,
+        true,
+      );
+      break;
+    case "star":
+      pts = sloppyPolylinePoints(
+        starVertices(from.x, from.y, to.x, to.y),
+        seed,
+        sloppiness,
+        strokeWidth,
+        true,
+      );
+      break;
+    case "line":
+      pts = sloppyPolylinePoints(
+        [
+          { x: from.x, y: from.y },
+          { x: to.x, y: to.y },
+        ],
+        seed,
+        sloppiness,
+        strokeWidth,
+        false,
+      );
+      break;
+    case "circle":
+      pts = sloppyCirclePoints(from, to, sloppiness, strokeWidth);
+      break;
   }
-  // Main circle
-  for (let i = 0; i <= points; i++) {
-    const t = i / points;
-    const angle = startOffset + t * mainArc;
-    const noise = getNoise(angle);
-    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-    const px = cx + (rx * squeeze + noise) * Math.cos(angle + tilt);
-    const py = cy + (ry / squeeze + noise) * Math.sin(angle + tilt);
-    d.push(`L${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
-  }
-  return d.join(" ");
+  if (!pts || pts.length === 0) return "";
+  return pts
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${toSX(p.x).toFixed(2)} ${toSY(p.y).toFixed(2)}`,
+    )
+    .join(" ");
 }
 
 /** The canvas cursor for the lit SUB-TOOL.
@@ -454,6 +491,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextFontSizeChange,
       onTextRotationChange,
       annotations,
+      shapes,
       renderOverlay,
       hoveredAnnotationId,
       onCanvasHover,
@@ -1399,34 +1437,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const imageGuides = useGuidesStore((s) => s.guides);
     const guidesLocked = useGuidesStore((s) => s.guidesLocked);
     const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
-    // ── Perspective tool (v8.42) ────────────────────────────────────────
-    // The hook lives HERE, not in AppShell: everything it needs is already on
-    // `hookResult` (toolRef / syncState / flushToCanvas), and the panel reads
-    // its results out of usePerspectiveStore rather than through props. That is
-    // what let the tool land without adding anything to AppShell.
-    const perspectiveMode = useToolStore((s) => s.perspectiveMode);
-    const perspectiveTargetId = usePerspectiveStore((s) => s.targetId);
-    const setPerspectiveTargetId = usePerspectiveStore((s) => s.setTargetId);
+    // ── Perspective tool ────────────────────────────────────────────────
     // All three sub-tools (Distort / Perspective / Skew) resolve to the one
-    // `perspective` ToolType, so this stays a single check.
+    // `perspective` ToolType, so this stays a single check. Everything else
+    // about the tool — its hook, its quad, its action bar — lives in
+    // PerspectiveLayer; see the note at the top of that file for why it is not
+    // forty more lines in here.
     const perspectiveActive = activeTool === "perspective";
-    const perspectiveTargetBounds = React.useMemo(() => {
-      if (perspectiveTargetId === null) return null;
-      const a = (annotations ?? []).find((n) => n.id === perspectiveTargetId);
-      return a ? { x: a.x, y: a.y, w: a.tile_w, h: a.tile_h } : null;
-    }, [perspectiveTargetId, annotations]);
-    const perspective = usePerspectiveTool({
-      toolRef: hookResult.toolRef,
-      syncState: hookResult.syncState,
-      flushToCanvas: hookResult.flushToCanvas,
-      // A target only counts while the tool is actually active — otherwise a
-      // stale pick from a previous session would silently redirect the next
-      // warp onto an annotation the user is no longer looking at.
-      selectedTextId: perspectiveActive ? perspectiveTargetId : null,
-      imgW,
-      imgH,
-      targetBounds: perspectiveTargetBounds,
-    });
 
     const textWrapWidth = useTextBoxStore((s) => s.wrapWidth);
     const setTextWrapWidth = useTextBoxStore((s) => s.setWrapWidth);
@@ -1473,7 +1490,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // reading `engineWorkerEnabled()` would be a call site branching on
           // the flag, which `engineAsyncMigration.contract.test.ts` forbids;
           // this is an opaque identity string that says nothing about
-          // behaviour. Its value is stable for any tab that never touches the
+          // behavior. Its value is stable for any tab that never touches the
           // flag, so ordinary use sees the same reconciliation as before.
           key={surfaceKey}
           ref={attachCanvas}
@@ -1525,7 +1542,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           <DrawPreviewOverlay ref={drawPreviewRef} {...overlayFrame} />
         )}
 
-        <CompareSlider canvasEl={canvasRef.current} />
+        <CompareSlider canvasEl={canvasRef.current} toolRef={hookResult.toolRef} revision={hookResult.state.undoCount} />
 
         {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}
         {(lassoCommitted || lassoPreview) && (
@@ -1572,6 +1589,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               zoom={zoom}
             />
           )}
+
+        {/* AI Object Removal's mask brush — self-gated on the tool store (it is
+            the one overlay here that TAKES the pointer, so it must not linger,
+            and this file is line-capped). */}
+        <ObjectRemovalOverlay {...overlayFrame} />
 
         {/* ── Rulers & Grids overlay (non-destructive; grid geometry from Rust) ── */}
         {guides &&
@@ -1626,35 +1648,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             );
           })()}
 
-        {/* ── Perspective quad + handles ─────────────────────────────────── */}
-        {perspectiveActive &&
-          perspective.quad &&
-          canvasRef.current &&
-          imgW > 0 &&
-          imgH > 0 &&
-          (() => {
-            const canvas = canvasRef.current!;
-            const r = canvas.getBoundingClientRect();
-            return (
-              <PerspectiveOverlay
-                rect={r}
-                sx={r.width / canvas.width}
-                sy={r.height / canvas.height}
-                quad={perspective.quad}
-                mode={perspectiveMode}
-                vector={perspective.targetLabel !== null}
-                onChange={perspective.setQuad}
-                // Pointer-up ends the GESTURE; it does not commit to the
-                // engine. Applying on every release would make an exploratory
-                // drag destructive, so the commit stays on the panel's Apply
-                // button and this is only where a drag stops.
-                onCommit={() => {}}
-                annotations={annotations ?? []}
-                targetId={perspectiveTargetId}
-                onTargetChange={setPerspectiveTargetId}
-              />
-            );
-          })()}
+        {/* ── Perspective quad, handles and actions ──────────────────────── */}
+        {perspectiveActive && canvasRef.current && (
+          <PerspectiveLayer
+            toolRef={hookResult.toolRef}
+            canvasEl={canvasRef.current}
+            syncState={hookResult.syncState}
+            flushToCanvas={hookResult.flushToCanvas}
+            imgW={imgW}
+            imgH={imgH}
+            annotations={annotations ?? []}
+            shapes={shapes ?? []}
+            activeLayerId={hookResult.state.activeLayerId}
+          />
+        )}
 
         {/* Bézier pen overlay — interactive path creation (Paint → Pen). */}
         {penActive && canvasRef.current && (
@@ -1908,6 +1915,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const EP_R = 6; // endpoint-circle radius — screen px
           const strokeW = Math.max(1, eff.strokeWidth * sx);
           const color = eff.strokeColor;
+          // Sketchy outline? Read live so a panel tweak while the overlay is
+          // open immediately rewobbles the preview. Mirrors the engine rule:
+          // 0 → clean strokes, > 0 → the wobbly path generator.
+          const sloppyAmt = eff.sloppiness ?? 0;
+          const sloppy = sloppyAmt > 0;
 
           // Live interior-fill preview. `eff` is the shape's captured style on
           // reselect, or the live panel for a new shape — both carry fill, so
@@ -2013,13 +2025,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
             );
           } else if (shape === "line") {
-            preview = (
+            const strokeLayer = sloppy ? (
+              <path
+                d={sloppyShapePath(start, end, "line", sloppyAmt, eff.strokeWidth, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round"
+              />
+            ) : (
               <line
                 x1={toSX(start.x)} y1={toSY(start.y)}
                 x2={toSX(end.x)}   y2={toSY(end.y)}
                 stroke={color} strokeWidth={strokeW} strokeLinecap="round"
               />
             );
+            preview = strokeLayer;
             bodyHit = (
               <line
                 x1={toSX(start.x)} y1={toSY(start.y)}
@@ -2033,39 +2052,83 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const cr = (Math.min(bx1 - bx0, by1 - by0) / 2) * sx;
             const ccx = vx + vw / 2;
             const ccy = vy + vh / 2;
+            // Fill stays a clean circle of that same radius; only the STROKE
+            // roams, and it now roams around the SAME circle (it used to wobble
+            // around the bbox ellipse, so fill and outline disagreed).
+            const fillLayer = (
+              <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} />
+            );
+            // An empty sketchy path means the circle is too small to wobble;
+            // fall back to the clean arc, which is what the engine does.
+            const sloppyD = sloppy
+              ? sloppyShapePath(start, end, "circle", sloppyAmt, eff.strokeWidth, toSX, toSY)
+              : "";
+            const strokeLayer = sloppyD ? (
+              <path
+                d={sloppyD}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            ) : (
+              <circle cx={ccx} cy={ccy} r={cr} fill="none" stroke={color} strokeWidth={strokeW} />
+            );
             preview = (
               <>
                 {gradientDef}
-                <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} stroke={color} strokeWidth={strokeW} />
+                {fillLayer}
+                {strokeLayer}
               </>
             );
             bodyHit = (
               <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
             );
-          } else if (shape === "handCircle") {
-            preview = (
+          } else if (shape === "diamond" || shape === "star") {
+            // Outline-only (the engine fills only kinds 0/1). Firm → clean
+            // polygon over the exact vertex list Rust rasterises; sketchy →
+            // the same vertices pushed through the wobble path generator.
+            const verts =
+              shape === "diamond"
+                ? diamondVertices(start.x, start.y, end.x, end.y)
+                : starVertices(start.x, start.y, end.x, end.y);
+            const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
+            const strokeLayer = sloppy ? (
               <path
-                d={handCirclePath(start, end, toSX, toSY)}
+                d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY)}
                 fill="none" stroke={color} strokeWidth={strokeW}
                 strokeLinecap="round" strokeLinejoin="round"
               />
-            );
-            bodyHit = (
-              <ellipse
-                cx={vx + vw / 2} cy={vy + vh / 2}
-                rx={Math.max(vw / 2, 8)} ry={Math.max(vh / 2, 8)}
-                fill="transparent" {...bodyProps}
+            ) : (
+              <polygon
+                points={pts}
+                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
               />
+            );
+            preview = strokeLayer;
+            bodyHit = (
+              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
             );
           } else {
             // rect
+            const fillLayer = (
+              <rect x={vx} y={vy} width={vw} height={vh} fill={fillAttr} />
+            );
+            const strokeLayer = sloppy ? (
+              <path
+                d={sloppyShapePath(start, end, "rect", sloppyAmt, eff.strokeWidth, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            ) : (
+              <rect
+                x={vx} y={vy} width={vw} height={vh}
+                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
+              />
+            );
             preview = (
               <>
                 {gradientDef}
-                <rect
-                  x={vx} y={vy} width={vw} height={vh}
-                  fill={fillAttr} stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
-                />
+                {fillLayer}
+                {strokeLayer}
               </>
             );
             bodyHit = (
@@ -2307,7 +2370,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // The height the TEXT needs. v8.41 makes this a floor rather than
           // the answer: a dragged box height overrides it when it is taller,
           // mirroring the engine, where `box_height` is a minimum and the type
-          // is centred in whatever surplus there is (`text::box_top_inset`).
+          // is centered in whatever surplus there is (`text::box_top_inset`).
           const naturalH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
           const boxH = Math.max(naturalH, Math.ceil(textBoxHeight * scaleY));
 
@@ -2322,7 +2385,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // must change with it; `scripts/guardrails.sh` enforces that the two
           // files move together.
           //
-          // This used to be the tile CENTRE, measured out of the engine through
+          // This used to be the tile CENTER, measured out of the engine through
           // `measureText` so the two agreed. That read is gone with it — the
           // top-left is (0, 0) in the box's own frame, so nothing needs
           // measuring. It was one of the two RENDER-PASS engine reads the
@@ -2352,7 +2415,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // ── v8.37 — ONE handle changes the font size, and it is not a corner.
           //
           // Until now EIGHT box handles (corners + edges) all ran the same
-          // drag: proportional font scaling from the box centre. Chris's
+          // drag: proportional font scaling from the box center. Chris's
           // report: "corners need to be reserved for changing the size of the
           // bounding box, not the font size inside the box." The dedicated
           // font-size affordance is the square-on-a-stem on the LEFT edge
@@ -2369,11 +2432,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // IndexedDB that holds one), i.e. an ADR plus the dexie-migration
           // procedure, not a handler swap. Filed in PARKING_LOT with the two
           // candidate designs. Until that lands, a rendered corner handle
-          // would promise a behaviour the model cannot express — so none is
+          // would promise a behavior the model cannot express — so none is
           // rendered, and the dashed border alone delineates the derived box.
 
           // Font-size handle drag — scales font size proportionally with the
-          // pointer's distance from the box centre (the same feel the old
+          // pointer's distance from the box center (the same feel the old
           // eight handles had, now living on exactly one handle).
           const handleFontSizePointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
@@ -2408,7 +2471,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // is derived from wrapping. The first half was right and the
           // conclusion was wrong: height cannot drive reflow, but it can drive
           // LAYOUT. v8.41 gave the engine a real `box_height` (a minimum, with
-          // the text centred in the surplus and the background growing to it),
+          // the text centered in the surplus and the background growing to it),
           // so dragging up and down now means something all the way through to
           // the committed pixels. Chris's report was simply "not just left and
           // right".
@@ -2514,7 +2577,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
-          // Rotate drag — orbit the handle around the box centre. We track the
+          // Rotate drag — orbit the handle around the box center. We track the
           // ANGULAR DELTA from where the user grabbed (not the absolute mouse
           // angle): the handle rests below the box, so reading the absolute
           // angle snapped the text ~180° the instant it was grabbed. Starting
@@ -2599,7 +2662,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
           // Triangle tail rendered as an SVG inside the rotated wrapper so it
           // tracks the textarea's orientation. Geometry matches the Rust path:
-          // project a ray from the rect centre at `tailAngle`° onto the rect's
+          // project a ray from the rect center at `tailAngle`° onto the rect's
           // bounding edge; that exit point is the base, apex sits tailLen past.
           const tailSvg = (() => {
             if (tailAngle === null) return null;
@@ -2752,7 +2815,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 }}
                 autoFocus
               />
-              {/* SVG overlay — all elements grouped and rotated around box centre */}
+              {/* SVG overlay — all elements grouped and rotated around box center */}
               <svg
                 data-text-overlay
                 style={{

@@ -12,6 +12,7 @@ import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
 import { resolveSet, validated, validatedNumberInRange, type SetArg } from "./_shared";
 import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
+import type { MaskPoint, MaskStroke } from "@/lib/objectRemovalMask";
 import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
@@ -36,6 +37,11 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  bare value tuple for hydration validation. */
 export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
+/** The `effects` tool's two panels: `adjust` = the Adjustments sliders,
+ *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
+ *  `partialize` allowlist, so a reload reopens Adjustments (the long-standing
+ *  default) and no storage schema changes. */
+export type EffectsMode = "adjust" | "levels" | "presets";
 /** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
  *  behind it, `ocr` = read text out of the image. Lifted here out of
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
@@ -80,7 +86,7 @@ export type SelectionShape = "rect" | "ellipse";
  *  - `wand`       — 4-connected flood fill within tolerance (the original).
  *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
  *                   at the object outline instead of leaking through gradients.
- *  - `colorRange` — every pixel within tolerance of the clicked colour anywhere
+ *  - `colorRange` — every pixel within tolerance of the clicked color anywhere
  *                   in the image (Photoshop's Select → Color Range).
  *  Session — many clicks, then a close:
  *  - `lasso`      — magnetic lasso: click anchors, the wire path-finds along the
@@ -151,7 +157,7 @@ export interface ToolState {
    *  stays out of it: a pad open across a reload would point at whatever
    *  shape happened to get that id. */
   duplicatePadId: number | null;
-  /** Recently eyedroppered colours, newest first, de-duplicated, capped.
+  /** Recently eyedroppered colors, newest first, de-duplicated, capped.
    *
    *  NOT PERSISTED — same reasoning as `activeSubTool`: `partialize` below is
    *  an explicit allowlist and this is kept out of it, so adding the feature
@@ -163,6 +169,7 @@ export interface ToolState {
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
   eraserMode: EraserMode;
+  effectsMode: EffectsMode;
   textMode: TextMode;
   /** Which drag rule the Perspective tool's handles obey.
    *
@@ -190,12 +197,38 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
+  /** AI › Object Removal is painting its mask ON the canvas right now.
+   *
+   *  This replaced a portal-mounted popup that painted on its own private
+   *  copy of the frame. The three fields below are what the popup used to
+   *  hold in local `useState`; they live here because the paint surface
+   *  (`features/canvas/ObjectRemovalOverlay`) and the controls that drive it
+   *  (`features/tools/settings/AISettings`) are in different subtrees, and a
+   *  store action is the only sanctioned way across (no new CustomEvents).
+   *
+   *  DELIBERATELY NOT PERSISTED — `partialize` below is an allowlist and all
+   *  three are kept out of it, same as `activeSubTool` and `selectionMask`.
+   *  So: no IndexedDB schema change, no version bump, and the
+   *  `dexie-migration` gate is not triggered. A half-painted mask surviving a
+   *  reload would also point at whatever image happened to load next. */
+  objectRemovalMasking: boolean;
+  /** The painted strokes, in IMAGE-space pixels (see `lib/objectRemovalMask`).
+   *  Image space, not screen space, is what makes the uploaded mask land in
+   *  register at any zoom. */
+  objectRemovalStrokes: MaskStroke[];
+  /** Mask brush diameter in IMAGE pixels. Same range and default the popup's
+   *  slider had (8–120, 40). */
+  objectRemovalBrush: number;
+  /** The inpaint job is in flight. The paint stays on screen over the object
+   *  being removed, but the overlay stops taking the pointer — a stroke added
+   *  now could not reach the model that is already running on the mask. */
+  objectRemovalBusy: boolean;
   stampSettings: StampSettings;
   toolSettings: ToolSettings;
 
   setActiveTool: (v: SetArg<ToolType>) => void;
   setActiveSubTool: (v: SetArg<string>) => void;
-  /** Record a picked colour at the head of the history. */
+  /** Record a picked color at the head of the history. */
   pushPickedColor: (hex: string) => void;
   removePickedColor: (hex: string) => void;
   clearPickedColors: () => void;
@@ -212,12 +245,26 @@ export interface ToolState {
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
+  setEffectsMode: (v: SetArg<EffectsMode>) => void;
   setTextMode: (v: SetArg<TextMode>) => void;
   setPerspectiveMode: (v: SetArg<PerspectiveMode>) => void;
   setBatchMode: (v: SetArg<BatchMode>) => void;
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
+   *  the mask describes one object on one image, so carrying it into the next
+   *  visit to the panel could only ever remove the wrong thing. */
+  setObjectRemovalMasking: (v: SetArg<boolean>) => void;
+  setObjectRemovalBrush: (v: SetArg<number>) => void;
+  setObjectRemovalBusy: (v: SetArg<boolean>) => void;
+  /** Pointer down — opens a stroke at `p` with the current brush size. */
+  beginObjectRemovalStroke: (p: MaskPoint) => void;
+  /** Pointer move — appends to the open stroke. A no-op when none is open. */
+  extendObjectRemovalStroke: (p: MaskPoint) => void;
+  /** Drop the most recent stroke (the popup had Clear only). */
+  undoObjectRemovalStroke: () => void;
+  clearObjectRemovalStrokes: () => void;
   setExportFormat: (v: SetArg<ExportFormat>) => void;
   setQuality: (v: SetArg<number>) => void;
   setStampSettings: (v: SetArg<StampSettings>) => void;
@@ -248,6 +295,7 @@ export const useToolStore = create<ToolState>()(
       stampSubMode: "clone",
       shapesMode: "shapes",
       eraserMode: "brush",
+      effectsMode: "adjust",
       textMode: "text",
       perspectiveMode: "perspective",
       batchMode: "logo",
@@ -258,6 +306,10 @@ export const useToolStore = create<ToolState>()(
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
+      objectRemovalMasking: false,
+      objectRemovalStrokes: [],
+      objectRemovalBrush: 40,
+      objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
 
@@ -266,7 +318,7 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       // Newest first, case-insensitively de-duplicated (the engine hands back
       // uppercase hex, hand-typed swatches are lowercase — without this the
-      // same colour lands twice and looks like a bug). Capped at 12: it is a
+      // same color lands twice and looks like a bug). Capped at 12: it is a
       // recall list, not a log, and the panel column is 252px.
       pushPickedColor: (hex) =>
         set((s) => {
@@ -303,6 +355,7 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
       setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
+      setEffectsMode: (v) => set((s) => ({ effectsMode: resolveSet(v, s.effectsMode) })),
       setTextMode: (v) => set((s) => ({ textMode: resolveSet(v, s.textMode) })),
       setPerspectiveMode: (v) =>
         set((s) => ({ perspectiveMode: resolveSet(v, s.perspectiveMode) })),
@@ -312,6 +365,48 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setObjectRemovalMasking: (v) =>
+        set((s) => {
+          const next = resolveSet(v, s.objectRemovalMasking);
+          // Leaving clears. Entering clears too, so the panel never opens onto
+          // paint left over from a mask that was cancelled or already sent.
+          // Busy is a property of the mode, so it goes with it — otherwise a
+          // job that ended by leaving the mode would leave the next mask
+          // un-paintable.
+          return {
+            objectRemovalMasking: next,
+            objectRemovalStrokes: [],
+            objectRemovalBusy: false,
+          };
+        }),
+      setObjectRemovalBrush: (v) =>
+        set((s) => ({ objectRemovalBrush: resolveSet(v, s.objectRemovalBrush) })),
+      setObjectRemovalBusy: (v) =>
+        set((s) => ({ objectRemovalBusy: resolveSet(v, s.objectRemovalBusy) })),
+      beginObjectRemovalStroke: (p) =>
+        set((s) => ({
+          objectRemovalStrokes: [
+            ...s.objectRemovalStrokes,
+            { size: s.objectRemovalBrush, points: [p] },
+          ],
+        })),
+      extendObjectRemovalStroke: (p) =>
+        set((s) => {
+          const open = s.objectRemovalStrokes[s.objectRemovalStrokes.length - 1];
+          if (!open) return {};
+          // New array + new stroke object: the overlay re-renders off identity,
+          // and mutating in place would paint nothing until the next unrelated
+          // state change.
+          return {
+            objectRemovalStrokes: [
+              ...s.objectRemovalStrokes.slice(0, -1),
+              { ...open, points: [...open.points, p] },
+            ],
+          };
+        }),
+      undoObjectRemovalStroke: () =>
+        set((s) => ({ objectRemovalStrokes: s.objectRemovalStrokes.slice(0, -1) })),
+      clearObjectRemovalStrokes: () => set({ objectRemovalStrokes: [] }),
       setExportFormat: (v) =>
         set((s) => ({ exportFormat: resolveSet(v, s.exportFormat) })),
       setQuality: (v) => set((s) => ({ quality: resolveSet(v, s.quality) })),
@@ -361,7 +456,7 @@ export const useToolStore = create<ToolState>()(
           batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
           // Both tolerate a blob written before these keys existed: `undefined`
           // fails every check and falls back to the freshly-constructed default,
-          // which is exactly the pre-#14 behaviour. No version bump, no
+          // which is exactly the pre-#14 behavior. No version bump, no
           // migration — the allowlist grew, the schema did not.
           exportFormat: validated(p.exportFormat, EXPORT_FORMATS, current.exportFormat),
           quality: validatedNumberInRange(p.quality, 1, 100, current.quality),

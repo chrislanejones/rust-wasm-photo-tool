@@ -170,7 +170,7 @@ describe("the cache behaves like a memo, not a mirror", () => {
     expect(measureText(null, "hello", 24, false)).toBeUndefined();
     expect(textInkOffset(undefined, "hello", 24, false)).toBeUndefined();
     // ...and passing a live tool does NOT change that, which is the v8.14
-    // behaviour change: the sync readers cannot reach the engine any more.
+    // behavior change: the sync readers cannot reach the engine any more.
     expect(measureText(fakeTool(), "hello", 24, false)).toBeUndefined();
     expect(textMetricsCacheSize(), "a miss must not store anything").toBe(0);
   });

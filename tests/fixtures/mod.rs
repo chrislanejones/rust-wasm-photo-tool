@@ -41,8 +41,8 @@ impl Fixture {
 }
 
 /// Every fixture used by the replay-parity suite, by name:
-/// - `solid_64`     — 64x64, one flat colour.
-/// - `gradient_128` — 128x128, a top-to-bottom colour ramp (128 bands).
+/// - `solid_64`     — 64x64, one flat color.
+/// - `gradient_128` — 128x128, a top-to-bottom color ramp (128 bands).
 /// - `edge_96x64`   — 96x64 non-square, sharp vertical edge at the midline.
 /// - `pixel_1x1`    — the degenerate 1x1 canvas.
 ///
@@ -58,7 +58,7 @@ pub fn fixture(name: &str) -> Fixture {
     }
 }
 
-/// Every fixture name `fixture()` recognises, for tests that want to sweep
+/// Every fixture name `fixture()` recognizes, for tests that want to sweep
 /// all of them.
 pub const ALL_FIXTURES: &[&str] = &["solid_64", "gradient_128", "edge_96x64", "pixel_1x1"];
 
@@ -75,7 +75,7 @@ fn solid(name: &'static str, w: u32, h: u32, rgba: [u8; 4]) -> Fixture {
     }
 }
 
-/// Top-to-bottom colour ramp: one flat colour per row, red rising and green
+/// Top-to-bottom color ramp: one flat color per row, red rising and green
 /// falling with `y`. Deliberately banded (constant per row) rather than a
 /// continuous per-pixel gradient, so it stays cheap to reconstruct via
 /// [`Fixture::load_ops`] (one `FillRegion` per row) while still exercising
@@ -133,7 +133,7 @@ fn pixel_at(pixels: &[u8], w: u32, x: u32, y: u32) -> [u8; 4] {
 }
 
 /// Row-wise run-length encode `pixels` into horizontal runs of constant
-/// colour, then merge vertically-consecutive rows that share the exact same
+/// color, then merge vertically-consecutive rows that share the exact same
 /// run pattern into a single taller `FillRegion` per run. General-purpose
 /// and exact for any input — not tuned to any one fixture's shape.
 fn flat_to_fill_ops(pixels: &[u8], w: u32, h: u32) -> Vec<Op> {
@@ -141,7 +141,7 @@ fn flat_to_fill_ops(pixels: &[u8], w: u32, h: u32) -> Vec<Op> {
         return Vec::new();
     }
 
-    type Run = (u32, u32, [u8; 4]); // (start_x, len, colour)
+    type Run = (u32, u32, [u8; 4]); // (start_x, len, color)
 
     let mut rows: Vec<Vec<Run>> = Vec::with_capacity(h as usize);
     for y in 0..h {

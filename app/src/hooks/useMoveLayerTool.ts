@@ -20,7 +20,7 @@ interface Opts {
  * total offset in as a single "Move Layer" history step. Offsets are whole
  * pixels.
  *
- * Pairs with paste-into-active-layer: paste drops content centred, then this
+ * Pairs with paste-into-active-layer: paste drops content centered, then this
  * tool nudges it into place.
  */
 export function useMoveLayerTool({

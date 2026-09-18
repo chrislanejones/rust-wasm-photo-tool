@@ -78,7 +78,7 @@ self.onmessage = async (e) => {
 
         tool = new ImageHorseTool(d.w, d.h);
         // A recognisable image: a red field the probe can verify arrived, not a
-        // uniform grey that would pass even if nothing were drawn.
+        // uniform gray that would pass even if nothing were drawn.
         const px = new Uint8Array(d.w * d.h * 4);
         for (let i = 0; i < px.length; i += 4) {
           px[i] = 220; px[i + 1] = 40; px[i + 2] = 40; px[i + 3] = 255;

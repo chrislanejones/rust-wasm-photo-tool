@@ -4,6 +4,222 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — `testReplicate` deploys to prod by default, and calls itself temporary (2026-09-17)
+
+Noticed while wiring the Convex deploy into CI (step 0.5, PR #165). Not a bug,
+a decision nobody has made.
+
+`convex/testReplicate.ts` opens with *"TEMPORARY diagnostics … Safe to delete."*
+Every export in it is `internalAction` / `internalMutation` / `internalQuery`,
+so **no client can reach it** and this is not an exposure. But `convex deploy`
+pushes everything in `convex/`, so once CI deploys, a module that describes
+itself as temporary is live in production permanently.
+
+It also holds `devFixUser`, which mutates the first row of `users`. Internal,
+so only reachable from the dashboard — still not something to carry in prod
+without meaning to.
+
+Three options, none urgent: delete it, move it behind a dev-only path, or
+decide it stays and drop the "safe to delete" line so the next reader does not
+have to re-ask. `scripts/convex-deploy-check.mjs` lists it as expected today,
+so whichever way it goes, that list changes with it.
+
+## OPEN — marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
+
+Found by the records audit while retiring the Quick Adjust grid for the Presets
+tile (#88), and **caused by that retirement** — flagged rather than fixed,
+because marketing copy is Margot's lane and the call is Chris's.
+
+| Where | Line | Claim |
+|---|---|---|
+| `marketing/src/pages/Pricing.tsx` | 66, 144 | "4× upscale" listed as a Pro feature |
+| `marketing/src/seo.ts` | 97, 221 | same, in the SEO copy |
+
+Until this session the editor had a **grayed 4x Upscale tile** sitting in the
+Quick Adjust grid's empty fifth cell, captioned "isn't connected yet — it needs
+a model". Selling it on the Pricing page was a stretch, but the app at least
+said "not yet" out loud. Retiring the grid removed that tile, and it existed
+nowhere else — so the editor now has no 4× upscale affordance at all, grayed or
+otherwise, while the Pricing page still lists it as something Pro buys.
+
+Three ways out, in rough order of honesty: build it; drop the claim from
+Pricing + SEO; or re-home the grayed tile somewhere (Enhance › Presets has no
+natural slot for it, which is part of why it went).
+
+Related: [[project_paid_tier_gating_bug]] is the same family — a tier claim with
+no wire behind it.
+
+## OPEN — 2,351 wasm bytes are reclaimable from the tonal filters (2026-09-15)
+
+Measured while building the Presets tile (#88), not taken in that diff.
+
+`presets::apply_stack` calls the five `filters::adjust_*` delegators, and the
+optimiser inlines all five SIMD filter bodies into it — code that already
+exists behind the Adjustments sliders. Cost, measured on the pinned build:
+
+| build | wasm bytes | SIMD opcodes |
+|---|---|---|
+| master (Levels, `b19a45a9`) | 829,481 | 5563 |
+| with Presets | 832,962 | 5765 |
+| **+ `#[inline(never)]` on the 5 delegators** | **830,611** | **5563** |
+
+So the attribute reclaims **2,351 B** and returns the SIMD opcode count to
+*exactly* the baseline — no duplicated SIMD code at all. Two dead ends already
+ruled out: `#[inline(never)]` on `apply_stack` itself produces a byte-identical
+build (it stops the wrong inlining), and wrapping the calls in `#[inline(never)]`
+helpers inside `presets.rs` makes it *worse* (833,200 B / 5781) because the real
+filter is then inlined into the wrapper anyway.
+
+**Why it was parked rather than taken.** It edits five shared functions that the
+six Adjustments sliders also call, and `filters` is named as a hot path by the
+`rust-wasm-loop` skill, so the change needs a bench. The only bench harness here
+is criterion on the host, where `cfg(target_feature = "simd128")` is false — it
+would measure the scalar mirror while the change affects the wasm SIMD build.
+Greening a hot-path edit on a bench that cannot execute the path in question is
+the vacuous-check pattern (`docs/vacuous-checks.md`), so the honest order is:
+get a wasm-level bench first, then take the 2,351 B.
+
+The overhead in question is one function call per WHOLE-BUFFER pass, so the
+expected cost is nil — but "expected" is the word doing the work, which is
+exactly why it wants a measurement.
+
+## RESOLVED — ⚠️ UNDO IS NOT DURABLE: a reload silently puts the undone edit back (2026-09-16)
+
+> **Fixed by PR #161 (`2e6c5f32`), merged 2026-09-16.** The dirty rule could
+> not tell *edited back to where it was saved* from *never edited*: undoing to
+> zero made `undoCount === 0`, the session read as clean, and no write was
+> asked for. It now compares against the undo count at the last successful
+> write, captured before the await. `app/src/lib/dirtyRule.test.ts` pins it in
+> 11 cases and 3 go red against the old rule. Kept here because the entry below
+> — the op-log breakage — is still open and reads as its sibling.
+
+**Was live on production. Found while auditing persistence for sync (step 0,
+`docs/sync-audit.md`), not caused by it.** This is the entry below made worse:
+that one says "undo still shows the right pixels, so nothing is lost", which is
+true within a session and **false across a reload**.
+
+Measured on `edit.imagehorse.app`, twice (Vivid, then Warm), 1385x2068 sample:
+
+| Step | Screen | Archive on disk |
+| --- | --- | --- |
+| Apply preset | `8ed2e567` | `5b389c67` written ✅ |
+| **Ctrl+Z** | **`77686a30`** undo visibly worked | `5b389c67` **unchanged** |
+| Wait 35 s | `77686a30` | `5b389c67` still unchanged |
+| **Reload → Resume editing** | **`8ed2e567`** | — |
+
+The user pressed undo, watched it work, reloaded, and got the change back.
+
+**No save fires at all** — this is not a stale capture. `window.__ihSaveGuard()`
+across a clean run: baseline `allowedKnown` 1 → preset applied **2** → after
+Ctrl+Z + 8 s still **2**. `refused` stayed **0**, so the ownership guard is not
+declining it; the autosave never asks. End state: screen `77686a30`, archive
+`b6cb4374` — two different documents.
+
+**Ruled out.** `dirtyRef` (`useImageSession.ts:191`) is
+`undoCount > 0 || hasBeenModified || layerRevision > 0`, and `hasBeenModified`
+stays true after an undo — its own comment at line 264 says it "cannot
+re-trigger once true" — so the early return at line 256 is NOT the cause.
+`autosaveDelayMs` returns 300 ms or 2500 ms, so a 35-second silence is not a
+timer. `stamp.state.undoCount` IS in the effect's dependency list and DOES
+change on undo.
+
+**Next step:** instrument the four lines between that effect firing and
+`savePhotoEdit` being called — do not reason about them further. Then an e2e
+that edits, undoes, reloads and asserts the restored canvas hash equals the
+post-undo one.
+
+**Why no gate catches it:** `saveOwnership.test.ts` drives `savePhotoEdit`
+directly and the Rust tests drive the engine directly. Nothing exercises
+edit → undo → reload. Vacuous-checks family 3.
+
+⚠️ **This blocks cross-device sync.** A sync engine replicates the ARCHIVE, so
+on this evidence it would copy the un-undone document to the second device and
+hand it back to the first on the next pull — two devices disagreeing with the
+user instead of one. Fix and cover with a test before any sync code is written.
+
+## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+Found while testing the Levels tile, and **not caused by it**. Undo still shows
+the right pixels, so nothing is lost — but it always takes the snapshot path,
+so the undo depth the op log exists to protect (ADR-052: ~10 steps on a 12 MP
+photo, ~5 on 24 MP) is never actually delivered.
+
+| Run (fresh Canvas + Photo document, production build) | After undo |
+|---|---|
+| A — paint stroke via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| B — Levels preview → apply via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| C — **paint stroke through the real UI**, Ctrl+Z | ❌ cursor stays 1, `oplog_status` = "broken — snapshot undo has taken over" |
+| Levels through the real UI, Ctrl+Z **or** a direct `t.undo()` | ❌ same as C |
+
+So the break happens BETWEEN the edit and the undo, and only when the app's
+own flush path runs: `flushToCanvas` → `onOplogFlush` (persistence writer) and
+`blitLiveEngine`. `try_oplog_undo` refuses and `oplog_engine_in_sync()` fails,
+although the log's base (keyframe 0) is still the untouched photo and one
+correct op is recorded. Ruled out: tiles flush (returns early on a 2-layer
+document), `calculate_histogram` (read-only), the PageUp and Ctrl+Z key
+handlers (a focused range slider returns early; undo is a bare `t.undo()`),
+`restoreOplog` (only on photo open).
+
+**Why every gate is green:** the Rust parity tests and the op-log undo tests
+drive the engine directly and never run the app's flush or persistence path —
+vacuous-checks family 3, "the observation was never taken".
+
+**Next step:** replay run A with `blitLiveEngine` and `onOplogFlush` added one
+at a time to find the call that desyncs the log, then an e2e that paints and
+undoes through the UI and asserts `oplog_is_broken() === false`.
+
+## OPEN — mobile Download saves a file with no extension (2026-09-15)
+
+Noticed while fixing the pasted-export name (`fix/pasted-export-name`), not
+touched by it. `MobileShell.tsx:176` downloads the stored ORIGINAL as
+`a.download = photo.name`, and gallery names are stored with the extension
+stripped (`useImageSession.ts:401`). So a pasted image would save as `pasted`
+and `beach.jpg` as `beach` — no `.png` / `.jpg`. Read from the code only; not
+yet observed on a phone. The desktop export paths append `-revised` + the real
+extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
+decide first whether mobile should save the original (as now) or the edit.
+
+## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+
+Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
+is a plain `#[wasm_bindgen]` export in `src/settings.rs:62`, not feature-gated,
+and its own doc comment says JS is meant to read it: "JS estimates the depth
+from the live document size and this number; hardcoding 512 MB there would be a
+second copy of a value that already lives here" (ADR-052). There is no caller in
+`app/`.
+
+⚠️ **Do not delete it on the strength of "zero references."** That is the
+`useRealTier` shape — a zero-reference export that was a MISSING WIRE, not dead
+code. Run the pickaxe first (`git log --all -G "history_max_bytes"`) to tell
+"never connected" from "lost", and read ADR-052 for what the undo-depth
+estimate was supposed to do.
+
+## OPEN — the `guardrails` CI job never builds wasm (2026-09-12)
+
+So the dead-exports engine half counts **0** in CI and cannot fail there; it is
+vacuous check #15 in `docs/vacuous-checks.md`. Fixing it is a one-line job
+change (build wasm before the script), but it turns CI **red** on the export
+above the moment it lands — so the two are one decision, not two. Sequence:
+resolve `history_max_bytes`, then make the gate able to see it.
+
+## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
+
+Every **scheduled** run of `ci.yml` in the last eight weeks concluded `failure`,
+and it was never a vulnerability. Read from the 2026-09-14 run's log:
+
+| | |
+|---|---|
+| Vulnerabilities | **0** — "No vulnerabilities were found" |
+| Warnings | 2 unmaintained (`atomic-polyfill` RUSTSEC-2023-0089, `spin`), 1 yanked (`ttf-parser`) |
+| What fails | `rustsec/audit-check@v2` then tries to open a GitHub issue: `Resource not accessible by integration` |
+| Why | the `cargo-audit` job grants `contents: read` and `checks: write` — no `issues: write` |
+
+Push and PR runs of the same job pass, so a red is only ever visible on the
+cron — which is also the run nobody opens. Two ways out, one decision: grant
+`issues: write` (this repo has **zero** issues on purpose, so weekly auto-issues
+may be unwanted), or stop the action from filing issues and read the warnings
+from the check-run. Separately, the three warnings deserve a look on their own.
+
 ## OPEN — should cut-to-layer produce a FULL-CANVAS layer? (2026-09-06)
 
 Split out of the closed #72 below, which proved the engine is correctly scoped
@@ -329,6 +545,20 @@ before estimating — grep the exported method list, not the issue title.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
+**Update 2026-09-14 — measured on the live responses, not the config.** The
+headers shipped in v8.70 (ADR-048) and are on all three origins. What is still
+open:
+
+| Item | State |
+|---|---|
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
+| CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+
+The table below is the state before v8.70, kept for history.
+
 Found by the night-0902 security pass. Live responses from **both** the app and
 the marketing site carry exactly one security header:
 
@@ -494,7 +724,7 @@ the production build:
 | fresh text, shadow **off** (the default) | `Add Text` + phantom `Text Shadow` = **2** | **1** |
 | fresh text, shadow **on** | `Add Text` + `Text Shadow` = **2** | still **2** |
 
-The off case was a comparison bug (`set_text_shadow` compared dormant colour /
+The off case was a comparison bug (`set_text_shadow` compared dormant color /
 alpha / offset while the shadow was invisible on both sides) and is fixed in
 the engine. The on case is structural: `commitText` is `add_text_annotation`
 followed by three setters, each of which is its own snap, and the op log's
@@ -528,7 +758,7 @@ snapshot) — it is only the reload boundary that drops it.
 The `.ora` row is the same root cause as the reload row: `get_layer_png(i)`
 returns `layer.buf` — raw pixels — while the flat composite paths all route
 through `render_layer`, which applies mask then overlay. Verified in code
-2026-08-28, not inferred. It is pre-existing behaviour for masks; Color Overlay
+2026-08-28, not inferred. It is pre-existing behavior for masks; Color Overlay
 simply inherits it.
 
 Not fixed here: persisting either one is an IndexedDB schema change, so it goes
@@ -730,7 +960,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   `canvasSurfaceKey.contract.test.ts` pins it (mutation-tested: restoring the
   flag branch turns both new guards red).
 
-  **The honest behaviour, now stated everywhere:** `ih_engine_worker` takes
+  **The honest behavior, now stated everywhere:** `ih_engine_worker` takes
   effect on the NEXT LOAD, like `ih_tiles_flush` / `ih_oplog_undo` /
   `ih_patchmatch`. A mid-session flip is inert — the app keeps working, the
   canvas stops updating until reload. Verified in the browser both directions.
@@ -822,7 +1052,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   the worker that is nine round trips per frame — roughly 0.9 ms of a
   16.7 ms budget spent answering a question nobody is looking at unless the
   diagnostics window is open. Converted faithfully in v8.22 and deliberately
-  NOT redesigned; the honest options each change behaviour: one
+  NOT redesigned; the honest options each change behavior: one
   `capture_oplog_stats()` on the Rust side (the a3/a5 atomic-capture
   pattern), throttling to a few Hz, or only running it while the panel is
   open. **Read Stage 5's frame timeline with this in mind rather than
@@ -1045,7 +1275,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   "Original" stops being the true original after the first run. Measured on
   Toyota-Florida-Woods during QC: **`.webp` 87,642 B → `.jpg` 105,547 B** — a
   button called "Auto Compress" made the file 20% BIGGER and switched format,
-  because it re-encodes an already-optimised WebP as JPEG at the export
+  because it re-encodes an already-optimized WebP as JPEG at the export
   format/quality. The prior bytes survive (content-addressed dedupe means
   nothing is overwritten) but nothing references them and there is no UI to get
   back. Fix candidates: keep a pristine-original pointer separate from the
@@ -1194,7 +1424,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   every tool panel and the routing layer. Per the project's definition of done
   that flags a QC pass before the next release, and one was already outstanding
   from v7.44–46.
-- **Colour-picker history is per-session by design.** Persisting it means
+- **Color-picker history is per-session by design.** Persisting it means
   adding `pickedColorHistory` to `useToolStore`'s `partialize`, which is an
   IndexedDB schema change and therefore goes through the `dexie-migration`
   skill. Not a one-liner.
@@ -1594,7 +1824,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `"Edit Shape"`, so a recolour, a move and a resize all write the same row.
   Recolour a square then drag it and History shows two identical `Edit Shape`
   entries with nothing to tell them apart — in the one place you'd look for
-  "the step where I changed the colour". Fix is to pass the label in from the
+  "the step where I changed the color". Fix is to pass the label in from the
   call site (`Recolour Shape` / `Move Shape` / `Resize Shape`); small, but it
   touches the Rust crate so it needs a wasm rebuild and a size note. Same
   applies to text annotations if it's done.
@@ -1611,7 +1841,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 ## Docs cleanup (2026-08-04)
 
 - **RESOLVED, not OPEN: the auth doc is not radioactive — forward-only move is
-  enough, filter-repo is not warranted.** The brief asked for a judgement call
+  enough, filter-repo is not warranted.** The brief asked for a judgment call
   and offered to log it OPEN. Measured instead, against the shipped client
   bundle: the Convex deployment URL, the Clerk issuer and the Clerk
   publishable key are **all already in `www-dist/assets/index-*.js`** — public
@@ -1712,7 +1942,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `setEngineDocument(entry.id)` runs when the engine has been *handed* the
   pixels, not when it has taken them. A failed load would leave the marker
   naming a photo the engine never got — which is precisely the unguarded
-  behaviour shipping today, so it degrades to the status quo rather than to a
+  behavior shipping today, so it degrades to the status quo rather than to a
   refusal. Making the engine load awaitable would let ownership follow the
   document instead of the intent. The other three sites (op-log restore,
   `loadFromSaved`, fresh import) are all recorded after a real await.
@@ -1720,7 +1950,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   `handleDeleteSelected` and `confirmDeleteAll` (AppShell.tsx ~638 and ~1075)
   null the active photo without a `setEngineDocument(null)`. Skipped on purpose:
   CLAUDE.md says do not add to AppShell, and the omission only ever produces
-  `unknown → allow`, i.e. today's behaviour, never a false refusal. It leaves a
+  `unknown → allow`, i.e. today's behavior, never a false refusal. It leaves a
   stale marker naming a deleted photo, which is harmless now (nothing is left to
   save under it) and a latent trap for any future path that saves without
   loading. Wire it when those handlers move out of AppShell.
@@ -1789,7 +2019,7 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 - **NOTE — `crypto.subtle` is secure-context only.** A dev server reached over a
   LAN IP has no `crypto.subtle`, where the hash would throw into the catch that
   reports "cloud save failed" and silently disable sync altogether. `archiveHash`
-  returns null there and the caller uploads — shipped behaviour.
+  returns null there and the caller uploads — shipped behavior.
 - **OPEN — the sync record is session-lived and per-tab.** `lastUploadedRef` is
   a ref, so a reload re-uploads once per photo, and two tabs do not share it.
   Cheap direction to be wrong in, but it means the 28→4 number will look
@@ -2458,7 +2688,7 @@ undercounts this file: it is four of five, not one.
 
 ## ✅ RESOLVED v7.96 — `has_transparency()` cost a full composite, on every sync
 
-**Found a5 (2026-08-09), fixed 2026-08-10 by DELETION, not optimisation.**
+**Found a5 (2026-08-09), fixed 2026-08-10 by DELETION, not optimization.**
 Nothing consumed the value: `CanvasArea` was its only reader and stopped gating
 on it in `5e46921` (2026-06-27) when the checkerboard became unconditional CSS.
 Removed from `UiStateCapture`; `has_transparency()` stays as a method.
@@ -2559,7 +2789,7 @@ had a fallback before this module existed."* Nobody had tested it. It is false.
 
 | Call site | Kind | On a miss |
 |---|---|---|
-| `CanvasArea:2118` | render | ✅ JS-measured box centre |
+| `CanvasArea:2118` | render | ✅ JS-measured box center |
 | `CanvasArea:2288` | render | ✅ `sx - bgPad` |
 | `useTextTool:251` | commit | tolerates — commits at the **uncorrected anchor** |
 | `useTextTool:368` | re-edit | tolerates — the re-edit cycle **drifts** |
@@ -2706,7 +2936,7 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   panel gutters shrink the bar's inner box to ~532px, so each `1fr` column is
   ~130px while the left cluster's own content (Undo pill 84 + divider + Zoom
   pill 84 + two 12px gaps) is **193px**. Grid does not shrink it — it spills
-  right, under the centre column, and the centre column is later in the DOM so
+  right, under the center column, and the center column is later in the DOM so
   it paints on top and takes the clicks.
 
   Measured on master with the component changes stashed, at 1100px, Tools +
@@ -2717,14 +2947,14 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   | Left column width | 130px | 143px |
   | Left cluster content | 193px | 193px |
   | Zoom ↔ toggle-group overlap | **38px** | **26px** |
-  | `elementFromPoint` at Zoom-in's centre | **"New"** | **"New"** |
+  | `elementFromPoint` at Zoom-in's center | **"New"** | **"New"** |
 
   So **the Zoom-in button is unclickable in that band** — the click activates
-  New. The oval pass narrowed the centre pill (188 → 164) and therefore reduced
+  New. The oval pass narrowed the center pill (188 → 164) and therefore reduced
   the overlap, but did not remove it and was not its cause.
 
   The fix is a layout decision, not a size tweak: either drop the `1fr_auto_1fr`
-  grid for a flex row that lets the centre move off-centre under pressure, or
+  grid for a flex row that lets the center move off-center under pressure, or
   extend the existing `compact` collapse so the Undo/Redo pill (or the divider
   and gaps) also drops in the BP_TIGHT band, the way `narrow` already does.
   Both change where the toggles sit — Chris's call, not a passing edit.
@@ -2767,3 +2997,59 @@ GREEN on prose (quiet, and it is the direction that lets things through).
 Fix when someone is next in that file: strip `//` and `/* */` before matching,
 then re-baseline. Expect the count to RISE, and expect some of the new entries
 to be real.
+
+## `history_max_bytes` is exported and never called (found 2026-09-12)
+
+`src/settings.rs:62` exports it through `wasm_bindgen`, and its own doc comment
+says why: *"JS estimates the depth from the live document size and this number;
+hardcoding 512 MB there would be a second copy of a value that already lives
+here."* That JS never arrived — `git log --all -G "history_max_bytes" -- app/src`
+returns nothing, so the wire was **never connected**, not lost.
+
+It came in with #127 (the undo-degradation warning, ADR-052). So either the
+warning is computing its depth from a hardcoded number after all — the exact
+duplication the export exists to prevent — or it is not computing it at all.
+**Check which before deciding**: wire the caller up, or delete the export.
+
+Not fixed here because it is another feature's decision, and because the gate
+that should have caught it cannot — see `docs/vacuous-checks.md`.
+
+---
+
+## The long-form date formatter is written twice
+
+`fmtDate` in `marketing/src/pages/Trail.tsx` and `fmtPostDate` in
+`marketing/src/data/posts.ts` are the same eight lines: parse `YYYY-MM-DD` off
+the string and render `13 August 2026`. Both parse from the string rather than
+through `new Date(iso)` on purpose — a bare ISO date is read as UTC midnight and
+rendered in the reader's local zone, so anyone west of Greenwich sees a release
+land a day early — and that reasoning is now also written out twice.
+
+**Left duplicated deliberately.** The blog session's scope was the blog, and
+`posts.ts` has to stay importable by `seo.ts` (which the prerender loads under
+Node), so the shared home is a new module rather than either existing file. Two
+copies with a pointer comment is not yet worth a third file.
+
+**Do it when a third caller appears** — that is the point at which "they might
+drift" stops being hypothetical. `marketing/src/lib/date.ts` is the obvious
+home; `lib/` already exists for `analytics.ts`.
+
+---
+
+## `dialogZoom` is down to one consumer
+
+Retiring `ObjectRemovalModal` (its mask painter moved onto the canvas) left
+`dialogZoom` in `app/src/lib/animations.ts` with exactly one caller,
+`UploadDialog`. That file's own comment says a variant used once is
+indirection rather than a single source of truth — so by its own rule the
+variant should now be inlined, or kept only because a second dialog is
+expected back.
+
+**Left alone deliberately.** The variant exists because the two dialogs had
+already drifted (`scale: 0.95` vs `0.96`) and nobody could see it; deleting the
+record of that is how it comes back. It is also out of scope for the session
+that removed the modal — a one-line animation change in an unrelated feature is
+exactly the "clean up while I'm here" edit the rules forbid.
+
+**Do it when** a modal primitive consolidation happens anyway — the three-modal
+convergence onto `ui/dialog` already tracked above is the natural moment.

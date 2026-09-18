@@ -4,9 +4,15 @@ import Nav from "./components/Nav";
 import CommandPalette from "./components/CommandPalette";
 import Home from "./pages/Home";
 import Architecture from "./pages/Architecture";
+import About from "./pages/About";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import Trail from "./pages/Trail";
+import NotFound from "./pages/NotFound";
+import useHead from "./useHead";
+import { trackPageView } from "./lib/analytics";
 
 /** Client-side routing keeps the scroll position across pages, which is the
  *  wrong default for a set of documents: follow a link and you land halfway
@@ -30,6 +36,23 @@ function ScrollBehaviour() {
 }
 
 export default function App() {
+  // Title, description, canonical and JSON-LD follow the route. The prerendered
+  // HTML already carries the right ones for the page a visitor lands on; this is
+  // what keeps them right after a client-side navigation.
+  useHead();
+
+  // GA4's own page_view is switched off (see lib/analytics.ts), so this is the
+  // only thing that counts a page — including the first. It sits AFTER
+  // `useHead()` on purpose: effects in one component run in declaration order,
+  // so the title is already the new route's by the time this reads it.
+  // Sending from inside ScrollBehaviour instead would invert that — a child's
+  // effects run before its parent's — and every hit would carry the PREVIOUS
+  // page's title.
+  const { pathname: analyticsPath, search: analyticsSearch } = useLocation();
+  useEffect(() => {
+    trackPageView(analyticsPath + analyticsSearch);
+  }, [analyticsPath, analyticsSearch]);
+
   const [searchOpen, setSearchOpen] = useState(false);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
@@ -56,9 +79,20 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/architecture" element={<Architecture />} />
+        <Route path="/blog" element={<Blog />} />
+        {/* The one parameterized route on the site. It is NOT in ROUTES — see
+            the note in seo.ts — so prerender.mjs writes these files from POSTS
+            instead, and an unknown slug renders NotFound rather than a blank
+            article. */}
+        <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/features" element={<Features />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/about" element={<About />} />
         <Route path="/trail-log" element={<Trail />} />
+        {/* A catch-all, so an unknown URL gets a page that says so instead of a
+            bare nav over empty space. Paired with a real 404 status from the
+            host — see scripts/prerender.mjs. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <CommandPalette open={searchOpen} onClose={closeSearch} />
     </>

@@ -204,6 +204,74 @@ jobs:
         if: env.CONVEX_DEPLOY_KEY == ''
         run: echo "Skipping Convex checks — add the CONVEX_DEPLOY_KEY repo secret to enable."
 
+  # Convex functions do not reach production by merging. Nothing in this
+  # workflow pushed them until now: the job above runs `convex codegen`, which
+  # typechecks and regenerates `convex/_generated` and deploys NOTHING. So the
+  # repo could hold a function, CI could go green, the client could ship a call
+  # to it, and prod could have never heard of it.
+  #
+  # That is not hypothetical. #121 shipped a client calling
+  # `userColors:listUserColors`, the function was never deployed, and every
+  # signed-in user got a blank screen. When this job was written prod was STILL
+  # missing `shares` and `userColors` — both of which the app calls — measured
+  # against dev as a control, which had all sixteen modules.
+  convex-deploy:
+    name: Convex deploy (prod functions)
+    runs-on: ubuntu-latest
+    # Pushes to master only. A pull request must never be able to change what
+    # production runs, and a fork PR cannot read the secret anyway.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Deploy behind the gates that would catch a broken build. `convex` is the
+    # one that typechecks the functions being pushed.
+    needs: [web, convex]
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # WHERE AM I POINTED? `convex deploy` targets whatever deployment its key
+      # belongs to and mentions it only in passing, so a dev-scoped key sitting
+      # in this secret would push a green, successful, entirely wrong deploy.
+      # This reads the deployment URL back as data and fails before anything is
+      # pushed if it is not prod.
+      - name: Confirm the target deployment before pushing anything
+        if: env.CONVEX_DEPLOY_KEY != ''
+        run: node scripts/convex-deploy-check.mjs --expect-deployment https://pastel-alligator-180.convex.cloud
+
+      - name: Deploy functions
+        if: env.CONVEX_DEPLOY_KEY != ''
+        run: pnpm exec convex deploy --message "CI ${{ github.sha }}"
+
+      # A deploy that silently pushed nothing also exits 0, so the exit code is
+      # not the evidence. This asks the deployment what it actually serves and
+      # fails if any module in `convex/` is missing from the answer.
+      - name: Prove every module is live
+        if: env.CONVEX_DEPLOY_KEY != ''
+        run: node scripts/convex-deploy-check.mjs
+
+      # ⚠️ NOT a skip. This job only runs on a push to master, so there is no
+      # legitimate reason for the secret to be missing here — a fork PR never
+      # reaches this job at all.
+      #
+      # It WAS a skip, for one night, and that was worse than useless: the
+      # secret was not set, all three steps above were skipped, and the job
+      # reported SUCCESS while deploying nothing. Prod stayed three modules
+      # short and master's CI said everything was fine. Green because it could
+      # not fail is the exact shape docs/vacuous-checks.md exists to name.
+      - name: Fail if the deploy key is missing
+        if: env.CONVEX_DEPLOY_KEY == ''
+        run: |
+          echo "::error::CONVEX_DEPLOY_KEY is not set, so nothing was deployed."
+          echo "Add it as a repository secret (Settings → Secrets and variables → Actions)."
+          echo "Get the value from the Convex dashboard: Settings → Deploy keys → Production."
+          exit 1
+
   uploadthing-leak-guard:
     name: UploadThing secret-leak guard
     runs-on: ubuntu-latest
@@ -271,10 +339,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v4.37.9
+      - uses: github/codeql-action/init@v4.38.0
         with:
           language: javascript-typescript
-      - uses: github/codeql-action/analyze@v4.37.9
+      - uses: github/codeql-action/analyze@v4.38.0
 
   # ---------- Static guardrails (from docs/ci-guardrails.md) ----------
   # BLOCKING as of the night-repair pass. These ran under `continue-on-error`

@@ -8,7 +8,7 @@ modified; every number here comes from a throwaway copy (`test/vector-rebase`)
 so nothing published was rewritten.
 
 **One-sentence verdict: the work is sound and self-tested but decaying, the
-reconciliation cost is real and growing, and it does NOT fix the shape-colour
+reconciliation cost is real and growing, and it does NOT fix the shape-color
 bug — so nothing should be waiting on it.**
 
 ## What it is
@@ -66,9 +66,9 @@ tracked build-cache that has caused merge trouble before. Master has since
 stopped tracking it; the branch still carries it, so it shows up as
 modify/delete and can simply be dropped.
 
-## Does the shape-colour bug exist there? Yes — untouched
+## Does the shape-color bug exist there? Yes — untouched
 
-This was the reason to look. A placed square or circle cannot be recoloured, and
+This was the reason to look. A placed square or circle cannot be recolored, and
 the working theory was that the Vector rewrite might already have addressed it,
 making a fix on master dead code.
 
@@ -80,7 +80,7 @@ returns zero lines. Both blockers survive there exactly as on master:
   `fillColor` at 282 — the reselect snapshot outranks the live panel, so a
   panel change can never reach the commit.
 - `editDirtyRef` (line 302) is only ever set by a handle drag (line 534), so a
-  colour-only edit hits the `if (!editDirtyRef.current) … return` early exit and
+  color-only edit hits the `if (!editDirtyRef.current) … return` early exit and
   never calls `update_shape_annotation` at all.
 
 The branch reorganises the Shapes **UI** (`ShapeSettings.tsx`) and leaves the
@@ -96,7 +96,7 @@ only grows, and it is already 29 hunks across the most-edited files in the repo.
 Either schedule the rebase-and-finish as its own session soon, or delete the
 branch and keep `vectorGesture.ts` as the salvage. What should **not** happen is
 another month of drift, and nothing should be held back waiting for it —
-including the shape-colour fix, which it does not contain.
+including the shape-color fix, which it does not contain.
 
 Not merged, per instruction: a `wip(` commit does not go to production
 unattended.

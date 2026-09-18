@@ -203,9 +203,9 @@
 | 8   | **Transform spacing fix** — the "Transform" heading in the Crop tool's panel moved closer to its Flip H / Flip V / Rotate buttons (`gap-5` → `gap-2`), so the label-to-buttons spacing matches the "Ratio" → ratio-button rhythm used elsewhere in the same panel                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Complete |
 | 9   | **Marketing: Trail → Trail Log** — the changelog page (formerly Shipped, then Trail) now reads **Trail Log**. Route `/trail` → `/trail-log`; Nav and Footer labels + page eyebrow all updated. Component/file internally still `Trail` (purely internal — the public URL and labels are what change)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Complete |
 | 10  | **Drawing coverage helpers** — `src/drawing.rs` gains three public coverage helpers: `rounded_rect_coverage` (per-pixel α for an AA rounded rect), `triangle_coverage` (per-pixel α for an AA triangle), and `blend_coverage` (Porter-Duff source-over given coverage). Foundation work for the bubble-tail flushness fix and future shape-edge AA improvements                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Complete |
-| 11  | **New Pens tab — Pins + Freehand** — the Shapes tool grew a third tab between `Shapes` and `Arrows`. **Pins** mode drops auto-numbered callout discs (1, 2, 3…) on click, with a `Pin Size` slider (16–72 px) and a click-to-move on existing pins. **Freehand** mode draws a thick, round-capped polyline pen stroke on drag, with a `Stroke Width` slider. Both share the colour swatch. Rust gains two new shape kinds (`5 = pin`, `6 = polyline`) with `add_pin_annotation` / `restore_pin_annotation` and `add_polyline_annotation` / `restore_polyline_annotation` APIs, plus `render_pin` (filled disc + centred ab_glyph number) and `drawing::draw_polyline` (round-capped segment loop) / `drawing::fill_circle`. `ShapeAnnotation` extended with `number: u32` (pin label) and `points: Vec<(f64, f64)>` (polyline vertices); `get_shape_annotations` JSON, `PersistedShape`, and the persistence restore path all extended to round-trip them. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup. Hit-testing extended: polylines test against each segment; pins fall under the existing padded-bbox path. Pins reselect as a circle handle but keep their `kind=5` on commit via a new `kindByte` override in `DrawEditState.style`; polylines are delete-only (no bbox handle) via the Reselect panel                                                                                 | Complete |
+| 11  | **New Pens tab — Pins + Freehand** — the Shapes tool grew a third tab between `Shapes` and `Arrows`. **Pins** mode drops auto-numbered callout discs (1, 2, 3…) on click, with a `Pin Size` slider (16–72 px) and a click-to-move on existing pins. **Freehand** mode draws a thick, round-capped polyline pen stroke on drag, with a `Stroke Width` slider. Both share the color swatch. Rust gains two new shape kinds (`5 = pin`, `6 = polyline`) with `add_pin_annotation` / `restore_pin_annotation` and `add_polyline_annotation` / `restore_polyline_annotation` APIs, plus `render_pin` (filled disc + centered ab_glyph number) and `drawing::draw_polyline` (round-capped segment loop) / `drawing::fill_circle`. `ShapeAnnotation` extended with `number: u32` (pin label) and `points: Vec<(f64, f64)>` (polyline vertices); `get_shape_annotations` JSON, `PersistedShape`, and the persistence restore path all extended to round-trip them. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup. Hit-testing extended: polylines test against each segment; pins fall under the existing padded-bbox path. Pins reselect as a circle handle but keep their `kind=5` on commit via a new `kindByte` override in `DrawEditState.style`; polylines are delete-only (no bbox handle) via the Reselect panel                                                                                 | Complete |
 | 12  | **AI Tools: Background Removal goes live (Replicate + Convex pipeline)** — the AI panel's first model is no longer a placeholder. New `useAIJob` hook drives a single end-to-end job: export current canvas to PNG → `generateUploadUrl` → POST to Convex storage with `Content-Type: image/png` → call `api.ai.dispatch({ photoKey, type: "rembg", inputStorageId })` → subscribe to `api.aiJobs.getJob(jobId)` via `useQuery` → when the webhook flips status to `done`, fetch `outputUrl`, decode via `createImageBitmap` → 2D canvas → ImageData, and hand RGBA pixels back. AppShell's new `handleAIResult` calls `loadImageFromPixels` to swap the working image and marks the photo modified. Phase state machine (`idle` / `uploading` / `running` / `done` / `error`) drives button copy ("Uploading…" / "Removing background…" / "Remove Background"). A `consumedRef` guard prevents a re-render from decoding the same finished job twice. Gating: the panel is gated by `hasReplicateAI(effectiveUserMode)` from `lib/tiers.ts` — non-Paid users see a Lock notice ("AI tools run on Replicate and are a Paid feature"); the button is disabled when `!aiEnabled` or no active photo. ToolsSidebar threads a new `aiEnabled` prop through to `<AISettings>`. The remaining models (Text Extract / 4× Upscale / Object Removal / Alt Text) keep their `COMING_SOON` placeholder cards until the same plumbing is cloned for each | Complete |
-| 13  | **Auto Compress split into Selected / All buttons** — the Resize panel's bottom section was reorganised: a centred `⚡ Auto Compress` label sits over a 2-button grid (`Selected Image` / `All Images`), then an `<hr>`, then `Apply Compression & Resize` and `Show A/B Compare` below. The `onAutoCompress` callback gained a `scope: "selected" \| "all"` arg threaded through `ResizeSettings` → `ToolsSidebar` → `AppShell`. `AppShell.handleAutoCompress(scope)` resolves the target set as: `scope === "all"` → every photo; `scope === "selected"` → the checkbox multi-selection when one exists, otherwise just the active photo in the ring (so "Selected Image" is meaningful even with zero checkboxes). Button label pluralises to `Selected Images` when `selectedCount > 1`. `Selected Image` only disables on `isCompressing` / `disabled`, not on `selectedCount === 0`. `activePhotoId` added to the `useCallback` deps so the ring-fallback path stays current                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Complete |
+| 13  | **Auto Compress split into Selected / All buttons** — the Resize panel's bottom section was reorganised: a centered `⚡ Auto Compress` label sits over a 2-button grid (`Selected Image` / `All Images`), then an `<hr>`, then `Apply Compression & Resize` and `Show A/B Compare` below. The `onAutoCompress` callback gained a `scope: "selected" \| "all"` arg threaded through `ResizeSettings` → `ToolsSidebar` → `AppShell`. `AppShell.handleAutoCompress(scope)` resolves the target set as: `scope === "all"` → every photo; `scope === "selected"` → the checkbox multi-selection when one exists, otherwise just the active photo in the ring (so "Selected Image" is meaningful even with zero checkboxes). Button label pluralises to `Selected Images` when `selectedCount > 1`. `Selected Image` only disables on `isCompressing` / `disabled`, not on `selectedCount === 0`. `activePhotoId` added to the `useCallback` deps so the ring-fallback path stays current                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Complete |
 
 ## v3.5 Change Summary — 2026-06-17
 
@@ -297,12 +297,12 @@
 | #   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                       | Status   |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | 1   | **Firefox draw-stability fix** — `flushToCanvas` no longer hands `putImageData` an `ImageData` backed by live WASM linear memory. A later `memory.grow()` (undo snapshots accumulating ≈ stroke 5-8) detached that shared `ArrayBuffer`, and Firefox's desynchronized present read it stale → garbage. It now copies the composite into a reused, JS-owned backbuffer first                                                                  | Complete |
-| 2   | **Pins tool (renamed from Pens)** — dropped the freehand sub-mode and its top toggle; the panel is now Stroke-Width → label-style → colour. New **Numbers / Letters** toggle (Rust `ShapeAnnotation.label_kind`, spreadsheet-style A…Z, AA…); labels are **centred by visual ink-bounds** in `render_pin` (not the padded glyph box); pin diameter follows the Stroke Width slider. Old freehand saves still load                            | Complete |
+| 2   | **Pins tool (renamed from Pens)** — dropped the freehand sub-mode and its top toggle; the panel is now Stroke-Width → label-style → color. New **Numbers / Letters** toggle (Rust `ShapeAnnotation.label_kind`, spreadsheet-style A…Z, AA…); labels are **centered by visual ink-bounds** in `render_pin` (not the padded glyph box); pin diameter follows the Stroke Width slider. Old freehand saves still load                            | Complete |
 | 3   | **Paint stroke stabilizer** — pulled-string "lazy mouse" smoothing with an **Off / Low / Med / High** strength toggle (leash 0/12/22/36 px). The trailing-tip math + state live in Rust (`paint_stab_begin` / `paint_stab_to` / `paint_stab_flush`); `usePaintTool` maps strength → leash and catches up to the cursor on mouse-up                                                                                                           | Complete |
 | 4   | **"New" panel + Alt+N** — the top-bar **Upload** toggle is now **New** (it also creates blank canvases), and its shortcut moved from Alt+U to **Alt+N** (`useKeyboardShortcuts`, `TopBar`, `ShortcutModal`)                                                                                                                                                                                                                                  | Complete |
 | 5   | **Download chooser** — the two export buttons collapsed into one **`Download {FORMAT}`** button (pluralized when the gallery has >1 photo) that opens a **Selected / All / Cancel** dialog noting multi-image exports come as a `.zip`                                                                                                                                                                                                       | Complete |
 | 6   | **Unified dialog system (`ui/dialog.tsx`)** — app surface (`bg-bg-secondary`, `border-border`, `rounded-xl`), the close control is now a `TinyButton`, the accent focus ring is gone (X ring removed + `onOpenAutoFocus` prevented), and `DevTierDialog` switched to `LargeButton`. Hits Delete-All, the new Download chooser, and DevTier                                                                                                   | Complete |
-| 7   | **Toolbar redesign** — `ToolsSidebar` is **260px** (matches the Review panel); the ten tool tiles are fully spatial (`aspect-square w-full` in `1fr` columns, %-sized icons), neutral/monochrome with **only the active tool coloured**, plus the warm-accent hover ring restored                                                                                                                                                            | Complete |
+| 7   | **Toolbar redesign** — `ToolsSidebar` is **260px** (matches the Review panel); the ten tool tiles are fully spatial (`aspect-square w-full` in `1fr` columns, %-sized icons), neutral/monochrome with **only the active tool colored**, plus the warm-accent hover ring restored                                                                                                                                                            | Complete |
 | 8   | **Settings-panel consistency** — smaller dropdown font (`text-xs`); halved the gap below each panel's tab switch and pulled the switch up to the divider (`-mt-2`); `SizeSlider` dots variant compacted; **Opacity** sliders gained matching preset dots; every N-button picker (`ToolButtonGroup` + the Quick-Adjust / Transform action grids) uses `grid-auto-rows:1fr` so all buttons equalize to the tallest (i18n-safe for long labels) | Complete |
 | 9   | **Panel-gutter single source of truth (`lib/layout.ts`)** — TopBar padding, canvas `main-content` margin, and the gallery margin all read `PANEL_OPEN_GUTTER` (= 284), fixing a stale `320` (the old 296px toolbar) that left the canvas/checkerboard and gallery mis-aligned on the toolbar side when panels were open                                                                                                                      | Complete |
 | 10  | **Marketing** — hero image fixed (`June-2.webp` copied into `marketing/public`); Features cards updated (stabilizer, Pins numbers/letters, redaction, EXIF privacy); Trail Log gained a **sticky month-filter** pill toggle                                                                                                                                                                                                                  | Complete |
@@ -315,7 +315,7 @@
 | 2   | **General → runtime undo depth (Rust)** — new `src/settings.rs` owns the policy (default 50, bounds 50–1000, clamp); `History` gained a live `max_history` field + `set_max_history` (clamp + trim), exposed as the engine `set_max_history(n)` wasm-bindgen method. A **Max History** slider (50–1000) with **Apply & Save** applies it to the WASM engine and persists; it's re-applied to each freshly-created engine on load                                                                                                                 | Complete |
 | 3   | **General → idle screen** — `useIdleTimeout` + `IdleOverlay`: after a configurable timeout (15 / 30 / 60 min or Never; default 30) the page dims to a black **"Continue with Image Horse"** screen so the browser can throttle the tab. Saves CPU/battery; it does **not** reclaim WASM memory (only a reload does) — which is what the Max History knob is for                                                                                                                                                                                  | Complete |
 | 4   | **Super User tab (admin-gated)** — the old Alt+L tier override (No Login / Logged In / Paid + tier matrix) moved into a Super User tab shown only for `ADMIN_EMAIL` (`lib/superuser.ts`; a client-side **visibility** gate — the real tier stays enforced server-side by Convex). Removed the Alt+L dialog (`DevTierDialog` deleted) + shortcut, the status-bar triple-click unlock, and the "Secret Menu" group in `ShortcutModal`                                                                                                              | Complete |
-| 5   | **Preferences store** — `lib/preferences.ts` / `usePreferences`: app-wide prefs (`maxHistory`, `idleTimeoutMin`) persisted to `localStorage` (`image-horse-prefs`), mirroring the `useUserColors` pattern. `GeneralPane.tsx` carries the roadmap for the next General settings (export defaults, accent colour, reduce-motion, clear-local-data)                                                                                                                                                                                                 | Complete |
+| 5   | **Preferences store** — `lib/preferences.ts` / `usePreferences`: app-wide prefs (`maxHistory`, `idleTimeoutMin`) persisted to `localStorage` (`image-horse-prefs`), mirroring the `useUserColors` pattern. `GeneralPane.tsx` carries the roadmap for the next General settings (export defaults, accent color, reduce-motion, clear-local-data)                                                                                                                                                                                                 | Complete |
 | 6   | **Download dialog format picker** — new dependency-free `ui/radio-cards.tsx` (native radios → real radiogroup semantics + arrow-key nav) renders a 2×2 format grid (JPEG / PNG / WebP / AVIF + hints) inside the Download dialog, so anyone who missed the Compress dropdown gets a second shot; it's two-way synced with `exportFormat`. The title is count-aware (`Download JPEG` / `JPEGs`), **"All" hides when there's a single image**, and the gallery **Export Selected** button now opens the same dialog (defaulting to "Selected (n)") | Complete |
 | 7   | **Dialog header / body / footer (`ui/dialog.tsx`)** — restructured to a title-left + boxed-`X` header bar (with a divider), a padded `DialogBody`, and a bordered footer; `DialogContent` went to `p-0` so each section pads itself. Applies to the Download and Delete-All dialogs                                                                                                                                                                                                                                                              | Complete |
 | 8   | **Hardening / quality** — surfaced previously-silent failures to the Diagnostics log via `logDiagnostic("CONVEX_DB", …)` for cloud-edit save (`useEditPersistence`) and `users.upsert` (`useStoreUser`); fixed an `<img src="">` (empty string → full-page re-request) per gallery thumbnail in `GalleryBar`; removed debug `console.log`s from the `redo` path; replaced a triple `as any` namespace-dig in `ToolsSidebar` with a typed `StampSettingsPanel` import                                                                             | Complete |
@@ -370,10 +370,10 @@
 
 | #   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Status   |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1   | **Eraser tool + configurable brush hardness (Rust)** — the Paint tool's sub-modes are now **Paint · Blur · Pen · Eraser**. New Rust `erase_down/move/up` reuse the whole paint stroke engine (soft dabs, max-coverage so a stroke holds its true opacity, lazy-mouse stabilizer) but **scrub the active layer's alpha toward transparent** — keeping the base RGB so a partial erase fades out with no colour fringe — via an `erase` branch in `recomposite_stroke_bbox`. The brush dab's edge **Hardness** (0–100%) is now a real control (was a hardcoded 0.7) read by `accumulate_dab`, shared by paint + eraser. New `ToolSettings`: `brushHardness`, `eraserSize/Opacity/Hardness`; `usePaintTool` gained an `erase` flag. WASM rebuilt; `stamp_tool.d.ts` shadow hand-synced | Complete |
+| 1   | **Eraser tool + configurable brush hardness (Rust)** — the Paint tool's sub-modes are now **Paint · Blur · Pen · Eraser**. New Rust `erase_down/move/up` reuse the whole paint stroke engine (soft dabs, max-coverage so a stroke holds its true opacity, lazy-mouse stabilizer) but **scrub the active layer's alpha toward transparent** — keeping the base RGB so a partial erase fades out with no color fringe — via an `erase` branch in `recomposite_stroke_bbox`. The brush dab's edge **Hardness** (0–100%) is now a real control (was a hardcoded 0.7) read by `accumulate_dab`, shared by paint + eraser. New `ToolSettings`: `brushHardness`, `eraserSize/Opacity/Hardness`; `usePaintTool` gained an `erase` flag. WASM rebuilt; `stamp_tool.d.ts` shadow hand-synced | Complete |
 | 2   | **Histogram falls down when you cycle photos** — switching to another photo now drops the histogram bars to the baseline and holds them down for as long as the new photo takes to composite, then they rise into its shape; an in-place edit of the same photo keeps the smooth morph (no collapse-per-brush-stroke). Threaded a `photoKey` into `HistogramView` so a photo switch is distinguished from an edit                                                                                                                                                                                                                                                                                                                                                                   | Complete |
 | 3   | **Selection marker → Rust + drift fix** — the magic-wand marker is now a Rust-traced **marching-ants–style dashed outline** (2-tone black/white boundary + a faint interior tint) instead of a flat blue fill that buried the pixels (`selection_overlay_rgba`). Fixed the marker drifting away on zoom/pan: it used a one-shot `getBoundingClientRect()` under `position:fixed`; `SelectionOverlay` now rides the same `translate(pan) scale(zoom)` transform as the canvas (mirrors the checkerboard) so it stays pinned to the pixels                                                                                                                                                                                                                                            | Complete |
-| 4   | **Transparency checkerboard always behind the image** — the backdrop is no longer gated on `hasTransparency`; it's always rendered behind the canvas (an opaque image fully covers it, so it costs nothing) so eraser strokes, deleted selections, and PNG alpha read as an "empty grid" the instant they appear instead of risking a black flash. Standard editor behaviour: the checkerboard shows ONLY through the image's transparent regions                                                                                                                                                                                                                                                                                                                                   | Complete |
+| 4   | **Transparency checkerboard always behind the image** — the backdrop is no longer gated on `hasTransparency`; it's always rendered behind the canvas (an opaque image fully covers it, so it costs nothing) so eraser strokes, deleted selections, and PNG alpha read as an "empty grid" the instant they appear instead of risking a black flash. Standard editor behavior: the checkerboard shows ONLY through the image's transparent regions                                                                                                                                                                                                                                                                                                                                   | Complete |
 | 5   | **Batch commit** — this commit also lands accumulated in-progress work from prior sessions (Batch-editor settings, the Subscription/Settings theme sweep, Arrow settings, Super-User / User-menu, the move-layer tool, `MediaTile`). Whole tree compiles: `tsc --noEmit` clean, Rust builds, 26 Rust tests pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Complete |
 | 6   | **Docs & marketing** — README this summary; Trail Log **v0.9.30**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Complete |
 
@@ -414,7 +414,7 @@
 
 | #   | Change                                                                                                                                                                                                                                                                                                   | Status   |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1   | **WASM engine modularization** — the ~4,800-line `src/lib.rs` god-object split into focused modules (`annotations.rs` / `effects.rs` / `layer.rs` / `paint.rs` / `selection.rs` / `utils.rs`), shrinking `lib.rs` by ~60%. Behaviour-identical (same tools, same speed); far faster to build and work in | Complete |
+| 1   | **WASM engine modularization** — the ~4,800-line `src/lib.rs` god-object split into focused modules (`annotations.rs` / `effects.rs` / `layer.rs` / `paint.rs` / `selection.rs` / `utils.rs`), shrinking `lib.rs` by ~60%. Behavior-identical (same tools, same speed); far faster to build and work in | Complete |
 | 2   | **Shared `SmallDialog`** — the idle "paused to save power" screen, the small-window notice, and the resume prompt now use one compact card component (mid-size icon + title + body + single button). `IdleScreen` dropped its bespoke BrandReveal entrance for a dimmed backdrop + the shared card       | Complete |
 | 3   | **Cursor fix** — the brush-size ring is gated to the brush-family tools (`brush` + `effects`); `compress` (Resize), `arrow` (Layer Settings), and `ai` now keep the standard default arrow on the canvas and over the panels (no stray paint ring, including when the pointer is idle)                   | Complete |
 | 4   | **Docs** — README this summary; Trail Log **v0.9.35**                                                                                                                                                                                                                                                    | Complete |
@@ -452,7 +452,7 @@
 
 State-management foundation + storage investigation. All additive — the new
 Zustand stores are not yet consumed by AppShell, so this release changes no
-runtime behaviour; it lands the plumbing and the docs that the AppShell wiring
+runtime behavior; it lands the plumbing and the docs that the AppShell wiring
 builds on.
 
 | #   | Change | Status |
@@ -484,7 +484,7 @@ Zustand persistence + docs are groundwork.
 
 The Zustand migration's payoff: `AppShell` now reads its UI / tool / gallery state
 from the stores instead of ~38 local `useState`s — plus a logged-in photo-switch
-speedup and a CI clippy fix. **Behaviour-preserving** (the app works exactly as
+speedup and a CI clippy fix. **Behavior-preserving** (the app works exactly as
 before); verified by `tsc -b` + `vite build` and in-browser including persist
 hydration on refresh. fallow's unused-files count dropped 10 → 5 (the 5 store files
 are now reachable). This is the groundwork for splitting the 3k-line `AppShell` into
@@ -494,7 +494,7 @@ per-feature modules (see [Architecture Roadmap](archive/Architecture-Roadmap.md)
 | --- | ------ | ------ |
 | 1   | **AppShell wired to Zustand** — every store-bound `useState` (UI panel/dialog flags + master-bar tab; active tool + all tool-mode flags/settings; photos / selection / savings / modified / manifest / cap) replaced with same-name atomic selector bindings from `useUIStore` / `useToolStore` / `useGalleryStore`. `SetArg` keeps the ~30 functional-updater call sites working untouched; setters are stable refs (no extra re-renders). Now-unused imports (`defaultToolSettings`, `DEFAULT_PHOTO_LIMIT`, `GalleryManifest`, `EffectsMode`) pruned | Complete |
 | 2   | **Logged-in switch speedup** — `handleSelectPhoto` re-saved the outgoing photo on every switch, and when signed in `savePhotoEdit` uploads the full edit archive to Convex; now it saves only when the photo was actually modified | Complete |
-| 3   | **clippy CI fix** — the `if n > 0 { sum / n }` cell-average guards in `drawing.rs` (pixelate) + `filters.rs` (mosaic) tripped Rust 1.96's `manual_checked_ops`; folded into `checked_div` (behaviour-identical, works on the older local clippy too — no `#[allow]`) | Complete |
+| 3   | **clippy CI fix** — the `if n > 0 { sum / n }` cell-average guards in `drawing.rs` (pixelate) + `filters.rs` (mosaic) tripped Rust 1.96's `manual_checked_ops`; folded into `checked_div` (behavior-identical, works on the older local clippy too — no `#[allow]`) | Complete |
 | 4   | **Docs** — README intro + a "state management" release note; `Architecture.md` "Client state (Zustand)" section; `Features.md` state bullet; `File-Map.md` `stores/` tree + `lib/` additions; marketing Hero copy | Complete |
 
 ## v5.9 Change Summary — 2026-06-29
@@ -509,7 +509,7 @@ tests), `tsc --noEmit`, and `vite build` (all green).
 | --- | ------ | ------ |
 | 1   | **New-Document category tabs** — `NewActions.tsx`'s flat `PAGE_PRESETS` became `PRESET_CATEGORIES` (Social / Web / Video / Paper) with a `PRESET_BY_ID` lookup. A "Canvas type" `ToolButtonGroup` (4-col) swaps which "Page size" presets show; picking one fills width/height as before. Sizes: Instagram/IG-portrait/Story, Facebook + cover, LinkedIn + banner, X, Pinterest; FHD/HD/4K, OG, ad units, favicon; YouTube thumb/banner, 1080p/4K/vertical/square/TikTok; A3/A4/A5, Letter/Legal, 4×6/5×7/8×10 | Complete |
 | 2   | **Logo/title hidden in blank mode** — `NewActions` gained an `onBlankModeChange` prop (fired from a `useEffect` on `blankMode`); `UploadDialog` drops its logo + "Image Horse" header while the Blank Canvas panel is open, restoring it on close/reopen. Sign-in + close (X/Escape) unaffected | Complete |
-| 3   | **Two-layer "artboard" on import** — new Rust `ImageHorseTool::load_image_artboard(pixels, img_w, img_h, pad, bg_rgba)`: grows the document to `photo + 2·pad`, builds a solid **Background** layer + a transparent **Photo** layer with the image pasted centred at `(pad, pad)`, photo layer active. Mirrors `load_image` otherwise (clears history/overlays). Two unit tests (opaque + transparent canvas) | Complete |
+| 3   | **Two-layer "artboard" on import** — new Rust `ImageHorseTool::load_image_artboard(pixels, img_w, img_h, pad, bg_rgba)`: grows the document to `photo + 2·pad`, builds a solid **Background** layer + a transparent **Photo** layer with the image pasted centered at `(pad, pad)`, photo layer active. Mirrors `load_image` otherwise (clears history/overlays). Two unit tests (opaque + transparent canvas) | Complete |
 | 4   | **Canvas-on-import preference** — `canvasArtboard` (bool) + `canvasPadding` (px, 0–200, default 10) added to `Preferences` (interface, defaults, `normalize`, `serialize`). Settings → General → *Canvas on import* toggle (Canvas+photo / Photo-only) + a conditional border slider. Default **off** = classic single full-bleed `load_image`. Wired through `useCloneStamp.loadImageFromPixels`'s new optional `artboard` arg; AppShell passes it **only** on fresh import (`handleAddPhotos`), not on photo-switch / restore / AI-result, so an already-loaded photo isn't re-padded | Complete |
 
 > **Known follow-ups (artboard).** The two-layer artboard applies on **fresh import
@@ -1017,7 +1017,7 @@ Tool-arc session 2.6: **Edit and Transform → "Adjust & Select"**, the
 selection tools consolidated into it, and a shared Rust edge-detection
 core underneath. Verified on canvas: from ONE identical click the three
 selection kinds return genuinely different masks — wand 290,224 px,
-edge-aware 290,170 px (tighter — the edge map walls it in), colour
+edge-aware 290,170 px (tighter — the edge map walls it in), color
 range 300,872 px (larger — it takes disconnected pixels the wand can't
 reach). Gates: cargo fmt / clippy / **66 tests** (+4 for the edge core),
 tsc + prod build clean, zero console errors.
@@ -1026,7 +1026,7 @@ tsc + prod build clean, zero console errors.
 | --- | ------ | ------ |
 | 1   | **Shared edge-detection core** (`src/edges.rs`, new module) — Sobel gradient magnitude, 0..=255 per pixel. Computed over perceptual luminance **and** the raw channels, taking the max: a red/green boundary at matched luminance is a real edge to a human and invisible to a luma-only operator, and the test suite pins exactly that case. L1 magnitude (`\|gx\| + \|gy\|`) rather than a hypot — a sqrt per channel per pixel buys a difference nobody can see once it's thresholded. Border pixels read 0 (a 3×3 kernel has no valid neighbourhood there, and treating the image frame as an edge would wall in every fill that starts near it). **Built once, deliberately shared**: the magnetic lasso and Smart Brush walk these same edges when they land — a second gradient implementation elsewhere is how those two features drift apart | Complete |
 | 2   | **Edge-aware wand** (`magic_wand_select_edges`) — the same flood fill, but it won't cross a pixel whose edge strength exceeds the threshold, so a fill stops at the object outline instead of leaking through a soft gradient. The seed pixel is exempt: clicking directly *on* an outline should still select something rather than silently nothing. An "Edge sensitivity" slider appears only for this kind — hidden, not disabled, for the others, so the panel doesn't grow dead controls | Complete |
-| 3   | **Color Range** (`color_range_select`) — every pixel within tolerance of the clicked colour anywhere in the image, not just the connected blob (Photoshop's Select → Color Range) | Complete |
+| 3   | **Color Range** (`color_range_select`) — every pixel within tolerance of the clicked color anywhere in the image, not just the connected blob (Photoshop's Select → Color Range) | Complete |
 | 4   | **One flood fill, not three** — `magic_wand_select` and `magic_wand_select_edges` differ by a single `Option`, so they share one `flood_select`, and all three entry points share one `seed_index` bounds-check. The copy-pasted second fill cost ~1.2 KB of duplicated wasm and would have been the classic fixed-in-one-place-not-the-other bug | Complete |
 | 5   | **"Adjust & Select"** — `TransformCropSettings` adopts the shared `ToolModeToggle` with `[Adjust] \| [Select]`; Adjust holds the original crop/transform body verbatim, Select holds the new panel. Display label only — the tool id stays `crop` (shortcut `2`, persistence, the ToolType union all depend on it). Registered as the **third `ToolModule`** (after Paint and Resize), and the palette's sub-mode entries route through `SUBMODE_SETTERS` | Complete |
 | 6   | **The wand moved home** — out of Layer Settings, where it sat next to Move and Resize-Layer despite being a selection tool. Three routing sites had to follow it or click-to-select would silently no-op: the canvas `selectionActive` gate (was hard-coded to the old `arrow` tool), the leave-tool cleanup (which would otherwise switch selection off the moment you opened the tool that owns it), and the click-to-select toggle (now also switches to Adjust & Select → Select, since the routing is gated on the sub-mode) | Complete |
@@ -1181,7 +1181,7 @@ longest-running open question.
 The old default cropped exports to just the photo, with the rationale "the
 backing canvas is a compositional guide, not real content." Under ADR-016 the
 Canvas IS the document's bottom layer, so what you see on screen is what you get
-on export. Users who never touched the toggle will see padded, coloured exports
+on export. Users who never touched the toggle will see padded, colored exports
 where they previously got a tight crop. Opt out in Settings → "Canvas background
 on export", or hide the layer in the Layers panel. This was put to Chris with the
 consequence named, and confirmed — it is a deliberate reversal, recorded as such
@@ -1447,7 +1447,7 @@ it. Now portalled to `<body>`, where the token means what it says. **Fixes every
 tooltip in the app.**
 
 Verified by hit-test, not by eye: `document.elementFromPoint()` at the tooltip's
-centre now returns the tooltip, where it previously returned a gallery node.
+center now returns the tooltip, where it previously returned a gallery node.
 
 ### "Auto Compress" → "Auto Compress & Resize"
 
@@ -1636,7 +1636,7 @@ await idbSave(photoId, toolRef);      // ← never reached on a HANG
 ```
 
 The cloud attempt ran **first**, and the local IndexedDB write lived in the
-`catch`. That is only a defence against a **rejection**. `generateUploadUrl()` is a
+`catch`. That is only a defense against a **rejection**. `generateUploadUrl()` is a
 Convex mutation that, when the deployment does not answer, **hangs** — neither
 resolves nor rejects. A hang never reaches a catch.
 
@@ -2003,7 +2003,7 @@ with 182 files completely clean.** All 26 errors are fixed in this release.
 | 2   | ESLint 10.7 + `typescript-eslint` 8.65 + `eslint-plugin-react-hooks` 7.1 + `eslint-plugin-react-refresh` 0.5 added as root devDependencies | Complete — none of them were installed before |
 | 3   | 11 `no-useless-assignment` dead stores removed — initializers overwritten on every path before any read | Complete — `tsc` definite-assignment verified each one |
 | 4   | 3 `no-explicit-any` casts replaced — two `storageId as any` become `Id<"_storage">`, one Convex row field gets a narrow inline type | Complete |
-| 5   | 2 `no-unused-expressions` — `cond ? a() : b()` used as a statement became `if/else` | Complete — behaviour identical |
+| 5   | 2 `no-unused-expressions` — `cond ? a() : b()` used as a statement became `if/else` | Complete — behavior identical |
 | 6   | 3 empty `catch {}` blocks documented; 2 dead test helpers deleted; 2 `prefer-const` | Complete |
 | 7   | 2 stale `eslint-disable` comments removed — written for a linter that had never run | Complete |
 | 8   | `no-unused-vars` configured to honour the existing `^_` convention (`_settings`, `_onChange`, `_dropped`) | Complete — the code already marked intent; the rule now reads it |
@@ -2210,7 +2210,7 @@ recorded here rather than quietly "fixed".
 
 | #   | Change | Status |
 | --- | -------- | -------- |
-| 1   | Six `oplog.as_ref()/.as_mut().unwrap()` in `oplog_sync_annotations`, `oplog_sync_canvas`, `try_oplog_undo`, `try_oplog_redo` → guarded re-acquisition falling back to snapshot undo | Complete — **but they were never live crashes**: all six already sat behind a `None` guard in the same function. A borrow-checker artifact (the guard's borrow dies at the intervening `&mut self` calls), fixed as defence in depth |
+| 1   | Six `oplog.as_ref()/.as_mut().unwrap()` in `oplog_sync_annotations`, `oplog_sync_canvas`, `try_oplog_undo`, `try_oplog_redo` → guarded re-acquisition falling back to snapshot undo | Complete — **but they were never live crashes**: all six already sat behind a `None` guard in the same function. A borrow-checker artifact (the guard's borrow dies at the intervening `&mut self` calls), fixed as defense in depth |
 | 2   | Deploy sentinel — `scripts/deploy-sentinel.sh` + CI job fetching the LIVE site's glue and wasm; fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` | New — the manual check that caught the five-week featureless-prod bug, automated. Kept a script so it stays runnable by hand |
 | 3a  | `ih_selection_bool` kill switch verified intact after the v7.47 six-mode rework; pinned by `selectionBool.test.ts` (6 tests) | Complete — every `set_selection_combine` write is fed by `selectionCombineMode`, which reads the flag itself |
 | 3b  | `importOra` made module-private instead of deleted | **Brief was wrong**: it is called twice inside `importOraAsNewPhoto`, which is live in `ExportPane.tsx`. Deleting it breaks `.ora` import, and the parser stays reachable regardless, so deletion shed zero attack surface |
@@ -2288,12 +2288,12 @@ passing.
 | 5   | **Canvas dispatch switches on sub-tool.** `useEffectiveTool`'s unmatched-tool fallthrough returned the raw clone-stamp handlers — the near-miss where a marquee drag almost clone-stamped. Default is now `idle`, every group has an explicit case, every Create/Edit sub-tool is named | **FIXED** |
 | 6   | Cursor declared per sub-tool in the registry, on the same row as dispatch — a sub-tool with no gesture carries no cursor *and* idles, so the two can't drift. Select's Shift/Alt badge and Resize Layer's `move` stay dynamic | Complete |
 | 7   | Edit panels split: `TransformCropSettings` and `LayerSettings` each gained a `section` prop. All six live Edit sub-tools render their own section alone | Complete |
-| 8   | Colour-picker history — newest-first, case-insensitively de-duplicated, capped at 12. Built from `ReselectBar` in a `.history-list`, the same primitives as the Guides list, so the two can't drift apart visually | New |
+| 8   | Color-picker history — newest-first, case-insensitively de-duplicated, capped at 12. Built from `ReselectBar` in a `.history-list`, the same primitives as the Guides list, so the two can't drift apart visually | New |
 | 9   | Digits `1`–`5` select groups. Hand-written `TOOL_BY_KEY` (11 entries) deleted for `GROUP_BY_KEY`, derived from the registry. `6`–`0`/`-` now inert — test-pinned, so muscle memory does nothing rather than something | Complete |
 | 10  | `ShortcutModal` re-pointed at the group registry. Worth recording: it already derived from `toolConfig.ts` — the "fourth hand-maintained copy" that lost Select for three releases was fixed before this arc, not by it | Corrected |
 | 11  | Registry edits from review: **Line removed** (`line` stays a shape kind in the Shapes panel), **OCR promoted** to a Create sub-tool, **Guides** kept live but re-iconed off `Ruler` (it read as a measurement tool that doesn't exist), **Perspective** Coming Soon | Complete |
 | 12  | Coming Soon is a discriminated-union member carrying no `tool`, so it is unreachable by route and palette **by type** rather than by a runtime check somebody can forget | Complete |
-| 13  | Text panel: background/bubble/shadow controls now render in the Text mode too, directly after the colour swatch | Complete |
+| 13  | Text panel: background/bubble/shadow controls now render in the Text mode too, directly after the color swatch | Complete |
 | 14  | Sub-tile border width matched to the rail (`border-2`); hover ring no longer clipped by the height-animating wrapper's `overflow-hidden`; toolbar icons 50% → 55%, scoped to the tile components rather than the global `h-1/2` utilities | Complete |
 | 15  | All 33 sub-tools gained a tooltip description — Create is 13 tiles and was a wall of icons | Complete |
 
@@ -2325,7 +2325,7 @@ alongside the ORPHAN/AMBIGUOUS list.
 | 3   | **Ambiguity fixed while writing the redirect table**: `select` is BOTH a group id and a legacy tool slug, so `#/tool/select/edge` was resolving as a group, failing to match `edge` as a sub-tool *id*, and silently dropping onto the group default (Magic Wand) — the wrong selection mode with nothing to say so. Under the `tool/` prefix the legacy reading now wins | **FIXED** |
 | 4   | Coming Soon sub-tools are unreachable by URL: a route naming one collapses to the group default. They carry no `tool`, so `applyRoute` would have nothing to activate | Complete |
 | 5   | `applyRoute` now goes through `activateSubTool` — the same call the rail and the palette make — so a link and a click leave the app in identical state, including preselects (the Color Picker toggle arms and disarms) | Complete |
-| 6   | **Command palette rebuilt on the group registry.** It emitted "Paint › Paint": the old loop walked `TOOLS` + the sub-mode table, so it spoke legacy tool names and doubled the label whenever a tool's first mode shared its name. Now one entry per group + one per live sub-tool, labelled "Create › Brush" | **FIXED** |
+| 6   | **Command palette rebuilt on the group registry.** It emitted "Paint › Paint": the old loop walked `TOOLS` + the sub-mode table, so it spoke legacy tool names and doubled the label whenever a tool's first mode shared its name. Now one entry per group + one per live sub-tool, labeled "Create › Brush" | **FIXED** |
 | 7   | Palette Batch gating matches the rail and the router (2+ photos), pinned in all three places | Complete |
 | 8   | **Ruler** added to Edit beside Guides as a disabled placeholder, like Perspective — slot held, measuring unbuilt. 34 sub-tools, 32 live | New |
 | 9   | Three test suites rewritten against the new contract: `routes.test.ts` (74 tests incl. the redirect table), `commands.test.ts`, `routeState.test.ts` — round-trip identity is asserted over **every live sub-tool**, not a sample | Complete |
@@ -2355,9 +2355,9 @@ sub-tools (letter scoped to the active group).
 | 4   | **⌘K indexes all 45 features**, each deep-linked to its own `/features#<slug>` anchor. DERIVED from `features.ts` — the same generated data the page renders — so the palette and the page cannot disagree. The full body text stays searchable while only the first clause is shown | New |
 | 5   | `featureSlug` moved into `featureIcons.ts` (hand-written) and shared by the page and the palette. It was inline in `Features.tsx`; a second copy in the palette would have been how a deep link silently rots. NOT in `features.ts` — that file is regenerated and would wipe it | Complete |
 | 6   | **8 stale feature entries corrected.** They still described the eleven-tool layout: "Effects → Color Picker tab", "the Arrows sub-tab inside the Shapes tool", "tab-switched with Blur Brush and Pen", "the Stamp tool's Emojis tab", "Text → Background → Drop Shadow". None of those places exist now | Complete |
-| 7   | **5 new feature entries**: the five-group toolbar, sub-tool routing, sub-tool canvas dispatch, colour-picker history, OCR. Features 40 → 45 (UI 15 → 20) | Complete |
+| 7   | **5 new feature entries**: the five-group toolbar, sub-tool routing, sub-tool canvas dispatch, color-picker history, OCR. Features 40 → 45 (UI 15 → 20) | Complete |
 | 8   | Top bar icon buttons (Undo / Redo / both Zooms / Settings / signed-out user) take the tool-rail vocabulary — border for state, hover ring, icon at 55% — at 36px so the glyph matches the rail's within a pixel. `standalone` variant carries its own fill for the two that sit outside a group pill | Complete |
-| 9   | Every `ToggleButtonGroup` button gets the hover ring and one 18px glyph, labelled or not. The top bar's four and the Review panel's four were already the same component; they now look it. Reaches the settings panes too, deliberately | Complete |
+| 9   | Every `ToggleButtonGroup` button gets the hover ring and one 18px glyph, labeled or not. The top bar's four and the Review panel's four were already the same component; they now look it. Reaches the settings panes too, deliberately | Complete |
 
 **Verified**: marketing and app both build; the served marketing bundle carries
 the new title, the feature entries and the `/features#` deep links. App gates:
@@ -2411,10 +2411,10 @@ every `Ctrl`-chord at once rather than hand-adding rows one at a time.
 
 | #   | Change | Status |
 | --- | -------- | -------- |
-| 1   | **A pen path deselected the moment you clicked the panel.** `PenOverlay`'s "click off the canvas → finish" listener works on raw coordinates, so every click on the tool panel counted as off-canvas — including the colour swatch you opened the panel to reach. The path was finished and deselected before the picker rendered, which is what made the Reselect list feel mandatory for something as ordinary as recolouring a path | **FIXED** — panels marked `data-pen-keep-selection` operate ON the selection and no longer end it; the workspace around the canvas still does |
+| 1   | **A pen path deselected the moment you clicked the panel.** `PenOverlay`'s "click off the canvas → finish" listener works on raw coordinates, so every click on the tool panel counted as off-canvas — including the color swatch you opened the panel to reach. The path was finished and deselected before the picker rendered, which is what made the Reselect list feel mandatory for something as ordinary as recoloring a path | **FIXED** — panels marked `data-pen-keep-selection` operate ON the selection and no longer end it; the workspace around the canvas still does |
 | 2   | **A finished path now stays selected.** `add_bezier_annotation` already returned the new id — nothing was reading it, so a committed path went straight back to nothing selected. The overlay keeps it, re-takes the engine's editing lock, and the panel's Stroke and Background then restyle the path you just drew | New |
-| 3   | Live preview needed no new plumbing: the overlay already drew with the panel's current `color`/`fillColor`, so a selected path recolours as you click swatches and bakes on finish | Recorded |
-| 4   | **Escape used to CANCEL whenever a path was selected** — correct when the only way to be selected was deliberately re-opening a committed path, but with (2) it threw away every restyle: pick a colour, press Escape, and the path snapped back to the colour it was drawn in. Escape now commits and deselects; `Ctrl+Z` is how you take back a reshape | **FIXED** (introduced by (2), caught in browser before it shipped) |
+| 3   | Live preview needed no new plumbing: the overlay already drew with the panel's current `color`/`fillColor`, so a selected path recolors as you click swatches and bakes on finish | Recorded |
+| 4   | **Escape used to CANCEL whenever a path was selected** — correct when the only way to be selected was deliberately re-opening a committed path, but with (2) it threw away every restyle: pick a color, press Escape, and the path snapped back to the color it was drawn in. Escape now commits and deselects; `Ctrl+Z` is how you take back a reshape | **FIXED** (introduced by (2), caught in browser before it shipped) |
 | 5   | The close gesture that actually fires lives in `startDrag`, not `onCanvasDown`: the 8×8 first-anchor handle sits on top of the capture rect and stops propagation. Adding keep-selection to the `onCanvasDown` twin alone did nothing — clicking the first anchor still deselected | **FIXED** |
 | 6   | **Leaving the pen could have made a path vanish.** Because a finished path now holds `editing_shape_id`, unmounting the overlay would hide the baked path with nothing left drawing it. A teardown handler commits what's in flight (or releases the lock). Deliberately not `finish` — its `setState` calls have nothing to update during teardown | Complete |
 | 7   | **You could not tell whether the ends were joined.** An open path finishing near its start looked identical to a closed loop, and nothing hinted that clicking the first anchor would connect them. The first point now carries a ring: dashed (open), solid blue + filled (a click here joins them, or they already are). Static by choice — an animated dash would be one more moving thing over the photo and would need a reduced-motion escape | New |
@@ -2471,7 +2471,7 @@ instance), C (what shipped) are written up with tradeoffs in
 
 **Not live until deployed.** The auth config only takes effect once `npx convex
 deploy` pushes it to `brave-ant-608`. Deliberately not run here — it changes
-auth behaviour for the backend production depends on, which is a morning
+auth behavior for the backend production depends on, which is a morning
 decision, not a 2am one.
 
 **Gates**: app `tsc --noEmit` clean, eslint **0 errors / 59 warnings**,
@@ -2514,7 +2514,7 @@ edits or the canvas stopped showing them.
 
 | #   | Change | Status |
 | --- | -------- | -------- |
-| 1   | **Two tiles claimed to be the current tool.** Click the Enhance tile, press `3`: Enhance goes `aria-pressed=false` — it is not the active group — yet keeps painting `solid 2px rgb(252,223,194) off:2px` because it matches `:focus-visible`, while Create paints the same colour as a `border-color`. Same hue, same width, one just outside the box and one on the edge | **FIXED** — focus is now `2px dashed var(--focus-ring)`, a neutral ink token (`#2a2622` light / `#eeeeee` dark) |
+| 1   | **Two tiles claimed to be the current tool.** Click the Enhance tile, press `3`: Enhance goes `aria-pressed=false` — it is not the active group — yet keeps painting `solid 2px rgb(252,223,194) off:2px` because it matches `:focus-visible`, while Create paints the same color as a `border-color`. Same hue, same width, one just outside the box and one on the edge | **FIXED** — focus is now `2px dashed var(--focus-ring)`, a neutral ink token (`#2a2622` light / `#eeeeee` dark) |
 | 2   | Diagnosed before anything was styled, in a real browser against computed styles. `:hover` was ruled out by re-reading with the pointer parked on the canvas — the ring survived it. `:active` and `aria-pressed` were never involved | Verified |
 | 3   | **"Switch to `focus-visible:`" was already done, and was not the fix.** A mouse click leaves DOM focus on the tile but measures `:focus-visible` **false**. Chrome re-evaluates that heuristic when keyboard input arrives, so the very shortcut that moves the active state to another tile is what lights a focus ring on the old one. Both tiles then legitimately match two different selectors that happened to look identical | Recorded |
 | 4   | **The gallery was worse than the toolbar.** `.photo-thumb.selected` declared `outline: 2px solid var(--accent); outline-offset: 2px` — byte-identical to the global focus rule. A keyboard-focused thumbnail was indistinguishable from a multi-selected one, not merely confusable. Focus now wins the `outline` channel (source-ordered after `.selected`, equal specificity) and selection keeps a `border-color` so it survives being focused | **FIXED** |
@@ -2577,7 +2577,7 @@ edits or the canvas stopped showing them.
 | 22  | **Also found: the real production deployment (`pastel-alligator-180`) has no auth providers configured at all** — same probe returns the short form with no provider list. That is a live trap for "point the live site at production": doing so without deploying `auth.config.ts` there first would go from "wrong user row" to "not authenticated at all", looking exactly like the original bug returning | Recorded |
 | 23  | Findings written to `docs/internal/share-links-auth-mismatch.md` under a dated heading, with the credential-free re-check command. Identifiers truncated and email addresses omitted deliberately — this repository is public | Complete |
 | 24  | **#14 — `exportFormat` and `quality` are remembered.** They were `useState` in AppShell, so every reload silently reset them to JPEG at 75 and the user re-picked their format on every visit. Now persisted in `useToolStore` beside the sub-mode prefs — same "remember what I picked" contract, no engine coupling, so nothing to sync into WASM on rehydrate | **FIXED** |
-| 25  | **Additive only: no version bump, no migration, no `dexie-migration` trigger.** The `partialize` allowlist grew by two keys; the schema did not change. A blob written before these keys existed rehydrates them as `undefined`, which fails validation and falls back to the in-code default — i.e. exactly the pre-#14 behaviour. Verified against a real pre-#14 blob in the browser, not only in tests | Verified |
+| 25  | **Additive only: no version bump, no migration, no `dexie-migration` trigger.** The `partialize` allowlist grew by two keys; the schema did not change. A blob written before these keys existed rehydrates them as `undefined`, which fails validation and falls back to the in-code default — i.e. exactly the pre-#14 behavior. Verified against a real pre-#14 blob in the browser, not only in tests | Verified |
 | 26  | `ExportFormat` is now derived from an `EXPORT_FORMATS` tuple (same shape as `BRUSH_MODES` et al.) so the persisted value can be range-checked against **this build's** list on rehydrate. New `validatedNumberInRange` guard in `stores/_shared.ts` for `quality` — the union-based `validated` cannot express a 1..100 range. The existing validators were not touched | Complete |
 | 27  | The "partializes exactly the six sub-mode prefs" assertion is a deliberate DRIFT PIN, and it failed on this change exactly as designed — widening persistence has to break it on purpose rather than slip through. Updated consciously, plus three new tests: tolerance of a pre-#14 blob, rejection of an unknown format, and range-checking of quality (0, 101, -5, NaN, Infinity, "75", null all fall back) | Verified |
 | 28  | Round-tripped through the real UI, not just the store: picked WebP in the Compress dropdown, did a full page reload, and the dropdown still read WebP. Preferences were restored to the JPEG/75 defaults afterwards | Verified |
@@ -2633,7 +2633,7 @@ edits or the canvas stopped showing them.
 | 40  | **024 was deliberately skipped, not missed** — it is claimed by the engine-in-a-worker draft on `spike/engine-worker`, which is not on master. Numbering it here would have collided on merge. The INDEX carries a reserved row saying so | Recorded |
 | 41  | The July shipping popper was refreshed **as part of this release rather than after it** — 195 entries across 60 July releases, 486 all-time, 40%, split fix 64 / ui 43 / feature 33 / infra 30 / rust 24 / perf 1. Counted after this release's own entries were in `releases.ts`, which is the order the file's comment requires and the exact failure fixed in v7.59 | Complete |
 | 42  | **The "89-line triplicate" was twelve lines.** fallow's `dup:1002f0a8` — 89 lines, 3 instances, the largest clone group in the codebase — matched `usePaintTool` / `useMoveLayerTool` / `useMagicEraserTool`. Reading all three first: the only byte-identical code is the 12-line `coords` callback mapping a mouse event to image-space pixels. The rest of the matched window is structural rhyme, `useCallback` shapes that normalise to the same token stream. **A fallow line count is the matched window, not the shared code** | Recorded |
-| 43  | Extracted `hooks/useCanvasCoords.ts` and nothing else. Behaviour-preserving by construction: same `useCallback` with the same `[canvasRef]` dependency, so callback identity and every downstream dependency array are unchanged | **FIXED** |
+| 43  | Extracted `hooks/useCanvasCoords.ts` and nothing else. Behavior-preserving by construction: same `useCallback` with the same `[canvasRef]` dependency, so callback identity and every downstream dependency array are unchanged | **FIXED** |
 | 44  | **The pointer-gesture lifecycle the group appears to share is not shared.** Down: Move sets refs and calls nothing, Paint pushes smart-brush config then branches three ways with different arg lists, Magic Eraser feature-detects patchmatch exports and never flushes. Move: Move dedupes to whole pixels, Paint flushes only when the engine reports changed pixels, Magic Eraser coalesces its overlay to one rAF (`selection_overlay()` is O(image size) and froze a 1385×2068 image). Up: Move commits, Paint always flushes behind a 20-line comment recording the bug that gating it caused, Magic Eraser conditionally removes and always clears the mask. Unifying that needs a flag per difference — three honest copies beat it, so it was not built | Recorded |
 | 45  | Proof it was removed rather than relocated, which was last night's failure mode: duplication **2,116 → 1,990 lines, 4.0% → 3.8%**, files 46 → 44, clone groups 62 → 60, and `dup:1002f0a8` absent. No group in the after-report names the new helper or any of the three hooks; two files left the duplicate set entirely | Verified |
 | 46  | **`ShortcutModal` rebuilt on the `ui/dialog` primitive.** It was a bespoke `motion.div` with no `role="dialog"`, no `aria-modal`, no Escape and no focus trap. The layout did not fight it — `.shortcut-modal` was `max-width: 760px` by hand and `size="xl"` is `max-w-[760px]`, so the two-column table is untouched at 9 groups and 33 rows, still derived from the registry. The old look is kept with the two props `SmallWindowNotice` already uses for it | **FIXED** |
@@ -2652,13 +2652,13 @@ edits or the canvas stopped showing them.
 | 2   | New engine module `src/describe.rs` + `describe_image` export. Measures hue histogram, luma mean/variance, local gradient energy, palette diversity, and skin/foliage/sky ratios, returning tags plus a ready-made slug as JSON | **NEW** |
 | 3   | Sampling is capped at a ~160×160 grid, so a 24MP photo costs the same to read as a thumbnail. Off the flush path; the only allocation is the output `String` | Complete |
 | 4   | Hand-rolled JSON rather than serde — serde is gated behind the `tiles` feature, and this module should not inherit that coupling | Recorded |
-| 5   | **It describes an image; it does not recognise objects in it.** `dark-blue-portrait`, never `golden-retriever`. Stated in the panel's lightbulb rather than hidden. A caption model was the alternative and was rejected: demo mode is sacred and captioning cannot run offline. The `alt` job type in `convex/ai.ts` still has no model registered and remains the upgrade path | Recorded |
+| 5   | **It describes an image; it does not recognize objects in it.** `dark-blue-portrait`, never `golden-retriever`. Stated in the panel's lightbulb rather than hidden. A caption model was the alternative and was rejected: demo mode is sacred and captioning cannot run offline. The `alt` job type in `convex/ai.ts` still has no model registered and remains the upgrade path | Recorded |
 | 6   | `lib/describeImage.ts` owns name-building: token expansion (`{desc} {color} {subject} {kind} {tone} {orientation} {detail} {name} {n}`), slugging, and collision resolution. Split from the panel because the collision rules are the part worth testing | **NEW** |
 | 7   | Dedup is case-insensitive (APFS and NTFS agree) and steps around names that already look like suffixes — `["beach", "beach-2", "beach"]` → `beach-3`, not a second `beach-2` | Complete |
 | 8   | The ZIP export is **not** the reason dedup exists — it runs its own `usedNames` pass and would suffix duplicates itself. The reason is that identical names are unusable in the gallery before any export, and letting the archive invent suffixes hands the user an ordering they never chose. An earlier comment claiming data loss here was wrong and was corrected | Recorded |
 | 9   | **A stack of images never asks.** Two or more dropped or pasted images go straight to the gallery, empty gallery or not; `handleAddPhotos` takes as many as the tier cap allows and toasts when it trimmed. A single image keeps the three-way choice dialog | **NEW** |
 | 10  | **This closed a silent data-loss path.** The drop handler used `.find()`, so a multi-file drop kept file #1 and discarded the rest with no indication. The clipboard path had the same hole. Hence `>= 2` rather than the `> 2` originally asked for: the dialog is single-image by construction, so at `> 2` a two-file drop still loses one | **FIXED** |
-| 11  | **Two hue-binning bugs, caught by the tests before release.** The 12 bin names were off by one against the 30° centres — "gold" had been slipped in at index 2, rotating the whole wheel — so pure blue came out `sky` and foliage came out `lime`. Fixed the table, not the tests | **FIXED** |
+| 11  | **Two hue-binning bugs, caught by the tests before release.** The 12 bin names were off by one against the 30° centers — "gold" had been slipped in at index 2, rotating the whole wheel — so pure blue came out `sky` and foliage came out `lime`. Fixed the table, not the tests | **FIXED** |
 | 12  | `subject == color` is reachable (a blue sky scores both the `sky` hue bin and the `sky` subject); the slug drops the duplicate rather than emitting `sky-sky` | Complete |
 | 13  | **The `portrait` subject over-fires on warm scenes.** Kovac's skin rule fires on any warm mid-tone, so beige stucco and sunlit stone read as skin — a white car against a beige wall came out `orange-portrait`. Guards added (`kind == "photo"`, `detail != "smooth"`, threshold 0.14 → 0.18) with a regression test pinning the flat-warm-wall case | Partial |
 | 14  | ~~OPEN — those tightened thresholds were never re-measured.~~ **RE-MEASURED 2026-08-01 against the same 12 bundled sample photos, and the tightening is very nearly inert.** Exactly ONE of the 12 changed: #10 `orange-portrait` → `orange-smooth`. Neither of the two images it was aimed at moved — #04 (white car / beige wall) and #06 (stone and tree) are still `orange-portrait`. The one true positive, #01, kept its tag, so the change does no harm; it just does almost nothing | **MEASURED** |
@@ -2679,14 +2679,14 @@ edits or the canvas stopped showing them.
 | 20  | The July shipping popper refreshed **as part of this release rather than after it** — 205 entries across 61 July releases, 496 all-time, 41%, split fix 66 / ui 45 / feature 35 / infra 33 / rust 25 / perf 1. Counted after this release's own entries were in `releases.ts`, which is the order the file's comment requires | Complete |
 | 21  | **OPEN — a fresh `imagehorse-qc` is owed before the next release.** This touched both the engine and the tools | Recorded |
 | 22  | **OPEN — an ADR is owed** for the describer, the new wasm export, the fourth Batch sub-mode, and the local-describer-over-caption-model decision | Recorded |
-| 23  | **OPEN (pre-existing, not from this release) — a placed shape's colour cannot be changed.** Two independent blockers in `commitEdit`: the reselect style snapshot outranks the live panel (`es.style?.strokeColor ?? s.strokeColor`), and `editDirtyRef` is only set by a handle drag, so a colour-only edit early-returns without calling `update_shape_annotation`. Landed in `b6813b7` (2026-06-13) with reselect itself | Recorded |
+| 23  | **OPEN (pre-existing, not from this release) — a placed shape's color cannot be changed.** Two independent blockers in `commitEdit`: the reselect style snapshot outranks the live panel (`es.style?.strokeColor ?? s.strokeColor`), and `editDirtyRef` is only set by a handle drag, so a color-only edit early-returns without calling `update_shape_annotation`. Landed in `b6813b7` (2026-06-13) with reselect itself | Recorded |
 
 ## v7.62 Change Summary — 2026-08-01
 
 | #   | Feature                                                   | Status                                   |
 | --- | --------------------------------------------------------- | ---------------------------------------- |
 | 1   | **Live overlays no longer drift when the image is resampled.** Reported as "add a shape, then text, then use the resize tool, shrink a little, and the vector items move to the side instead of anchoring in the same spot." They were never moving — the image was moving out from under them | **FIXED** |
-| 2   | Root cause: a layer owns three things measured in canvas coordinates — its pixel buffer, its optional mask, and its live text/shape overlays — and `resize_with_filter` resampled only the first. Measured before the fix: a rect centred on a 200×200 canvas (`x0=90`) was still at `x0=90` after resizing to 100×100, i.e. **90% across a canvas it used to be centred on** | Recorded |
+| 2   | Root cause: a layer owns three things measured in canvas coordinates — its pixel buffer, its optional mask, and its live text/shape overlays — and `resize_with_filter` resampled only the first. Measured before the fix: a rect centered on a 200×200 canvas (`x0=90`) was still at `x0=90` after resizing to 100×100, i.e. **90% across a canvas it used to be centered on** | Recorded |
 | 3   | `crop` and `resize_canvas` have translated overlays with their layer for months, with tests asserting it. `resize_with_filter` was the sibling that never did | Recorded |
 | 4   | X and Y scale **independently** — anchoring to image content is the whole point. Magnitudes with no axis (font size, stroke width, background padding, corner radius, shadow blur) scale by the **geometric mean** of the two: exact for a uniform resize, area-preserving for a non-uniform one | Complete |
 | 5   | Text tiles are **rebuilt** via `build_text_annotation`, not repositioned. The tile is a cached glyph bitmap; moving it without rebuilding would draw the old bitmap at the new size | Complete |
@@ -2701,16 +2701,16 @@ edits or the canvas stopped showing them.
 | 14  | Tests: **9 new, 163 total** (was 154). Shape and text coordinates, font size, tile rebuild, stroke-width floor, non-uniform axes, upscale, degenerate no-op, mask resampled to the new size with coverage intact, and pen-path `points` scaling with the bbox rather than being left behind | Verified |
 | 15  | Engine size 758,946 → 761,213 bytes (+2,267, **+0.30%**) — scaling arithmetic, the tile rebuild call, the mask resampler. Nothing on the flush path changed; resize is user-initiated, so no bench | Verified |
 | 16  | Gates: `cargo fmt --check` clean · clippy `-D warnings` clean · 163 Rust tests · `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 309 vitest · production build succeeds | Verified |
-| 17  | **OPEN — not verified in a browser.** Automation could not get permission to drive the tab this session. The engine behaviour is pinned by unit tests asserting the exact reported symptom, and the JS staleness was found by reading rather than running, so the end-to-end path deserves a human look | Recorded |
+| 17  | **OPEN — not verified in a browser.** Automation could not get permission to drive the tab this session. The engine behavior is pinned by unit tests asserting the exact reported symptom, and the JS staleness was found by reading rather than running, so the end-to-end path deserves a human look | Recorded |
 
 ## v7.63 Change Summary — 2026-08-04
 
 | #   | Change | Status |
 | --- | ------ | ------ |
-| 1   | **A shape you have already placed can be recoloured.** Click a committed square or circle (on canvas or via Review → Reselect), pick a colour, and it changes. It previously did nothing — reported seven weeks running and reproduced on production 2026-08-03 | Complete |
-| 2   | Stroke width, arrow style and the four fill controls (mode, colour, second colour, gradient angle, mosaic block) had the identical blocker and are fixed by the same change | Complete |
-| 3   | Root cause was entirely React-side, in `useDrawingTools`. `selectShape` snapshots the shape's own style into `editState.style` so reselecting a red square shows it red; that snapshot then outranked the live panel everywhere (`es.style?.strokeColor ?? s.strokeColor`), so a panel colour could never reach the shape | Complete |
-| 4   | Second blocker in the same path: `editDirtyRef` was set only by a handle drag, so a colour-only edit hit `commitEdit`'s no-op early exit and never called `update_shape_annotation` at all. Both had to go | Complete |
+| 1   | **A shape you have already placed can be recolored.** Click a committed square or circle (on canvas or via Review → Reselect), pick a color, and it changes. It previously did nothing — reported seven weeks running and reproduced on production 2026-08-03 | Complete |
+| 2   | Stroke width, arrow style and the four fill controls (mode, color, second color, gradient angle, mosaic block) had the identical blocker and are fixed by the same change | Complete |
+| 3   | Root cause was entirely React-side, in `useDrawingTools`. `selectShape` snapshots the shape's own style into `editState.style` so reselecting a red square shows it red; that snapshot then outranked the live panel everywhere (`es.style?.strokeColor ?? s.strokeColor`), so a panel color could never reach the shape | Complete |
+| 4   | Second blocker in the same path: `editDirtyRef` was set only by a handle drag, so a color-only edit hit `commitEdit`'s no-op early exit and never called `update_shape_annotation` at all. Both had to go | Complete |
 | 5   | The snapshot is now a DEFAULT rather than an override — new `panelStylePatch` diffs the panel against its own previous value and carries across only the fields just changed, so an untouched field keeps the shape's own value and reselect still renders the shape as itself | Complete |
 | 6   | **No new engine export.** The brief called for `set_shape_color(id, r, g, b)`; `update_shape_annotation` already validated the id, snapped "Edit Shape" for undo and wrote into the annotation record, and its own doc comment already said "a drag/resize **or panel restyle** of a selected shape". A second path would have duplicated a subset of it and skipped fill entirely — see ADR-029 | Complete |
 | 7   | Engine size unchanged at **761,213 bytes** — nothing was added to the crate. No hot-path change, so no bench | Verified |
@@ -2732,12 +2732,12 @@ edits or the canvas stopped showing them.
 
 | #   | Change | Status |
 | --- | ------ | ------ |
-| 1   | **Fixes a hole in v7.63's shape recolour, found in user testing hours after it shipped.** Reselect a shape and click a colour, and it only registered if that colour differed from the one the panel was already showing. Click an orange shape while the panel still read purple, click purple, and nothing happened — no colour change and no history entry | Complete |
+| 1   | **Fixes a hole in v7.63's shape recolour, found in user testing hours after it shipped.** Reselect a shape and click a color, and it only registered if that color differed from the one the panel was already showing. Click an orange shape while the panel still read purple, click purple, and nothing happened — no color change and no history entry | Complete |
 | 2   | Cause: `panelStylePatch` diffs the panel against its OWN previous value, and reselect never synced the panel to the shape. So "the panel value changed" did not reliably mean "the user changed a control" — the assumption the whole diff rested on | Complete |
 | 3   | `selectShape` now loads the reselected shape's style into `ToolSettings` and seeds the diff baseline with the same values, so the sync is not itself read as an edit. The assumption is now true by construction | Complete |
-| 4   | Two further consequences, both good: the panel stops lying about what is selected (it shows the selected shape's colour and width), and the baseline becomes the SHAPE's style — so changing only the stroke width can no longer drag a stale panel colour along with it, which v7.63 would have done | Complete |
+| 4   | Two further consequences, both good: the panel stops lying about what is selected (it shows the selected shape's color and width), and the baseline becomes the SHAPE's style — so changing only the stroke width can no longer drag a stale panel color along with it, which v7.63 would have done | Complete |
 | 5   | Verified in a browser on the production build: panel red / shape orange → reselect → **panel syncs to orange** → click purple → preview turns purple → Enter → **"Edit Shape" appears in History**, undo enabled → Ctrl+Z → shape back to orange | Verified |
-| 6   | Tests: 2 regression tests in `useDrawingTools.test.ts` named for the reported symptom — the inert-swatch case, and that a width-only change does not carry the colour with it. vitest 318 → 320 | Verified |
+| 6   | Tests: 2 regression tests in `useDrawingTools.test.ts` named for the reported symptom — the inert-swatch case, and that a width-only change does not carry the color with it. vitest 318 → 320 | Verified |
 | 7   | ADR-029 carries a same-day follow-up section: the pre-mortem correctly named the diff as the weak point and incorrectly predicted the mechanism (a stale field list). The general lesson recorded: a diff-based "what did the user change" signal is only as good as the guarantee that the thing being diffed starts in sync with the thing being edited | Complete |
 | 8   | Engine untouched — wasm still **761,213 bytes**. No Rust change, so the 171 Rust tests are unaffected | Verified |
 | 9   | Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 320 vitest · production build succeeds | Verified |
@@ -2780,7 +2780,7 @@ edits or the canvas stopped showing them.
 | 2   | Measured, not inferred: four `edit-*` archives all decoding to 1445×2128 (the painted car) under four photo ids with four different aspect ratios. Self-sustaining — the victim then owned an archive with one undo entry, so it restored as modified forever | Recorded |
 | 3   | Reproduced under fixtures against the SHIPPED code first (3 passing tests proving one document could be written under any id), then inverted. `lib/engineDocument.ts` holds the marker; 8 tests | Verified |
 | 4   | **Refusal policy: silent + a Diagnostics line.** No toast, no throw — the work is still in the engine and lands under the right id once the document catches up | Complete |
-| 5   | **The bias is one-directional and inverted from the GC collector's.** Refuses ONLY when it positively knows the engine holds a different photo; unknown ownership always allows. A missed ownership site degrades to the shipped behaviour, never to data loss | Complete |
+| 5   | **The bias is one-directional and inverted from the GC collector's.** Refuses ONLY when it positively knows the engine holds a different photo; unknown ownership always allows. A missed ownership site degrades to the shipped behavior, never to data loss | Complete |
 | 6   | Ownership is recorded BEFORE the `isCurrent()` supersession bail — the marker describes the ENGINE, not the UI, and a superseded switch still replaced the document. Recording it after would refuse the next legitimate save | Complete |
 | 7   | **Both persistence legs are gated.** The Convex upload in `hooks/useEditPersistence` re-reads the engine and builds its own archive, so a refused local write would still have pushed the wrong pixels to the cloud — the same corruption one layer out, reproducible only when signed in | Complete |
 | 8   | **The switch inherits `savingRef`.** `handleSelectPhoto` called `savePhotoEdit` directly, bypassing the overlap guard entirely — one brush stroke, ten concurrent uploads of identical bytes, 238s of network. Routed through `flushEditArchive(outgoing, { detachCloudUpload: true })` | Complete |
@@ -2792,10 +2792,10 @@ edits or the canvas stopped showing them.
 | 14  | **The autosave debounce measured render quiet, not idleness.** `flushEditArchive` is a useCallback over `[stamp, …]` and `stamp` is a fresh object on nearly every engine sync, so the 2.5s timer tore down and re-armed on render churn — photo jzfnrd saved at 0s/7s/15.4s/25s at an IDENTICAL undo count. Held through a ref; the pagehide/visibilitychange listeners register once instead of on every render | Complete |
 | 15  | **`window.__ihArchiveCorruptionAudit()`** — read-only detector, ungated so it runs against a real production profile. Two signals: COLLISION (photos of different shapes whose archives share one canvas — how this was caught) and ASPECT DRIFT (advisory; crop and the artboard legitimately move a canvas). Detects and reports, NEVER repairs — a wrong repair costs the edits it was aimed at. 6 tests, half of them about not firing | Complete |
 | 16  | **`lib/uploadBudget.ts` — a ceiling on cloud uploads.** 10s per-photo interval + 60/hour rolling window. Limits the upload and never the local write; budget spent on success only; checked before the hash so a denied upload pays for no SHA-256. `window.__ihUploadBudget()`. 11 tests with injected time | Complete |
-| 17  | **Re-measured in a signed-in browser with the recorder in place: 19 switches, `mismatch=0`, `superseded=0`** (was 10 of 10), median switch 262ms (was ~13,000ms), 5 saves (was 28), `allowedUnknown=0` — the guard is not inert. Included canvas colour and size changes, which snapshot | Verified |
+| 17  | **Re-measured in a signed-in browser with the recorder in place: 19 switches, `mismatch=0`, `superseded=0`** (was 10 of 10), median switch 262ms (was ~13,000ms), 5 saves (was 28), `allowedUnknown=0` — the guard is not inert. Included canvas color and size changes, which snapshot | Verified |
 | 18  | Convex audit, read-only: `projects`/`layers`/`annotations`/`history` have 0 client references and 0 rows; `images` is 0/0 but is the landing table for the unbuilt Pro upload pipeline (see `StoragePane.tsx`) and is NOT dead. `ai_jobs.type: "alt"` annotated as registered-but-unimplemented per ADR-028 | Recorded |
 | 19  | ⚠️ **The orphan generator is UNFIXED**: the archive uploads before the pointer commits, so any failure between them strands a file permanently, and `crons.ts` is empty. This produced 3,535 MB of orphaned storage, exceeded the Convex free plan, disabled every deployment on the account and took an unrelated production site down with it. `photoEdits.save` is innocent — it deletes the superseded file | Recorded |
-| 20  | `docs/internal/convex-deployments.md` — production runs against `brave-ant-608`, the deployment Convex labels *dev*; `pastel-alligator-180` is labelled *production*, has no auth providers and has never held a document. Includes the migration order, because deploying `auth.config.ts` after repointing turns "wrong user row" into "cannot sign in at all" | Complete |
+| 20  | `docs/internal/convex-deployments.md` — production runs against `brave-ant-608`, the deployment Convex labels *dev*; `pastel-alligator-180` is labeled *production*, has no auth providers and has never held a document. Includes the migration order, because deploying `auth.config.ts` after repointing turns "wrong user row" into "cannot sign in at all" | Complete |
 | 21  | Engine untouched — no Rust change. Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · **369 vitest** (was 344) · production build succeeds | Verified |
 | 22  | ⚠️ `imagehorse-qc` NOT run for this release — flagged and shipped at the maintainer's explicit call. A full pass is owed, and was already owed from the AI-Rename session | Recorded |
 
@@ -2828,10 +2828,10 @@ edits or the canvas stopped showing them.
 | 3 | The Compress panel promised "+83% Web Performance Gain" for AVIF while the note beneath it said the file would be saved as PNG. `formatCode` weights AVIF as the most efficient format, so the panel contradicted itself in one viewport. The figures now model the format that lands | **Fixed** |
 | 4 | The dependency array keyed those figures on `exportFormat`, which never changes — so the async encoder probe could never re-fire the effect and the AVIF numbers would have stayed on screen permanently | **Fixed** |
 | 5 | The Download dialog is a second format picker and still sold AVIF as "Smallest · modern", with a "Download AVIF" button that handed over a PNG | **Fixed** |
-| 6 | **PNG itself was never wrong.** Verified against the shipped engine: after `resize(636,865)` the exported file carries a 636×865 IHDR at bit depth 8, colour type 6. ~0.93 MB is what lossless RGBA costs at 550k pixels — 1.90 bytes/pixel | **No bug** |
+| 6 | **PNG itself was never wrong.** Verified against the shipped engine: after `resize(636,865)` the exported file carries a 636×865 IHDR at bit depth 8, color type 6. ~0.93 MB is what lossless RGBA costs at 550k pixels — 1.90 bytes/pixel | **No bug** |
 | 7 | **Resize Layer read as a dead button.** It never refused: a single-layer document returns `has_paste_preview() === true`, the composite is unchanged during the preview, and the overlay is ungated. The box was seeded at the full canvas, so every handle sat exactly on the image border. Seeds at an 8% inset now — measured 58/59/59/59 px against master's 0/0/0/0 | **Fixed** |
 | 8 | `gen-trail-data.mjs` ran `git log` with no ref, so the contribution squares depended on which working tree it ran in — a feature worktree counted unmerged commits as shipped, the main tree mid-release missed the commits being released. Resolves against `master` now, and warns how many commits it is not counting | **Fixed** |
-| 9 | The marketing site pinned its content to the left edge on a large display — the gutter capped at 4rem, leaving ~800px of dead space at 2560px wide. One token change centres all 18 sections, with no breakpoint: `max()` hands over from the clamp exactly at 80rem, so narrower widths are unchanged | **Fixed** |
+| 9 | The marketing site pinned its content to the left edge on a large display — the gutter capped at 4rem, leaving ~800px of dead space at 2560px wide. One token change centers all 18 sections, with no breakpoint: `max()` hands over from the clamp exactly at 80rem, so narrower widths are unchanged | **Fixed** |
 | 10 | New hero capture on the README and the marketing site. The old one was from June and still showed a menu two toolbar revisions out of date — the site was advertising an app that no longer existed. 2048x1219, 66 KB, with `width`/`height` and the CSS `aspect-ratio` all updated together so the box is held before the image decodes | **Done** |
 
 **Not built:** real AVIF encoding. No encoder exists in the browser, in the app, or in the crate; adding one is a dependency decision (`@jsquash/avif` is 7.97 MB unpacked, or a `ravif` feature in the crate). AVIF stays in the format list and is now honest about what it produces.
@@ -2840,7 +2840,7 @@ edits or the canvas stopped showing them.
 
 | # | Change | Status |
 |---|--------|--------|
-| 1 | **New button-set image on the homepage**, replacing a command-palette screenshot that could not be read at the size it renders. Nine controls in a 3×3 grid, each square carrying its own border, background and text colour rather than a small button floating inside a larger tile — so nothing overflows and nothing is decorative. Rendered from the app's own stylesheet and Lucide geometry, not redrawn. 832×1106, **18,888 bytes** lossless WebP | **Done** |
+| 1 | **New button-set image on the homepage**, replacing a command-palette screenshot that could not be read at the size it renders. Nine controls in a 3×3 grid, each square carrying its own border, background and text color rather than a small button floating inside a larger tile — so nothing overflows and nothing is decorative. Rendered from the app's own stylesheet and Lucide geometry, not redrawn. 832×1106, **18,888 bytes** lossless WebP | **Done** |
 | 2 | Sized backwards from the 414px column it renders in rather than guessed: captions land at **14.9px** on screen, against 4.0px for the first attempt at 16 tiles. Lossless beat quality-88 on both counts — smaller *and* sharper — because the sheet is flat panels and hard edges, which is what lossy WebP wastes bits on | **Done** |
 | 3 | **The closing section is two columns**: the wifi-off mark alone on the left, headline, paragraph and both buttons on the right | **Done** |
 | 4 | A line about the network being optional once the app has loaded. Deliberately NOT "works offline" — the service worker has never shipped, so a cold load with no connection still fails. What is true is that nothing stops mid-edit, and that is what it says | **Done** |
@@ -3351,7 +3351,7 @@ was never wrong — measured 0.000px error against all five links, at rest and
 hovered. The *rendering* was: an animating transform promotes the bar to its
 own compositor layer, which is rasterized at the element's layout size — one
 pixel — and then stretched by the GPU. A stretched 1px texture is a smear,
-which is exactly why it arrived soft while travelling and snapped crisp once
+which is exactly why it arrived soft while traveling and snapped crisp once
 the animation settled and Chrome re-rastered.
 
 The bar is `position: absolute`, so animating its width lays out one 2px
@@ -3654,7 +3654,7 @@ whose signature has no session-state parameter — so the post-reload condition
 is its only condition, and the old bug is not merely untested there but
 unrepresentable.
 
-**Two halves, both load-bearing.** The behavioural tests prove the decision
+**Two halves, both load-bearing.** The behavioral tests prove the decision
 reads storage. They cannot see a gate re-added upstream of the call, so a
 source-level test covers that — same style and reasoning as
 `engineOwnership.contract.test.ts`. The structural rule distinguishes two uses
@@ -4036,7 +4036,7 @@ from the post-commit state, on purpose. And `find` returning `undefined` is a
 **handled** case, not a silent failure: it falls through to opening a fresh text
 input, which is the right thing when you empty a text and click where it was.
 
-So collapsing it into one atomic call would change behaviour whichever side of
+So collapsing it into one atomic call would change behavior whichever side of
 `commitText` the call landed on. That site needs ordinary await-restructuring,
 not a capture. Building a mirrored `capture_text_hit` "for symmetry" would have
 been two conventions for one problem — the exact failure this batch was warned
@@ -4369,7 +4369,7 @@ not clear a click path:
 | Ctrl+Z with an empty undo stack | **no change at all** — the guard short-circuits |
 | React state vs engine | matched at every step |
 
-Undo correctly greys out at the bottom of the stack and the status bar drops its
+Undo correctly grays out at the bottom of the stack and the status bar drops its
 "Ctrl+Z undo" hint. No console errors.
 
 **Gates.** 463 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
@@ -4439,7 +4439,7 @@ the artboard path, which is how every ordinary photo load runs (`Canvas` +
 |---|---|
 | Engine vs canvas backing store, on load | 1385×2068, **exact match** |
 | Photo switch to a different orientation | 2068×1385, **exact match** |
-| Centre pixel after switch | `rgba(21,28,5,255)` — painted, not blank |
+| Center pixel after switch | `rgba(21,28,5,255)` — painted, not blank |
 | `undoCount` after load | 0 — clean baseline preserved |
 | Console errors | none |
 
@@ -4868,7 +4868,7 @@ at the canvas:
 | Clone stamp, click with no source | **rejected** — undo stays 0, guard fires |
 | Clone stamp, Alt-click | source armed |
 | Clone stamp, click + drag | **`Stamp 1`** in history, undo 1 |
-| Eyedropper click | `get_pixel(969,1489)` -> **#59503D**, committed as brush colour |
+| Eyedropper click | `get_pixel(969,1489)` -> **#59503D**, committed as brush color |
 | `export_dims_excluding_background()` | **1365x2048** against a 1385x2068 document |
 | Console | no errors, no unhandled rejections |
 
@@ -4996,7 +4996,7 @@ production build, and each left the right history entry:
 |---|---|---|
 | Magic wand click | `magic_wand_select` | `Magic Wand` |
 | Edge-aware click | `magic_wand_select_edges` | `Edge Select` |
-| Colour-range click | `color_range_select` | `Color Range` |
+| Color-range click | `color_range_select` | `Color Range` |
 | Lasso anchor 1 | `lasso_active` -> `lasso_begin` | session opens |
 | Lasso anchors 2-3 | `lasso_active` -> `lasso_commit` | `lasso_committed_path` x3 |
 | Lasso double-click | `lasso_close` | `Magnetic Lasso` |
@@ -5013,7 +5013,7 @@ production build, and each left the right history entry:
 **What the browser could NOT check, stated plainly.** The *negative* direction
 of the Delete and Copy/Cut guards is unreachable by clicking: the panel disables
 those buttons when nothing is selected, and `onDoubleClick` is only bound while
-a lasso session is open. So the guards are defence-in-depth behind UI gating,
+a lasso session is open. So the guards are defense-in-depth behind UI gating,
 and the proof that they still reject is the mutation run, not a click.
 
 Mutation tested: **13 mutants, all 13 killed** — including all five truthy traps.
@@ -5079,7 +5079,7 @@ to catch that.
 
 Mutation tested: **7 mutants, all 7 killed**.
 
-**Gates.** 467 JS tests (11 of them pin this file's behaviour), `tsc` clean,
+**Gates.** 467 JS tests (11 of them pin this file's behavior), `tsc` clean,
 eslint 0 errors, production build clean. Engine untouched — no `build:wasm`.
 
 ## v8.10 Change Summary — 2026-08-11
@@ -5097,7 +5097,7 @@ never been tested. Checked, all six callers:
 
 | Call site | Kind | On a miss |
 |---|---|---|
-| `CanvasArea:2118` | render | ✅ JS-measured box centre |
+| `CanvasArea:2118` | render | ✅ JS-measured box center |
 | `CanvasArea:2288` | render | ✅ `sx - bgPad` |
 | `useTextTool:251` | commit | tolerates — commits at the **uncorrected anchor** |
 | `useTextTool:368` | re-edit | tolerates — the re-edit cycle **drifts** |
@@ -5119,7 +5119,7 @@ of photos to the wrong place. The header simply never caught up.
 | `m[0]` | `undefined` |
 | `m[0] + bgPad * 2` | **NaN** |
 
-So the documented behaviour (skip the photo, report it) silently becomes NaN
+So the documented behavior (skip the photo, report it) silently becomes NaN
 geometry for every photo in the batch. It is a truthy trap created *by the
 conversion*, inside a JS caller — the class `engine-call-audit.mjs` cannot see
 by construction, because it lists traps at the engine call site rather than ones
@@ -5527,7 +5527,7 @@ clean. Engine untouched — no `build:wasm`.
 ADR-024 Stage 3.5, **a13**. Gate 8 -> 7. No user-visible change.
 
 `useEngineCore`'s `syncState` — the one call that publishes the whole document
-mirror to React, and the most-travelled site in the migration at **74 callers**.
+mirror to React, and the most-traveled site in the migration at **74 callers**.
 
 | Bucket | Before | After |
 |---|---|---|
@@ -5640,7 +5640,7 @@ clean. Engine untouched — no `build:wasm`.
 
 ## v8.18 Change Summary — 2026-08-12
 
-**No behaviour change. Four stale claims corrected, and the pen redesign
+**No behavior change. Four stale claims corrected, and the pen redesign
 designed.** A follow-up to v8.17 rather than a new step: the gate is unmoved at
 **7**, and no engine call was converted.
 
@@ -5667,7 +5667,7 @@ moves.
 
 ### A fifth, and the better lesson
 
-`lib/openraster/export.ts` labelled its `flatten_text_annotations` trap
+`lib/openraster/export.ts` labeled its `flatten_text_annotations` trap
 **"THE LAST TRUTHY TRAP IN THE CODEBASE"** when it shipped in v8.15. v8.16
 disproved it the next day, finding another in `AppShell.handlePlace` where the
 guard sits one line *below* the call — a shape the audit classifies from the text
@@ -5978,7 +5978,7 @@ Third instance of the wrapped-call hole (v8.12, v8.13), and the first where the
 wrapper's result was only truthiness-checked — the case v8.12 predicted would be
 caught by **neither** gate. It was caught by a domain test asserting that a
 broken log is never written to disk. The lesson stands and is now proven: when a
-batch converts a JS wrapper, the ratchet is blind and only behaviour tests cover
+batch converts a JS wrapper, the ratchet is blind and only behavior tests cover
 it.
 
 ### Verification
@@ -6004,11 +6004,11 @@ clean. Engine untouched — no `build:wasm`.
 panel nobody is looking at unless it is open — ~0.9 ms per frame behind the
 worker. Recorded in PARKING_LOT.md rather than fixed here; the honest options
 (one `capture_oplog_stats()`, throttling, or only running while the panel is
-open) each change behaviour.
+open) each change behavior.
 
 ## v8.23 Change Summary — 2026-08-12
 
-**a12 designed (`docs/engine-worker-a12-design.md`), a12.0 built.** No behaviour
+**a12 designed (`docs/engine-worker-a12-design.md`), a12.0 built.** No behavior
 change. Three things block a12 as ADR-024 states it, each verified against the
 code rather than reasoned about — the ADR is corrected in place.
 
@@ -6485,11 +6485,11 @@ Measured on the boot-restore path:
 The engine is per-DOCUMENT; the surface is per-ELEMENT. The two lifetimes were
 conflated. The worker is now kept for the life of the tab and the document is
 replaced inside it (`reinit`), with `release` for the teardown that `reset()`
-wants. The wasm-memory concern that motivated the old behaviour is met better
+wants. The wasm-memory concern that motivated the old behavior is met better
 this way: the outgoing document is freed inside the worker and its linear memory
 reused, instead of a whole second instance being allocated.
 
-⚠️ **A green test asserted the broken behaviour.** `"terminates the previous
+⚠️ **A green test asserted the broken behavior.** `"terminates the previous
 worker when a new document is opened"` pinned exactly the disposal that caused
 this, on correct-sounding wasm-memory grounds. It has been inverted, and the
 reasoning is written into the test so the next reader sees why.
@@ -6547,7 +6547,7 @@ and `blit()` returns above the check — so it was forced, as the plan required:
 [engine-worker] blit refused: stale canvas: work targets generation 1, live generation is 999
 ```
 
-With a behavioural control, because a refusal nobody can distinguish from a dead
+With a behavioral control, because a refusal nobody can distinguish from a dead
 draw path proves nothing:
 
 | | pixels changed |
@@ -6765,7 +6765,7 @@ directory.
 
 Nothing technical is left under it. Gates pass, the measurement is in, the
 coverage objection was answered in v8.29, and the escape hatch now does what the
-code says it does. What remains is a judgement call about a default.
+code says it does. What remains is a judgment call about a default.
 
 Parked, deliberately: **live mode migration** (making a flip take effect
 immediately — pixels and op log both have to cross, and it needs its own
@@ -6927,7 +6927,7 @@ bounded — a stuck stroke can delay a save, never starve it.
 the wiring guard red. 8 new tests, including the non-vacuous one — the gate
 observed WAITING while a stroke is active.
 
-Second prong, honestly labelled: the worker now **transfers** reply buffers
+Second prong, honestly labeled: the worker now **transfers** reply buffers
 over 256 KB instead of structured-cloning them (its `.slice()` copy is dead
 after post — the detach hazard that forbids transferring caller buffers does
 not apply). At a 10 MB matched-size A/B this measured **neutral** — the
@@ -7164,7 +7164,7 @@ clean. wasm 775,604 → 777,589 B (+1,985: alpha-bbox scan + crop copy).
 | op-log format risk? | none for this work — the log is single-content-layer by design (ADR-016), out of scope on multi-layer docs | `Op` enum carries no layer id except `LayerMove` |
 
 Two fake bugs were manufactured by the probe itself (documented in
-SESSION_LOG): the layer row's geometric centre is the **"Move up"** button, so
+SESSION_LOG): the layer row's geometric center is the **"Move up"** button, so
 robot clicks "selecting" a row were reordering the stack — an opaque photo
 restacked above a hidden layer reads exactly like content loss. That
 fat-finger surface is itself evidence for this release's change.
@@ -7297,7 +7297,7 @@ the op-log path does.
 
 Three asks and a pre-session leftover: the brushes that still lagged on the
 live site, a text box that resized in one axis only, a shape that retyped
-itself when you picked the next one, and the guide-colour work already sitting
+itself when you picked the next one, and the guide-color work already sitting
 in the tree.
 
 ### The brush arc, finished
@@ -7335,7 +7335,7 @@ the shared module is the next step.
 ### Text box height — op-log v3 → v4 (ADR-033)
 
 `TextAnnotation.box_height` is a MINIMUM height with the text **top-aligned**.
-Centring was built first and reversed before shipping: it halves the top
+Centering was built first and reversed before shipping: it halves the top
 handle's tracking speed and forces a second JS estimate of natural height,
 worth about 0.1 × font_size of anchor drift. Four corner handles move both
 axes, W and E stay width-only, and there is no height-only handle — the honest
@@ -7360,14 +7360,14 @@ wasm 785,803 → 790,179 B (**+4,376, +0.56%**).
 ### Shapes stay the shape you drew
 
 A freshly drawn shape read its type live from the panel, the same way it reads
-its colour, so picking the next shape retyped the pending one. Type is pinned
+its color, so picking the next shape retyped the pending one. Type is pinned
 at mouse-up in `DrawEditState.drawnShape` and resolved through one shared
 `pendingShapeType()` used by both the overlay renderer and `commitEdit`, so the
 preview and the pixels cannot disagree.
 
-### Guide colour
+### Guide color
 
-Guides take a colour: cyan by default — the Photoshop convention — with ten in
+Guides take a color: cyan by default — the Photoshop convention — with ten in
 the list. It is a preference, not per-photo state, so it survives clearing the
 guides and switching photos, and persists across sessions under its own
 localStorage key rather than routing prefs plumbing through AppShell.
@@ -7406,13 +7406,13 @@ was not run.
 
 | Section | Result |
 |---|---|
-| §1 boot + demo mode | **PASS** — engine initialises logged-out, wasm 200, zero app console errors |
+| §1 boot + demo mode | **PASS** — engine initializes logged-out, wasm 200, zero app console errors |
 | §2 clone stamp | **PASS** — stroke records, undo removes, redo restores **byte-exact** |
 | §2 blur brush | **PASS** — stroke records, undo removes |
 | §2 shapes | **PASS** — picking another shape leaves the drawn one alone |
 | §2 text | **PASS** — commits onto the canvas, undo removes |
 | §2 export | **PASS** — real image bytes out of the share dialog |
-| §4 persistence | **PASS** — paint stroke + Canvas survive reload; guide colour survives reload |
+| §4 persistence | **PASS** — paint stroke + Canvas survive reload; guide color survives reload |
 | §5 visual / contrast | **NOT RUN** — needs a visible window |
 
 The QC pass is now a spec — `e2e/qc-v841.spec.ts` — rather than a checklist
@@ -7515,7 +7515,7 @@ re-run on this tree, not taken on report.
 | drag rules (Distort / Perspective / Skew) | `app/src/lib/perspective.ts` — TypeScript, deliberately |
 | quad state | `app/src/stores/usePerspectiveStore.ts` |
 | overlay + panel | `PerspectiveOverlay.tsx`, `PerspectiveSettings.tsx` |
-| text corners | normalised fractions on the annotation, warp applied as the LAST tile stage |
+| text corners | normalized fractions on the annotation, warp applied as the LAST tile stage |
 
 **The rules stay on the main thread on purpose.** "The engine owns pixels"
 holds — a drag rule maps one pointer position to four corner positions and
@@ -7525,7 +7525,7 @@ rule behind the port would add a `postMessage` round trip to every
 arc spent five releases removing, and v8.42 finished paying off.
 
 **Text keeps its corners, not its pixels.** A text annotation stores the quad
-as normalised fractions, so a tile rebuild at a new size re-applies the same
+as normalized fractions, so a tile rebuild at a new size re-applies the same
 quad instead of resampling already-resampled output. Verified by forcing a
 rebuild 488×280 → 488×862 with the quad bit-identical and re-applied. Reselect
 returns the quad to within 0.03 px after leaving the tool entirely, and
@@ -7533,7 +7533,7 @@ returns the quad to within 0.03 px after leaving the tool entirely, and
 
 Format v4 → v5 by ADR-033's recipe. ⚠️ **The skipped field's default is NOT
 its semantic default this time** — an all-zero quad is a collapsed point, not
-the identity — so `decode_op` normalises, or the recorder would append a
+the identity — so `decode_op` normalizes, or the recorder would append a
 `TextPerspective` on every sync forever.
 
 ### Two bugs that passed every gate
@@ -7546,7 +7546,7 @@ nothing.
    identity on every AppShell render. That re-ran the seed effect, which reset
    the in-progress drag back to a rectangle — so Apply committed the identity
    transform. Keyed the effect on a primitive string instead.
-2. Re-applying to already-warped text normalised against the POST-warp bounds
+2. Re-applying to already-warped text normalized against the POST-warp bounds
    while the engine stores against the unwarped tile, compounding the shear
    with no way back.
 
@@ -7665,7 +7665,7 @@ No Rust changed, so the engine is untouched at 806,967 B.
 
 ## v8.45 Change Summary — 2026-08-17
 
-**ADR-035, and `showModeRow` stops being a shim.** No behaviour change: this
+**ADR-035, and `showModeRow` stops being a shim.** No behavior change: this
 release makes v8.44's UI decision the recorded, deliberate one instead of an
 exception apologised for in a footnote. Chris: *"ok I do want to do this, can
 we bypass, and rewrite the adr."*
@@ -7675,7 +7675,7 @@ we bypass, and rewrite the adr."*
 The `adr` skill is explicit — *"Never edit an accepted ADR's Decision — write a
 new one"* — so ADR-034 keeps its text and its status line now reads **decision
 1 superseded by ADR-035**; decisions 2–4 (rules in TypeScript, resampling in
-Rust, text storing normalised corners) stand untouched. The essay v8.44 bolted
+Rust, text storing normalized corners) stand untouched. The essay v8.44 bolted
 onto the bottom of ADR-034 has been removed: that content is ADR-035's job, and
 a superseded record should point at its successor rather than argue with
 itself. Same for the INDEX row, which is now a pointer instead of a paragraph.
@@ -7699,7 +7699,7 @@ false, and seven of the eight multi-mode panels still use sidebar tiles.
 ### The cost, named rather than buried
 
 Two placements now exist, so a reader has to ask which applies. ADR-035's
-pre-mortem argues the case against: *siblings vs facets* is a judgement call,
+pre-mortem argues the case against: *siblings vs facets* is a judgment call,
 and Shapes (rectangle/ellipse/line) and Text (text/background/OCR) are
 genuinely arguable both ways — drift could eat ADR-023's consistency one
 plausible header comment at a time.
@@ -8010,7 +8010,7 @@ The floor exists to catch the v7.36–v7.45 bug, where production shipped a
 featureless wasm for five weeks. A featureless build has since grown past the
 floor, so the size check would have waved that exact failure through. The
 symbol check (`oplog_`, `remove_object`, `rect_select`) still catches it — the
-floor had quietly stopped being defence in depth.
+floor had quietly stopped being defense in depth.
 
 ### The new band
 
@@ -8292,7 +8292,7 @@ transparent fill, 40px pad), both branches:
 | **JPEG** | **240×160** | 200,40,50 — the photo, **no black frame** |
 
 ⚠️ **The first measurement proved nothing and was thrown away.** The browser
-profile it ran in had `exportCanvasBackground: false` and an opaque grey fill,
+profile it ran in had `exportCanvasBackground: false` and an opaque gray fill,
 so both formats cropped for reasons unrelated to the change. The prefs were set
 to the actual bug conditions and the pair re-run.
 
@@ -8314,22 +8314,22 @@ set so a fifth format cannot be added into the bug by accident.
 
 ### 2 · A/B compare — the labels name a side now
 
-Both chips were children of the divider element and centred on it
+Both chips were children of the divider element and centered on it
 (`left-1/2 -translate-x-1/2`), so each sat half over the original and half over
 the edit and named **neither**; stacked diagonally, nothing tied either word to
-a picture. Centred on the line they also hung off the photo onto the workspace
+a picture. Centered on the line they also hung off the photo onto the workspace
 backdrop whenever the handle neared an edge.
 
 | | Before | Now |
 |---|---|---|
-| Position | centred on the divider | fully inside its own half |
+| Position | centered on the divider | fully inside its own half |
 | Direction | none | `‹ Original` / `Edited ›`, pointing outward |
 | Shape | floating pill | squared against the line, rounded outside — a tab |
-| Colour | both white | white = untouched, warm accent = the edit |
+| Color | both white | white = untouched, warm accent = the edit |
 | At an edge | spilled onto the backdrop | clipped to its half, fades under 104px |
 | Leaving Enhance | overlay stayed pinned, button gone | closes itself |
 
-The divider position moved into the Zustand UI store, with the re-centre-on-close
+The divider position moved into the Zustand UI store, with the re-center-on-close
 rule living in the setter so no caller re-implements it.
 
 Deliberately NOT moved into Rust: there is no pixel work in compare — it is a
@@ -8418,7 +8418,7 @@ Five compiler releases of new lints and nothing fired.
 The pin now goes stale **invisibly** — nothing announces that 1.97.1 is old, and
 dependabot does not watch `rust-toolchain.toml`. The previous regime at least
 drifted forward. ADR-038's pre-mortem names the failure: someone deletes the
-file "temporarily" to unblock a build, floating behaviour returns silently, and
+file "temporarily" to unblock a build, floating behavior returns silently, and
 the next size surprise takes just as long to diagnose — only with an ADR
 claiming it cannot happen.
 
@@ -8473,7 +8473,7 @@ visible defect** (ADR-039), and it **silently changes exported dimensions** — 
 you got.
 
 ⚠️ **Existing installs are NOT migrated.** `normalize()` only fills an absent
-key, so anyone with the pref already stored keeps their behaviour.
+key, so anyone with the pref already stored keeps their behavior.
 
 ### 3. Apply Resize — resample and nothing else
 
@@ -8574,7 +8574,7 @@ would move the byte count and cost the assertion.
 (`self.layers[self.active]`) while `render_layer` composites EVERY visible one.
 So `-1` carries two meanings and the call sites collapsed them into one:
 
-| `-1` means | Old behaviour | New |
+| `-1` means | Old behavior | New |
 |---|---|---|
 | Empty canvas | new annotation | new annotation ✅ |
 | Ink on another layer | **new annotation on top of it** | **nothing** |
@@ -8794,7 +8794,7 @@ rather than argued:
 
 That control is the whole case: the port's own tests are blind to a real change
 in the source they mirror. The guard hashes the Rust function bodies with
-whitespace and comments normalised.
+whitespace and comments normalized.
 
 ### 6. Dead code removed, and the tripwires that catch the next lot
 
@@ -8906,7 +8906,7 @@ passed on a broken binding. A gate that runs one configuration reports on that
 configuration.
 
 Removing it made two existing specs fail. Both had been passing on the double
-undo cancelling out a real bug.
+undo canceling out a real bug.
 
 **Undo was dead after any slider.** The listener that was deleted happened to be
 the unguarded one. The survivor's guard returns early for any focused
@@ -8917,7 +8917,7 @@ and returns early for everything else, so a focused slider's arrow keys, Space
 and Enter still reach the control.
 
 **Every text commit wrote two history entries.** `set_text_shadow` compared the
-dormant colour, alpha and offset while the shadow was OFF on both sides: a fresh
+dormant color, alpha and offset while the shadow was OFF on both sides: a fresh
 annotation is all zeros, the panel's default is 60% alpha at 2px with blur, so
 off-to-off compared unequal and snapped. Probed with `history_labels()`:
 `Add Text|Text Shadow` → `Add Text`. A fresh text with the shadow genuinely on
@@ -8940,7 +8940,7 @@ view of the document. ADR-041.
 | Baking | one `apply_color_overlay` helper shared by the live render, Apply, and `merge_down` — which flattens the lower layer by hand and would have dropped its style |
 | Persistence | session-lived, same as masks. Both need one dexie migration — filed, not built |
 
-Centre pixel on the production build: `72,61,59` → red at full strength
+Center pixel on the production build: `72,61,59` → red at full strength
 **`239,68,68`** → 50% `156,65,64` → one undo **`72,61,59`** → Apply holds
 `239,68,68`.
 
@@ -9022,7 +9022,7 @@ pins both halves, so a future tidy-up that gates them together fails.
 
 Why it survived: `Apply Resize` is disabled unless `dimensionsChanged`, and the
 dimension fields live in the Resize tile — so in Compress it was almost always
-grey, which reads as "not applicable right now" rather than "wrong panel". The
+gray, which reads as "not applicable right now" rather than "wrong panel". The
 Compress percent slider changes dimensions too, so it was reachable enabled.
 
 ### The celebration popper stopped being hand-typed
@@ -9074,8 +9074,8 @@ at measured coordinates:
 | Rows | What | Result |
 |---|---|---|
 | F1–F7 | unfilled rect: 5 edges hit, 3 interior points miss, a drag inside draws | **pass** |
-| F8–F10 | solid / gradient / pixelate fills: centre hits | **pass** |
-| F11–F14 | unfilled circle + hand-drawn: centre misses, rims hit | **pass** |
+| F8–F10 | solid / gradient / pixelate fills: center hits | **pass** |
+| F11–F14 | unfilled circle + hand-drawn: center misses, rims hit | **pass** |
 | F15–F16 | pin keeps its bbox; line is distance-based | **pass** |
 | F17–F18 | stroke width scales the ring pad (sw 8 → pad 6; sw 2) | **pass** |
 | F19–F21 | a filled shape shadows, an unfilled one does not | **pass** |
@@ -9190,7 +9190,7 @@ but the tile said nothing, and the switch unmounts the Layers panel.
 | Invert / Apply / Remove | no | yes |
 
 The sibling "Paint mask" tile performs the same switch and already explained
-itself, so this applies that pattern rather than inventing one. Behaviour is
+itself, so this applies that pattern rather than inventing one. Behavior is
 unchanged; tool selection keeps its single owner in `useToolStore`.
 
 ### The upload dialog's progress bar is gone
@@ -9245,7 +9245,7 @@ hand-written half beside it.
 ### Two chips for v8.59
 
 The `FEATURES` list is hand-written on purpose while the numbers above it are
-generated — a headline is a judgement about what mattered, and the trail log's
+generated — a headline is a judgment about what mattered, and the trail log's
 `feature` tag does not carry it (August's biggest change shipped tagged
 `infra`). It had no entry for v8.59.
 
@@ -9427,7 +9427,7 @@ because the service worker is opt-in at *build* time. Not run in CI.
 **The undo section stopped being a before/after.** It led with "snapshot-based
 today — not an operation log" and carried the op-log correction beside it,
 which reads as a plan superseded. The two run together and have since v7.36 —
-the op log is an optimisation allowed to fail its hash check, and the snapshot
+the op log is an optimization allowed to fail its hash check, and the snapshot
 stack is the thing that is not allowed to. Rewritten as one description, with
 the caps that were never documented: **50 steps, 512 MB**.
 
@@ -9537,7 +9537,7 @@ and only pads the others. Hence a new flag rather than a reuse.
 
 Opt-in, because eleven other call sites share this component and their labels
 are already even. The group costs 57.6px (468.4 → 526) and grows
-symmetrically — measured centre shift **0.0px**.
+symmetrically — measured center shift **0.0px**.
 
 Measured at 1600, 1010 and 335px and in compact mode. The mobile bar is
 untouched and cannot be affected: it wires `IconButton` directly rather than
@@ -9655,7 +9655,7 @@ No engine change, so no `build:wasm` and no size-band movement.
 The status bar stops whispering, and undo stops moving your layer in silence.
 Two visible fixes, one invisible one, and a correction to this record.
 
-### The status bar was two different greys
+### The status bar was two different grays
 
 Half of it used `--text-muted` and half used `--text-secondary`, on the same row
 at the same 10px. Measured against the bar's own background:
@@ -9685,7 +9685,7 @@ answers to the 3:1 threshold, which it clears.
 ⚠️ A first measurement read light-mode brand at 1.97 and looked like a bad
 regression. It was the probe: `.status-brand-link` has `transition: color
 0.15s`, and the sample landed mid-transition after a theme toggle. Anything
-timing a themed colour has to wait that out.
+timing a themed color has to wait that out.
 
 ### Undo moved the active layer without saying so
 
@@ -9723,7 +9723,7 @@ This was machine-observable for the first time because v8.63 added
 
 `persistActiveCanvas` — the internal save that re-encodes the canvas over its
 stored original — moved to `app/src/app/session/usePersistActiveCanvas.ts`.
-**3,814 → 3,718**, ratchet lowered to match in the same commit. No behaviour
+**3,814 → 3,718**, ratchet lowered to match in the same commit. No behavior
 change.
 
 The inventory that picked it also answered a bigger question. Of **247 named
@@ -9762,7 +9762,7 @@ No engine change — no `build:wasm`, crate untouched, size band unmoved.
 
 ## v8.65 Change Summary — 2026-09-03
 
-Skewed is the rare case. One behaviour change people will feel immediately, one
+Skewed is the rare case. One behavior change people will feel immediately, one
 visible bug gone, a redesigned New panel, and two investigations recorded.
 
 ### Dragging a corner keeps the proportions now
@@ -9931,7 +9931,7 @@ beside "Rulers" is a coin toss, so the parked one is renamed **"Measure"**.
 | `opacity-30` (shipped) | **1.33** | **1.56** |
 | `opacity-100` | 3.00 | 4.61 |
 
-That last row is the point: at full strength the old enabled colour was only
+That last row is the point: at full strength the old enabled color was only
 3.00:1, so **no opacity** left a disabled state both dimmer and visible.
 
 | | Was | Now | Light | Dark |
@@ -10024,7 +10024,7 @@ lockstep `try_oplog_undo` depends on: it pops a snapshot *and* seeks the log
 back one op, so the undo rewound the previous real edit instead of the reorder.
 
 ⚠️ **ADR-044's central safety argument was false.** It held that the composite
-pixel-hash guard made the no-op-log decision safe. Two shapes sharing a colour
+pixel-hash guard made the no-op-log decision safe. Two shapes sharing a color
 composite **byte-identically** after a swap — verified in the browser,
 `composite_hash_hex` unchanged at `94be559de15fc519` across a reorder — so the
 guard never fires and the broken lockstep proceeds. The ADR now carries a
@@ -10093,7 +10093,7 @@ differ in **456,523 byte positions**; the sizes merely landed close. Quote the
 `imagehorse-qc` §1–2 against the production build: boots logged-out with **0
 console errors**, sample images load, shapes draw, undo works. The z-order
 regression was re-verified on the production build with the op-log path **live**
-(`oplog_active: true`) and three same-coloured shapes — the exact configuration
+(`oplog_active: true`) and three same-colored shapes — the exact configuration
 that defeated the old guard: `[1,2,3]` → reorder → `[2,1,3]` → undo →
 **`[1,2,3]`**, zero shapes lost.
 
@@ -10110,7 +10110,7 @@ build becoming something you can make claims about.
 | Change | Detail |
 |---|---|
 | Annotation counts on layer rows (#63) | `textCount` / `shapeCount` in `get_layers()`, rendered beside the mask badge. Only when non-zero |
-| Colour Overlay disables on an empty layer (#71) | with a stated reason, not just grey. New engine primitive `layer_is_empty(&self, index)` |
+| Color Overlay disables on an empty layer (#71) | with a stated reason, not just gray. New engine primitive `layer_is_empty(&self, index)` |
 
 Both are display-only on the TypeScript side — no new store subscriptions.
 
@@ -10192,7 +10192,7 @@ v128 opcodes, unchanged.
 ### QC
 
 `imagehorse-qc` §1–2 against the production build: boots logged-out with **0
-console errors**; sample images load; the Colour Overlay swatches verified
+console errors**; sample images load; the Color Overlay swatches verified
 against the ENGINE, not the DOM alone — empty layer **12/12 disabled** with the
 reason, paint enables all 12, and undo re-disables all 12 with the engine
 agreeing.
@@ -10238,9 +10238,9 @@ Two causes, both from the panel using its own UI instead of the house set:
   explanations since the no-toolbar-paragraphs rule. The panel body is
   button-only again.
 
-Colour moved to the shared `ColorSwatchGrid` with `allowCustom={false}` — a grid
+Color moved to the shared `ColorSwatchGrid` with `allowCustom={false}` — a grid
 overlay has to read against an arbitrary photo, so that is a functional palette,
-not a creative one, and offering the user's saved paint colours there would be
+not a creative one, and offering the user's saved paint colors there would be
 the wrong list.
 
 Measured after: **0 clipped buttons, 0 inline paragraphs, 3 lightbulbs** at a
@@ -10414,7 +10414,7 @@ Undo/redo verified on both paths in the browser: quality 75 → 50 → apply →
 
 ### The close X
 
-The Layers list's own 20px X, centred on the panel's top-left vertex — at 24px, a panel 12px from the screen edge put it at 0–24 and touching the viewport; at 20px it spans 2–22. Tools and Review moved `overflow-hidden` to an inner wrapper so the shell can let it hang out. The reveal is `hoverReveal` in `animations.ts`, driven by the button reading its own parent's pointer events — a `whileHover` on the panel would propagate to every tile icon inside it. Keyboard focus reveals it; hidden, it is `pointer-events: none`.
+The Layers list's own 20px X, centered on the panel's top-left vertex — at 24px, a panel 12px from the screen edge put it at 0–24 and touching the viewport; at 20px it spans 2–22. Tools and Review moved `overflow-hidden` to an inner wrapper so the shell can let it hang out. The reveal is `hoverReveal` in `animations.ts`, driven by the button reading its own parent's pointer events — a `whileHover` on the panel would propagate to every tile icon inside it. Keyboard focus reveals it; hidden, it is `pointer-events: none`.
 
 | Panel | Rest | Hover | Leave | Focus | Click closes | Top bar reopens |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -10476,7 +10476,7 @@ The stubborn 7px under Compress was a bare inline `<label>` floating in a 24px l
 
 `--color-theme-border` was never defined, so Tailwind generated no rule for `border-theme-border` and the bare `border` utility beside it fell back to `currentColor` — near-white in dark, which read as a deliberate cream outline and hid the bug for months, and `#2a2622` in light, which read as a black box.
 
-All ten call sites are interactive controls, so the accent family is right; full strength is not — it would spend the loudest colour on a resting boundary and ring every colour swatch in orange. Defined as `color-mix(in srgb, var(--primary) 60%, transparent)`: `rgba(201,143,63,0.6)` light, `rgba(252,223,194,0.6)` dark.
+All ten call sites are interactive controls, so the accent family is right; full strength is not — it would spend the loudest color on a resting boundary and ring every color swatch in orange. Defined as `color-mix(in srgb, var(--primary) 60%, transparent)`: `rgba(201,143,63,0.6)` light, `rgba(252,223,194,0.6)` dark.
 
 ⚠️ Four siblings are still undefined and deliberately untouched, each a visual decision rather than a bug fix: `--color-theme-accent` (the *fill* on those same inputs), `--color-theme-background`, `--color-theme-chart`, `--color-theme-sidebar-muted`.
 
@@ -10530,7 +10530,7 @@ This activates nothing. The service worker still ships dark.
 | # | Change | Status |
 | --- | --- | --- |
 | 1 | **A/B Compare stays available** after a compress or resize — it was gated on state a tool switch or reload wiped | Complete |
-| 2 | Rotated text is anchored at its **top-left**, not the centre of a tile that grows as you type | Complete |
+| 2 | Rotated text is anchored at its **top-left**, not the center of a tile that grows as you type | Complete |
 | 3 | WebGPU blur wired behind `ih_webgpu` — **byte-identical to the engine**, CPU fallback on every failure path | Complete, flag OFF |
 | 4 | GPU blur refuses a **software adapter** — "GPU on" could silently mean slower | Complete |
 | 5 | GPU device + pipeline cached, with `device.lost` recovery; redundant buffer copy dropped | Complete |
@@ -10541,7 +10541,7 @@ This activates nothing. The service worker still ships dark.
 | 10 | DM Sans + JetBrains Mono **self-hosted** — the demo tier really makes no network calls | Complete |
 | 11 | Three theme tokens defined that emitted **no CSS at all** — 13 dead class references | Complete |
 | 12 | `window.__ihRotatedTextAudit()` — read-only count of stored rotated text | Complete |
-| 13 | `scripts/inert-class-audit.mjs` — finds colour classes that emit no rule | Complete |
+| 13 | `scripts/inert-class-audit.mjs` — finds color classes that emit no rule | Complete |
 | 14 | Two matched-pair guardrails: rotation anchor, and blur engine ↔ oracle | Complete |
 | 15 | Five dependabot bumps landed as one lockfile write (vitest 4 → 5) | Complete |
 | 16 | ADR-050 **closed** — the audit measured zero rotated annotations, so no migration | Decided |
@@ -10587,17 +10587,78 @@ This activates nothing. The service worker still ships dark.
 | **Reselect** | Any placed text or shape can be duplicated from its row. The copy is made by cloning the object inside the engine rather than rebuilding it from a property list, so a shadow, rotation, background or perspective warp cannot be silently dropped. |
 | **Stroke Stabilizer** | Reaches the Eraser, the blur brush, pixelate, redact and the clone stamp, from the single existing setting. The Eraser had been honouring it all along with no control in the panel to switch it on. |
 | **Stroke Stabilizer** | On the clone stamp the source offset is preserved exactly — a lagging tip samples a source lagging by the same vector, so the smoothing changes the path and nothing else. |
-| **Lists** | History, Reselect and Layers are one row component instead of three that had drifted. Buttons sit in one tight cluster; the coloured dots are gone in favour of the numbers already beside them; Reselect rows are numbered. |
+| **Lists** | History, Reselect and Layers are one row component instead of three that had drifted. Buttons sit in one tight cluster; the colored dots are gone in favour of the numbers already beside them; Reselect rows are numbered. |
 | **Lists** | History and Reselect hide their row buttons until hover **or keyboard focus** — focus reveals the whole cluster, so nothing is hidden from a Tab user. Layers keeps its buttons visible: they are used constantly and the eye reports a state rather than only offering an action. |
-| **Gallery** | The bar header is three columns — count left, compress centred, actions right. Centred on the bar rather than on the leftover space, so the compress pair stops shifting when a selection appears. |
+| **Gallery** | The bar header is three columns — count left, compress centered, actions right. Centered on the bar rather than on the leftover space, so the compress pair stops shifting when a selection appears. |
 | **Gallery** | The count's (i) is a lightbulb, matching every other explanation in the app. |
 | **Import** | Dropping or pasting an image with nothing open goes straight to the gallery. The choice dialog offers three options, two of which need an open image, so it was asking a question with one possible answer. |
-| **Status bar** | The second dimension is labelled `Current:`. It reports the document, which includes the canvas border. |
+| **Status bar** | The second dimension is labeled `Current:`. It reports the document, which includes the canvas border. |
 | **Eraser** | The panel header says "Eraser", not "Brush" above a field called Brush Size; the field is "Eraser Size". |
 | **Mobile** | The viewer can save a photo to the device. The notice says so, having previously claimed only uploading and browsing. |
 | **Engine** | The stabilizer is its own module (`src/stabilizer.rs`) with the leash table exported to JS as `stabilizer_leash`, so the pen overlay cannot grow a second copy of the numbers. Paint's pixels are unchanged — `tests/replay_parity.rs` is the proof. |
 | **Engine** | `duplicate_text_annotation` / `duplicate_shape_annotation` clone the struct, covered by a test that walks every emitted field rather than a hand-listed set. |
-| **Colour** | The "+" on a colour swatch opens a full picker — hue wheel or SV rectangle, with hex/RGB/HSL fields that track each other, and a before/after split over a checkerboard. Saved colours live in a palette that is localStorage when logged out and a Convex `user_colors` table when signed in, so the logged-out path never touches the network. |
+| **Color** | The "+" on a color swatch opens a full picker — hue wheel or SV rectangle, with hex/RGB/HSL fields that track each other, and a before/after split over a checkerboard. Saved colors live in a palette that is localStorage when logged out and a Convex `user_colors` table when signed in, so the logged-out path never touches the network. |
 | **Fixes** | Two files that existed nowhere in master were landed, and a PR-sweep e2e spec's dead selector repaired — it was reporting a harness miss as a 120s product failure. |
 
 wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
+
+## v8.76 Change Summary — 2026-09-12
+
+**The editor has its own address, and the front page is the front page again.**
+
+| Area | Change |
+| --- | --- |
+| **Hosting** | Image Horse runs on its own domain. The site is at `imagehorse.app`, the editor at `edit.imagehorse.app`, and `www` 308s to the apex. The Netlify address still works and stays up as the rollback path. |
+| **Hosting** | The apex had been serving the **editor**. Two Vercel projects share this repo and a Root Directory setting picks which config each reads; the marketing project was still rooted at the repo root, where `vercel.json` had just been repointed at the editor build. It is rooted at `marketing/` now. |
+| **Hosting** | `marketing/vercel.json` had never been valid. Vercel's config schema is `additionalProperties: false` at every level, so the eight `"//"` comment keys it carried made every deploy that read it a 400 *before a build started*. It went unnoticed because no project had ever read the file. The prose moved to `marketing/VERCEL-CONFIG.md`. |
+| **Site** | Unmatched paths return a real 404 again instead of answering with the home page at status 200 — the catch-all rewrite belonged to the editor's config, not the site's. |
+| **Site** | The marketing site carries its own security headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS) and its own content-security policy, rather than inheriting the editor's — it loads no wasm, no Clerk and no Convex, so it allows none of them. |
+| **Features page** | Ten entries drew a plain square instead of an icon. `features.ts` is generated from `docs/Features.md`; the icon map beside it is hand-written, and eight features had shipped with no entry while two more had been renamed, which drops the icon just as quietly. All 48 features are mapped, and the fallback is now a dot rather than `Square` — which "Blank Canvas" legitimately uses, so an unmapped feature had been indistinguishable from a real one. |
+| **SEO** | The sitemap stops stamping every URL with the deploy date. A shallow clone has no history to read a real `lastmod` from, so it invented one for all five URLs. |
+| **SEO** | The editor's canonical link and `og:url` name `edit.imagehorse.app` instead of a build host. |
+| **Engine** | The wasm builds on Vercel unchanged — 823,479 B, `features tiles,patchmatch`, exports intact, served copy matching its own build record. The feature set now has one home, `scripts/build-wasm.sh`, instead of being duplicated in a host config. |
+| **Deploy check** | `scripts/deploy-sentinel.sh` follows production to `edit.imagehorse.app`, after a manual run against that host passed. Note its limit: it inspects the wasm binary, not whether the app mounts — it passed green while the editor rendered a blank screen. |
+
+## v8.77 Change Summary — 2026-09-14
+
+**Other sites can't frame the editor, and A/B compare lines up.**
+
+| Area | Change |
+| --- | --- |
+| **Security** | Both sites send `X-Frame-Options: DENY`. ADR-048 counted `frame-ancestors 'none'` as enforcing, but it shipped inside `Content-Security-Policy-Report-Only`, which blocks nothing: since v8.70, `edit.imagehorse.app`, `imagehorse.app` and the Netlify site all rendered inside a cross-origin iframe. Proven in Chromium with a must-block and a must-load control, then proven blocked with the header (#144). |
+| **Compare** | The A/B overlay covers `photo_bounds` instead of the whole canvas. On a 400×300 photo with the default 10px artboard the overlay was 420×320, and the original was stretched across the band. Now the band shows through the same on both halves. Nothing in the document changes, so leaving compare has nothing to restore. A unit test and an e2e spec pin it, and each fails against the old geometry (#146). |
+| **Engine** | Vercel's wasm is byte-identical to CI's: **823,503 B, `102e26d9…`**. Vercel's `CARGO_HOME` is `/rust`, which matched none of the `--remap-path-prefix` entries, so 27 registry paths were embedded and production ran 24 B off every other builder (823,479 B). One line in `.cargo/config.toml`, verified against the served preview asset, not only the build record (#145). |
+| **Docs** | Vacuous check #15 (the guardrails CI job never builds wasm) and why `netlify.toml` stays. Three findings parked: `history_max_bytes` has no caller; `cspInlineHash.test.ts` guards `netlify.toml` only; and the scheduled `cargo audit` has been red for eight weeks because the job lacks `issues: write`. It found no vulnerabilities. |
+
+## v8.78 Change Summary — 2026-09-15
+
+**The Stroke Stabilizer steadies your line again, and a pasted picture saves as `pasted-revised`.**
+
+| Area | Change |
+| --- | --- |
+| **Stroke Stabilizer** | Dead since v8.75. #122 moved the leash into `Stabilizer` and left `paint_move` reading `let leash = 0.0; if leash > 0.0 { … }`, so the stabilized branch never ran: moves painted the raw path, the tip stayed at the press point, and `paint_up`'s catch-up flush drew a straight line from the press point to the release point. Every level, in Paint, Eraser, mask paint and the Magic Eraser brush; clone stamp and blur wire their own stabilizer and were fine. Found in QC on v8.77. Fix: `if self.paint_stab.is_on()`. New `tests/paint_stabilized.rs` goes 4 of 6 red on the old engine, 6/6 on the fix; the same in-browser probe draws the closing diagonal on the served v8.77 build and not on the fix. Saved documents replay as drawn, no migration (#151). |
+| **Paste** | A pasted picture exports as `pasted-revised`. Browsers name pasted bitmaps `image.png`, so every paste exported as `image-revised`, and the three paste entry points had drifted to three names. One rule in `lib/pastedImageName.ts`: a generic `image.*` name, no name, or a bare Blob becomes `pasted.<ext>`; a real file from File Explorer keeps its name. Unit test and e2e spec, the spec red against the old call sites (#148). |
+| **Start screen** | Create AI Image is hidden behind `AI_IMAGE_READY` until a text-to-image job type exists, and the tile grid goes 2×2 while it's hidden (#150). The website icon opens `imagehorse.app` instead of `image-horse.vercel.app` (#137). |
+| **Netlify** | On `rust-wasm-photo-tool.netlify.app` and its deploy previews only, a toast says the editor moved and that the address forwards to `edit.imagehorse.app` on 2026-09-29, and tells signed-out users to export first, since their IndexedDB gallery is per origin. Checked on the real Netlify preview: one notice, wraps cleanly (#149). |
+| **Tests** | `cspInlineHash.test.ts` checked the inline-script hash in `netlify.toml` only, while production serves `vercel.json`; it went 2/2 green with production's hash broken. It now reads both files and the hash out of each CSP header's `script-src`. Vacuous check #16 (#147). |
+| **Engine size** | 823,503 → **823,714 B** (+211 B). The only source change that compiles into the wasm is the stabilizer branch, which the optimizer had been dropping while `leash` was a constant 0. |
+| **QC** | Checklist rows 1–7 passed on a local production build of master + #137, #147–#149 (Export all keeps edits after reload, real screenshot paste, file paste, gallery reload, A/B compare, keyboard). That pass found the stabilizer bug and the stale link. |
+
+## v8.79 Change Summary — 2026-09-16
+
+**Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop.**
+
+| Area | Change |
+| --- | --- |
+| **Perspective** | The tool can be pointed at a **square, a circle, a line, an arrow, a pin, a pen path or a piece of text** and warps *that object*, non-destructively. Before this, text was the only vector target and everything else fell through to the destructive pixel warp — which is what *"only works with raster"* meant: the photo under the square moved and the square did not. The warped object is **still an object** — recolour, move, resize, undo or re-select it and the perspective comes along, because the quad is stored on the annotation as fractions of its own box and applied at render time. **Apply · Reset · Cancel are on the canvas** under the box as well as in the panel, and **Esc cancels**, taking the whole six-handle frame off instead of straightening the corners and leaving it there. Only objects on the active layer are pickable, and switching layers drops the pick. Op-log format **v5 → v6** by the same prefix-extension recipe as v3/v4/v5; v5 blobs decode unchanged and mean "no perspective" ([ADR-053](adr/053-a-shapes-perspective-is-normalized-over-its-bbox-and-its-tile-is-padded.md), #130). |
+| **Presets** | Enhance › Presets: one click for a whole look, previewed on your own photo on hover. A preset is **not a new primitive** — `apply_stack` calls the brightness, contrast, highlights, shadows and saturation filters the engine already had, in a documented order that is itself pinned by tests. Applying one is a single undo step; the Quick Adjust grid it grew out of cost two, and that grid is now retired, leaving Adjustments as sliders only ([ADR-055](adr/055-a-color-preset-is-a-named-stack-of-existing-filters-sharing-one-preview-slot.md), #153). |
+| **Dialogs** | Every modal backdrop is one definition. Nine of them had drifted to **five different opacities, four z-tokens plus two raw numbers, two blur radii and two with no blur at all** — because `ui/dialog`'s default shipped without a blur, so each dialog that wanted one hand-rolled its own. Export, Settings, the Command Palette, Diagnostics and Shortcuts inherit from that default and had **no blur at all** before this. The scrim also stopped fading, which is the performance fix: animating opacity on a full-viewport `backdrop-filter` re-blurs the whole screen every frame, measured at 150–183 ms per frame on the New dialog and never recovering inside 600 ms; static, the same open costs one ~117 ms mount hitch and is back at 60 fps six frames later (#155). |
+| **Panel buttons** | The actions at the bottom of Crop, Canvas Size, Layers, Levels, Color Picker and Remove Object were one job done **four ways across six panels**. `PanelActionBar` owns the layout only and leaves `button.tsx` untouched. New `--destructive-strong` token for the destructive label: "Remove canvas" measured **3.66:1 light / 3.98:1 dark** against WCAG 1.4.3's 4.5:1, now ≈4.9:1 both. ⚠️ **Rulers & Grid changes behavior** — 4 buttons became 2 toggles and `onChange` fires unconditionally, so clicking a lit toggle now turns it **off** where the old "On" was idempotent ([ADR-056](adr/056-a-panels-bottom-actions-are-one-primitive-and-the-two-up-bar-pushes-them-apart.md), #154). |
+| **Levels** | The histogram is `h-16` → `h-30` (64 → 120 px). At 64 it was a short strip above three full-height slider rows and read as controls with a thumbnail attached. Gray fill, brown marker lines and brown slider dots unchanged (#155). |
+| **New dialog** | A switch, default **off**, decides whether anything leaves the tab. Off: the four in-browser tiles. On: `Create AI Image` joins them, with its Pro key badge. It is locked while that step is open — flipping it off would unmount the tile that owns the step and take the prompt with it. Named `onlineFeaturesEnabled` rather than for AI, and named that **before shipping**, because it is a persisted key: renaming it once real browsers have written it costs a migration. Generate is still disabled — there is no text-to-image job type in `convex/aiJobs.ts` (#155). |
+| **Pro badge** | The key in a tile's top-left corner moved to `ToolButton`, so `ActionTile` and `ToolButtonGroup` both get it from one definition. Enhance › AI's two actions were hand-rolled `bg-purple-600` buttons with white text — a color in no theme token — and are now the same stacked tile group Select › Wand's Selection row uses. guardrails `raw-colors` **26 → 24** (#155). |
+| **Analytics** | Vercel Web Analytics on the editor, and Google Analytics 4 on both sites — `G-8RYJ8KWYRW` for the site, `G-NVVF53KKNK` for the editor. ⚠️ **The SPA rewrite would have silently killed the Vercel one**: `/(.*)` → `/index.html` catches `/_vercel/insights/script.js` too, and production was measured returning **200 `text/html`** for that path, so the script tag would have parsed the HTML page as JavaScript and reported zero visits with everything else correctly configured. The rewrite now excludes `/_vercel/`. GA ships with **no inline script** on either site — both run `script-src 'self'` with no `'unsafe-inline'`, so Google's own snippet would have worked in dev and died the day CSP is enforced (#155, #157). |
+| **Favicon** | The marketing site's tab icon is the horse instead of a 214-byte placeholder square. The artwork already fills 90.1% of its viewBox, so there was no padding to crop (#155). |
+| **Engine size** | 823,714 → **845,156 B** (+21,442). Shape perspective, the preset stack and the tonal preview slot. |
+| **Refactor** | `oplog_sync_annotations`' diff moved out of `lib.rs` to `ops::annotation_sync_ops`; the Perspective tool's canvas wiring moved out of `CanvasArea.tsx` to `features/canvas/PerspectiveLayer.tsx`. `src/lib.rs` is **4,808** lines against master's previous 4,902 — the guardrail floor moved down with it. |
+| **QC** | `imagehorse-qc` was **not run** for this cut. Verified in a real browser on the deployed build: both sites boot and mount, GA4 fires a `page_view` on each with the correct path and title, and a client-side route change on the marketing site sends a second one carrying the **new** page's title. |

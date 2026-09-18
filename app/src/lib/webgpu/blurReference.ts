@@ -1,6 +1,6 @@
 // A deliberate, line-by-line port of the engine's separable Gaussian blur.
 // This is the ORACLE the GPU shader is checked against, so it exists to be
-// obviously faithful rather than fast. Do not optimise it.
+// obviously faithful rather than fast. Do not optimize it.
 //
 // Ported from:
 //   src/filters.rs        build_gaussian_kernel()
@@ -22,7 +22,7 @@
 //
 // Rounding: the SIMD path stores via `f32x4_add(acc, 0.5)` then a truncating
 // convert, so `Math.trunc(fround(x + 0.5))` is the faithful form. `f32::round()`
-// in the scalar fallback agrees with it for the non-negative values a normalised
+// in the scalar fallback agrees with it for the non-negative values a normalized
 // kernel produces.
 //
 // ⚠️ THIS FILE WAS WRONG FOR ITS WHOLE LIFE, in a way its own header could not
@@ -75,7 +75,7 @@ export function hasEngineKernel(): boolean {
 const F = Math.fround;
 
 /**
- * `build_gaussian_kernel` — length 2*radius+1, normalised to sum 1.
+ * `build_gaussian_kernel` — length 2*radius+1, normalized to sum 1.
  *
  * Prefers the ENGINE's kernel. The fround-emulated fallback is as close as
  * JavaScript can get and is still not exact, because `f32::exp` has no JS

@@ -105,7 +105,7 @@ describe("canvasSurfaceKey", () => {
     // the tempting fallback is ON ("unreadable → default"), and it is wrong: a
     // context that cannot READ the kill switch cannot SET it either, so ON
     // would strand that user on the one path whose escape hatch is unreachable.
-    // Broken storage → local engine, the pre-a14 behaviour. This assertion is
+    // Broken storage → local engine, the pre-a14 behavior. This assertion is
     // the a14 pre-flight's decision #1, pinned.
     vi.stubGlobal("localStorage", {
       getItem: () => {
@@ -119,7 +119,7 @@ describe("canvasSurfaceKey", () => {
   });
 
   it("returns an opaque token, not the flag value", () => {
-    // A caller must not be able to read behaviour out of it. `"1"`/`"0"` or a
+    // A caller must not be able to read behavior out of it. `"1"`/`"0"` or a
     // boolean would invite `if (key === "1")`, which is the branching the
     // async-migration contract forbids.
     withFlag("1");

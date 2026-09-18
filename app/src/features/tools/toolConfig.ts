@@ -47,7 +47,7 @@ export const TOOLS: ToolDefinition[] = [
     // sub-mode split into its own tool; now just the crop/transform half.
     id: "crop",
     label: "Adjust",
-    description: "Crop, flip, rotate and pick a colour off the image",
+    description: "Crop, flip, rotate and pick a color off the image",
     icon: VectorSquare,
     shortcutKey: "2",
   },
@@ -57,7 +57,7 @@ export const TOOLS: ToolDefinition[] = [
     // (wand/edge/color/lasso); drag = rect/ellipse marquee.
     id: "select",
     label: "Select",
-    description: "Wand, edge-aware, lasso, colour range or marquee",
+    description: "Wand, edge-aware, lasso, color range or marquee",
     icon: SquareDashedMousePointer,
     // The promised digit, delivered: `S` was removed in v7.44 pending this
     // renumbering, and Select sits third in the rail, so it takes `3`. Do NOT
@@ -93,7 +93,8 @@ export const TOOLS: ToolDefinition[] = [
     // DISPLAY label only — id stays "ai" (shortcut 6, persistence, routing
     // are load-bearing; renamed here the same way "crop"→"Adjust & Select"
     // and "compress"→"Resize" were). Was the AI tool; OCR moved to Text,
-    // 4x Upscale moved to Effects, and this slot is now Eraser: PatchMatch/
+    // 4x Upscale moved to Effects and then away entirely (its grayed tile went
+    // with the Quick Adjust grid), and this slot is now Eraser: PatchMatch/
     // Magic Eraser + Background Removal + Object Removal (AISettings.tsx).
     id: "ai",
     label: "Eraser",

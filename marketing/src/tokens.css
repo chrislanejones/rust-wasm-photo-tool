@@ -1,6 +1,6 @@
-/* Design tokens — the single source for colour, type, space and motion.
+/* Design tokens — the single source for color, type, space and motion.
  *
- * Every value the stylesheet uses lives here. Rule: no raw colours, no raw
+ * Every value the stylesheet uses lives here. Rule: no raw colors, no raw
  * font-families, no magic durations anywhere else. A new value becomes a
  * token first, then gets referenced.
  */
@@ -27,9 +27,9 @@
   --color-bloom-2:      oklch(60% 0.220 15);
 
   /* Contribution-grid ramp — an amber intensity scale off --color-accent.
-   * L0 is an empty day (a tinted surface, never a pure grey); L1–L4 climb
+   * L0 is an empty day (a tinted surface, never a pure gray); L1–L4 climb
    * toward the accent. Named tokens because the grid must not improvise
-   * colour mid-render. */
+   * color mid-render. */
   --color-grid-0:       oklch(20% 0.012 40);
   --color-grid-1:       oklch(34% 0.070 48);
   --color-grid-2:       oklch(48% 0.115 50);
@@ -57,6 +57,15 @@
    * than gravity. The hero line is 60, so it caps here. */
   --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
   --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
+
+  /* Long-form reading, and only that. --text-base is sized for prose that sits
+     beside controls and gets scanned; an article is read start to finish, and
+     at 16px/1.55 a 68-character line asks the eye to track further than it
+     comfortably can for ten minutes. These two are referenced by .post and
+     nothing else — a page of UI copy that reaches for them is a page that
+     should have been an article. */
+  --text-prose:    1.125rem;
+  --leading-prose: 1.7;
 
   --leading-display: 1.0;
   --leading-tight:   1.05;

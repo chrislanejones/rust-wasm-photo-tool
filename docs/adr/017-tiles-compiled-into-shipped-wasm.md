@@ -68,7 +68,7 @@ replaced with the new reality and a pointer here.
 - **The op-log code path now executes in production for the first time.** It has
   never run outside tests and a local preview. That is the risk this ADR carries,
   and it is why the flags stay OFF and the Phase-1 dogfood still has to happen.
-- The flags become *real*: flipping `ih_oplog_undo` now actually changes behaviour
+- The flags become *real*: flipping `ih_oplog_undo` now actually changes behavior
   instead of being inert.
 
 ## Verification (real browser, production build, 2026-07-13)

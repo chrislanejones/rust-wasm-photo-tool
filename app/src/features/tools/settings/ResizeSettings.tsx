@@ -136,7 +136,7 @@ export function ResizeSettings({
     exportFormat === "avif" && avifOk === false ? "png" : exportFormat;
 
   // A quiet line under the picker. Information, not a warning: PNG being large
-  // is correct behaviour, and the surprise it causes is only that the status
+  // is correct behavior, and the surprise it causes is only that the status
   // bar shows the SOURCE size while a lossless re-encode lands on disk.
   const formatNote =
     exportFormat === "png"
@@ -507,7 +507,7 @@ export function ResizeSettings({
           neighbour. One panel inset on each side of the rule reads as a
           separator rather than a gap. */}
       <div className="border-t border-theme-sidebar-border pt-panel mt-panel space-y-2">
-        {/* ONE apply button, labelled for what is actually pending. It says
+        {/* ONE apply button, labeled for what is actually pending. It says
             "Apply Resize" when only the dimensions moved, "Apply Compression"
             when only quality/format/method moved, and "Apply Compression &
             Resize" when both did — which is also the disabled resting label,

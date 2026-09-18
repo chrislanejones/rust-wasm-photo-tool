@@ -101,7 +101,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
   // Black and white until the pixels are decoded AND it is this tile's turn —
-  // but only for a photo that just arrived; a restored one starts in colour.
+  // but only for a photo that just arrived; a restored one starts in color.
   const develop = useThumbDevelop(entry.id, entry.thumbBlob);
 
   useEffect(() => {
@@ -172,7 +172,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
       {/* The image pops inside the clipped card — hoverPop from lib/animations.ts,
-          the same definition the tool tiles use — and comes into colour from
+          the same definition the tool tiles use — and comes into color from
           black and white as it lands: thumbDevelop, same file. */}
       <motion.img
         ref={imgRef}
@@ -299,12 +299,12 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
            that marks a selected thumbnail.
 
            ⚠️ Using a *-foreground token as a background is deliberate, not a
-           slip. This chip sits on an arbitrary PHOTO, so it needs a colour that
+           slip. This chip sits on an arbitrary PHOTO, so it needs a color that
            does not follow the panel — and that token is the only theme-stable
            dark the palette has.
 
            The unselected state stays a scrim-plus-border rather than a theme
-           colour: it sits on an arbitrary photo, so it needs to work against
+           color: it sits on an arbitrary photo, so it needs to work against
            unknown pixels rather than against the panel. The border is stronger
            now, and the tick is faintly present instead of fully transparent so
            the control reads as a checkbox before you hover it. */
@@ -341,7 +341,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
  *   many selected      (i) [Compress Selected]
  *                      │ [Unselect] [Delete Selected] [Export or Share Images]
  *
- * Nothing here is new behaviour — every handler already existed. `onAutoCompress`
+ * Nothing here is new behavior — every handler already existed. `onAutoCompress`
  * is the same one the Resize panel calls, so the two surfaces cannot drift.
  */
 function GalleryActions({
@@ -454,8 +454,8 @@ function GalleryActions({
           />
           {/* GRID, not a flex row: `auto-cols-fr` gives Compress Image and
               Compress All the SAME width whatever their labels measure, and
-              `justify-center` centres the pair as a block. A flex row sized
-              each button to its own text, so the two sat off-centre and
+              `justify-center` centers the pair as a block. A flex row sized
+              each button to its own text, so the two sat off-center and
               visibly mismatched.
               COMPACT STACKS. One column, full-width buttons — the vertical
               bar has no room to put two beside each other without clipping
@@ -636,7 +636,7 @@ export function GalleryBar({
                   // (the header grows when a selection appears).
                   "mb-3 flex flex-col gap-2 border-b border-border pb-3"
                 : // THREE COLUMNS: count · compress · actions. `1fr auto 1fr`
-                  // rather than `grid-cols-3` so the middle is centred on the
+                  // rather than `grid-cols-3` so the middle is centered on the
                   // BAR, not on whatever width the other two happened to leave
                   // — with equal thirds the compress block drifted whenever the
                   // count grew ("Selected: 3 of 12") or an action appeared.

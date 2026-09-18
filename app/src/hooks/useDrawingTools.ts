@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
-import type { ToolType, ToolSettings } from "@/lib/types";
+import type { ShapeName, ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
+import {
+  diamondVertices,
+  shapeWobbleSeed,
+  sloppyCirclePoints,
+  sloppyPolylinePoints,
+  starVertices,
+} from "@/lib/shapeSloppiness";
 
 export interface Point {
   x: number;
@@ -34,20 +41,20 @@ export interface DrawEditState {
   end: Point;
   /** The shape type this pending NEW shape was drawn as, pinned at mouse-up.
    *
-   *  The type used to be read live from `ToolSettings.shape` like the colour
+   *  The type used to be read live from `ToolSettings.shape` like the color
    *  and the stroke width, and that made picking a different shape in the
    *  panel RETYPE the shape already on the canvas: draw a circle, click
    *  Square, and the circle became a square. Chris's report — "clicking
    *  another shape should not change the last shape created on the canvas,
    *  let it just allow a new shape to be added."
    *
-   *  Type is not like colour. A colour tweak is an edit to the thing in front
+   *  Type is not like color. A color tweak is an edit to the thing in front
    *  of you; a shape click is the choice of what you are about to draw NEXT,
    *  which is why `panelStylePatch` already refuses to carry `shape` across to
    *  a RESELECTED shape. This pins the same rule for a freshly drawn one, so
    *  the two paths finally agree. Unset for reselected shapes, which carry
    *  their own type in `style.shape`. */
-  drawnShape?: "rect" | "circle" | "handCircle" | "line";
+  drawnShape?: ShapeName;
   /** When set, we're editing an EXISTING live shape annotation (this id)
    *  rather than creating a new one. Commit calls update_shape_annotation. */
   editId?: number;
@@ -56,10 +63,13 @@ export interface DrawEditState {
    *  style rather than the current toolbar settings. New shapes leave this
    *  undefined and read settings live. */
   style?: {
-    shape: "rect" | "circle" | "handCircle" | "line";
+    shape: ShapeName;
     strokeColor: string;
     strokeWidth: number;
     arrowStyle: "single" | "double";
+    /** Stroke sloppiness 0-100 (how hand-drawn the outline is), captured on
+      * reselect so it round-trips — a sketchy circle stays sketchy. */
+    sloppiness: number;
     /** The shape's real Rust `kind` byte, preserved across an edit so a pin
      *  (kind 5) re-rendered as a circle handle still commits as a pin. */
     kindByte?: number;
@@ -93,21 +103,21 @@ export type ShapeStylePatch = Partial<NonNullable<DrawEditState["style"]>>;
 export function pendingShapeType(
   es: Pick<DrawEditState, "style" | "drawnShape"> | null | undefined,
   panelShape: string | undefined,
-): "rect" | "circle" | "handCircle" | "line" {
-  const fromPanel = panelShape as "rect" | "circle" | "handCircle" | "line" | undefined;
+): ShapeName {
+  const fromPanel = panelShape as ShapeName | undefined;
   return es?.style?.shape ?? es?.drawnShape ?? fromPanel ?? "rect";
 }
 
 /**
  * Which style fields the user just changed in the Shapes panel.
  *
- * This is the fix for the seven-week "a placed square cannot be recoloured"
+ * This is the fix for the seven-week "a placed square cannot be recolored"
  * bug. `selectShape` snapshots a reselected shape's own style into
  * `editState.style` so clicking a red square shows it red rather than
  * repainting it with whatever the panel happens to hold. But that snapshot
  * then outranked the panel everywhere (`es.style?.strokeColor ?? s.strokeColor`
- * in `commitEdit`), so a colour change could never reach the shape — and
- * because only a handle drag set `editDirtyRef`, a colour-only edit also took
+ * in `commitEdit`), so a color change could never reach the shape — and
+ * because only a handle drag set `editDirtyRef`, a color-only edit also took
  * `commitEdit`'s no-op early exit and never called `update_shape_annotation`
  * at all. Two blockers, one symptom.
  *
@@ -115,7 +125,7 @@ export function pendingShapeType(
  * as a DEFAULT rather than an override: diff the panel against its own
  * PREVIOUS value and carry across only what actually changed. Comparing
  * against the shape instead would repaint it the moment it was selected,
- * which is the behaviour the snapshot exists to prevent.
+ * which is the behavior the snapshot exists to prevent.
  *
  * Returns `null` when nothing changed, so the caller can skip the re-render
  * and — more importantly — avoid marking the edit dirty, which would push a
@@ -123,7 +133,7 @@ export function pendingShapeType(
  *
  * `shape` is deliberately absent: `kindByte` preserves a pin's real kind
  * across an edit, so retyping a committed shape is a separate operation and
- * not something a colour click should trigger.
+ * not something a color click should trigger.
  */
 export function panelStylePatch(
   prev: ToolSettings,
@@ -133,6 +143,7 @@ export function panelStylePatch(
   if (next.strokeColor !== prev.strokeColor) patch.strokeColor = next.strokeColor;
   if (next.strokeWidth !== prev.strokeWidth) patch.strokeWidth = next.strokeWidth;
   if (next.arrowStyle !== prev.arrowStyle) patch.arrowStyle = next.arrowStyle;
+  if (next.sloppiness !== prev.sloppiness) patch.sloppiness = next.sloppiness;
   if (next.fillMode !== prev.fillMode) patch.fillMode = next.fillMode;
   if (next.fillColor !== prev.fillColor) patch.fillColor = next.fillColor;
   if (next.fillColor2 !== prev.fillColor2) patch.fillColor2 = next.fillColor2;
@@ -145,7 +156,8 @@ export function panelStylePatch(
 /** One entry from `tool.get_shape_annotations()`. */
 export interface ShapeMeta {
   id: number;
-  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow,5=pin,6=polyline
+  kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
+                // 6=polyline,7=bezier,8=diamond,9=star
   x0: number;
   y0: number;
   x1: number;
@@ -155,6 +167,9 @@ export interface ShapeMeta {
   b: number;
   stroke_width: number;
   arrow_style: number;
+  /** Stroke sloppiness 0-100 (how hand-drawn the outline is). Absent on
+   *  shapes written before the field shipped (they meant "firm"). */
+  sloppiness?: number;
   /** Pin sequence index (kind 5). */
   number: number;
   /** Pin label style (kind 5): 0 = number, 1 = letter. */
@@ -171,12 +186,17 @@ export interface ShapeMeta {
   points: number[][];
 }
 
-/** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). */
-const SHAPE_KIND_NAME: Record<number, "rect" | "circle" | "handCircle" | "line"> = {
+/** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). Kind 3
+ *  (the legacy hand-drawn circle) re-edits as a CIRCLE — its hand-drawn look
+ *  is not lost, because `selectShape` seeds sloppiness 100 for shapes that
+ *  predate the field. */
+const SHAPE_KIND_NAME: Record<number, ShapeName> = {
   0: "rect",
   1: "circle",
   2: "line",
-  3: "handCircle",
+  3: "circle",
+  8: "diamond",
+  9: "star",
 };
 
 /** ToolSettings shape name → Rust `kind` byte. */
@@ -184,7 +204,8 @@ const SHAPE_NAME_KIND: Record<string, number> = {
   rect: 0,
   circle: 1,
   line: 2,
-  handCircle: 3,
+  diamond: 8,
+  star: 9,
 };
 
 function rgbToHex(r: number, g: number, b: number): string {
@@ -434,6 +455,11 @@ export function useDrawingTools({
     const fill2Hex = fillColor2 ?? "#000000";
     const fillAngle = gradientAngle ?? 0;
     const fillBlockVal = fillBlock ?? 16;
+    // Stroke sloppiness — reselected shapes keep their captured value, new
+    // shapes read the panel live. New shapes use the live panel value so the
+    // just-drawn shape has sloppiness, but would also pick any unsaved panel
+    // change (like strokeColor).
+    const sloppiness = es.style?.sloppiness ?? s.sloppiness ?? 0;
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -457,6 +483,7 @@ export function useDrawingTools({
         fill2Hex,
         fillAngle,
         fillBlockVal,
+        sloppiness,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -474,6 +501,7 @@ export function useDrawingTools({
         fill2Hex,
         fillAngle,
         fillBlockVal,
+        sloppiness,
       );
       // The just-drawn shape becomes the Align/Placement target, so the
       // grid (and numpad 1-9) can place it immediately after drawing.
@@ -534,12 +562,17 @@ export function useDrawingTools({
       // overlay instead (see handleSelectObject).
       if (sh.kind === 7) return;
       // Pins (kind 5) edit as a circle handle but keep their pin kind on commit.
-      const shapeName: "rect" | "circle" | "handCircle" | "line" =
+      // Kind 3 (legacy hand-drawn circle) rewrote itself into a CIRCLE at
+      // render-time the moment this feature shipped, and re-edits as a sloppy
+      // circle: its sloppiness field was never written, so seed 100 — the look
+      // it was baked with — whenever a kind-3 shape is dropped on the overlay.
+      const shapeName: ShapeName =
         sh.kind === 4 || sh.kind === 5
           ? sh.kind === 5
             ? "circle"
             : "line"
           : (SHAPE_KIND_NAME[sh.kind] ?? "rect");
+      const sloppiness = sh.sloppiness ?? (sh.kind === 3 ? 100 : 0);
       const next: DrawEditState = {
         kind: sh.kind === 4 ? "arrow" : "shape",
         start: { x: sh.x0, y: sh.y0 },
@@ -551,6 +584,7 @@ export function useDrawingTools({
           strokeWidth: sh.stroke_width,
           arrowStyle: sh.arrow_style === 1 ? "double" : "single",
           kindByte: sh.kind,
+          sloppiness,
           fillMode:
             sh.fill_kind === 1
               ? "solid"
@@ -576,18 +610,19 @@ export function useDrawingTools({
       // Without this the panel keeps whatever was last used, which made
       // `panelStylePatch` unable to see a real edit: reselect an orange shape
       // while the panel still reads purple, click purple because that is the
-      // colour you want, and the panel's value does not change — so the diff
+      // color you want, and the panel's value does not change — so the diff
       // returned null, the shape stayed orange, and nothing reached history.
       // Syncing here makes "the panel value changed" mean exactly "the user
       // changed a control", which is the invariant the diff depends on. It also
       // stops the panel lying about what is selected, and makes the baseline
       // the SHAPE's style, so changing only the width can no longer drag a
-      // stale panel colour along with it.
+      // stale panel color along with it.
       const synced: ToolSettings = {
         ...settingsRef.current,
         strokeColor: next.style!.strokeColor,
         strokeWidth: next.style!.strokeWidth,
         arrowStyle: next.style!.arrowStyle,
+        sloppiness: next.style!.sloppiness,
         fillMode: next.style!.fillMode,
         fillColor: next.style!.fillColor,
         fillColor2: next.style!.fillColor2,
@@ -1030,6 +1065,7 @@ export function useDrawingTools({
           settings.shape ?? "rect",
           settings.strokeColor,
           settings.strokeWidth,
+          settings.sloppiness ?? 0,
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
@@ -1193,9 +1229,10 @@ function drawShapePreview(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },
   to: { x: number; y: number },
-  shape: string,
+  shape: ShapeName,
   color: string,
   width: number,
+  sloppiness: number,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -1206,6 +1243,73 @@ function drawShapePreview(
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
+
+  if (sloppiness > 0) {
+    // Mirrors Rust: at sloppiness > 0 EVERY shape routes through the
+    // sketchy path generator so the preview and the committed pixels match
+    // (draw_shape, drawing.rs). Firm shapes (0) take the clean branches below.
+    let verts: { x: number; y: number }[];
+    let pts;
+    switch (shape) {
+      case "rect":
+        verts = [
+          { x, y },
+          { x: x + w, y },
+          { x: x + w, y: y + h },
+          { x, y: y + h },
+        ];
+        pts = sloppyPolylinePoints(
+          verts,
+          shapeWobbleSeed(from.x, from.y, to.x, to.y),
+          sloppiness,
+          width,
+          true,
+        );
+        break;
+      case "circle":
+        pts = sloppyCirclePoints(from, to, sloppiness, width);
+        break;
+      case "diamond":
+        pts = sloppyPolylinePoints(
+          diamondVertices(from.x, from.y, to.x, to.y),
+          shapeWobbleSeed(from.x, from.y, to.x, to.y),
+          sloppiness,
+          width,
+          true,
+        );
+        break;
+      case "star":
+        pts = sloppyPolylinePoints(
+          starVertices(from.x, from.y, to.x, to.y),
+          shapeWobbleSeed(from.x, from.y, to.x, to.y),
+          sloppiness,
+          width,
+          true,
+        );
+        break;
+      case "line":
+        pts = sloppyPolylinePoints(
+          [
+            { x: from.x, y: from.y },
+            { x: to.x, y: to.y },
+          ],
+          shapeWobbleSeed(from.x, from.y, to.x, to.y),
+          sloppiness,
+          width,
+          false,
+        );
+        break;
+    }
+    if (pts && pts.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      return;
+    }
+    // No sketchy path (a circle too small to wobble) — fall through to the
+    // clean branches, which is what the engine does.
+  }
 
   ctx.beginPath();
 
@@ -1221,53 +1325,20 @@ function drawShapePreview(
       break;
     }
 
-    case "handCircle": {
-      // Hand-drawn circle preview — wobbly ellipse with tail
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-      const rx = w / 2;
-      const ry = h / 2;
-      const points = 60;
+    case "diamond": {
+      const pts = diamondVertices(from.x, from.y, to.x, to.y);
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.stroke();
+      break;
+    }
 
-      const startOffset = (from.x * 31.17 + from.y * 47.53) % (Math.PI * 2);
-      const mainArc = Math.PI * 2 - Math.PI * 0.15;
-      const seed =
-        from.x * 31.17 + from.y * 47.53 + to.x * 13.91 + to.y * 67.37;
-
-      const getNoise = (angle: number) =>
-        Math.sin(angle * 2.3 + seed) * 3 +
-        Math.sin(angle * 1.1 + seed * 0.7) * 2 +
-        Math.cos(angle * 3.7 + seed * 1.3) * 1.5;
-
-      const tilt = (((seed * 1000) % 1000) / 1000 - 0.5) * 0.15;
-
-      // Tail
-      const tailLength = Math.PI * 0.3;
-      ctx.beginPath();
-      for (let i = 0; i <= 10; i++) {
-        const t = i / 10;
-        const angle = startOffset - tailLength * (1 - t);
-        const noise = getNoise(angle) * t;
-        const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-        const inward = (1 - t) * (rx * 0.15);
-        const px =
-          cx + (rx * squeeze - inward + noise) * Math.cos(angle + tilt);
-        const py =
-          cy + (ry / squeeze - inward + noise) * Math.sin(angle + tilt);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-
-      // Main circle
-      for (let i = 0; i <= points; i++) {
-        const t = i / points;
-        const angle = startOffset + t * mainArc;
-        const noise = getNoise(angle);
-        const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
-        const px = cx + (rx * squeeze + noise) * Math.cos(angle + tilt);
-        const py = cy + (ry / squeeze + noise) * Math.sin(angle + tilt);
-        ctx.lineTo(px, py);
-      }
+    case "star": {
+      const pts = starVertices(from.x, from.y, to.x, to.y);
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
       ctx.stroke();
       break;
     }

@@ -94,7 +94,7 @@ describe("raster surface — selected image / layer / paste placement", () => {
   });
 
   it("EDGE handles stay free even on a plain drag — one axis has no ratio to keep", () => {
-    // This is the documented Figma/Illustrator/Photoshop behaviour and the
+    // This is the documented Figma/Illustrator/Photoshop behavior and the
     // reason the spec says "plain CORNER drag".
     expect(resize("raster", "e", START, { dx: 100, dy: 0 }, false))
       .toMatchObject({ width: 500, height: 300 });

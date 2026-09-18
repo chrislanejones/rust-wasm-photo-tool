@@ -95,7 +95,7 @@ to arbitrary ones chosen at runtime. Two honest options, unchanged by which:
 
 | Option | Buys | Costs |
 |---|---|---|
-| **Self-host** the faces | Claim becomes true, for the first time | Bundle size; a licence check per face |
+| **Self-host** the faces | Claim becomes true, for the first time | Bundle size; a license check per face |
 | **Fetch and disclose** | Any Google font, cheap | The copy has to change and say so before the first fetch |
 
 Worth deciding once with the `/pricing` AI-copy problem rather than twice.
@@ -174,7 +174,7 @@ is better than either option this ADR offered.
 
 **Nothing is fetched and nothing is bundled.** A Pro user picks a `.ttf`/`.otf`
 off their own disk — bought from Adobe, downloaded from Google Fonts, whatever
-they already have a licence for — and Image Horse stores it locally and hands
+they already have a license for — and Image Horse stores it locally and hands
 the bytes to `ab_glyph`. That kills three problems at once:
 
 | Problem this ADR raised | Why it goes away |
@@ -183,7 +183,7 @@ the bytes to `ab_glyph`. That kills three problems at once:
 | Fetching sends the user's IP to Google | Nothing is fetched |
 | Redistributing a licensed face | We never ship or host it; the user supplies their own |
 
-The licence question moves to the user, which is where it belongs — they already
+The license question moves to the user, which is where it belongs — they already
 hold whatever rights they hold. Worth one line of UI copy so they know that.
 
 ### Copy for the Fonts section

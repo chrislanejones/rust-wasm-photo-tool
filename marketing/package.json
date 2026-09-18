@@ -5,20 +5,27 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
-    "gen:data": "node scripts/gen-trail-data.mjs"
+    "gen:data": "node scripts/gen-trail-data.mjs",
+    "build:client": "vite build",
+    "build:ssr": "vite build --ssr src/entry-server.tsx --outDir dist-ssr",
+    "prerender": "node scripts/prerender.mjs",
+    "gen:og": "node scripts/gen-og-images.mjs"
   },
   "dependencies": {
-    "lucide-react": "^1.25.0",
+    "lucide-react": "^1.46.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router-dom": "^7.18.3"
+    "react-router": "^7.18.3",
+    "react-router-dom": "^7.18.3",
+    "three": "0.165.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.5.1",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/three": "0.165.0",
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"

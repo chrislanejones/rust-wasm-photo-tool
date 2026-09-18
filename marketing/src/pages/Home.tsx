@@ -1,6 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import ShotTimeline from "../components/ShotTimeline";
+import ButtonSet from "../components/ButtonSet";
+import CubeLetters from "../components/CubeLetters";
 import { CpuIcon, ListIcon, ServerIcon } from "../components/Icons";
+import { SHOTS } from "../data/shots";
+import { POSTS, fmtPostDate, postPath } from "../data/posts";
 import { EDITOR_URL, GITHUB_URL, external } from "../config";
 
 type Where = "all" | "local" | "server";
@@ -86,18 +92,12 @@ export default function Home() {
 
           {/* A real browser capture, not a redrawn frame — and it happens to show
               the "annotate it" beat in the headline actually happening: a photo
-              marked up in the tab, nothing uploaded. It's the LCP, so it loads
-              eagerly and carries its own dimensions to hold layout. */}
-          <figure className="hero__shot shot-frame">
-            <img
-              src="/IH-Hero-Image-August-2026.webp"
-              width={2048}
-              height={1219}
-              fetchPriority="high"
-              decoding="async"
-              alt="The Image Horse editor open on a photo of a white Mercedes SUV, a magic-wand selection marching around the bonnet, with the Wand and Selection panels on the left and History and Layers on the right — five photos in the gallery strip below, all held in the browser."
-            />
-          </figure>
+              marked up in the tab, nothing uploaded. It's still the LCP and it
+              still loads eagerly; the rail underneath it only ever reaches for
+              an older frame once someone drags it. See ShotTimeline for what
+              that costs (nothing, until it's asked for) and src/data/shots.ts
+              for where each older frame was recovered from. */}
+          <ShotTimeline shots={SHOTS} />
         </header>
 
         <hr className="rule-thick" />
@@ -166,19 +166,18 @@ export default function Home() {
         </section>
 
         {/* The tool run, deliberately a dense typographic list not an icon grid —
-            with the button set beside it, so the words have faces. The shot is
-            rendered from the app's own stylesheet, not redrawn. */}
+            with the tile set beside it, so the words have faces.
+
+            The set was an 832x859 WebP of the editor's toolbar until 09-16.
+            It is twelve real tiles now, named, in the editor's own glyph-over-
+            label shape: a picture of an interface asks to be taken on trust,
+            and these can be pressed. They select and nothing else — see the
+            note in ButtonSet.tsx for why "Apply" did not survive the change
+            and Download did not survive the names. */}
         <section className="editor" id="editor">
-          <figure className="editor__shot shot-frame">
-            <img
-              src="/button-set.webp"
-              width={832}
-              height={859}
-              loading="lazy"
-              decoding="async"
-              alt="Nine of Image Horse's own controls — Paint, Magic Wand, Crop, Resize, Download, Undo, Layers, Apply and Export — some idle, some selected."
-            />
-          </figure>
+          <div className="editor__shot">
+            <ButtonSet />
+          </div>
           <div className="editor__text">
             <h2 className="section__title section__title--sm">In the editor</h2>
             <p className="editor__run">
@@ -196,6 +195,101 @@ export default function Home() {
           </div>
         </section>
 
+        {/* The GPU row.
+            Sits between what the editor does and what the blog argues, because
+            it is neither: it is the one measurement on this page that has not
+            shipped yet.
+
+            ⚠️ THE COPY HERE IS DELIBERATELY NOT "BLUR RUNS ON YOUR GPU". The
+            design this came from said exactly that, and the repository says
+            otherwise in its own words — featureFlags.ts calls the WebGPU flag
+            an opt-in that "attaches the GPU blur correctness harness. No pixel
+            in the app goes near the GPU yet", and ADR-030 is still a draft. A
+            home page selling a path no pixel takes is the font dropdown that
+            listed twelve families and rendered one (ADR-051), with a bigger
+            audience.
+
+            So the section sells the measurement, which is real and is better
+            than the vague claim anyway, and the cubes are the honest demo: they
+            ARE drawn by WebGPU when the machine has it, and the label under
+            them says which backend actually ran. */}
+        <section className="gpu" id="gpu" aria-labelledby="gpu-title">
+          <div className="gpu__text">
+            <h2 id="gpu-title" className="section__title section__title--sm">
+              Your GPU does this blur 17× faster.
+            </h2>
+            <p className="lede">
+              Measured against the engine's own SIMD blur on real hardware, not estimated:{" "}
+              <span className="fig">5.3×</span> at 512 pixels, <span className="fig">17.6×</span> at
+              2048, and <span className="fig">53.8×</span> once the radius gets wide. There is no
+              crossover — the GPU wins on a single image.
+            </p>
+            <p className="gpu__caveat">
+              None of it touches a pixel in the editor yet. It sits behind an opt-in flag while the
+              correctness harness runs, because the GPU library does not fit the engine's size
+              budget and the path has to live outside the WebAssembly boundary. When it lands it
+              will be the same picture, sooner.
+            </p>
+            <p className="gpu__hint">
+              The letters are the real thing. Click, drag or press a key — they spring back.
+            </p>
+          </div>
+
+          <CubeLetters />
+        </section>
+
+        {/* Field notes.
+            Sits here, after the reader has been told what the thing is and what
+            is in it, and before being asked to open it — this is the section
+            for the reader who is convinced and now wants to know whether the
+            people building it know what they are doing.
+
+            It shows the three newest posts and no more. A home page that lists
+            every post becomes an index of the blog, and there is already one of
+            those; the job here is a sample and a way in. The same `.postcard`
+            as /blog rather than a bespoke home-page card, so the two surfaces
+            are the same object at two sizes. */}
+        {POSTS.length > 0 && (
+          <section className="notes" id="notes">
+            <header className="head-hang">
+              <h2 className="section__title section__title--sm">From the blog</h2>
+              <p className="lede">
+                The Trail Log says what shipped. These are the ones that needed the argument written
+                out — the decision, what it cost, and the measurements it was made on.
+              </p>
+            </header>
+
+            <ol className="postlist__list">
+              {POSTS.slice(0, 3).map((post) => (
+                <li className="postcard" key={post.slug}>
+                  <div className="postcard__meta">
+                    <time className="postcard__date" dateTime={post.published}>
+                      {fmtPostDate(post.published)}
+                    </time>
+                    {post.version && <span className="postcard__version">{post.version}</span>}
+                  </div>
+                  <div className="postcard__body">
+                    <h3 className="postcard__title">
+                      <Link to={postPath(post)}>{post.headline}</Link>
+                    </h3>
+                    <p className="postcard__deck">{post.deck}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            {/* Only worth showing once there is more on /blog than is already
+                on this page. */}
+            {POSTS.length > 3 && (
+              <p className="notes__more">
+                <Link to="/blog">
+                  All {POSTS.length} posts <span aria-hidden="true">→</span>
+                </Link>
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Two columns: the mark alone on the left, everything that can be read
             or clicked on the right. The mark is decorative — the sentence beside
             it carries the meaning — so it is aria-hidden and never focusable. */}
@@ -210,7 +304,7 @@ export default function Home() {
             </p>
             <div className="close__actions">
               <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the demo
+                Open the beta
               </a>
               <a className="cta cta--outline cta--lg" href={GITHUB_URL} {...external}>
                 Read the source

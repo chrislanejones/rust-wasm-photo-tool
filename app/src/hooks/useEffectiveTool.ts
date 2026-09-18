@@ -136,7 +136,7 @@ export function useEffectiveTool({
           onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
           onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
           // Deliberately the stamp's own mouse-up — the picker commits on
-          // down/move and has no release behaviour of its own.
+          // down/move and has no release behavior of its own.
           onMouseUp: stamp.onMouseUp,
         };
       }

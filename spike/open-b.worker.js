@@ -14,7 +14,7 @@ function paint() {
   ctx.fillStyle = "#f97316";
   const m = Math.round(Math.min(w, h) * 0.05);
   for (const [x, y] of [[0, 0], [w - m, 0], [0, h - m], [w - m, h - m]]) ctx.fillRect(x, y, m, m);
-  // a grid, so scaling artefacts are legible
+  // a grid, so scaling artifacts are legible
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.lineWidth = 2;
   for (let x = 0; x <= w; x += Math.round(w / 8)) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }

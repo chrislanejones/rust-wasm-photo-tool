@@ -63,7 +63,7 @@ import { CELEBRATION_STATS } from "@/lib/celebrationStats";
  *  orphans the last chip in a half-empty row.
  *
  *  Hand-written on purpose while the NUMBERS above are generated. A headline
- *  is a judgement about what mattered, and the trail log's `feature` tag does
+ *  is a judgment about what mattered, and the trail log's `feature` tag does
  *  not carry that — August's biggest change shipped tagged `infra`.
  *
  *  App-facing features only. The trail log this is drawn from covers the
@@ -74,7 +74,7 @@ const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: stri
   { icon: LayoutGrid, label: "Layers went from three to eight" },
   { icon: ScanEye, label: "Perspective transform" },
   { icon: MousePointerClick, label: "Clicking another layer stopped inventing one" },
-  { icon: Aperture, label: "Colour Overlay on any layer" },
+  { icon: Aperture, label: "Color Overlay on any layer" },
   { icon: RotateCcw, label: "One Ctrl+Z is one step again" },
   { icon: Eraser, label: "Delete removes the shape you picked" },
   { icon: Palette, label: "Same binary three releases running" },

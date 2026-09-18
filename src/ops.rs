@@ -24,7 +24,7 @@
 //!   three functions).
 //! - `Blur` → `filters::gaussian_blur_region` with the same
 //!   `build_gaussian_kernel` the live blur-brush uses; `points` are the
-//!   exact dab centres in stamp order (blur dabs are order-dependent).
+//!   exact dab centers in stamp order (blur dabs are order-dependent).
 //! - `Crop` → `transform::crop` + the same annotation-offset shift as
 //!   `crop_in_place`.
 //! - `LayerMove` → `transform::translate` + the same annotation shift as
@@ -100,34 +100,72 @@ use serde::{Deserialize, Serialize};
 /// and `v2_blobs_still_decode_under_v3` (unchanged, and still passing under
 /// v4 — that it did not need editing IS the prefix-extension property).
 ///
-/// **6** — v8.76, the font selector: text annotations gained a `font_id`
-/// naming the typeface the engine rasterises them with. The recipe a fourth
-/// time, clause for clause:
-///
-///   * `font_id` is `#[serde(skip)]` on [`TextParams`], so the struct's wire
-///     layout is STILL byte-identical to v2's.
-///   * The face rides in an APPENDED variant ([`Op::TextFont`]), after
-///     `PerspectiveWarp`, so no existing variant is renumbered.
-///   * `encode_annotations` gained a SEVENTH trailing element, keeping v6
-///     blobs a strict prefix-extension of v5 ones.
-///
-/// A v5 document decodes with every `font_id` empty — the embedded Liberation
-/// Sans, which is the only face that existed when it was written and therefore
-/// exactly what it meant. Pinned by `v5_blobs_still_decode_under_v6`.
-///
-/// ⚠️ The skipped-field default and the semantic default AGREE here, unlike
-/// the quad (see `default_quad_if_unset`). `String::default()` is `""`, and
-/// `""` is defined by `fonts::DEFAULT_FONT_ID`'s contract to mean the embedded
-/// face. That is why this step needs no promoting function — but it is a
-/// property to check, not to assume, the next time a field is added.
-///
 /// v5 (v8.42, the Perspective tool) is the same move a third time: two more
 /// APPENDED `Op` variants (`TextPerspective`, `PerspectiveWarp`) and a sixth
 /// trailing element on the annotation tuple carrying the per-text corner
 /// quads. A v4 document decodes with every quad at the identity — "no
 /// perspective", which is exactly what a v4 document meant. Pinned by
 /// `v4_blobs_still_decode_under_v5`.
-pub const OP_FORMAT_VERSION: u8 = 6;
+///
+/// **6** — v8.76, the Perspective tool reaching SHAPES: the same move a fourth
+/// time, for squares, circles and everything else `ShapeAnnotation` draws.
+///
+///   * `perspective` is `#[serde(skip)]` on [`ShapeParams`], so that struct's
+///     wire layout is still byte-identical to v2's — which matters more here
+///     than it did for text, because `ShapeAdd`/`ShapeEdit` payloads have been
+///     persisted since v2 and a shifted byte would mis-decode every one of
+///     them.
+///   * The quad rides in an APPENDED variant ([`Op::ShapePerspective`]), after
+///     `PerspectiveWarp`, so no existing variant is renumbered.
+///   * `encode_annotations` gained a SEVENTH tuple element carrying the
+///     per-shape quads, keeping v6 blobs a strict prefix-extension of v5 ones.
+///
+/// A v5 document decodes with every shape quad at the identity — "no
+/// perspective", which is exactly what a v5 document meant. Pinned by
+/// `v5_blobs_still_decode_under_v6` and `v5_op_bytes_still_decode_under_v6`.
+///
+/// **7** — v8.8x, shape stroke sloppiness: the same move a fifth time, so a
+/// firm-rendered shape can be re-rendered sketchy and survive replay.
+///
+///   * `sloppiness` is `#[serde(skip)]` on [`ShapeParams`] — the wire layout
+///     stays byte-identical to v6's, and the shape-add/edit payloads persisted
+///     since v2 still decode. Its semantic default (0 = firm) equals the
+///     skipped default, so no normalisation step is needed.
+///   * The value rides in an APPENDED variant ([`Op::ShapeSloppiness`]), after
+///     `ShapePerspective`, so no existing variant is renumbered.
+///   * `encode_annotations` gained an EIGHTH tuple element carrying the
+///     per-shape sloppiness, keeping v7 blobs a strict prefix-extension of v6.
+///
+/// A v6 document decodes with every shape firm — exactly what a v6 document
+/// meant.
+///
+/// **8** — v8.8x, the font selector: text annotations gained a `font_id`
+/// naming the typeface the engine rasterises them with. The recipe a SIXTH
+/// time, clause for clause:
+///
+///   * `font_id` is `#[serde(skip)]` on [`TextParams`], so the struct's wire
+///     layout is STILL byte-identical to v2's.
+///   * The face rides in an APPENDED variant ([`Op::TextFont`]), after
+///     `ShapeSloppiness`, so no existing variant is renumbered.
+///   * `encode_annotations` gained a NINTH trailing element, keeping v8 blobs
+///     a strict prefix-extension of v7 ones.
+///
+/// ⚠️ This step was WRITTEN as v6, on a branch that then sat unmerged while
+/// v6 and v7 shipped for shapes. `TextFont` was moved to the END of the enum
+/// on merge rather than left where the branch put it: the two shape variants
+/// are on users' disks and `TextFont` never was, so the only renumbering that
+/// costs anything is the one that did not happen.
+///
+/// A v7 document decodes with every `font_id` empty — the embedded Liberation
+/// Sans, which is the only face that existed when it was written and therefore
+/// exactly what it meant. Pinned by `v7_blobs_still_decode_under_v8`.
+///
+/// ⚠️ The skipped-field default and the semantic default AGREE here, unlike
+/// the quad (see `default_quad_if_unset`). `String::default()` is `""`, and
+/// `""` is defined by `fonts::DEFAULT_FONT_ID`'s contract to mean the embedded
+/// face. That is why this step needs no promoting function — but it is a
+/// property to check, not to assume, the next time a field is added.
+pub const OP_FORMAT_VERSION: u8 = 8;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -142,7 +180,7 @@ pub struct Rect {
     pub h: u32,
 }
 
-/// Straight (non-premultiplied) RGBA colour.
+/// Straight (non-premultiplied) RGBA color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rgba {
     pub r: u8,
@@ -166,7 +204,7 @@ pub struct Brush {
     pub hardness: f32,
     /// 0.0 .. 1.0.
     pub opacity: f32,
-    /// Eraser stroke: scrubs alpha instead of laying colour — the same
+    /// Eraser stroke: scrubs alpha instead of laying color — the same
     /// coverage machinery with `recomposite`'s erase branch.
     pub erase: bool,
 }
@@ -216,7 +254,7 @@ pub struct TextParams {
     pub shadow_blur: u32,
     /// Reflow width in px (0 = don't wrap — size the box to the text). v8.40.
     ///
-    /// ⚠️ `#[serde(skip)]` is LOAD-BEARING, not an optimisation. postcard
+    /// ⚠️ `#[serde(skip)]` is LOAD-BEARING, not an optimization. postcard
     /// writes struct fields positionally with no names and no length prefix,
     /// so a real field here would shift every byte after it in the
     /// `Op::TextAdd` / `Op::TextEdit` payloads already persisted in users'
@@ -235,7 +273,7 @@ pub struct TextParams {
     /// `encode_annotations`, and as [`Op::TextBoxHeight`] in the log.
     #[serde(skip)]
     pub box_height: u32,
-    /// Normalised projective corner quad (TL, TR, BR, BL). v8.42.
+    /// Normalized projective corner quad (TL, TR, BR, BL). v8.42.
     ///
     /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
     /// on `wrap_width` and `box_height` above — read that comment, it applies
@@ -290,6 +328,18 @@ pub struct ShapeParams {
     pub b: u8,
     pub stroke_width: f64,
     pub arrow_style: u8,
+    /// Stroke sloppiness (0–100): how hand-drawn the outline is.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing for the identical reason it is on
+    /// [`TextParams::perspective`] / our own `perspective` field — read that
+    /// comment. `ShapeAdd`/`ShapeEdit` payloads have been persisted since v2
+    /// and postcard encodes struct fields positionally, so a new field here
+    /// would mis-decode every one already on disk. The value rides instead as
+    /// [`Op::ShapeSloppiness`], appended after [`Op::ShapePerspective`] so no
+    /// existing variant is renumbered. Deserialises to 0 — the "clean / firm"
+    /// default, which is exactly what every pre-sloppiness shape meant.
+    #[serde(skip)]
+    pub sloppiness: u8,
     pub number: u32,
     pub label_kind: u8,
     pub points: Vec<(f64, f64)>,
@@ -304,6 +354,17 @@ pub struct ShapeParams {
     pub fill2_a: u8,
     pub fill_angle: u16,
     pub fill_block: u32,
+    /// Normalized projective corner quad (TL, TR, BR, BL) over the shape's own
+    /// bbox. v8.76 — the vector Perspective tool reaching squares and circles.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on [`TextParams::perspective`] — read that comment, it applies word for
+    /// word. The quad travels beside the struct instead, as
+    /// [`Op::ShapePerspective`] in the log. Deserialises to all-zero, which
+    /// `default_quad_if_unset` promotes to the identity — exactly what every
+    /// pre-v8.76 shape meant.
+    #[serde(skip)]
+    pub perspective: [(f32, f32); 4],
 }
 
 impl TextParams {
@@ -361,6 +422,7 @@ impl ShapeParams {
             b: s.b,
             stroke_width: s.stroke_width,
             arrow_style: s.arrow_style,
+            sloppiness: s.sloppiness,
             number: s.number,
             label_kind: s.label_kind,
             points: s.points.clone(),
@@ -375,6 +437,7 @@ impl ShapeParams {
             fill2_a: s.fill2_a,
             fill_angle: s.fill_angle,
             fill_block: s.fill_block,
+            perspective: s.perspective.0,
         }
     }
 
@@ -393,6 +456,7 @@ impl ShapeParams {
             b: self.b,
             stroke_width: self.stroke_width,
             arrow_style: self.arrow_style,
+            sloppiness: self.sloppiness,
             number: self.number,
             label_kind: self.label_kind,
             points: self.points.clone(),
@@ -407,8 +471,203 @@ impl ShapeParams {
             fill2_a: self.fill2_a,
             fill_angle: self.fill_angle,
             fill_block: self.fill_block,
+            perspective: crate::perspective::NormQuad(self.perspective),
         }
     }
+}
+
+/// Diff live annotation lists against the log's document and return the ops
+/// that close the gap — nothing here touches engine state, which is why it
+/// lives beside the `Op` definitions rather than in the engine.
+///
+/// ⚠️ THE SKIPPED FIELDS ARE THE WHOLE DIFFICULTY. `TextParams::wrap_width`,
+/// `box_height` and `perspective`, and `ShapeParams::perspective`, are all
+/// `#[serde(skip)]` (they have to be — see the fields' comments), so
+/// `TextAdd`/`TextEdit`/`ShapeAdd`/`ShapeEdit` physically CANNOT carry them.
+/// Every such change therefore needs its own `TextWrap` / `TextBoxHeight` /
+/// `TextPerspective` / `ShapePerspective` op, or replay rebuilds the item
+/// unboxed and unwarped, the composite hash diverges, and the log marks itself
+/// broken — silently falling the user back to snapshot undo. All four are
+/// handled identically below; keep them that way, because one of them being
+/// forgotten is the failure this comment exists to prevent.
+///
+/// Returns an empty vec when both sides are empty, which is the fast path that
+/// makes a pure-paint session free.
+pub(crate) fn annotation_sync_ops(
+    texts: &[crate::annotations::TextAnnotation],
+    shapes: &[crate::annotations::ShapeAnnotation],
+    log_doc: &Document,
+) -> Vec<Op> {
+    let mut pending: Vec<Op> = Vec::new();
+    if texts.is_empty()
+        && shapes.is_empty()
+        && log_doc.texts.is_empty()
+        && log_doc.shapes.is_empty()
+    {
+        return pending;
+    }
+    for lt in &log_doc.texts {
+        if !texts.iter().any(|a| a.id == lt.id) {
+            pending.push(Op::TextRemove { id: lt.id });
+        }
+    }
+    for a in texts {
+        let params = TextParams::from_annotation(a);
+        // ⚠️ `TextParams::wrap_width`, `box_height`, `perspective` AND
+        // `font_id` are all `#[serde(skip)]` (they have to be — see the
+        // fields' comments), so `TextAdd`/`TextEdit` physically CANNOT
+        // carry any of them. Every such change therefore needs its own
+        // `TextWrap` / `TextBoxHeight` / `TextPerspective` / `TextFont`
+        // op, or replay rebuilds the text unboxed, unwarped and in the
+        // wrong typeface, the composite hash diverges, and the log marks
+        // itself broken — silently falling the user back to snapshot
+        // undo. The four are handled identically; keep them that way,
+        // because one of them being forgotten is the failure this comment
+        // exists to prevent, and it has already happened twice (v8.42
+        // added the third, v8.8x the fourth).
+        match log_doc.texts.iter().find(|t| t.id == a.id) {
+            None => {
+                let wrap = params.wrap_width;
+                let box_h = params.box_height;
+                let quad = params.perspective;
+                let font = params.font_id.clone();
+                pending.push(Op::TextAdd(params));
+                if wrap != 0 {
+                    pending.push(Op::TextWrap {
+                        id: a.id,
+                        wrap_width: wrap,
+                    });
+                }
+                if box_h != 0 {
+                    pending.push(Op::TextBoxHeight {
+                        id: a.id,
+                        box_height: box_h,
+                    });
+                }
+                // The "unset" sentinel for the quad is the IDENTITY,
+                // not zero — the other two axes get to use 0 because 0
+                // means "auto" for them, whereas an all-zero quad is a
+                // collapsed point. Emitting nothing here leaves replay
+                // at the identity, which is the same thing.
+                if !crate::perspective::is_identity(&quad) {
+                    pending.push(Op::TextPerspective { id: a.id, quad });
+                }
+                // "" is the embedded face — same "unset means the
+                // default" shape as `wrap == 0`.
+                if !font.is_empty() {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: font,
+                    });
+                }
+            }
+            Some(t) => {
+                if t.wrap_width != params.wrap_width {
+                    pending.push(Op::TextWrap {
+                        id: a.id,
+                        wrap_width: params.wrap_width,
+                    });
+                }
+                if t.box_height != params.box_height {
+                    pending.push(Op::TextBoxHeight {
+                        id: a.id,
+                        box_height: params.box_height,
+                    });
+                }
+                if t.perspective != params.perspective {
+                    pending.push(Op::TextPerspective {
+                        id: a.id,
+                        quad: params.perspective,
+                    });
+                }
+                if t.font_id != params.font_id {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: params.font_id.clone(),
+                    });
+                }
+                // Compare everything EXCEPT the four skipped fields,
+                // which the branches above already accounted for —
+                // otherwise a box-only drag would also emit a redundant
+                // TextEdit (and `TextParams` derives PartialEq over the
+                // real fields, `#[serde(skip)]` or not, so they DO
+                // count here).
+                let mut without_box = t.clone();
+                without_box.wrap_width = params.wrap_width;
+                without_box.box_height = params.box_height;
+                without_box.perspective = params.perspective;
+                without_box.font_id = params.font_id.clone();
+                if without_box != params {
+                    pending.push(Op::TextEdit(params));
+                }
+            }
+        }
+    }
+    for ls in &log_doc.shapes {
+        if !shapes.iter().any(|s| s.id == ls.id) {
+            pending.push(Op::ShapeRemove { id: ls.id });
+        }
+    }
+    for s in shapes {
+        let params = ShapeParams::from_annotation(s);
+        // ⚠️ `ShapeParams::perspective` is `#[serde(skip)]` (it has to
+        // be — see the field's comment), so `ShapeAdd`/`ShapeEdit`
+        // physically CANNOT carry it. It needs its own
+        // `ShapePerspective` op, exactly as the text quad needs
+        // `TextPerspective` above; without it replay rebuilds the shape
+        // unwarped, the composite hash diverges, and the log marks
+        // itself broken — silently falling the user back to snapshot
+        // undo. This is the fourth axis in that family; keep all four
+        // handled the same way.
+        match log_doc.shapes.iter().find(|p| p.id == s.id) {
+            None => {
+                let quad = params.perspective;
+                let sloppiness = params.sloppiness;
+                pending.push(Op::ShapeAdd(params));
+                // The "unset" sentinel is the IDENTITY, not zero —
+                // emitting nothing leaves replay at the identity, which
+                // is the same thing.
+                if !crate::perspective::is_identity(&quad) {
+                    pending.push(Op::ShapePerspective { id: s.id, quad });
+                }
+                // Sloppiness is `#[serde(skip)]`; emit its own appended op the
+                // same way the quad does. 0 (firm) needs no op — a shape
+                // decoded from a v6 keyframe is already firm.
+                if sloppiness != 0 {
+                    pending.push(Op::ShapeSloppiness {
+                        id: s.id,
+                        sloppiness,
+                    });
+                }
+            }
+            Some(p) => {
+                if p.perspective != params.perspective {
+                    pending.push(Op::ShapePerspective {
+                        id: s.id,
+                        quad: params.perspective,
+                    });
+                }
+                if p.sloppiness != params.sloppiness {
+                    pending.push(Op::ShapeSloppiness {
+                        id: s.id,
+                        sloppiness: params.sloppiness,
+                    });
+                }
+                // Compare everything EXCEPT the skipped quad, which the
+                // branch above already accounted for — otherwise a
+                // perspective-only drag would also emit a redundant
+                // ShapeEdit (`ShapeParams` derives PartialEq over the
+                // real fields, `#[serde(skip)]` or not, so it DOES
+                // count here).
+                let mut without_quad = p.clone();
+                without_quad.perspective = params.perspective;
+                if without_quad != params {
+                    pending.push(Op::ShapeEdit(params));
+                }
+            }
+        }
+    }
+    pending
 }
 
 /// A single recorded edit. Every variant is applied for real (no no-ops).
@@ -423,9 +682,9 @@ pub enum Op {
         points: Vec<(f64, f64)>,
         brush: Brush,
     },
-    /// Fill a rectangle with a flat colour.
+    /// Fill a rectangle with a flat color.
     FillRegion { rect: Rect, color: Rgba },
-    /// Gaussian-blur brush stroke: `points` are the EXACT dab centres in
+    /// Gaussian-blur brush stroke: `points` are the EXACT dab centers in
     /// stamp order (blur dabs read already-blurred pixels, so order
     /// matters), `radius` the brush radius, `intensity` the kernel radius.
     Blur {
@@ -483,7 +742,7 @@ pub enum Op {
     /// all. Same argument for carrying it here instead of as a `TextParams`
     /// field.
     TextBoxHeight { id: u32, box_height: u32 },
-    /// v8.42 — a text annotation's projective corner quad, normalised 0..1
+    /// v8.42 — a text annotation's projective corner quad, normalized 0..1
     /// across its tile in TL/TR/BR/BL order.
     ///
     /// Appended, for the third time, for the reason spelled out on
@@ -497,17 +756,37 @@ pub enum Op {
     TextPerspective { id: u32, quad: [(f32, f32); 4] },
     /// v8.42 — the DESTRUCTIVE half of the Perspective tool: lift the pixels
     /// in `rect` and resample them into `quad` (absolute canvas coords, not
-    /// normalised — a pixel warp has no tile to be a fraction of).
+    /// normalized — a pixel warp has no tile to be a fraction of).
     ///
     /// Appended after [`Op::TextPerspective`]; same rule, same reason.
     PerspectiveWarp { rect: Rect, quad: [(f32, f32); 4] },
-    /// v8.76 — a text annotation's TYPEFACE. `""` is the embedded Liberation
+    /// v8.76 — a SHAPE's projective corner quad, normalized 0..1 across its
+    /// own bbox in TL/TR/BR/BL order. The square/circle twin of
+    /// [`Op::TextPerspective`], and what makes Distort / Perspective / Skew
+    /// non-destructive on everything the app draws rather than on text alone.
+    ///
+    /// Appended, for the fourth time, for the reason spelled out on
+    /// [`Op::TextWrap`]: postcard indexes enum variants positionally, so
+    /// appending is invisible to every op already on a user's disk and
+    /// inserting would renumber all of them.
+    ShapePerspective { id: u32, quad: [(f32, f32); 4] },
+    /// v8.8x — a shape's stroke sloppiness (0–100): how hand-drawn its
+    /// outline is. The fifth of the appended family: `#[serde(skip)]` on
+    /// [`ShapeParams::sloppiness`] means `ShapeAdd`/`ShapeEdit` CANNOT carry
+    /// it, and without this op replay rebuilds the shape firm regardless of
+    /// what the user drew — a composite-hash divergence the log then marks
+    /// itself broken over. Reuse the rationale on [`Op::TextWrap`]: appended,
+    /// never inserted, so the variants already on disk keep their indices.
+    ShapeSloppiness { id: u32, sloppiness: u8 },
+    /// v8.8x — a text annotation's TYPEFACE. `""` is the embedded Liberation
     /// Sans; anything else names a face registered via `register_font`.
     ///
-    /// Appended after [`Op::PerspectiveWarp`], for the fourth time, for the
+    /// Appended after [`Op::ShapeSloppiness`], for the sixth time, for the
     /// reason spelled out on [`Op::TextWrap`]: postcard indexes enum variants
     /// positionally, so appending is invisible to every op already on a user's
-    /// disk and inserting would renumber all of them.
+    /// disk and inserting would renumber all of them. It sits LAST rather than
+    /// beside `PerspectiveWarp` where its branch first put it — see the ⚠️ on
+    /// [`OP_FORMAT_VERSION`]'s **8**.
     ///
     /// A `String`, not an index — replaying a log on a machine with a
     /// different set of faces registered must mean "this face is missing", not
@@ -547,6 +826,10 @@ impl Op {
             // and the History panel is where they go to find and re-select it.
             Op::TextPerspective { .. } => "Perspective",
             Op::PerspectiveWarp { .. } => "Perspective",
+            Op::ShapePerspective { .. } => "Perspective",
+            // Same reasoning as ShapePerspective: a sloppiness change is a
+            // style decision the user made in the panel, worth its own entry.
+            Op::ShapeSloppiness { .. } => "Edit Shape",
             // Its OWN label, like TextPerspective and unlike TextWrap: picking
             // a typeface is a deliberate styling choice the user will want to
             // find in the History panel, not a by-product of dragging a box.
@@ -640,6 +923,19 @@ pub fn decode_op(bytes: &[u8]) -> Result<Op, OpError> {
             p.perspective = default_quad_if_unset(p.perspective);
             Op::TextEdit(p)
         }
+        // Shapes carry the same skipped quad since v8.76, so they need the
+        // same promotion — and for the same reason, not merely by analogy:
+        // `oplog_sync_annotations` diffs `ShapeParams` the way it diffs
+        // `TextParams`, so an all-zero decode would differ from the live
+        // identity on every sync and append a `ShapePerspective` op forever.
+        Op::ShapeAdd(mut p) => {
+            p.perspective = default_quad_if_unset(p.perspective);
+            Op::ShapeAdd(p)
+        }
+        Op::ShapeEdit(mut p) => {
+            p.perspective = default_quad_if_unset(p.perspective);
+            Op::ShapeEdit(p)
+        }
         other => other,
     })
 }
@@ -700,14 +996,31 @@ pub fn encode_annotations(
     // lets `decode_annotations` read both. Parallel to `texts` by index.
     // v4 appends the box heights the same way, one element further out.
     // v5 appends the corner quads one element further out again.
-    // v6 appends the typeface ids one element further out again.
+    // v6 appends the SHAPE quads, parallel to `shapes` by index — the seventh
+    // element, and the same prefix-extension trick for the fourth time.
+    // v7 appends the per-shape SLOOPINESS (0–100), parallel to `shapes` by
+    // index — the eighth element, same trick. `ShapeParams::sloppiness` is
+    // `#[serde(skip)]`, so this tuple is the ONLY place a keyframe carries it:
+    // the op log still mirrors it with `Op::ShapeSloppiness` appended frames.
+    // v8 appends the per-TEXT typeface ids — the ninth element, parallel to
+    // `texts` by index, same trick again.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
     let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+    let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+    let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
     let fonts: Vec<&str> = texts.iter().map(|t| t.font_id.as_str()).collect();
-    if let Ok(body) =
-        postcard::to_allocvec(&(texts, shapes, canvas, &wraps, &heights, &quads, &fonts))
-    {
+    if let Ok(body) = postcard::to_allocvec(&(
+        texts,
+        shapes,
+        canvas,
+        &wraps,
+        &heights,
+        &quads,
+        &shape_quads,
+        &shape_sloppiness,
+        &fonts,
+    )) {
         out.extend_from_slice(&body);
     }
     out
@@ -736,6 +1049,87 @@ pub fn decode_annotations(
     // out of bytes at the element it never wrote, so the fallback fires and
     // the missing values default to 0 — "size the box to the text" on both
     // axes, which is precisely what a v2 or v3 document meant.
+    type V8 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u8>,
+        Vec<String>,
+    );
+    if let Ok((
+        mut texts,
+        mut shapes,
+        canvas,
+        wraps,
+        heights,
+        quads,
+        shape_quads,
+        shape_sloppiness,
+        fonts,
+    )) = postcard::from_bytes::<V8>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
+        }
+        for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
+            sp.sloppiness = sl;
+        }
+        for (t, f) in texts.iter_mut().zip(fonts) {
+            t.font_id = f;
+        }
+        return Ok((texts, shapes, canvas));
+    }
+    type V7 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u8>,
+    );
+    if let Ok((
+        mut texts,
+        mut shapes,
+        canvas,
+        wraps,
+        heights,
+        quads,
+        shape_quads,
+        shape_sloppiness,
+    )) = postcard::from_bytes::<V7>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
+        }
+        for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
+            sp.sloppiness = sl;
+        }
+        return Ok((texts, shapes, canvas));
+    }
     type V6 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -743,9 +1137,9 @@ pub fn decode_annotations(
         Vec<u32>,
         Vec<u32>,
         Vec<[(f32, f32); 4]>,
-        Vec<String>,
+        Vec<[(f32, f32); 4]>,
     );
-    if let Ok((mut texts, shapes, canvas, wraps, heights, quads, fonts)) =
+    if let Ok((mut texts, mut shapes, canvas, wraps, heights, quads, shape_quads)) =
         postcard::from_bytes::<V6>(body)
     {
         for (t, w) in texts.iter_mut().zip(wraps) {
@@ -757,8 +1151,8 @@ pub fn decode_annotations(
         for (t, q) in texts.iter_mut().zip(quads) {
             t.perspective = default_quad_if_unset(q);
         }
-        for (t, f) in texts.iter_mut().zip(fonts) {
-            t.font_id = f;
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
         }
         return Ok((texts, shapes, canvas));
     }
@@ -770,7 +1164,8 @@ pub fn decode_annotations(
         Vec<u32>,
         Vec<[(f32, f32); 4]>,
     );
-    if let Ok((mut texts, shapes, canvas, wraps, heights, quads)) = postcard::from_bytes::<V5>(body)
+    if let Ok((mut texts, mut shapes, canvas, wraps, heights, quads)) =
+        postcard::from_bytes::<V5>(body)
     {
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
@@ -781,6 +1176,10 @@ pub fn decode_annotations(
         for (t, q) in texts.iter_mut().zip(quads) {
             t.perspective = default_quad_if_unset(q);
         }
+        // No shape-quad element at all — every shape is unwarped.
+        for sp in shapes.iter_mut() {
+            sp.perspective = crate::perspective::IDENTITY_QUAD;
+        }
         return Ok((texts, shapes, canvas));
     }
     type V4 = (
@@ -790,7 +1189,7 @@ pub fn decode_annotations(
         Vec<u32>,
         Vec<u32>,
     );
-    if let Ok((mut texts, shapes, canvas, wraps, heights)) = postcard::from_bytes::<V4>(body) {
+    if let Ok((mut texts, mut shapes, canvas, wraps, heights)) = postcard::from_bytes::<V4>(body) {
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
         }
@@ -801,6 +1200,9 @@ pub fn decode_annotations(
         for t in texts.iter_mut() {
             t.perspective = crate::perspective::IDENTITY_QUAD;
         }
+        for sp in shapes.iter_mut() {
+            sp.perspective = crate::perspective::IDENTITY_QUAD;
+        }
         return Ok((texts, shapes, canvas));
     }
     type V3 = (
@@ -809,20 +1211,26 @@ pub fn decode_annotations(
         Option<CanvasParams>,
         Vec<u32>,
     );
-    if let Ok((mut texts, shapes, canvas, wraps)) = postcard::from_bytes::<V3>(body) {
+    if let Ok((mut texts, mut shapes, canvas, wraps)) = postcard::from_bytes::<V3>(body) {
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
         }
         for t in texts.iter_mut() {
             t.perspective = crate::perspective::IDENTITY_QUAD;
         }
+        for sp in shapes.iter_mut() {
+            sp.perspective = crate::perspective::IDENTITY_QUAD;
+        }
         return Ok((texts, shapes, canvas));
     }
     type V2 = (Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>);
-    let (mut texts, shapes, canvas) =
+    let (mut texts, mut shapes, canvas) =
         postcard::from_bytes::<V2>(body).map_err(|_| OpError::Decode)?;
     for t in texts.iter_mut() {
         t.perspective = crate::perspective::IDENTITY_QUAD;
+    }
+    for sp in shapes.iter_mut() {
+        sp.perspective = crate::perspective::IDENTITY_QUAD;
     }
     Ok((texts, shapes, canvas))
 }
@@ -843,7 +1251,7 @@ pub fn decode_annotations(
 /// Ops never touch this. It is refreshed from the engine (`canvas_params`) and
 /// applied uniformly across the log's base, keyframes and live document —
 /// metadata is not versioned by the op stream, so undo does not rewind the
-/// canvas colour.
+/// canvas color.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CanvasParams {
     pub r: u8,
@@ -1181,6 +1589,16 @@ pub fn apply(op: &Op, doc: &mut Document) {
                 t.perspective = *quad;
             }
         }
+        Op::ShapePerspective { id, quad } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                sp.perspective = *quad;
+            }
+        }
+        Op::ShapeSloppiness { id, sloppiness } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                sp.sloppiness = *sloppiness;
+            }
+        }
         Op::TextFont { id, font_id } => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.font_id = font_id.clone();
@@ -1254,19 +1672,11 @@ fn shift_annotations(doc: &mut Document, dx: i32, dy: i32) {
     }
 }
 
-/// Precompute the 256-entry levels remap for a channel value.
+/// Precompute the 256-entry levels remap for a channel value. Delegates to the
+/// live Levels tool, so replay and the live apply are one function and cannot
+/// drift (`levels.rs`). The math moved there unchanged.
 fn build_levels_lut(p: &LevelsParams) -> [u8; 256] {
-    let lo = p.black as f32;
-    let hi = p.white as f32;
-    let denom = (hi - lo).max(1.0);
-    let inv_gamma = 1.0 / p.gamma.max(0.01);
-    let mut lut = [0u8; 256];
-    for (v, out) in lut.iter_mut().enumerate() {
-        let t = ((v as f32 - lo) / denom).clamp(0.0, 1.0);
-        let t = t.powf(inv_gamma);
-        *out = (t * 255.0).round().clamp(0.0, 255.0) as u8;
-    }
-    lut
+    crate::levels::levels_lut(p.black, p.white, p.gamma)
 }
 
 // ── The log ──────────────────────────────────────────────────────────────────
@@ -1373,7 +1783,7 @@ impl OpLog {
     ///
     /// Uniform on purpose: the Canvas is metadata, not content, so it is not
     /// versioned by the op stream. Storing it only on `live` would mean a seek
-    /// back to a keyframe resurrects an old canvas colour (undo silently
+    /// back to a keyframe resurrects an old canvas color (undo silently
     /// repainting the artboard); storing it only on the base would mean replay
     /// from a keyframe loses it. Writing all three keeps replay from ANY
     /// position byte-identical to the engine, which is what the sync check
@@ -1568,6 +1978,7 @@ mod tests {
             b: 0,
             stroke_width: 2.0,
             arrow_style: 0,
+            sloppiness: 0,
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -1582,6 +1993,7 @@ mod tests {
             fill2_a: 0,
             fill_angle: 0,
             fill_block: 0,
+            perspective: crate::perspective::IDENTITY_QUAD,
         }
     }
 
@@ -1635,6 +2047,10 @@ mod tests {
             Op::TextRemove { id: 1 },
             Op::ShapeAdd(test_shape(2)),
             Op::ShapeRemove { id: 2 },
+            Op::ShapeSloppiness {
+                id: 2,
+                sloppiness: 65,
+            },
             Op::LayerMove {
                 layer: 0,
                 dx: -5,
@@ -1781,7 +2197,7 @@ mod tests {
             },
             &mut doc,
         );
-        // A hard, opaque brush lays pure colour on the stroke line...
+        // A hard, opaque brush lays pure color on the stroke line...
         assert_eq!(doc.pixels.get_pixel(30, 32), [20, 200, 60, 255]);
         // ...and leaves pixels beyond the radius untouched.
         assert_eq!(doc.pixels.get_pixel(30, 45), [200, 200, 200, 255]);
@@ -1822,7 +2238,7 @@ mod tests {
             },
             &mut doc,
         );
-        assert_eq!(doc.pixels.get_pixel(16, 16)[3], 0, "centre fully erased");
+        assert_eq!(doc.pixels.get_pixel(16, 16)[3], 0, "center fully erased");
         assert_eq!(
             doc.pixels.get_pixel(2, 2),
             [50, 60, 70, 255],
@@ -2428,6 +2844,41 @@ mod v2_migration_tests {
         [(0.15, 0.0), (0.85, 0.0), (1.0, 1.0), (0.0, 1.0)]
     }
 
+    /// A plain filled square, as `ShapeParams`. Local to this module for the
+    /// same reason `a_text` is: the migration tests must build their fixtures
+    /// from the fields they are asserting about, not inherit them.
+    fn a_shape(id: u32) -> ShapeParams {
+        ShapeParams {
+            id,
+            kind: 0,
+            x0: 4.0,
+            y0: 4.0,
+            x1: 24.0,
+            y1: 24.0,
+            r: 9,
+            g: 8,
+            b: 7,
+            stroke_width: 2.0,
+            arrow_style: 0,
+            sloppiness: 0,
+            number: 0,
+            label_kind: 0,
+            points: Vec::new(),
+            fill_kind: 0,
+            fill_r: 0,
+            fill_g: 0,
+            fill_b: 0,
+            fill_a: 0,
+            fill2_r: 0,
+            fill2_g: 0,
+            fill2_b: 0,
+            fill2_a: 0,
+            fill_angle: 0,
+            fill_block: 0,
+            perspective: crate::perspective::IDENTITY_QUAD,
+        }
+    }
+
     /// A v4 writer emitted `[4] ++ postcard((texts, shapes, canvas, wraps,
     /// heights))` — the 5-tuple, with no quads. Reconstructed byte-for-byte.
     fn v4_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
@@ -2502,45 +2953,58 @@ mod v2_migration_tests {
         }
     }
 
-    /// A v5 writer emitted `[5] ++ postcard((texts, shapes, canvas, wraps,
-    /// heights, quads))` — the 6-tuple, with no font ids. Reconstructed
-    /// byte-for-byte rather than by calling the current encoder, because an
-    /// encoder that drifted would produce a test that agrees with itself.
-    fn v5_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
-        let mut out = vec![5u8];
+    /// A v7 writer emitted `[7] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads, shape_sloppiness))` — the 8-tuple, with no
+    /// font ids. Reconstructed byte-for-byte rather than by calling the current
+    /// encoder, because an encoder that drifted would produce a test that
+    /// agrees with itself.
+    fn v7_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![7u8];
         let shapes: Vec<ShapeParams> = Vec::new();
         let canvas: Option<CanvasParams> = None;
         let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
         let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
         let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
         out.extend_from_slice(
-            &postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps, &heights, &quads)).unwrap(), // allow: rust-panic
+            &postcard::to_allocvec(&(
+                texts,
+                &shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &shape_sloppiness,
+            ))
+            .unwrap(), // allow: rust-panic
         );
         out
     }
 
     #[test]
-    fn v5_blobs_still_decode_under_v6() {
-        // The load-bearing one, for the fourth time. Anyone who has opened the
-        // app since v8.42 has v5 blobs in IndexedDB, and `ih_oplog_persist`
+    fn v7_blobs_still_decode_under_v8() {
+        // The load-bearing one, for the sixth time. Anyone who has opened the
+        // app since v8.76 has v7 blobs in IndexedDB, and `ih_oplog_persist`
         // ships ON — a rejected log costs them their cross-reload undo.
         let mut t = a_text(11);
         t.wrap_width = 240;
         t.box_height = 310;
         t.perspective = a_quad();
-        let (got, shapes, canvas) = decode_annotations(&v5_annotation_blob(&[t]))
-            .expect("a v5 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        let (got, shapes, canvas) = decode_annotations(&v7_annotation_blob(&[t]))
+            .expect("a v7 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
         assert_eq!(got.len(), 1);
-        assert_eq!(got[0].wrap_width, 240, "the v5 width survives the step");
-        assert_eq!(got[0].box_height, 310, "the v5 height survives the step");
+        assert_eq!(got[0].wrap_width, 240, "the v7 width survives the step");
+        assert_eq!(got[0].box_height, 310, "the v7 height survives the step");
         assert_eq!(
             got[0].perspective,
             a_quad(),
-            "the v5 quad survives the step"
+            "the v7 quad survives the step"
         );
         assert_eq!(
             got[0].font_id, "",
-            "a v5 document meant the embedded Liberation Sans, because it was \
+            "a v7 document meant the embedded Liberation Sans, because it was \
              the only face that existed — the skipped-field default and the \
              semantic default agree here, unlike the quad"
         );
@@ -2549,7 +3013,7 @@ mod v2_migration_tests {
     }
 
     #[test]
-    fn v6_blobs_round_trip_the_font_id() {
+    fn v8_blobs_round_trip_the_font_id() {
         let mut t = a_text(12);
         t.wrap_width = 240;
         t.perspective = a_quad();
@@ -2559,14 +3023,17 @@ mod v2_migration_tests {
         let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(got[0].wrap_width, 240);
         assert_eq!(got[0].perspective, a_quad());
-        assert_eq!(got[0].font_id, "liberation-serif", "v6 carries the face");
+        assert_eq!(got[0].font_id, "liberation-serif", "v8 carries the face");
     }
 
     #[test]
-    fn v5_op_bytes_still_decode_under_v6() {
+    fn v7_op_bytes_still_decode_under_v8() {
         // Appending `TextFont` must not renumber the variants already on disk
-        // — `PerspectiveWarp` was appended last before it, so it is the one
-        // that would break first.
+        // — `ShapeSloppiness` was appended last before it, so it is the one
+        // that would break first. `PerspectiveWarp` held that seat when this
+        // test was written against v6; the two shape variants landed in front
+        // of it while the branch waited, which is exactly the renumbering this
+        // test exists to catch.
         for op in [
             Op::TextAdd(a_text(1)),
             Op::TextBoxHeight {
@@ -2586,12 +3053,20 @@ mod v2_migration_tests {
                 },
                 quad: a_quad(),
             },
+            Op::ShapePerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::ShapeSloppiness {
+                id: 5,
+                sloppiness: 80,
+            },
         ] {
-            let mut v5_bytes = vec![5u8];
-            v5_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
-            let decoded = decode_op(&v5_bytes)
-                .unwrap_or_else(|e| panic!("v5 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
-            assert_eq!(decoded, op, "v5 op must mean the same thing under v6");
+            let mut v7_bytes = vec![7u8];
+            v7_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v7_bytes)
+                .unwrap_or_else(|e| panic!("v7 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v7 op must mean the same thing under v8");
         }
     }
 
@@ -2680,6 +3155,189 @@ mod v2_migration_tests {
         );
     }
 
+    /// A v5 writer emitted `[5] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads))` — the 6-tuple, with no SHAPE quads. Reconstructed
+    /// byte-for-byte.
+    fn v5_annotation_blob(texts: &[TextParams], shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![5u8];
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(texts, shapes, &canvas, &wraps, &heights, &quads)).unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v5_blobs_still_decode_under_v6() {
+        // The load-bearing one, for the fourth time. Anyone who has opened the
+        // app since v8.42 has v5 blobs in IndexedDB, and every one of them
+        // holds shapes whose quad element simply does not exist.
+        let mut t = a_text(7);
+        t.wrap_width = 240;
+        t.perspective = a_quad();
+        let (got, shapes, canvas) = decode_annotations(&v5_annotation_blob(&[t], &[a_shape(3)]))
+            .expect("a v5 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(got[0].wrap_width, 240, "the v5 width survives the step");
+        assert_eq!(got[0].perspective, a_quad(), "the v5 text quad survives it");
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(
+            shapes[0].perspective,
+            crate::perspective::IDENTITY_QUAD,
+            "a v5 document meant 'no perspective' on its shapes — NOT a collapsed all-zero quad"
+        );
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v6_round_trips_the_shape_quad() {
+        let mut sp = a_shape(2);
+        sp.perspective = a_quad();
+        let blob = encode_annotations(&[], &[sp], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(shapes[0].perspective, a_quad(), "v6 carries the shape quad");
+    }
+
+    #[test]
+    fn v5_op_bytes_still_decode_under_v6() {
+        // Appending `ShapePerspective` must not renumber the variants already
+        // on disk — `PerspectiveWarp` was appended last before it, so it is the
+        // one that would break first.
+        for op in [
+            Op::ShapeAdd(a_shape(2)),
+            Op::ShapeRemove { id: 2 },
+            Op::TextPerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+                quad: a_quad(),
+            },
+        ] {
+            let mut v5_bytes = vec![5u8];
+            v5_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v5_bytes)
+                .unwrap_or_else(|e| panic!("v5 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v5 op must mean the same thing under v6");
+        }
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_the_perspective_field() {
+        // Fourth instance of the measurement, and the one with the most at
+        // stake: ShapeAdd/ShapeEdit payloads have been persisted since v2.
+        let a = a_shape(4);
+        let mut b = a_shape(4);
+        b.perspective = a_quad();
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "perspective must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn shape_perspective_op_applies_to_the_right_shape() {
+        let mut doc = Document::new(32, 32);
+        doc.shapes.push(a_shape(1));
+        doc.shapes.push(a_shape(2));
+        apply(
+            &Op::ShapePerspective {
+                id: 2,
+                quad: a_quad(),
+            },
+            &mut doc,
+        );
+        assert_eq!(
+            doc.shapes[0].perspective,
+            crate::perspective::IDENTITY_QUAD,
+            "untouched"
+        );
+        assert_eq!(doc.shapes[1].perspective, a_quad());
+    }
+
+    #[test]
+    fn decoded_shape_ops_never_carry_the_all_zero_quad() {
+        // Same regression as `decoded_text_ops_never_carry_the_all_zero_quad`,
+        // one struct over: an all-zero decode compares unequal to the live
+        // identity, so the sync emits a ShapePerspective op forever while the
+        // user does nothing.
+        let bytes = encode_op(&Op::ShapeAdd(a_shape(1)));
+        // Matched rather than let-else'd on purpose: rustfmt moves a trailing
+        // comment out of a let-else head, so the `// allow: rust-panic` a
+        // scrutinee `unwrap` needs cannot stay on its own line (guardrails.sh
+        // names this exact hazard). A match keeps the one panic annotatable.
+        match decode_op(&bytes) {
+            Ok(Op::ShapeAdd(p)) => assert_eq!(
+                p.perspective,
+                crate::perspective::IDENTITY_QUAD,
+                "the skipped field must decode to the identity, not to zeros"
+            ),
+            other => panic!("expected a ShapeAdd back, got {other:?}"), // allow: rust-panic
+        }
+    }
+
+    #[test]
+    fn an_unwarped_shape_syncs_no_perspective_op() {
+        // The other half of the same hazard, on the diff side: a plain shape
+        // must produce exactly ShapeAdd and nothing else, or every recomposite
+        // grows the log by one op.
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "one ShapeAdd, no quad op: {ops:?}");
+        // Feed it back and the log is now in sync — a second pass must be silent.
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "a synced shape must produce no further ops"
+        );
+    }
+
+    #[test]
+    fn a_warped_shape_syncs_its_quad_as_its_own_op() {
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        s.perspective = crate::perspective::NormQuad(a_quad());
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert!(
+            ops.iter()
+                .any(|o| matches!(o, Op::ShapePerspective { id: 9, .. })),
+            "the quad cannot ride on ShapeAdd — it must have its own op: {ops:?}"
+        );
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert_eq!(doc.shapes[0].perspective, a_quad(), "replay carries it");
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "and a second pass is silent — the log must not grow on every sync"
+        );
+    }
+
     #[test]
     fn perspective_warp_op_moves_pixels_into_the_quad() {
         let mut doc = Document::new(64, 64);
@@ -2734,5 +3392,176 @@ mod v2_migration_tests {
         // And the source rect was moved, not copied: nothing outside the quad
         // keeps the original fill.
         assert_eq!(at(28, 11)[3], 0, "top-right corner must be vacated too");
+    }
+
+    /// A v6 writer emitted `[6] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads))` — the 7-tuple, with no sloppiness.
+    /// Reconstructed byte-for-byte.
+    fn v6_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![6u8];
+        let texts: Vec<TextParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = Vec::new();
+        let heights: Vec<u32> = Vec::new();
+        let quads: Vec<[(f32, f32); 4]> = Vec::new();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts,
+                shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v6_blobs_still_decode_under_v7() {
+        // Fifth iteration of the load-bearing read. v6 blobs hold shapes whose
+        // sloppiness element simply does not exist — they meant "firm", and
+        // that must survive the step.
+        let mut sp = a_shape(3);
+        sp.perspective = a_quad();
+        let (_, shapes, _) = decode_annotations(&v6_annotation_blob(&[sp]))
+            .expect("a v6 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(
+            shapes[0].perspective,
+            a_quad(),
+            "the v6 shape quad survives the step"
+        );
+        assert_eq!(
+            shapes[0].sloppiness, 0,
+            "a v6 document meant 'firm' on its shapes — no sloppiness at all"
+        );
+    }
+
+    #[test]
+    fn v7_round_trips_the_shape_sloppiness() {
+        let mut sp = a_shape(2);
+        sp.sloppiness = 80;
+        let blob = encode_annotations(&[], &[sp], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(shapes[0].sloppiness, 80, "v7 carries the shape sloppiness");
+    }
+
+    #[test]
+    fn v6_op_bytes_still_decode_under_v7() {
+        // Appending `ShapeSloppiness` must not renumber the variants already
+        // on disk — `PerspectiveWarp` was appended last before it, so it is the
+        // one that would break first.
+        for op in [
+            Op::ShapeAdd(a_shape(2)),
+            Op::ShapeRemove { id: 2 },
+            Op::ShapePerspective {
+                id: 2,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+                quad: a_quad(),
+            },
+        ] {
+            let mut v6_bytes = vec![6u8];
+            v6_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v6_bytes)
+                .unwrap_or_else(|e| panic!("v6 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v6 op must mean the same thing under v7");
+        }
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_sloppiness() {
+        // Fifth instance of the measurement: ShapeAdd/ShapeEdit payloads have
+        // been persisted since v2, so sloppiness must not appear on the wire
+        // either — it rides in `encode_annotations` and `Op::ShapeSloppiness`.
+        let a = a_shape(4);
+        let mut b = a_shape(4);
+        b.sloppiness = 100;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "sloppiness must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn shape_sloppiness_op_applies_to_the_right_shape() {
+        let mut doc = Document::new(32, 32);
+        doc.shapes.push(a_shape(1));
+        doc.shapes.push(a_shape(2));
+        apply(
+            &Op::ShapeSloppiness {
+                id: 2,
+                sloppiness: 40,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.shapes[0].sloppiness, 0, "untouched");
+        assert_eq!(doc.shapes[1].sloppiness, 40);
+    }
+
+    #[test]
+    fn a_firm_shape_syncs_no_sloppiness_op() {
+        // `an_unwarped_shape_syncs_no_perspective_op` guards the quad's twin
+        // hazard; this one guards the sloppiness twin. A plain shape must
+        // produce exactly ShapeAdd and nothing else, or every recomposite
+        // grows the log by one op.
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "one ShapeAdd, no sloppiness op: {ops:?}");
+        // Feed it back and the log is now in sync — a second pass must be silent.
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "a synced shape must produce no further ops"
+        );
+    }
+
+    #[test]
+    fn a_sloppy_shape_syncs_its_sloppiness_as_its_own_op() {
+        let mut doc = Document::new(32, 32);
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 9,
+            kind: 0,
+            ..Default::default()
+        };
+        s.x1 = 20.0;
+        s.y1 = 20.0;
+        s.sloppiness = 55;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert!(
+            ops.iter()
+                .any(|o| matches!(o, Op::ShapeSloppiness { id: 9, .. })),
+            "the sloppiness cannot ride on ShapeAdd — it must have its own op: {ops:?}"
+        );
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert_eq!(doc.shapes[0].sloppiness, 55, "replay carries it");
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "and a second pass is silent — the log must not grow on every sync"
+        );
     }
 }

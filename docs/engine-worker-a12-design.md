@@ -47,7 +47,7 @@ So the seam has to move up, from *attachment* to *construction*:
 toolRef.current = await createLiveEngine({ width, height, pixels });
 ```
 
-- **local:** `new Tool(w,h)`, `load_image(pixels)`, return it — today's behaviour.
+- **local:** `new Tool(w,h)`, `load_image(pixels)`, return it — today's behavior.
 - **worker:** `client.init(w,h)`, `client.call("load_image", [pixels], [pixels.buffer])`,
   return the proxy.
 
@@ -356,7 +356,7 @@ Two defects, both fixed in v8.28, both invisible to the entire test suite:
 
 1. **Every load past the first left a blank canvas.** The worker holding the
    `OffscreenCanvas` was disposed and rebuilt per document; an element yields a
-   surface exactly once. A green test asserted this behaviour.
+   surface exactly once. A green test asserted this behavior.
 2. **Capture structs arrived as `{ __wbg_ptr }`.** See ADR-024, "The fifth trap
    shape".
 

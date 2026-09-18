@@ -2,7 +2,7 @@
 //
 // This module is a deliberate second definition of a rule that lives in
 // annotations.rs (see that file's header for why). These tests are what stops
-// the two drifting: each one states the Rust behaviour it is holding the TS to,
+// the two drifting: each one states the Rust behavior it is holding the TS to,
 // so a future change to either side fails here rather than in someone's canvas.
 import { describe, it, expect } from "vitest";
 import {
@@ -121,6 +121,42 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(poly, 50, 50)).toBe(-1); // interior, not near either
   });
 
+  it("hit-tests an unfilled diamond (8) along its four edges only", () => {
+    // pad 6 → tolerance 10. The top→right edge runs (50,0)→(100,50); its
+    // 45° diagonal puts the center ~35px from every edge, so the hollow
+    // middle is a miss — a click selects whatever is behind it.
+    const dia = [shape({ id: 31, kind: 8, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(dia, 75, 25)).toBe(31);  // on the top→right edge
+    expect(shapeAnnotationAt(dia, 25, 25)).toBe(31);  // on the left→top edge
+    expect(shapeAnnotationAt(dia, 50, 50)).toBe(-1);  // empty middle
+    expect(shapeAnnotationAt(dia, 75, 50)).toBe(-1);  // just inside an edge
+    expect(shapeAnnotationAt(dia, 100, 100)).toBe(-1); // far outside
+  });
+
+  it("hit-tests an unfilled star (9) along its closed 10-vertex outline", () => {
+    const star = [shape({ id: 32, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    // Midpoint of the top tip's left edge (inner valley → outer tip).
+    expect(shapeAnnotationAt(star, 42.6, 14.9)).toBe(32);
+    expect(shapeAnnotationAt(star, 73.8, 57.7)).toBe(32); // inner valley vertex
+    expect(shapeAnnotationAt(star, 50, 50)).toBe(-1); // hollow middle
+  });
+
+  it("a FILLED diamond/star falls back to its padded bounding box", () => {
+    // The engine only routes 8/9 through the edge test while UNFILLED;
+    // filled, it uses the same in_outer box rule as a pin (never actually
+    // painted — the fill renderer handles kinds 0/1 — but the hit test
+    // answers the same way).
+    const dia = [
+      shape({ id: 33, kind: 8, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
+      shape({ id: 34, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
+    ];
+    expect(shapeAnnotationAt(dia, 50, 50)).toBe(34); // filled star covers center
+    const justStar = dia.slice(1);
+    expect(shapeAnnotationAt(justStar, 104, 50)).toBe(34); // inside pad
+    expect(shapeAnnotationAt(justStar, 108, 50)).toBe(-1); // past pad
+    expect(shapeAnnotationAt(dia.slice(0, 1), 50, 50)).toBe(33);
+  });
+
   it("pads the outline of a closed kind, INCLUSIVE both edges", () => {
     // Rust's box test is `>=` and `<=` on both sides — unlike the text tile,
     // which is half-open. The asymmetry is real; keep it.
@@ -130,7 +166,7 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(rect, 3, 30)).toBe(-1);
   });
 
-  it("normalises an inverted rect (x1 < x0)", () => {
+  it("normalizes an inverted rect (x1 < x0)", () => {
     const rect = [shape({ id: 14, kind: 0, x0: 50, y0: 50, x1: 10, y1: 10 })];
     expect(shapeAnnotationAt(rect, 10, 30)).toBe(14); // on its left stroke
     expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // hollow middle
@@ -142,7 +178,7 @@ describe("shapeAnnotationAt", () => {
   it("REGRESSION: an unfilled rect's empty interior is a MISS, its stroke a hit", () => {
     // pad 6 on a 20..100 box → ring is 14..26 and 94..106 on each axis.
     const rect = [shape({ id: 20, kind: 0, x0: 20, y0: 20, x1: 100, y1: 100 })];
-    expect(shapeAnnotationAt(rect, 60, 60)).toBe(-1); // dead centre
+    expect(shapeAnnotationAt(rect, 60, 60)).toBe(-1); // dead center
     expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // just inside the ring
     expect(shapeAnnotationAt(rect, 20, 60)).toBe(20); // on the left stroke
     expect(shapeAnnotationAt(rect, 15, 60)).toBe(20); // outer pad
@@ -159,9 +195,9 @@ describe("shapeAnnotationAt", () => {
   });
 
   it("an unfilled circle is a ring, and its bbox corner is not ink", () => {
-    // 20..120 → centre (70,70), r 50; pad 6 → ring radii 44..56.
+    // 20..120 → center (70,70), r 50; pad 6 → ring radii 44..56.
     const circ = [shape({ id: 22, kind: 1, x0: 20, y0: 20, x1: 120, y1: 120 })];
-    expect(shapeAnnotationAt(circ, 70, 70)).toBe(-1); // centre
+    expect(shapeAnnotationAt(circ, 70, 70)).toBe(-1); // center
     expect(shapeAnnotationAt(circ, 70, 40)).toBe(-1); // r=30
     expect(shapeAnnotationAt(circ, 70, 20)).toBe(22); // on the stroke
     expect(shapeAnnotationAt(circ, 70, 25)).toBe(22); // r=45

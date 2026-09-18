@@ -24,6 +24,114 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.79",
+    date: "2026-09-16",
+    headline: "Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop",
+    entries: [
+      {
+        tag: "feature",
+        text: "Perspective, Distort and Skew work on the things you drew. Point the tool at a square, a circle, a line, an arrow, a pin, a pen path or a piece of text and the warp happens to that object, not to the photo underneath it. Text was the only thing that worked that way before. The warped object stays an object: recolour it, move it, drag it to a new size, undo it, or re-select it and adjust the same corners. Apply, Reset and Cancel sit on the canvas under the box, and Esc takes the whole frame away.",
+      },
+      {
+        tag: "feature",
+        text: "Enhance has a Presets tile. One click applies a whole look, and hovering one previews it on your own photo before you commit. A preset is a named stack of adjustments the app already had, so applying it is a single undo step. The Quick Adjust grid it grew out of is gone, and Adjustments is sliders only.",
+      },
+      {
+        tag: "ui",
+        text: "Every dialog has the same backdrop. Export, Settings, the Command Palette, Diagnostics and Shortcuts had none at all while the New dialog had one, and the rest had drifted to four different shades. The New dialog also opens without its stutter, because the backdrop no longer re-blurs the whole screen on every frame of the animation.",
+      },
+      {
+        tag: "ui",
+        text: "The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Color Picker and Remove Object are one shape instead of four. In Rulers & Grid, clicking a lit toggle now turns it off, where before clicking it again did nothing.",
+      },
+      {
+        tag: "ui",
+        text: "The Levels histogram is tall enough to read, and the New dialog has a switch. Off, which is the default, everything stays in your browser. On adds Create AI Image, which sends your prompt to a server.",
+      },
+      {
+        tag: "infra",
+        text: "The site and the editor both run Google Analytics, and the editor also reports to Vercel Web Analytics. The tab icon on imagehorse.app is the horse.",
+      },
+    ],
+  },
+  {
+    version: "v8.78",
+    date: "2026-09-15",
+    headline: "The Stroke Stabilizer steadies your line again, and a pasted picture saves as pasted-revised",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Stroke Stabilizer works again. Since v8.75 it did worse than nothing: a stroke drew your raw line, then closed itself with a straight line back to where you started, so an L came out as a triangle and a U as a box. It happened on every setting and on the Paint brush, the Eraser, mask painting and the Magic Eraser brush. One line in the engine had the leash stuck at zero.",
+      },
+      {
+        tag: "ui",
+        text: "A picture you paste in, like a screenshot or \"Copy image\" from a web page, exports as pasted-revised instead of image-revised. Paste an actual file from File Explorer and it keeps its own name.",
+      },
+      {
+        tag: "ui",
+        text: "Create AI Image is hidden until it works. It opened a dialog you could fill in and then couldn't generate from.",
+      },
+      {
+        tag: "infra",
+        text: "The old Netlify address shows a notice that the editor moved to edit.imagehorse.app and starts forwarding there on September 29. Photos saved there without signing in stay with that address, so the notice says to download them first.",
+      },
+    ],
+  },
+  {
+    version: "v8.77",
+    date: "2026-09-14",
+    headline: "Other sites can't frame the editor, and A/B compare lines up",
+    entries: [
+      {
+        tag: "fix",
+        text: "Other websites can no longer load the editor or the front page inside a frame of their own. A rule meant to stop that has been there since v8.70, but it sat in the half of the security policy that only reports, so it never blocked anything. Both sites now send a header the browser enforces by itself, checked in a real browser before and after.",
+      },
+      {
+        tag: "ui",
+        text: "A/B compare lines up. With the default canvas border, the original half was stretched across the border while the edited half showed it, so the two sides differed in something that isn't your picture. The original now sits exactly over the photo, the border looks the same on both sides, and turning compare off leaves your document exactly as it was.",
+      },
+      {
+        tag: "rust",
+        text: "The engine the editor downloads is now byte-for-byte the one the test builds produce: 823,503 bytes. Vercel keeps its Rust packages somewhere the build wasn't told to tidy up, so real file paths ended up inside the binary and production ran 24 bytes different from every other build of the same code. One line fixed it.",
+      },
+    ],
+  },
+  {
+    version: "v8.76",
+    date: "2026-09-12",
+    headline: "The editor has its own address, and the front page is the front page again",
+    entries: [
+      {
+        tag: "infra",
+        text: "Image Horse runs on its own domain. The site is at imagehorse.app, the editor opens at edit.imagehorse.app, and www redirects to the apex. The old Netlify address still works and stays up for now, so nothing you have bookmarked breaks.",
+      },
+      {
+        tag: "fix",
+        text: "For a few hours the front page served the editor instead of the site. Two projects share this repo and a Root Directory setting decides which one builds which site; the marketing project was still pointed at the repo root, where the config had just been changed to build the editor. It points at marketing/ now.",
+      },
+      {
+        tag: "infra",
+        text: "Underneath that sat a config file that had never once worked. Vercel rejects any key it does not recognize, and marketing/vercel.json carried eight comment keys, so every deploy that read it was refused before a build started. Nothing noticed, because nothing had ever read it.",
+      },
+      {
+        tag: "fix",
+        text: "Junk URLs give a real 404 again instead of quietly answering with the home page, and the site carries its own security headers and content-security policy rather than borrowing the editor's — it loads no wasm, no auth and no database, so it allows none of them.",
+      },
+      {
+        tag: "ui",
+        text: "Ten entries on the Features page were drawing a plain square where an icon should be. The feature list is generated from the repo's own list; the icon map beside it is written by hand. Eight features had shipped without an icon, and two more had been renamed, which drops the icon just as quietly. Every feature has one now, and anything unmapped falls back to a dot, so the next gap looks like a gap rather than a broken tile.",
+      },
+      {
+        tag: "fix",
+        text: "The sitemap stops stamping every URL with the deploy date — a shallow clone has no history to read a real date from, so it was inventing one. The editor's canonical link and share card name edit.imagehorse.app rather than a build host.",
+      },
+      {
+        tag: "rust",
+        text: "The engine builds on the new host unchanged: 823,479 bytes, tiles and patchmatch present, and the served copy matches its own build record. Which features go into a build now has one home in the build script instead of being repeated in a host config, which is the trap that once shipped ten releases of a featureless engine.",
+      },
+    ],
+  },
+  {
     version: "v8.75",
     date: "2026-09-11",
     headline: "Shapes duplicate in any direction, the Stroke Stabilizer steadies every brush, and the lists stop disagreeing with each other",
@@ -46,19 +154,19 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "ui",
-        text: "History, Reselect and the Layers list are one component instead of three that had drifted apart. Row buttons sit together in one cluster and the coloured dots are gone in favour of the numbers already beside them. History and Reselect keep their buttons out of sight until you hover or tab into a row; Layers keeps its visible, because those get used constantly and the eye is reporting a state rather than only offering an action.",
+        text: "History, Reselect and the Layers list are one component instead of three that had drifted apart. Row buttons sit together in one cluster and the colored dots are gone in favour of the numbers already beside them. History and Reselect keep their buttons out of sight until you hover or tab into a row; Layers keeps its visible, because those get used constantly and the eye is reporting a state rather than only offering an action.",
       },
       {
         tag: "ui",
-        text: "The gallery bar's header is three columns — the count on the left, the compress buttons centred, the actions on the right — and the compress pair is centred on the bar rather than on the space left over, so it stops shifting when a selection appears.",
+        text: "The gallery bar's header is three columns — the count on the left, the compress buttons centered, the actions on the right — and the compress pair is centered on the bar rather than on the space left over, so it stops shifting when a selection appears.",
       },
       {
         tag: "fix",
-        text: "Dropping an image with nothing open goes straight to the gallery instead of opening a dialog whose other two choices both need an image already open. The status bar's second number is labelled. The Eraser panel says Eraser rather than Brush above a field called Brush Size.",
+        text: "Dropping an image with nothing open goes straight to the gallery instead of opening a dialog whose other two choices both need an image already open. The status bar's second number is labeled. The Eraser panel says Eraser rather than Brush above a field called Brush Size.",
       },
       {
         tag: "feature",
-        text: "The \"+\" on any colour swatch opens a real colour picker — a hue wheel or a saturation/brightness rectangle, with hex, RGB and HSL fields that all track each other and a before/after split over a checkerboard. Colours you keep land in a palette that follows you: saved on your device when you are logged out, synced to your account when you are signed in.",
+        text: "The \"+\" on any color swatch opens a real color picker — a hue wheel or a saturation/brightness rectangle, with hex, RGB and HSL fields that all track each other and a before/after split over a checkerboard. Colors you keep land in a palette that follows you: saved on your device when you are logged out, synced to your account when you are signed in.",
       },
       {
         tag: "feature",
@@ -73,7 +181,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "feature",
-        text: "A pasted or dropped photo used to sit as a grey block until its thumbnail was ready. It comes up like a Polaroid now — white paper that sweeps open from the top — and every tile takes at least a quarter of a second even when the pixels are instant, because a thirty-millisecond flash reads as a glitch. Several at once come up left to right. A slow photo slows the develop rather than freezing it.",
+        text: "A pasted or dropped photo used to sit as a gray block until its thumbnail was ready. It comes up like a Polaroid now — white paper that sweeps open from the top — and every tile takes at least a quarter of a second even when the pixels are instant, because a thirty-millisecond flash reads as a glitch. Several at once come up left to right. A slow photo slows the develop rather than freezing it.",
       },
       {
         tag: "feature",
@@ -136,7 +244,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "Several text fields asked for colours that were never defined — thirteen places requesting a colour that did not exist.",
+        text: "Several text fields asked for colors that were never defined — thirteen places requesting a color that did not exist.",
       },
       {
         tag: "ui",
@@ -163,7 +271,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "Text fields had a black outline in light mode. They were never given a colour at all, so they fell back to the text colour — near-white in dark, which looked deliberate, and black in light, which did not. They wear the app's warm accent now, in both themes.",
+        text: "Text fields had a black outline in light mode. They were never given a color at all, so they fell back to the text color — near-white in dark, which looked deliberate, and black in light, which did not. They wear the app's warm accent now, in both themes.",
       },
       {
         tag: "fix",
@@ -271,11 +379,11 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "ui",
-        text: "The Colour Overlay tints a layer clipped to its own pixels, which means on a layer with nothing on it the swatches were offering an effect that could not happen \u2014 you picked a colour and nothing changed. They are disabled there now, with a line saying why rather than just going grey. Paint something on the layer and they come back; undo that paint and they go away again.",
+        text: "The Color Overlay tints a layer clipped to its own pixels, which means on a layer with nothing on it the swatches were offering an effect that could not happen \u2014 you picked a color and nothing changed. They are disabled there now, with a line saying why rather than just going gray. Paint something on the layer and they come back; undo that paint and they go away again.",
       },
       {
         tag: "rust",
-        text: "The engine binary now comes out byte-for-byte identical whether it is compiled on a laptop, in CI, or on the deploy server. That sounds like housekeeping and is not: until now nobody could say for certain that the engine running on the site was the engine that had been tested, because three machines produced three slightly different binaries from the same source. They differed only in the build machine's own directory paths, baked into the file by the compiler. Those are gone, the tool that optimises the binary is pinned to one version, and the deploy now publishes a fingerprint of what it built so the site can be checked against it.",
+        text: "The engine binary now comes out byte-for-byte identical whether it is compiled on a laptop, in CI, or on the deploy server. That sounds like housekeeping and is not: until now nobody could say for certain that the engine running on the site was the engine that had been tested, because three machines produced three slightly different binaries from the same source. They differed only in the build machine's own directory paths, baked into the file by the compiler. Those are gone, the tool that optimizes the binary is pinned to one version, and the deploy now publishes a fingerprint of what it built so the site can be checked against it.",
       },
       {
         tag: "infra",
@@ -294,7 +402,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "The first version of that shipped a bug worth describing. Reorder a shape, press undo, and the newest shape was gone \u2014 not moved back, gone, with the reorder still applied. Undo tracks edits by pairing each one with a snapshot, and a reorder was taking a snapshot without registering an edit, so one press rewound the wrong step. It never reached a release; it was caught the same day it was written. The safety check that was supposed to catch it could not: it compares what the canvas looks like before and after, and two shapes of the same colour swapping places look identical.",
+        text: "The first version of that shipped a bug worth describing. Reorder a shape, press undo, and the newest shape was gone \u2014 not moved back, gone, with the reorder still applied. Undo tracks edits by pairing each one with a snapshot, and a reorder was taking a snapshot without registering an edit, so one press rewound the wrong step. It never reached a release; it was caught the same day it was written. The safety check that was supposed to catch it could not: it compares what the canvas looks like before and after, and two shapes of the same color swapping places look identical.",
       },
       {
         tag: "fix",
@@ -313,7 +421,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "fix",
-        text: "Erase something \u2014 the Magic Eraser, the eraser brush, a layer mask \u2014 then export as JPEG, and the hole came out as a black patch. JPEG has no transparency, so every see-through pixel has to be painted onto a colour before the file is written, and nothing on the export path was doing that. The browser encoder does not ask what you wanted; it writes black. Holes now become white, and PNG, WebP and AVIF keep their transparency untouched. Black was never a wrong colour choice, incidentally \u2014 it is what you get when nothing chooses at all.",
+        text: "Erase something \u2014 the Magic Eraser, the eraser brush, a layer mask \u2014 then export as JPEG, and the hole came out as a black patch. JPEG has no transparency, so every see-through pixel has to be painted onto a color before the file is written, and nothing on the export path was doing that. The browser encoder does not ask what you wanted; it writes black. Holes now become white, and PNG, WebP and AVIF keep their transparency untouched. Black was never a wrong color choice, incidentally \u2014 it is what you get when nothing chooses at all.",
       },
       {
         tag: "ui",
@@ -321,7 +429,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "Undo and Redo were greyed out so far they disappeared. Measured against the bar behind them, the disabled icons came to 1.33:1 in light mode \u2014 invisible rather than dimmed. Fading them was never going to work: the enabled colour was itself only 3:1, so every step down from it landed below the floor. Both states move up together instead, and a disabled button now reads as quiet rather than absent.",
+        text: "Undo and Redo were grayed out so far they disappeared. Measured against the bar behind them, the disabled icons came to 1.33:1 in light mode \u2014 invisible rather than dimmed. Fading them was never going to work: the enabled color was itself only 3:1, so every step down from it landed below the floor. Both states move up together instead, and a disabled button now reads as quiet rather than absent.",
       },
       {
         tag: "infra",
@@ -344,7 +452,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "The two thumbnails on the \"Welcome back\" screen showed the browser's broken-image icon instead of your photos. The screen built its preview images and then threw them away a moment later, before the page had drawn them \u2014 so every return visit greeted you with two grey placeholders. They are built and released together now, and the same fault is fixed in the resume dialog.",
+        text: "The two thumbnails on the \"Welcome back\" screen showed the browser's broken-image icon instead of your photos. The screen built its preview images and then threw them away a moment later, before the page had drawn them \u2014 so every return visit greeted you with two gray placeholders. They are built and released together now, and the same fault is fixed in the resume dialog.",
       },
       {
         tag: "ui",
@@ -363,7 +471,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "ui",
-        text: "Half the status bar was one grey and half was another, on the same row at the same 10px \u2014 the file size, dimensions and zoom looked right while the brand, the shortcut labels and their key chips looked washed out beside them. That was not a taste problem. Measured against the bar's own background, the dim half came to 3.65:1 in light mode, under the 4.5:1 that WCAG AA asks for at this size, and the shortcut hints were dimmed TWICE because a 70% opacity sat on top of the faint colour. Everything in the bar now uses the same value the readouts already used: 6.99:1 in light, 8.56:1 in dark.",
+        text: "Half the status bar was one gray and half was another, on the same row at the same 10px \u2014 the file size, dimensions and zoom looked right while the brand, the shortcut labels and their key chips looked washed out beside them. That was not a taste problem. Measured against the bar's own background, the dim half came to 3.65:1 in light mode, under the 4.5:1 that WCAG AA asks for at this size, and the shortcut hints were dimmed TWICE because a 70% opacity sat on top of the faint color. Everything in the bar now uses the same value the readouts already used: 6.99:1 in light, 8.56:1 in dark.",
       },
       {
         tag: "fix",
@@ -371,7 +479,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "infra",
-        text: "The swap itself is deliberately still there. Making undo remember which layer an operation belonged to means teaching the engine an ownership it has never had, which is a much larger change than a flash; the honest version of this release is that the behaviour is unchanged and only its visibility is fixed.",
+        text: "The swap itself is deliberately still there. Making undo remember which layer an operation belonged to means teaching the engine an ownership it has never had, which is a much larger change than a flash; the honest version of this release is that the behavior is unchanged and only its visibility is fixed.",
       },
       {
         tag: "infra",
@@ -386,7 +494,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "ui",
-        text: "The five buttons across the top bar \u2014 New, Tools, Gallery, Review, Export \u2014 each sized themselves to their own text, so \"New\" came out 71.6px against Gallery's 100.4. Twenty-eight pixels of difference between two things that are meant to read as peers. They are all one width now, the width of the widest label. The group costs 57.6px more and grows symmetrically, so the centred cluster does not move.",
+        text: "The five buttons across the top bar \u2014 New, Tools, Gallery, Review, Export \u2014 each sized themselves to their own text, so \"New\" came out 71.6px against Gallery's 100.4. Twenty-eight pixels of difference between two things that are meant to read as peers. They are all one width now, the width of the widest label. The group costs 57.6px more and grows symmetrically, so the centered cluster does not move.",
       },
       {
         tag: "fix",
@@ -444,7 +552,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "Export is the only button in that group that is not a toggle. It fires an action rather than turning a panel on, so it never lights up, and it greys out when there is no image instead of pretending to be available. Its tooltip says Alt + E because that shortcut was checked in the code before it was written down — the first draft said Ctrl + S, which is not bound to anything.",
+        text: "Export is the only button in that group that is not a toggle. It fires an action rather than turning a panel on, so it never lights up, and it grays out when there is no image instead of pretending to be available. Its tooltip says Alt + E because that shortcut was checked in the code before it was written down — the first draft said Ctrl + S, which is not bound to anything.",
       },
     ],
   },
@@ -455,7 +563,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "ui",
-        text: "Ctrl + \\ counts the month's shipping. The counts have been generated since v8.58, but the short list of highlights beside them is hand-written on purpose — a headline is a judgement about what mattered, and the log's feature tag does not carry that; August's biggest change shipped tagged infra. The list now includes the two things from v8.59 a user can actually notice: the mask tile saying it picks up the brush, and the upload dialog no longer drawing a progress bar out of thin air. The lockfile repair and the nav change are deliberately left off — a highlight in the editor for something you cannot find there reads as a missing feature.",
+        text: "Ctrl + \\ counts the month's shipping. The counts have been generated since v8.58, but the short list of highlights beside them is hand-written on purpose — a headline is a judgment about what mattered, and the log's feature tag does not carry that; August's biggest change shipped tagged infra. The list now includes the two things from v8.59 a user can actually notice: the mask tile saying it picks up the brush, and the upload dialog no longer drawing a progress bar out of thin air. The lockfile repair and the nav change are deliberately left off — a highlight in the editor for something you cannot find there reads as a missing feature.",
       },
       {
         tag: "fix",
@@ -486,7 +594,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "ui",
-        text: "\"Add mask\" says what it is about to do. The tile creates the mask and then switches you to the Paint brush, which is correct, since a mask is something you paint. But it did that silently, and the switch closes the Layers panel, so you ended up somewhere else with no explanation of how you got there. It now says so, the same way the \"Paint mask\" tile beside it always has. Nothing about the behaviour changed — only the silence.",
+        text: "\"Add mask\" says what it is about to do. The tile creates the mask and then switches you to the Paint brush, which is correct, since a mask is something you paint. But it did that silently, and the switch closes the Layers panel, so you ended up somewhere else with no explanation of how you got there. It now says so, the same way the \"Paint mask\" tile beside it always has. Nothing about the behavior changed — only the silence.",
       },
       {
         tag: "fix",
@@ -505,7 +613,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "fix",
-        text: "The Resize tool's two tiles — Compress and Resize — share one row of buttons underneath them, and that row sat outside the control that switches tiles. So the resize-only button rendered under Compress too, offering itself in the middle of a job it explicitly does not do; its own tooltip says it leaves the quality slider alone. It hid for months because it is greyed out unless you have changed the width or height, and those fields live in the other tile, so a greyed button read as \"not for me right now\" rather than \"wrong panel\". The percent slider under Compress changes dimensions too, though, so it was reachable and live from the wrong place. Apply Compression & Resize stays under both tiles on purpose: it is the button that commits everything and the one that unlocks A/B Compare.",
+        text: "The Resize tool's two tiles — Compress and Resize — share one row of buttons underneath them, and that row sat outside the control that switches tiles. So the resize-only button rendered under Compress too, offering itself in the middle of a job it explicitly does not do; its own tooltip says it leaves the quality slider alone. It hid for months because it is grayed out unless you have changed the width or height, and those fields live in the other tile, so a grayed button read as \"not for me right now\" rather than \"wrong panel\". The percent slider under Compress changes dimensions too, though, so it was reachable and live from the wrong place. Apply Compression & Resize stays under both tiles on purpose: it is the button that commits everything and the one that unlocks A/B Compare.",
       },
       {
         tag: "fix",
@@ -536,11 +644,11 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "Committing a line of text wrote two history entries instead of one. The text tool compared its drop-shadow settings before and after and counted a change even when the shadow was off on both sides, because a new annotation starts at all zeros while the panel's idea of off carries a default colour and offset. Off to off is a no-op now. Text with the shadow actually on is still two steps — that one needs the engine to group operations.",
+        text: "Committing a line of text wrote two history entries instead of one. The text tool compared its drop-shadow settings before and after and counted a change even when the shadow was off on both sides, because a new annotation starts at all zeros while the panel's idea of off carries a default color and offset. Off to off is a no-op now. Text with the shadow actually on is still two steps — that one needs the engine to group operations.",
       },
       {
         tag: "feature",
-        text: "Colour Overlay — Photoshop's layer style, under Layer Mask in the Layers tool. Pick a colour to turn it on, drag Strength to blend it back toward the real colours, Apply to bake it in or Remove to drop it. It tints what the layer actually contains, so transparent stays transparent with no coloured fringe at the edges, and it sits under the mask, so masking a tinted layer hides the tint with it. One undo removes the whole thing however long you spent dragging the slider. It survives merging, flattening, exports and the thumbnail; it does not survive a reload yet — it is session-lived, exactly like the layer mask it sits under.",
+        text: "Color Overlay — Photoshop's layer style, under Layer Mask in the Layers tool. Pick a color to turn it on, drag Strength to blend it back toward the real colors, Apply to bake it in or Remove to drop it. It tints what the layer actually contains, so transparent stays transparent with no colored fringe at the edges, and it sits under the mask, so masking a tinted layer hides the tint with it. One undo removes the whole thing however long you spent dragging the slider. It survives merging, flattening, exports and the thumbnail; it does not survive a reload yet — it is session-lived, exactly like the layer mask it sits under.",
       },
       {
         tag: "fix",
@@ -668,7 +776,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "fix",
-        text: "Every JPEG export came out with a black border. A photo opens on a slightly larger backing canvas, that canvas ships with the export, and its default fill is transparent — which PNG stores perfectly well, so nothing looked wrong there. JPEG cannot store transparency, and rather than say so it fills those pixels with black. A transparent canvas is now left out of a JPEG; an opaque canvas colour still exports, because that border is something you can actually see.",
+        text: "Every JPEG export came out with a black border. A photo opens on a slightly larger backing canvas, that canvas ships with the export, and its default fill is transparent — which PNG stores perfectly well, so nothing looked wrong there. JPEG cannot store transparency, and rather than say so it fills those pixels with black. A transparent canvas is now left out of a JPEG; an opaque canvas color still exports, because that border is something you can actually see.",
       },
       {
         tag: "fix",
@@ -676,7 +784,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "ui",
-        text: "A/B compare says which side is which. The two labels used to sit centred on the divider, one top and one bottom, so each hung half over each picture and named neither. They now sit fully on their own side and point outwards, as two tabs attached to the divider. Compare also switches itself off when you leave the Enhance tools instead of staying stuck on the canvas.",
+        text: "A/B compare says which side is which. The two labels used to sit centered on the divider, one top and one bottom, so each hung half over each picture and named neither. They now sit fully on their own side and point outwards, as two tabs attached to the divider. Compare also switches itself off when you leave the Enhance tools instead of staying stuck on the canvas.",
       },
       {
         tag: "infra",
@@ -892,7 +1000,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "ui",
-        text: "Guides have a colour — cyan by default, ten to pick from, and the choice is remembered between sessions.",
+        text: "Guides have a color — cyan by default, ten to pick from, and the choice is remembered between sessions.",
       },
       {
         tag: "infra",
@@ -1315,7 +1423,7 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
-        text: "The migration tracks how many places still read from the engine in a way that would break on a background thread, and that counter hit its floor last release. It was never counting one category: the calls that run on every mouse-move, deliberately left until last. Fifteen of those eighteen still read the old way, and all fifteen would fail quietly — the lasso's “am I drawing?” check unable to say no, the eyedropper reading colour out of nothing, the brush thinking every mouse-move changed the picture.",
+        text: "The migration tracks how many places still read from the engine in a way that would break on a background thread, and that counter hit its floor last release. It was never counting one category: the calls that run on every mouse-move, deliberately left until last. Fifteen of those eighteen still read the old way, and all fifteen would fail quietly — the lasso's “am I drawing?” check unable to say no, the eyedropper reading color out of nothing, the brush thinking every mouse-move changed the picture.",
       },
       {
         tag: "perf",
@@ -1330,7 +1438,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "fix",
-        text: "Finishing a pen path now waits for the engine to confirm it before keeping that path selected. It is the last of ninety-one changes of this kind, and the one left until the end, because the answer here is the whole point rather than a formality — the id that comes back is what keeps the colour and Background controls pointing at the thing you just drew.",
+        text: "Finishing a pen path now waits for the engine to confirm it before keeping that path selected. It is the last of ninety-one changes of this kind, and the one left until the end, because the answer here is the whole point rather than a formality — the id that comes back is what keeps the color and Background controls pointing at the thing you just drew.",
       },
       {
         tag: "fix",
@@ -1376,7 +1484,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "infra",
-        text: "The readout that mirrors the open document — image size, zoom, the undo and redo counts, the layer list — now waits for the engine's answer. It runs after almost every edit you make, which makes it the most-travelled call of the lot, and the last one of these that was a straightforward conversion.",
+        text: "The readout that mirrors the open document — image size, zoom, the undo and redo counts, the layer list — now waits for the engine's answer. It runs after almost every edit you make, which makes it the most-traveled call of the lot, and the last one of these that was a straightforward conversion.",
       },
       {
         tag: "fix",
@@ -1531,11 +1639,11 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "infra",
-        text: "Wand, edge-aware, colour range, magnetic lasso and both marquees — thirteen engine calls in one file, the largest batch of this run, and five of them were checks written as “if the engine says yes”.",
+        text: "Wand, edge-aware, color range, magnetic lasso and both marquees — thirteen engine calls in one file, the largest batch of this run, and five of them were checks written as “if the engine says yes”.",
       },
       {
         tag: "fix",
-        text: "Every mode was then driven in a real browser, and each left the right entry in the history: Magic Wand, Edge Select, Colour Range, Magnetic Lasso, Marquee, Ellipse Marquee, Select All, Delete Selection, Selection to Layer.",
+        text: "Every mode was then driven in a real browser, and each left the right entry in the history: Magic Wand, Edge Select, Color Range, Magnetic Lasso, Marquee, Ellipse Marquee, Select All, Delete Selection, Selection to Layer.",
       },
       {
         tag: "perf",
@@ -1640,7 +1748,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "fix",
-        text: "One source file contained two invisible NUL characters, used as a separator inside a cache key. That is enough to make every search tool classify the file as binary and skip it silently \u2014 so searching the project for anything defined in it returned a confident zero. It surfaced by contradiction: the history said an identifier had been added and never removed, while the search said it did not exist. The characters are now written as an escape: identical behaviour, and the file is searchable again.",
+        text: "One source file contained two invisible NUL characters, used as a separator inside a cache key. That is enough to make every search tool classify the file as binary and skip it silently \u2014 so searching the project for anything defined in it returned a confident zero. It surfaced by contradiction: the history said an identifier had been added and never removed, while the search said it did not exist. The characters are now written as an escape: identical behavior, and the file is searchable again.",
       },
       {
         tag: "infra",
@@ -1860,7 +1968,7 @@ export const RELEASES: Release[] = [
     entries: [
       {
         tag: "infra",
-        text: "Add, remove, rename, reorder, merge, show and hide, opacity and masks are all ready for an engine that answers over a message queue instead of instantly. Behaviour is unchanged — every one of them was driven and the layer stack checked afterwards.",
+        text: "Add, remove, rename, reorder, merge, show and hide, opacity and masks are all ready for an engine that answers over a message queue instead of instantly. Behavior is unchanged — every one of them was driven and the layer stack checked afterwards.",
       },
     ],
   },
@@ -2063,7 +2171,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "The download dialog is a second format picker, and it was still advertising AVIF as \"Smallest, modern\" with a button that handed over a PNG." },
       { tag: "ui", text: "Picking PNG now says it is lossless and will be larger than the source, rather than leaving you to discover that on disk. For an app about compression, a silent surprise was the wrong default." },
       { tag: "fix", text: "Resize Layer opened its box flush against the edge of the picture, so every handle sat on the border and nothing appeared to happen when you clicked it. The tool always worked; it just gave you nothing to grab. It opens inset now." },
-      { tag: "ui", text: "On a large display the site pinned everything to the left edge with a wide empty strip down the right. The content column is centred, on every page rather than just the homepage." },
+      { tag: "ui", text: "On a large display the site pinned everything to the left edge with a wide empty strip down the right. The content column is centered, on every page rather than just the homepage." },
       { tag: "ui", text: "New screenshot on the homepage and the README. The old one was taken in June and still showed a menu two revisions out of date — the site was advertising an app that no longer existed." },
       { tag: "infra", text: "The contribution squares counted whichever branch the generator happened to run in, so work could show up before it shipped or vanish until it merged. It reads the merged history now, and says so when it is running ahead of it." },
     ],
@@ -2117,24 +2225,24 @@ export const RELEASES: Release[] = [
   {
     version: "v7.64",
     date: "2026-08-04",
-    headline: "Recolouring a shape works from the panel it actually shows",
+    headline: "Recoloring a shape works from the panel it actually shows",
     entries: [
-      { tag: "fix", text: "The last release made a placed shape recolourable, but only if the colour you clicked was different from the one the panel happened to be showing. Click a shape you drew in orange while the panel still reads purple from earlier, click purple because purple is what you want, and nothing happened — the panel had not changed, so the app thought you had not asked for anything." },
-      { tag: "ui", text: "The panel now loads the shape's own settings when you click it, so it shows you what the selected shape is instead of whatever you last used. A click on any colour is a real change." },
-      { tag: "fix", text: "Changing only the stroke width no longer quietly drags an old panel colour along with it." },
-      { tag: "fix", text: "Stroke width, the arrow style and the fill controls were stuck for the same reason and are fixed alongside the colour. Reselect a pin and recolour it and it stays a pin, instead of turning into a plain circle." },
-      { tag: "ui", text: "A run of changes to one shape is a single undo step, not one per click — pick a colour, nudge the width, change the fill, and Ctrl+Z takes all of it back at once." },
+      { tag: "fix", text: "The last release made a placed shape recolourable, but only if the color you clicked was different from the one the panel happened to be showing. Click a shape you drew in orange while the panel still reads purple from earlier, click purple because purple is what you want, and nothing happened — the panel had not changed, so the app thought you had not asked for anything." },
+      { tag: "ui", text: "The panel now loads the shape's own settings when you click it, so it shows you what the selected shape is instead of whatever you last used. A click on any color is a real change." },
+      { tag: "fix", text: "Changing only the stroke width no longer quietly drags an old panel color along with it." },
+      { tag: "fix", text: "Stroke width, the arrow style and the fill controls were stuck for the same reason and are fixed alongside the color. Reselect a pin and recolour it and it stays a pin, instead of turning into a plain circle." },
+      { tag: "ui", text: "A run of changes to one shape is a single undo step, not one per click — pick a color, nudge the width, change the fill, and Ctrl+Z takes all of it back at once." },
       { tag: "infra", text: "Two regression tests named for the symptom that was reported, so this exact case cannot come back quietly." },
     ],
   },
   {
     version: "v7.63",
     date: "2026-08-04",
-    headline: "Change the colour of a shape you already placed",
+    headline: "Change the color of a shape you already placed",
     entries: [
-      { tag: "fix", text: "Click a square or a circle you drew earlier, pick a different colour, and it changes. Until now it did nothing at all — the shape kept whatever colour it was drawn with, and the only way to change your mind was to delete it and draw it again. The bug was seven weeks old." },
+      { tag: "fix", text: "Click a square or a circle you drew earlier, pick a different color, and it changes. Until now it did nothing at all — the shape kept whatever color it was drawn with, and the only way to change your mind was to delete it and draw it again. The bug was seven weeks old." },
       { tag: "fix", text: "Stroke width, the arrow style and the fill controls were stuck in exactly the same way, for exactly the same reason, and they are fixed with it." },
-      { tag: "fix", text: "The parts you would check next were checked rather than assumed. Recolouring is one undo step, so Ctrl+Z puts the old colour back. The new colour survives closing the picture and opening it again. And it is the new colour that comes out in the file you export, not just the one on screen." },
+      { tag: "fix", text: "The parts you would check next were checked rather than assumed. Recoloring is one undo step, so Ctrl+Z puts the old color back. The new color survives closing the picture and opening it again. And it is the new color that comes out in the file you export, not just the one on screen." },
       { tag: "ui", text: "Dialogs keep the keyboard inside them. With a dialog open, Tab used to walk straight out of it and carry on through the page behind, and closing one left you back at the top of the page instead of on the button you opened it from. Every dialog now holds the keyboard while it is open and hands it back where you left it." },
       { tag: "ui", text: "Screen readers are told the rest of the app is inactive while a dialog is up, which they were not before. That covers every dialog at once — the delete confirmations, Settings, the shortcut list and the update prompt all share one piece of code, and the fix went there." },
       { tag: "infra", text: "Seventeen new tests, and both fixes were measured in a real browser rather than reasoned about — including a control run against the old code to confirm the keyboard really did escape before, and really does not now." },
@@ -2149,7 +2257,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Text scales with the picture too, instead of staying the same size and swallowing a photo you have just made smaller." },
       { tag: "fix", text: "A layer mask used to stop working altogether after a resize. The mask is stored at the picture's size, and resizing left it at the old one, at which point the app quietly ignored it and the layer went back to fully visible. Same cause as the first one, found while fixing it." },
       { tag: "fix", text: "Cropping had the same blind spot in a different place. It moved things to the right position but never told the screen to redraw them, so they looked wrong until you undid something or switched tools. Crop, resize, canvas size and the canvas border all say so now." },
-      { tag: "infra", text: "Nine tests pin it down, including the exact case that was reported: a shape centred on a picture is still centred after the picture is halved." },
+      { tag: "infra", text: "Nine tests pin it down, including the exact case that was reported: a shape centered on a picture is still centered after the picture is halved." },
     ],
   },
   {
@@ -2157,12 +2265,12 @@ export const RELEASES: Release[] = [
     date: "2026-07-31",
     headline: "Name a whole gallery from what's in the pictures",
     entries: [
-      { tag: "feature", text: "Batch has a fourth tool: AI Rename. It reads every loaded photo and names it from what it sees — the dominant colour, whether it is bright or dark, whether it is a photograph, a graphic or a screenshot, and a rough read on the subject. Scan once, then edit the naming pattern and the whole list re-previews as you type. It runs on your own machine, so it works signed out and costs nothing per picture." },
-      { tag: "feature", text: "It describes a picture rather than recognising what is in it. You get dark-blue-portrait, not golden-retriever. That is a real limit, and the panel says so instead of pretending otherwise." },
+      { tag: "feature", text: "Batch has a fourth tool: AI Rename. It reads every loaded photo and names it from what it sees — the dominant color, whether it is bright or dark, whether it is a photograph, a graphic or a screenshot, and a rough read on the subject. Scan once, then edit the naming pattern and the whole list re-previews as you type. It runs on your own machine, so it works signed out and costs nothing per picture." },
+      { tag: "feature", text: "It describes a picture rather than recognizing what is in it. You get dark-blue-portrait, not golden-retriever. That is a real limit, and the panel says so instead of pretending otherwise." },
       { tag: "ui", text: "Drop or paste a stack of images and they go straight to the gallery. The three-way \"where should this go\" question only makes sense for a single picture, so now it only shows up for a single picture." },
       { tag: "fix", text: "Dropping several images at once used to keep the first one and throw the rest away — no message, nothing to tell you they had gone. Pasting several did the same. Both now take every image you hand them, as many as your plan has room for, and say so when the batch had to be trimmed." },
       { tag: "rust", text: "The reading is done in the engine rather than the browser. It samples a fixed grid whatever the picture's size, so a 24-megapixel photo costs the same to look at as a thumbnail." },
-      { tag: "fix", text: "Two colours came out wrong and the tests caught it before release: pure blue was being called \"sky\" and green foliage \"lime\", because the colour wheel was labelled one notch off." },
+      { tag: "fix", text: "Two colors came out wrong and the tests caught it before release: pure blue was being called \"sky\" and green foliage \"lime\", because the color wheel was labeled one notch off." },
       { tag: "infra", text: "Thirty-three new tests cover the naming, including the case that matters most — twenty photos that honestly describe the same still have to end up with twenty different filenames." },
     ],
   },
@@ -2174,7 +2282,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Your drawing is saved on a short delay, and if you switched photos while one of those saves was still writing, the next save was dropped instead of queued — silently, with nothing left to retry it. The strokes since the last completed save never reached disk. Saves now queue behind each other, so switching photos waits for the write instead of racing it." },
       { tag: "fix", text: "That was worse than it sounds: when reopening a photo the app trusts that record over its other copy, so it would hand back an older version that looked perfectly intact. Nothing about the saved format changed — only whether the save runs." },
       { tag: "infra", text: "Reproduced under test fixtures before being fixed: four tests that failed first, and the twenty-three existing save-and-restore tests still pass untouched." },
-      { tag: "infra", text: "Four architecture decision records written for calls already made — how the toolbar is organised, how the focus ring works, how non-React code talks to the UI, and how shared image data is cleaned up. They record decisions rather than making them." },
+      { tag: "infra", text: "Four architecture decision records written for calls already made — how the toolbar is organized, how the focus ring works, how non-React code talks to the UI, and how shared image data is cleaned up. They record decisions rather than making them." },
       { tag: "infra", text: "Audited all fifteen documentation pages. Four were saying things that are no longer true — the keyboard-shortcut table still listed the old tool keys, and the file-format page still called a shipped feature a plan — and the security page was missing its most urgent open item. Nothing was deleted; everything listed still earns its place." },
       { tag: "infra", text: "Chased down whether the paid-tier mix-up had a billing record tangled in it. It does not: nobody has ever subscribed, so there is nothing attached to the wrong account and nothing to migrate. Read-only investigation — no account, subscription or backend setting was touched." },
       { tag: "infra", text: "A structural health report on ten releases of drift, measured rather than guessed. The good news: a big refactor from ten releases ago held, and the file it produced is exactly the size it was left at. The less good news: the file it was split out of grew anyway while being actively dismantled, and a second oversized file has been quietly getting bigger. Nothing was changed off the back of it — the numbers are the point." },
@@ -2240,8 +2348,8 @@ export const RELEASES: Release[] = [
     date: "2026-07-27",
     headline: "A pen path stays put while you style it",
     entries: [
-      { tag: "fix", text: "Reaching for the Pen panel deselected the path you had just drawn. The \"click away to finish\" rule read raw coordinates, so every click on the panel counted as away — including the click on the colour swatch you opened it to reach. The path was gone before the picker appeared." },
-      { tag: "ui", text: "Finishing a pen path now leaves it selected, so Stroke and Background restyle the thing you just drew. Changing a path's colour used to mean finding it in the Reselect list first, which is a lot to ask of anyone who hasn't found that list." },
+      { tag: "fix", text: "Reaching for the Pen panel deselected the path you had just drawn. The \"click away to finish\" rule read raw coordinates, so every click on the panel counted as away — including the click on the color swatch you opened it to reach. The path was gone before the picker appeared." },
+      { tag: "ui", text: "Finishing a pen path now leaves it selected, so Stroke and Background restyle the thing you just drew. Changing a path's color used to mean finding it in the Reselect list first, which is a lot to ask of anyone who hasn't found that list." },
       { tag: "ui", text: "The ring on your first point says whether the ends are joined: dashed while the path is open, solid blue when clicking there would connect them, and solid once they are. An open path that happened to finish near its start used to look exactly like a closed one." },
       { tag: "ui", text: "Esc is the way out — it bakes the path and deselects. Undo still steps back through the restyle and then the path itself, one at a time." },
     ],
@@ -2294,8 +2402,8 @@ export const RELEASES: Release[] = [
       { tag: "ui", text: "The toolbar is now five groups — Enhance, Select, Create, Edit, Batch — with everything you had one level down as a sub-tool. Nothing dropped, no tool id renamed, so old links still resolve." },
       { tag: "fix", text: "The sub-tool decides what the canvas does. Anything without its own case used to inherit the clone stamp's handlers, which is how a selection drag could nearly clone-stamp the image." },
       { tag: "ui", text: "Crop, Transform and the Eyedropper each get their own panel instead of sharing one. Same for Resize Layer, Canvas Size and Guides." },
-      { tag: "feature", text: "The eyedropper remembers: picked colours land in a Recent Colors list you can click to re-apply." },
-      { tag: "ui", text: "OCR moved out of the Text panel and onto the rail; Text's background and bubble controls moved up beside the colour swatch." },
+      { tag: "feature", text: "The eyedropper remembers: picked colors land in a Recent Colors list you can click to re-apply." },
+      { tag: "ui", text: "OCR moved out of the Text panel and onto the rail; Text's background and bubble controls moved up beside the color swatch." },
       { tag: "ui", text: "Digits 1-5 select the five groups, derived from the registry so the keys, the tooltips and the shortcut sheet can't disagree." },
     ],
   },
@@ -2395,7 +2503,7 @@ export const RELEASES: Release[] = [
     date: "2026-07-19",
     headline: "The app learns to cache itself — switch still off",
     entries: [
-      { tag: "infra", text: "Every visit re-downloads about 3.6 MB of the app, the Rust engine included, and losing your connection mid-session means the next boot fails outright — odd behaviour for an editor whose photos and edits already live on your own machine. A service worker fixes both. This one only caches the app's own files: signing in, cloud sync and share links always go straight to the network, so nothing about your account or your documents can be served stale." },
+      { tag: "infra", text: "Every visit re-downloads about 3.6 MB of the app, the Rust engine included, and losing your connection mid-session means the next boot fails outright — odd behavior for an editor whose photos and edits already live on your own machine. A service worker fixes both. This one only caches the app's own files: signing in, cloud sync and share links always go straight to the network, so nothing about your account or your documents can be served stale." },
       { tag: "infra", text: "It ships turned off, and a default build contains none of it — nothing registered, no bytes. Switching it on is a separate decision, because a misbehaving service worker is the worst thing this app could ship: it leaves people on an old version without ever saying so. Once on, a new build waits for you to click Reload rather than swapping code out from under an open edit." },
     ],
   },
@@ -2528,7 +2636,7 @@ export const RELEASES: Release[] = [
     date: "2026-07-13",
     headline: "What you see is what you download",
     entries: [
-      { tag: "feature", text: "Exports now include the canvas behind your photo — the padding and background colour you can see on screen come with the download. Before, exports quietly cropped to just the photo. If you preferred it that way, there's a switch: Settings → \"Canvas background on export\", or just hide the canvas layer in the Layers panel." },
+      { tag: "feature", text: "Exports now include the canvas behind your photo — the padding and background color you can see on screen come with the download. Before, exports quietly cropped to just the photo. If you preferred it that way, there's a switch: Settings → \"Canvas background on export\", or just hide the canvas layer in the Layers panel." },
       { tag: "fix", text: "\"Blank Canvas\" is now called \"New Canvas\" when you start a document. Small thing — it just means the word \"canvas\" refers to one thing throughout the app instead of two." },
       { tag: "rust", text: "Behind the scenes: the canvas is now properly understood as part of the document rather than as a stray layer, which clears the road for undo history that survives a reload. That feature was quietly unreachable on any photo with a canvas — which, on the default settings, is every photo." },
       { tag: "rust", text: "Behind the scenes: a long-standing question about running the engine on multiple CPU cores in the browser is finally settled — it works, and signing in still works alongside it. That opens the door to making the new Magnetic Lasso and Smart Brush faster on large photos." },
@@ -2552,7 +2660,7 @@ export const RELEASES: Release[] = [
     entries: [
       { tag: "rust", text: "Behind the scenes: work continues on undo history that survives closing the tab. It's still switched off by default, and this release is about earning the right to switch it on — two bugs were found that could quietly hand you back the wrong picture after a reload." },
       { tag: "fix", text: "The first: after an AI edit (like Remove Background), a reload could restore the photo as it was BEFORE the AI ran, or as a blend of two different edit histories. The saved history couldn't tell an old recording from a new one, so it wrote the new edits on top of the old ones." },
-      { tag: "fix", text: "The second: a photo with saved history that you'd since added a layer to would come back with its layers gone. The history replayed without complaint — it just replayed a picture that only had one layer. It now recognises it's out of date and steps aside for the real file." },
+      { tag: "fix", text: "The second: a photo with saved history that you'd since added a layer to would come back with its layers gone. The history replayed without complaint — it just replayed a picture that only had one layer. It now recognizes it's out of date and steps aside for the real file." },
       { tag: "rust", text: "The Diagnostics window (Alt+Delete) now shows what's actually stored for the current photo, and says plainly when a saved history has been stood down." },
     ],
   },
@@ -2563,8 +2671,8 @@ export const RELEASES: Release[] = [
     entries: [
       { tag: "feature", text: "\"Edit and Transform\" is now \"Adjust & Select\", split in two: Adjust for cropping, flipping and rotating, and Select for choosing what you're working on. The magic wand moved in here (it used to live under Layer Settings, oddly), and it brought company." },
       { tag: "feature", text: "New Edge-aware wand: it selects like the normal wand but stops at an object's outline instead of bleeding out into the background through a soft gradient — the exact spot the old wand always let you down." },
-      { tag: "feature", text: "New Color Range: click a colour and take every pixel of it anywhere in the photo, not just the connected patch under your cursor. One click gets all the sky, including the bits peeking between buildings." },
-      { tag: "rust", text: "Behind the scenes: a proper edge-detection engine now ships, and it notices colour boundaries a brightness-only detector would miss entirely (a red shape on a green background of the same brightness, say). It's built to be shared — the magnetic lasso and a future smart brush will use exactly the same edges." },
+      { tag: "feature", text: "New Color Range: click a color and take every pixel of it anywhere in the photo, not just the connected patch under your cursor. One click gets all the sky, including the bits peeking between buildings." },
+      { tag: "rust", text: "Behind the scenes: a proper edge-detection engine now ships, and it notices color boundaries a brightness-only detector would miss entirely (a red shape on a green background of the same brightness, say). It's built to be shared — the magnetic lasso and a future smart brush will use exactly the same edges." },
       { tag: "fix", text: "The little green savings badge on a compressed photo (\"-95%\") used to vanish the moment you reloaded the page. It stays put now — it was only ever held in memory, even though the photo it belonged to was being restored properly." },
     ],
   },
@@ -2574,7 +2682,7 @@ export const RELEASES: Release[] = [
     headline: "Real compression targets, working alignment, and shadows you can actually see",
     entries: [
       { tag: "feature", text: "Compress Image(s) now works toward an actual size target — about 200 KB — stepping quality down first, then dimensions if it has to, instead of doing one pass and hoping. Images over 2500px get resized as part of the job (the progress toast tells you when that's happening). In testing, a 9.9 MB photo came out at exactly 200 KB." },
-      { tag: "fix", text: "The nine Align buttons now work no matter how you picked the thing you're aligning. Before, they only woke up if you'd selected the object from the Reselect list — pick it on the canvas and they sat there greyed out. Placing text also used to look like it did nothing; it was moving, you just couldn't see it." },
+      { tag: "fix", text: "The nine Align buttons now work no matter how you picked the thing you're aligning. Before, they only woke up if you'd selected the object from the Reselect list — pick it on the canvas and they sat there grayed out. Placing text also used to look like it did nothing; it was moving, you just couldn't see it." },
       { tag: "fix", text: "Shadows are visible in dark mode. Menus, tooltips, toasts and dialogs were rendering flat against the dark background — they now lift off the page properly, with a subtle edge. (Two panels turned out to have had no shadow at all, in either theme.)" },
       { tag: "fix", text: "Text in a background box or speech bubble now lands exactly where you place it. Plain text was fixed last release; the bubble was still drifting — by quite a lot, as it turns out — because of the space its tail reserves." },
       { tag: "ui", text: "Selecting a batch of photos got quicker: tick one checkbox, hold Shift, click another — everything between them selects in one go, just like a file manager." },
@@ -2706,7 +2814,7 @@ export const RELEASES: Release[] = [
     date: "2026-07-08",
     headline: "Pasting big images finally behaves — and SVGs just work",
     entries: [
-      { tag: "feature", text: "Paste an image as a new layer and you now get a movable, resizable placement box — an image bigger than your canvas arrives scaled to fit instead of getting cropped with no way back. Press Enter to place it, or Esc to cancel — and cancelling cleans up the layer it would have landed on, too." },
+      { tag: "feature", text: "Paste an image as a new layer and you now get a movable, resizable placement box — an image bigger than your canvas arrives scaled to fit instead of getting cropped with no way back. Press Enter to place it, or Esc to cancel — and canceling cleans up the layer it would have landed on, too." },
       { tag: "feature", text: "Resizing or moving a pasted image now shows up in History as its own step. Undo peels back just the resize first, then the paste — instead of nuking the whole thing in one go. The image is re-rendered from the original every time, so there's no quality loss from resizing twice." },
       { tag: "feature", text: "You can drop, paste, or open SVG files now. They're converted to regular pixels the moment they come in — safely, so nothing inside the file can run — and from there they edit like any other image." },
       { tag: "ui", text: "The Compress panel's buttons are regrouped: Apply Compression & Resize and A/B Compare sit together at the top, with the one-click Auto Compress actions below." },
@@ -3170,9 +3278,9 @@ export const RELEASES: Release[] = [
     headline: "Review panel, 360° bubble tails, dev tier switcher",
     entries: [
       { tag: "feature", text: "AI Tools: Background Removal is live. One click hands the canvas PNG to a real Convex → Replicate pipeline (rembg model), with a phase-state button (Uploading… / Removing background…) and a reactive Convex subscription on the job row. When the webhook completes, the result image streams back, decodes to RGBA, and replaces the working image — the photo is marked modified so the change persists. Gated to the Paid tier; non-Paid users see an inline Lock notice. Other AI models (OCR, 4× Upscale, Object Removal, Alt Text) remain Coming Soon placeholders awaiting the same plumbing." },
-      { tag: "ui", text: "Auto Compress split into explicit Selected / All buttons. A centred ⚡ Auto Compress label sits over a two-button row — Selected Image (or Selected Images when more than one is checkbox-selected) and All Images — followed by an HR separator and then Apply Compression & Resize and Show A/B Compare. Selected scope compresses the checkbox multi-selection when one exists, otherwise just the active photo in the ring, so the button is always meaningful." },
-      { tag: "feature", text: "New Pens tab in the Shapes tool — sits between Shapes and Arrows. Pins mode drops auto-numbered callout discs (1, 2, 3…) on click with a Pin Size slider; click an existing pin to move it. Freehand mode draws a thick, round-capped polyline pen stroke on drag with its own Stroke Width slider. Both share the colour swatch." },
-      { tag: "rust", text: "Pens are real Rust shapes — two new kinds (5 = pin, 6 = polyline) added to ShapeAnnotation, with add_pin_annotation / add_polyline_annotation APIs, render_pin (filled AA disc + centred ab_glyph number), drawing::draw_polyline (round-capped segment loop), and drawing::fill_circle. ShapeAnnotation gained number (pin label) and points (polyline vertices); get_shape_annotations JSON, PersistedShape, and the restore path round-trip both. Polyline hit-testing uses per-segment distance; pins reuse the padded-bbox path. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup." },
+      { tag: "ui", text: "Auto Compress split into explicit Selected / All buttons. A centered ⚡ Auto Compress label sits over a two-button row — Selected Image (or Selected Images when more than one is checkbox-selected) and All Images — followed by an HR separator and then Apply Compression & Resize and Show A/B Compare. Selected scope compresses the checkbox multi-selection when one exists, otherwise just the active photo in the ring, so the button is always meaningful." },
+      { tag: "feature", text: "New Pens tab in the Shapes tool — sits between Shapes and Arrows. Pins mode drops auto-numbered callout discs (1, 2, 3…) on click with a Pin Size slider; click an existing pin to move it. Freehand mode draws a thick, round-capped polyline pen stroke on drag with its own Stroke Width slider. Both share the color swatch." },
+      { tag: "rust", text: "Pens are real Rust shapes — two new kinds (5 = pin, 6 = polyline) added to ShapeAnnotation, with add_pin_annotation / add_polyline_annotation APIs, render_pin (filled AA disc + centered ab_glyph number), drawing::draw_polyline (round-capped segment loop), and drawing::fill_circle. ShapeAnnotation gained number (pin label) and points (polyline vertices); get_shape_annotations JSON, PersistedShape, and the restore path round-trip both. Polyline hit-testing uses per-segment distance; pins reuse the padded-bbox path. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup." },
       { tag: "feature", text: "History panel rebuilt as a Review panel — one collapsible panel hosting three independent sections: History (undo timeline), Reselect (live text and shape annotations), and Layers (placeholder). Open any combination; the body splits evenly between open sections — 1 full, 2 halves, 3 thirds — each with its own scroll area and header." },
       { tag: "ui", text: "Shared ToggleButtonGroup component drives the top bar's Upload / Tools / Gallery / Review cluster and the Review panel's History / Reselect / Layers cluster. Multi-select (each button independent), compact icon mode, label-only mode for narrow panels, evenly-spread fill option." },
       { tag: "rust", text: "Speech-bubble tail is now a 360° angle, not five discrete directions. Drag the Tail Direction slider and the tail sweeps continuously around the bubble. Rust builds the tile with a uniform margin on all sides and projects a ray from the bubble center onto the rect edge to place the tail base; live preview uses identical math." },

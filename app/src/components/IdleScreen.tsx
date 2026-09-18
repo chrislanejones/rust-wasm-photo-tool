@@ -51,7 +51,7 @@ export function IdleScreen({
       {/* Chrome-less content: the visible box is the card. Overlay + content
           ride at --z-idle so the idle screen covers every panel and dialog. */}
       <DialogContent
-        overlayClassName="z-[var(--z-idle)] bg-black/70 backdrop-blur-sm"
+        overlayClassName="z-[var(--z-idle)]"
         className="z-[var(--z-idle)] w-auto max-w-xs overflow-visible border-0 bg-transparent p-0 shadow-none"
       >
         <IdleScreenCard onContinue={onContinue} />

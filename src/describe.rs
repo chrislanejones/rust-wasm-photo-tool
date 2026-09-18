@@ -2,7 +2,7 @@
 //! Local, offline content description — the engine behind Batch → **AI Rename**.
 //!
 //! Given an RGBA buffer this returns a handful of descriptive tags (dominant
-//! colour, tone, what kind of image it is, a coarse subject guess) which the
+//! color, tone, what kind of image it is, a coarse subject guess) which the
 //! panel turns into a filename. It runs entirely in the engine: no network, no
 //! account, no per-image cost, so it works in demo mode like every other local
 //! tool.
@@ -19,8 +19,8 @@
 //! 6000×4000 photo costs the same as a 640×480 one. Nothing here is on the
 //! flush path — it is called once per photo when the user presses Rename.
 
-/// The 12 hue buckets, 30° apart. Index `i` is CENTRED on `i * 30°` and spans
-/// `±15°`, so the entries must line up with the primaries at their centres:
+/// The 12 hue buckets, 30° apart. Index `i` is CENTERED on `i * 30°` and spans
+/// `±15°`, so the entries must line up with the primaries at their centers:
 /// 0 red, 60 yellow, 120 green, 180 cyan, 240 blue, 300 magenta. (An earlier
 /// draft slipped "gold" in at index 2 and shifted everything after it by one
 /// bin — pure blue came out "sky" and foliage came out "lime". Adding a name
@@ -66,7 +66,7 @@ impl Description {
             tone: "",
             contrast: "normal",
             palette: "",
-            color: "grey",
+            color: "gray",
             orientation: "square",
             detail: "",
             transparent: false,
@@ -137,7 +137,7 @@ struct Tally {
     sky_n: u32,
     near_white: u32,
     translucent: u32,
-    /// 4096-entry "have I seen this colour" bitset (4 bits per channel), so
+    /// 4096-entry "have I seen this color" bitset (4 bits per channel), so
     /// palette diversity costs no allocation.
     palette_bits: [u64; 64],
     palette_count: u32,
@@ -196,7 +196,7 @@ fn tally(pixels: &[u8], w: usize, h: usize) -> Tally {
             t.sat_sum += sat as f64;
 
             // Only pixels with a real hue vote, weighted by how saturated they
-            // are — otherwise a wash of near-grey outvotes the actual subject.
+            // are — otherwise a wash of near-gray outvotes the actual subject.
             if sat > 0.18 && val > 0.12 && val < 0.98 {
                 let bin = (((hue + 15.0) / 30.0) as usize) % 12;
                 t.hue_hist[bin] += sat as f64;
@@ -340,7 +340,7 @@ pub(crate) fn describe(pixels: &[u8], w: u32, h: u32) -> Description {
         } else if mean_lum < 0.20 {
             "black"
         } else {
-            "grey"
+            "gray"
         }
     } else {
         HUE_NAMES[best_hue.0]
@@ -403,7 +403,7 @@ pub(crate) fn describe(pixels: &[u8], w: u32, h: u32) -> Description {
         parts.push(detail);
     }
     while parts.len() > 3 {
-        parts.remove(1); // drop tone before colour/subject
+        parts.remove(1); // drop tone before color/subject
     }
 
     Description {
@@ -424,7 +424,7 @@ pub(crate) fn describe(pixels: &[u8], w: u32, h: u32) -> Description {
 mod tests {
     use super::*;
 
-    /// Fill an RGBA buffer with one colour.
+    /// Fill an RGBA buffer with one color.
     fn solid(w: u32, h: u32, r: u8, g: u8, b: u8, a: u8) -> Vec<u8> {
         let mut v = Vec::with_capacity((w * h * 4) as usize);
         for _ in 0..(w * h) {

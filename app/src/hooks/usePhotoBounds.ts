@@ -13,7 +13,7 @@ export interface PhotoBounds {
  * The PHOTO's bounds inside the document — what "how big is my picture" means
  * (#81).
  *
- * A default import is an artboard: a Canvas fill with the photo centred on it,
+ * A default import is an artboard: a Canvas fill with the photo centered on it,
  * so the document is `photo + 2 * canvasPadding`. Reading `stamp.state.width`
  * therefore reported a number 20px larger than the file the user opened, and
  * the resize panel then locked its aspect ratio to that document — type 400 and

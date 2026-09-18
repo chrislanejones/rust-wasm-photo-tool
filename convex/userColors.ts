@@ -1,5 +1,5 @@
 // .convex/userColors.ts
-// The global "+" colour palette — synced per user via Convex. Anonymous users
+// The global "+" color palette — synced per user via Convex. Anonymous users
 // keep the same list in localStorage; see app/src/hooks/useUserColors.ts for
 // the client that picks between the two.
 import { v } from "convex/values";
@@ -12,7 +12,7 @@ const MAX_USER_COLORS = 32;
 /** Normalise for de-dup: lowercase, drop whitespace. */
 const norm = (c: string) => c.trim().toLowerCase();
 
-/** The current user's saved colours, newest first. [] when signed out. */
+/** The current user's saved colors, newest first. [] when signed out. */
 export const listUserColors = query({
   args: {},
   handler: async (ctx) => {
@@ -27,7 +27,7 @@ export const listUserColors = query({
   },
 });
 
-/** Save a colour to the palette. No-op if it is already there (case- and
+/** Save a color to the palette. No-op if it is already there (case- and
  *  whitespace-insensitive). Trims the palette to the newest 32. */
 export const addUserColor = mutation({
   args: { color: v.string() },
@@ -57,7 +57,7 @@ export const addUserColor = mutation({
   },
 });
 
-/** Remove a colour from the palette. No-op if it is not there. */
+/** Remove a color from the palette. No-op if it is not there. */
 export const removeUserColor = mutation({
   args: { color: v.string() },
   handler: async (ctx, { color }) => {

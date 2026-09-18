@@ -100,7 +100,7 @@ fn a_single_opaque_pixel_is_found_at_every_position() {
     }
 }
 
-/// Alpha only — a colour with zero alpha is still nothing.
+/// Alpha only — a color with zero alpha is still nothing.
 #[test]
 fn opaque_looking_colour_with_zero_alpha_is_still_empty() {
     let mut t = tool();

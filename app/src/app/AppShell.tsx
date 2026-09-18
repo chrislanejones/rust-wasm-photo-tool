@@ -23,6 +23,7 @@ import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { canEncode } from "@/lib/encodeSupport";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
+import { namePastedImage } from "@/lib/pastedImageName";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
@@ -468,7 +469,7 @@ export function AppShell() {
   // CSS transitions; the <MotionConfig> wrapper below handles framer-motion.
   useReduceMotion(prefs.reduceMotion);
   // Shared responsive breakpoints (one resize listener) — drives the top bar's
-  // compact collapse, the narrow overlay-drawer behaviour for the side panels,
+  // compact collapse, the narrow overlay-drawer behavior for the side panels,
   // and the too-small notice.
   const bp = useBreakpoint();
   // Canvas "Rulers & Grids" overlay config (Settings → Rulers & Grids). Inline
@@ -1287,7 +1288,7 @@ export function AppShell() {
   const selectionTolerance = useToolStore((s) => s.selectionTolerance);
   const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
   const selectionMask = useToolStore((s) => s.selectionMask);
-  // Which engine call a canvas click makes (wand / edge-aware / colour range /
+  // Which engine call a canvas click makes (wand / edge-aware / color range /
   // lasso / rect / ellipse) — one exclusive mode, gesture included.
   const selectionKind = useToolStore((s) => s.selectionKind);
   const setSelectionKind = useToolStore((s) => s.setSelectionKind);
@@ -1589,6 +1590,8 @@ export function AppShell() {
       5: "Pin",
       6: "Pen",
       7: "Pen Path",
+      8: "Diamond",
+      9: "Star",
     };
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
@@ -1790,7 +1793,7 @@ export function AppShell() {
   });
 
   /**
-   * Paste a bitmap from the clipboard into the **active layer**, centred on the
+   * Paste a bitmap from the clipboard into the **active layer**, centered on the
    * canvas. Accepts either the `clipboardData.items` from a native paste event
    * or, when called without them, falls back to the async Clipboard API (for an
    * explicit button/menu invocation). Decodes the image to RGBA and composites
@@ -1856,7 +1859,6 @@ export function AppShell() {
   const handlePasteFromClipboard = useCallback(
     async (items?: DataTransferItemList | null) => {
       let source: Blob | null = null;
-      let fileName = "pasted.png";
       if (items) {
         // Collect EVERY image on the clipboard, not just the first. Pasting a
         // multi-file selection out of a file manager hands over one item per
@@ -1867,18 +1869,15 @@ export function AppShell() {
         const pasted = Array.from(items)
           .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
           .map((it) => it.getAsFile())
-          .filter((f): f is File => f !== null);
+          .filter((f): f is File => f !== null)
+          .map(namePastedImage);
         if (pasted.length >= 2) {
           // A stack never asks — straight to the gallery. handleAddPhotos
           // trims to the tier cap and toasts when it had to.
           await handleAddPhotos(pasted);
           return;
         }
-        const only = pasted[0];
-        if (only) {
-          source = only;
-          if (only.name) fileName = only.name;
-        }
+        if (pasted[0]) source = pasted[0];
       }
       if (!source) {
         try {
@@ -1904,13 +1903,7 @@ export function AppShell() {
         }
       }
       if (!source) return;
-      const file =
-        source instanceof File
-          ? source
-          : new File([source], fileName, {
-              type: source.type || "image/png",
-            });
-      await openImportDialog(source, file);
+      await openImportDialog(source, namePastedImage(source));
     },
     [openImportDialog, handleAddPhotos],
   );
@@ -2191,7 +2184,7 @@ export function AppShell() {
   /**
    * Photoshop-style **Canvas Size** apply (the "Resize canvas" control in Layer
    * Settings). Resizes the backing document WITHOUT resampling the photo — the
-   * layer content keeps its native resolution, centred, the new area filled with
+   * layer content keeps its native resolution, centered, the new area filled with
    * the user's chosen backing color (transparent ⇒ checkerboard). Undoable
    * (resize_canvas pushes history) and persisted like any other canvas edit.
    */
@@ -2402,7 +2395,7 @@ export function AppShell() {
     // intermittent because edit-then-export-immediately is correct — only a
     // reload in between breaks it.
     //
-    // The gate was never load-bearing, only an optimisation: BOTH of its
+    // The gate was never load-bearing, only an optimization: BOTH of its
     // "ship the original" branches were byte-identical, so all it ever decided
     // was whether to spend one IndexedDB read. The presence of a saved edit is
     // the real question, and `loadPhotoEdit` answers it directly from storage
@@ -3101,6 +3094,8 @@ export function AppShell() {
             onShadows={stamp.adjustShadows}
             onHighlights={stamp.adjustHighlights}
             onSharpen={stamp.adjustSharpen}
+            levels={stamp.levels}
+            presets={stamp.presets}
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}
@@ -3317,6 +3312,7 @@ export function AppShell() {
                           onTextFontSizeChange={handleTextFontSizeChange}
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
+                          shapes={drawingTools.shapes}
                           renderOverlay={renderDuplicatePad}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
@@ -3332,6 +3328,7 @@ export function AppShell() {
                             strokeWidth: toolSettings.strokeWidth,
                             arrowStyle: toolSettings.arrowStyle,
                             shape: toolSettings.shape ?? "rect",
+                            sloppiness: toolSettings.sloppiness ?? 0,
                             fillMode: toolSettings.fillMode,
                             fillColor: toolSettings.fillColor,
                             fillColor2: toolSettings.fillColor2,
@@ -3452,6 +3449,7 @@ export function AppShell() {
                       onTextFontSizeChange={handleTextFontSizeChange}
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
+                      shapes={drawingTools.shapes}
                       renderOverlay={renderDuplicatePad}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
@@ -3467,6 +3465,7 @@ export function AppShell() {
                         strokeWidth: toolSettings.strokeWidth,
                         arrowStyle: toolSettings.arrowStyle,
                         shape: toolSettings.shape ?? "rect",
+                        sloppiness: toolSettings.sloppiness ?? 0,
                         fillMode: toolSettings.fillMode,
                         fillColor: toolSettings.fillColor,
                         fillColor2: toolSettings.fillColor2,

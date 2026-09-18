@@ -4,6 +4,7 @@ import { AppShell } from "./AppShell";
 import { ShareViewer } from "@/components/ShareViewer";
 import { CommandPalette } from "@/features/commandPalette";
 import { RouteSync, SHARE_PARAM } from "@/features/routing";
+import { MovedNotice } from "@/features/hostMove";
 
 export default function App() {
   // A `?v=<token>` link opens the read-only share viewer instead of the editor.
@@ -30,6 +31,9 @@ export default function App() {
       {/* URL <-> state mirror: #/tool/paint/blur, #/settings/security. Renders
           nothing; see features/routing. */}
       <RouteSync />
+      {/* Retired Netlify address only: "we moved, download your library
+          first". Renders nothing anywhere else; see features/hostMove. */}
+      <MovedNotice />
     </TooltipProvider>
   );
 }

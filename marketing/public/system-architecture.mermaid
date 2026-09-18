@@ -1,30 +1,40 @@
-%% Image Horse — whole-app system architecture (AS SHIPPED, v8.66, 2026-09-04)
-%% 
-%% The dashed "Network" plane is optional: sever it and the solid client
-%% subgraph is a complete, working editor. Demo mode is sacred.
-%% 
-%% This file is the downloadable source behind the hand-drawn map on
-%% /architecture. It had drifted to v7.10 (July 2026) and described a version
-%% of the app that stopped existing at v8.32; the corrections in this pass:
-%% 
-%%   - The engine runs in a WORKER, and has been the default since v8.32
-%%     (ADR-024). It was drawn on the main thread. This is the largest
-%%     structural fact about the app: main-thread blocking per heavy
-%%     operation went from 129-137 ms to 0.
-%%   - The OffscreenCanvas belongs to the ENGINE worker, not the codec worker.
-%%   - The rayon worker pool is GONE, not "planned": measured at 8-31x SLOWER
-%%     than single-threaded and rejected (tag negative-result/rayon-wavefront).
-%%     No SharedArrayBuffer, no COOP/COEP, no wasm threads anywhere.
-%%   - PatchMatch SHIPPED (v7.46, Magic Eraser) — it was listed as planned.
-%%     The wasm is built `--features tiles,patchmatch`.
-%%   - The service worker is BUILT BUT OFF: the default build statically
-%%     removes it (`__IH_SW_MODE__ === "off"`, ADR-019). It was drawn serving
-%%     the app. It has never shipped on.
-%%   - WebGPU is one blur kernel plus a self-test, with zero consumers on the
-%%     pixel path — not a backend the engine renders through.
-%%   - React 19, not 18. Seven Zustand stores, not five.
+%%-- Image Horse — whole-app system architecture (AS SHIPPED, v8.79, 2026-09-16)
+%%--
+%%-- The downloadable source behind the hand-drawn map on /architecture. Both
+%%-- are maintained BY HAND and have drifted apart before; when they disagree,
+%%-- check the code, not either picture.
+%%--
+%%-- The dashed "Network" plane is optional: sever it and the solid client
+%%-- subgraph is a complete, working editor. Demo mode is sacred.
+%%--
+%%-- WHAT THIS DIAGRAM IS CAREFUL ABOUT, because each one has been drawn wrong
+%%-- here before:
+%%--
+%%--   - The engine runs in a WORKER and has been the default since v8.32
+%%--     (ADR-024). Main-thread blocking per heavy operation went 129-137 ms
+%%--     to 0. The OffscreenCanvas belongs to the ENGINE worker, not the codec.
+%%--   - The service worker is BUILT BUT OFF. The default build statically
+%%--     removes it (__IH_SW_MODE__ === "off", ADR-019). It has never shipped
+%%--     on, which is why this file does NOT say "works offline" — a cold load
+%%--     with no network fails.
+%%--   - WebGPU is one blur kernel plus a self-test, with ZERO consumers on the
+%%--     pixel path. It is not a backend the engine renders through.
+%%--   - The rayon worker pool is GONE, not planned: measured 8-31x SLOWER than
+%%--     single-threaded and rejected. No SharedArrayBuffer, no COOP/COEP, no
+%%--     wasm threads anywhere.
+%%--   - PatchMatch SHIPPED in v7.46 (Magic Eraser). Built --features
+%%--     tiles,patchmatch.
+%%--   - React 19, not 18. Seven Zustand stores, not five.
+%%--
+%%-- ⚠️ EVERY COMMENT LINE HERE CARRIES CHARACTERS AFTER THE %% ON PURPOSE.
+%%-- Mermaid strips comments with [^\n]+, which needs at least one character
+%%-- after the marker, so a BARE %% silently breaks the whole file. Three lines
+%%-- in this header used to be "%%" plus a single trailing space — parsing only
+%%-- because of that space, one whitespace-trimming save away from breaking, with
+%%-- nothing in the repo enforcing it. Use %%-- and the hazard is gone.
+%%--
 flowchart TB
-    subgraph client["BROWSER — fully functional offline, no account"]
+    subgraph client["BROWSER — no account, and no server in the edit path"]
         direction TB
 
         subgraph ui["UI plane · main thread · React 19 + TypeScript + Vite"]

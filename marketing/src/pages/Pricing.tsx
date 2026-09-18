@@ -47,7 +47,7 @@ const CARDS: Card[] = [
       "Edit sync to the cloud",
       "Originals stay on-device",
       "24 images",
-      "3 projects",
+      "100 MB of cloud storage",
       "8 layers per image",
     ],
     cta: "Create account",
@@ -60,14 +60,12 @@ const CARDS: Card[] = [
     price: "$10",
     unit: "per month",
     perks: [
-      <>Cloud originals — 5&nbsp;GB, or bring your own S3</>,
+      <>Cloud originals — 5&nbsp;GB</>,
       "16 layers per image",
       "Background and object removal",
-      "4× upscale",
-      "Unlimited AI passes",
-      <>
-        100 photos <span className="muted">(coming soon)</span>
-      </>,
+      "Read text out of an image",
+      "50 AI passes a day",
+      "100 photos",
     ],
     cta: "Start Pro",
     lead: true,
@@ -101,16 +99,25 @@ const MATRIX: Group[] = [
     rows: [
       { feature: "Clone stamp", cells: [yes, yes, yes] },
       { feature: "Paint / brush", cells: [yes, yes, yes] },
+      { feature: sub("Stroke stabilizer", "paint, eraser, blur, redact"), cells: [yes, yes, yes] },
       { feature: "Arrows, shapes, text, emoji", cells: [yes, yes, yes] },
-      { feature: "Blur brush", cells: [yes, yes, yes] },
+      { feature: sub("Bézier pen", "re-editable paths"), cells: [yes, yes, yes] },
+      { feature: sub("Selection", "wand, lasso, color range, edge-aware"), cells: [yes, yes, yes] },
+      { feature: sub("Perspective, distort, skew", "shapes, text and paths"), cells: [yes, yes, yes] },
+      { feature: "Blur, pixelate and black-box redaction", cells: [yes, yes, yes] },
+      { feature: sub("Magic eraser", "PatchMatch, on your machine"), cells: [yes, yes, yes] },
       { feature: "Brightness / contrast", cells: [yes, yes, yes] },
+      { feature: sub("Levels", "against a live histogram"), cells: [yes, yes, yes] },
+      { feature: sub("Color presets", "one click, one undo step"), cells: [yes, yes, yes] },
       { feature: "Crop / resize", cells: [yes, yes, yes] },
       {
         feature: sub("Layers", "client-side stack"),
-        cells: [num("3 per image"), num("3 per image"), num("unlimited")],
+        cells: [num("8 per image"), num("8 per image"), num("16 per image")],
       },
       { feature: "Undo / redo", cells: [yes, yes, yes] },
       { feature: "Export PNG · JPEG · WebP · AVIF", cells: [yes, yes, yes] },
+      { feature: sub("OpenRaster export and import", "layers intact, opens in Krita"), cells: [yes, yes, yes] },
+      { feature: sub("Batch", "logo, text, rename, AI rename — all local"), cells: [yes, yes, yes] },
     ],
   },
   {
@@ -121,28 +128,27 @@ const MATRIX: Group[] = [
       { feature: sub("Edit persistence", "saved across sessions"), cells: [no, yes, yes] },
       {
         feature: "Original files",
-        cells: [num("local"), num("on your device"), num("cloud or your S3")],
+        cells: [num("local"), num("on your device"), num("cloud")],
       },
-      { feature: "Cloud storage quota", cells: [no, no, num("5 GB · or BYO S3")] },
+      { feature: "Cloud storage quota", cells: [no, num("100 MB"), num("5 GB")] },
     ],
   },
   {
     name: "Projects and data — Convex",
     rows: [
-      { feature: "Projects", cells: [no, num("3 projects"), num("unlimited")] },
+      { feature: "Projects", cells: [no, yes, yes] },
       { feature: "Persistent history", cells: [no, yes, yes] },
       { feature: "Annotations sync", cells: [no, yes, yes] },
-      { feature: "Share links", cells: [no, num("1 active"), num("unlimited")] },
+      { feature: "Share links", cells: [no, yes, yes] },
     ],
   },
   {
     name: "AI features — Replicate, billed to us",
     rows: [
-      { feature: sub("Background removal", "rembg"), cells: [no, no, num("unlimited")] },
-      { feature: sub("Object removal", "LaMa inpainting"), cells: [no, no, num("unlimited")] },
-      { feature: sub("Auto alt text", "BLIP"), cells: [no, no, num("unlimited")] },
-      { feature: sub("4× upscale", "Real-ESRGAN"), cells: [no, no, num("unlimited")] },
-      { feature: sub("Auto-enhance", "histogram, runs in WASM"), cells: [no, yes, yes] },
+      { feature: sub("Background removal", "rembg"), cells: [no, no, yes] },
+      { feature: sub("Object removal", "SD Inpaint"), cells: [no, no, yes] },
+      { feature: sub("Read text out of an image", "OCR"), cells: [no, no, yes] },
+      { feature: sub("Daily AI passes", "resets every 24 hours"), cells: [no, no, num("50 a day")] },
     ],
   },
 ];
@@ -178,7 +184,7 @@ export default function Pricing() {
             you for a crop.
           </p>
           <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-            Open the demo
+            Open the beta
           </a>
         </header>
 

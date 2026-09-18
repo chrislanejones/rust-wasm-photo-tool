@@ -14,7 +14,7 @@ interface Props {
    * swatches. Defaults to true so all pickers share the global user palette.
    */
   allowCustom?: boolean;
-  /** Greys out every swatch and the "+" button, and stops them being
+  /** Grays out every swatch and the "+" button, and stops them being
    *  keyboard-reachable. The CALLER owns the explanation — a disabled control
    *  with no stated reason is the thing this repo's a11y pass keeps finding. */
   disabled?: boolean;
@@ -22,7 +22,7 @@ interface Props {
 
 /**
  * A row of preset swatches + the user's saved palette + a "+" that opens the
- * ColorPickerDialog (wheel / square, RGBA / HSL / hex fields). "Use colour" in
+ * ColorPickerDialog (wheel / square, RGBA / HSL / hex fields). "Use color" in
  * the dialog applies to THIS control; the dialog's own palette "+" saves to the
  * global list every grid shows (localStorage signed out, Convex signed in).
  */
@@ -96,7 +96,7 @@ export function ColorSwatchGrid({
           onOpenChange={setPickerOpen}
           initialColor={value}
           onPick={onChange}
-          title={label === "Color" ? "Pick a colour" : `${label} colour`}
+          title={label === "Color" ? "Pick a color" : `${label} color`}
         />
       )}
     </div>
@@ -114,12 +114,12 @@ interface SwatchProps {
 function Swatch({ color, active, onClick, onRemove, disabled }: SwatchProps) {
   // The "transparent" entry is the transparent backing canvas: render the same
   // transparency checkerboard the canvas itself shows (`.checkerboard-canvas`,
-  // styles.css — also used by CanvasArea) instead of a flat panel-coloured
-  // square, so the swatch reads as "no fill / checkerboard". Solid colours keep
+  // styles.css — also used by CanvasArea) instead of a flat panel-colored
+  // square, so the swatch reads as "no fill / checkerboard". Solid colors keep
   // their flat fill.
   const isTransparent = color === "transparent";
   // A translucent pick from the dialog arrives as `#rrggbbaa`. Flat-filled it
-  // reads as a darker opaque colour (50% blue looks navy on the dark panel),
+  // reads as a darker opaque color (50% blue looks navy on the dark panel),
   // so it sits on the swatch checkerboard the same way the dialog previews it.
   const isTranslucent = /^#[0-9a-f]{8}$/i.test(color) && !/ff$/i.test(color);
   return (

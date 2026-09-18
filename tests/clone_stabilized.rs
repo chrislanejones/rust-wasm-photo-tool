@@ -27,7 +27,7 @@ const W: u32 = 160;
 const H: u32 = 160;
 
 /// Left half red, right half blue, so cloning across the seam moves an
-/// unmistakable colour. Flat fills would let a wrong offset pass unnoticed.
+/// unmistakable color. Flat fills would let a wrong offset pass unnoticed.
 fn tool() -> ImageHorseTool {
     let mut px = vec![0u8; (W * H * 4) as usize];
     for y in 0..H {

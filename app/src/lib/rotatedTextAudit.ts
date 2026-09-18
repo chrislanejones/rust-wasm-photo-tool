@@ -41,9 +41,9 @@ export interface RotatedTextReport {
 }
 
 /**
- * Estimated ink shift from the centre anchor to the top-left anchor.
+ * Estimated ink shift from the center anchor to the top-left anchor.
  *
- * ⚠️ AN ESTIMATE, and labelled as one everywhere it surfaces. The exact shift
+ * ⚠️ AN ESTIMATE, and labeled as one everywhere it surfaces. The exact shift
  * is `(hw(cos−1) − hh·sin, hw·sin + hh(cos−1))` where hw/hh are HALF THE TILE
  * dimensions — and the tile is not persisted. `editPersistence.ts` strips
  * `tile_*` on save precisely because it is re-rendered on restore. So the tile

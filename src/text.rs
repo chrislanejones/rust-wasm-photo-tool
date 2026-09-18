@@ -226,7 +226,7 @@ pub fn render_stamp_label(
         }
     }
 
-    // Text centred, 85% opacity
+    // Text centered, 85% opacity
     let text_start_x = pad as f32;
     let baseline_y = pad as f32 + ascent;
     rasterise_line(
@@ -260,8 +260,8 @@ pub fn side_padding(font_size: f32) -> f32 {
 /// and adding the surplus below it. v8.41, when the text box gained a real
 /// height so the six handles resize both axes instead of only the width.
 ///
-/// **Top-aligned, not centred**, and the reason is the handles rather than the
-/// typography. Centring reads better in a speech bubble, but it makes the box
+/// **Top-aligned, not centered**, and the reason is the handles rather than the
+/// typography. Centering reads better in a speech bubble, but it makes the box
 /// grow half as fast as the pointer: with the text pinned to the middle,
 /// dragging the top edge up by N only lifts the edge by N/2 unless the anchor
 /// is also walked, and the type slides under the cursor while you resize.
@@ -269,7 +269,7 @@ pub fn side_padding(font_size: f32) -> f32 {
 /// `wrap_width` already glues it to the left — so every handle moves its own
 /// edge 1:1, the opposite edge stays put, and vertical resizing behaves
 /// identically to the horizontal resizing that shipped in v8.40. Consistency
-/// with the axis that already worked beat prettier default centring.
+/// with the axis that already worked beat prettier default centering.
 ///
 /// It also keeps the anchor mapping honest for free: the box's top IS the
 /// text's top, so `annotation_ink_offset` needs no vertical correction and
@@ -345,7 +345,7 @@ fn wrap_with(text: &str, font_size: f32, max_w: f32, font: &FontRef<'_>) -> Stri
             continue;
         }
         // Only a paragraph that genuinely must break gets its inter-word runs
-        // normalised to single spaces — that is inherent to re-breaking, and
+        // normalized to single spaces — that is inherent to re-breaking, and
         // the alternative (carrying original runs across a break) puts stray
         // leading spaces at the start of wrapped lines.
         let mut line = String::new();
@@ -408,17 +408,17 @@ fn measure_with(text: &str, font_size: f32, font: &FontRef<'_>) -> (u32, u32) {
 /// tile's TOP-LEFT stays fixed under rotation.
 ///
 /// ⚠️ THIS IS THE ANCHOR DECISION, and it is the whole of ADR-050. It used to
-/// be "keep the two tiles' CENTRES together", which reads as obviously correct
-/// and is not: the unrotated tile's centre is `tile_w / 2`, and `tile_w` grows
+/// be "keep the two tiles' CENTERS together", which reads as obviously correct
+/// and is not: the unrotated tile's center is `tile_w / 2`, and `tile_w` grows
 /// with the text. So the pivot slid right as the user typed and the committed
 /// ink translated — measured at 30°, ink minX/minY went (107,104) → (118,67)
 /// for the same text getting longer. Top-left does not move when the tile
 /// grows, which is why it is the anchor now.
 ///
-/// [`rotate_pixels`] maps the SOURCE centre onto the OUTPUT centre, so the
+/// [`rotate_pixels`] maps the SOURCE center onto the OUTPUT center, so the
 /// source top-left lands at `R(-c_src) + c_dst` inside the output. Placing the
 /// tile at minus that puts the source top-left back on the anchor. Deriving it
-/// from the two centres rather than from the corner extrema is what makes the
+/// from the two centers rather than from the corner extrema is what makes the
 /// `+2` padding `rotate_pixels` adds cancel out on its own — a min-of-corners
 /// formulation has to know about that padding, and would silently go 1px wrong
 /// if it ever changed.

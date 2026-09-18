@@ -36,14 +36,14 @@ export interface ThumbDevelop {
   initial: typeof thumbDevelop.mono;
   /** Feed to `animate`. */
   animate: typeof thumbDevelop.mono;
-  /** Hand to the <img>'s onLoad AND onError, so a broken image cannot stay grey. */
+  /** Hand to the <img>'s onLoad AND onError, so a broken image cannot stay gray. */
   onImgReady: () => void;
 }
 
 /**
- * WHEN a thumbnail comes into colour. Two facts must both be true: the <img>
+ * WHEN a thumbnail comes into color. Two facts must both be true: the <img>
  * has decoded AND this tile's turn has come. Either alone is wrong — instant
- * pixels would flash past the hold, and a turn with no pixels would colour a
+ * pixels would flash past the hold, and a turn with no pixels would color a
  * blank tile.
  *
  * What it looks like — the hold, the fade, the lead — lives in `thumbDevelop`

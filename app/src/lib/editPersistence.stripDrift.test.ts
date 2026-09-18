@@ -96,7 +96,7 @@ describe("stripLiveAnnotations", () => {
   });
 
   it("returns [] for malformed JSON instead of throwing mid-save", () => {
-    // Both call sites relied on their own try/catch for this; the behaviour
+    // Both call sites relied on their own try/catch for this; the behavior
     // moved into the function and must not have been lost on the way.
     expect(stripLiveAnnotations("not json")).toEqual([]);
     expect(stripLiveAnnotations("")).toEqual([]);

@@ -116,7 +116,7 @@ describe("it does not throttle ordinary use", () => {
   // user's edits and nobody finds out for weeks.
 
   it("lets a person edit a five-photo gallery all evening", () => {
-    // One upload per photo every 30s for an hour: comfortably real behaviour,
+    // One upload per photo every 30s for an hour: comfortably real behavior,
     // and far more saving than a human actually does.
     let denied = 0;
     let t = T0;

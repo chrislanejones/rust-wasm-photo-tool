@@ -8,7 +8,7 @@ use stamp_tool::ImageHorseTool;
 const W: u32 = 24;
 const H: u32 = 16;
 
-/// A tool whose composite is two flat colour fields: left half red, right half
+/// A tool whose composite is two flat color fields: left half red, right half
 /// blue — so a wand flood from the left grabs a known, bounded region.
 fn split_tool() -> ImageHorseTool {
     let mut t = ImageHorseTool::new(W, H);
@@ -28,7 +28,7 @@ fn split_tool() -> ImageHorseTool {
     t
 }
 
-/// Pixels with non-zero alpha in an overlay RGBA, and their first colour seen.
+/// Pixels with non-zero alpha in an overlay RGBA, and their first color seen.
 fn covered(ov: &[u8]) -> (usize, Option<[u8; 3]>) {
     let mut n = 0;
     let mut color = None;
@@ -47,7 +47,7 @@ fn preview_covers_the_region_a_click_would_grab() {
     // Wand (kind 0) from the left field, tight tolerance → the left half only.
     let ov = t.selection_preview(3.0, 8.0, 0, 20, 0, 1);
     let (n, _) = covered(&ov);
-    assert_eq!(n, (W / 2 * H) as usize, "preview = the left colour field");
+    assert_eq!(n, (W / 2 * H) as usize, "preview = the left color field");
 }
 
 #[test]

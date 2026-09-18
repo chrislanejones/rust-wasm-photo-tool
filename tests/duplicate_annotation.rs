@@ -136,7 +136,7 @@ fn duplicating_a_missing_text_id_is_a_pure_no_op() {
 fn duplicating_a_shape_offsets_it_and_stacks_it_on_top() {
     let mut t = tool();
     let src = t.add_shape_annotation(
-        0, 20.0, 20.0, 100.0, 100.0, "#ff0000", 2.0, 0, 0, "#00ff00", "#0000ff", 0, 0,
+        0, 20.0, 20.0, 100.0, 100.0, "#ff0000", 2.0, 0, 0, "#00ff00", "#0000ff", 0, 0, 0,
     );
 
     let copy = t.duplicate_shape_annotation(src, 10.0, 10.0);
@@ -155,7 +155,7 @@ fn duplicating_a_shape_offsets_it_and_stacks_it_on_top() {
 fn duplicating_a_missing_shape_id_is_a_pure_no_op() {
     let mut t = tool();
     t.add_shape_annotation(
-        0, 20.0, 20.0, 100.0, 100.0, "#ff0000", 2.0, 0, 0, "#00ff00", "#0000ff", 0, 0,
+        0, 20.0, 20.0, 100.0, 100.0, "#ff0000", 2.0, 0, 0, "#00ff00", "#0000ff", 0, 0, 0,
     );
     let before = t.undo_count();
     assert_eq!(t.duplicate_shape_annotation(4242, 1.0, 1.0), -1);

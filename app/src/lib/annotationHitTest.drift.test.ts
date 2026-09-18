@@ -90,7 +90,7 @@ function hashOf(fnName: string): string {
  * TO UPDATE — and only ever in this order:
  *   1. Read the Rust diff. Decide what changed about the RULE.
  *   2. Make `annotationHitTest.ts` match, and add a case to
- *      `annotationHitTest.test.ts` covering the new behaviour.
+ *      `annotationHitTest.test.ts` covering the new behavior.
  *   3. Only then paste the new hash here.
  *
  * Updating the hash first turns this file into a rubber stamp, which is
@@ -101,7 +101,10 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // 6769816ca3a09358 → cd6a41ce328a78b2 (2026-08-28): the ring rule for
   // unfilled rect / circle / hand-circle. Port + tests updated FIRST, per the
   // order above.
-  shape_annotation_at: "cd6a41ce328a78b2",
+  // cd6a41ce328a78b2 → 2f58b7e76eb659d0 (2026-09-17): diamond (8) / star (9)
+  // route through an outline-edges test while unfilled, padded bbox when
+  // filled. Port + tests updated FIRST, per the order above.
+  shape_annotation_at: "2f58b7e76eb659d0",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

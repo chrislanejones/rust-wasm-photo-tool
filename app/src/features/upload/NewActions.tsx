@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   Link,
   Sparkles,
-  KeyRound,
   Plus,
   X,
 } from "lucide-react";
@@ -26,6 +25,8 @@ import { FIELD_NUMERIC, FIELD_TEXTAREA } from "@/lib/styles";
 import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { IconButton } from "@/components/ui/icon-button";
+import { Switch } from "@/components/ui/switch";
+import { useUIStore } from "@/stores/useUIStore";
 import { UserMenu } from "@/components/UserMenu";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -39,6 +40,7 @@ import {
   rejectReason,
 } from "./aiImageDraft";
 import { isSvgFile } from "@/lib/rasterizeSvg";
+import { namePastedImage } from "@/lib/pastedImageName";
 
 interface SizePreset {
   id: string;
@@ -181,6 +183,29 @@ interface Props {
 const GENERATE_BLOCKED_REASON =
   "Image generation isn't connected yet — the model still needs choosing.";
 
+/*
+ * WHAT LEAVES THE TAB IS BEHIND A SWITCH (Chris, 2026-09-16).
+ * v8.78 hid `Create AI Image` outright because Generate was a dead button.
+ * That fixed the wrong thing: the real tension is the marketing promise —
+ * "Nothing leaves your tab by accident" — against a tile whose job is to send
+ * a prompt to a server. Hiding it kept the promise by deleting the feature; a
+ * switch keeps it by making the send a CHOICE.
+ * `useUIStore.onlineFeaturesEnabled`, default OFF, persisted. Off: four
+ * in-browser tiles. On: the fifth joins and Create AI Image is reachable.
+ *
+ * ⚠️ NAMED FOR THE AXIS, NOT FOR AI — settled BEFORE shipping because it is a
+ * persisted key: rename it after real browsers have written it and you owe a
+ * migration plus orphaned values. AI is the first thing on this list, not the
+ * only one — `app/index.html` pulls DM Sans and JetBrains Mono from Google on
+ * EVERY load, logged-out, which is what actually makes /architecture's "No
+ * account, no network" false (ADR-051). Putting those behind this switch means
+ * self-hosting or a fallback face, but the flag is named for that job now so
+ * it will not need a second one.
+ *
+ * Generate is STILL disabled (see GENERATE_BLOCKED_REASON) — the switch
+ * restores the way in; the job type restores the way out.
+ */
+
 export function NewActions({
   onFiles,
   onFilesAdded,
@@ -202,6 +227,8 @@ export function NewActions({
   const [blankMode, setBlankMode] = useState(false);
   // Create AI Image — step 2 of this same menu, which is why its left button is
   // Back rather than Cancel: it returns here, it does not abandon the flow.
+  const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  const setOnlineFeaturesEnabled = useUIStore((s) => s.setOnlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiRatio, setAiRatio] = useState<string>(ASPECT_RATIOS[0].id);
@@ -373,12 +400,7 @@ export function NewActions({
       for (const item of items) {
         for (const type of item.types) {
           if (type.startsWith("image/")) {
-            const blob = await item.getType(type);
-            files.push(
-              new File([blob], `pasted-image.${type.split("/")[1] ?? "png"}`, {
-                type,
-              }),
-            );
+            files.push(namePastedImage(await item.getType(type)));
           }
         }
       }
@@ -409,7 +431,8 @@ export function NewActions({
       const files = Array.from(items)
         .filter((i) => i.type.startsWith("image/"))
         .map((i) => i.getAsFile())
-        .filter((f): f is File => f !== null);
+        .filter((f): f is File => f !== null)
+        .map(namePastedImage);
       if (files.length) {
         e.preventDefault();
         processFiles(files);
@@ -704,11 +727,14 @@ export function NewActions({
                 className="flex flex-1 flex-col items-center gap-4"
               >
                 {/* Three columns of stacked tiles — the same ActionTile the
-                    tool panels use (Select → Magic Wand), icon on top. Five
-                    tiles, so the second row holds two; `Create AI Image` is
-                    disabled until it exists. Was four full-width Buttons in
-                    two columns. */}
-                <div className="grid grid-cols-3 gap-3 w-full">
+                    tool panels use (Select → Magic Wand), icon on top. While
+                    `Create AI Image` is off (onlineFeaturesEnabled) there are
+                    four tiles, laid out 2×2 — in three columns the fourth sat
+                    alone beside a blank gap and read as something missing.
+                    Five tiles in three columns when it returns. */}
+                <div
+                  className={`grid ${onlineFeaturesEnabled ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
+                >
                   <ActionTile
                     ref={firstButtonRef}
                     icon={FolderOpen}
@@ -734,29 +760,20 @@ export function NewActions({
                     onClick={() => setBlankMode(true)}
                     title="Start with a new canvas"
                   />
-                  {/* ⚠️ NOT DISABLED, deliberately. A greyed tile teaches
-                      people the feature does not exist. This opens for
-                      everyone; the gate is on Generate, so a free user sees
-                      the whole flow, composes a prompt, and meets the upsell
+                  {/* Off, not disabled — see the switch note above. When it
+                      returns it opens for everyone; the gate is on Generate,
+                      so a free user sees the whole flow and meets the upsell
                       at the moment they understand what they would be buying.
                       The key says which it is before they start. */}
-                  <div className="relative flex flex-1">
+                  {onlineFeaturesEnabled && (
                     <ActionTile
                       icon={Sparkles}
                       label="Create AI Image"
                       onClick={() => setAiMode(true)}
+                      pro
                       title="Generate an image from a description (Pro)"
                     />
-                    <span
-                      aria-hidden
-                      // Top-left of the tile, left of the icon, on the optical
-                      // line of the icon's top rather than the tile's corner.
-                      className="pointer-events-none absolute left-1.5 top-1.5 text-theme-primary"
-                    >
-                      <KeyRound className="h-3 w-3" />
-                    </span>
-                    <span className="sr-only">Pro feature</span>
-                  </div>
+                  )}
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is
@@ -808,7 +825,8 @@ export function NewActions({
         // words on any of them; the names live in `label` (screen readers)
         // and `title` (hover). (Line comments, not {/* */}: this sits inside
         // the `&&( … )` parens where a JSX comment is a second expression.)
-        <div className="flex items-center gap-2 px-6 pb-4">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-6 pb-4">
+          <div className="flex items-center gap-2">
           <UserMenu />
           <IconButton
             icon={Link}
@@ -816,7 +834,7 @@ export function NewActions({
             title="Image Horse Website"
             standalone
             onClick={() =>
-              window.open("https://image-horse.vercel.app/", "_blank", "noopener")
+              window.open("https://imagehorse.app/", "_blank", "noopener")
             }
           />
           <IconButton
@@ -845,6 +863,35 @@ export function NewActions({
               )
             }
           />
+          </div>
+          {/* Column 2 is the gutter. The label sits LEFT of the switch so a
+              length change grows into it and the switch never shifts. */}
+          {/* LOCKED INSIDE THE AI STEP: flipping off would unmount the tile
+              that owns the step, taking the prompt and references with it.
+              Back clears aiMode and re-enables this — guard the door, not
+              the room. */}
+          <div className="col-start-3 flex items-center gap-2">
+            <label
+              htmlFor="online-features-switch"
+              className={`select-none text-xs text-text-secondary ${
+                aiMode ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
+            >
+              {onlineFeaturesEnabled ? "Online features on" : "Everything in your browser"}
+            </label>
+            <Switch
+              id="online-features-switch"
+              checked={onlineFeaturesEnabled}
+              onCheckedChange={(on) => setOnlineFeaturesEnabled(on)}
+              disabled={aiMode}
+              aria-label="Online features — lets this tab send data to a server"
+              title={
+                aiMode
+                  ? "Hit Back first — this would close the step you're in and lose your prompt."
+                  : "Off: everything stays in this tab. On: adds features that send data out — today that is Create AI Image, which sends your prompt and any attached images to a server."
+              }
+            />
+          </div>
         </div>
       )}
     </>

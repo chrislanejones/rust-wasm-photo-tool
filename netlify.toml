@@ -1,3 +1,33 @@
+# ⚠️ SUPERSEDED, BUT STILL LIVE — and still the thing serving deploy previews.
+# The editor's Vercel build now lives in the repo-root vercel.json (see the
+# feat/app-on-vercel commits, which took two failed deploys to get the Rust
+# toolchain right). This file has not been retired because the Netlify site is
+# still up and still building every PR.
+#
+# Do not delete it to tidy up. That retirement condition — "only after
+# scripts/deploy-sentinel.sh passes against the Vercel host" — was MET on
+# 2026-09-12, and the reason to keep this file changed rather than expired.
+#
+# Netlify is now the only builder other than CI that compiles this tree, and
+# that is load-bearing. The morning after the move, the same commit built four
+# ways: this laptop, CI and Netlify all produced 823,503 B / 102e26d9…, and
+# Vercel — the host serving users — produced 823,479 B / 0383b226…. Vercel's
+# CARGO_HOME is /rust, so it matched none of .cargo/config.toml's
+# --remap-path-prefix entries and embedded its real registry paths.
+#
+# THREE AGAINST ONE IS WHAT MADE THAT READABLE. Delete this host and the next
+# such drift is CI against production, one against one, with nothing to say
+# which of the two is the odd one out. Keep it until the sentinel's tier-2 check
+# has actually COMPARED on Vercel at least once (it has never yet — on push it
+# races the deploy and reports "skipped — deploy lag").
+#
+# The featureless-wasm bug the comments below describe is exactly the class of
+# failure a host migration can reintroduce silently. docs/Deploying.md has the
+# order.
+#
+# Everything below is unchanged. If you edit the build command here, check
+# whether the root vercel.json needs the same edit.
+
 [build]
   # ⚠️ A SECOND, STALE COPY OF THIS COMMAND LIVES IN THE NETLIFY UI (#56).
   # Read 2026-09-04 via `netlify api getSite` — `build_settings.cmd` is still
@@ -15,10 +45,9 @@
   #   3. `pnpm ci` is not a pnpm command at all.
   #
   # THIS FILE WINS TODAY. netlify.toml's `command` overrides the UI setting, and
-  # the shipped wasm proves it: 841,355 B built locally at v8.76, against
-  # 720,904 B for a measured featureless build and an 800,000–872,000 B sentinel
-  # band (ADR-053, reviewing ADR-045's, which narrowed ADR-037's). The "Deploy
-  # sentinel (live prod engine)" job is green.
+  # the shipped wasm proves it: 816,971 B live, against 720,904 B for a measured
+  # featureless build and an 800,000–840,000 B sentinel band (ADR-045, which
+  # narrowed ADR-037's). The "Deploy sentinel (live prod engine)" job is green.
   #
   # So this is a loaded gun, not a live fire. It goes off if netlify.toml is
   # renamed, moved under a `base` subdirectory where Netlify cannot see it, or
@@ -141,6 +170,7 @@
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
     Content-Security-Policy-Report-Only = """\

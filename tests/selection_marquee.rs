@@ -116,9 +116,9 @@ fn degenerate_drag_deselects_in_replace_mode() {
 #[test]
 fn ellipse_selects_centre_but_not_bounding_corners() {
     let mut t = new_tool();
-    t.ellipse_select(2.0, 2.0, 12.0, 12.0); // circle r=5 centred at (7,7)
+    t.ellipse_select(2.0, 2.0, 12.0, 12.0); // circle r=5 centered at (7,7)
     let got = selected(&t);
-    assert!(at(&got, 7, 7), "centre is in");
+    assert!(at(&got, 7, 7), "center is in");
     assert!(at(&got, 2, 7), "left edge midpoint is in");
     assert!(!at(&got, 2, 2), "bounding-box corner is out");
     assert!(!at(&got, 11, 2), "every corner is out");
@@ -134,10 +134,10 @@ fn ellipse_selects_centre_but_not_bounding_corners() {
 #[test]
 fn ellipse_dragged_past_the_edge_is_cropped_not_squashed() {
     let mut t = new_tool();
-    // Circle r=6 centred at (0,6): only the right half is on-canvas.
+    // Circle r=6 centered at (0,6): only the right half is on-canvas.
     t.ellipse_select(-6.0, 0.0, 6.0, 12.0);
     let got = selected(&t);
-    assert!(at(&got, 0, 6), "on-canvas part of the centre row is in");
+    assert!(at(&got, 0, 6), "on-canvas part of the center row is in");
     assert!(at(&got, 5, 6), "rightmost pixel of the radius is in");
     assert!(
         !at(&got, 5, 0),

@@ -53,7 +53,7 @@ interface TopBarProps {
    *  opening a panel, so it never renders active. It replaced the Tools
    *  panel's full-width "Download & Share {FORMAT}" footer, which took a whole
    *  row of the sidebar for one button, and now sits beside New in the right
-   *  cluster's icon pair rather than in the labelled centre group. */
+   *  cluster's icon pair rather than in the labeled center group. */
   onExport: () => void;
   canExport: boolean;
   /** Shared window width (from useBreakpoint) — drives the compact / narrow
@@ -110,8 +110,8 @@ export function TopBar({
   // two odd ones out in a group of panel toggles — New opens a dialog, Export
   // fires a download — and one of them (Export) had to permanently report
   // `active: false` to sit here at all. They are an icon-only pair in the
-  // right cluster now, shaped exactly like Undo/Redo, so the centre group is
-  // what it claims to be: the three side panels, labelled.
+  // right cluster now, shaped exactly like Undo/Redo, so the center group is
+  // what it claims to be: the three side panels, labeled.
   const toggleButtons: ToggleGroupItem[] = [
     {
       key: "T",
@@ -277,7 +277,7 @@ export function TopBar({
             {/* Right cluster: New/Export, then Settings + Clerk user menu,
                 anchored right — the mirror of the left cluster's Undo/Redo +
                 divider + Zoom, so the bar reads as two icon pairs flanking one
-                labelled group of tabs.
+                labeled group of tabs.
 
                 Settings + user used to float loose against the bar background
                 while every other control sat in a group — the same near-miss

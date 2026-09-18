@@ -28,6 +28,11 @@ export interface StampSettings {
   opacity: number;
 }
 
+/** The shapes the Shapes tool can draw. The Rust `kind` bytes: 0 rect, 1
+ *  circle, 2 line, 8 diamond, 9 star (kind 3, the legacy hand-drawn circle,
+ *  is no longer creatable but still renders from old documents). */
+export type ShapeName = "rect" | "circle" | "line" | "diamond" | "star";
+
 export interface ToolSettings extends StampSettings {
   strokeWidth: number;
   strokeColor: string;
@@ -62,7 +67,7 @@ export interface ToolSettings extends StampSettings {
   textFontId: string;
   fontWeight: "normal" | "bold";
   textColor: string;
-  shape?: "rect" | "circle" | "handCircle" | "line";
+  shape?: ShapeName;
 
   // Shape interior fill (rect + circle only). Painted under the stroke.
   /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2,
@@ -73,13 +78,18 @@ export interface ToolSettings extends StampSettings {
   gradientAngle: number;   // degrees: 0 →, 45 ↘, 90 ↓, 135 ↙
   fillBlock: number;       // mosaic block size (px) for fillMode "pixelate"
 
+  /** Shape stroke sloppiness 0-100: how hand-drawn the outline is. 0 = firm
+   *  straight/clean edges; 100 = the old hand-drawn look (wobbly, ends that
+   *  don't quite meet). Applied to EVERY shape, not just the circle. */
+  sloppiness: number;
+
   // Effects (was Blur) — the Paint tool's Blur Brush + the Levels panel.
   /** Blur-brush effect: "gaussian" softens, "pixelate" mosaics, "solid" redacts. */
   blurMode: "gaussian" | "pixelate" | "solid";
   blurSize: number;          // brush footprint (shared by all blur-brush modes)
   blurIntensity: number;     // gaussian kernel radius (px)
   pixelSize: number;         // mosaic block size (px) for "pixelate"
-  redactColor: string;       // opaque fill colour for "solid"
+  redactColor: string;       // opaque fill color for "solid"
   effectBrightness: number;  // -100 to +100, applied on commit
   effectContrast: number;    // 0 to 300, applied on commit (100 = neutral)
 

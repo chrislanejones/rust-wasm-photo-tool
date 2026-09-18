@@ -2,16 +2,16 @@
 //! stabilized stroke still records an op log that replays to the same pixels.
 //!
 //! The op-log half is safe by construction — `Op::Blur.points` is documented
-//! as "the EXACT dab centres in stamp order" and `apply_effect_dab` pushes
-//! each centre as it stamps, so a stabilized stroke records its POST-leash
-//! centres and replay needs no knowledge of the stabilizer at all. This file
+//! as "the EXACT dab centers in stamp order" and `apply_effect_dab` pushes
+//! each center as it stamps, so a stabilized stroke records its POST-leash
+//! centers and replay needs no knowledge of the stabilizer at all. This file
 //! is what turns that argument into a check.
 use stamp_tool::ImageHorseTool;
 
 const W: u32 = 120;
 const H: u32 = 120;
 
-/// A gradient, so a blur actually changes bytes — blurring flat colour is a
+/// A gradient, so a blur actually changes bytes — blurring flat color is a
 /// no-op and every assertion below would pass vacuously.
 fn tool() -> ImageHorseTool {
     let mut px = vec![0u8; (W * H * 4) as usize];

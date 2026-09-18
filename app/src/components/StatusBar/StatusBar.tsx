@@ -60,7 +60,7 @@ const TOOL_SLOTS_DESKTOP = 2;
 const BASE_SLOTS_DESKTOP = 2;
 const BASE_SLOTS_COMPACT = 1;
 
-const MARKETING_URL = "https://image-horse.vercel.app";
+const MARKETING_URL = "https://imagehorse.app";
 
 /** Tier of the current user. Lives here historically; consumed by
  *  `photoLimits` and AppShell even though the status bar no longer shows it. */
@@ -149,7 +149,7 @@ export function StatusBar({
           target="_blank"
           rel="noopener noreferrer"
           className="status-brand-link whitespace-nowrap"
-          title="Visit image-horse.vercel.app"
+          title="Visit imagehorse.app"
         >
           <span>🐴 Image Horse</span>
           <ExternalLink size={12} aria-hidden="true" />

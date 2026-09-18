@@ -1,4 +1,4 @@
-// User-added colours — the global "+" palette — live globally and sync across
+// User-added colors — the global "+" palette — live globally and sync across
 // every ColorSwatchGrid / ColorPickerDialog instance.
 //
 // Two backings, picked by auth state (the same split as useRecentTexts):

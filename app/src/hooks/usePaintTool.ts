@@ -14,20 +14,20 @@ interface Opts {
   flushToCanvas: () => void;
   syncState: () => void;
   /** Eraser variant: drive `erase_down/move/up` (clear alpha) instead of
-   *  `paint_down/move/up` (lay down colour). Same stroke engine in Rust. */
+   *  `paint_down/move/up` (lay down color). Same stroke engine in Rust. */
   erase?: boolean;
   /** Mask variant: drive `mask_paint_down/move/up` — paint the active layer's
    *  grayscale mask (non-destructive) instead of pixels. Takes precedence over
    *  `erase`. Uses the Paint brush's size/opacity/hardness/stabilizer. */
   maskMode?: boolean;
-  /** Grey value laid into the mask when `maskMode`: 0 = hide, 255 = reveal. */
+  /** Gray value laid into the mask when `maskMode`: 0 = hide, 255 = reveal. */
   maskValue?: number;
 }
 
 /**
  * Thin pointer-event forwarder for the paint brush (and, with `erase`, the
  * eraser). All the stroke logic lives in Rust behind `paint_down/move/up` (or
- * `erase_down/move/up`): hex-colour parsing, the configurable edge hardness, the
+ * `erase_down/move/up`): hex-color parsing, the configurable edge hardness, the
  * stabilizer ("lazy mouse") leash, the stroke state machine, and per-stroke
  * opacity (overlapping dabs combine by max coverage, so a 50% stroke stays a
  * true 50% instead of building up toward opaque). JS only maps the event to
@@ -64,9 +64,9 @@ export function usePaintTool({
 
       // Push the Smart Brush config before the stroke opens: `set_smart_brush`
       // takes effect from the next `paint_begin`, and `paint_down` below is
-      // what calls it. Only for the colour brush — containing an ERASER at an
+      // what calls it. Only for the color brush — containing an ERASER at an
       // edge is a different feature with a different answer, and guessing at it
-      // here would ship a behaviour nobody asked for.
+      // here would ship a behavior nobody asked for.
       //
       // Called unconditionally (not just when on) so that turning the switch or
       // the toggle OFF actually reaches the engine and frees its cost map,

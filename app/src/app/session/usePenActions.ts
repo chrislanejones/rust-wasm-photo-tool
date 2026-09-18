@@ -39,7 +39,7 @@ export function usePenActions(
     async (flatPoints: number[]) => {
       const tool = stamp.toolRef.current;
       if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
-      // Any path with a background colour fills its interior — Rust's fill_polygon
+      // Any path with a background color fills its interior — Rust's fill_polygon
       // auto-closes the flattened curve, so an open curve OR a full (closed) loop
       // both fill. (Previously this was gated on an explicit `close`, so a curve
       // or circle finished without closing never filled.)
@@ -63,7 +63,7 @@ export function usePenActions(
       stamp.syncState();
       // Hand the id back so the overlay can keep the path selected. Without it
       // a finished path was immediately deselected, and the Reselect list was
-      // the only way back to its colour and Background.
+      // the only way back to its color and Background.
       return id;
     },
     [

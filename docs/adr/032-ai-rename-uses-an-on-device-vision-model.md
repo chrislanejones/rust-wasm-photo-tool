@@ -123,7 +123,7 @@ truth to check against.
 |---|---|---|---|
 | **1** | **Model spike.** ✅ **DONE 2026-08-08** — `docs/ai-rename-model-spike.md`. Nine ground-truthed photos, five candidates, the q8 trap and the vocabulary curve | nothing, a document | n/a |
 | **2** | **This ADR** | docs | n/a |
-| 3 | Baked-vocabulary build step + the label list as reviewable source | a JSON artefact, unused | delete the artefact |
+| 3 | Baked-vocabulary build step + the label list as reviewable source | a JSON artifact, unused | delete the artifact |
 | 4 | On-device path behind `ih_ai_rename_model`, default OFF. `describe.rs` still the live answer | nothing user-visible | flag stays off |
 | 5 | Browser measurement — load time, inference, fp16 backend support, mobile cold start | a document | n/a |
 | 6 | Flip the flag if stage 5 justifies it, `ih_ai_rename_model=0` as the kill switch | the feature | kill switch |

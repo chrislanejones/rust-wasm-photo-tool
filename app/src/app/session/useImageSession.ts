@@ -52,6 +52,41 @@ import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
  * Exported for the unit test; the real fix — recording these edits in the op
  * log — is filed as ADR-024-F4.
  */
+/**
+ * Does the in-memory document differ from what is on disk?
+ *
+ * ⚠️ THE OLD RULE WAS `undoCount > 0`, AND UNDOING BACK TO ZERO SILENTLY LOST
+ * THE UNDO. Measured on production 2026-09-16: apply a preset (undo 0 → 1,
+ * dirty, archive written), press Ctrl+Z (undo 1 → 0, **dirty false**), and the
+ * autosave effect returned early. The archive kept the EDITED document, so a
+ * reload put the undone change back — the user watched undo work, reloaded,
+ * and got the edit they had just removed.
+ *
+ * The mistake is that `undoCount > 0` asks "has this document been edited",
+ * when the question is "does it differ from the copy on disk". Those agree
+ * until you undo back past every step you have saved, which is exactly when
+ * the disk is most wrong: it holds an edit the user has explicitly discarded.
+ *
+ * So dirty is now a COMPARISON against the undo count at the last successful
+ * write. `savedUndoCount` is `undefined` for a photo that has never been
+ * saved, where `undoCount === 0` correctly means "nothing to write".
+ *
+ * Exported for the unit test, same as `autosaveDelayMs` below.
+ */
+export function isDirty(
+  undoCount: number,
+  savedUndoCount: number | undefined,
+  hasBeenModified: boolean,
+  layerRevision: number,
+): boolean {
+  if (hasBeenModified || layerRevision > 0) return true;
+  // Never written: only a non-empty history is worth a save.
+  if (savedUndoCount === undefined) return undoCount > 0;
+  // Written before: ANY divergence from the saved point is dirty, including
+  // moving BACKWARDS past it.
+  return undoCount !== savedUndoCount;
+}
+
 export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): number {
   // ⚠️ "The log is ACTIVE" is NOT the safety condition, and the first cut of
   // this function keyed on it and still lost the stroke. A fresh document's
@@ -188,8 +223,16 @@ export function useImageSession({
   //     user data with no backup.
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
-  dirtyRef.current =
-    stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0;
+  /** photoId → the engine's undo count when its archive was last written.
+   *  Absent ≡ never written this session. Keyed per photo because gallery
+   *  cycling switches documents under one hook instance. */
+  const savedUndoRef = useRef(new Map<string, number>());
+  dirtyRef.current = isDirty(
+    stamp.state.undoCount,
+    activePhotoId ? savedUndoRef.current.get(activePhotoId) : undefined,
+    hasBeenModified,
+    layerRevision,
+  );
 
   const flushEditArchive = useCallback(
     async (photoId?: string, opts?: { detachCloudUpload?: boolean }) => {
@@ -204,8 +247,16 @@ export function useImageSession({
       if (!id || !dirtyRef.current || !stamp.toolRef.current) return;
       if (savingRef.current) return; // never overlap two archive writes
       savingRef.current = true;
+      // Read BEFORE the await: `savePhotoEdit` captures the engine's state at
+      // its own moment, and an edit landing mid-write must leave the document
+      // dirty rather than be marked saved by a write that predates it.
+      const writtenAtUndoCount = stamp.state.undoCount;
       try {
-        await savePhotoEdit(id, stamp.toolRef, opts);
+        const wrote = await savePhotoEdit(id, stamp.toolRef, opts);
+        // Only on a write the ownership guard actually allowed. A refused save
+        // returns false and must NOT move the saved point, or the next undo
+        // would compare against a write that never happened.
+        if (wrote !== false) savedUndoRef.current.set(id, writtenAtUndoCount);
       } catch (err) {
         // Never let an autosave failure surface as an unhandled rejection — but
         // never swallow it either: the Diagnostics window is where it belongs.
@@ -320,7 +371,7 @@ export function useImageSession({
       // The engine has been handed THIS photo's pixels. `loadImageFromPixels`
       // is fire-and-forget (it voids the engine promise), so this is "committed
       // to", not "finished". If that load were to fail the marker would name a
-      // photo the engine never got — which is exactly the unguarded behaviour
+      // photo the engine never got — which is exactly the unguarded behavior
       // shipping today, so it degrades to the status quo rather than to a
       // refusal. Parked as OPEN: making the engine load awaitable would let
       // ownership follow the document instead of the intent.

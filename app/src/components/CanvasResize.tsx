@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import {
+  PanelAction,
+  PanelActionBar,
+} from "@/components/ui/panel-action-bar";
 import { DimensionFields } from "@/components/DimensionFields";
 
 interface Props {
@@ -21,7 +24,7 @@ interface Props {
  * {@link DimensionFields} (Scale %, W×H, aspect lock) so it matches that panel
  * exactly, plus an Apply button. This is a Photoshop-style **Canvas Size**
  * change (the backing document grows/shrinks, the photo stays at its native
- * resolution, centred, and the new area fills with the backing color) — it does
+ * resolution, centered, and the new area fills with the backing color) — it does
  * NOT resample the image. The work runs in Rust (`resize_canvas`); this only
  * collects the target dimensions.
  */
@@ -97,25 +100,29 @@ export function CanvasResize({
         onToggleLock={() => setLockAspect((v) => !v)}
       />
 
-      <div className="flex gap-2">
-        <Button
-          size="large"
-          className="flex-1"
+      {/* SOURCE ORDER IS THE LAYOUT: the two-up bar puts the first action on
+          the left and the last on the right, so the destructive one now leads
+          and the primary — whose label GROWS ("Resize canvas → 1920×1080") —
+          hugs the right edge at its own width. Under the old two `flex-1`
+          halves the growing label wrapped to three lines and dragged "Remove
+          canvas" to the same height with it (measured 54px → 70px for BOTH
+          buttons the moment the dimensions changed). */}
+      <PanelActionBar layout="split">
+        <PanelAction
+          tone="destructive"
+          disabled={disabled || !canRemove}
+          onClick={onRemove}
+        >
+          Remove canvas
+        </PanelAction>
+        <PanelAction
           disabled={disabled || !changed}
           onClick={() => onApply(targetW, targetH)}
         >
           Resize canvas
           {changed ? ` → ${targetW}×${targetH}` : ""}
-        </Button>
-        <Button
-          size="large"
-          className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
-          disabled={disabled || !canRemove}
-          onClick={onRemove}
-        >
-          Remove canvas
-        </Button>
-      </div>
+        </PanelAction>
+      </PanelActionBar>
     </div>
   );
 }

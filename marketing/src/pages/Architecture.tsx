@@ -13,9 +13,29 @@ const FILTERS = [
   { key: "pro", label: "Paid users", Icon: CrownIcon },
 ] as const;
 
+/* ⚠️ THE DEMO NOTE IS A FACTUAL CLAIM. Measure it before changing it.
+ *
+ * It said "No account, no network" for months while it was false, twice over
+ * and for two different reasons:
+ *
+ *   1. `app/index.html` <link>ed fonts.googleapis.com on every load, so every
+ *      demo visitor's IP reached Google before touching anything. FIXED — the
+ *      two UI faces are self-hosted now (v8.72).
+ *   2. Clerk's SDK initializes on load even signed out. STILL TRUE. Measured
+ *      on production, logged out, 2026-09-11: 7 requests to
+ *      `<instance>.clerk.accounts.dev` and 2 to `clerk-telemetry.com` before
+ *      any interaction.
+ *
+ * Fixing (1) and leaving the sentence alone is how a claim stays wrong through
+ * the release that was supposed to make it true. What IS true, and is the
+ * thing worth claiming, is that no PHOTO leaves the browser — so that is what
+ * it says now.
+ *
+ * To re-measure: load the app logged out and read
+ * `performance.getEntriesByType("resource")` for origins that are not our own. */
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
-  demo: "No account, no network. The dashed plane is never opened — this is the demo everyone gets, and it is the whole editor.",
+  demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the demo everyone gets, and it is the whole editor.",
   free: "Signing in adds sync, history and one share link. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
   pro: "Everything that ships today. Pro is the only tier where a photo of yours reaches an inference server.",
 };
@@ -99,7 +119,7 @@ export default function Architecture() {
                   <li>AppShell — composition and layout only</li>
                   <li>Tool registry — 5 modules registered, routing still in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask</li>
-                  <li>Zustand stores — UI · tool · gallery · annotation · guides</li>
+                  <li>Zustand stores — UI · tool · gallery · annotation · guides · perspective · text box</li>
                 </ul>
               </article>
 
@@ -186,7 +206,7 @@ export default function Architecture() {
           <div className="stack__grid">
             <article className={node("demo free pro")}>
               <h4 className="node__title">React App</h4>
-              <p className="node__sub">Vite + React 19 · Netlify static SPA</p>
+              <p className="node__sub">Vite + React 19 · Vercel static SPA</p>
             </article>
             <article className={node("demo free pro")}>
               <h4 className="node__title">Canvas Engine</h4>
@@ -208,7 +228,7 @@ export default function Architecture() {
               ["annotations · selection", "Live text & shape overlays · magic-wand"],
               ["stamp · transform", "Clone brush · flip / rotate / resize / crop"],
               ["filters", "Brightness · contrast · gaussian blur"],
-              ["drawing · text", "Arrows / shapes / bézier · embedded fonts"],
+              ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, rasterised in Rust"],
               ["codec · history", "PNG encode (Rust) · undo snapshots"],
               ["simd", "v128/f32x4 kernels · scalar fallback"],
               ["utils", "json · point math · shared helpers"],
@@ -428,7 +448,7 @@ export default function Architecture() {
             Live, a VS&nbsp;Code preview, your own docs.
           </p>
           <div className="why__actions">
-            {/* A download rather than a live render: mermaid's colour parser
+            {/* A download rather than a live render: mermaid's color parser
                 rejects OKLCH outright, so theming it from these tokens would
                 mean a second hex palette plus ~1MB of CDN to draw what the
                 hand-built map above already says. */}
@@ -451,7 +471,7 @@ export default function Architecture() {
           </div>
           <p className="diagram__foot muted">
             <span className="mono">system-architecture.mermaid</span> · Mermaid{" "}
-            <span className="mono">flowchart TB</span> · <span className="fig">79</span> lines · the
+            <span className="mono">flowchart TB</span> · <span className="fig">113</span> lines · the
             dashed subgraph is the plane you can cut.
           </p>
         </section>

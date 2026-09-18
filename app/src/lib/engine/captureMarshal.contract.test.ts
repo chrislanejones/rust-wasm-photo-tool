@@ -59,7 +59,7 @@ describe("the mechanism", () => {
 });
 
 describe("isCaptureStruct", () => {
-  it("recognises a boxed struct", () => {
+  it("recognizes a boxed struct", () => {
     expect(isCaptureStruct(new FakeCapture())).toBe(true);
   });
 
@@ -138,10 +138,10 @@ describe("rehydrateCapture", () => {
 
 // ── The structural guard ────────────────────────────────────────────────────
 //
-// The tests above pin the behaviour. This one pins the SCOPE: it fails the
+// The tests above pin the behavior. This one pins the SCOPE: it fails the
 // moment the engine grows another struct-returning method, whether or not
 // anyone remembers this file exists. That is the half that would have caught
-// the original bug — the behaviour was never wrong, the coverage was.
+// the original bug — the behavior was never wrong, the coverage was.
 describe("every struct-returning engine method is accounted for", () => {
   // Anchored on THIS FILE, never on `process.cwd()`. A guard that reads source
   // relative to the launch directory passes vacuously when the suite is started

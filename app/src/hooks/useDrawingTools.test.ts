@@ -1,14 +1,14 @@
 // ===== FILE: app/src/hooks/useDrawingTools.test.ts =====
-// Covers `panelStylePatch`, the decision at the centre of the seven-week
-// "draw a square, click it again, change the colour — nothing happens" bug.
+// Covers `panelStylePatch`, the decision at the center of the seven-week
+// "draw a square, click it again, change the color — nothing happens" bug.
 //
 // The engine side was never broken: `update_shape_annotation` already wrote
-// the colour, snapped history and rendered into the export. What was broken
-// was that a panel colour click never reached it. Two things had to be true
+// the color, snapped history and rendered into the export. What was broken
+// was that a panel color click never reached it. Two things had to be true
 // before it could, and both live in this function's contract:
 //
 //   • the panel has to be able to OVERRIDE the reselect style snapshot
-//     (otherwise `es.style?.strokeColor ?? s.strokeColor` pins the old colour),
+//     (otherwise `es.style?.strokeColor ?? s.strokeColor` pins the old color),
 //   • and only when something actually changed (otherwise merely selecting a
 //     shape marks the edit dirty and drops a junk "Edit Shape" step on the
 //     undo stack).
@@ -50,7 +50,7 @@ describe("panelStylePatch", () => {
     expect(patch).toBeNull();
   });
 
-  it("carries a stroke colour change", () => {
+  it("carries a stroke color change", () => {
     const patch = panelStylePatch(settings(), settings({ strokeColor: "#00ff00" }));
     expect(patch).toEqual({ strokeColor: "#00ff00" });
   });
@@ -109,7 +109,7 @@ describe("panelStylePatch", () => {
 
   it("REGRESSION: a swatch click is inert when the panel already shows that value", () => {
     // This is the hole that shipped in v7.63 and was found in user testing:
-    // "the colour changes of shapes are not in history".
+    // "the color changes of shapes are not in history".
     //
     // Reselect an ORANGE shape while the panel still reads PURPLE from earlier
     // use, then click purple because purple is what you want. The panel's value
@@ -130,7 +130,7 @@ describe("panelStylePatch", () => {
 
   it("REGRESSION: with the baseline seeded from the shape, one control does not drag the others", () => {
     // The flip side of seeding from the shape: reselect an orange shape (panel
-    // now also orange) and change ONLY the stroke width. Colour must not be
+    // now also orange) and change ONLY the stroke width. Color must not be
     // dragged along, or every width tweak silently repaints the shape.
     const seededFromShape = settings({ strokeColor: "#f97316", strokeWidth: 3 });
     const widthOnly = settings({ strokeColor: "#f97316", strokeWidth: 9 });
@@ -153,8 +153,8 @@ describe("panelStylePatch", () => {
 // a circle, then click square, it turns circle into a square."
 //
 // A freshly drawn shape used to read its TYPE live from the panel, exactly the
-// way it reads its colour, so choosing the next shape retyped the current one.
-// Type is not like colour: a colour click edits the thing in front of you, a
+// way it reads its color, so choosing the next shape retyped the current one.
+// Type is not like color: a color click edits the thing in front of you, a
 // shape click chooses what you are about to draw next. `panelStylePatch`
 // already refused to carry `shape` across to a RESELECTED shape (see the test
 // above); this pins the same rule for a NEW one, and pins that the overlay and
@@ -175,7 +175,7 @@ describe("pendingShapeType", () => {
   });
 
   it("falls back to the panel when nothing is pending — that is what picks the NEXT shape", () => {
-    expect(pendingShapeType(null, "handCircle")).toBe("handCircle");
+    expect(pendingShapeType(null, "diamond")).toBe("diamond");
     expect(pendingShapeType(undefined, "circle")).toBe("circle");
   });
 

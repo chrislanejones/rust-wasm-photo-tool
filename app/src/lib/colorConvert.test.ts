@@ -20,7 +20,7 @@ const NAMED = [
   { name: "blue",    rgb: { r: 0,   g: 0,   b: 255 }, hsv: { h: 240, s: 100, v: 100 }, hsl: { h: 240, s: 100, l: 50 } },
   { name: "white",   rgb: { r: 255, g: 255, b: 255 }, hsv: { h: 0,   s: 0,   v: 100 }, hsl: { h: 0,   s: 0,   l: 100 } },
   { name: "black",   rgb: { r: 0,   g: 0,   b: 0   }, hsv: { h: 0,   s: 0,   v: 0   }, hsl: { h: 0,   s: 0,   l: 0 } },
-  { name: "grey",    rgb: { r: 128, g: 128, b: 128 }, hsv: { h: 0,   s: 0,   v: 50.2 }, hsl: { h: 0, s: 0, l: 50.2 } },
+  { name: "gray",    rgb: { r: 128, g: 128, b: 128 }, hsv: { h: 0,   s: 0,   v: 50.2 }, hsl: { h: 0, s: 0, l: 50.2 } },
   { name: "AB1163",  rgb: { r: 171, g: 17,  b: 99  }, hsv: { h: 328.1, s: 90.1, v: 67.1 }, hsl: { h: 328.1, s: 81.9, l: 36.9 } },
 ];
 
@@ -38,7 +38,7 @@ describe("rgb ↔ hsv", () => {
       expect(hsvToRgb(rgbToHsv(c.rgb))).toEqual(c.rgb);
     });
   }
-  it("every 8-bit grey round-trips exactly", () => {
+  it("every 8-bit gray round-trips exactly", () => {
     for (let n = 0; n <= 255; n++) {
       expect(hsvToRgb(rgbToHsv({ r: n, g: n, b: n }))).toEqual({ r: n, g: n, b: n });
     }
@@ -138,7 +138,7 @@ describe("parseHslString", () => {
 });
 
 describe("wrapHue", () => {
-  it("normalises into [0, 360)", () => {
+  it("normalizes into [0, 360)", () => {
     expect(wrapHue(0)).toBe(0);
     expect(wrapHue(360)).toBe(0);
     expect(wrapHue(-30)).toBe(330);

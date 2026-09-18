@@ -21,7 +21,7 @@ import { useCallback } from "react";
  *
  * The callback identity is stable for a stable `canvasRef`, matching the
  * `useCallback(..., [canvasRef])` each hook used before — so downstream
- * dependency arrays that list `coords` keep the same behaviour.
+ * dependency arrays that list `coords` keep the same behavior.
  */
 export function useCanvasCoords(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,

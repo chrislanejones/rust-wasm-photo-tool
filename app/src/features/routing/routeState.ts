@@ -55,7 +55,10 @@ function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
     case "text": return s.textMode;
     case "emoji": return s.batchMode;
     case "perspective": return s.perspectiveMode;
-    default: return undefined; // single-mode: effects, crop, arrow, compress
+    // Two tiles on one tool id: Adjustments and Levels. Without this case a
+    // Levels link reloaded as Adjustments (routeState.test.ts round-trip).
+    case "effects": return s.effectsMode;
+    default: return undefined; // single-mode: crop, arrow, compress
   }
 }
 
@@ -92,7 +95,7 @@ export const currentHash = (): string => formatRoute(readRoute());
  * value actually CHANGES. That is the loop guard (no "am I writing?" boolean,
  * which is the classic way this feature rots: a stale flag and the hash and
  * the state stop agreeing). It also keeps a redundant re-apply from re-firing
- * AppShell's activeTool effects (which reset colour-picker / move / selection
+ * AppShell's activeTool effects (which reset color-picker / move / selection
  * modes).
  */
 export function applyRoute(route: Route): void {

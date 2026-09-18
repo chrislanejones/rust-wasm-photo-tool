@@ -52,7 +52,7 @@ document changes. The tempting shape — a map of emptiness by layer id — is
 precisely the shape that caused the **v7.81 batch-export data loss**, where a
 derived "which photos have edits" list went stale and silently dropped edits.
 `undefined` means not-yet-known and disables nothing, so a slow or failed
-answer never greys out a working control.
+answer never grays out a working control.
 
 ## Consequences
 
@@ -60,7 +60,7 @@ answer never greys out a working control.
 + The engine gains a cheap, pure predicate other callers can use — "is this
   layer worth compositing / exporting / showing a thumbnail for" are all the
   same question.
-+ The reason is shown, not just the grey. A disabled control with no stated
++ The reason is shown, not just the gray. A disabled control with no stated
   cause is the thing this repo's a11y passes keep finding.
 - **+258 B** of wasm, inside the 800,000–840,000 band (ADR-045).
 - One more awaited engine site (127 → 128 in the Stage 3.5 ratchet). It is

@@ -21,7 +21,7 @@
 //
 // Moving the two Maps into module scope or a Zustand store would also make them
 // readable, and would change their LIFETIME: refs die when BatchSettings
-// unmounts, module state does not. That is a behaviour change disguised as a
+// unmounts, module state does not. That is a behavior change disguised as a
 // refactor — today, leaving the Batch tool and returning loses the baselines,
 // so a re-applied logo stacks. Maybe that should be fixed; it is not this
 // change, and doing it silently while fixing a delete bug is how one bug turns

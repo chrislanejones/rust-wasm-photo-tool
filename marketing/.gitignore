@@ -7,3 +7,7 @@ dist
 vite.config.d.ts
 vite.config.js
 .vercel
+
+# Vite SSR build — the compiled renderer that scripts/prerender.mjs imports.
+# Build output, same as dist/.
+dist-ssr

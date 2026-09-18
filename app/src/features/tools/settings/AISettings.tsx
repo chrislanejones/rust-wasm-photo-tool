@@ -2,24 +2,44 @@
 // Replicate + Convex pipeline (useAIJob). Text Extract (OCR) moved to the
 // Text tool (TextSettings.tsx) — it's a text-shaped feature, not an
 // image-shaped one, and it has its own dedicated useAIJob instance there now.
-// 4x Upscale's Coming Soon placeholder moved to EffectsSettings.tsx.
-import { useState } from "react";
-import { Scissors, Eraser, BroomSparkles, Trash2, Lock } from "lucide-react";
+// 4x Upscale has NO placeholder anywhere any more: its grayed tile lived in
+// the Quick Adjust grid, and that grid was retired when Enhance › Presets
+// landed. There is no surface for it in the editor until it is built.
+//
+// Object Removal paints its mask ON THE CANVAS (ObjectRemovalOverlay), not in
+// a popup. The old ObjectRemovalModal re-drew the frame onto a private canvas
+// inside a portal and asked the user to paint there, at a third scale, beside
+// the image they were actually editing. The mask bytes are unchanged — same
+// strokes, same rasterizer, same black/white PNG at native resolution — only
+// the surface moved. This panel keeps the controls (brush size, undo, clear,
+// cancel, confirm) and the store holds the paint.
+import { useEffect, useRef, useState } from "react";
+import { Scissors, Eraser, BroomSparkles, Trash2, Lock, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { StabilizerRow } from "./StabilizerRow";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { useAIJob, type AIResultPixels } from "@/hooks/useAIJob";
 import { useToolStore, type EraserMode } from "@/stores/useToolStore";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
-import { ObjectRemovalModal } from "./ObjectRemovalModal";
+import {
+  buildObjectRemovalMaskPng,
+  hasMaskPaint,
+  pngDimensions,
+} from "@/lib/objectRemovalMask";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
 const ERASER_SIZE_PRESETS = [8, 16, 32, 64] as const;
+/** Object Removal's mask brush, in IMAGE pixels. Spans the popup's old 8-120
+ *  range so a mask painted before this change would be painted the same way
+ *  now. */
+const MASK_BRUSH_PRESETS = [8, 40, 80, 120] as const;
 
 type LiveType = "rembg" | "inpaint";
 
@@ -101,8 +121,16 @@ export function AISettings({
 }: AISettingsProps) {
   const { run, phase, busy, error } = useAIJob(onAIResult);
   const [lastType, setLastType] = useState<LiveType | null>(null);
-  const [showObjModal, setShowObjModal] = useState(false);
-  const [objSource, setObjSource] = useState<Uint8Array | null>(null);
+  // Object Removal's mask lives in the tool store, because the surface it is
+  // painted on (the canvas) is in a different subtree from these controls.
+  const masking = useToolStore((s) => s.objectRemovalMasking);
+  const setMasking = useToolStore((s) => s.setObjectRemovalMasking);
+  const strokes = useToolStore((s) => s.objectRemovalStrokes);
+  const maskBrush = useToolStore((s) => s.objectRemovalBrush);
+  const setMaskBrush = useToolStore((s) => s.setObjectRemovalBrush);
+  const undoStroke = useToolStore((s) => s.undoObjectRemovalStroke);
+  const clearStrokes = useToolStore((s) => s.clearObjectRemovalStrokes);
+  const setMaskBusy = useToolStore((s) => s.setObjectRemovalBusy);
   // Lives in the shared tool store (not local state) so canvas routing
   // (useEffectiveTool) can see which sub-mode is selected — the prerequisite
   // for Magic Eraser to receive paint strokes once that routing lands.
@@ -142,22 +170,76 @@ export function AISettings({
     void run(type, activePhotoId, png);
   };
 
-  const openObjModal = async () => {
-    const tool = stampToolRef.current;
-    // `setShowObjModal(true)` stays AFTER the await, deliberately: the modal
-    // reads `objSource` and would open against a stale one (or null on the
-    // first use) if it were raised before the bytes arrived.
-    if (!tool || !activePhotoId) return;
-    setObjSource(new Uint8Array(await tool.export_png()));
-    setShowObjModal(true);
+  /** Put the canvas into mask-painting mode. Nothing is exported here: the
+   *  popup had to capture the frame up front because it drew its own copy of
+   *  it, and capturing early is what made its mask describe a document state
+   *  that could already have moved on. The real canvas needs no copy, so the
+   *  ONE engine read happens at confirm time instead — see below. */
+  const startMasking = () => {
+    if (!stampToolRef.current || !activePhotoId) return;
+    // Deliberately touches NO job state — `lastType` is set at confirm, the
+    // way the popup's own confirm did. Setting it here instead looked
+    // harmless and was not: `lastType` + `phase` are read together, so
+    // entering the mode after ANY finished job made the pair read
+    // ("inpaint", "done") and the exit effect below fired on the spot. The
+    // brush was unreachable for the rest of the session.
+    setMasking(true);
   };
 
-  const confirmObjRemoval = (maskPng: Uint8Array) => {
-    if (!activePhotoId || !objSource) return;
-    setShowObjModal(false);
+  const cancelMasking = () => setMasking(false);
+
+  const confirmObjRemoval = async () => {
+    const tool = stampToolRef.current;
+    if (!tool || !activePhotoId || !hasMaskPaint(strokes)) return;
+    // ATOMIC CAPTURE. One engine call, one document state: the source PNG is
+    // read once, and the mask is rasterized to THAT PNG's own dimensions. The
+    // mask therefore cannot be sized to a frame the source is not — which is
+    // the failure mode a display-sized or separately-measured mask has, and
+    // it is silent (the model erases the wrong region rather than erroring).
+    const png = new Uint8Array(await tool.export_png());
+    const { width, height } = await pngDimensions(png);
+    const maskPng = await buildObjectRemovalMaskPng(strokes, width, height);
     setLastType("inpaint");
-    void run("inpaint", activePhotoId, objSource, maskPng);
+    // Masking stays ON while the model runs, so the painted region is still
+    // visible over the object it is removing; the overlay stops taking the
+    // pointer. The effect below drops both when the job lands.
+    setMaskBusy(true);
+    void run("inpaint", activePhotoId, png, maskPng);
   };
+
+  const inpaintBusy = busy && lastType === "inpaint";
+  /** At least one stroke exists — the same gate the popup's `hasMask` state
+   *  was, derived from the strokes rather than tracked alongside them. */
+  const painted = hasMaskPaint(strokes);
+
+  // Leave mask mode when the inpaint job finishes, fails, or this panel goes
+  // away (tool switch, sign-out, the AI sub-tool losing its Replicate mode).
+  // A live overlay whose panel is gone would take every canvas click with no
+  // way to confirm or cancel — the one way this mode could strand a user.
+  const replicateAvailable = isReplicate && aiEnabled;
+  useEffect(() => {
+    if (!replicateAvailable) setMasking(false);
+  }, [replicateAvailable, setMasking]);
+
+  // Watches the TRANSITION out of busy, not the value of `phase`. `phase` is
+  // sticky — it sits on "done"/"error" until the next job starts — so a rule
+  // written against it fires on state left over from the last run rather than
+  // on this run ending. This arms only once a mask job is actually in flight
+  // and fires only when that job stops being in flight.
+  const inpaintRanRef = useRef(false);
+  useEffect(() => {
+    if (!masking) return;
+    if (inpaintBusy) {
+      inpaintRanRef.current = true;
+      return;
+    }
+    if (inpaintRanRef.current) {
+      inpaintRanRef.current = false;
+      setMasking(false);
+    }
+  }, [masking, inpaintBusy, setMasking]);
+
+  useEffect(() => () => setMasking(false), [setMasking]);
 
   return (
     // The four mode tiles moved to the ToolsSidebar header (SubtoolRow), which
@@ -170,7 +252,7 @@ export function AISettings({
       {isReplicate ? (
         <SectionHeader
           title="AI"
-          info="Runs on Replicate, so it needs sign-in and a Paid plan. Background Removal cuts the subject out; Object Removal opens a mask editor, you paint what should go, and the model fills it back in."
+          info="Runs on Replicate, so it needs sign-in and a Paid plan. Background Removal cuts the subject out; Object Removal hands the canvas a brush, you paint over what should go, and the model fills it back in."
         />
       ) : (
         <SectionHeader title={activeModeInfo.title} info={headerInfo} />
@@ -269,20 +351,125 @@ export function AISettings({
             </div>
           )}
 
-          <button
-              type="button"
-              onClick={() => runModel("rembg")}
-              disabled={!canRun || busy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
-              {busy && lastType === "rembg" && <Spinner size={14} />}
-              {lastType === "rembg" && phase === "uploading"
-                ? "Uploading..."
-                : lastType === "rembg" && phase === "running"
-                  ? "Removing background..."
-                  : "Remove Background"}
-          </button>
+          {/* The same stacked tile group Select → Wand's Selection row uses,
+              in ACTION mode (no `value`, so nothing ever lights). These were
+              two hand-rolled `bg-purple-600` buttons with white text — a
+              color that is in no theme token and a shape that matched nothing
+              else in the sidebar, which is why they read as a different app.
+              The key badge replaces the inline `Lock` glyph: same message,
+              same corner as `Create AI Image`, and it no longer competes with
+              the spinner for the row. */}
+          {masking ? (
+            /* ── Mask painting is live: the canvas is the surface ──────────
+               These replace the two action tiles rather than sitting under
+               them. While a mask is being painted, starting Background
+               Removal is not a thing the user can coherently want, and the
+               popup that used to own these controls made the same choice by
+               covering the panel. */
+            <div className="space-y-3 rounded-lg border border-border bg-bg-elevated/60 p-3">
+              <p className="text-2xs leading-relaxed text-text-secondary">
+                Paint over the object on the canvas, then choose Remove Object.
+                Press <kbd className="font-mono">Esc</kbd> to cancel.
+              </p>
+              <SizeSlider
+                label="Brush Size"
+                value={maskBrush}
+                min={8}
+                max={120}
+                onChange={setMaskBrush}
+                presets={MASK_BRUSH_PRESETS}
+                disabled={inpaintBusy}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={undoStroke}
+                  disabled={!painted || inpaintBusy}
+                  title="Undo the last brush stroke"
+                >
+                  {/* "Undo Stroke", not "Undo": the top bar already has an
+                      Undo, and two controls with the same accessible name
+                      doing different things is exactly what a screen-reader
+                      user cannot disambiguate. Same reason for Clear Mask. */}
+                  <Undo2 /> Undo Stroke
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={clearStrokes}
+                  disabled={!painted || inpaintBusy}
+                  title="Clear the whole mask"
+                >
+                  <Eraser /> Clear Mask
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Stays ENABLED while the job runs, and says what it does
+                    then: the mask is already uploaded, so this dismisses the
+                    overlay rather than cancelling the removal. Disabling it
+                    would leave a mouse-only user behind a surface that takes
+                    every canvas click until a job that may never settle does.
+                    Escape is the keyboard twin and is never gated. */}
+                <Button className="flex-1" onClick={cancelMasking}>
+                  {inpaintBusy ? "Hide Mask" : "Cancel"}
+                </Button>
+                <Button
+                  size="large"
+                  className="flex-1"
+                  onClick={() => void confirmObjRemoval()}
+                  disabled={!painted || !canRun || inpaintBusy}
+                >
+                  {inpaintBusy ? <Spinner size={14} /> : <BroomSparkles />}
+                  {inpaintBusy
+                    ? phase === "uploading"
+                      ? "Uploading..."
+                      : "Removing..."
+                    : "Remove Object"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+          <ToolButtonGroup<"rembg" | "inpaint">
+            columns={2}
+            stacked
+            disabled={!canRun || busy}
+            onChange={(id) => {
+              if (id === "rembg") void runModel("rembg");
+              else startMasking();
+            }}
+            options={[
+              {
+                id: "rembg",
+                label:
+                  lastType === "rembg" && phase === "uploading"
+                    ? "Uploading..."
+                    : lastType === "rembg" && phase === "running"
+                      ? "Removing..."
+                      : "Remove Background",
+                icon:
+                  busy && lastType === "rembg"
+                    ? () => <Spinner size={24} />
+                    : Scissors,
+                pro: true,
+                title: "Remove the background (Pro)",
+              },
+              {
+                id: "inpaint",
+                label:
+                  lastType === "inpaint" && phase === "uploading"
+                    ? "Uploading..."
+                    : lastType === "inpaint" && phase === "running"
+                      ? "Removing..."
+                      : "Remove Object",
+                icon:
+                  busy && lastType === "inpaint"
+                    ? () => <Spinner size={24} />
+                    : BroomSparkles,
+                pro: true,
+                title: "Remove an object (Pro)",
+              },
+            ]}
+          />
+          )}
           {lastType === "rembg" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
@@ -292,20 +479,6 @@ export function AISettings({
             </p>
           )}
 
-          <button
-              type="button"
-              onClick={openObjModal}
-              disabled={!canRun || busy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
-              {busy && lastType === "inpaint" && <Spinner size={14} />}
-              {lastType === "inpaint" && phase === "uploading"
-                ? "Uploading..."
-                : lastType === "inpaint" && phase === "running"
-                  ? "Removing object..."
-                  : "Remove Object"}
-          </button>
           {lastType === "inpaint" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
@@ -316,14 +489,6 @@ export function AISettings({
           )}
         </>
       )}
-
-      <ObjectRemovalModal
-        open={showObjModal}
-        busy={busy && lastType === "inpaint"}
-        sourcePng={objSource}
-        onClose={() => setShowObjModal(false)}
-        onConfirm={confirmObjRemoval}
-      />
     </div>
   );
 }

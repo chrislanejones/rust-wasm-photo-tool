@@ -1,4 +1,4 @@
-# ADR-050: Rotated text drifts because it is anchored by its own tile's centre
+# ADR-050: Rotated text drifts because it is anchored by its own tile's center
 Date: 2026-09-08   Status: draft — anchor SHIPPED 2026-09-09 (#99), migration DECLINED on measurement
 
 Filed against "the text bounding box moves/resizes as you type". Reproduced,
@@ -38,7 +38,7 @@ right and 37px up. The committed pixels move, so this is not a preview artifact.
 
 ## The mechanism
 
-`text::rotate_pixels` rotates about the centre of the tile it is given:
+`text::rotate_pixels` rotates about the center of the tile it is given:
 
 ```rust
 let cx = w as f32 / 2.0;
@@ -47,7 +47,7 @@ let cy = h as f32 / 2.0;
 
 `w` and `h` are the extents of the rendered text, so **the rotation anchor is a
 function of the text's own length**. Add a character, the tile widens, its
-centre moves, and rotating about a moved centre translates the result. The
+center moves, and rotating about a moved center translates the result. The
 rotated bounding box is then placed at the annotation's `(x, y)`, so the ink
 inside it lands somewhere new.
 

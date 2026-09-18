@@ -1,12 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm run build:marketing",
-  "installCommand": "pnpm install",
-  "outputDirectory": "marketing/dist",
   "framework": null,
+  "installCommand": "export PATH=\"${CARGO_HOME:-$HOME/.cargo}/bin:$PATH\" && rustup show && cargo install wasm-pack --version 0.15.0 --locked && pnpm install",
+  "buildCommand": "export PATH=\"${CARGO_HOME:-$HOME/.cargo}/bin:$PATH\" && bash ./scripts/build-wasm.sh && pnpm --filter stamp-tool build && bash ./scripts/write-build-info.sh www-dist",
+  "outputDirectory": "www-dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!_vercel/).*)",
       "destination": "/index.html"
     }
   ],
@@ -19,6 +19,10 @@
           "value": "nosniff"
         },
         {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
@@ -28,7 +32,7 @@
         },
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-2kzO0RCVLXlFIInFPo4scxTQKGqCV5AmH72rPA4nFK8=' https://*.clerk.accounts.dev https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' blob: data: https://f1avkyiqgj.ufs.sh https://*.ufs.sh https://www.google-analytics.com; connect-src 'self' blob: data: https://*.clerk.accounts.dev https://*.convex.cloud wss://*.convex.cloud https://*.ufs.sh https://fonts.googleapis.com https://fonts.gstatic.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; worker-src 'self' blob:; frame-src 'self' https://*.clerk.accounts.dev; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }

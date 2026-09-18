@@ -3,14 +3,15 @@ import {
   RotateCw,
   FlipHorizontal,
   FlipVertical,
-  Crop,
   Maximize,
-  Pipette,
   Square,
   RectangleHorizontal,
   RectangleVertical,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  PanelAction,
+  PanelActionBar,
+} from "@/components/ui/panel-action-bar";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -87,9 +88,9 @@ interface TransformCropSettingsProps {
    *  rather than the whole panel three times over.
    *
    *  Omitted renders all three, stacked with separators — the pre-restructure
-   *  behaviour, kept so any other caller is unaffected. */
+   *  behavior, kept so any other caller is unaffected. */
   section?: "crop" | "transform" | "colorPicker";
-  /** Re-apply a colour from the picker history (sets brush + text colour, the
+  /** Re-apply a color from the picker history (sets brush + text color, the
    *  same two fields a fresh pick writes). */
   onPickColor?: (hex: string) => void;
 }
@@ -132,7 +133,7 @@ export function TransformCropSettings({
     const [rw, rh] = RATIO_DIMS[id];
     onCropRatioChange([rw, rh]);
     if (!imageWidth || !imageHeight || !onSetCropSelection) return;
-    // Delegate the centred-crop math to Rust so it stays consistent with
+    // Delegate the centered-crop math to Rust so it stays consistent with
     // the drag-snap math driven by `constrain_crop_to_ratio`.
     const mod = await import("stamp_tool");
     await mod.default();
@@ -178,13 +179,14 @@ export function TransformCropSettings({
             </div>
           )}
 
-          <Button size="large"
-            className="w-full"
-            disabled={disabled}
-            onClick={onApplyCrop}
-          >
-            <Crop className="h-4 w-4" /> Apply Crop
-          </Button>
+          {/* The reference footer action. It used to carry a <Crop/> glyph,
+              which was the only icon in any of the six panel action bars —
+              and "Apply Crop" was already saying it. */}
+          <PanelActionBar>
+            <PanelAction disabled={disabled} onClick={onApplyCrop}>
+              Apply Crop
+            </PanelAction>
+          </PanelActionBar>
         </div>
       )}
 
@@ -241,18 +243,21 @@ export function TransformCropSettings({
             info="Click the eyedropper to activate, then hover over the image to magnify pixels. Click to pick a color — it will be set as your brush and text color."
           />
 
-          <Button size="large"
-            className={cn(
-              "w-full",
-              colorPickerActive &&
-                "bg-theme-primary text-theme-primary-foreground border-theme-primary ring-2 ring-theme-primary/40 hover:brightness-100",
-            )}
-            disabled={disabled}
-            onClick={() => onSetColorPickerActive(!colorPickerActive)}
-          >
-            <Pipette className="h-4 w-4" />
-            {colorPickerActive ? "Click image to pick" : "Activate Eyedropper"}
-          </Button>
+          {/* One button whose LABEL carries the state, not two buttons. The lit
+              treatment is unchanged; what is new is the `aria-pressed` that
+              goes with it — before this, a screen-reader user got a button
+              whose name changed under them with nothing saying it was on. */}
+          <PanelActionBar>
+            <PanelAction
+              pressed={colorPickerActive}
+              disabled={disabled}
+              onClick={() => onSetColorPickerActive(!colorPickerActive)}
+            >
+              {colorPickerActive
+                ? "Click image to pick"
+                : "Activate Eyedropper"}
+            </PanelAction>
+          </PanelActionBar>
 
           <div className="flex items-center gap-3">
             <div
@@ -276,7 +281,7 @@ export function TransformCropSettings({
             </div>
           )}
 
-          {/* ── Picked-colour history ──────────────────────────────────────
+          {/* ── Picked-color history ──────────────────────────────────────
               Same UI vocabulary as the Guides list in LayerSettings: a
               `.history-list` of ReselectBar rows, click to re-apply, ✕ to
               forget. Reusing ReselectBar rather than rolling a swatch list

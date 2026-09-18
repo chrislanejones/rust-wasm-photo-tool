@@ -44,6 +44,9 @@ import {
   Trash2,
   Type,
   BroomSparkles,
+  Sparkles,
+  Aperture,
+  SunDim,
 } from "lucide-react";
 import type { ToolType } from "@/lib/types";
 import { TOOL_MODULES } from "./toolModules";
@@ -51,6 +54,7 @@ import { useToolStore } from "@/stores/useToolStore";
 import type {
   BatchMode,
   BrushMode,
+  EffectsMode,
   EraserMode,
   PerspectiveMode,
   SelectionKind,
@@ -109,6 +113,15 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
       keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
     },
   ],
+  // `effects` is three tiles on one tool id: Adjustments, Levels and Presets.
+  // `setModeOf` refuses any mode not listed here, silently — without this row
+  // the Levels tile set nothing and the panel stayed on Adjustments (caught by
+  // routeState.test.ts's round-trip, not by a click).
+  effects: [
+    { id: "adjust", label: "Adjustments", icon: SunDim, keywords: ["brightness", "contrast", "saturation", "adjust"] },
+    { id: "levels", label: "Levels", icon: Aperture, keywords: ["levels", "black point", "white point", "midtones", "gamma"] },
+    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click"] },
+  ],
 };
 
 /** Read/write the store field that holds a tool's active sub-mode.
@@ -164,6 +177,13 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
   emoji: {
     select: (s) => s.batchMode,
     set: (m) => useToolStore.getState().setBatchMode(m as BatchMode),
+  },
+  // Enhance › Adjustments and Enhance › Levels are two tiles on ONE tool id
+  // (`effects`). The mode is what tells them apart, so both tiles carry one —
+  // without it, clicking Adjustments after Levels would keep showing Levels.
+  effects: {
+    select: (s) => s.effectsMode,
+    set: (m) => useToolStore.getState().setEffectsMode(m as EffectsMode),
   },
 };
 

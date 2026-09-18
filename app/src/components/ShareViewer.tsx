@@ -9,6 +9,17 @@ import { Toaster, toast } from "@/components/ui/sonner";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
+/** US date, `MM-DD-YYYY`. Pinned to `en-US` on purpose: a bare
+ *  `toLocaleDateString()` follows the VISITOR's locale, so the same share link
+ *  read as 16/09/2026 in London and 2026/9/16 in Tokyo. Share pages are public,
+ *  so the visitor is usually not the person who made the link. */
+const shareDate = new Intl.DateTimeFormat("en-US", {
+  month: "2-digit",
+  day: "2-digit",
+  year: "numeric",
+});
+const formatShareDate = (ms: number) => shareDate.format(new Date(ms)).replace(/\//g, "-");
+
 /** Public, read-only viewer for a `?v=<token>` share link. Renders the flattened
  *  snapshot with download / copy-link / open-editor actions. Works for anonymous
  *  visitors — `shares.get` and `shares.recordView` are public Convex functions. */
@@ -132,7 +143,7 @@ function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string 
         <span>·</span>
         <span>{share.views} {share.views === 1 ? "view" : "views"}</span>
         <span>·</span>
-        <span>{new Date(share.createdAt).toLocaleDateString()}</span>
+        <span>{formatShareDate(share.createdAt)}</span>
       </div>
 
       <div className="flex w-full max-w-md flex-wrap gap-2">

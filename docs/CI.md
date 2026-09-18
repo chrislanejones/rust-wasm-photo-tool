@@ -144,9 +144,12 @@ Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
 **The `convex` job is skipped.** It needs `CONVEX_DEPLOY_KEY` — see Setup notes.
 
-**`deploy-sentinel` fails after a green build.** The build was fine and the *deploy* is wrong — usually a Cargo feature set in `netlify.toml` that doesn't match `build:wasm`. Check the served wasm's size and exports, not the local one.
+**`deploy-sentinel` fails after a green build.** The build was fine and the *deploy* is wrong — usually a Cargo feature set in the root `vercel.json` (or `netlify.toml`) that doesn't match `build:wasm`. Check the served wasm's size and exports, not the local one.
+
+**`deploy-sentinel` fails tier 2 — "the SAME commit and DIFFERENT bytes".** The builders disagree, and the first thing to check is `.cargo/config.toml`: its `--remap-path-prefix` list must name *every* builder by its `$CARGO_HOME`, and there is no wildcard. Vercel's is `/rust`, not a home directory — it was missed when the editor moved hosts, and production shipped 24 B off CI for it.
 
 ## Deploy hosts
 
-- **Netlify** — git root → installs Rust + `wasm-pack` → builds the editor app → `www-dist`
-- **Vercel** — `marketing/` root → `marketing/vercel.json` → builds the marketing site → `dist`
+- **Vercel** — git root → root `vercel.json` → installs Rust + `wasm-pack` → builds the editor app → `www-dist` → **edit.imagehorse.app** (canonical since v8.76)
+- **Vercel** — `marketing/` root → `marketing/vercel.json` → builds the marketing site → `dist` → **imagehorse.app**
+- **Netlify** — git root → `netlify.toml` → the same editor build → `www-dist`. Still live, still builds PR previews, kept as the rollback path. Not what the sentinel checks.

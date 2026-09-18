@@ -17,7 +17,7 @@ interface Props {
  * Rebuilt onto `ui/dialog` (Radix) in NIGHT JOB III. It was a bespoke
  * `motion.div` overlay with no `role="dialog"`, no `aria-modal`, no Escape
  * handler and no focus trap — measured, not assumed. Rather than hand-adding
- * four accessibility behaviours to a one-off overlay, this uses the primitive
+ * four accessibility behaviors to a one-off overlay, this uses the primitive
  * the delete confirms, Diagnostics and the update prompt already share, so
  * there is one less bespoke overlay to drift.
  *
@@ -25,7 +25,7 @@ interface Props {
  * primitive and were hand-added here, because fixing them centrally is a change
  * to every dialog in the app. NIGHT JOB V made that change: they now live in
  * `ui/dialog`'s `DialogContent`, and the ~40 lines that used to sit here are
- * gone. Nothing about this modal's behaviour changed in the move.
+ * gone. Nothing about this modal's behavior changed in the move.
  *
  * The old look is preserved deliberately, via two props: `--z-modal` (60)
  * keeps it above dialog-level
@@ -46,7 +46,7 @@ export function ShortcutModal({ open, onClose }: Props) {
       <DialogContent
         size="xl"
         aria-describedby={undefined}
-        overlayClassName="z-[var(--z-modal)] bg-black/60 backdrop-blur-sm"
+        overlayClassName="z-[var(--z-modal)]"
         className="z-[var(--z-modal)] flex max-h-[80vh] flex-col"
       >
         <DialogHeader className="px-5 py-4">

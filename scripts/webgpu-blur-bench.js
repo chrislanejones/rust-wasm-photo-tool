@@ -207,7 +207,7 @@ fn main(@builtin(global_invocation_id) gid:vec3<u32>){
     const entry = performance.getEntriesByType("resource").map((r) => r.name).find((n) => /stamp_tool-.*\.js$/.test(n));
     if (!entry) { device.destroy(); return { adapter: `${vendor}/${arch}`, parity, fatal: "engine module not found on this page — open the app first" };}
     const mod = await import(entry);
-    if (typeof mod.default === "function") { try { await mod.default(); } catch { /* already initialised */ } }
+    if (typeof mod.default === "function") { try { await mod.default(); } catch { /* already initialized */ } }
 
     const sizes = opts.sizes ?? [[512, 512], [1024, 1024], [2048, 2048]];
     const intensity = opts.intensity ?? 5;

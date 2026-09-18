@@ -1,5 +1,5 @@
 // Pins the v8.34 backpressure semantics now that they live in one shared
-// place. Every case here is a behaviour the paint fix was measured to need;
+// place. Every case here is a behavior the paint fix was measured to need;
 // if one goes red, the brush lag is on its way back for every consumer at
 // once — which is the trade the extraction made.
 import { describe, it, expect } from "vitest";

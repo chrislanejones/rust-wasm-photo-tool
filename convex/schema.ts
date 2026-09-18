@@ -12,6 +12,20 @@ export default defineSchema({
     tier: v.union(v.literal("free"), v.literal("pro"), v.literal("team")),
     dailyUsage: v.number(),
     usageResetAt: v.number(),
+    /* The monthly ceiling, alongside the daily one.
+     *
+     * A daily cap alone does not bound what a plan costs: 50 a day is 1,500 a
+     * month, and every one of those is a Replicate invoice. The daily number
+     * is there to stop a burst; this one is there so a month has a floor under
+     * its margin.
+     *
+     * OPTIONAL, and that is load-bearing. Convex validates the whole table
+     * against the schema on push, so a required field added to a table that
+     * already has rows fails the deploy. Absent reads as zero — see
+     * `monthlyUsed` in aiJobs.ts — which is the correct answer for a user who
+     * predates the field. */
+    monthlyUsage: v.optional(v.number()),
+    monthResetAt: v.optional(v.number()),
     // App preferences (Settings → General/Appearance), stored as a JSON blob
     // plus its SHA-256 so the client can skip redundant writes / verify on load.
     settings: v.optional(v.string()),
@@ -174,14 +188,14 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_usedAt", ["userId", "usedAt"]),
 
-  // ── User colours (the global "+" palette) ──────────────────────────────
+  // ── User colors (the global "+" palette) ──────────────────────────────
   // One row per saved swatch. Anonymous users keep the same list in
   // localStorage (hooks/useUserColors.ts); signed-in users read and write
   // here so the palette follows them across devices. Capped at 32 per user
   // by the mutation, newest first via `createdAt`.
   user_colors: defineTable({
     userId: v.id("users"),
-    /** Normalised `#rrggbb` / `#rrggbbaa`, lowercase. */
+    /** Normalized `#rrggbb` / `#rrggbbaa`, lowercase. */
     color: v.string(),
     createdAt: v.number(),
   })

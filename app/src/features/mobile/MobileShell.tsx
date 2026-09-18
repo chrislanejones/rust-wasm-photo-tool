@@ -13,15 +13,19 @@ import {
   ChevronRight,
   Download,
   ImagePlus,
+  Settings,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/UserMenu";
+import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
+import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
@@ -284,6 +288,12 @@ export function MobileShell({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
+  // Store flag, not a local useState: dialog visibility is UI-chrome state and
+  // every other dialog in the app already lives in useUIStore. It also means a
+  // future entry point (a palette command, a `#/settings` deep link) can open
+  // this without MobileShell exposing a handle.
+  const settingsOpen = useUIStore((s) => s.mobileSettingsOpen);
+  const setSettingsOpen = useUIStore((s) => s.setMobileSettingsOpen);
 
   // The viewed photo was deleted (confirm dialog → handleRemovePhoto) —
   // fall back to the grid rather than a blank viewer.
@@ -307,8 +317,14 @@ export function MobileShell({
 
   return (
     <div className="fixed inset-0 z-[var(--z-mobile)] flex flex-col bg-bg-primary">
-      {/* Header — logo + name on the left, sign-in / avatar on the right,
-          mirroring the top bar's chrome. */}
+      {/* Header — logo + name on the left, settings and sign-in / avatar on the
+          right, in the top bar's own cog-then-user order.
+
+          MEASURED before the cog went in (390px, signed out): the name block is
+          `flex-1` at 272px while its widest line — the subtitle — needs 134px.
+          A 44px control plus the 10px gap takes the block to 218px, still 84px
+          of slack, and neither line truncates. There is room for a third
+          control here; it did not have to go anywhere else. */}
       <div className="flex items-center gap-2.5 border-b border-border bg-bg-secondary px-4 py-2.5">
         <img src={horseLogo} alt="" className="h-9 w-9 drop-shadow" />
         <div className="min-w-0 flex-1">
@@ -317,6 +333,18 @@ export function MobileShell({
           </h1>
           <p className="text-xs text-text-muted">Mobile — upload &amp; view</p>
         </div>
+        {/* 44px, not IconButton's default 30px box: this is the touch surface,
+            and 30px is under the WCAG 2.5.5 target size. The glyph inside stays
+            18px, so it reads at the same weight as the top bar's cog — only the
+            tappable area grows. */}
+        <IconButton
+          icon={Settings}
+          label="Settings"
+          title="Theme and motion"
+          standalone
+          className="h-11 w-11 rounded-lg"
+          onClick={() => setSettingsOpen(true)}
+        />
         <UserMenu />
       </div>
 
@@ -390,6 +418,8 @@ export function MobileShell({
           e.target.value = "";
         }}
       />
+
+      <MobileSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       {viewerId && (
         <MobileViewer

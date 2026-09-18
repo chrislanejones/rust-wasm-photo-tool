@@ -762,7 +762,7 @@ export function useTextTool({
         textInputRef.current = null;
         editingAnnotationId.current = null;
         setTextInput(null);
-        // Cancelling an edit must un-suppress the (unchanged) baked tile.
+        // Canceling an edit must un-suppress the (unchanged) baked tile.
         toolRef.current?.set_editing_text(-1);
         flushToCanvas();
       } else if (e.key === "Enter" && !e.shiftKey) {

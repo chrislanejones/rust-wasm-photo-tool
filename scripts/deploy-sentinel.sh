@@ -24,23 +24,48 @@
 # Runnable by hand — that is the point:  ./scripts/deploy-sentinel.sh
 set -uo pipefail
 
-SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
-# ── BAND REVIEW, v8.76 (was 800,000-840,000, ADR-045) ────────────────────────
-# ADR-045 sized the old ceiling as "~1.4 perspective-sized features (+16,788 B)"
-# of headroom. Runtime fonts cost +17,852 B measured locally (823,503 ->
-# 841,355) — one perspective-sized feature — so the headroom is spent exactly as
-# budgeted, and this is the band review ADR-045 anticipated rather than a
-# baseline being unbolted to go green. ADR-053 has the arithmetic.
+# ⚠️ THIS DEFAULT FOLLOWS PRODUCTION, NOT THE PLAN. It is the host that is
+# serving users right now, because a sentinel aimed anywhere else is not a
+# weaker check — it is no check at all, and a permanently red one at that.
 #
-# ⚠️ ONLY THE CEILING MOVES. Raising the floor to match — which ADR-045's own
-# arithmetic would justify, and which would tighten the featureless detector —
-# is a TRAP, and it was nearly shipped: this script runs against LIVE prod, so a
-# floor above the currently-deployed binary fails the moment it is pushed and
-# stays failing until the deploy lands. A gate that is red for the length of a
-# deploy is a gate people learn to ignore. Tighten the floor in a LATER commit,
-# once a build at the new size is actually live — never in the same one.
+# FLIPPED to edit.imagehorse.app on 2026-09-12, which is now the host serving
+# the editor. The two preconditions this comment used to name were both met
+# first, in this order:
+#   1. `vercel domains add edit.imagehorse.app image-horse` — the domain resolves
+#      to the editor project and serves it over HTTPS on Vercel nameservers.
+#   2. A manual run against that host PASSED:
+#        823,479 B, features tiles,patchmatch, all exports declared,
+#        tier 1 (served wasm == the build's own record) ✓
+#
+# The earlier attempts to point this at app./edit.imagehorse.app were premature
+# and CI correctly rejected them: three fetch attempts, three 404s, "SENTINEL
+# FAIL: could not fetch", because the domain did not resolve to the editor yet.
+# The danger of leaving it that way was never the red run — it is that a check
+# which is red for a reason everybody knows about gets ignored or switched off,
+# and then the real failure it exists to catch (a featureless wasm, which once
+# shipped for ten releases) goes through unnoticed.
+#
+# The Netlify host stays alive as the rollback path and is NOT the default any
+# more. To aim this anywhere else for one run:
+#
+#   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
+SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
-MAX_WASM="${SENTINEL_MAX_WASM:-872000}"
+# 840000 -> 860000 (Chris, 2026-09-16). The FLOOR is the featureless detector
+# and stays at 800000 — that decision was made on 09-15 and is not revisited
+# here. This is the ceiling, and it is a drift alarm, not a budget.
+#
+# It went red on attributable growth rather than mystery: Enhance > Presets
+# (#153) added 9,248 B and shape perspective (#130) added 12,194 B, taking the
+# live engine 823,714 -> 845,156 B. Both are features that were reviewed and
+# merged, so the number the alarm was set against is the thing that is out of
+# date.
+#
+# 860000 leaves ~14,800 B of headroom, which is deliberately less than one
+# embedded TTF (61,972 B) — ADR-051's argument that a font cannot be embedded
+# without moving this band has to keep failing loudly, and a ceiling raised far
+# enough to absorb one would silence it.
+MAX_WASM="${SENTINEL_MAX_WASM:-860000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
 # `oplog_active` is the tiles/op-log surface; `remove_object` is PatchMatch.
 #

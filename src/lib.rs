@@ -12,7 +12,7 @@
 //! The JS side imports `ImageHorseTool` — the API surface is unchanged.
 
 // Several drawing / annotation / composite functions take many positional
-// params (colours, coords, flags) by design; grouping them into structs would
+// params (colors, coords, flags) by design; grouping them into structs would
 // obscure the call sites more than it helps. Allow the lint crate-wide.
 #![allow(clippy::too_many_arguments)]
 
@@ -29,8 +29,10 @@ mod effects;
 mod fonts;
 mod history;
 mod layer;
+mod levels;
 mod livewire;
 mod paint;
+mod presets;
 // Pure-geometry projective transforms (the Perspective tool). `pub` for the
 // same reason `ops`/`tiles` are: the integration tests in `tests/` build
 // `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen
@@ -42,6 +44,7 @@ mod settings;
 mod stabilizer;
 mod stamp;
 mod text;
+mod tonal_preview;
 mod transform;
 mod utils;
 
@@ -460,11 +463,11 @@ pub struct ImageHorseTool {
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
     /// How the NEXT tool-produced selection mask combines with the current
-    /// selection: 0 = replace (default / historical behaviour), 1 = add
+    /// selection: 0 = replace (default / historical behavior), 1 = add
     /// (union), 2 = subtract. Set by JS from the Shift/Alt modifier when the
     /// `ih_selection_bool` flag is on; the producers (wand/edge/color-range and
     /// the lasso at close) route through `apply_produced_selection`. Stays 0
-    /// when the flag is off, so nothing about the shipped behaviour changes.
+    /// when the flag is off, so nothing about the shipped behavior changes.
     selection_combine: u8,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
@@ -518,7 +521,7 @@ pub struct ImageHorseTool {
     /// Active-layer snapshot at stroke start; the stroke is recomposited over it
     /// each move so the rendered opacity stays exactly the slider value.
     paint_base: Vec<u8>,
-    /// Stroke colour / opacity / radius — fixed for the whole stroke.
+    /// Stroke color / opacity / radius — fixed for the whole stroke.
     paint_color: (u8, u8, u8),
     paint_opacity: f32,
     paint_radius: f64,
@@ -530,9 +533,9 @@ pub struct ImageHorseTool {
     /// the smoothstep falloff. 1.0 = crisp edge, lower = softer. Shared by the
     /// paint brush and the eraser (set on `paint_down` / `erase_down`).
     paint_hardness: f32,
-    /// When true the active stroke is an ERASER: instead of laying down colour it
+    /// When true the active stroke is an ERASER: instead of laying down color it
     /// clears the active layer's alpha (coverage × opacity) toward transparent,
-    /// keeping the base RGB so partial erases fade out without a colour shift.
+    /// keeping the base RGB so partial erases fade out without a color shift.
     paint_erase: bool,
     /// When true the active stroke paints the active layer's MASK (grayscale)
     /// rather than its pixels — same dab/coverage/stabilizer engine, but the
@@ -584,10 +587,13 @@ pub struct ImageHorseTool {
     /// In-flight paint/erase stroke being recorded: (painted polyline, brush).
     #[cfg(feature = "tiles")]
     rec_stroke: Option<(Vec<(f64, f64)>, crate::ops::Brush)>,
-    /// In-flight effects stroke: (dab centres, radius, intensity, mode).
+    /// In-flight effects stroke: (dab centers, radius, intensity, mode).
     #[cfg(feature = "tiles")]
     #[allow(clippy::type_complexity)]
     rec_effect: Option<(Vec<(f64, f64)>, f64, u32, u8)>,
+    /// Open tonal preview (Levels or a color preset): the untouched layer
+    /// copy. ONE slot for both — see `tonal_preview.rs`.
+    tonal_preview: Option<crate::tonal_preview::TonalPreview>,
 }
 
 impl ImageHorseTool {
@@ -932,6 +938,7 @@ impl ImageHorseTool {
             rec_stroke: None,
             #[cfg(feature = "tiles")]
             rec_effect: None,
+            tonal_preview: None,
         }
     }
 
@@ -985,7 +992,7 @@ impl ImageHorseTool {
     /// `(img_w + 2*pad) × (img_h + 2*pad)`, and the stack becomes:
     ///   • a **Canvas** layer (`LayerKind::Canvas`) — a solid `bg_*` fill
     ///     (`bg_a = 0` ⇒ transparent canvas), sized to the whole document, and
-    ///   • a **Photo** layer — the incoming RGBA `pixels` pasted centred at
+    ///   • a **Photo** layer — the incoming RGBA `pixels` pasted centered at
     ///     `(pad, pad)`, transparent elsewhere.
     /// The Photo layer is left active so the first edit targets the image, not
     /// the backing canvas. Otherwise mirrors `load_image` (clears history,
@@ -1397,131 +1404,22 @@ impl ImageHorseTool {
         let Some(content) = self.content_idx() else {
             return;
         };
-        let mut pending: Vec<crate::ops::Op> = Vec::new();
-        {
+        // The diff itself is pure — a function of the two lists and the log's
+        // document — so it lives in `ops.rs` next to the variants it emits,
+        // where its four skipped-field hazards are documented once beside the
+        // fields that cause them.
+        let pending = {
             // Guarded, not unwrapped — see oplog_sync_canvas for the rationale.
             let Some(log_ref) = self.oplog.as_ref() else {
                 return;
             };
-            let log_doc = log_ref.live_document();
             let layer = &self.layers[content];
-            if layer.text_annotations.is_empty()
-                && layer.shape_annotations.is_empty()
-                && log_doc.texts.is_empty()
-                && log_doc.shapes.is_empty()
-            {
-                return;
-            }
-            for lt in &log_doc.texts {
-                if !layer.text_annotations.iter().any(|a| a.id == lt.id) {
-                    pending.push(crate::ops::Op::TextRemove { id: lt.id });
-                }
-            }
-            for a in &layer.text_annotations {
-                let params = crate::ops::TextParams::from_annotation(a);
-                // ⚠️ `wrap_width`, `box_height`, `perspective` AND `font_id`
-                // are all `#[serde(skip)]` on `TextParams` (they have to be —
-                // see the fields' comments), so `TextAdd`/`TextEdit` physically
-                // CANNOT carry any of them. Each needs its own op — `TextWrap`
-                // / `TextBoxHeight` / `TextPerspective` / `TextFont` — or
-                // replay rebuilds the text unboxed, unwarped and in the wrong
-                // typeface, the composite hash diverges, and the log marks
-                // itself broken, silently dropping the user to snapshot undo.
-                // The four are handled identically; keep them that way. One of
-                // them being forgotten is what this comment exists to prevent,
-                // and it has already happened twice (v8.42, v8.76).
-                match log_doc.texts.iter().find(|t| t.id == a.id) {
-                    None => {
-                        let wrap = params.wrap_width;
-                        let box_h = params.box_height;
-                        let quad = params.perspective;
-                        let font = params.font_id.clone();
-                        pending.push(crate::ops::Op::TextAdd(params));
-                        if wrap != 0 {
-                            pending.push(crate::ops::Op::TextWrap {
-                                id: a.id,
-                                wrap_width: wrap,
-                            });
-                        }
-                        if box_h != 0 {
-                            pending.push(crate::ops::Op::TextBoxHeight {
-                                id: a.id,
-                                box_height: box_h,
-                            });
-                        }
-                        // The "unset" sentinel for the quad is the IDENTITY,
-                        // not zero — the other two axes get to use 0 because 0
-                        // means "auto" for them, whereas an all-zero quad is a
-                        // collapsed point. Emitting nothing here leaves replay
-                        // at the identity, which is the same thing.
-                        if !crate::perspective::is_identity(&quad) {
-                            pending.push(crate::ops::Op::TextPerspective { id: a.id, quad });
-                        }
-                        // "" is the embedded face — same "unset means the
-                        // default" shape as `wrap == 0`.
-                        if !font.is_empty() {
-                            pending.push(crate::ops::Op::TextFont {
-                                id: a.id,
-                                font_id: font,
-                            });
-                        }
-                    }
-                    Some(t) => {
-                        if t.wrap_width != params.wrap_width {
-                            pending.push(crate::ops::Op::TextWrap {
-                                id: a.id,
-                                wrap_width: params.wrap_width,
-                            });
-                        }
-                        if t.box_height != params.box_height {
-                            pending.push(crate::ops::Op::TextBoxHeight {
-                                id: a.id,
-                                box_height: params.box_height,
-                            });
-                        }
-                        if t.perspective != params.perspective {
-                            pending.push(crate::ops::Op::TextPerspective {
-                                id: a.id,
-                                quad: params.perspective,
-                            });
-                        }
-                        if t.font_id != params.font_id {
-                            pending.push(crate::ops::Op::TextFont {
-                                id: a.id,
-                                font_id: params.font_id.clone(),
-                            });
-                        }
-                        // Compare everything EXCEPT the four skipped fields,
-                        // which the branches above already accounted for —
-                        // otherwise a box-only drag would also emit a redundant
-                        // TextEdit (and `TextParams` derives PartialEq over the
-                        // real fields, `#[serde(skip)]` or not, so they DO
-                        // count here).
-                        let mut without_box = t.clone();
-                        without_box.wrap_width = params.wrap_width;
-                        without_box.box_height = params.box_height;
-                        without_box.perspective = params.perspective;
-                        without_box.font_id = params.font_id.clone();
-                        if without_box != params {
-                            pending.push(crate::ops::Op::TextEdit(params));
-                        }
-                    }
-                }
-            }
-            for ls in &log_doc.shapes {
-                if !layer.shape_annotations.iter().any(|s| s.id == ls.id) {
-                    pending.push(crate::ops::Op::ShapeRemove { id: ls.id });
-                }
-            }
-            for s in &layer.shape_annotations {
-                let params = crate::ops::ShapeParams::from_annotation(s);
-                match log_doc.shapes.iter().find(|p| p.id == s.id) {
-                    None => pending.push(crate::ops::Op::ShapeAdd(params)),
-                    Some(p) if *p != params => pending.push(crate::ops::Op::ShapeEdit(params)),
-                    _ => {}
-                }
-            }
-        }
+            crate::ops::annotation_sync_ops(
+                &layer.text_annotations,
+                &layer.shape_annotations,
+                log_ref.live_document(),
+            )
+        };
         for op in pending {
             self.oplog_record(op);
         }
@@ -1529,7 +1427,7 @@ impl ImageHorseTool {
 
     /// Refresh the log's Canvas metadata from the engine (ADR-016).
     ///
-    /// The Canvas is metadata, so changing it — recolouring the artboard,
+    /// The Canvas is metadata, so changing it — recoloring the artboard,
     /// hiding it, dropping its opacity — is NOT an op. Without this the log's
     /// composite would still carry the old fill, the sync check would find a
     /// mismatch, and a routine canvas recolour would break op-log undo for the
@@ -1679,7 +1577,7 @@ impl ImageHorseTool {
     /// This is what lets a persisted log restore the FULL visual: the persisted
     /// pixel plane is the content layer alone, so without rebuilding the fill a
     /// restored artboard would come back transparent where the user had a
-    /// colour.
+    /// color.
     #[cfg(feature = "tiles")]
     fn restore_canvas_layer(&mut self, canvas: Option<crate::ops::CanvasParams>, w: u32, h: u32) {
         match canvas {
@@ -2188,6 +2086,9 @@ impl ImageHorseTool {
         let w = self.width as i32;
         let h = self.height as i32;
         let snap = self.make_snapshot(&format!("Stamp {}", self.stamp.stroke_counter + 1));
+        // The stroke changes pixels now but pushes its snapshot at the END, so
+        // move the generation here, where history actually changes (`History::generation`).
+        self.hist.generation += 1;
         let active = self.active;
         let layer = &mut self.layers[active];
         self.stamp.begin_stroke(
@@ -2611,9 +2512,9 @@ impl ImageHorseTool {
     /// owns three things measured in canvas coordinates — its buffer, its
     /// optional mask, and its live text/shape overlays — and for years this
     /// resampled only the first. The overlays kept their absolute coordinates
-    /// while the image shrank underneath them, so a shape centred on a 200px
+    /// while the image shrank underneath them, so a shape centered on a 200px
     /// canvas stayed at x=90 on a 100px one: 90% across a canvas it used to be
-    /// centred on. Reported as "the vector items move to the side instead of
+    /// centered on. Reported as "the vector items move to the side instead of
     /// anchoring in the same spot". Masks had the quieter version of the same
     /// bug: `render_layer` skips a mask whose length no longer matches the
     /// canvas, so a resize silently switched masking off altogether.
@@ -2676,11 +2577,11 @@ impl ImageHorseTool {
                         (a.wrap_width as f64 * s_uniform) as u32,
                         // Both box axes are canvas-space measurements, so both
                         // scale with the image. Leaving the height unscaled
-                        // would let a resize pull the type off-centre inside
+                        // would let a resize pull the type off-center inside
                         // its own background.
                         (a.box_height as f64 * s_uniform) as u32,
                         // NOT scaled — and that is the point of storing the
-                        // quad normalised. The corners are fractions of the
+                        // quad normalized. The corners are fractions of the
                         // tile, so they mean the same shape at any size; a
                         // resize re-renders the text bigger and re-applies the
                         // identical perspective, with nothing to keep in step.
@@ -2746,9 +2647,9 @@ impl ImageHorseTool {
     ///
     /// `anchor` is a 0..=8 Photoshop nine-grid position
     /// (`0` TL, `1` TC, `2` TR, `3` ML, `4` MC, `5` MR, `6` BL, `7` BC, `8` BR);
-    /// `4` (centre) is the default the UI uses. The offset is the position of
+    /// `4` (center) is the default the UI uses. The offset is the position of
     /// the old top-left within the new canvas: each axis is flush at the start
-    /// (`col/row 0`), centred (`1`), or flush at the end (`2`).
+    /// (`col/row 0`), centered (`1`), or flush at the end (`2`).
     ///
     /// The bottom **Background** layer of a multi-layer document (the solid
     /// backing canvas built by `load_image_artboard`) is rebuilt to the full
@@ -2769,7 +2670,7 @@ impl ImageHorseTool {
         bg_a: u8,
     ) {
         // Zero dimensions are invalid. A same-size call is intentionally NOT
-        // short-circuited: it re-fills the backing layer (so a backing-colour
+        // short-circuited: it re-fills the backing layer (so a backing-color
         // change with an unchanged border still repaints) while preserving the
         // content layers byte-for-byte at offset 0.
         if new_w == 0 || new_h == 0 {
@@ -2780,7 +2681,7 @@ impl ImageHorseTool {
         let (nw, nh) = (new_w as i32, new_h as i32);
 
         // Anchor → where the old top-left lands in the new canvas. `col`/`row`
-        // pick 0 = flush start, 1 = centred, 2 = flush end on each axis.
+        // pick 0 = flush start, 1 = centered, 2 = flush end on each axis.
         let col = (anchor % 3) as i32;
         let row = (anchor / 3) as i32;
         let off_x = match col {
@@ -2881,7 +2782,7 @@ impl ImageHorseTool {
     }
 
     /// Normalize the current document to an **artboard**: the photo content at
-    /// its native size, centred, with a uniform `pad`-px border filled with
+    /// its native size, centered, with a uniform `pad`-px border filled with
     /// `bg_*` (`bg_a = 0` ⇒ transparent ⇒ checkerboard). This is the IDEMPOTENT,
     /// ABSOLUTE counterpart to the old delta-based live border — calling it with
     /// the same `pad` always yields exactly
@@ -3193,7 +3094,7 @@ impl ImageHorseTool {
     /// the text by `bg_padding` on every side, so the text itself never
     /// shifts and callers don't need to re-derive their placement math when
     /// background is toggled on.
-    /// `angle_deg` rotates the rendered tile clockwise (positive) around its centre.
+    /// `angle_deg` rotates the rendered tile clockwise (positive) around its center.
     ///
     /// `background_kind`: 0 = none, 1 = solid rect. NOT 2 (speech bubble) —
     /// batch text is a one-shot flatten with no live overlay to hang a
@@ -3203,7 +3104,7 @@ impl ImageHorseTool {
     /// so the rect-fill/padding/corner-radius rendering can't drift between
     /// the live-overlay and batch entry points.
     /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
-    /// `target_size`, and composite it centred on (dest_x, dest_y).
+    /// `target_size`, and composite it centered on (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_red pipeline for red stamps.
     pub fn commit_red_stamp(
         &mut self,
@@ -3255,7 +3156,7 @@ impl ImageHorseTool {
         self.layers[self.active].buf.data[idx..idx + 4].to_vec()
     }
 
-    /// Returns a flat RGBA grid of (2*radius+1)² pixels centred on (cx, cy).
+    /// Returns a flat RGBA grid of (2*radius+1)² pixels centered on (cx, cy).
     /// Out-of-bounds pixels are returned as opaque black.
     pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
         let side = 2 * radius + 1;
@@ -3349,7 +3250,7 @@ fn resize_mask(mask: &[u8], ow: u32, oh: u32, nw: u32, nh: u32, filter: u8) -> V
 ///
 /// Stateless and offline: no account, no network, no per-image cost, so batch
 /// renaming works in demo mode. See `describe.rs` for what the tags mean — in
-/// particular, this describes an image, it does not recognise objects in it.
+/// particular, this describes an image, it does not recognize objects in it.
 #[wasm_bindgen]
 pub fn describe_image(pixels: &[u8], w: u32, h: u32) -> String {
     describe::describe(pixels, w, h).to_json()
@@ -3640,7 +3541,7 @@ pub fn constrain_crop_to_ratio(
     Some(vec![x as u32, y as u32, w_u, h_u])
 }
 
-/// Compute the largest centred rectangle with the given aspect ratio that
+/// Compute the largest centered rectangle with the given aspect ratio that
 /// fits inside an `image_w` × `image_h` image. Used by the Crop tool's
 /// ratio buttons (1:1, 4:3, 16:9, …) so the JS side doesn't reinvent the
 /// math. Returns `[x, y, w, h]` as a `Uint32Array`, or `undefined` (`None`)
@@ -3676,7 +3577,7 @@ pub fn compute_aspect_crop(
 mod layer_tests {
     use super::*;
 
-    /// A solid WxH RGBA image filled with one colour.
+    /// A solid WxH RGBA image filled with one color.
     fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
         let mut v = Vec::with_capacity((w * h * 4) as usize);
         for _ in 0..(w * h) {
@@ -3723,7 +3624,7 @@ mod layer_tests {
     fn commit_text_kind_one_paints_a_padded_background_rect() {
         // Same call, background_kind = 1 (solid rect), padding 5: the same
         // probe point (inside the padding, left of the text) is now the
-        // opaque background colour.
+        // opaque background color.
         let mut t = ImageHorseTool::new(200, 100);
         let dest_x = 50i32;
         let dest_y = 30i32;
@@ -3746,10 +3647,10 @@ mod layer_tests {
         // whether or not a background is drawn — the rect grows OUTWARD from
         // the text, never displacing it. Compare the first FULLY-opaque,
         // pure-white pixel scanning rightward from dest_x on the vertical
-        // centre row: a fully-covered glyph pixel is backdrop-independent
-        // (the `over` operator reduces to the source colour at alpha=255),
+        // center row: a fully-covered glyph pixel is backdrop-independent
+        // (the `over` operator reduces to the source color at alpha=255),
         // so this is immune to the anti-aliased edge blending differently
-        // against a transparent vs. a coloured background.
+        // against a transparent vs. a colored background.
         let text_col = |bg_on: bool| -> u32 {
             let mut t = ImageHorseTool::new(200, 100);
             let dest_x = 50i32;
@@ -3791,26 +3692,26 @@ mod layer_tests {
     #[test]
     fn artboard_load_pads_and_makes_two_layers() {
         // 4×4 red photo, 2px white canvas border → 8×8 document, two layers,
-        // photo active. Corner is the white canvas; centre is the red photo.
+        // photo active. Corner is the white canvas; center is the red photo.
         let mut t = ImageHorseTool::new(8, 8);
         t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 2, 255, 255, 255, 255);
         assert_eq!((t.width, t.height), (8, 8));
         assert_eq!(t.layer_count(), 2);
         assert_eq!(t.active, 1, "photo layer is active");
         assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner = canvas");
-        assert_eq!(px(&t, 4, 4), [255, 0, 0, 255], "centre = photo");
+        assert_eq!(px(&t, 4, 4), [255, 0, 0, 255], "center = photo");
     }
 
     #[test]
     fn resize_canvas_grows_without_resampling() {
         // 4×4 red photo on a 2px white artboard → 8×8 doc, two layers. Mark a
         // single distinctive pixel on the Photo layer, then grow the canvas to
-        // 16×16 centred (no resample). The doc grows, the marked pixel survives
+        // 16×16 centered (no resample). The doc grows, the marked pixel survives
         // byte-for-byte at its shifted location (a resample would blend it with
         // its red neighbours), and the freshly exposed border is the bg fill.
         let mut t = ImageHorseTool::new(8, 8);
         t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 2, 255, 255, 255, 255);
-        // Photo layer (index 1) doc-coord (2,2) = photo top-left → unique colour.
+        // Photo layer (index 1) doc-coord (2,2) = photo top-left → unique color.
         let i = ((2 * 8 + 2) * 4) as usize;
         t.layers[1].buf.data[i..i + 4].copy_from_slice(&[1, 2, 3, 255]);
 
@@ -3818,21 +3719,21 @@ mod layer_tests {
 
         assert_eq!((t.width, t.height), (16, 16), "doc grew");
         assert_eq!(t.layer_count(), 2, "layer count unchanged");
-        // Centre offset = (16-8)/2 = 4, so doc(2,2) → doc(6,6).
+        // Center offset = (16-8)/2 = 4, so doc(2,2) → doc(6,6).
         assert_eq!(
             px(&t, 6, 6),
             [1, 2, 3, 255],
             "photo pixel preserved exactly (not resampled)"
         );
-        // Photo centre red(4,4) → doc(8,8) still pure red.
-        assert_eq!(px(&t, 8, 8), [255, 0, 0, 255], "photo centre preserved");
+        // Photo center red(4,4) → doc(8,8) still pure red.
+        assert_eq!(px(&t, 8, 8), [255, 0, 0, 255], "photo center preserved");
         // Freshly exposed corner is the white backing fill.
         assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "new border = bg fill");
     }
 
     #[test]
     fn resize_canvas_shrinks_and_crops() {
-        // Shrink an 8×8 artboard to 4×4 centred: offset = (4-8)/2 = -2, so the
+        // Shrink an 8×8 artboard to 4×4 centered: offset = (4-8)/2 = -2, so the
         // photo region (2..6) lands at (0..4) and fills the whole smaller doc.
         let mut t = ImageHorseTool::new(8, 8);
         t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 2, 0, 0, 0, 0);
@@ -3856,7 +3757,7 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(44, 44);
         t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 20, 200, 200, 200, 255);
         assert_eq!((t.width, t.height), (44, 44), "jumbo doc");
-        // Mark the photo top-left (doc 20,20) with a unique colour so we can
+        // Mark the photo top-left (doc 20,20) with a unique color so we can
         // prove the photo is re-blitted, not resampled.
         let i = ((20 * 44 + 20) * 4) as usize;
         t.layers[1].buf.data[i..i + 4].copy_from_slice(&[1, 2, 3, 255]);
@@ -3886,7 +3787,7 @@ mod layer_tests {
     #[test]
     fn set_artboard_border_grows_backing_for_single_layer_doc() {
         // A plain single-layer photo (load_image) gains a Background + Photo
-        // pair when bordered, with the photo centred inside the pad.
+        // pair when bordered, with the photo centered inside the pad.
         let mut t = ImageHorseTool::new(4, 4);
         t.load_image(&solid(4, 4, [0, 0, 255, 255]));
         assert_eq!(t.layer_count(), 1, "starts single-layer");
@@ -3895,7 +3796,7 @@ mod layer_tests {
         assert_eq!((t.width, t.height), (24, 24), "photo + 2*pad");
         assert_eq!(t.layer_count(), 2, "grew a Background layer");
         assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner = backing");
-        assert_eq!(px(&t, 11, 11), [0, 0, 255, 255], "photo centred at (10,10)");
+        assert_eq!(px(&t, 11, 11), [0, 0, 255, 255], "photo centered (10,10)");
 
         // Idempotent on the now-two-layer doc too.
         t.set_artboard_border(10, 255, 255, 255, 255);
@@ -3932,9 +3833,9 @@ mod layer_tests {
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // Rect (4,4)-(16,16), solid blue fill (kind 1), thin black stroke.
         t.add_shape_annotation(
-            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0,
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0, 0,
         );
-        let p = px(&t, 10, 10); // interior centre
+        let p = px(&t, 10, 10); // interior center
         assert_eq!(
             [p[0], p[1], p[2]],
             [0, 0, 255],
@@ -3948,7 +3849,7 @@ mod layer_tests {
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // fill_kind 0 = none → interior stays white.
         t.add_shape_annotation(
-            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         assert_eq!(px(&t, 10, 10), [255, 255, 255, 255]);
     }
@@ -3958,9 +3859,9 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(40, 40);
         t.load_image(&solid(40, 40, [255, 255, 255, 255]));
         // Horizontal (angle 0) gradient red→green across a wide rect; no stroke
-        // bleed in the centre band we sample.
+        // bleed in the center band we sample.
         t.add_shape_annotation(
-            0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0,
+            0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0, 0,
         );
         let left = px(&t, 6, 20);
         let right = px(&t, 34, 20);
@@ -4024,7 +3925,7 @@ mod layer_tests {
             [0, 0, 255],
             "interior of a near-closed circle should be blue fill, got {centre:?}"
         );
-        // Well inside, off-centre, still filled.
+        // Well inside, off-center, still filled.
         let inner = px(&t, 20, 14);
         assert_eq!(
             [inner[0], inner[1], inner[2]],
@@ -4068,7 +3969,7 @@ mod layer_tests {
         assert_eq!(
             px(&t, 10, 10),
             [0, 0, 0, 255],
-            "brush centre redacted to black"
+            "brush center redacted to black"
         );
         assert_eq!(
             px(&t, 0, 0),
@@ -4083,14 +3984,14 @@ mod layer_tests {
         t.load_image(&solid(32, 32, [40, 80, 120, 255]));
         t.begin_pixelate_stroke();
         t.pixelate_region(16.0, 16.0, 16.0, 8);
-        // Averaging a uniform region leaves the colour unchanged.
+        // Averaging a uniform region leaves the color unchanged.
         assert_eq!(px(&t, 16, 16), [40, 80, 120, 255]);
     }
 
     #[test]
     fn shape_pixelate_fill_quantizes_into_blocks() {
         let mut t = ImageHorseTool::new(16, 16);
-        // Horizontal grey ramp so neighbouring columns differ before pixelating.
+        // Horizontal gray ramp so neighbouring columns differ before pixelating.
         let mut data = Vec::with_capacity(16 * 16 * 4);
         for _y in 0..16 {
             for x in 0..16u32 {
@@ -4101,7 +4002,7 @@ mod layer_tests {
         t.load_image(&data);
         // Whole-image rect, pixelate fill (kind 3), one 16px block → one cell.
         t.add_shape_annotation(
-            0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16,
+            0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16, 0,
         );
         let a = px(&t, 2, 8);
         let b = px(&t, 13, 8);
@@ -4116,7 +4017,7 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         t.add_shape_annotation(
-            0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24,
+            0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24, 0,
         );
         let json = t.get_layer_shape_annotations(0);
         assert!(json.contains("\"fill_block\":24"), "got {json}");
@@ -4324,7 +4225,7 @@ mod layer_persistence_tests {
         assert_eq!(t.layer_count(), 2);
         assert_eq!(t.active, 1);
         assert_ne!(id0, id1);
-        // Top layer transparent → bottom colour shows through.
+        // Top layer transparent → bottom color shows through.
         assert_eq!(px(&t, 0, 0), [10, 20, 30, 255]);
         // Per-layer PNG serialization is non-empty.
         assert!(!t.get_layer_png(0).is_empty());
@@ -4337,7 +4238,7 @@ mod layer_persistence_tests {
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         // Shape on the base layer (active = 0).
         t.add_shape_annotation(
-            0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         // New empty top layer.
         t.add_layer("top");
@@ -4391,7 +4292,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(200, 200);
         t.load_image(&solid(200, 200, [255, 255, 255, 255]));
         t.add_shape_annotation(
-            6, 20.0, 40.0, 60.0, 80.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            6, 20.0, 40.0, 60.0, 80.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         t.layers[t.active].shape_annotations[0].points = vec![(20.0, 40.0), (60.0, 80.0)];
 
@@ -4435,7 +4336,7 @@ mod layer_persistence_tests {
             "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
         );
         t.add_shape_annotation(
-            1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         // Crop a 10x10 rect starting at (5,5) — annotations must shift by
         // (-5,-5) to stay anchored to the same photo content, matching the

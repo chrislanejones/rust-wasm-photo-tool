@@ -13,6 +13,7 @@ export const defaultToolSettings: ToolSettings = {
   fillColor2: "#ec4899",
   gradientAngle: 0,
   fillBlock: 16,
+  sloppiness: 0,
   brushColor: "#ef4444",
   brushOpacity: 100,
   brushHardness: 80,

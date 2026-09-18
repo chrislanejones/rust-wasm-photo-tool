@@ -7,7 +7,7 @@
 //   structurally; worker ON is accepted behaviorally only after local and
 //   worker implementations pass the same contract.
 //
-// This file proves the STRUCTURAL half. It cannot prove the behavioural half —
+// This file proves the STRUCTURAL half. It cannot prove the behavioral half —
 // that needs a running worker and an op-log equivalence run, which is a12/a13.
 //
 // WHY A RATCHET AND NOT A BOOLEAN. Value-consuming sites start un-awaited
@@ -764,7 +764,43 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // has no `.length` and no indices, so an un-awaited read would silently
     // produce `undefined` bounds and fall back to the document — the exact
     // number this change exists to stop reporting.
-    // Fonts — 137 -> 140: three awaited sites born with the feature, all in
+    // Levels (#87) — 137 -> 141: `useTransforms`' Levels controls, born
+    // awaited. `levels_preview_set` (twice: the move, and the retry after a
+    // re-begin), `tonal_preview_cancel` and `levels_apply` all return a
+    // boolean that decides whether to flush or re-begin, and under the worker
+    // an un-awaited boolean is a Promise, which is always truthy: a stale
+    // preview would never re-begin and every cancel would flush for nothing.
+    // Remaining stays 5 and un-awaited stays 0, so nothing new is unconverted.
+    // Presets (#88) — 141 -> 144: `useTransforms`' preset controls add SIX
+    // engine calls, of which three are counted here and three are not. The
+    // three inside the hover loop (`preset_preview_set` twice and the
+    // `tonal_preview_begin` that retries after a stale drop) classify as
+    // `c-hot-path`, the same bucket Levels' own `levels_preview_set` sits in,
+    // because they run per pointer-move. The three counted are the discrete
+    // ones: `tonal_preview_begin` opening the slot, `tonal_preview_cancel`
+    // deciding whether to flush on leave, and `preset_apply` returning whether
+    // pixels changed. Born awaited for the usual reason — under the worker an
+    // un-awaited boolean is a Promise and always truthy, so a hover that never
+    // changed anything would still flush and a stale preview would never
+    // re-begin. Remaining stays 5 and un-awaited stays 0.
+    // Perspective on SHAPES (#130) — 144 -> 146: rebased onto Levels and
+    // Presets, so this pair stacks on 144 rather than the 137 it was written
+    // against. The Perspective tool reaching SHAPES adds TWO
+    // awaited sites in `usePerspectiveTool`, both born awaited rather than
+    // converted and both the exact twins of the text pair already counted
+    // above: `shape_perspective_of` (the reselect seed — it CONSUMES the
+    // stored quad, so it could never have been fire-and-forget; un-awaited it
+    // hands `fromFlat` a Promise, whose `.length` is undefined, and every
+    // reselect would silently restart from a plain rectangle) and
+    // `set_shape_perspective` (the commit, whose boolean decides whether the
+    // canvas is flushed and the history re-synced — and an un-awaited Promise
+    // is truthy, so a refused quad would still repaint and log a step). The
+    // gate numbers below (5 exempt / 0 unawaited / 0 truthy) are again
+    // unchanged, which is the point of updating this number deliberately
+    // instead of loosening the assertion.
+    // Fonts (#131) — 146 -> 149: rebased onto Levels, Presets and shape
+    // perspective, so these three stack on 146 rather than the 137 the branch
+    // was written against. Three awaited sites born with the feature, all in
     // `engineFonts.ts` / `useTextTool.ts`. `register_font` and `has_font` are
     // value-consuming in the sense that matters here: un-awaited, `has_font`
     // returns a Promise, every Promise is truthy, and `availableFaces` would
@@ -773,7 +809,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // real id for the life of the page. `set_text_font` is awaited for the same
     // reason its siblings `set_text_wrap_width` and `set_text_box_height` are:
     // it must land before the commit's flush reads the tile.
-    expect(gate.awaited, "cumulative converted sites").toBe(140);
+    expect(gate.awaited, "cumulative converted sites").toBe(149);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

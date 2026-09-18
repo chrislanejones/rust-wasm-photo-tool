@@ -138,7 +138,8 @@ export interface PersistedAnnotation {
  *  `get_shape_annotations`. The `id` is regenerated on restore. */
 export interface PersistedShape {
   id?: number;
-  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow,5=pin,6=polyline
+  kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
+                // 6=polyline,7=bezier,8=diamond,9=star
   x0: number;
   y0: number;
   x1: number;
@@ -152,6 +153,11 @@ export interface PersistedShape {
   number?: number;
   /** Pin label style (kind 5): 0 = number, 1 = letter. Absent on older saves. */
   label_kind?: number;
+  /** Stroke sloppiness 0-100 (how hand-drawn the outline is). Absent on older
+   *  saves — meaning "firm", so restore defaults to 0 (kind 3 hand-drawn
+   *  circles read as a sloppy circle instead; the engine re-renders them as a
+   *  circle at seed their look — see SHAPE_KIND_NAME). */
+  sloppiness?: number;
   /** Interior fill (rect/circle): 0 none, 1 solid, 2 linear gradient. Older
    *  saves omit these — treat absent as 0/no-fill on restore. */
   fill_kind?: number;

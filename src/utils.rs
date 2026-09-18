@@ -13,7 +13,7 @@
 ///
 /// Infinity was never the problem — `f64::INFINITY.clamp(0.0, 1.0)` is 1.0 —
 /// which is exactly why the NaN case looked guarded and was not. Both go
-/// through here so there is one rule instead of two behaviours.
+/// through here so there is one rule instead of two behaviors.
 ///
 /// Reachable from a `.ora` import, not just from the slider: `stackXml.ts`
 /// reads `opacity` off the file with `parseFloat`, and `parseFloat("abc")` is
@@ -101,9 +101,9 @@ pub(crate) fn pin_label(number: u32, label_kind: u8) -> String {
     chars.iter().rev().collect()
 }
 /// Tight ink bounding box (min_x, min_y, max_x, max_y inclusive) of a rendered
-/// RGBA tile — the extent of pixels with non-trivial alpha. Used to centre a
+/// RGBA tile — the extent of pixels with non-trivial alpha. Used to center a
 /// glyph by its *visual* mass rather than its padded line box, so a single
-/// digit or letter lands dead-centre on the pin disc.
+/// digit or letter lands dead-center on the pin disc.
 pub(crate) fn ink_bounds(pixels: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
     let (mut min_x, mut min_y, mut max_x, mut max_y) = (w, h, 0u32, 0u32);
     let mut found = false;

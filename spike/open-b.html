@@ -119,7 +119,7 @@ push("display size after worker resize", afterResize, beforeResize + " (unchange
 
 // ── 7. worker can still read its own pixels back ────────────────────────
 const pr = await ask({ type: "probe" });
-push("worker pixel readback at (10,10)", pr.px, "the drawn colour", pr.ok ? "PASS" : "FAIL");
+push("worker pixel readback at (10,10)", pr.px, "the drawn color", pr.ok ? "PASS" : "FAIL");
 
 document.getElementById("out").innerHTML =
   "<table><tr><th>check</th><th>got</th><th>expected</th><th>verdict</th></tr>" +
