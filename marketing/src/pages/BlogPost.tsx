@@ -2,18 +2,26 @@ import { Link, useParams } from "react-router-dom";
 import Footer from "../components/Footer";
 import NotFound from "./NotFound";
 import { POSTS, fmtPostDate, postFor, postPath } from "../data/posts";
-import { POST_BODIES } from "../posts/registry";
+import { POST_BODIES, POST_TOPPERS } from "../posts/registry";
 import { AUTHOR } from "../seo";
 import { EDITOR_URL, external } from "../config";
 
 /* /blog/:slug — the article shell.
  *
  * The shell owns everything around the writing: the way back, the headline, the
- * dateline, what to read next, and the footer. The post owns the words. That
- * split is what keeps a post file to prose and figures with no page furniture
- * in it, and it means a change to the dateline is one edit rather than one per
- * post.
+ * dateline, what to read next, and the footer. The post owns the words, and
+ * optionally a header banner — the picture behind the headline, never the
+ * headline itself. That split is what keeps a post file to prose and figures
+ * with no page furniture in it, and it means a change to the dateline is one
+ * edit rather than one per post.
  */
+
+const Sep = () => (
+  <span className="post-head__sep" aria-hidden="true">
+    ·
+  </span>
+);
+
 export default function BlogPost() {
   const { slug = "" } = useParams();
   const post = postFor(slug);
@@ -25,6 +33,7 @@ export default function BlogPost() {
   if (!post) return <NotFound />;
 
   const Body = POST_BODIES[post.slug];
+  const Topper = POST_TOPPERS[post.slug];
 
   // POSTS is newest first, so the entry before this one is the newer post.
   const i = POSTS.indexOf(post);
@@ -34,38 +43,42 @@ export default function BlogPost() {
   return (
     <>
       <main id="main">
-        <header className="post-head">
-          <div className="post-head__bloom" aria-hidden="true" />
-
-          {/* A real link up to the index, not a browser-history "back" — this
-              page is reachable from a search result, where there is nothing
-              behind it to go back to. */}
-          <p className="post-head__up">
-            <Link to="/blog">Blog</Link>
-          </p>
-
-          <h1 className="post-head__title">{post.headline}</h1>
-          <p className="post-head__deck">{post.deck}</p>
+        <header className={Topper ? "post-head post-head--topper" : "post-head"}>
+          {Topper ? (
+            <>
+              {/* The post's own scene, then a scrim that darkens the top for
+                  the nav and the foot for the headline. Both decorative. */}
+              <div className="post-head__scene" aria-hidden="true">
+                <Topper />
+              </div>
+              <div className="post-head__scrim" aria-hidden="true" />
+            </>
+          ) : (
+            <div className="post-head__bloom" aria-hidden="true" />
+          )}
 
           <p className="post-head__meta">
+            {/* A real link up to the index, not a browser-history "back" — this
+                page is reachable from a search result, where there is nothing
+                behind it to go back to. */}
+            <Link className="post-head__up" to="/blog">
+              Blog
+            </Link>
+            <Sep />
+            <span>{post.tag}</span>
+            <Sep />
             <time dateTime={post.published}>{fmtPostDate(post.published)}</time>
             {post.version && (
               <>
-                <span className="post-head__sep" aria-hidden="true">
-                  ·
-                </span>
+                <Sep />
                 <span className="post-head__version">{post.version}</span>
               </>
             )}
-            <span className="post-head__sep" aria-hidden="true">
-              ·
-            </span>
+            <Sep />
             <span>{AUTHOR.name}</span>
             {post.updated && (
               <>
-                <span className="post-head__sep" aria-hidden="true">
-                  ·
-                </span>
+                <Sep />
                 {/* Only ever shown when the post declares a real revision. */}
                 <span className="post-head__updated">
                   updated <time dateTime={post.updated}>{fmtPostDate(post.updated)}</time>
@@ -73,6 +86,9 @@ export default function BlogPost() {
               </>
             )}
           </p>
+
+          <h1 className="post-head__title">{post.headline}</h1>
+          <p className="post-head__deck">{post.deck}</p>
         </header>
 
         <article className="post">

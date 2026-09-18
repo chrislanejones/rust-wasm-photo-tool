@@ -2,10 +2,17 @@
 // Renders the raster brand assets that have to be PNG:
 //
 //   public/og/*.png            one social share card per route (1200×630)
+//   public/og/blog/<slug>.png  one per post, over the post's header scene
 //   public/apple-touch-icon.png    180×180, for an iOS home-screen bookmark
 //   public/icon-192.png, icon-512.png    the PWA manifest icons
 //
 //   node marketing/scripts/gen-og-images.mjs      (needs playwright; see below)
+//   node marketing/scripts/gen-og-images.mjs --posts    the post cards only
+//
+// `--posts` exists because the other ten files are pixel-stable but not
+// byte-stable: a newer Chromium encodes the same pixels into a different PNG,
+// so a full run rewrites every route card and icon with no visible change,
+// and a new post's card would arrive wrapped in ten binary diffs.
 //
 // ── why these are committed, not built ───────────────────────────────────
 // This script is NOT part of `pnpm build`. It needs a headless Chromium, and
@@ -24,13 +31,14 @@
 // link unfurls as a bare text row. 1200×630 is the size those scrapers crop to,
 // so rendering at exactly that avoids their crop deciding what gets cut off.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve, join } from "node:path";
+import { dirname, extname, resolve, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const marketing = resolve(here, "..");
 const outDir = join(marketing, "public", "og");
+const dist = join(marketing, "dist");
 
 // `@playwright/test` rather than a bare `playwright` dependency: the repo already
 // has it at the root for the e2e suite, pinned to the version the installed
@@ -51,7 +59,7 @@ try {
 
 // The route table is the source for the card text, same as for the <head>. It is
 // read from the SSR build so this script never needs its own TypeScript step.
-const { ROUTES, POSTS } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
+const { ROUTES, POSTS, postPath } = await import(join(marketing, "dist-ssr", "entry-server.js")).catch(() => {
   console.error("gen-og-images: run `pnpm build` first — it needs dist-ssr/entry-server.js.");
   process.exit(1);
 });
@@ -143,7 +151,9 @@ const page = await browser.newPage({
   deviceScaleFactor: 1,
 });
 
-for (const route of ROUTES) {
+const postsOnly = process.argv.includes("--posts");
+
+for (const route of postsOnly ? [] : ROUTES) {
   const [headline, kicker] = HEADLINE[route.to] ?? [route.title, ""];
   await page.setContent(card(headline.replace(/\n/g, "<br>"), kicker), {
     waitUntil: "load",
@@ -165,18 +175,215 @@ for (const route of ROUTES) {
  *
  * Written to og/blog/<slug>.png, mirroring the URL, so a post's card is
  * findable from its address without a lookup table.
+ *
+ * ── the scene behind it ──
+ * A post with a header banner (posts/registry.tsx) gets that banner's scene
+ * behind its card, the way the design draws it. The scene is NOT rebuilt here.
+ * The script opens the BUILT post, lets the site's own code draw the banner,
+ * and screenshots just the scene. A second copy of a three.js scene in a
+ * build script would drift from the page on the first edit, and nothing would
+ * notice.
+ *
+ * Reduced motion is emulated on purpose. Under it a scene draws one frame, the
+ * one the design picked for the still, and stops. So the card is the same
+ * picture on every run instead of whichever frame the timer landed on.
+ *
+ * The built site is served to the browser from dist/ by request interception,
+ * so there is no server and no port. Every other request is refused, except
+ * Google Fonts. That includes analytics: a render script must never count as
+ * a visit.
  */
+const ORIGIN = "http://og.localhost";
+const MIME = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
+};
+
+const siteContext = await browser.newContext({
+  viewport: { width: 1200, height: 630 },
+  deviceScaleFactor: 1,
+  reducedMotion: "reduce",
+});
+await siteContext.route("**/*", (route) => {
+  const url = new URL(route.request().url());
+  if (url.origin === ORIGIN) {
+    // /blog/<slug> is a directory index in dist/, as it is on Vercel.
+    let path = join(dist, decodeURIComponent(url.pathname));
+    if (!extname(path)) path = join(path, "index.html");
+    try {
+      return route.fulfill({
+        body: readFileSync(path),
+        contentType: MIME[extname(path)] ?? "application/octet-stream",
+      });
+    } catch {
+      return route.fulfill({ status: 404, body: "" });
+    }
+  }
+  if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
+    return route.continue();
+  }
+  return route.abort();
+});
+
+/** The post's header scene as a transparent PNG data URL, at card size, or
+ *  null for a post with no banner. */
+async function scenePlate(post) {
+  const site = await siteContext.newPage();
+  try {
+    await site.goto(`${ORIGIN}${postPath(post)}`, { waitUntil: "load" });
+    if ((await site.locator(".post-head__scene .scene").count()) === 0) return null;
+    // Everything but the scene goes invisible, and the scene's box becomes the
+    // viewport. Its canvas bleeds past that box exactly as it does in the
+    // header, so the crop is the one the design shows.
+    //
+    // ⚠️ The slot is pinned opaque with its fade switched off. The banner
+    // fades in, and the site's reduced-motion rule does not remove fades, it
+    // shortens every transition to 150ms. Two frames after "ready" the scene
+    // was still at 35% opacity, and the first card came out a quarter darker
+    // than the page with nothing to say why.
+    await site.addStyleTag({
+      content: `
+        html, body { background: transparent !important; }
+        body * { visibility: hidden !important; }
+        .post-head__scene, .post-head__scene * { visibility: visible !important; }
+        .post-head__scene { position: fixed !important; inset: 0 !important; opacity: 1 !important; }
+        .post-head__scene .scene__slot { opacity: 1 !important; transition: none !important; }
+      `,
+    });
+    await site.waitForSelector('.post-head__scene .scene[data-status="ready"]', { timeout: 30_000 });
+    // Two frames: one for the resize to land, one for the redraw it triggers.
+    await site.evaluate(
+      () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+    );
+    const png = await site.screenshot({ type: "png", omitBackground: true });
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } finally {
+    await site.close();
+  }
+}
+
+const logo = `data:image/svg+xml;base64,${readFileSync(
+  join(marketing, "public", "Image-Horse-Logo.svg"),
+).toString("base64")}`;
+
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* The post card, after the design's #og-card. Same tokens as the page, written
+ * out as literal oklch like the route card above. Sizes are the design's
+ * container units resolved at 1200px wide (1cqw = 12px).
+ *
+ * Unlike the route cards this one loads Geist and JetBrains Mono. The design
+ * is set in them and the card is mostly type, so the system fallback reads
+ * as a different card. The script warns if they did not load.
+ *
+ * The line under the headline is the deck's first clause, up to the em dash.
+ * The whole deck runs to four lines of mono at this size and crowds the
+ * headline up into the wordmark. */
+const postCard = (post, plate) => `<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=block">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    position: relative; overflow: hidden;
+    font-family: "Geist", system-ui, sans-serif;
+    color: oklch(95% 0.010 70);
+    background:
+      radial-gradient(60% 80% at 82% 0%, color-mix(in oklch, oklch(74% 0.220 50) 32%, transparent), transparent 70%),
+      radial-gradient(45% 70% at 0% 100%, color-mix(in oklch, oklch(60% 0.220 15) 22%, transparent), transparent 70%),
+      oklch(13% 0.018 35);
+  }
+  .plate { position: absolute; inset: 0; width: 1200px; height: 630px; opacity: 0.9; }
+  .scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      color-mix(in oklch, oklch(13% 0.018 35) 55%, transparent) 0%,
+      transparent 35%, transparent 55%,
+      color-mix(in oklch, oklch(13% 0.018 35) 92%, transparent) 100%);
+  }
+  .card {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 60px 66px;
+  }
+  .top { display: flex; align-items: center; gap: 14px; }
+  .tile {
+    display: grid; place-items: center;
+    width: 55px; height: 55px; border-radius: 12px;
+    background: oklch(95% 0.010 70);
+  }
+  .tile img { display: block; width: 43px; height: 43px; }
+  .mark { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+  .pill {
+    margin-left: 7px; padding: 4px 11px;
+    border: 1px solid oklch(40% 0.025 40); border-radius: 999px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: oklch(78% 0.015 60); white-space: nowrap;
+  }
+  .words { display: flex; flex-direction: column; gap: 17px; max-width: 78%; }
+  h1 {
+    font-size: 67px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em;
+    text-wrap: balance;
+    text-shadow: 0 2px 24px oklch(13% 0.018 35);
+  }
+  .dek {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 17px; line-height: 1.5; letter-spacing: 0.06em;
+    color: oklch(78% 0.015 60);
+  }
+  .url { color: oklch(74% 0.180 55); }
+</style></head>
+<body>
+  ${plate ? `<img class="plate" src="${plate}" alt="">` : ""}
+  <div class="scrim"></div>
+  <div class="card">
+    <div class="top">
+      <span class="tile"><img src="${logo}" alt=""></span>
+      <span class="mark">Image Horse</span>
+      <span class="pill">Engineering blog</span>
+    </div>
+    <div class="words">
+      <h1>${esc(post.headline)}</h1>
+      <p class="dek">${esc(post.deck.split(" — ")[0])} <span class="url">· imagehorse.app/blog</span></p>
+    </div>
+  </div>
+</body></html>`;
+
 mkdirSync(join(outDir, "blog"), { recursive: true });
 
 for (const post of POSTS) {
+  const plate = await scenePlate(post);
   await page.setViewportSize({ width: 1200, height: 630 });
-  await page.setContent(card(post.headline, `Blog · ${post.version ?? "Image Horse"}`), {
-    waitUntil: "load",
+  await page.setContent(postCard(post, plate), { waitUntil: "load" });
+  // Ask for the faces by name rather than trusting `fonts.ready` alone, which
+  // can resolve before layout has asked for them. `load` resolves to the faces
+  // it found, and to an empty list when the stylesheet never arrived. Not
+  // `fonts.check()`: it answers true for a family with no faces at all.
+  const fontsLoaded = await page.evaluate(async () => {
+    const want = ['700 67px "Geist"', '700 24px "Geist"', '17px "JetBrains Mono"'];
+    const got = await Promise.all(want.map((f) => document.fonts.load(f).catch(() => [])));
+    return got.every((faces) => faces.length > 0 && faces.every((f) => f.status === "loaded"));
   });
+  if (!fontsLoaded) {
+    console.warn(
+      `  ⚠ og/blog/${post.slug}.png: Geist or JetBrains Mono did not load (offline?). ` +
+        `The card was drawn in the system fallback; re-run with a network before committing it.`,
+    );
+  }
   const file = join(outDir, "blog", `${post.slug}.png`);
   writeFileSync(file, await page.screenshot({ type: "png" }));
-  console.log(`  og/blog/${post.slug}.png`);
+  console.log(`  og/blog/${post.slug}.png${plate ? "  (with its header scene)" : ""}`);
 }
+
+await siteContext.close();
 
 /* ── icons ────────────────────────────────────────────────────────────────
  * public/favicon.svg stays the favicon — SVG is the better format there and
@@ -201,11 +408,13 @@ const icon = (px) => `<!doctype html>
   }
 </style></head><body><div class="tile"></div></body></html>`;
 
-for (const [name, px] of [
+const ICONS = [
   ["apple-touch-icon", 180],
   ["icon-192", 192],
   ["icon-512", 512],
-]) {
+];
+
+for (const [name, px] of postsOnly ? [] : ICONS) {
   await page.setViewportSize({ width: px, height: px });
   await page.setContent(icon(px), { waitUntil: "load" });
   writeFileSync(join(marketing, "public", `${name}.png`), await page.screenshot({ type: "png" }));

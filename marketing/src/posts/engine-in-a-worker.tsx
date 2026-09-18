@@ -1,7 +1,9 @@
 /* "The engine left the main thread. The pixels stayed put."
  *
  * Body only — the headline, the deck, the dateline and the footer are the
- * shell's (pages/BlogPost.tsx). This file starts at the first paragraph.
+ * shell's (pages/BlogPost.tsx). This file starts at the first paragraph. The
+ * one thing it adds above that is `Topper`, the scene behind the shell's
+ * headline, at the bottom of this file.
  *
  * Every figure in here is in the repository. The blocking times and the
  * round-trip numbers come from docs/engine-worker-feasibility.md and
@@ -771,4 +773,14 @@ export default function EngineInAWorker() {
       <p className="post__kicker">The engine works in the back room now. The tab just paints.</p>
     </>
   );
+}
+
+/* The header banner. FIG 1's scene, full-bleed and unlabeled, behind the
+ * headline the shell renders — the shell owns the words, this owns what sits
+ * under them. Wired up in registry.tsx.
+ *
+ * The same picture is the post's share card: scripts/gen-og-images.mjs loads
+ * the built post, screenshots this scene, and lays the card over it. */
+export function Topper() {
+  return <Scene kind="threads" backdrop />;
 }

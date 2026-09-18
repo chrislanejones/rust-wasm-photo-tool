@@ -1,5 +1,6 @@
 /* The three WebGL scenes behind FIG 1, FIG 2 and FIG 4 of "The engine left
- * the main thread", and the loop that drives them.
+ * the main thread", and the loop that drives them. FIG 1's scene also runs,
+ * unlabeled, as the post's header banner (`backdrop`).
  *
  * Ported from Chris's Claude Design export (an <ih-scene> custom element),
  * with the same geometry, timing, labels and camera. Imperative on purpose: a
@@ -85,6 +86,9 @@ export interface SceneOptions {
   animate: boolean;
   showLabels: boolean;
   controls: boolean;
+  /** A header banner rather than a figure: the box fills the header, so it is
+   *  framed to cover rather than to show the whole diagram. See `size()`. */
+  backdrop?: boolean;
 }
 
 /* ── easing ─────────────────────────────────────────────────────────────── */
@@ -632,9 +636,12 @@ const BUILDERS: Record<SceneKind, (sc: SceneKit) => Ticker> = {
  *  available (three's renderer constructor does), which the caller turns into
  *  the static fallback. */
 export function createScene(o: SceneOptions): SceneHandle {
-  const { T, slot, controls, animate } = o;
+  const { T, slot, controls, animate, backdrop = false } = o;
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // A figure is at most ~1,100 CSS px wide. A backdrop is the whole header,
+  // which at 2× on a laptop is over four million pixels a frame for a picture
+  // that sits under a scrim at 85% opacity. 1.5× is sharp enough for that.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, backdrop ? 1.5 : 2));
   renderer.setClearColor(0x000000, 0);
   renderer.domElement.className = "scene__canvas";
   const layer = document.createElement("div");
@@ -670,12 +677,23 @@ export function createScene(o: SceneOptions): SceneHandle {
     // the aspect ratio keeps the left-to-right extent identical at every size
     // and spends the phone's extra height on empty air above and below, which
     // is the half nobody is reading.
+    //
+    // A backdrop wants the opposite. It is a picture behind a headline, not a
+    // diagram anyone reads, and holding the width on a phone-shaped header
+    // shrinks the whole scene to a thumbnail floating in the middle of the
+    // text. So it keeps the vertical field and lets a tall box crop the sides,
+    // which leaves the packets crossing the seam in the middle of the frame.
+    // Below 560px it widens the field by 1.35×. The design pulled the camera
+    // back by that factor instead, but the threads scene rewrites the camera's
+    // position every frame, and a wider field gives nearly the same picture
+    // without reaching into a builder. The two slab edges stay in view.
     const FOV_16_9 = 32;
     const REF = 16 / 9;
+    const widen = backdrop ? (w < 560 ? 1.35 : 1) : Math.max(1, REF / aspect);
     sc.camera.fov =
-      aspect >= REF
+      widen === 1
         ? FOV_16_9
-        : (2 * Math.atan(Math.tan((FOV_16_9 * Math.PI) / 360) * (REF / aspect)) * 180) / Math.PI;
+        : (2 * Math.atan(Math.tan((FOV_16_9 * Math.PI) / 360) * widen) * 180) / Math.PI;
     sc.camera.updateProjectionMatrix();
     dirty = true;
   };
