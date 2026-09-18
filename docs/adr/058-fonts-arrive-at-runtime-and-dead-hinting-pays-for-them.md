@@ -1,6 +1,7 @@
-# ADR-058: Fonts arrive at runtime, and the sentinel ceiling moves to pay for it
+# ADR-058: Fonts arrive at runtime, and dead hinting pays for them
 Date: 2026-09-11   Status: Accepted
-Resolves the open questions in ADR-051. Reviews the band set by ADR-045.
+Resolves the open questions in ADR-051. Reviews the band set by ADR-045 and
+leaves it exactly where it found it.
 
 ## Context
 
@@ -15,6 +16,13 @@ That left two ways to build it, and Chris picked from them directly:
 |---|---|
 | Embed a second family in the engine | **Blocked.** ADR-037's band, re-measured by ADR-045, does not have the bytes |
 | **Ship TTFs, `register_font` at runtime** | **Chosen** |
+
+⚠️ The "blocked" row is true of a **stock** TTF and was never re-checked
+against an unhinted one. A Liberation face with the hinting `ab_glyph` cannot
+run stripped out is **~30,000 B, not 61,972** — see the band-review section,
+which is where that stopped being a footnote. It does not change the decision
+(runtime loading is still right, and three families still do not fit), but the
+3× figure this ADR opens with is a measurement of a file, not of a constraint.
 
 ## Decision
 
@@ -73,21 +81,39 @@ oversight: two hand-written tables, one fix. Both panels now read one list
 through `useEngineFaces`, which is also the only thing allowed to decide that a
 face may be offered.
 
-## Op-log v5 → v6
+## Op-log v7 → v8
 
-The fourth application of the prefix-extension recipe documented on
+⚠️ **This was written as v5 → v6 and is not any more.** The branch sat
+unmerged from 09-11 to 09-17 while v6 (shape perspective, #130) and v7 (shape
+sloppiness, #179) shipped, and both of those claimed the number this step had
+taken. Rebasing the step is not cosmetic: `Op::TextFont` had been appended
+after `PerspectiveWarp`, and the two shape variants have since landed in front
+of it. **`TextFont` moved to the END of the enum on merge**, because postcard
+indexes variants positionally and the two shape variants are on users' disks
+while `TextFont` never was. The only renumbering that would have cost anything
+is the one that did not happen.
+
+The SIXTH application of the prefix-extension recipe documented on
 `OP_FORMAT_VERSION`, clause for clause:
 
 | Clause | This time |
 |---|---|
 | Field is `#[serde(skip)]` | `font_id` on `TextParams` — wire layout still byte-identical to v2 |
-| New variant is APPENDED | `Op::TextFont`, after `PerspectiveWarp` |
-| Annotation tuple grows at the tail | a **seventh** trailing element on `encode_annotations` |
+| New variant is APPENDED | `Op::TextFont`, after `ShapeSloppiness` — **last**, not where the branch put it |
+| Annotation tuple grows at the tail | a **ninth** trailing element on `encode_annotations` |
 
-A v5 document decodes with every `font_id` empty, which is the embedded face,
-which is exactly what it meant. Pinned by `v5_blobs_still_decode_under_v6`,
-`v5_op_bytes_still_decode_under_v6` and
-`text_params_wire_layout_is_unchanged_by_the_font_id_field`.
+A v7 document decodes with every `font_id` empty, which is the embedded face,
+which is exactly what it meant. Pinned by `v7_blobs_still_decode_under_v8`,
+`v7_op_bytes_still_decode_under_v8` and
+`text_params_wire_layout_is_unchanged_by_the_font_id_field` — the first two
+renamed and re-pointed from the v5/v6 pair they were written as, which collided
+by NAME with master's identically-named tests and would not have compiled.
+
+⚠️ **The lesson is about elapsed time, not about postcard.** A format-version
+step is a claim on a shared number. A branch that holds one for six days while
+two other features ship does not find out until it merges, and the failure mode
+is silent for the two that shipped first: they are correct, and the late branch
+is the one carrying a stale variant index.
 
 ⚠️ **One thing differed from the quad step.** Here the skipped-field default and
 the semantic default agree — `String::default()` is `""`, and `""` is defined to
@@ -118,40 +144,112 @@ outlines**. Two things enforce it, and both are load-bearing:
 Neither has a runtime detector. If one goes, nothing goes red — text just starts
 landing a few pixels off its own preview.
 
-## The band review
+## The band review — WITHDRAWN 2026-09-17, the ceiling does not move
 
-This is the review ADR-045 anticipated, not a baseline being unbolted to go
-green. ADR-045 sized its own ceiling as **"23,029 B of growth headroom — ~1.4
-perspective-sized features (+16,788 B)"**. That was a budget, written down in
-advance, and this is the feature it was written for.
+⚠️ **This section is why this ADR is not called what it was called.** It was
+written as *"…and the sentinel ceiling moves to pay for it"*. The ceiling does
+not move, and nothing is paid for by moving it. Retitled 2026-09-18; the number
+did not change.
 
-| | Bytes |
+### What this section used to argue
+
+That runtime fonts cost **+17,852 B** (823,503 → 841,355, local builds), which
+is one perspective-sized feature, which is the budget ADR-045 wrote down in
+advance — so **ceiling 840,000 → 872,000**, floor unchanged, and the move is
+a review rather than a baseline unbolted to go green.
+
+The arithmetic was right. The conclusion was avoidable, and two things happened
+between 09-11 and 09-17 that retire it.
+
+**First, the ceiling moved anyway, without this ADR.** Chris took it 840,000 →
+**860,000** on 09-16, for Enhance › Presets and shape perspective. So the
+proposal here was a *second* raise in two releases. A ceiling raised twice in
+two releases is not a limit, it is a formality, and the next feature asks for
+the same thing with a better precedent than the last one had.
+
+**Second, the bytes were already there.** They did not need buying.
+
+### The bytes were already in the binary, doing nothing
+
+`ab_glyph` has no TrueType bytecode interpreter. It never has. So every
+hinting byte in the two embedded faces is carried, shipped, decompressed and
+never executed. Measured on the actual files:
+
+| Embedded face | File | `fpgm`+`prep`+`cvt `+`gasp` | glyph instructions | dead total |
+|---|---:|---:|---:|---:|
+| LiberationSans-Regular | 61,972 | 3,471 | 29,071 | **32,542** (52.5%) |
+| LiberationSans-Bold | 61,520 | 3,804 | 27,966 | **31,770** (51.6%) |
+| | | | | **64,312** |
+
+Over half of each embedded face is instructions for an interpreter that is not
+in the binary. Stripping them — hinting tables deleted, every glyph's
+instruction stream emptied, outlines and advance widths and `cmap` untouched —
+takes the two faces from **123,492 B to 60,020 B**.
+
+### Measured, three builds, same toolchain
+
+rustc 1.97.1 (8bab26f4f), wasm-pack 0.15.0, binaryen 117, `features=tiles,patchmatch`.
+
+| Build | Bytes | vs ceiling (860,000) |
+|---|---:|---:|
+| master @ `39ef3adf` | 858,087 | 1,913 under |
+| this branch, merged, **hinted** faces | **877,311** | **17,311 OVER — red** |
+| this branch, merged, **unhinted** faces | **814,202** | **45,798 under** |
+
+The middle row is the one that matters for the decision. **Merged and hinted,
+this branch does not fit under the ceiling at all** — not "is tight", does not
+fit, by 17,311 B. Raising the ceiling to 872,000 as this ADR proposed would not
+even have covered it; 877,311 needs 880,000. The proposal was already stale
+when it was written, because it was sized against a 823,503 B baseline that
+master left behind 56 commits ago.
+
+The third row is the whole finding: **−63,109 B against this branch's own
+hinted build, and −43,885 B against master.** Runtime fonts land and the binary
+comes out *smaller than master*, under a ceiling nobody touched.
+
+### The pixel check, which is the only thing that licenses any of it
+
+Stripping hinting is safe *because it changes no pixel*, and that is measured,
+not argued. Both faces were rendered through the shipped `text::render_text`
+path in one binary — embedded unhinted face against the original hinted bytes
+registered through `fonts::register`, so same `ab_glyph`, same rasterizer, same
+code path, one variable.
+
+| | |
 |---|---|
-| Baseline (master, local build) | 823,503 |
-| With runtime fonts (local build) | 841,355 |
-| **Delta** | **+17,852** |
-| Perspective, for comparison (ADR-045) | +16,788 |
+| Cases | 572 (11 glyph samples × 26 sizes, 6–200 px incl. fractional × regular/bold) |
+| Pixels compared | 40,913,342 |
+| Tile-size mismatches | **0** |
+| **Differing pixels** | **0** |
 
-One perspective-sized feature. The headroom is spent exactly as budgeted, and
-the distinction matters: raising a limit *because the number hit it* is the one
-move this repo's gates exist to prevent, and ADR-037 said so in its own
-consequences. Spending a stated budget and then restating the budget is a
-different act. A reader will reach for the first reading, so the numbers above
-are the answer to it.
+And the result is not vacuous, which took its own control: registering a
+genuinely different face (Liberation Serif) through the same path renders
+409×44 against the embedded 438×44, and an unregistered id falls back to the
+embedded face. The harness can tell faces apart; it reports zero because there
+is nothing to report.
 
-**Ceiling: 840,000 → 872,000.** **Floor: unchanged at 800,000.**
+`fonts::the_embedded_faces_carry_no_hinting` keeps it that way — it parses the
+embedded bytes and fails on any hinting table or any non-zero glyph instruction
+stream, so a stock TTF dropped in here as a routine "font update" goes red
+instead of quietly spending 63 KB. Mutation-tested: restoring the original
+Regular fails it on `fpgm`.
 
-The asymmetry is deliberate and was nearly got wrong. ADR-045's own arithmetic
-would justify raising the floor too — it set the floor 16,971 B under the
-then-current build, and 800,000 now sits 41,355 B under this one, so the
-featureless detector is looser than ADR-045 intended it to be. But
-`deploy-sentinel.sh` runs against **live production**. A floor above the
-currently live pre-fonts binary fails the moment it is pushed and stays red
-until the deploy lands, and a gate that is red for the length of a deploy is a
-gate people learn to ignore.
+### Decision
 
-**Owed work, on the record: tighten the floor in a later commit, once a build at
-the new size is actually live.** Not in this one.
+**The ceiling stays at 860,000. The floor stays at 800,000.** Neither is
+touched by this ADR, and the sections above that proposed 872,000 are withdrawn
+rather than deleted, because the reasoning is the record of how a band gets
+raised by a branch that is measuring against a stale baseline.
+
+⚠️ **Do not apply this swap to master on its own.** Master is 858,087, so the
+same −63,109 would put it near **794,978** — **under the 800,000 floor**, and
+the floor is the featureless-build detector. On this branch the swap lands at
+814,202, which is 14,202 clear of the floor. The swap is safe *with* the fonts
+feature and breaks the sentinel *without* it. That coupling is not obvious and
+is the single most important line in this section.
+
+One scoping note: the served faces in `app/public/fonts/` were already subset
+and unhinted. Only the two `include_bytes!` faces carried this.
 
 One other size note worth keeping. A `HashMap` for the six-entry registry cost
 **5,181 B** of wasm — `RandomState`, SipHash and the `RawTable` machinery, none
@@ -205,9 +303,11 @@ test.
   `register_font` is the exact entry point a user-supplied `.ttf` needs, and the
   shipped faces are simply its first caller. What remains for it is the upload
   UI, Dexie storage for font blobs, and the Convex sync tier.
-- **The featureless detector is looser than ADR-045 left it**, and stays that way
-  until the floor is tightened in a follow-up. That debt is stated above and is
-  the real price of this change.
+- **The saving is coupled to the feature and cannot be lifted out of it.**
+  Applied to master alone the same −63,109 B lands near **794,978** — under the
+  800,000 floor, which is the featureless-build detector. It is safe only
+  carried *with* the fonts, which is what puts it at 814,202. Nothing in the
+  repo enforces that pairing; it is written down here and nowhere else.
 - Two invariants now hold the metrics cache up and neither is checked at
   runtime: registration is monotone, and registration precedes measurement.
   Break either and the symptom is a few pixels of drift, not an error.
@@ -249,13 +349,17 @@ cache key. The invariant that prevents it lives in one `if` in `fonts::register`
 and in the discipline of awaiting `ensureEngineFonts`, and nothing at runtime
 notices when either goes.
 
-Second candidate: the new ceiling gets treated as the new normal, the floor is
-never tightened, and the sentinel's featureless half degrades from "measured" to
-"historical" — which is how ADR-037's band got wide in the first place.
+Second candidate: the 45,798 B this leaves under the ceiling get read as
+permanent headroom rather than as a one-time refund, and the next features spend
+it without re-measuring — which is how ADR-037's band got wide in the first
+place. The sharper version is the coupling above: somebody lifts the unhinted
+faces onto a branch that does not carry the fonts feature, the floor fires, and
+the cheapest-looking fix is lowering the floor.
 
 Early warning sign: **any change to `fonts::register` that removes the
-already-registered short-circuit**, or any new call site that measures text
-without awaiting registration first.
+already-registered short-circuit**, any new call site that measures text without
+awaiting registration first, or any diff that touches `src/fonts/*.ttf` without
+touching the fonts feature.
 
 ADR-051 offered its own early warning — *"a font-related PR that changes no file
 under `src/`"* — on the grounds that such a PR is definitionally cosmetic. This
