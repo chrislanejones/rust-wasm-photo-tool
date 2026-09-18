@@ -59,12 +59,44 @@ function repoModules() {
  *  the target assertion and the module check alike. */
 const PROD = process.argv.includes("--prod") ? ["--prod"] : [];
 
+/** Scopes a CONVEX_DEPLOY_KEY needs for this script, and why each one.
+ *
+ *  `deployment:deploy`     push code, schema and auth config.
+ *  `deployment:data:view`  read `function-spec` back. BOTH checks here are
+ *                          reads: "am I pointed at the right deployment" and
+ *                          "did the modules land". A key with deploy alone can
+ *                          push and cannot prove anything about what it pushed.
+ *
+ *  Convex does not document that `function-spec` needs the data scope — it was
+ *  learned from a red CI job, so it is written down here rather than rediscovered. */
+const REQUIRED_SCOPES = "deployment:deploy + deployment:data:view";
+
 function convex(args) {
-  return execFileSync("npx", ["convex", ...args, ...PROD], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"],
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  try {
+    return execFileSync("npx", ["convex", ...args, ...PROD], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  } catch (err) {
+    // A permission failure is the one error with a known, two-minute remedy, so
+    // say the remedy instead of a Node stack trace. Everything else re-throws:
+    // guessing at an unknown failure is how a check starts lying.
+    const stderr = String(err?.stderr ?? "");
+    if (/do not have permission/i.test(stderr)) {
+      const scope = stderr.match(/\((deployment:[a-z:]+)\)/)?.[1] ?? "an unknown scope";
+      console.error(`::error::CONVEX_DEPLOY_KEY is missing the ${scope} permission, so nothing was verified.`);
+      console.error("");
+      console.error(`  This script needs ${REQUIRED_SCOPES}.`);
+      console.error("  Convex dashboard -> Production -> Deploy keys -> generate with BOTH boxes ticked,");
+      console.error("  then GitHub -> Settings -> Secrets and variables -> Actions -> CONVEX_DEPLOY_KEY.");
+      console.error("");
+      console.error("  Nothing was deployed. Re-run this job after replacing the secret.");
+      process.exit(1);
+    }
+    if (stderr) process.stderr.write(stderr);
+    throw err;
+  }
 }
 
 /** What the deployment actually serves: its URL, and the modules it holds.
