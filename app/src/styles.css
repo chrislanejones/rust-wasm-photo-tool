@@ -1503,10 +1503,47 @@ textarea:focus-visible {
 .status-brand-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   color: inherit;
   text-decoration: none;
   transition: color 0.15s ease;
+}
+
+/* The words after the horse. After five minutes (StatusBar's
+   BRAND_COLLAPSE_MS) they slide away left to right — the settings tiles' swap,
+   turned on its side: a short slide with a fade, then the gap closes so the
+   hints can have the room. The horse stays and is still the link.
+
+   The gap lives on this span as a margin, not on the link as `gap`, so it
+   closes with the words instead of leaving 4px of nothing after the horse. */
+.status-brand-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  max-width: 10rem;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.24s ease-out,
+    max-width 0.3s ease-in-out 0.16s,
+    margin-left 0.3s ease-in-out 0.16s;
+}
+
+.status-brand-link[data-collapsed] .status-brand-name {
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+/* The in-app toggle is covered by the global `html.reduce-motion *` rule;
+   this is the OS setting. The words still go — they just don't travel. */
+@media (prefers-reduced-motion: reduce) {
+  .status-brand-name {
+    transition: none;
+  }
 }
 
 .status-brand-link:hover {

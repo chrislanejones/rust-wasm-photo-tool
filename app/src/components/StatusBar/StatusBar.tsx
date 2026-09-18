@@ -6,6 +6,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
+import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 
@@ -62,6 +63,12 @@ const BASE_SLOTS_COMPACT = 1;
 
 const MARKETING_URL = "https://imagehorse.app";
 
+/** After this long the brand's words slide away and only the horse stays —
+ *  still the same link. Five minutes is long enough to have read it once and
+ *  short enough that it stops taking room from the hints for the rest of the
+ *  session. */
+const BRAND_COLLAPSE_MS = 5 * 60 * 1000;
+
 /** Tier of the current user. Lives here historically; consumed by
  *  `photoLimits` and AppShell even though the status bar no longer shows it. */
 export type UserMode = "demo" | "loggedIn" | "paid";
@@ -80,6 +87,9 @@ interface Props {
    *  dynamic slot). Falls through to the cycling interface-hint pool when
    *  absent, so that slot never sits empty. */
   activeToolHint2?: ShortcutHint;
+  /** How deep undo can go right now (#37). `null` until the engine has a
+   *  document and has told us its byte budget — see `useUndoDepth`. */
+  undoDepth?: UndoDepth | null;
 }
 
 export function StatusBar({
@@ -89,6 +99,7 @@ export function StatusBar({
   photoHeight,
   activeToolHint,
   activeToolHint2,
+  undoDepth,
 }: Props) {
   const sizeLabel = formatBytes(fileSize);
   // Read from the gallery store rather than two more props out of AppShell —
@@ -120,6 +131,13 @@ export function StatusBar({
     return () => window.clearInterval(id);
   }, []);
 
+  // One-way: once the words have gone they stay gone for the session.
+  const [brandCollapsed, setBrandCollapsed] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setBrandCollapsed(true), BRAND_COLLAPSE_MS);
+    return () => window.clearTimeout(id);
+  }, []);
+
   // Tool slots first — desktop only. Compact drops them (see the slot map).
   const dynamic: ShortcutHint[] = [];
   if (!compact) {
@@ -144,15 +162,24 @@ export function StatusBar({
   return (
     <footer className="status-bar">
       <div className="status-section">
+        {/* The name is spelled out in aria-label because after five minutes
+            the visible words are gone and a bare 🐴 would be announced as
+            "horse face". It starts with the visible words, so speech input
+            ("click Image Horse") still matches while they are showing. */}
         <a
           href={MARKETING_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="status-brand-link whitespace-nowrap"
+          data-collapsed={brandCollapsed || undefined}
           title="Visit imagehorse.app"
+          aria-label="Image Horse — visit imagehorse.app (opens in a new tab)"
         >
-          <span>🐴 Image Horse</span>
-          <ExternalLink size={12} aria-hidden="true" />
+          <span aria-hidden="true">🐴</span>
+          <span className="status-brand-name" aria-hidden="true">
+            <span>Image Horse</span>
+            <ExternalLink size={12} />
+          </span>
         </a>
       </div>
 
@@ -168,6 +195,18 @@ export function StatusBar({
       </div>
 
       <div className="status-section status-right">
+        {/* Left of every size readout, so the two dimension readouts stay
+            side by side. Neutral on purpose at every value: this replaced a
+            toast that read as a warning, and a readout that turns red at 4%
+            would just be the toast again. */}
+        {undoDepth && (
+          <>
+            <span className="status-zoom" title={describeUndoDepth(undoDepth)}>
+              Undo {undoDepth.percent}%
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {sizeLabel && (
           <>
             <span className="status-zoom">{sizeLabel}</span>
