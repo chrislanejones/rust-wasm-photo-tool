@@ -46,7 +46,9 @@ export function sameTarget(
   return a.kind === b.kind && a.id === b.id;
 }
 
-/** Rust shape `kind` byte → the name the panel and the Reselect list show. */
+/** Rust shape `kind` byte → the name the panel and the Reselect list show.
+ *  The ONE copy — AppShell's Reselect list kept its own until the triangle
+ *  arrived and would have needed the same line added twice. */
 const SHAPE_KIND_LABEL: Record<number, string> = {
   0: "Square",
   1: "Circle",
@@ -58,6 +60,7 @@ const SHAPE_KIND_LABEL: Record<number, string> = {
   7: "Pen Path",
   8: "Diamond",
   9: "Star",
+  10: "Triangle",
 };
 
 /** The name for a shape's `kind` byte; "Shape" for anything unrecognised. */

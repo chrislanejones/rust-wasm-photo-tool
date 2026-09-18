@@ -141,6 +141,44 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(star, 50, 50)).toBe(-1); // hollow middle
   });
 
+  it("hit-tests an unfilled triangle (10) along its three edges only", () => {
+    // Apex (50,0), base (100,100)→(0,100). pad 6 → tolerance 10.
+    const tri = [shape({ id: 35, kind: 10, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(tri, 50, 100)).toBe(35); // on the base
+    expect(shapeAnnotationAt(tri, 75, 50)).toBe(35); // on the right edge
+    expect(shapeAnnotationAt(tri, 50, 60)).toBe(-1); // hollow middle
+    expect(shapeAnnotationAt(tri, 5, 5)).toBe(-1); // bbox corner, off the ink
+  });
+
+  it("a star with more points hit-tests its own outline", () => {
+    // 8 points: the tip at 3 o'clock (100,50) is a vertex; with 5 points the
+    // right-hand tips sit elsewhere and (100,50) is off the ink.
+    const eight = [shape({ id: 36, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100, starPoints: 8 })];
+    const five = [shape({ id: 37, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(eight, 100, 50)).toBe(36);
+    expect(shapeAnnotationAt(five, 100, 50)).toBe(-1);
+  });
+
+  it("tests a TURNED shape in its own frame", () => {
+    // A 100×20 unfilled rect centered on (50,50), turned 90°: on screen it
+    // stands upright, 20 wide and 100 tall.
+    const turned = [
+      shape({ id: 38, kind: 0, x0: 0, y0: 40, x1: 100, y1: 60, rotation: 90 }),
+    ];
+    expect(shapeAnnotationAt(turned, 50, 1)).toBe(38); // its top end, on screen
+    expect(shapeAnnotationAt(turned, 2, 50)).toBe(-1); // where the UNturned left end was
+    // Upright, the same box answers the other way round.
+    const upright = [shape({ id: 39, kind: 0, x0: 0, y0: 40, x1: 100, y1: 60 })];
+    expect(shapeAnnotationAt(upright, 2, 50)).toBe(39);
+    expect(shapeAnnotationAt(upright, 50, 1)).toBe(-1);
+  });
+
+  it("ignores rotation on kinds the engine does not turn", () => {
+    // A pin (5) is a padded box; a stray rotation must not move its hit area.
+    const pin = [shape({ id: 40, kind: 5, x0: 0, y0: 40, x1: 100, y1: 60, rotation: 90 })];
+    expect(shapeAnnotationAt(pin, 2, 50)).toBe(40);
+  });
+
   it("a FILLED diamond/star falls back to its padded bounding box", () => {
     // The engine only routes 8/9 through the edge test while UNFILLED;
     // filled, it uses the same in_outer box rule as a pin (never actually

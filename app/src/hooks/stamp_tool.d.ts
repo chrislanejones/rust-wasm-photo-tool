@@ -1184,7 +1184,13 @@ declare module "stamp_tool" {
 
     // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
     // kind: 0=rect, 1=circle, 2=line, 3=handCircle(legacy), 4=arrow, 5=pin,
-    //       6=polyline, 7=bezier, 8=diamond, 9=star.
+    //       6=polyline, 7=bezier, 8=diamond, 9=star, 10=triangle.
+    // star_points: star (9) only — 0 = the classic 5, else 3..=12.
+    // rotation_deg: clockwise about the bbox center, (-180, 180]. The bbox
+    //   x0..y1 stays the UNROTATED box. Honored by rect/circle/line/diamond/
+    //   star/triangle; the UI turns a line by moving its endpoints instead.
+    //   These two trailing params exist in Rust as `*_shape_annotation_full`,
+    //   exported under the original names (the lib.rs line ratchet).
     // arrow_style (arrows only): 0=single, 1=double.
     shape_annotation_count(): number;
     /** Add a numbered callout pin (kind 5): circle bbox + label. Pushes "Add Pin". */
@@ -1258,6 +1264,8 @@ declare module "stamp_tool" {
       fill_angle: number,
       fill_block: number,
       sloppiness: number,
+      star_points: number,
+      rotation_deg: number,
     ): number;
     /** Restore a persisted shape WITHOUT pushing history (load path). Colors are raw bytes. */
     restore_shape_annotation(
@@ -1283,6 +1291,8 @@ declare module "stamp_tool" {
       fill_angle: number,
       fill_block: number,
       sloppiness: number,
+      star_points: number,
+      rotation_deg: number,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -1301,6 +1311,8 @@ declare module "stamp_tool" {
       fill_angle: number,
       fill_block: number,
       sloppiness: number,
+      star_points: number,
+      rotation_deg: number,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;

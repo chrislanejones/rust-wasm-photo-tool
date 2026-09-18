@@ -129,7 +129,7 @@ export interface PersistedAnnotation {
 export interface PersistedShape {
   id?: number;
   kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
-                // 6=polyline,7=bezier,8=diamond,9=star
+                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle
   x0: number;
   y0: number;
   x1: number;
@@ -158,6 +158,12 @@ export interface PersistedShape {
   fill_block?: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points?: number[][];
+  /** Degrees clockwise about the box center. Absent on saves before
+   *  rotation shipped — restore passes 0 (upright). No archive version bump:
+   *  shapes are stored as the engine's JSON, so a new key is additive. */
+  rotation?: number;
+  /** Star point count; absent or 0 = the classic 5. */
+  starPoints?: number;
 }
 
 /** Parse the JSON emitted by `get_shape_annotations`. */

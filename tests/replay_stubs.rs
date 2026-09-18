@@ -205,6 +205,8 @@ fn shape_perspective_parity() {
         stroke_width: 3.0,
         arrow_style: 0,
         sloppiness: 0,
+        rotation_deg: 0.0,
+        star_points: 0,
         number: 0,
         label_kind: 0,
         points: Vec::new(),

@@ -4,6 +4,163 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a commit click can leave a stray rectangle behind (2026-09-18)
+
+**Pre-existing — reproduced on a master-based production build**, found while
+smoke-testing shape rotation. Not caused by feat/shapes-triangle-rotate.
+
+Repro (Shapes tool, 256×256 image, Playwright `mouse.click` = no pause between
+down and up):
+
+| Step | Action |
+|---|---|
+| 1 | Draw a star, click empty canvas to commit |
+| 2 | Draw a rectangle, click empty canvas (252,252) to commit |
+| 3 | Click the star's tip (190,21) to reselect it; change a style control |
+| 4 | Click empty canvas (252,252) to commit |
+| Result | An extra rectangle **(252,252)→(190,21)**: step 2's commit point to step 3's click point |
+
+Hypothesis, NOT confirmed: `onMouseDown` in useDrawingTools is async and
+awaits `commitEdit` plus two engine hit-tests before it sets `isDrawing`, so a
+fast click's mouse-up can arrive first and return early, leaving `isDrawing`
+stuck; the next mouse move then extends a rubber band from the stale start. A
+simpler three-click sequence did NOT reproduce, so isolate before fixing.
+
+## DECISION NEEDED — shape rotation takes the engine 4,146 B over the sentinel ceiling (2026-09-18)
+
+Branch `feat/shapes-triangle-rotate`. Not a bug; a number Chris set.
+
+| Build (tiles,patchmatch) | Bytes | vs `MAX_WASM` 860,000 |
+|---|---|---|
+| origin/master `4890bf1f` | 858,087 | 1,913 under |
+| this branch | 864,146 | **4,146 over** |
+
+What the +6,059 B is (twiggy, raw builds with names): the op-log v8 family
+(v8 decode tail, 10-tuple encode, the two new variants' (de)serializers,
+`apply`, `to_annotation`) is most of it; rotation in render and hit-test and
+the three `_full` exports are the rest; the drawing refactor nets about zero.
+Already taken out on the branch: ~2.3 KB of `fmod` soft-float (one `%`) and a
+duplicated v8 decode branch (~2.5 KB). Nothing further comes out without
+dropping v8 persistence.
+
+The deploy sentinel will go red on the first deploy that carries this. Same
+shape as #160 (840k → 860k for Presets + shape perspective): attributable,
+reviewed growth. The call — raise the ceiling, or trim something else — is
+Chris's; `scripts/deploy-sentinel.sh` is outside the engine lane.
+
+## OPEN — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+
+**Pre-existing since v7 (sloppiness), widened by v8.** Reproduced at engine
+level by `ops_engine_parity::one_undo_removes_a_seven_point_star`, which is
+`#[ignore]`d and fails when run with `--ignored`.
+
+`try_oplog_undo` pops ONE snapshot and seeks the log back ONE op — the
+"one recorded op ↔ one snapshot" lockstep. But a shape ADDED with a
+non-default skipped field records `ShapeAdd` **plus** a side op, under the
+single "Add Shape" snapshot:
+
+| Added with | Ops recorded for one snapshot |
+|---|---|
+| sloppiness > 0 (v7) | ShapeAdd + ShapeSloppiness |
+| a 7-point star (v8) | ShapeAdd + ShapeStarPoints |
+| a rotation (v8) | ShapeAdd + ShapeRotation |
+| a duplicate of any of those | the same, under "Duplicate Shape" |
+
+First undo: the log rewinds only the side op; in memory the ShapeAdd still
+carries the value, so **the press changes nothing on screen**, and every later
+undo lands one gesture late. (A five-point star costs nothing: the engine
+stores 5 as 0, the skipped default, so no side op is emitted.)
+
+Narrowed on the branch, not fixed: the sync used to emit a redundant
+`ShapeEdit` beside every sloppiness-only change (two ops for one gesture);
+all four skipped fields are neutralized now, so a side-field-only change is
+exactly one op.
+
+**Masked in the running app today** by "in the running app, undo of ANY
+recorded edit breaks the op log" (below): a broken log falls back to snapshot
+undo, which is correct. Fix that entry and this one surfaces.
+
+Fix options, both format-level (ADR material): give the log gesture
+boundaries (a group marker per snapshot, and undo seeks to the group start),
+or record a shape's skipped fields in ONE appended op on add
+(`ShapeAddStyled`) instead of ShapeAdd + N side ops.
+
+## OPEN — pen polylines hit-test as their whole bbox since #172 (2026-09-18)
+
+`shape_annotation_at`'s docstring says polylines hit by "distance to the
+stroke", and before #172 they did: `if kind 2|4 {…} else if kind 6 {…}`. The
+#172 restructure moved the `kind == 6` arm INSIDE the first branch, whose
+condition (`kind 2 || kind 4 || (unfilled && kind 8|9)`) never admits a 6 —
+so the arm is dead, and a polyline falls through to the padded-bbox rule.
+
+Probed on the shapes branch (same code as master here): an L-shaped pen stroke
+(20,20)→(20,180)→(180,180), clicked at (150, 30) — about 100 px from any ink —
+**hits**. So a drag started inside a large freehand loop reselects the loop,
+the exact problem the ring rule was written to stop.
+
+Fix is one clause (`|| s.kind == 6` in that condition), but it changes hit
+behavior and the #60 drift guard hashes this body, so it belongs with the TS
+port (`app/src/lib/annotationHitTest.ts`, which may mirror the dead arm too),
+not slipped into a rotation change. Left untouched on the shapes branch.
+
+## OPEN — `Op::TextEdit` replay wipes a text box's wrap, height and quad after a reload (2026-09-18)
+
+The text twin of the ShapeEdit bug fixed on `feat/shapes-triangle-rotate`
+(`a_decoded_shape_edit_keeps_the_side_op_fields`). `apply` does
+`*t = p.clone()`; a TextEdit read back from disk carries its
+`#[serde(skip)]` fields at their defaults, so replaying it undoes the
+TextWrap / TextBoxHeight / TextPerspective ops recorded before it.
+
+Probed, not inferred: TextAdd(wrap 240, box 90, keystone) → TextWrap →
+TextBoxHeight → TextPerspective → TextEdit(x + 7), encoded → decoded →
+replayed, came back **wrap 0, box 0, quad identity**. Same fix as the shape
+side: carry the skipped fields over in the TextEdit arm (they are owned by
+their side ops). Left out of the shapes branch to keep it one target.
+
+## OPEN — a rotated FILLED shape is resampled on every composite (2026-09-18)
+
+By contract, a rotated rect with any fill (and a rotated gradient circle)
+renders through the perspective warp route with an identity quad plus the
+rotation: a shape-sized tile is rendered, then bilinear-resampled into the
+canvas, on every `recomposite()`. Outlines instead turn their points and cost
+nothing extra. Measured, native release, core-pinned:
+
+| 700×500 rect on 1600×1200 | ms / recomposite |
+|---|---|
+| outline, unrotated | 22.3 |
+| outline, rotated 30° | 23.1 |
+| solid fill, unrotated | 37.7 |
+| **solid fill, rotated 30°** | **87.3** |
+| gradient fill, rotated 30° | 97.6 |
+
+About 3× the cost of the fill itself, scaling with shape AREA. Perspective-
+warped shapes already pay the same (ADR-053 accepted it); rotation will be
+far more common. The resampled stroke is also slightly softer than the crisp
+rotated stroke of an unfilled rect.
+
+Proposed follow-up: fill solid and gradient directly — iterate the rotated
+bbox, inverse-rotate each pixel center into the shape's frame, reuse the
+existing inside test and gradient projection — and draw the stroke through
+the rotated-outline route. Should land close to the unrotated fill cost.
+Keep the warp only for pixelate. `benches/shapes.rs`
+(`shape_rotated_filled_rect_recomposite_1`) is the before/after.
+
+## OPEN — two approximations a rotated shape accepts (2026-09-18)
+
+1. **Non-uniform scale.** A rotated shape is stored as its unrotated box +
+   an angle. Crop, Move Layer, the canvas-size offsets and `shift_annotations`
+   only translate, and rotation about the center is translation-invariant, so
+   those are exact. But a NON-uniform resample (`resize_with_filter` with
+   different x/y factors) scales x0..y1 per axis and keeps the angle — the
+   honest result would be a parallelogram, which the model cannot hold. The
+   shape comes back a rect, correctly placed and sized along its own axes,
+   at the same angle.
+2. **Rotated pixelate fill.** Goes through the warp route, which averages the
+   UNROTATED canvas region under the tile before turning it — the limitation
+   ADR-053 accepted for perspective. The rotated tile still covers its whole
+   area, so nothing underneath is revealed; the cells are just computed in the
+   shape's frame and then rotated.
+
 ## OPEN — `testReplicate` deploys to prod by default, and calls itself temporary (2026-09-17)
 
 Noticed while wiring the Convex deploy into CI (step 0.5, PR #165). Not a bug,

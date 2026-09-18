@@ -6,12 +6,13 @@ import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import {
-  diamondVertices,
+  closedOutline,
+  effectiveStarPoints,
   shapeWobbleSeed,
   sloppyCirclePoints,
   sloppyPolylinePoints,
-  starVertices,
 } from "@/lib/shapeSloppiness";
+import { normalizeDeg } from "@/lib/shapeRotation";
 
 export interface Point {
   x: number;
@@ -55,6 +56,12 @@ export interface DrawEditState {
    *  the two paths finally agree. Unset for reselected shapes, which carry
    *  their own type in `style.shape`. */
   drawnShape?: ShapeName;
+  /** Degrees, clockwise on screen, about the box center — the rotate
+   *  handle's value. GEOMETRY, not style: it lives beside `start`/`end`
+   *  because a handle drag changes it, and it is never read from the panel.
+   *  Absent = 0. A line never carries one — turning a line moves its
+   *  endpoints instead (see lib/shapeRotation.ts). */
+  rotation?: number;
   /** When set, we're editing an EXISTING live shape annotation (this id)
    *  rather than creating a new one. Commit calls update_shape_annotation. */
   editId?: number;
@@ -81,6 +88,9 @@ export interface DrawEditState {
     gradientAngle: number;
     /** Mosaic block size (px) for fillMode "pixelate". */
     fillBlock: number;
+    /** Star point count (3–12), captured on reselect so a 7-point star
+     *  stays a 7-point star. Ignored by every other shape. */
+    starPoints: number;
   };
 }
 
@@ -150,6 +160,7 @@ export function panelStylePatch(
   if (next.gradientAngle !== prev.gradientAngle)
     patch.gradientAngle = next.gradientAngle;
   if (next.fillBlock !== prev.fillBlock) patch.fillBlock = next.fillBlock;
+  if (next.starPoints !== prev.starPoints) patch.starPoints = next.starPoints;
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
@@ -157,7 +168,7 @@ export function panelStylePatch(
 export interface ShapeMeta {
   id: number;
   kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
-                // 6=polyline,7=bezier,8=diamond,9=star
+                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle
   x0: number;
   y0: number;
   x1: number;
@@ -184,6 +195,11 @@ export interface ShapeMeta {
   fill_block: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points: number[][];
+  /** Degrees clockwise about the box center. Absent on shapes written
+   *  before rotation shipped (they meant 0). */
+  rotation?: number;
+  /** Star point count; 0 or absent = the classic 5. */
+  starPoints?: number;
 }
 
 /** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). Kind 3
@@ -197,6 +213,7 @@ const SHAPE_KIND_NAME: Record<number, ShapeName> = {
   3: "circle",
   8: "diamond",
   9: "star",
+  10: "triangle",
 };
 
 /** ToolSettings shape name → Rust `kind` byte. */
@@ -206,6 +223,7 @@ const SHAPE_NAME_KIND: Record<string, number> = {
   line: 2,
   diamond: 8,
   star: 9,
+  triangle: 10,
 };
 
 function rgbToHex(r: number, g: number, b: number): string {
@@ -460,6 +478,11 @@ export function useDrawingTools({
     // just-drawn shape has sloppiness, but would also pick any unsaved panel
     // change (like strokeColor).
     const sloppiness = es.style?.sloppiness ?? s.sloppiness ?? 0;
+    // Star points ride only on a star; every other kind stores 0 ("unset"),
+    // so a triangle or square never carries a stray count into the log.
+    const starPoints =
+      kind === 9 ? effectiveStarPoints(es.style?.starPoints ?? s.starPoints) : 0;
+    const rotation = normalizeDeg(es.rotation ?? 0);
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -484,6 +507,8 @@ export function useDrawingTools({
         fillAngle,
         fillBlockVal,
         sloppiness,
+        starPoints,
+        rotation,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -502,6 +527,8 @@ export function useDrawingTools({
         fillAngle,
         fillBlockVal,
         sloppiness,
+        starPoints,
+        rotation,
       );
       // The just-drawn shape becomes the Align/Placement target, so the
       // grid (and numpad 1-9) can place it immediately after drawing.
@@ -577,6 +604,7 @@ export function useDrawingTools({
         kind: sh.kind === 4 ? "arrow" : "shape",
         start: { x: sh.x0, y: sh.y0 },
         end: { x: sh.x1, y: sh.y1 },
+        rotation: sh.rotation ?? 0,
         editId: id,
         style: {
           shape: shapeName,
@@ -597,6 +625,7 @@ export function useDrawingTools({
           fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
           gradientAngle: sh.fill_angle,
           fillBlock: sh.fill_block ?? 16,
+          starPoints: effectiveStarPoints(sh.starPoints),
         },
       };
       tool.set_editing_shape(id);
@@ -628,6 +657,7 @@ export function useDrawingTools({
         fillColor2: next.style!.fillColor2,
         gradientAngle: next.style!.gradientAngle,
         fillBlock: next.style!.fillBlock,
+        starPoints: next.style!.starPoints,
       };
       prevStyleSettingsRef.current = synced;
       useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
@@ -775,12 +805,22 @@ export function useDrawingTools({
     };
   }, [annotationsRevision, refreshShapes, toolRef]);
 
-  /** Overlay handle drags push new geometry here (canvas coords). */
-  const updateEditGeometry = useCallback((start: Point, end: Point) => {
+  // Publish which RESELECTED shape the edit box holds (see the store field).
+  // Derived here, from the one piece of state that knows, so every path that
+  // opens or clears the box — select, commit, cancel, undo removing it — is
+  // covered without each remembering to write it.
+  const editingKind = editState?.editId != null ? (editState.style?.kindByte ?? null) : null;
+  useEffect(() => {
+    useAnnotationStore.getState().setEditingShapeKind(editingKind);
+  }, [editingKind]);
+
+  /** Overlay handle drags push new geometry here (canvas coords). `rotation`
+   *  is passed only by the rotate handle; every other drag leaves it as is. */
+  const updateEditGeometry = useCallback((start: Point, end: Point, rotation?: number) => {
     editDirtyRef.current = true;
     setEditState((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, start, end };
+      const next = rotation === undefined ? { ...prev, start, end } : { ...prev, start, end, rotation };
       editStateRef.current = next;
       return next;
     });
@@ -1066,6 +1106,7 @@ export function useDrawingTools({
           settings.strokeColor,
           settings.strokeWidth,
           settings.sloppiness ?? 0,
+          settings.starPoints ?? 5,
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
@@ -1233,6 +1274,7 @@ function drawShapePreview(
   color: string,
   width: number,
   sloppiness: number,
+  starPoints: number,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -1243,63 +1285,28 @@ function drawShapePreview(
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
+  // rect / diamond / star / triangle — the exact vertex list Rust strokes.
+  const outline = closedOutline(shape, from, to, starPoints);
 
   if (sloppiness > 0) {
     // Mirrors Rust: at sloppiness > 0 EVERY shape routes through the
     // sketchy path generator so the preview and the committed pixels match
     // (draw_shape, drawing.rs). Firm shapes (0) take the clean branches below.
-    let verts: { x: number; y: number }[];
-    let pts;
-    switch (shape) {
-      case "rect":
-        verts = [
-          { x, y },
-          { x: x + w, y },
-          { x: x + w, y: y + h },
-          { x, y: y + h },
-        ];
-        pts = sloppyPolylinePoints(
-          verts,
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "circle":
-        pts = sloppyCirclePoints(from, to, sloppiness, width);
-        break;
-      case "diamond":
-        pts = sloppyPolylinePoints(
-          diamondVertices(from.x, from.y, to.x, to.y),
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "star":
-        pts = sloppyPolylinePoints(
-          starVertices(from.x, from.y, to.x, to.y),
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "line":
-        pts = sloppyPolylinePoints(
-          [
-            { x: from.x, y: from.y },
-            { x: to.x, y: to.y },
-          ],
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          false,
-        );
-        break;
-    }
+    const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
+    const pts = outline
+      ? sloppyPolylinePoints(outline, seed, sloppiness, width, true)
+      : shape === "circle"
+        ? sloppyCirclePoints(from, to, sloppiness, width)
+        : sloppyPolylinePoints(
+            [
+              { x: from.x, y: from.y },
+              { x: to.x, y: to.y },
+            ],
+            seed,
+            sloppiness,
+            width,
+            false,
+          );
     if (pts && pts.length > 1) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
@@ -1312,41 +1319,18 @@ function drawShapePreview(
   }
 
   ctx.beginPath();
-
-  switch (shape) {
-    case "rect":
-      ctx.strokeRect(x, y, w, h);
-      break;
-
-    case "circle": {
-      const r = Math.min(w, h) / 2;
-      ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
-      ctx.stroke();
-      break;
-    }
-
-    case "diamond": {
-      const pts = diamondVertices(from.x, from.y, to.x, to.y);
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    }
-
-    case "star": {
-      const pts = starVertices(from.x, from.y, to.x, to.y);
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    }
-
-    case "line":
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-      break;
+  if (outline) {
+    ctx.moveTo(outline[0].x, outline[0].y);
+    for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (shape === "circle") {
+    const r = Math.min(w, h) / 2;
+    ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
   }
 }
