@@ -2944,37 +2944,65 @@ a { color: inherit; }
   filter: blur(50px);
 }
 
-/* The bloom is a sibling of the text, not a parent, so the text has to be
-   lifted over it explicitly — a z-index:-1 on the bloom would put it behind
-   the page background instead. */
-.post-head__up,
+/* The header banner, for a post that has one (posts/registry.tsx). The post's
+   own scene runs full-bleed behind the headline and the words sit at the foot,
+   where the scrim is darkest.
+
+   The two radial stops are the ground AND the fallback. The scene fades in
+   over them once three.js has loaded after the page, and if WebGL or the chunk
+   never arrives this is what stays: the same warm corners, no scene, no error
+   text. Prerendered, it is exactly this. */
+.post-head--topper {
+  min-block-size: min(92svh, 860px);
+  justify-content: flex-end;
+  padding-block-end: var(--space-2xl);
+  margin-block-end: var(--space-2xl);
+  border-block-end: var(--rule-hair) solid var(--color-rule);
+  background:
+    radial-gradient(
+      60% 80% at 82% 0%,
+      color-mix(in oklch, var(--color-bloom-1) 32%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 70% at 0% 100%,
+      color-mix(in oklch, var(--color-bloom-2) 22%, transparent),
+      transparent 70%
+    ),
+    var(--color-paper);
+}
+
+.post-head__scene,
+.post-head__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.post-head__scene { opacity: 0.85; }
+
+/* Dark at the top so the nav pill has something to sit on, clear through the
+   middle where the scene carries the picture, and nearly solid at the foot,
+   behind the headline. */
+.post-head__scrim {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-paper) 70%, transparent) 0%,
+    transparent 30%,
+    transparent 50%,
+    color-mix(in oklch, var(--color-paper) 94%, transparent) 100%
+  );
+}
+
+/* The bloom and the banner are siblings of the text, not parents, so the text
+   has to be lifted over them explicitly — a z-index:-1 on the bloom would put
+   it behind the page background instead. */
 .post-head__title,
 .post-head__deck,
 .post-head__meta {
   position: relative;
   z-index: var(--z-base);
-}
-
-.post-head__up { font-size: var(--text-sm); }
-.post-head__up a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  /* A real link to the index, not a history step — this page is reachable from
-     a search result, where there is nothing behind it. */
-  padding-block: var(--space-xs);
-  color: var(--color-ink-2);
-  text-decoration: none;
-}
-.post-head__up a::before {
-  content: "←";
-  color: var(--color-accent);
-}
-.post-head__up a:hover { color: var(--color-ink); }
-.post-head__up a:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 3px;
-  border-radius: 2px;
 }
 
 .post-head__title {
@@ -2995,19 +3023,65 @@ a { color: inherit; }
   max-width: 52ch;
 }
 
+/* Over a moving picture the words get a soft shadow of the ground color. It
+   does nothing on the scrim at the foot and holds the edges of the letters
+   where a lit slab drifts behind them. */
+.post-head--topper .post-head__title {
+  max-width: 18ch;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  text-shadow: 0 2px 28px var(--color-paper);
+}
+.post-head--topper .post-head__deck { text-shadow: 0 1px 18px var(--color-paper); }
+/* The dateline is 12px and sits highest, in the band the scrim leaves clear —
+   and on a wide screen the blit packets cross the scene at exactly that height.
+   Under reduced motion one of them is parked behind the date for good: accent
+   on red, about 1.5:1. A wide blur is too faint to hold letters this small, so
+   three tight shadows stack into a dark outline around each glyph, and the
+   letters are read against that instead of against whatever is passing. */
+.post-head--topper .post-head__meta {
+  text-shadow:
+    0 0 1px var(--color-paper),
+    0 0 2px var(--color-paper),
+    0 0 3px var(--color-paper),
+    0 1px 12px var(--color-paper);
+}
+
+/* The dateline, above the headline: the way back to the index, the tag, the
+   date, the release and the byline, in one mono line. */
 .post-head__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-xs);
-  font-size: var(--text-sm);
-  color: var(--color-ink-3);
+  gap: var(--space-2xs) var(--space-xs);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
   font-variant-numeric: tabular-nums;
 }
 .post-head__sep { color: var(--color-rule-strong); }
+/* A version is written lowercase everywhere else on the site. */
 .post-head__version {
-  font-family: var(--font-outlier);
   color: var(--color-accent);
+  text-transform: none;
+}
+
+/* A real link to the index, not a history step — this page is reachable from a
+   search result, where there is nothing behind it. The arrow says "up" without
+   leaning on the color. */
+.post-head__up {
+  padding-block: var(--space-xs);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.post-head__up::before { content: "← "; }
+.post-head__up:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+.post-head__up:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 /* ── the body ─────────────────────────────────────────────── */
@@ -3385,6 +3459,14 @@ a { color: inherit; }
    inside `.post` the generic `.post a` rule would put a link underline back
    through the middle of a filled button. */
 .post__actions a { text-decoration: none; }
+
+/* ⚠️ `.post .cta--fill`, not `.cta--fill`. The generic `.post a` above is
+   (0,1,1) — a class plus an element — and beats the button's lone class at
+   (0,1,0), so the filled button inherited the link AMBER and read as amber
+   text on an amber pill: "Open the beta" at the foot of the worker post.
+   Same trap as `.nav-sheet .nav-sheet__cta`. (0,2,0) wins it back. */
+.post .cta--fill,
+.post .cta--fill:hover { color: var(--color-accent-ink); }
 
 .post__sources {
   max-width: var(--measure);

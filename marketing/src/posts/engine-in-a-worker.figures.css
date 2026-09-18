@@ -218,6 +218,37 @@
   background: repeating-linear-gradient(135deg, transparent 0 14px, var(--color-paper-3) 14px 16px);
 }
 
+/* ── backdrop ──────────────────────────────────────────────────
+   The same scene as a post's header banner (.post-head__scene in styles.css).
+   No frame, no fill: the header's gradient is the ground, and it is also the
+   whole fallback, because a backdrop that fails simply never fades in.
+
+   The box bleeds past every edge, most at the foot, as in the design, so the
+   camera's slow drift never shows where the canvas stops. The header clips
+   it, so the bleed cannot widen the page. */
+.scene--backdrop {
+  position: absolute;
+  inset: -6% -2% -10%;
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Two classes, so it outranks the phone rule below that turns a figure's box
+   4:3. A backdrop takes whatever shape the header is. */
+.scene--backdrop .scene__gl {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.scene--backdrop .scene__slot { opacity: 0; }
+.scene--backdrop[data-status="ready"] .scene__slot { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .scene--backdrop .scene__slot { transition: opacity var(--dur-long) var(--ease-out); }
+}
+
 @media (max-width: 40rem) {
   /* A phone gives the scene about a third of the width it was composed for,
      and a 16:9 box at 335px is 189px tall — too little for the staging to

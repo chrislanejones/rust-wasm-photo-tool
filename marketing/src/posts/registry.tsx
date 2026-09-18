@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { POSTS } from "../data/posts";
-import EngineInAWorker from "./engine-in-a-worker";
+import EngineInAWorker, { Topper as EngineInAWorkerTopper } from "./engine-in-a-worker";
 
 /* slug → body. The only module that imports both halves of a post.
  *
@@ -10,6 +10,17 @@ import EngineInAWorker from "./engine-in-a-worker";
  */
 export const POST_BODIES: Record<string, ComponentType> = {
   "engine-in-a-worker": EngineInAWorker,
+};
+
+/* slug → header banner, for a post that has one.
+ *
+ * Optional, and a post without an entry gets the plain header. The banner is
+ * decoration behind the shell's headline, so it renders nothing a reader or a
+ * crawler needs: prerendered, it is an empty box over the header's gradient,
+ * and the scene fades in after the page has loaded.
+ */
+export const POST_TOPPERS: Partial<Record<string, ComponentType>> = {
+  "engine-in-a-worker": EngineInAWorkerTopper,
 };
 
 /* Fail the build on a post with no body.

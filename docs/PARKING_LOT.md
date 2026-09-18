@@ -19,6 +19,63 @@ made it 2048×1365 inside a 2068×1385 artboard):
 fixed. Observation only; no cause guessed. First check whether it corrects
 itself after the next edit.
 
+## OPEN — a trailing-slash URL hydrates with the 404 head (09-18-2026)
+
+Found while checking the worker post's header banner (branch
+`feat/blog-worker-topper`) against a local static server that redirects
+directories to a trailing slash.
+
+`useHead()` in `marketing/src/useHead.ts` matches the path exactly.
+`routeFor("/pricing/")` misses, and `postOnPath("/blog/engine-in-a-worker/")`
+rejects the slug because it contains a `/`. So the hook falls through to
+`applyNotFoundHead()` while React Router still renders the real page.
+
+| What the reader sees | What the live `<head>` says after hydration |
+|---|---|
+| the full post, correct h1 | `robots: noindex, follow`, and no canonical, `og:url`, `og:title`, `og:type` or `og:image` |
+
+**Production is masked, not safe.** `marketing/vercel.json` sets
+`trailingSlash: false`, so Vercel 308-redirects the slash away before the page
+loads. Any other host, and any preview that serves directory indexes, shows
+the mismatch. The prerendered HTML is correct either way, so crawlers that do
+not run JS never see it. A fix would be to strip one trailing slash before the
+lookups in `useHead()`.
+
+## OPEN — ADR-057's blast radius no longer holds: the worker post fetches three.js on arrival (09-18-2026)
+
+For Dara. `feat/blog-worker-topper` puts FIG 1's scene behind the post's
+headline as a header banner. A banner is in the viewport at load, so the post
+now requests `engine-in-a-worker.three-*.js` (118.6 KB gzipped on this build)
+on every visit. It waits for the load event plus an idle callback, and it is
+still the only page that asks for the chunk. But ADR-057 says *"The post itself
+does not request it until a figure nears the viewport"*, and its Consequences
+weigh the cost as paid only by readers who scroll to a figure. Both are now
+false for this post. The chunk boundary is unchanged: no new `from "three"`
+import, and the same 19-class re-export module.
+
+## OPEN — the worker post's header design and the live post disagree on four facts (09-18-2026)
+
+Chris's calls. Found while building the header banner from his design file
+("The engine left the main thread (4).html"). The banner went in with the
+**live** values and did not copy the design's.
+
+| Fact | Live (`marketing/src/data/posts.ts`) | Design | Note |
+|---|---|---|---|
+| Headline | "We moved the engine off the main thread. The pixels stayed put." | "The engine left the main thread. The pixels stayed put." | The post file's header comment, figures.css, figures.tsx and ADR-057 all use the design's wording. The h1 and the new share card both use the live one. |
+| Date | `published: "2026-08-13"`, which is v8.32's ship date | "16 Sep 2026" | The post went up with #159 on 09-16. `datePublished` in the BlogPosting graph says August. |
+| Reading time | not shown | "~12 minutes" | Left out. It needs a count derived from the body, not a typed number that goes stale on the next edit. |
+| Date format | "13 August 2026" (`fmtPostDate`; Trail Log's `fmtDate` matches) | "16 Sep 2026" | Neither is MM-DD-YYYY, the global rule for dates a person reads. That is site-wide, not a banner question. |
+
+## OPEN — `marketing/` has no lint gate (09-18-2026)
+
+`pnpm lint` is `eslint app/src eslint.config.mjs`, so nothing lints the
+marketing site. Pointing the root config at it works for the `.ts`/`.tsx`
+files, which come out clean. The scripts do not: `marketing/scripts/*.mjs` get
+`no-undef` for `console`, `process`, `URL` and `document`, because the root
+config only declares globals for `app/src`. That is 9 errors in
+`gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
+`marketing/**` block with node and browser globals would make this gate real.
+
 ## OPEN — `testReplicate` deploys to prod by default, and calls itself temporary (2026-09-17)
 
 Noticed while wiring the Convex deploy into CI (step 0.5, PR #165). Not a bug,
