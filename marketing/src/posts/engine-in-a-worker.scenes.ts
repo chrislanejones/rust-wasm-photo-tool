@@ -227,6 +227,39 @@ class SceneKit {
     return rec;
   }
 
+  /** The two side headings, as a fixed row at the top of the frame rather than
+   *  labels pinned into the scene.
+   *
+   *  They were projected labels, anchored behind each slab. That works until
+   *  the camera drifts or the frame narrows, and then the heading and its
+   *  subtitle slide toward the packets they are meant to be naming. A heading
+   *  is not part of the diagram's geometry — it names a side — so it belongs in
+   *  the frame, not in the scene.
+   *
+   *  Not marked `minor`, so it survives the narrow-width rule that hides the
+   *  annotation labels: at 390px the headings are the only thing telling you
+   *  which slab is which. */
+  header(leftTitle: string, leftSub: string, rightTitle: string, rightSub: string) {
+    const row = document.createElement("div");
+    row.className = "scene__header";
+    row.style.display = this.showLabels ? "grid" : "none";
+    const col = (title: string, sub: string, tone: "ink" | "accent") => {
+      const d = document.createElement("div");
+      d.className = "scene__header-col";
+      const t = document.createElement("span");
+      t.className = `scene__header-title scene__label--${tone}`;
+      t.textContent = title;
+      const u = document.createElement("span");
+      u.className = "scene__header-sub scene__label--ink3";
+      u.textContent = sub;
+      d.append(t, u);
+      return d;
+    };
+    row.append(col(leftTitle, leftSub, "ink"), col(rightTitle, rightSub, "accent"));
+    this.layer.appendChild(row);
+    return row;
+  }
+
   /** Show or hide a label, honoring the scene-wide switch. */
   show(rec: LabelRec, on: boolean) {
     rec.el.style.display = on && this.showLabels ? "block" : "none";
@@ -307,8 +340,8 @@ type Ticker = (t: number) => void;
 /* ── FIG 1: where things live ───────────────────────────────────────────── */
 function buildThreads(sc: SceneKit): Ticker {
   const { T, C } = sc;
-  sc.camera.position.set(0.3, 6.2, 9.2);
-  sc.camera.lookAt(0, 0.2, 0);
+  sc.camera.position.set(0.3, 6.2, 9.6);
+  sc.camera.lookAt(0, -0.25, 0);
   const main = sc.slab(4.2, 0.18, 3.6, C.paper3);
   main.position.set(-2.9, 0, 0);
   const work = sc.slab(4.2, 0.18, 3.6, C.paper4, C.accent);
@@ -335,11 +368,8 @@ function buildThreads(sc: SceneKit): Ticker {
   ctx.material.emissive = new T.Color(C.accent);
   sc.dashed([3.3, 0.1, -0.45], [2.9, 0.1, 0.4], C.accent);
 
-  sc.label("Main thread", [-2.9, 0.1, -2.4], { tone: "ink", size: 13, weight: 700, dy: -140, mono: false });
-  sc.label("React · pointer input · layout", [-2.9, 0.1, -2.4], { tone: "ink3", dy: -30, minor: true });
-  sc.label("Engine worker", [2.9, 0.1, -2.4], { tone: "accent", size: 13, weight: 700, dy: -140, mono: false });
-  sc.label("engine · own wasm memory · canvas", [2.9, 0.1, -2.4], { tone: "ink3", dy: -30, minor: true });
-  sc.label("postMessage", [0, 1.95, -2.6], { tone: "ink3", dy: -110, minor: true });
+  sc.header("Main thread", "React · pointer input · layout", "Engine worker", "engine · own wasm memory · canvas");
+  sc.label("postMessage", [0, 0.9, -2.6], { tone: "ink3", size: 11, minor: true });
   sc.label("UI", [-3.6, 0.62, -1.0], { tone: "ink2", size: 11, minor: true });
   sc.label("input", [-1.9, 0.55, -1.0], { tone: "ink2", size: 11, minor: true });
   sc.label("<canvas> — element stays, surface gone", [-2.9, 0.18, 1.0], { tone: "ink3", size: 11, dy: 90, minor: true });
@@ -362,7 +392,7 @@ function buildThreads(sc: SceneKit): Ticker {
     ctx.material.emissiveIntensity = 0.25 + 0.2 * Math.sin(t * 6);
     sc.camera.position.x = camBase.x + Math.sin(t * 0.25) * 0.9;
     sc.camera.position.z = camBase.z + Math.cos(t * 0.25) * 0.3;
-    sc.camera.lookAt(0, 0.2, 0);
+    sc.camera.lookAt(0, -0.25, 0);
     const late = t > 1.2;
     for (const l of [l1, l2, l3]) sc.show(l, late);
   };
@@ -507,15 +537,14 @@ const CANVAS_CHAPTERS: Chapter[] = [
 
 function buildCanvas(sc: SceneKit): Ticker {
   const { T, C } = sc;
-  sc.camera.position.set(0.3, 6.0, 9.4);
-  sc.camera.lookAt(0, 0.3, 0);
+  sc.camera.position.set(0.3, 6.0, 9.6);
+  sc.camera.lookAt(0, -0.25, 0);
   const main = sc.slab(4.2, 0.18, 3.6, C.paper3);
   main.position.set(-2.9, 0, 0);
   const work = sc.slab(4.2, 0.18, 3.6, C.paper4, C.accent);
   work.position.set(2.9, 0, 0);
   sc.dashed([0, 0.05, -2.6], [0, 0.05, 2.6], C.ink3);
-  sc.label("Main thread", [-2.9, 0.1, -2.4], { tone: "ink", size: 13, weight: 700, dy: -110, mono: false });
-  sc.label("Engine worker", [2.9, 0.1, -2.4], { tone: "accent", size: 13, weight: 700, dy: -110, mono: false });
+  sc.header("Main thread", "DOM · the <canvas> element", "Engine worker", "engine · linear memory · OffscreenCanvas");
   const mem = sc.slab(1.9, 0.62, 1.1, C.paper2, C.accent);
   mem.position.set(3.3, 0.4, -1.0);
   const eng = sc.slab(1.1, 0.34, 0.7, C.accent, C.accent);

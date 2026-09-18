@@ -383,3 +383,59 @@
   .queue__sub { font-size: 10px; }
   .queue__foot { font-size: 11px; }
 }
+
+/* ── Scene headings ────────────────────────────────────────────────────────
+   The two side headings sit in the frame, not in the scene. As projected
+   labels they slid toward the packets they were naming whenever the camera
+   drifted or the frame narrowed. Deliberately NOT `--minor`: at 390px these
+   are the only thing saying which slab is which, so they survive the rule
+   that hides the annotation labels. */
+.scene__header {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.scene__header-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scene__header-title {
+  font: 700 14px/1.2 var(--font-body);
+  letter-spacing: -0.01em;
+}
+
+/* The subtitle is one line by contract — it names a side, and a second line
+   would push it into the slab it labels. */
+.scene__header-sub {
+  font: 500 11px/1.4 var(--font-mono);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .scene__header { top: 8px; padding: 0 10px; gap: 10px; }
+  .scene__header-title { font-size: 12px; }
+  /* Two lines rather than an ellipsis here. At 390px the right-hand subtitle
+     truncates to "engine · own wasm memory · …", and the word it drops is
+     "canvas" — which is the whole point of the figure. The scene sits low
+     enough on a phone to give the second line its 14px. */
+  .scene__header-sub {
+    font-size: 10px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
