@@ -69,12 +69,13 @@ export interface Post {
 
   /** Social card, site-relative. Falls back to the site default.
    *
-   *  Left unset until the PNG is actually committed. `pnpm gen:og` writes one
-   *  card per post to public/og/blog/<slug>.png — it needs a Chromium
-   *  (`pnpm exec playwright install chromium`) and is deliberately not part of
-   *  `pnpm build`. Point this at "/og/blog/<slug>.png" once that file is in the
-   *  repo, and not before: a route claiming a card that is not there unfurls as
-   *  a broken image, which is worse than the generic one. */
+   *  Left unset until the PNG is actually committed. `pnpm gen:og --posts`
+   *  writes one card per post to public/og/blog/<slug>.png, after a
+   *  `pnpm build` (it reads the built post for the header scene). It needs a
+   *  Chromium (`pnpm exec playwright install chromium`) and is deliberately not
+   *  part of `pnpm build`. Point this at "/og/blog/<slug>.png" once that file
+   *  is in the repo, and not before: a route claiming a card that is not there
+   *  unfurls as a broken image, which is worse than the generic one. */
   ogImage?: string;
 }
 
@@ -89,6 +90,7 @@ export const POSTS: readonly Post[] = [
     published: "2026-08-13",
     version: "v8.32",
     tag: "engineering",
+    ogImage: "/og/blog/engine-in-a-worker.png",
     sources: [
       "marketing/src/posts/engine-in-a-worker.tsx",
       "docs/adr/024-engine-in-a-worker.md",

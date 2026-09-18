@@ -4,12 +4,15 @@
  *   <Scene kind="doors" />            FIG 2 — three doors and the wall
  *   <Scene kind="canvas" controls />  FIG 4 — the transfer, in four beats
  *   <Queue />                         FIG 5 — the FIFO gate and the op log
+ *   <Scene kind="threads" backdrop /> the header banner behind the headline
  *
  * React owns the frame: the box, the caption slot, the fallback and FIG 4's
  * controls. The WebGL scenes themselves are imperative
  * (engine-in-a-worker.scenes.ts) and three.js is loaded with a dynamic import
  * the first time a scene comes near the viewport, so the ~400 kB it costs is
- * paid only on this post and only by a reader who scrolls to a figure.
+ * paid only on this post. The header banner is a scene that is in view from
+ * the start, so every reader of the post pays it, after the page has loaded
+ * (see `backdrop` below). No other page ever requests it.
  *
  * Prerender-safe by construction. scripts/prerender.mjs renders this under
  * Node, where there is no window, no matchMedia, no WebGL — so the render
@@ -102,6 +105,28 @@ export function resolvePalette(): GlPalette {
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Run `fn` once the page has finished loading and the browser has a spare
+ *  moment. Returns a cancel. */
+function afterLoadAndIdle(fn: () => void): () => void {
+  let cancelIdle = () => {};
+  const idle = () => {
+    // Typed as always present, and it is not: Safari keeps it behind a flag.
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(fn, { timeout: 2000 });
+      cancelIdle = () => window.cancelIdleCallback(id);
+    } else {
+      const id = window.setTimeout(fn, 200);
+      cancelIdle = () => window.clearTimeout(id);
+    }
+  };
+  if (document.readyState === "complete") idle();
+  else window.addEventListener("load", idle, { once: true });
+  return () => {
+    window.removeEventListener("load", idle);
+    cancelIdle();
+  };
+}
+
 /* ── Scene ──────────────────────────────────────────────────────────────── */
 
 type Status = "idle" | "loading" | "ready" | "failed";
@@ -113,9 +138,27 @@ export interface SceneProps {
   /** Design-tool switches, kept for parity. Reduced motion overrides both. */
   animate?: boolean;
   labels?: boolean;
+  /**
+   * A post's header banner rather than a figure. It fills its positioned
+   * parent with no frame, no labels and no fallback text: there is no caption
+   * to explain it, and if WebGL fails the header's own gradient is already
+   * the right picture.
+   *
+   * It also loads later. A figure is fetched when it nears the viewport, and a
+   * banner is in the viewport at load by definition, so the same rule would
+   * put three.js (~116 KB gzipped) in the same breath as the fonts and the
+   * main bundle. A backdrop waits for the load event and an idle moment.
+   */
+  backdrop?: boolean;
 }
 
-export function Scene({ kind, controls = false, animate = true, labels = true }: SceneProps) {
+export function Scene({
+  kind,
+  controls = false,
+  animate = true,
+  labels = true,
+  backdrop = false,
+}: SceneProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const slotRef = useRef<HTMLDivElement>(null);
   const stepRef = useRef<HTMLDivElement>(null);
@@ -154,8 +197,9 @@ export function Scene({ kind, controls = false, animate = true, labels = true }:
               slot,
               stepEl: stepRef.current,
               animate: animate && !reducedMotion(),
-              showLabels: labels,
+              showLabels: labels && !backdrop,
               controls,
+              backdrop,
             });
             onScreen.observe(root);
             setHandle(scene);
@@ -169,21 +213,24 @@ export function Scene({ kind, controls = false, animate = true, labels = true }:
       },
       { rootMargin: "25% 0px" },
     );
-    near.observe(root);
+    let cancelWait = () => {};
+    if (backdrop) cancelWait = afterLoadAndIdle(() => near.observe(root));
+    else near.observe(root);
 
     return () => {
       cancelled = true;
+      cancelWait();
       near.disconnect();
       onScreen.disconnect();
       scene?.dispose();
       scene = null;
     };
-  }, [kind, controls, animate, labels]);
+  }, [kind, controls, animate, labels, backdrop]);
 
   return (
     <div
       ref={rootRef}
-      className={`scene scene--${kind}${controls ? " scene--controls" : ""}`}
+      className={`scene scene--${kind}${controls ? " scene--controls" : ""}${backdrop ? " scene--backdrop" : ""}`}
       data-status={status}
     >
       <div className="scene__gl">
@@ -191,7 +238,7 @@ export function Scene({ kind, controls = false, animate = true, labels = true }:
             runtime and never touched by React. Decorative: the caption in the
             post carries the meaning, and the labels would read as a jumble. */}
         <div ref={slotRef} className="scene__slot" aria-hidden="true" />
-        {status === "failed" && (
+        {status === "failed" && !backdrop && (
           <div className="scene__fallback">
             3D diagram unavailable — WebGL or the network did not come through. The caption says
             what it shows.
