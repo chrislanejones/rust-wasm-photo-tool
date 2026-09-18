@@ -91,10 +91,10 @@ n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-
     -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
     -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' -g '!**/toolConfig.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 26 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
+check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
-check "type-scale" 9 "off-scale type / faux weights (§4)" "$n_type"
+check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
 
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
       -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
@@ -169,7 +169,7 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
-check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
+check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 
 # ── src/lib.rs SIZE RATCHET (the Rust twin of eslint's max-lines) ──
 #
