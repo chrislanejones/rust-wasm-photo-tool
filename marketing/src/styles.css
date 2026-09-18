@@ -3460,6 +3460,14 @@ a { color: inherit; }
    through the middle of a filled button. */
 .post__actions a { text-decoration: none; }
 
+/* ⚠️ `.post .cta--fill`, not `.cta--fill`. The generic `.post a` above is
+   (0,1,1) — a class plus an element — and beats the button's lone class at
+   (0,1,0), so the filled button inherited the link AMBER and read as amber
+   text on an amber pill: "Open the beta" at the foot of the worker post.
+   Same trap as `.nav-sheet .nav-sheet__cta`. (0,2,0) wins it back. */
+.post .cta--fill,
+.post .cta--fill:hover { color: var(--color-accent-ink); }
+
 .post__sources {
   max-width: var(--measure);
   font-size: var(--text-sm);
