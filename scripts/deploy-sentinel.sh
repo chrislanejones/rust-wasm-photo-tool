@@ -50,6 +50,25 @@ set -uo pipefail
 #
 #   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
 SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
+
+# ⚠️ THE FLOOR IS LOAD-BEARING IN A NEW WAY SINCE 2026-09-18, AND A RED FLOOR IS
+# NOT EVIDENCE THAT THE FLOOR IS STALE.
+#
+# It has always been the featureless-build detector: a wasm this small means the
+# engine was compiled without --features tiles,patchmatch, which is the v7.36-v7.45
+# bug where Netlify shipped a featureless engine for ten releases.
+#
+# It now also holds a second line. The fonts work removes ~63,109 B of TrueType
+# hinting bytecode that ab_glyph never executes. Applied TO THE FONTS BRANCH that
+# lands at 814,202 B, comfortably inside the band. Applied to master ALONE it gives
+# roughly 794,978 B — BELOW this floor — so the saving is coupled to the feature it
+# pays for and cannot be banked separately.
+#
+# That is the failure mode to expect: someone recovers the hinting on its own, sees
+# this go red, reads the floor as out of date, and lowers it. Lowering it here would
+# re-open the featureless-build hole to buy a saving that has nowhere to go. If you
+# are here because the floor went red, the question is what made the engine small,
+# not whether 800000 is still the right number.
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
 # 840000 -> 860000 (Chris, 2026-09-16). The FLOOR is the featureless detector
 # and stays at 800000 — that decision was made on 09-15 and is not revisited
