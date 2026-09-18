@@ -376,7 +376,7 @@ function buildThreads(sc: SceneKit): Ticker {
   sc.label("engine", [3.3, 1.08, -1.0], { tone: "ink", size: 11, minor: true });
   sc.label("linear memory", [3.3, 0.1, -1.0], { tone: "ink2", size: 11, dy: 110, minor: true });
   sc.label("OffscreenCanvas · putImageData here", [2.9, 0.22, 1.0], { tone: "accent", size: 11, dy: 90, minor: true });
-  const l1 = sc.label("call { id, method, args } →", [0, 1.15, -0.55], { tone: "accent", size: 11, dy: -160, minor: true });
+  const l1 = sc.label("call { id, method, args } →", [0.35, 0.55, -0.55], { tone: "accent", size: 11, dy: -150, minor: true });
   const l2 = sc.label("← reply { id, ok, value }", [0, 0.9, -0.05], { tone: "ink2", size: 11, dy: 40, minor: true });
   const l3 = sc.label("blit → (no reply, not queued)", [0, 0.8, 1.05], { tone: "accent2", size: 11, dy: 90, minor: true });
   for (const l of [l1, l2, l3]) sc.show(l, false);
