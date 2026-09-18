@@ -24,6 +24,7 @@ import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { canEncode } from "@/lib/encodeSupport";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
 import { namePastedImage } from "@/lib/pastedImageName";
+import { shapeKindLabel } from "@/lib/perspectiveTarget";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
@@ -1581,18 +1582,6 @@ export function AppShell() {
     textTool.annotations.forEach((a, i) => {
       items.push({ key: `t${a.id}`, type: "text", id: a.id, label: `Text #${i + 1}` });
     });
-    const KIND_LABEL: Record<number, string> = {
-      0: "Square",
-      1: "Circle",
-      2: "Line",
-      3: "Hand-drawn",
-      4: "Arrow",
-      5: "Pin",
-      6: "Pen",
-      7: "Pen Path",
-      8: "Diamond",
-      9: "Star",
-    };
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
       counters[s.kind] = (counters[s.kind] ?? 0) + 1;
@@ -1601,7 +1590,7 @@ export function AppShell() {
       const label =
         s.kind === 5
           ? `Pin ${pinLabelText(s.number, s.label_kind)}`
-          : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
+          : `${shapeKindLabel(s.kind)} #${counters[s.kind]}`;
       items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
     });
     return items;

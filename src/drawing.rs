@@ -638,6 +638,68 @@ pub fn fill_shape(
     }
 }
 
+/// A rotation about a pivot, exactly as SVG's `rotate(θ cx cy)` applies it on
+/// a y-down canvas: positive θ turns CLOCKWISE on screen.
+///
+/// ```text
+/// x' = cx + (x-cx)·cosθ − (y-cy)·sinθ
+/// y' = cy + (x-cx)·sinθ + (y-cy)·cosθ
+/// ```
+///
+/// Built once per shape per composite (one `sin`/`cos` pair), then applied to
+/// every outline point — no allocation of its own.
+#[derive(Clone, Copy, Debug)]
+pub struct Rotation {
+    cos: f64,
+    sin: f64,
+    cx: f64,
+    cy: f64,
+}
+
+impl Rotation {
+    /// `deg` about the center of the bbox `(x0,y0)-(x1,y1)`. `None` for 0° and
+    /// for a non-finite angle — "no rotation" is the absence of a transform,
+    /// which is what keeps every unrotated shape on its pre-rotation code path
+    /// byte for byte.
+    ///
+    /// Radians are `deg * PI / 180`, written in that order on purpose: it is
+    /// the JS spelling (`deg * Math.PI / 180`), and `f64::to_radians` rounds
+    /// differently (`deg * (PI / 180)`).
+    pub fn about_bbox_center(deg: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> Option<Self> {
+        if deg == 0.0 || !deg.is_finite() {
+            return None;
+        }
+        let t = deg * PI / 180.0;
+        Some(Rotation {
+            cos: t.cos(),
+            sin: t.sin(),
+            cx: (x0 + x1) / 2.0,
+            cy: (y0 + y1) / 2.0,
+        })
+    }
+
+    /// Rotate one point about the pivot.
+    #[inline]
+    pub fn apply(&self, (x, y): (f64, f64)) -> (f64, f64) {
+        let dx = x - self.cx;
+        let dy = y - self.cy;
+        (
+            self.cx + dx * self.cos - dy * self.sin,
+            self.cy + dx * self.sin + dy * self.cos,
+        )
+    }
+}
+
+/// Rasterize one of the bbox-defined shapes.
+///
+/// `star_points` is the EFFECTIVE count for a star (kind 9) — the caller maps
+/// the stored "0 = classic" to 5; other kinds ignore it. `rot` rotates the
+/// OUTLINE of the rect (0), line (2), diamond (8), star (9) and triangle (10):
+/// the outline is built exactly as it would be unrotated — the sketch wobble
+/// included, seeded from the UNROTATED endpoints — and only then are its points
+/// turned about the bbox center. That is also how the frontend previews it (the
+/// unrotated path inside an SVG `rotate()`), so the wobble matches. Circle (1)
+/// and hand-circle (3) ignore `rot`; the fills are the caller's business.
 pub fn draw_shape(
     data: &mut [u8],
     w: u32,
@@ -650,9 +712,12 @@ pub fn draw_shape(
     color: [u8; 4],
     stroke_width: f64,
     sloppiness: f64,
+    star_points: u32,
+    rot: Option<Rotation>,
 ) {
     let wi = w as i32;
     let hi = h as i32;
+    let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
     match shape {
         // 0 = Rectangle
         0 => {
@@ -660,21 +725,18 @@ pub fn draw_shape(
             let y0 = from_y.min(to_y);
             let x1 = from_x.max(to_x);
             let y1 = from_y.max(to_y);
-            if sloppiness > 0.0 {
-                let pts = sloppy_polyline_points(
-                    &[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
-                    shape_wobble_seed(from_x, from_y, to_x, to_y),
-                    sloppiness,
-                    stroke_width,
-                    true,
-                );
-                draw_polyline(data, w, h, &pts, color, stroke_width);
-            } else {
-                draw_line_thick(data, wi, hi, x0, y0, x1, y0, color, stroke_width);
-                draw_line_thick(data, wi, hi, x1, y0, x1, y1, color, stroke_width);
-                draw_line_thick(data, wi, hi, x1, y1, x0, y1, color, stroke_width);
-                draw_line_thick(data, wi, hi, x0, y1, x0, y0, color, stroke_width);
-            }
+            draw_outline(
+                data,
+                w,
+                h,
+                &[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
+                true,
+                seed,
+                color,
+                stroke_width,
+                sloppiness,
+                rot,
+            );
         }
         // 1 = Circle (clean) or sketchy (sloppiness > 0)
         1 => {
@@ -714,28 +776,18 @@ pub fn draw_shape(
         }
         // 2 = Line
         2 => {
-            if sloppiness > 0.0 {
-                let pts = sloppy_polyline_points(
-                    &[(from_x, from_y), (to_x, to_y)],
-                    shape_wobble_seed(from_x, from_y, to_x, to_y),
-                    sloppiness,
-                    stroke_width,
-                    false,
-                );
-                draw_polyline(data, w, h, &pts, color, stroke_width);
-            } else {
-                draw_line_thick(
-                    data,
-                    wi,
-                    hi,
-                    from_x,
-                    from_y,
-                    to_x,
-                    to_y,
-                    color,
-                    stroke_width,
-                );
-            }
+            draw_outline(
+                data,
+                w,
+                h,
+                &[(from_x, from_y), (to_x, to_y)],
+                false,
+                seed,
+                color,
+                stroke_width,
+                sloppiness,
+                rot,
+            );
         }
         // 3 = Hand-drawn circle (legacy — superseded by sloppiness on a plain
         // circle, kept so old documents with kind 3 still render identically)
@@ -752,71 +804,82 @@ pub fn draw_shape(
                 stroke_width,
             );
         }
-        // 8 = Diamond
-        8 => {
-            draw_polygon_shape(
+        // 8 = Diamond, 9 = Star, 10 = Triangle — closed polygons, stroked
+        // alike (no fill: fills stay rect/circle only).
+        8..=10 => {
+            let verts = match shape {
+                8 => diamond_vertices(from_x, from_y, to_x, to_y),
+                9 => star_vertices_n(from_x, from_y, to_x, to_y, star_points),
+                _ => triangle_vertices(from_x, from_y, to_x, to_y),
+            };
+            draw_outline(
                 data,
-                wi,
-                hi,
-                &diamond_vertices(from_x, from_y, to_x, to_y),
-                from_x,
-                from_y,
-                to_x,
-                to_y,
+                w,
+                h,
+                &verts,
+                true,
+                seed,
                 color,
                 stroke_width,
                 sloppiness,
-            );
-        }
-        // 9 = Star
-        9 => {
-            draw_polygon_shape(
-                data,
-                wi,
-                hi,
-                &star_vertices(from_x, from_y, to_x, to_y),
-                from_x,
-                from_y,
-                to_x,
-                to_y,
-                color,
-                stroke_width,
-                sloppiness,
+                rot,
             );
         }
         _ => {}
     }
 }
 
-/// A closed polygonal shape (diamond / star): clean straight edges, or its
-/// wobbly sketchy outline when `sloppiness` > 0.
-fn draw_polygon_shape(
+/// Stroke an outline given as its clean vertices: straight thick segments, or
+/// the sketchy polyline when `sloppiness` > 0. `closed` adds the last→first
+/// edge. With `rot`, the finished points — wobble and all — are turned about
+/// the pivot just before they are drawn.
+///
+/// With `rot == None` this issues exactly the calls the pre-rotation rect,
+/// line, diamond and star branches issued, in the same order, so an unrotated
+/// shape's pixels are unchanged (pinned by `tests/shape_rotation.rs`). The
+/// rotated clean path rotates each segment's endpoints on the fly rather than
+/// collecting them, and the sketchy path rotates the polyline it already owns
+/// in place — neither allocates anything the unrotated path does not.
+fn draw_outline(
     data: &mut [u8],
-    w: i32,
-    h: i32,
+    w: u32,
+    h: u32,
     verts: &[(f64, f64)],
-    from_x: f64,
-    from_y: f64,
-    to_x: f64,
-    to_y: f64,
+    closed: bool,
+    seed: f64,
     color: [u8; 4],
     stroke_width: f64,
     sloppiness: f64,
+    rot: Option<Rotation>,
 ) {
     if sloppiness > 0.0 {
-        let pts = sloppy_polyline_points(
-            verts,
-            shape_wobble_seed(from_x, from_y, to_x, to_y),
-            sloppiness,
-            stroke_width,
-            true,
-        );
-        draw_polyline(data, w as u32, h as u32, &pts, color, stroke_width);
+        let mut pts = sloppy_polyline_points(verts, seed, sloppiness, stroke_width, closed);
+        if let Some(r) = rot {
+            for p in pts.iter_mut() {
+                *p = r.apply(*p);
+            }
+        }
+        draw_polyline(data, w, h, &pts, color, stroke_width);
     } else {
-        for i in 0..verts.len() {
-            let (ax, ay) = verts[i];
-            let (bx, by) = verts[(i + 1) % verts.len()];
-            draw_line_thick(data, w, h, ax, ay, bx, by, color, stroke_width);
+        let n = verts.len();
+        let edges = if closed { n } else { n.saturating_sub(1) };
+        for i in 0..edges {
+            let (mut a, mut b) = (verts[i], verts[(i + 1) % n]);
+            if let Some(r) = rot {
+                a = r.apply(a);
+                b = r.apply(b);
+            }
+            draw_line_thick(
+                data,
+                w as i32,
+                h as i32,
+                a.0,
+                a.1,
+                b.0,
+                b.1,
+                color,
+                stroke_width,
+            );
         }
     }
 }
@@ -834,11 +897,23 @@ pub fn diamond_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
     vec![(cx, miny), (maxx, cy), (cx, maxy), (minx, cy)]
 }
 
-/// Five-pointed star vertices filling the drag bbox: 5 outer tips at even
-/// indices, 5 inner valleys at odd indices, 36° apart, starting at 12 o'clock.
-/// Outer radii are the bbox half-extents (elliptical star); inner is 0.5×.
-/// Mirrored by hand in drawShapePreview / sloppyShapePath (CanvasArea).
-pub fn star_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+/// n-pointed star vertices filling the drag bbox (it replaced the five-point
+/// `star_vertices`, which is now `n = 5` — bit for bit, pinned by
+/// `five_points_is_the_old_star_bit_for_bit` against the old body verbatim):
+/// `2n` of them, n outer tips
+/// at even indices and n inner valleys at odd indices, `180/n`° apart,
+/// starting at 12 o'clock — `a = -PI/2 + i*PI/n`. Outer radii are the bbox
+/// half-extents (an elliptical star on a non-square drag); inner is 0.5×.
+///
+/// The angle is spelled `i * PI / n` (multiply, THEN divide) because that is
+/// how the five-point original spelled `i * PI / 5`; reassociating it would
+/// move the classic star's vertices by an ulp and its pixels with them.
+///
+/// `n` is the EFFECTIVE count (callers map the stored 0 to 5 and clamp to
+/// 3..=12); it is floored at 1 here only so a stray 0 cannot divide by zero.
+/// Mirrored by hand in `starVerticesN` (shapeSloppiness.ts).
+pub fn star_vertices_n(x0: f64, y0: f64, x1: f64, y1: f64, n: u32) -> Vec<(f64, f64)> {
+    let n = n.max(1);
     let minx = x0.min(x1);
     let maxx = x0.max(x1);
     let miny = y0.min(y1);
@@ -849,13 +924,26 @@ pub fn star_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
     let ory = (maxy - miny) * 0.5;
     let irx = orx * 0.5;
     let iry = ory * 0.5;
-    let mut verts = Vec::with_capacity(10);
-    for i in 0..10 {
+    let nf = n as f64;
+    let mut verts = Vec::with_capacity(2 * n as usize);
+    for i in 0..2 * n {
         let (rx, ry) = if i % 2 == 0 { (orx, ory) } else { (irx, iry) };
-        let a = -PI / 2.0 + i as f64 * PI / 5.0;
+        let a = -PI / 2.0 + i as f64 * PI / nf;
         verts.push((cx + rx * a.cos(), cy + ry * a.sin()));
     }
     verts
+}
+
+/// Isosceles triangle filling the drag bbox, apex up: `(cx, top)`,
+/// `(right, bottom)`, `(left, bottom)`. Mirrored by hand in
+/// `triangleVertices` (shapeSloppiness.ts).
+pub fn triangle_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+    let minx = x0.min(x1);
+    let maxx = x0.max(x1);
+    let miny = y0.min(y1);
+    let maxy = y0.max(y1);
+    let cx = (minx + maxx) * 0.5;
+    vec![(cx, miny), (maxx, maxy), (minx, maxy)]
 }
 
 /* ------------------------------------------------------------------ */
@@ -1283,5 +1371,154 @@ fn draw_hand_circle(
         let smx = (sx + ex) / 2.0;
         let smy = (sy + ey) / 2.0;
         draw_line_thick(data, w, h, smx, smy, ex, ey, color, stroke_width);
+    }
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+
+    /// `star_vertices` exactly as it stood before the point count existed —
+    /// kept here, verbatim, as the reference the five-point case must match.
+    /// The frontend's vitest pins the same ten vertices on its side.
+    fn legacy_star_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+        let minx = x0.min(x1);
+        let maxx = x0.max(x1);
+        let miny = y0.min(y1);
+        let maxy = y0.max(y1);
+        let cx = (minx + maxx) * 0.5;
+        let cy = (miny + maxy) * 0.5;
+        let orx = (maxx - minx) * 0.5;
+        let ory = (maxy - miny) * 0.5;
+        let irx = orx * 0.5;
+        let iry = ory * 0.5;
+        let mut verts = Vec::with_capacity(10);
+        for i in 0..10 {
+            let (rx, ry) = if i % 2 == 0 { (orx, ory) } else { (irx, iry) };
+            let a = -PI / 2.0 + i as f64 * PI / 5.0;
+            verts.push((cx + rx * a.cos(), cy + ry * a.sin()));
+        }
+        verts
+    }
+
+    #[test]
+    fn five_points_is_the_old_star_bit_for_bit() {
+        for bbox in [
+            (0.0, 0.0, 100.0, 100.0),
+            (14.0, 10.0, 78.0, 66.0),
+            (78.0, 66.0, 14.0, 10.0), // dragged up-left
+            (3.25, 7.5, 3.75, 191.125),
+        ] {
+            let (x0, y0, x1, y1) = bbox;
+            let old = legacy_star_vertices(x0, y0, x1, y1);
+            let new = star_vertices_n(x0, y0, x1, y1, 5);
+            assert_eq!(old.len(), 10);
+            // Bits, not approximate equality: the vitest and the pixel hashes
+            // both depend on the SAME doubles.
+            let bits = |v: &[(f64, f64)]| -> Vec<(u64, u64)> {
+                v.iter().map(|p| (p.0.to_bits(), p.1.to_bits())).collect()
+            };
+            assert_eq!(bits(&old), bits(&new), "bbox {bbox:?}");
+        }
+    }
+
+    #[test]
+    fn an_n_pointed_star_has_2n_vertices_tips_on_even_indices() {
+        for n in 3..=12u32 {
+            let v = star_vertices_n(0.0, 0.0, 100.0, 60.0, n);
+            assert_eq!(v.len(), 2 * n as usize, "n = {n}");
+            // The first tip is at 12 o'clock on the bbox top edge.
+            assert!(
+                (v[0].0 - 50.0).abs() < 1e-9 && v[0].1.abs() < 1e-9,
+                "{:?}",
+                v[0]
+            );
+            // Tips sit on the outer ellipse, valleys on the half-size one.
+            for (i, &(x, y)) in v.iter().enumerate() {
+                let e = ((x - 50.0) / 50.0).powi(2) + ((y - 30.0) / 30.0).powi(2);
+                let want = if i % 2 == 0 { 1.0 } else { 0.25 };
+                assert!((e - want).abs() < 1e-9, "n={n} i={i} e={e}");
+            }
+        }
+        let seven = star_vertices_n(10.0, 10.0, 90.0, 90.0, 7);
+        assert_eq!(seven.len(), 14, "a seven-point star has fourteen vertices");
+    }
+
+    #[test]
+    fn a_zero_point_count_cannot_divide_by_zero() {
+        let v = star_vertices_n(0.0, 0.0, 10.0, 10.0, 0);
+        assert!(v.iter().all(|p| p.0.is_finite() && p.1.is_finite()));
+    }
+
+    #[test]
+    fn the_triangle_is_isosceles_apex_up_and_fills_the_box() {
+        assert_eq!(
+            triangle_vertices(10.0, 20.0, 50.0, 80.0),
+            vec![(30.0, 20.0), (50.0, 80.0), (10.0, 80.0)]
+        );
+        // Drag direction does not matter — the bbox is normalized first.
+        assert_eq!(
+            triangle_vertices(50.0, 80.0, 10.0, 20.0),
+            triangle_vertices(10.0, 20.0, 50.0, 80.0)
+        );
+    }
+
+    /// The sketch wobble is built from the UNROTATED outline — seeded from the
+    /// unrotated endpoints — and only its finished points are turned. That is
+    /// what the frontend does (the unrotated path inside an SVG `rotate()`),
+    /// and it is why turning a sketchy shape does not re-roll its wobble.
+    #[test]
+    fn a_sketchy_rotated_outline_is_the_unrotated_wobble_turned() {
+        let (w, h) = (96u32, 80u32);
+        let (x0, y0, x1, y1) = (14.0, 10.0, 78.0, 66.0);
+        let color = [200, 30, 30, 255];
+        for kind in [0u32, 2, 8, 9, 10] {
+            let rot = Rotation::about_bbox_center(33.0, x0, y0, x1, y1).unwrap(); // allow: rust-panic
+            let mut got = vec![0u8; (w * h * 4) as usize];
+            draw_shape(
+                &mut got,
+                w,
+                h,
+                x0,
+                y0,
+                x1,
+                y1,
+                kind,
+                color,
+                3.0,
+                70.0,
+                7,
+                Some(rot),
+            );
+
+            let (verts, closed) = match kind {
+                0 => (vec![(x0, y0), (x1, y0), (x1, y1), (x0, y1)], true),
+                2 => (vec![(x0, y0), (x1, y1)], false),
+                8 => (diamond_vertices(x0, y0, x1, y1), true),
+                9 => (star_vertices_n(x0, y0, x1, y1, 7), true),
+                _ => (triangle_vertices(x0, y0, x1, y1), true),
+            };
+            let seed = shape_wobble_seed(x0, y0, x1, y1);
+            let turned: Vec<_> = sloppy_polyline_points(&verts, seed, 70.0, 3.0, closed)
+                .into_iter()
+                .map(|p| rot.apply(p))
+                .collect();
+            let mut want = vec![0u8; (w * h * 4) as usize];
+            draw_polyline(&mut want, w, h, &turned, color, 3.0);
+            assert!(got == want, "kind {kind}");
+        }
+    }
+
+    #[test]
+    fn rotation_matches_the_svg_rotate_formula() {
+        // 90° clockwise on a y-down canvas: right of center goes to below it.
+        let r = Rotation::about_bbox_center(90.0, 0.0, 0.0, 20.0, 20.0).unwrap(); // allow: rust-panic
+        let (x, y) = r.apply((20.0, 10.0));
+        assert!(
+            (x - 10.0).abs() < 1e-9 && (y - 20.0).abs() < 1e-9,
+            "({x}, {y})"
+        );
+        assert!(Rotation::about_bbox_center(0.0, 0.0, 0.0, 1.0, 1.0).is_none());
+        assert!(Rotation::about_bbox_center(f64::NAN, 0.0, 0.0, 1.0, 1.0).is_none());
     }
 }

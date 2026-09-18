@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   Diamond,
   Star,
+  Triangle,
 } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -22,14 +23,22 @@ import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
+// Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
+// "row of tiles" panels read as one family.
 const SHAPES = [
-  { id: "rect",    label: "Rectangle", icon: Square  },
-  { id: "circle",  label: "Circle",    icon: Circle  },
-  { id: "line",    label: "Line",      icon: Minus   },
-  { id: "diamond", label: "Diamond",   icon: Diamond },
-  { id: "star",    label: "Star",      icon: Star    },
+  { id: "rect",     label: "Rectangle", icon: Square   },
+  { id: "circle",   label: "Circle",    icon: Circle   },
+  { id: "line",     label: "Line",      icon: Minus    },
+  { id: "diamond",  label: "Diamond",   icon: Diamond  },
+  { id: "star",     label: "Star",      icon: Star     },
+  { id: "triangle", label: "Triangle",  icon: Triangle },
 ] as const;
+
+// Star points — numbers variant like Sloppiness. 3 is the fewest that still
+// reads as a star; 12 is where the tips start to blur into a sunburst.
+const STAR_POINT_PRESETS = [3, 5, 8, 12] as const;
 
 const PIN_LABELS = [
   { id: "numbers", label: "Numbers", icon: Hash },
@@ -76,7 +85,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
     id: "shapes",
     label: "Shapes",
     icon: ShapesIcon,
-    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable (drag handles, re-angle) until you commit it.",
+    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°).",
   },
   {
     id: "pens",
@@ -108,6 +117,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   const [internalMode, setInternalMode] = useState<ShapesMode>("shapes");
   const mode = activeMode ?? internalMode;
   const currentShape = (settings.shape ?? "rect") as ShapeType;
+  // A reselected star needs its Points slider even when the panel's tile says
+  // something else — the tile is what you draw NEXT, not what is selected.
+  const starSelected = useAnnotationStore((s) => s.editingShapeKind === 9);
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
@@ -131,10 +143,24 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                   {/* Shape selector — stacked tiles (icon on top, label below). */}
                   <ToolButtonGroup
                     stacked
+                    columns={3}
                     options={SHAPES}
                     value={currentShape}
                     onChange={(id) => onChange({ ...settings, shape: id })}
                   />
+
+                  {/* Points — the star only. The count lives on the star rather
+                      than the triangle because a star with 4 or 8 points is
+                      still a star; a triangle with 5 is a pentagon. */}
+                  {(currentShape === "star" || starSelected) && (
+                    <SizeSlider
+                      label="Points"
+                      value={settings.starPoints ?? 5}
+                      onChange={(v) => onChange({ ...settings, starPoints: v })}
+                      presets={STAR_POINT_PRESETS}
+                      variant="numbers"
+                    />
+                  )}
 
                   {/* Stroke Width */}
                   <SizeSlider
@@ -171,8 +197,8 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     onChange={(color) => onChange({ ...settings, strokeColor: color })}
                   />
 
-                  {/* Fill — rect + circle only (line/diamond/star have no fill
-                      in the engine: `fill_shape` handles kinds 0/1 only) */}
+                  {/* Fill — rect + circle only (line/diamond/star/triangle have
+                      no fill in the engine: `fill_shape` handles kinds 0/1 only) */}
                   {(currentShape === "rect" || currentShape === "circle") && (
                     <div className="space-y-4">
                       <label className="text-2xs font-bold text-theme-muted-foreground">

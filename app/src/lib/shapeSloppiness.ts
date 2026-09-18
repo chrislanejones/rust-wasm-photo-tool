@@ -151,7 +151,7 @@ export function sloppyPolylinePoints(
 /** A shapes's closed diamond outline, filling the drag bbox. The exact
  *  vertex list Rust rasterises (`diamond_vertices`), NOT the commit-time
  *  rendering — width/thickness only affects the stroke itself. */
-export function diamondVertices(x0: number, y0: number, x1: number, y1: number): Point[] {
+function diamondVertices(x0: number, y0: number, x1: number, y1: number): Point[] {
   const minx = Math.min(x0, x1);
   const maxx = Math.max(x0, x1);
   const miny = Math.min(y0, y1);
@@ -166,10 +166,26 @@ export function diamondVertices(x0: number, y0: number, x1: number, y1: number):
   ];
 }
 
-/** A five-pointed star filling the drag bbox: 5 outer tips at even indices,
- *  5 inner valleys at odd indices, 36° apart, starting at 12 o'clock. Outer
- *  radii are the bbox half-extents; inner is 0.5×. Mirrors `star_vertices`. */
-export function starVertices(x0: number, y0: number, x1: number, y1: number): Point[] {
+/** The Star's point count the engine actually draws: 0 (every shape saved
+ *  before the count existed) means the classic 5, anything else clamps to
+ *  3–12. Mirrors the engine's reading of `star_points`. */
+export function effectiveStarPoints(n: number | undefined): number {
+  if (!n) return 5;
+  return Math.min(12, Math.max(3, Math.round(n)));
+}
+
+/** An n-pointed star filling the drag bbox: n outer tips at even indices, n
+ *  inner valleys at odd indices, 180/n° apart, starting at 12 o'clock. Outer
+ *  radii are the bbox half-extents; inner is 0.5×. Mirrors `star_vertices_n`
+ *  (n = 5 is the classic star and `star_vertices`). */
+export function starVertices(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  points = 5,
+): Point[] {
+  const n = effectiveStarPoints(points);
   const minx = Math.min(x0, x1);
   const maxx = Math.max(x0, x1);
   const miny = Math.min(y0, y1);
@@ -181,13 +197,61 @@ export function starVertices(x0: number, y0: number, x1: number, y1: number): Po
   const irx = orx * 0.5;
   const iry = ory * 0.5;
   const verts: Point[] = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 2 * n; i++) {
     const rx = i % 2 === 0 ? orx : irx;
     const ry = i % 2 === 0 ? ory : iry;
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
     verts.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
   }
   return verts;
+}
+
+/** An isosceles triangle filling the drag bbox, apex up: (cx, top),
+ *  (right, bottom), (left, bottom). Mirrors `triangle_vertices`. */
+export function triangleVertices(x0: number, y0: number, x1: number, y1: number): Point[] {
+  const minx = Math.min(x0, x1);
+  const maxx = Math.max(x0, x1);
+  const miny = Math.min(y0, y1);
+  const maxy = Math.max(y0, y1);
+  return [
+    { x: (minx + maxx) * 0.5, y: miny },
+    { x: maxx, y: maxy },
+    { x: minx, y: maxy },
+  ];
+}
+
+/** The CLOSED outline the engine strokes for a polygon shape — rect, diamond,
+ *  star, triangle — or `null` for the two that are not polygons (circle,
+ *  line). One switch for both previews (the canvas rubber band and the SVG
+ *  edit overlay), so a new shape is one case here rather than one in each. */
+export function closedOutline(
+  shape: string,
+  from: Point,
+  to: Point,
+  starPoints?: number,
+): Point[] | null {
+  switch (shape) {
+    case "rect": {
+      const x = Math.min(from.x, to.x);
+      const y = Math.min(from.y, to.y);
+      const x1 = Math.max(from.x, to.x);
+      const y1 = Math.max(from.y, to.y);
+      return [
+        { x, y },
+        { x: x1, y },
+        { x: x1, y: y1 },
+        { x, y: y1 },
+      ];
+    }
+    case "diamond":
+      return diamondVertices(from.x, from.y, to.x, to.y);
+    case "star":
+      return starVertices(from.x, from.y, to.x, to.y, starPoints);
+    case "triangle":
+      return triangleVertices(from.x, from.y, to.x, to.y);
+    default:
+      return null;
+  }
 }
 
 /** Widest the ends may miss each other by, at full strength. */

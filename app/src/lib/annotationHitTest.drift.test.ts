@@ -104,7 +104,12 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // cd6a41ce328a78b2 → 2f58b7e76eb659d0 (2026-09-17): diamond (8) / star (9)
   // route through an outline-edges test while unfilled, padded bbox when
   // filled. Port + tests updated FIRST, per the order above.
-  shape_annotation_at: "2f58b7e76eb659d0",
+  // 2f58b7e76eb659d0 → ba5ac4fcb5d475f3 (2026-09-18): rotation (the query
+  // point turned by −θ about the bbox center for kinds 0/1/2/8/9/10),
+  // triangle (10) joins the unfilled-edges branch, the star takes its point
+  // count. Port + tests (triangle, 8-point star, turned rect, pin ignores θ)
+  // updated FIRST, per the order above.
+  shape_annotation_at: "ba5ac4fcb5d475f3",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

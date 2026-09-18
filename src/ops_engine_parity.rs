@@ -1378,3 +1378,90 @@ fn levels_records_one_op_and_oplog_undo_restores_it() {
         "op-log redo restores the levels"
     );
 }
+
+// ── v8: rotated, n-point shapes through the real engine and a reload ───────
+
+/// A sketchy, rotated seven-point star — then warped, then MOVED — persisted
+/// and restored into a fresh engine. Every skipped field has to cross the
+/// codec for the restored composite to match, and the move is the ShapeEdit
+/// that used to wipe them on replay (see `a_decoded_shape_edit_keeps_the_side_op_fields`).
+#[test]
+fn a_rotated_warped_star_survives_persist_restore_byte_identical() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let id = t.add_shape_annotation_full(
+        9, 14.0, 10.0, 70.0, 60.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 40, 7, 30.0,
+    );
+    t.recomposite();
+    assert!(t.set_shape_perspective(id, &[0.2, 0.0, 0.8, 0.0, 1.0, 1.0, 0.0, 1.0]));
+    t.recomposite();
+    let h_before_move = composite_hash(&mut t);
+    assert!(t.update_shape_annotation_full(
+        id, 9, 20.0, 14.0, 76.0, 64.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 40, 7,
+        30.0,
+    ));
+    t.recomposite();
+    let h_full = composite_hash(&mut t);
+    assert_ne!(h_before_move, h_full, "the move moved something");
+    assert!(!t.oplog_is_broken(), "the live log follows every step");
+
+    let total = t.oplog_op_count() as u32;
+    let frames = t.oplog_encoded_ops(0, total);
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, total));
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_full,
+        "restored == pre-reload, byte-exact: rotation, points, sketch and warp all crossed the codec"
+    );
+    assert!(!t2.oplog_is_broken());
+    let json = t2.get_shape_annotations();
+    assert!(
+        json.contains("\"rotation\":30,") && json.contains("\"starPoints\":7,"),
+        "{json}"
+    );
+
+    // Undo the move after the reload: the replayed ShapeEdit must not have
+    // eaten the fields the side ops own.
+    assert!(t2.undo());
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_before_move,
+        "post-reload undo, byte-exact"
+    );
+    assert!(!t2.oplog_is_broken());
+}
+
+/// KNOWN GAP, not introduced here — reproduced here. See docs/PARKING_LOT.md,
+/// "one gesture can record several ops, and op-log undo rewinds only one".
+///
+/// `try_oplog_undo` rewinds exactly ONE op per snapshot. A shape added with a
+/// non-default skipped field records ShapeAdd PLUS a side op for it
+/// (ShapeSloppiness since v7; ShapeRotation / ShapeStarPoints since v8) under
+/// the one "Add Shape" snapshot, so the first undo only rewinds the side op.
+/// In memory the ShapeAdd still carries the value, so that press changes
+/// nothing on screen, and every later undo lands one gesture late. Ignored
+/// until the log learns gesture boundaries; run with `--ignored` to see it.
+#[test]
+#[ignore = "known gap: several ops per snapshot (PARKING_LOT: one gesture can record several ops)"]
+fn one_undo_removes_a_seven_point_star() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    t.add_shape_annotation_full(
+        9, 14.0, 10.0, 70.0, 60.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 0, 7, 0.0,
+    );
+    t.recomposite();
+    assert!(t.undo());
+    assert_eq!(
+        t.shape_annotation_count(),
+        0,
+        "one undo removes the shape it added"
+    );
+    assert_eq!(composite_hash(&mut t), h0);
+}

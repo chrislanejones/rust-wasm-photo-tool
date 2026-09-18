@@ -121,6 +121,10 @@ export async function restoreLayerStack(
           s.fill_angle ?? 0,
           s.fill_block ?? 0,
           s.sloppiness ?? 0,
+          // Absent on every save before triangle/rotation shipped: 0 is the
+          // classic 5-point star and an upright shape, which is what they meant.
+          s.starPoints ?? 0,
+          s.rotation ?? 0,
         );
       }
     }

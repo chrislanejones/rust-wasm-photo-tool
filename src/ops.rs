@@ -138,7 +138,34 @@ use serde::{Deserialize, Serialize};
 ///
 /// A v6 document decodes with every shape firm — exactly what a v6 document
 /// meant.
-pub const OP_FORMAT_VERSION: u8 = 7;
+///
+/// **8** — shape ROTATION and the star's POINT COUNT: the same move a sixth
+/// time, for two fields at once.
+///
+///   * `rotation_deg` and `star_points` are both `#[serde(skip)]` on
+///     [`ShapeParams`], so the `ShapeAdd`/`ShapeEdit` wire layout is still
+///     byte-identical to v2's. Both skipped defaults ARE their semantic
+///     defaults — 0° is unrotated, and 0 points means the classic five-point
+///     star (`annotations::canonical_star_points`) — so, like sloppiness, no
+///     normalization step is needed on decode.
+///   * The values ride in two APPENDED variants, [`Op::ShapeRotation`] and
+///     [`Op::ShapeStarPoints`], after `ShapeSloppiness`, so no existing
+///     variant is renumbered.
+///   * `encode_annotations` gained a NINTH (per-shape rotation) and a TENTH
+///     (per-shape star points) tuple element, keeping v8 blobs a strict
+///     prefix-extension of v7.
+///
+/// A v7 document decodes with every shape unrotated and every star
+/// five-pointed — exactly what a v7 document meant. Pinned by
+/// `v7_blobs_still_decode_under_v8` and `v7_op_bytes_still_decode_under_v8`.
+/// (`decode_annotations` reads v8 as the v7 prefix plus a two-vector tail —
+/// the same bytes as the 10-tuple `encode_annotations` writes.)
+///
+/// v8 also changes what `Op::ShapeEdit` MEANS on replay, without changing its
+/// bytes: it now leaves the four skipped fields (quad, sloppiness, rotation,
+/// star points) as they were, because a decoded ShapeEdit carries only their
+/// defaults and replaying it used to wipe them. See `apply`.
+pub const OP_FORMAT_VERSION: u8 = 8;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -303,6 +330,24 @@ pub struct ShapeParams {
     /// default, which is exactly what every pre-sloppiness shape meant.
     #[serde(skip)]
     pub sloppiness: u8,
+    /// Rotation in degrees, clockwise about the bbox center, normalized to
+    /// (-180, 180] — see `ShapeAnnotation::rotation_deg`.
+    ///
+    /// ⚠️ `#[serde(skip)]` for the identical reason as `sloppiness` above.
+    /// Rides as [`Op::ShapeRotation`] in the log and as the ninth element of
+    /// `encode_annotations`. Deserializes to 0.0 — unrotated, which is exactly
+    /// what every pre-v8 shape meant.
+    #[serde(skip)]
+    pub rotation_deg: f64,
+    /// Star (kind 9) point count, stored canonical: 0 = the classic five,
+    /// else 3..=12 — see `annotations::canonical_star_points`.
+    ///
+    /// ⚠️ `#[serde(skip)]` for the identical reason as `sloppiness` above.
+    /// Rides as [`Op::ShapeStarPoints`] in the log and as the tenth element of
+    /// `encode_annotations`. Deserializes to 0 — the five-point star, which is
+    /// exactly what every pre-v8 star meant.
+    #[serde(skip)]
+    pub star_points: u8,
     pub number: u32,
     pub label_kind: u8,
     pub points: Vec<(f64, f64)>,
@@ -385,6 +430,8 @@ impl ShapeParams {
             stroke_width: s.stroke_width,
             arrow_style: s.arrow_style,
             sloppiness: s.sloppiness,
+            rotation_deg: s.rotation_deg,
+            star_points: s.star_points,
             number: s.number,
             label_kind: s.label_kind,
             points: s.points.clone(),
@@ -419,6 +466,8 @@ impl ShapeParams {
             stroke_width: self.stroke_width,
             arrow_style: self.arrow_style,
             sloppiness: self.sloppiness,
+            rotation_deg: self.rotation_deg,
+            star_points: self.star_points,
             number: self.number,
             label_kind: self.label_kind,
             points: self.points.clone(),
@@ -443,15 +492,18 @@ impl ShapeParams {
 /// lives beside the `Op` definitions rather than in the engine.
 ///
 /// ⚠️ THE SKIPPED FIELDS ARE THE WHOLE DIFFICULTY. `TextParams::wrap_width`,
-/// `box_height` and `perspective`, and `ShapeParams::perspective`, are all
-/// `#[serde(skip)]` (they have to be — see the fields' comments), so
+/// `box_height` and `perspective`, and `ShapeParams::perspective`,
+/// `sloppiness`, `rotation_deg` and `star_points`, are all `#[serde(skip)]`
+/// (they have to be — see the fields' comments), so
 /// `TextAdd`/`TextEdit`/`ShapeAdd`/`ShapeEdit` physically CANNOT carry them.
 /// Every such change therefore needs its own `TextWrap` / `TextBoxHeight` /
-/// `TextPerspective` / `ShapePerspective` op, or replay rebuilds the item
-/// unboxed and unwarped, the composite hash diverges, and the log marks itself
-/// broken — silently falling the user back to snapshot undo. All four are
-/// handled identically below; keep them that way, because one of them being
-/// forgotten is the failure this comment exists to prevent.
+/// `TextPerspective` / `ShapePerspective` / `ShapeSloppiness` /
+/// `ShapeRotation` / `ShapeStarPoints` op, or replay rebuilds the item
+/// unboxed, unwarped, firm, unrotated and five-pointed, the composite hash
+/// diverges, and the log marks itself broken — silently falling the user back
+/// to snapshot undo. All seven are handled identically below; keep them that
+/// way, because one of them being forgotten is the failure this comment
+/// exists to prevent.
 ///
 /// Returns an empty vec when both sides are empty, which is the fast path that
 /// makes a pure-paint session free.
@@ -569,6 +621,8 @@ pub(crate) fn annotation_sync_ops(
             None => {
                 let quad = params.perspective;
                 let sloppiness = params.sloppiness;
+                let rotation_deg = params.rotation_deg;
+                let star_points = params.star_points;
                 pending.push(Op::ShapeAdd(params));
                 // The "unset" sentinel is the IDENTITY, not zero —
                 // emitting nothing leaves replay at the identity, which
@@ -585,6 +639,21 @@ pub(crate) fn annotation_sync_ops(
                         sloppiness,
                     });
                 }
+                // Rotation and star points: same rule, same reason. Both
+                // defaults (0°, 0 = five points) are what a skipped-field
+                // decode already holds, so a plain shape emits neither.
+                if rotation_deg != 0.0 {
+                    pending.push(Op::ShapeRotation {
+                        id: s.id,
+                        rotation_deg,
+                    });
+                }
+                if star_points != 0 {
+                    pending.push(Op::ShapeStarPoints {
+                        id: s.id,
+                        star_points,
+                    });
+                }
             }
             Some(p) => {
                 if p.perspective != params.perspective {
@@ -599,15 +668,31 @@ pub(crate) fn annotation_sync_ops(
                         sloppiness: params.sloppiness,
                     });
                 }
-                // Compare everything EXCEPT the skipped quad, which the
-                // branch above already accounted for — otherwise a
-                // perspective-only drag would also emit a redundant
-                // ShapeEdit (`ShapeParams` derives PartialEq over the
-                // real fields, `#[serde(skip)]` or not, so it DOES
-                // count here).
-                let mut without_quad = p.clone();
-                without_quad.perspective = params.perspective;
-                if without_quad != params {
+                if p.rotation_deg != params.rotation_deg {
+                    pending.push(Op::ShapeRotation {
+                        id: s.id,
+                        rotation_deg: params.rotation_deg,
+                    });
+                }
+                if p.star_points != params.star_points {
+                    pending.push(Op::ShapeStarPoints {
+                        id: s.id,
+                        star_points: params.star_points,
+                    });
+                }
+                // Compare everything EXCEPT the four skipped fields, which the
+                // branches above already accounted for — otherwise a
+                // rotate-only drag would also emit a redundant ShapeEdit
+                // (`ShapeParams` derives PartialEq over the real fields,
+                // `#[serde(skip)]` or not, so they DO count here). Until v8
+                // this neutralized the quad alone, so every sloppiness-only
+                // change recorded a ShapeSloppiness AND a ShapeEdit.
+                let mut without_side = p.clone();
+                without_side.perspective = params.perspective;
+                without_side.sloppiness = params.sloppiness;
+                without_side.rotation_deg = params.rotation_deg;
+                without_side.star_points = params.star_points;
+                if without_side != params {
                     pending.push(Op::ShapeEdit(params));
                 }
             }
@@ -724,6 +809,15 @@ pub enum Op {
     /// itself broken over. Reuse the rationale on [`Op::TextWrap`]: appended,
     /// never inserted, so the variants already on disk keep their indices.
     ShapeSloppiness { id: u32, sloppiness: u8 },
+    /// v8 — a shape's rotation in degrees, clockwise about its bbox center,
+    /// normalized to (-180, 180]. The sixth of the appended family, for the
+    /// reason on [`Op::ShapeSloppiness`]: `#[serde(skip)]` on
+    /// [`ShapeParams::rotation_deg`] means `ShapeAdd`/`ShapeEdit` cannot carry
+    /// it. Appended, never inserted.
+    ShapeRotation { id: u32, rotation_deg: f64 },
+    /// v8 — a star's point count, canonical (0 = the classic five, else
+    /// 3..=12). Appended after [`Op::ShapeRotation`]; same rule, same reason.
+    ShapeStarPoints { id: u32, star_points: u8 },
 }
 
 impl Op {
@@ -761,6 +855,12 @@ impl Op {
             // Same reasoning as ShapePerspective: a sloppiness change is a
             // style decision the user made in the panel, worth its own entry.
             Op::ShapeSloppiness { .. } => "Edit Shape",
+            // Its own verb, like "Perspective": rotating is a gesture on the
+            // canvas handle, not a panel restyle, and the History panel is
+            // where the user goes to find that step again.
+            Op::ShapeRotation { .. } => "Rotate Shape",
+            // A panel restyle, like sloppiness.
+            Op::ShapeStarPoints { .. } => "Edit Shape",
         }
     }
 }
@@ -929,11 +1029,17 @@ pub fn encode_annotations(
     // index — the eighth element, same trick. `ShapeParams::sloppiness` is
     // `#[serde(skip)]`, so this tuple is the ONLY place a keyframe carries it:
     // the op log still mirrors it with `Op::ShapeSloppiness` appended frames.
+    // v8 appends the per-shape ROTATION (degrees) as the ninth element and the
+    // per-shape STAR POINTS (canonical u8) as the tenth — same trick, same
+    // reason: both fields are `#[serde(skip)]`, so these vectors are the only
+    // place a keyframe carries them.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
     let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
     let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
     let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+    let shape_rotations: Vec<f64> = shapes.iter().map(|s| s.rotation_deg).collect();
+    let shape_star_points: Vec<u8> = shapes.iter().map(|s| s.star_points).collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -943,6 +1049,8 @@ pub fn encode_annotations(
         &quads,
         &shape_quads,
         &shape_sloppiness,
+        &shape_rotations,
+        &shape_star_points,
     )) {
         out.extend_from_slice(&body);
     }
@@ -982,16 +1090,17 @@ pub fn decode_annotations(
         Vec<[(f32, f32); 4]>,
         Vec<u8>,
     );
+    // v8 is read THROUGH the v7 branch, not beside it. A postcard tuple is its
+    // elements back to back, so a v8 blob is a v7 blob with two more vectors
+    // after it: `take_from_bytes` decodes the v7 prefix and hands back the
+    // tail, and the tail either holds (rotations, star points) or is empty.
+    // A separate `V8` branch meant a second copy of everything below plus a
+    // second postcard decoder for the 10-tuple — ~5 KB of wasm (measured) for
+    // two loops.
     if let Ok((
-        mut texts,
-        mut shapes,
-        canvas,
-        wraps,
-        heights,
-        quads,
-        shape_quads,
-        shape_sloppiness,
-    )) = postcard::from_bytes::<V7>(body)
+        (mut texts, mut shapes, canvas, wraps, heights, quads, shape_quads, shape_sloppiness),
+        v8_tail,
+    )) = postcard::take_from_bytes::<V7>(body)
     {
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
@@ -1007,6 +1116,18 @@ pub fn decode_annotations(
         }
         for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
             sp.sloppiness = sl;
+        }
+        // Empty tail = a v7 blob: every shape unrotated and five-pointed, which
+        // is what `#[serde(skip)]` already left and what v7 meant.
+        if let Ok((rotations, star_points)) = postcard::from_bytes::<(Vec<f64>, Vec<u8>)>(v8_tail) {
+            // Normalized on the way in, like every other door the values come
+            // through: a stored NaN would otherwise reach every outline point.
+            for (sp, r) in shapes.iter_mut().zip(rotations) {
+                sp.rotation_deg = crate::annotations::normalize_rotation_deg(r);
+            }
+            for (sp, n) in shapes.iter_mut().zip(star_points) {
+                sp.star_points = crate::annotations::canonical_star_points(sp.kind, n);
+            }
         }
         return Ok((texts, shapes, canvas));
     }
@@ -1478,6 +1599,22 @@ pub fn apply(op: &Op, doc: &mut Document) {
                 sp.sloppiness = *sloppiness;
             }
         }
+        Op::ShapeRotation { id, rotation_deg } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                sp.rotation_deg = crate::annotations::normalize_rotation_deg(*rotation_deg);
+            }
+        }
+        Op::ShapeStarPoints { id, star_points } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                // Stored VERBATIM — not re-canonicalized against `sp.kind`. The
+                // diff emits side ops BEFORE the ShapeEdit that may change the
+                // kind, so a rect turned into a 7-point star arrives here while
+                // the document still says rect; folding by kind would zero the
+                // count and desync the log. The value was canonical when the
+                // engine produced it, and the renderer clamps on read.
+                sp.star_points = *star_points;
+            }
+        }
         Op::PerspectiveWarp { rect, quad } => {
             let (w, h) = (doc.width(), doc.height());
             if w == 0 || h == 0 {
@@ -1502,7 +1639,29 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         Op::ShapeEdit(p) => {
             if let Some(s) = doc.shapes.iter_mut().find(|s| s.id == p.id) {
+                // ⚠️ The four `#[serde(skip)]` fields are OWNED BY THEIR SIDE
+                // OPS (ShapePerspective / ShapeSloppiness / ShapeRotation /
+                // ShapeStarPoints), never by ShapeEdit, so they are carried
+                // over rather than replaced.
+                //
+                // This was `*s = p.clone()`, and it was only correct while the
+                // op had never been through the codec. A ShapeEdit read back
+                // from disk holds those fields at their DEFAULTS — serde never
+                // wrote them — so after a reload, replaying one (any undo that
+                // seeks back past it and forward again, or a restore) put the
+                // shape back unwarped, firm, unrotated and five-pointed while
+                // the engine still showed it warped: a composite mismatch, a
+                // broken log, snapshot undo for the rest of the session. The
+                // in-memory op happened to carry the right values, which is
+                // why nothing that never persisted could see it. Pinned by
+                // `a_decoded_shape_edit_keeps_the_side_op_fields`.
+                let (quad, sloppiness, rotation_deg, star_points) =
+                    (s.perspective, s.sloppiness, s.rotation_deg, s.star_points);
                 *s = p.clone();
+                s.perspective = quad;
+                s.sloppiness = sloppiness;
+                s.rotation_deg = rotation_deg;
+                s.star_points = star_points;
             }
         }
         Op::ShapeRemove { id } => {
@@ -1852,6 +2011,8 @@ mod tests {
             stroke_width: 2.0,
             arrow_style: 0,
             sloppiness: 0,
+            rotation_deg: 0.0,
+            star_points: 0,
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -1923,6 +2084,14 @@ mod tests {
             Op::ShapeSloppiness {
                 id: 2,
                 sloppiness: 65,
+            },
+            Op::ShapeRotation {
+                id: 2,
+                rotation_deg: -37.5,
+            },
+            Op::ShapeStarPoints {
+                id: 2,
+                star_points: 7,
             },
             Op::LayerMove {
                 layer: 0,
@@ -2733,6 +2902,8 @@ mod v2_migration_tests {
             stroke_width: 2.0,
             arrow_style: 0,
             sloppiness: 0,
+            rotation_deg: 0.0,
+            star_points: 0,
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -3284,6 +3455,385 @@ mod v2_migration_tests {
         assert!(
             annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
             "and a second pass is silent — the log must not grow on every sync"
+        );
+    }
+
+    // ── v8: rotation and the star's point count ────────────────────────────
+    // The same guarantees a sixth time, for two fields at once — plus the
+    // ShapeEdit replay fix that rides with them.
+
+    /// A v7 writer emitted `[7] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads, shape_sloppiness))` — the 8-tuple, with no
+    /// rotation and no star points. Reconstructed byte-for-byte.
+    fn v7_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![7u8];
+        let texts: Vec<TextParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = Vec::new();
+        let heights: Vec<u32> = Vec::new();
+        let quads: Vec<[(f32, f32); 4]> = Vec::new();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts,
+                shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &shape_sloppiness,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    /// A seven-point star, rotated, sketchy and warped — every skipped field
+    /// set to something that is not its default.
+    fn a_styled_star(id: u32) -> ShapeParams {
+        ShapeParams {
+            kind: 9,
+            sloppiness: 45,
+            rotation_deg: -37.5,
+            star_points: 7,
+            perspective: a_quad(),
+            ..a_shape(id)
+        }
+    }
+
+    #[test]
+    fn v7_blobs_still_decode_under_v8() {
+        // Sixth iteration of the load-bearing read. v7 blobs hold shapes whose
+        // rotation and point-count elements do not exist — they meant
+        // "unrotated" and "five points", and that must survive the step, along
+        // with everything v7 did carry.
+        let mut sp = a_shape(3);
+        sp.kind = 9;
+        sp.perspective = a_quad();
+        sp.sloppiness = 30;
+        let (_, shapes, _) = decode_annotations(&v7_annotation_blob(&[sp]))
+            .expect("a v7 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(shapes[0].perspective, a_quad(), "the v7 quad survives");
+        assert_eq!(shapes[0].sloppiness, 30, "the v7 sloppiness survives");
+        assert_eq!(shapes[0].rotation_deg, 0.0, "a v7 shape meant 'unrotated'");
+        assert_eq!(shapes[0].star_points, 0, "a v7 star meant 'five points'");
+    }
+
+    #[test]
+    fn v8_round_trips_rotation_and_star_points() {
+        let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        assert_eq!(OP_FORMAT_VERSION, 8);
+        let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(
+            shapes[0],
+            a_styled_star(2),
+            "every skipped field round-trips"
+        );
+        assert_eq!(shapes[1], a_shape(3), "a plain shape stays plain");
+    }
+
+    #[test]
+    fn v7_op_bytes_still_decode_under_v8() {
+        // Appending `ShapeRotation`/`ShapeStarPoints` must not renumber the
+        // variants already on disk — `ShapeSloppiness` was appended last before
+        // them, so it is the one that would break first.
+        for op in [
+            Op::ShapeAdd(a_shape(2)),
+            Op::ShapeEdit(a_shape(2)),
+            Op::ShapeRemove { id: 2 },
+            Op::ShapePerspective {
+                id: 2,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+                quad: a_quad(),
+            },
+            Op::ShapeSloppiness {
+                id: 2,
+                sloppiness: 70,
+            },
+        ] {
+            let mut v7_bytes = vec![7u8];
+            v7_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v7_bytes)
+                .unwrap_or_else(|e| panic!("v7 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v7 op must mean the same thing under v8");
+        }
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_rotation_and_star_points() {
+        // Sixth instance of the measurement: neither new field may appear on
+        // the wire of a ShapeAdd/ShapeEdit payload.
+        let a = a_shape(4);
+        let mut b = a_shape(4);
+        b.rotation_deg = 123.25;
+        b.star_points = 11;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "rotation and star points must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn rotation_and_star_point_ops_apply_to_the_right_shape() {
+        let mut doc = Document::new(32, 32);
+        doc.shapes.push(a_shape(1));
+        doc.shapes.push(ShapeParams {
+            kind: 9,
+            ..a_shape(2)
+        });
+        apply(
+            &Op::ShapeRotation {
+                id: 2,
+                rotation_deg: 200.0,
+            },
+            &mut doc,
+        );
+        apply(
+            &Op::ShapeStarPoints {
+                id: 2,
+                star_points: 9,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.shapes[0].rotation_deg, 0.0, "untouched");
+        assert_eq!(doc.shapes[0].star_points, 0, "untouched");
+        assert_eq!(doc.shapes[1].rotation_deg, -160.0, "normalized on replay");
+        assert_eq!(doc.shapes[1].star_points, 9);
+        assert_eq!(
+            Op::ShapeRotation {
+                id: 2,
+                rotation_deg: 1.0
+            }
+            .label(),
+            "Rotate Shape"
+        );
+        assert_eq!(
+            Op::ShapeStarPoints {
+                id: 2,
+                star_points: 7
+            }
+            .label(),
+            "Edit Shape"
+        );
+    }
+
+    fn live_star(id: u32) -> crate::annotations::ShapeAnnotation {
+        crate::annotations::ShapeAnnotation {
+            id,
+            kind: 9,
+            x1: 20.0,
+            y1: 20.0,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_plain_star_syncs_no_rotation_or_points_op() {
+        // The twin of `a_firm_shape_syncs_no_sloppiness_op`: 0° and the
+        // five-point star are the skipped defaults, so a plain star is one
+        // ShapeAdd and nothing else, or every recomposite grows the log.
+        let mut doc = Document::new(32, 32);
+        let s = live_star(9);
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "one ShapeAdd: {ops:?}");
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert!(annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty());
+    }
+
+    #[test]
+    fn a_rotated_seven_point_star_syncs_both_as_their_own_ops() {
+        let mut doc = Document::new(32, 32);
+        let mut s = live_star(9);
+        s.rotation_deg = 30.0;
+        s.star_points = 7;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert!(
+            ops.iter()
+                .any(|o| matches!(o, Op::ShapeRotation { id: 9, .. }))
+                && ops.iter().any(|o| matches!(
+                    o,
+                    Op::ShapeStarPoints {
+                        id: 9,
+                        star_points: 7
+                    }
+                )),
+            "neither can ride on ShapeAdd — each needs its own op: {ops:?}"
+        );
+        for op in &ops {
+            apply(op, &mut doc);
+        }
+        assert_eq!(doc.shapes[0].rotation_deg, 30.0);
+        assert_eq!(doc.shapes[0].star_points, 7);
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &doc).is_empty(),
+            "a second pass is silent"
+        );
+    }
+
+    #[test]
+    fn a_side_field_only_change_is_exactly_one_op() {
+        // The comparison clone used to neutralize the quad alone, so a
+        // sloppiness-only change recorded ShapeSloppiness AND a redundant
+        // ShapeEdit — two ops for one gesture's one snapshot. All four skipped
+        // fields are neutralized now; each change is its own single op.
+        let mut doc = Document::new(32, 32);
+        let mut s = live_star(9);
+        for op in annotation_sync_ops(&[], std::slice::from_ref(&s), &doc) {
+            apply(&op, &mut doc);
+        }
+        s.rotation_deg = 45.0;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "rotate only: {ops:?}");
+        assert!(matches!(ops[0], Op::ShapeRotation { id: 9, .. }));
+        apply(&ops[0], &mut doc);
+
+        s.sloppiness = 50;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "sloppiness only: {ops:?}");
+        assert!(matches!(ops[0], Op::ShapeSloppiness { id: 9, .. }));
+        apply(&ops[0], &mut doc);
+
+        s.star_points = 6;
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "points only: {ops:?}");
+        assert!(matches!(ops[0], Op::ShapeStarPoints { id: 9, .. }));
+        apply(&ops[0], &mut doc);
+
+        s.perspective = crate::perspective::NormQuad(a_quad());
+        let ops = annotation_sync_ops(&[], std::slice::from_ref(&s), &doc);
+        assert_eq!(ops.len(), 1, "quad only: {ops:?}");
+        assert!(matches!(ops[0], Op::ShapePerspective { id: 9, .. }));
+    }
+
+    /// Replay a log exactly the way a reload does: every op through the codec
+    /// (encode → frames → decode), then applied to a fresh document.
+    fn replay_through_the_codec(ops: &[Op]) -> Document {
+        let decoded = decode_op_frames(&encode_op_frames(ops)).unwrap(); // allow: rust-panic
+        let mut doc = Document::new(96, 80);
+        for op in &decoded {
+            apply(op, &mut doc);
+        }
+        doc
+    }
+
+    #[test]
+    fn a_decoded_shape_edit_keeps_the_side_op_fields() {
+        // THE replay bug the v8 change fixes. Add a sketchy, warped, rotated
+        // seven-point star; MOVE it (a plain ShapeEdit); persist; reload;
+        // replay. `apply` used to do `*s = p.clone()`, and a ShapeEdit read
+        // back from disk carries the skipped fields at their DEFAULTS, so the
+        // move wiped the warp and the sketch (and would have wiped the
+        // rotation and the points) — while the engine still showed them.
+        let mut live_doc = Document::new(96, 80);
+        let mut ops = Vec::new();
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 5,
+            kind: 9,
+            x0: 10.0,
+            y0: 10.0,
+            x1: 60.0,
+            y1: 50.0,
+            r: 200,
+            stroke_width: 3.0,
+            sloppiness: 45,
+            rotation_deg: 30.0,
+            star_points: 7,
+            perspective: crate::perspective::NormQuad(a_quad()),
+            ..Default::default()
+        };
+        for op in annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc) {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        // The move: geometry only.
+        s.x0 += 12.0;
+        s.x1 += 12.0;
+        s.y0 += 5.0;
+        s.y1 += 5.0;
+        let moved = annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc);
+        assert!(
+            matches!(moved.as_slice(), [Op::ShapeEdit(_)]),
+            "a move is exactly one ShapeEdit: {moved:?}"
+        );
+        for op in moved {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+
+        let reloaded = replay_through_the_codec(&ops);
+        let got = &reloaded.shapes[0];
+        assert_eq!(got.x0, 22.0, "the move itself replays");
+        assert_eq!(
+            got.perspective,
+            a_quad(),
+            "the warp survives the replayed edit"
+        );
+        assert_eq!(got.sloppiness, 45, "the sketch survives the replayed edit");
+        assert_eq!(
+            got.rotation_deg, 30.0,
+            "the rotation survives the replayed edit"
+        );
+        assert_eq!(
+            got.star_points, 7,
+            "the point count survives the replayed edit"
+        );
+        // And the picture: what a reload replays is what the user was looking
+        // at, byte for byte — the property the op-log sync check hashes.
+        assert_eq!(reloaded.composite_hash(), live_doc.composite_hash());
+    }
+
+    #[test]
+    fn turning_a_rect_into_a_seven_point_star_replays_in_sync() {
+        // The diff emits side ops BEFORE the ShapeEdit that changes the kind,
+        // so ShapeStarPoints{7} is applied while the document still says
+        // "rect". Replay must store it verbatim, not re-fold it by kind.
+        let mut live_doc = Document::new(96, 80);
+        let mut ops = Vec::new();
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 3,
+            kind: 0,
+            x0: 10.0,
+            y0: 10.0,
+            x1: 60.0,
+            y1: 50.0,
+            stroke_width: 3.0,
+            ..Default::default()
+        };
+        for op in annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc) {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        s.kind = 9;
+        s.star_points = 7;
+        for op in annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc) {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        assert_eq!(live_doc.shapes[0].kind, 9);
+        assert_eq!(live_doc.shapes[0].star_points, 7, "in memory");
+        assert_eq!(
+            replay_through_the_codec(&ops).shapes[0].star_points,
+            7,
+            "after a reload"
+        );
+        assert!(
+            annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc).is_empty(),
+            "and the log agrees with the engine — no op on the next sync"
         );
     }
 }

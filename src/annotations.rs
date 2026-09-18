@@ -96,7 +96,7 @@ pub struct ShapeAnnotation {
     pub id: u32,
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
     /// 7=bezier (cubic pen path; `points` holds the flat control sequence),
-    /// 8=diamond, 9=star.
+    /// 8=diamond, 9=star, 10=triangle.
     pub kind: u8,
     pub x0: f64,
     pub y0: f64, // start point / bbox corner (canvas coords)
@@ -112,6 +112,25 @@ pub struct ShapeAnnotation {
     /// hand-drawn (bowed edges, wobble, gaps). Applies to rect, circle, line,
     /// diamond (8) and star (9). Ignored for arrow/pin/polyline/bezier.
     pub sloppiness: u8,
+    /// Rotation in degrees, positive = CLOCKWISE on screen (the canvas is
+    /// y-down), about the bbox center `((x0+x1)/2, (y0+y1)/2)` — SVG's
+    /// `rotate(θ cx cy)`. Stored normalized to (-180, 180] by
+    /// [`normalize_rotation_deg`]; 0 = unrotated, which is what every shape
+    /// written before rotation means.
+    ///
+    /// The bbox `x0..y1` stays the UNROTATED local box, so resize handles, the
+    /// perspective basis ([`shape_basis_rect`]) and the sketch-wobble seed all
+    /// keep working in the shape's own frame; the angle is applied last, at
+    /// render and hit-test time. Honored by rect (0), circle (1, only where it
+    /// shows — see `render_shape_into`), line (2), diamond (8), star (9) and
+    /// triangle (10); the other kinds ignore it.
+    pub rotation_deg: f64,
+    /// Star (kind 9) point count. Stored CANONICAL by [`canonical_star_points`]:
+    /// 0 = the classic five-point star (so `Default`, pre-rotation documents
+    /// and a skipped-serde decode all mean the star they always meant), else
+    /// 3..=12 and never 5. Always 0 on every other kind. Read it through
+    /// [`effective_star_points`].
+    pub star_points: u8,
     /// Numbered callout pins (kind 5): the 1-based sequence index. 0 otherwise.
     pub number: u32,
     /// Pin label style (kind 5): 0 = number (1, 2, 3…), 1 = letter (A, B, C…).
@@ -370,6 +389,68 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
     out
 }
 
+/// A shape rotation in degrees, normalized to (-180, 180] — the one form
+/// stored, emitted and compared. Non-finite input is 0 (a NaN angle would
+/// otherwise reach every outline point), and -0 becomes 0 so the JSON never
+/// says `-0`.
+///
+/// Reduced with `floor`, NOT `%`, on purpose: f64 `%` is `fmod`, which wasm
+/// has no instruction for, and linking it pulled ~2.3 KB of soft-float
+/// reduction (plus a u128 divider) into the binary for this one line. `floor`
+/// is a native wasm op. For an angle already in range — which is everything
+/// the frontend sends, since it normalizes first — the reduction is exactly
+/// the identity, so the two sides cannot disagree about a stored value.
+pub(crate) fn normalize_rotation_deg(deg: f64) -> f64 {
+    if !deg.is_finite() {
+        return 0.0;
+    }
+    // Into [-180, 180) by whole turns, then fold the -180 end over to +180.
+    let mut r = deg - 360.0 * ((deg + 180.0) / 360.0).floor();
+    if r <= -180.0 {
+        r += 360.0;
+    }
+    // An angle so large that whole turns are no longer exact in f64 (past
+    // ~1e15°) cannot mean anything a user drew; keep it finite and in range.
+    if !(r > -180.0 && r <= 180.0) || r == 0.0 {
+        return 0.0;
+    }
+    r
+}
+
+/// The ONE stored form of a star's point count: 0 for "the classic star" and
+/// for every non-star kind, otherwise clamped to 3..=12 — with 5 folded to 0.
+///
+/// Folding 5 is what keeps the op log quiet. The frontend passes the
+/// effective count (5 for a default star), and a stored 5 would differ from
+/// the 0 a pre-rotation document decodes to, so every default star would sync
+/// an extra `Op::ShapeStarPoints` that changes nothing on screen. One value per
+/// meaning means the diff only sees real changes.
+pub(crate) fn canonical_star_points(kind: u8, n: u8) -> u8 {
+    if kind != 9 || n == 0 {
+        return 0;
+    }
+    match n.clamp(3, 12) {
+        5 => 0,
+        c => c,
+    }
+}
+
+/// A star's point count as the geometry uses it: stored 0 → 5, anything else
+/// clamped to 3..=12 (defensive — decoded data is not trusted to be canonical).
+pub(crate) fn effective_star_points(stored: u8) -> u32 {
+    if stored == 0 {
+        5
+    } else {
+        stored.clamp(3, 12) as u32
+    }
+}
+
+/// The kinds whose geometry turns with `rotation_deg`. Arrow, pin, polyline,
+/// bézier and the legacy hand-circle keep their stored geometry as-is.
+fn rotation_applies(kind: u8) -> bool {
+    matches!(kind, 0 | 1 | 2 | 8 | 9 | 10)
+}
+
 /// Serialize a list of shape annotations to JSON for the JS overlay /
 /// Reselect list. Geometry is the raw endpoint pair; the JS side derives
 /// bounding boxes the same way Rust's `draw_shape` does.
@@ -388,13 +469,15 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"sloppiness\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"sloppiness\":{},\"starPoints\":{},\"rotation\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
             s.stroke_width,
             s.arrow_style,
             s.sloppiness,
+            s.star_points,
+            s.rotation_deg,
             s.number,
             s.label_kind,
             s.fill_kind,
@@ -500,10 +583,20 @@ fn shape_tile(s: &ShapeAnnotation, tw: u32, th: u32, under: &[u8]) -> Vec<u8> {
     tile
 }
 
-/// Composite a shape through its perspective quad. Returns false when the warp
-/// cannot be done — a degenerate quad, or one so extreme that the padded tile
-/// crosses the horizon — and the caller then draws the shape flat rather than
-/// dropping it off the canvas.
+/// Composite a shape through its perspective quad — and through its rotation,
+/// for the rotated shapes whose FILL has to turn with them (see
+/// `render_shape_into`). Returns false when the warp cannot be done — a
+/// degenerate quad, or one so extreme that the padded tile crosses the
+/// horizon — and the caller then draws the shape flat rather than dropping it
+/// off the canvas.
+///
+/// Rotation is COMPOSED onto the quad, not a second pass: the destination
+/// corners are computed from the quad exactly as before and then each is
+/// turned about the bbox center. So a rotated, warped shape is "warp, then
+/// rotate" — the same order the frontend's SVG `rotate()` wraps its warped
+/// preview in — and it costs one resample, not two. An identity quad with a
+/// rotation reduces to a pure rotation, which is how a filled rect gets every
+/// fill kind rotated with no fill code of its own.
 fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> bool {
     let (bx, by, bw, bh) = shape_basis_rect(s);
     if bw < 1.0 || bh < 1.0 {
@@ -512,12 +605,21 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
     let q = s.perspective.0;
     // The quad in ABSOLUTE canvas coords, then the forward map that takes the
     // basis rect's own space (0..bw, 0..bh) to it.
-    let dst: crate::perspective::Quad = [
+    let mut dst: crate::perspective::Quad = [
         (bx + q[0].0 as f64 * bw, by + q[0].1 as f64 * bh),
         (bx + q[1].0 as f64 * bw, by + q[1].1 as f64 * bh),
         (bx + q[2].0 as f64 * bw, by + q[2].1 as f64 * bh),
         (bx + q[3].0 as f64 * bw, by + q[3].1 as f64 * bh),
     ];
+    if rotation_applies(s.kind) {
+        if let Some(r) =
+            drawing::Rotation::about_bbox_center(s.rotation_deg, s.x0, s.y0, s.x1, s.y1)
+        {
+            for c in dst.iter_mut() {
+                *c = r.apply(*c);
+            }
+        }
+    }
     let src_rect: crate::perspective::Quad = [(0.0, 0.0), (bw, 0.0), (bw, bh), (0.0, bh)];
     let Some(fwd) = crate::perspective::Homography::from_correspondences(&src_rect, &dst) else {
         return false;
@@ -563,7 +665,11 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
         } else {
             Vec::new()
         };
-        let tile = shape_tile(&shape_translated(s, tx as f64, ty as f64), tw, th, &under);
+        // The tile holds the shape in its OWN frame: the rotation is already in
+        // `dst`, so drawing it into the tile as well would turn it twice.
+        let mut in_tile = shape_translated(s, tx as f64, ty as f64);
+        in_tile.rotation_deg = 0.0;
+        let tile = shape_tile(&in_tile, tw, th, &under);
         let Some(warped) = crate::perspective::warp_rgba(&tile, tw, th, &local) else {
             continue;
         };
@@ -592,8 +698,25 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 /// tile has done since v8.42. The shape itself is untouched by it: the quad is
 /// a property applied at render time, so a warped square is still a square
 /// that can be recolored, re-filled, moved and re-warped.
+///
+/// ## Rotation (`rotation_deg`), by route
+///
+/// | shape | route |
+/// |---|---|
+/// | warped (any rotatable kind) | warp path, rotation composed onto the quad |
+/// | rect (0) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
+/// | circle (1) with a gradient | warp path, same reason (the gradient has a direction) |
+/// | rect (0) unfilled, line (2), diamond (8), star (9), triangle (10) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
+/// | circle (1) otherwise | flat, θ ignored — a circle is rotation-invariant |
+/// | 3, 4, 5, 6, 7 | θ ignored |
+///
+/// θ = 0 takes exactly the routes, and makes exactly the calls, it took
+/// before rotation existed.
 pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
-    if !crate::perspective::is_identity(&s.perspective.0) && render_shape_warped(data, w, h, s) {
+    let warped = !crate::perspective::is_identity(&s.perspective.0);
+    let rotated_fill = s.rotation_deg != 0.0
+        && ((s.kind == 0 && s.fill_kind != 0) || (s.kind == 1 && s.fill_kind == 2));
+    if (warped || rotated_fill) && render_shape_warped(data, w, h, s) {
         return;
     }
     render_shape_flat(data, w, h, s);
@@ -662,6 +785,15 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             color,
             s.stroke_width,
             s.sloppiness as f64,
+            effective_star_points(s.star_points),
+            // The circle is in `rotation_applies` for hit-testing and for its
+            // gradient's warp route, but its outline is rotation-invariant, so
+            // it is not handed one here.
+            if rotation_applies(s.kind) && s.kind != 1 {
+                drawing::Rotation::about_bbox_center(s.rotation_deg, s.x0, s.y0, s.x1, s.y1)
+            } else {
+                None
+            },
         ),
     }
 }
@@ -752,7 +884,8 @@ impl ImageHorseTool {
 
     // ── Drawing: Shapes ─────────────────────────────────────────
     /// Draw a shape onto the image buffer.
-    /// shape: 0=rect, 1=circle, 2=line
+    /// shape: 0=rect, 1=circle, 2=line, 8=diamond, 9=star (five points),
+    /// 10=triangle. Unrotated, firm.
     /// color_hex: CSS hex like "#ef4444"
     pub fn draw_shape(
         &mut self,
@@ -777,6 +910,8 @@ impl ImageHorseTool {
             color,
             stroke_width,
             0.0,
+            5,
+            None,
         );
     }
 
@@ -790,9 +925,22 @@ impl ImageHorseTool {
     }
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
-    /// 3=handCircle,4=arrow,8=diamond,9=star. Pushes an "Add Shape"/"Add
-    /// Arrow" snapshot so undo removes it. Returns the new id.
-    pub fn add_shape_annotation(
+    /// 3=handCircle,4=arrow,8=diamond,9=star,10=triangle. Pushes an "Add
+    /// Shape"/"Add Arrow" snapshot so undo removes it. Returns the new id.
+    ///
+    /// JS calls this as **`add_shape_annotation`** (`js_name`): the wasm export
+    /// keeps its name and gains two trailing arguments. It is `_full` on the
+    /// Rust side only because the pre-rotation Rust signature is kept as a
+    /// thin wrapper (see the plain `impl` block below), so the dozens of Rust
+    /// test call sites — eight of them in `lib.rs`, whose line ratchet a
+    /// rustfmt reflow would break — did not have to change.
+    ///
+    /// `star_points`: star (9) only — 0 = the classic five, else 3..=12
+    /// (stored canonical, see [`canonical_star_points`]). `rotation_deg`:
+    /// clockwise about the bbox center, normalized to (-180, 180] on the way
+    /// in; x0..y1 stay the UNROTATED box.
+    #[wasm_bindgen(js_name = add_shape_annotation)]
+    pub fn add_shape_annotation_full(
         &mut self,
         kind: u8,
         x0: f64,
@@ -808,6 +956,8 @@ impl ImageHorseTool {
         fill_angle: u16,
         fill_block: u32,
         sloppiness: u8,
+        star_points: u8,
+        rotation_deg: f64,
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
@@ -830,6 +980,8 @@ impl ImageHorseTool {
                 stroke_width,
                 arrow_style,
                 sloppiness,
+                rotation_deg: normalize_rotation_deg(rotation_deg),
+                star_points: canonical_star_points(kind, star_points),
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -853,7 +1005,11 @@ impl ImageHorseTool {
     /// the load path — the undo/redo stacks are injected separately). Color is
     /// passed as raw r,g,b (the persisted JSON stores bytes, not hex). Returns
     /// the new id.
-    pub fn restore_shape_annotation(
+    ///
+    /// JS calls this as **`restore_shape_annotation`** (`js_name`); the two
+    /// trailing arguments are the same as [`add_shape_annotation_full`](Self::add_shape_annotation_full)'s.
+    #[wasm_bindgen(js_name = restore_shape_annotation)]
+    pub fn restore_shape_annotation_full(
         &mut self,
         kind: u8,
         x0: f64,
@@ -877,6 +1033,8 @@ impl ImageHorseTool {
         fill_angle: u16,
         fill_block: u32,
         sloppiness: u8,
+        star_points: u8,
+        rotation_deg: f64,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
@@ -895,6 +1053,8 @@ impl ImageHorseTool {
                 stroke_width,
                 arrow_style,
                 sloppiness,
+                rotation_deg: normalize_rotation_deg(rotation_deg),
+                star_points: canonical_star_points(kind, star_points),
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -1212,7 +1372,13 @@ impl ImageHorseTool {
     /// Update an existing shape annotation in full (geometry + style). Pushes
     /// an "Edit Shape" snapshot so undo restores the prior values. Used when a
     /// drag/resize or panel restyle of a selected shape is committed.
-    pub fn update_shape_annotation(
+    ///
+    /// JS calls this as **`update_shape_annotation`** (`js_name`); the two
+    /// trailing arguments are the same as [`add_shape_annotation_full`](Self::add_shape_annotation_full)'s.
+    /// The perspective quad is deliberately NOT a parameter and is left as it
+    /// was — it has its own setter and its own op.
+    #[wasm_bindgen(js_name = update_shape_annotation)]
+    pub fn update_shape_annotation_full(
         &mut self,
         id: u32,
         kind: u8,
@@ -1229,6 +1395,8 @@ impl ImageHorseTool {
         fill_angle: u16,
         fill_block: u32,
         sloppiness: u8,
+        star_points: u8,
+        rotation_deg: f64,
     ) -> bool {
         if !self.layers[self.active]
             .shape_annotations
@@ -1257,6 +1425,8 @@ impl ImageHorseTool {
             s.stroke_width = stroke_width;
             s.arrow_style = arrow_style;
             s.sloppiness = sloppiness;
+            s.rotation_deg = normalize_rotation_deg(rotation_deg);
+            s.star_points = canonical_star_points(kind, star_points);
             s.fill_kind = fill_kind;
             s.fill_r = f[0];
             s.fill_g = f[1];
@@ -1561,26 +1731,47 @@ impl ImageHorseTool {
     ///
     /// Three rules, by what the user can actually see:
     /// - lines / arrows / polylines → distance to the stroke;
-    /// - an UNFILLED rect / circle / hand-circle / diamond / star → the ink
-    ///   RING only (rect: box ring, diamond/star: outline edges). Its empty
-    ///   interior is not ink, so a click there is a click on whatever is
-    ///   behind it — which is what lets a shape be drawn inside another shape
-    ///   instead of every such drag re-selecting the outer one;
+    /// - an UNFILLED rect / circle / hand-circle / diamond / star / triangle →
+    ///   the ink RING only (rect: box ring, diamond/star/triangle: outline
+    ///   edges). Its empty interior is not ink, so a click there is a click on
+    ///   whatever is behind it — which is what lets a shape be drawn inside
+    ///   another shape instead of every such drag re-selecting the outer one;
     /// - everything else (filled shapes, pins, bézier) → padded bounding box.
     ///   A fill IS ink, so its interior selects, as in Photoshop.
+    ///
+    /// A ROTATED rect / circle / line / diamond / star / triangle is tested in
+    /// its own frame: the query point is turned back by −θ about the bbox
+    /// center, and the three rules above run against the unrotated geometry.
     ///
     /// ⚠️ Mirrored by hand in `app/src/lib/annotationHitTest.ts` — #60's drift
     /// guard hashes this body, so a change here must be ported there first.
     pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
         for s in self.layers[self.active].shape_annotations.iter().rev() {
+            // Into the shape's own (unrotated) frame: rotate the query point by
+            // −θ about the bbox center. Same formula as `drawing::Rotation`,
+            // written out so this body carries everything the TS mirror copies.
+            // Shadows `x`/`y` for this shape only; the next one starts again
+            // from the caller's point.
+            let (x, y) = if s.rotation_deg != 0.0 && matches!(s.kind, 0 | 1 | 2 | 8 | 9 | 10) {
+                let t = -s.rotation_deg * std::f64::consts::PI / 180.0;
+                let (sin, cos) = (t.sin(), t.cos());
+                let cx = (s.x0 + s.x1) / 2.0;
+                let cy = (s.y0 + s.y1) / 2.0;
+                let dx = x - cx;
+                let dy = y - cy;
+                (cx + dx * cos - dy * sin, cy + dx * sin + dy * cos)
+            } else {
+                (x, y)
+            };
             let pad = (s.stroke_width * 0.5).max(6.0);
             let hit = if s.kind == 2
                 || s.kind == 4
-                || (s.fill_kind == 0 && (s.kind == 8 || s.kind == 9))
+                || (s.fill_kind == 0 && (s.kind == 8 || s.kind == 9 || s.kind == 10))
             {
                 // line / arrow → distance to the segment; diamond (8) / star (9)
-                // stroke is the outline edges only when unfilled (a click inside
-                // an empty diamond selects whatever is behind it).
+                // / triangle (10) stroke is the outline edges only when unfilled
+                // (a click inside an empty diamond selects whatever is behind
+                // it).
                 if s.kind == 8 {
                     let (minx, miny, maxx, maxy) = (
                         s.x0.min(s.x1),
@@ -1599,9 +1790,19 @@ impl ImageHorseTool {
                     tet.iter().any(|&(ax, ay, bx, by)| {
                         point_segment_distance(x, y, ax, ay, bx, by) <= pad + 4.0
                     })
-                } else if s.kind == 9 {
+                } else if s.kind == 9 || s.kind == 10 {
                     // Close the loop so the last→first edge is hit-testable too.
-                    let mut verts = crate::drawing::star_vertices(s.x0, s.y0, s.x1, s.y1);
+                    let mut verts = if s.kind == 9 {
+                        crate::drawing::star_vertices_n(
+                            s.x0,
+                            s.y0,
+                            s.x1,
+                            s.y1,
+                            effective_star_points(s.star_points),
+                        )
+                    } else {
+                        crate::drawing::triangle_vertices(s.x0, s.y0, s.x1, s.y1)
+                    };
                     if let Some(&first) = verts.first() {
                         verts.push(first);
                     }
@@ -1660,6 +1861,156 @@ impl ImageHorseTool {
         -1
     }
 }
+/// The PRE-ROTATION Rust signatures of the three shape entry points, kept as
+/// thin wrappers over the `_full` methods with `star_points = 0` (the classic
+/// star) and `rotation_deg = 0.0`. Deliberately a plain `impl`, NOT
+/// `#[wasm_bindgen]`: JS reaches the `_full` methods under these same names
+/// (`js_name`), and exporting both would be two wasm exports with one name.
+///
+/// Why they exist at all: `lib.rs` has eight test call sites of
+/// `add_shape_annotation` sitting on one line each, and widening them would
+/// make rustfmt reflow each one vertically — a few dozen lines against a
+/// `lib.rs` line ratchet that may not rise (`scripts/guardrails.sh`). Every
+/// other Rust caller (tests, benches) is spared the churn too. Anything new
+/// that wants rotation or a point count calls the `_full` form.
+impl ImageHorseTool {
+    /// `add_shape_annotation_full(.., sloppiness, 0, 0.0)`.
+    pub fn add_shape_annotation(
+        &mut self,
+        kind: u8,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color_hex: &str,
+        stroke_width: f64,
+        arrow_style: u8,
+        fill_kind: u8,
+        fill_hex: &str,
+        fill2_hex: &str,
+        fill_angle: u16,
+        fill_block: u32,
+        sloppiness: u8,
+    ) -> u32 {
+        self.add_shape_annotation_full(
+            kind,
+            x0,
+            y0,
+            x1,
+            y1,
+            color_hex,
+            stroke_width,
+            arrow_style,
+            fill_kind,
+            fill_hex,
+            fill2_hex,
+            fill_angle,
+            fill_block,
+            sloppiness,
+            0,
+            0.0,
+        )
+    }
+
+    /// `restore_shape_annotation_full(.., sloppiness, 0, 0.0)`.
+    pub fn restore_shape_annotation(
+        &mut self,
+        kind: u8,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        r: u8,
+        g: u8,
+        b: u8,
+        stroke_width: f64,
+        arrow_style: u8,
+        fill_kind: u8,
+        fill_r: u8,
+        fill_g: u8,
+        fill_b: u8,
+        fill_a: u8,
+        fill2_r: u8,
+        fill2_g: u8,
+        fill2_b: u8,
+        fill2_a: u8,
+        fill_angle: u16,
+        fill_block: u32,
+        sloppiness: u8,
+    ) -> u32 {
+        self.restore_shape_annotation_full(
+            kind,
+            x0,
+            y0,
+            x1,
+            y1,
+            r,
+            g,
+            b,
+            stroke_width,
+            arrow_style,
+            fill_kind,
+            fill_r,
+            fill_g,
+            fill_b,
+            fill_a,
+            fill2_r,
+            fill2_g,
+            fill2_b,
+            fill2_a,
+            fill_angle,
+            fill_block,
+            sloppiness,
+            0,
+            0.0,
+        )
+    }
+
+    /// `update_shape_annotation_full(.., sloppiness, 0, 0.0)`. ⚠️ Unlike the
+    /// two above this is not neutral on an existing shape: it RESETS a
+    /// rotation and a star count to their defaults, exactly as it resets every
+    /// other style field to what it is passed. Only callers that know the
+    /// shape has neither should use it.
+    pub fn update_shape_annotation(
+        &mut self,
+        id: u32,
+        kind: u8,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color_hex: &str,
+        stroke_width: f64,
+        arrow_style: u8,
+        fill_kind: u8,
+        fill_hex: &str,
+        fill2_hex: &str,
+        fill_angle: u16,
+        fill_block: u32,
+        sloppiness: u8,
+    ) -> bool {
+        self.update_shape_annotation_full(
+            id,
+            kind,
+            x0,
+            y0,
+            x1,
+            y1,
+            color_hex,
+            stroke_width,
+            arrow_style,
+            fill_kind,
+            fill_hex,
+            fill2_hex,
+            fill_angle,
+            fill_block,
+            sloppiness,
+            0,
+            0.0,
+        )
+    }
+}
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     // ── Live text annotations (non-destructive overlay) ─────────────────
@@ -2504,6 +2855,65 @@ mod hit_test_tests {
         assert_eq!(t.shape_annotation_at(60.0, 90.0), inner, "inner stroke");
         assert_eq!(t.shape_annotation_at(10.0, 90.0), outer, "outer stroke");
         assert_eq!(t.shape_annotation_at(40.0, 40.0), -1, "between the two");
+    }
+}
+
+#[cfg(test)]
+mod rotation_normalization_tests {
+    use super::normalize_rotation_deg;
+
+    /// The frontend normalizes before it calls in, so the engine's pass must be
+    /// EXACTLY the identity on anything already in (-180, 180] — including the
+    /// values next to ±180, where `(deg + 180) / 360` rounds up to a whole
+    /// turn. A one-ulp disagreement here would be a stored angle that differs
+    /// from the one the preview drew.
+    #[test]
+    fn it_is_the_identity_on_every_in_range_angle() {
+        let edge = 180.0f64;
+        let mut cases = vec![
+            180.0,
+            -179.5,
+            0.25,
+            -0.25,
+            45.0,
+            -90.0,
+            123.456789,
+            f64::from_bits(edge.to_bits() - 1),  // just under +180
+            -f64::from_bits(edge.to_bits() - 1), // just over -180
+            f64::MIN_POSITIVE,
+        ];
+        for i in 0..=720 {
+            cases.push(-179.75 + i as f64 * 0.4993);
+        }
+        for v in cases {
+            if v > -180.0 && v <= 180.0 && v != 0.0 {
+                assert_eq!(normalize_rotation_deg(v).to_bits(), v.to_bits(), "{v}");
+            }
+        }
+    }
+
+    #[test]
+    fn it_folds_turns_and_junk_into_range() {
+        for (asked, want) in [
+            (-180.0, 180.0f64),
+            (540.0, 180.0),
+            (-540.0, 180.0),
+            (360.0, 0.0),
+            (-0.0, 0.0),
+            (190.0, -170.0),
+            (-190.0, 170.0),
+            (1e300, 0.0),
+            (f64::NAN, 0.0),
+            (f64::NEG_INFINITY, 0.0),
+        ] {
+            // Bits, so a -0 cannot pass for 0 — the JSON would print it.
+            let got = normalize_rotation_deg(asked);
+            assert_eq!(
+                got.to_bits(),
+                want.to_bits(),
+                "{asked} -> {got}, want {want}"
+            );
+        }
     }
 }
 

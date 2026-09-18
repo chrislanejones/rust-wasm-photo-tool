@@ -50,6 +50,11 @@ describe("panelStylePatch", () => {
     expect(patch).toBeNull();
   });
 
+  it("carries a star point-count change", () => {
+    const patch = panelStylePatch(settings(), settings({ starPoints: 8 }));
+    expect(patch).toEqual({ starPoints: 8 });
+  });
+
   it("carries a stroke color change", () => {
     const patch = panelStylePatch(settings(), settings({ strokeColor: "#00ff00" }));
     expect(patch).toEqual({ strokeColor: "#00ff00" });

@@ -32,6 +32,15 @@ interface AnnotationState {
   penEditRequest: { id: number; points: number[] } | null;
   requestPenEdit: (req: { id: number; points: number[] }) => void;
   clearPenEditRequest: () => void;
+
+  // The Rust `kind` of the RESELECTED shape open in the edit box, or null.
+  // Not `selectedObject`: that is the Align target and outlives the edit box,
+  // so a star committed a minute ago would still be "selected" while a new
+  // rectangle is being drawn. The Shapes panel reads this to show the Star's
+  // Points slider for a star being edited even when its tile says otherwise.
+  // Written only by useDrawingTools, from its own edit state.
+  editingShapeKind: number | null;
+  setEditingShapeKind: (kind: number | null) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -48,4 +57,7 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
   penEditRequest: null,
   requestPenEdit: (req) => set({ penEditRequest: req }),
   clearPenEditRequest: () => set({ penEditRequest: null }),
+
+  editingShapeKind: null,
+  setEditingShapeKind: (kind) => set({ editingShapeKind: kind }),
 }));

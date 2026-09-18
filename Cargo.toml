@@ -82,6 +82,13 @@ name = "blur_threads"
 harness = false
 required-features = ["threads"]
 
+# Shape rasterization on the composite path (`render_shape_into` per shape per
+# `recomposite()`). Public API only, so it needs no feature and compiles on
+# the featureless build `cargo clippy --all-targets` checks.
+[[bench]]
+name = "shapes"
+harness = false
+
 # Replay-parity integration tests (tests/*.rs). Feature-gated the same way as
 # the bench above: they use stamp_tool::ops/tiles directly, which only exist
 # behind `tiles`. Plain `cargo test` skips these targets entirely (no compile
