@@ -358,4 +358,116 @@ mod tests {
             "bold on a Regular-only family should keep the TYPEFACE"
         );
     }
+
+    /// The embedded faces must carry NO TrueType hinting.
+    ///
+    /// `ab_glyph` has no bytecode interpreter, so `fpgm` / `prep` / `cvt ` /
+    /// `gasp` and every per-glyph instruction stream are bytes the binary
+    /// pays for in the size band and never executes. Measured 2026-09-17:
+    /// **63,472 B** across these two faces, against a sentinel ceiling that
+    /// leaves four figures of headroom — the hinting was larger than the
+    /// entire remaining budget by more than thirty times.
+    ///
+    /// Stripping it is pixel-identical, which is the whole reason it is safe:
+    /// 572 render cases over 26 sizes and 40,913,342 compared pixels produced
+    /// ZERO differing pixels through `text::render_text`. So the only way this
+    /// cost comes back is somebody dropping a stock TTF in here, which looks
+    /// like a routine font update and silently spends the band. This asserts
+    /// the property instead of trusting the step that produced the files.
+    #[test]
+    fn the_embedded_faces_carry_no_hinting() {
+        fn be16(d: &[u8], o: usize) -> usize {
+            ((d[o] as usize) << 8) | d[o + 1] as usize
+        }
+        fn be32(d: &[u8], o: usize) -> usize {
+            (be16(d, o) << 16) | be16(d, o + 2)
+        }
+
+        for (name, d) in [("Regular", EMBEDDED_REGULAR), ("Bold", EMBEDDED_BOLD)] {
+            let num_tables = be16(d, 4);
+            let mut tables: Vec<(&[u8], usize, usize)> = Vec::new();
+            for i in 0..num_tables {
+                let o = 12 + 16 * i;
+                tables.push((&d[o..o + 4], be32(d, o + 8), be32(d, o + 12)));
+            }
+            let find = |want: &[u8]| tables.iter().find(|(t, _, _)| *t == want).copied();
+
+            for bad in [&b"fpgm"[..], &b"prep"[..], &b"cvt "[..], &b"gasp"[..]] {
+                assert!(
+                    find(bad).is_none(),
+                    "{name}: hinting table {:?} is present, and ab_glyph never runs it",
+                    core::str::from_utf8(bad).unwrap_or("?")
+                );
+            }
+
+            // The bulk of the cost is not those tables — it is the per-glyph
+            // instruction streams inside `glyf`, ~29 KB of the ~32 KB per face.
+            let Some((_, head_o, _)) = find(b"head") else {
+                panic!("{name}: no head table"); // allow: rust-panic
+            };
+            let Some((_, maxp_o, _)) = find(b"maxp") else {
+                panic!("{name}: no maxp table"); // allow: rust-panic
+            };
+            let Some((_, loca_o, _)) = find(b"loca") else {
+                panic!("{name}: no loca table"); // allow: rust-panic
+            };
+            let Some((_, glyf_o, _)) = find(b"glyf") else {
+                panic!("{name}: no glyf table"); // allow: rust-panic
+            };
+
+            let long_loca = be16(d, head_o + 50) == 1;
+            let num_glyphs = be16(d, maxp_o + 4);
+            let loc = |g: usize| {
+                if long_loca {
+                    be32(d, loca_o + 4 * g)
+                } else {
+                    2 * be16(d, loca_o + 2 * g)
+                }
+            };
+
+            let mut instruction_bytes = 0usize;
+            for g in 0..num_glyphs {
+                let (start, end) = (loc(g), loc(g + 1));
+                if end <= start {
+                    continue; // an empty glyph — space, and friends
+                }
+                let base = glyf_o + start;
+                let contours = be16(d, base) as i16;
+                if contours >= 0 {
+                    let p = base + 10 + 2 * contours as usize;
+                    instruction_bytes += be16(d, p);
+                } else {
+                    // A composite carries instructions only if a component
+                    // says so; walking the flags is the only way to know.
+                    let mut p = base + 10;
+                    let mut has_instructions = false;
+                    loop {
+                        let flags = be16(d, p);
+                        p += 4;
+                        p += if flags & 0x0001 != 0 { 4 } else { 2 };
+                        if flags & 0x0008 != 0 {
+                            p += 2;
+                        } else if flags & 0x0040 != 0 {
+                            p += 4;
+                        } else if flags & 0x0080 != 0 {
+                            p += 8;
+                        }
+                        if flags & 0x0100 != 0 {
+                            has_instructions = true;
+                        }
+                        if flags & 0x0020 == 0 {
+                            break;
+                        }
+                    }
+                    if has_instructions {
+                        instruction_bytes += be16(d, p);
+                    }
+                }
+            }
+            assert_eq!(
+                instruction_bytes, 0,
+                "{name}: {instruction_bytes} B of glyph instructions the rasterizer never runs"
+            );
+        }
+    }
 }

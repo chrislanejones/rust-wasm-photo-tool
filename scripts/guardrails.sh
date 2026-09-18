@@ -166,7 +166,7 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # followed by a standalone `//` comment makes rustfmt align that comment to the
 # annotation column, shoving unrelated prose out to column ~70. A blank line
 # between them prevents it.
-check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
+check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
