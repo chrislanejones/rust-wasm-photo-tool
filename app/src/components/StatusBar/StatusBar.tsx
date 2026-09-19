@@ -21,7 +21,7 @@ export interface ShortcutHint {
 const BASE_HINTS: ShortcutHint[] = [
   { keys: "Ctrl+Z", label: "undo" },
   { keys: "Ctrl+Shift+Z", label: "redo" },
-  { keys: "Space", label: "pan" },
+  { keys: "H or Space", label: "pan" },
   { keys: "PgUp/Dn", label: "photos" },
   { keys: "Alt+Scroll", label: "zoom" },
   // Routing (v7.24) — the palette can copy a link straight to the view you're
