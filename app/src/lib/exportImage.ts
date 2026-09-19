@@ -263,6 +263,7 @@ export async function compositeSavedEdit(
           a.bg_padding ?? 8,
           a.bg_corner_radius ?? 8,
           a.bg_tail ?? 0,
+          a.font_id ?? "",
         );
       }
       tool.flatten_text_annotations();

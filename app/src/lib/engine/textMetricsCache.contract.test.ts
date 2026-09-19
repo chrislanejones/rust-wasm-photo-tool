@@ -54,7 +54,10 @@ describe("the wrapped engine methods read no engine state", () => {
   // forward straight to a free function. `self.` appearing in a body would mean
   // the result depends on the document, and the cache key would be incomplete.
   it("measure_text delegates to a free function and never touches self", () => {
-    const body = fnBody(rust("lib.rs"), "measure_text");
+    // `text.rs`, not `lib.rs`: v8.76 moved the binding next to the rasteriser
+    // it wraps (`src/lib.rs` is a line ratchet — `librs-lines` in
+    // guardrails.sh). The FILE is incidental; the property is not.
+    const body = fnBody(rust("text.rs"), "measure_text");
     expect(body).toContain("crate::text::measure(");
     expect(
       body.replace(/crate::text::measure\([^)]*\)/g, ""),
@@ -67,7 +70,40 @@ describe("the wrapped engine methods read no engine state", () => {
     expect(
       rust("text.rs"),
       "text::measure gained a receiver — it is no longer pure in its arguments",
-    ).toMatch(/pub fn measure\(\s*text:\s*&str,\s*font_size:\s*f32,\s*bold:\s*bool\s*\)/);
+    ).toMatch(
+      /pub fn measure\(\s*text:\s*&str,\s*font_size:\s*f32,\s*bold:\s*bool,\s*font_id:\s*&str\s*\)/,
+    );
+  });
+
+  // v8.76 — the fourth argument, and the reason this file gained a test rather
+  // than just a wider regex. `measure` is still pure IN ITS ARGUMENTS, but one
+  // of them now names bytes held in a process-wide registry, so purity holds
+  // only while a face id always resolves to the same outlines. `fonts::register`
+  // refusing to overwrite is what guarantees that; if it ever starts replacing,
+  // every cached metric for that id goes stale with nothing to invalidate.
+  it("fonts::register is monotone — an id is never re-pointed at new bytes", () => {
+    const body = fnBody(rust("fonts.rs"), "register");
+    expect(
+      body,
+      "fonts::register no longer short-circuits on an already-registered id. " +
+        "textMetricsCache keys on font_id and can never be invalidated — read " +
+        "its fontKey() comment and the module doc in src/fonts.rs.",
+    ).toMatch(/is_some\(\)\s*\)\s*\{\s*return Ok\(\(\)\);/);
+  });
+
+  // And the other half of the same contract, on the JS side: a face must be
+  // registered BEFORE it can be selected, or the fallback's measurement gets
+  // cached against the real id.
+  it("the font key is part of every cache key", () => {
+    const src = readFileSync(
+      new URL("./textMetricsCache.ts", import.meta.url),
+      "utf8",
+    );
+    const keys = src.match(/`[mib]\$\{SEP\}[^`]*`/g) ?? [];
+    expect(keys.length, "no cache keys found — the regex above has drifted").toBeGreaterThan(3);
+    for (const k of keys) {
+      expect(k, `cache key omits the typeface: ${k}`).toContain("font");
+    }
   });
 
   it("text_ink_offset_bg delegates to a free function and never touches self", () => {

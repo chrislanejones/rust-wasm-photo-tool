@@ -276,7 +276,7 @@ recording and persistence detail.
 [ADR-033](adr/033-the-text-box-has-a-height-and-the-op-log-goes-to-v4.md)
 named — [ADR-034](adr/034-perspective-is-projective-and-text-keeps-its-corners.md)
 took it to 5 for the text perspective quads, and
-[ADR-053](adr/053-a-shapes-perspective-is-normalized-over-its-bbox-and-its-tile-is-padded.md)
+[ADR-053](adr/053-a-shapes-perspective-is-normalised-over-its-bbox-and-its-tile-is-padded.md)
 to 6 for the SHAPE quads. `OP_FORMAT_VERSION` in `src/ops.rs`
 is the value; v2 through v5 blobs all still decode through the one path, and
 that prefix-extension property is pinned by tests

@@ -798,7 +798,18 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // gate numbers below (5 exempt / 0 unawaited / 0 truthy) are again
     // unchanged, which is the point of updating this number deliberately
     // instead of loosening the assertion.
-    expect(gate.awaited, "cumulative converted sites").toBe(146);
+    // Fonts (#131) — 146 -> 149: rebased onto Levels, Presets and shape
+    // perspective, so these three stack on 146 rather than the 137 the branch
+    // was written against. Three awaited sites born with the feature, all in
+    // `engineFonts.ts` / `useTextTool.ts`. `register_font` and `has_font` are
+    // value-consuming in the sense that matters here: un-awaited, `has_font`
+    // returns a Promise, every Promise is truthy, and `availableFaces` would
+    // offer EVERY face — including ones whose bytes never arrived. Those would
+    // then measure in the fallback and poison `textMetricsCache` against the
+    // real id for the life of the page. `set_text_font` is awaited for the same
+    // reason its siblings `set_text_wrap_width` and `set_text_box_height` are:
+    // it must land before the commit's flush reads the tile.
+    expect(gate.awaited, "cumulative converted sites").toBe(149);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

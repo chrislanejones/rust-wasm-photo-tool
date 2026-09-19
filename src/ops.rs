@@ -138,7 +138,34 @@ use serde::{Deserialize, Serialize};
 ///
 /// A v6 document decodes with every shape firm — exactly what a v6 document
 /// meant.
-pub const OP_FORMAT_VERSION: u8 = 7;
+///
+/// **8** — v8.8x, the font selector: text annotations gained a `font_id`
+/// naming the typeface the engine rasterises them with. The recipe a SIXTH
+/// time, clause for clause:
+///
+///   * `font_id` is `#[serde(skip)]` on [`TextParams`], so the struct's wire
+///     layout is STILL byte-identical to v2's.
+///   * The face rides in an APPENDED variant ([`Op::TextFont`]), after
+///     `ShapeSloppiness`, so no existing variant is renumbered.
+///   * `encode_annotations` gained a NINTH trailing element, keeping v8 blobs
+///     a strict prefix-extension of v7 ones.
+///
+/// ⚠️ This step was WRITTEN as v6, on a branch that then sat unmerged while
+/// v6 and v7 shipped for shapes. `TextFont` was moved to the END of the enum
+/// on merge rather than left where the branch put it: the two shape variants
+/// are on users' disks and `TextFont` never was, so the only renumbering that
+/// costs anything is the one that did not happen.
+///
+/// A v7 document decodes with every `font_id` empty — the embedded Liberation
+/// Sans, which is the only face that existed when it was written and therefore
+/// exactly what it meant. Pinned by `v7_blobs_still_decode_under_v8`.
+///
+/// ⚠️ The skipped-field default and the semantic default AGREE here, unlike
+/// the quad (see `default_quad_if_unset`). `String::default()` is `""`, and
+/// `""` is defined by `fonts::DEFAULT_FONT_ID`'s contract to mean the embedded
+/// face. That is why this step needs no promoting function — but it is a
+/// property to check, not to assume, the next time a field is added.
+pub const OP_FORMAT_VERSION: u8 = 8;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -256,6 +283,16 @@ pub struct TextParams {
     /// the identity — exactly what every pre-v8.42 annotation meant.
     #[serde(skip)]
     pub perspective: [(f32, f32); 4],
+    /// Typeface id; `""` = the embedded Liberation Sans. v8.76.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width`, `box_height` and `perspective` above — read that
+    /// comment, it applies word for word. The face travels beside the struct
+    /// instead: as the seventh element of `encode_annotations`, and as
+    /// [`Op::TextFont`] in the log. Deserialises to `""`, which is exactly
+    /// what every pre-v8.76 annotation meant.
+    #[serde(skip)]
+    pub font_id: String,
 }
 
 /// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
@@ -365,6 +402,7 @@ impl TextParams {
             shadow_dx: a.shadow_dx,
             shadow_dy: a.shadow_dy,
             shadow_blur: a.shadow_blur,
+            font_id: a.font_id.clone(),
         }
     }
 }
@@ -475,23 +513,24 @@ pub(crate) fn annotation_sync_ops(
     }
     for a in texts {
         let params = TextParams::from_annotation(a);
-        // ⚠️ `TextParams::wrap_width`, `box_height` AND `perspective`
-        // are all `#[serde(skip)]` (they have to be — see the fields'
-        // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
-        // any of them. Every such change therefore needs its own
-        // `TextWrap` / `TextBoxHeight` / `TextPerspective` op, or
-        // replay rebuilds the text unboxed and unwarped, the composite
-        // hash diverges, and the log marks itself broken — silently
-        // falling the user back to snapshot undo. The three are handled
-        // identically; keep them that way, because one of them being
-        // forgotten is the failure this comment exists to prevent.
-        // (v8.42 added the third; the comment said "two axes" and this
-        // is what following it looks like.)
+        // ⚠️ `TextParams::wrap_width`, `box_height`, `perspective` AND
+        // `font_id` are all `#[serde(skip)]` (they have to be — see the
+        // fields' comments), so `TextAdd`/`TextEdit` physically CANNOT
+        // carry any of them. Every such change therefore needs its own
+        // `TextWrap` / `TextBoxHeight` / `TextPerspective` / `TextFont`
+        // op, or replay rebuilds the text unboxed, unwarped and in the
+        // wrong typeface, the composite hash diverges, and the log marks
+        // itself broken — silently falling the user back to snapshot
+        // undo. The four are handled identically; keep them that way,
+        // because one of them being forgotten is the failure this comment
+        // exists to prevent, and it has already happened twice (v8.42
+        // added the third, v8.8x the fourth).
         match log_doc.texts.iter().find(|t| t.id == a.id) {
             None => {
                 let wrap = params.wrap_width;
                 let box_h = params.box_height;
                 let quad = params.perspective;
+                let font = params.font_id.clone();
                 pending.push(Op::TextAdd(params));
                 if wrap != 0 {
                     pending.push(Op::TextWrap {
@@ -513,6 +552,14 @@ pub(crate) fn annotation_sync_ops(
                 if !crate::perspective::is_identity(&quad) {
                     pending.push(Op::TextPerspective { id: a.id, quad });
                 }
+                // "" is the embedded face — same "unset means the
+                // default" shape as `wrap == 0`.
+                if !font.is_empty() {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: font,
+                    });
+                }
             }
             Some(t) => {
                 if t.wrap_width != params.wrap_width {
@@ -533,7 +580,13 @@ pub(crate) fn annotation_sync_ops(
                         quad: params.perspective,
                     });
                 }
-                // Compare everything EXCEPT the three skipped fields,
+                if t.font_id != params.font_id {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: params.font_id.clone(),
+                    });
+                }
+                // Compare everything EXCEPT the four skipped fields,
                 // which the branches above already accounted for —
                 // otherwise a box-only drag would also emit a redundant
                 // TextEdit (and `TextParams` derives PartialEq over the
@@ -543,6 +596,7 @@ pub(crate) fn annotation_sync_ops(
                 without_box.wrap_width = params.wrap_width;
                 without_box.box_height = params.box_height;
                 without_box.perspective = params.perspective;
+                without_box.font_id = params.font_id.clone();
                 if without_box != params {
                     pending.push(Op::TextEdit(params));
                 }
@@ -724,6 +778,21 @@ pub enum Op {
     /// itself broken over. Reuse the rationale on [`Op::TextWrap`]: appended,
     /// never inserted, so the variants already on disk keep their indices.
     ShapeSloppiness { id: u32, sloppiness: u8 },
+    /// v8.8x — a text annotation's TYPEFACE. `""` is the embedded Liberation
+    /// Sans; anything else names a face registered via `register_font`.
+    ///
+    /// Appended after [`Op::ShapeSloppiness`], for the sixth time, for the
+    /// reason spelled out on [`Op::TextWrap`]: postcard indexes enum variants
+    /// positionally, so appending is invisible to every op already on a user's
+    /// disk and inserting would renumber all of them. It sits LAST rather than
+    /// beside `PerspectiveWarp` where its branch first put it — see the ⚠️ on
+    /// [`OP_FORMAT_VERSION`]'s **8**.
+    ///
+    /// A `String`, not an index — replaying a log on a machine with a
+    /// different set of faces registered must mean "this face is missing", not
+    /// "this is a different face". `fonts::with_face` turns a missing one into
+    /// a visible fallback rather than a failed replay.
+    TextFont { id: u32, font_id: String },
 }
 
 impl Op {
@@ -761,6 +830,10 @@ impl Op {
             // Same reasoning as ShapePerspective: a sloppiness change is a
             // style decision the user made in the panel, worth its own entry.
             Op::ShapeSloppiness { .. } => "Edit Shape",
+            // Its OWN label, like TextPerspective and unlike TextWrap: picking
+            // a typeface is a deliberate styling choice the user will want to
+            // find in the History panel, not a by-product of dragging a box.
+            Op::TextFont { .. } => "Text Font",
         }
     }
 }
@@ -929,11 +1002,14 @@ pub fn encode_annotations(
     // index — the eighth element, same trick. `ShapeParams::sloppiness` is
     // `#[serde(skip)]`, so this tuple is the ONLY place a keyframe carries it:
     // the op log still mirrors it with `Op::ShapeSloppiness` appended frames.
+    // v8 appends the per-TEXT typeface ids — the ninth element, parallel to
+    // `texts` by index, same trick again.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
     let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
     let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
     let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+    let fonts: Vec<&str> = texts.iter().map(|t| t.font_id.as_str()).collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -943,6 +1019,7 @@ pub fn encode_annotations(
         &quads,
         &shape_quads,
         &shape_sloppiness,
+        &fonts,
     )) {
         out.extend_from_slice(&body);
     }
@@ -972,6 +1049,49 @@ pub fn decode_annotations(
     // out of bytes at the element it never wrote, so the fallback fires and
     // the missing values default to 0 — "size the box to the text" on both
     // axes, which is precisely what a v2 or v3 document meant.
+    type V8 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u8>,
+        Vec<String>,
+    );
+    if let Ok((
+        mut texts,
+        mut shapes,
+        canvas,
+        wraps,
+        heights,
+        quads,
+        shape_quads,
+        shape_sloppiness,
+        fonts,
+    )) = postcard::from_bytes::<V8>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
+        }
+        for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
+            sp.sloppiness = sl;
+        }
+        for (t, f) in texts.iter_mut().zip(fonts) {
+            t.font_id = f;
+        }
+        return Ok((texts, shapes, canvas));
+    }
     type V7 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -1279,6 +1399,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         t.shadow_dx,
         t.shadow_dy,
         t.shadow_blur,
+        &t.font_id,
     )
 }
 
@@ -1476,6 +1597,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::ShapeSloppiness { id, sloppiness } => {
             if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
                 sp.sloppiness = *sloppiness;
+            }
+        }
+        Op::TextFont { id, font_id } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.font_id = font_id.clone();
             }
         }
         Op::PerspectiveWarp { rect, quad } => {
@@ -1809,6 +1935,7 @@ mod tests {
             wrap_width: 0,
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
+            font_id: String::new(),
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -2472,6 +2599,7 @@ mod v2_migration_tests {
             wrap_width: 0,
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
+            font_id: String::new(),
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -2823,6 +2951,156 @@ mod v2_migration_tests {
                 .unwrap_or_else(|e| panic!("v4 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
             assert_eq!(decoded, op, "v4 op must mean the same thing under v5");
         }
+    }
+
+    /// A v7 writer emitted `[7] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads, shape_sloppiness))` — the 8-tuple, with no
+    /// font ids. Reconstructed byte-for-byte rather than by calling the current
+    /// encoder, because an encoder that drifted would produce a test that
+    /// agrees with itself.
+    fn v7_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![7u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                texts,
+                &shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &shape_sloppiness,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v7_blobs_still_decode_under_v8() {
+        // The load-bearing one, for the sixth time. Anyone who has opened the
+        // app since v8.76 has v7 blobs in IndexedDB, and `ih_oplog_persist`
+        // ships ON — a rejected log costs them their cross-reload undo.
+        let mut t = a_text(11);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        t.perspective = a_quad();
+        let (got, shapes, canvas) = decode_annotations(&v7_annotation_blob(&[t]))
+            .expect("a v7 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].wrap_width, 240, "the v7 width survives the step");
+        assert_eq!(got[0].box_height, 310, "the v7 height survives the step");
+        assert_eq!(
+            got[0].perspective,
+            a_quad(),
+            "the v7 quad survives the step"
+        );
+        assert_eq!(
+            got[0].font_id, "",
+            "a v7 document meant the embedded Liberation Sans, because it was \
+             the only face that existed — the skipped-field default and the \
+             semantic default agree here, unlike the quad"
+        );
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v8_blobs_round_trip_the_font_id() {
+        let mut t = a_text(12);
+        t.wrap_width = 240;
+        t.perspective = a_quad();
+        t.font_id = "liberation-serif".into();
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(got[0].wrap_width, 240);
+        assert_eq!(got[0].perspective, a_quad());
+        assert_eq!(got[0].font_id, "liberation-serif", "v8 carries the face");
+    }
+
+    #[test]
+    fn v7_op_bytes_still_decode_under_v8() {
+        // Appending `TextFont` must not renumber the variants already on disk
+        // — `ShapeSloppiness` was appended last before it, so it is the one
+        // that would break first. `PerspectiveWarp` held that seat when this
+        // test was written against v6; the two shape variants landed in front
+        // of it while the branch waited, which is exactly the renumbering this
+        // test exists to catch.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextBoxHeight {
+                id: 5,
+                box_height: 310,
+            },
+            Op::TextPerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 30,
+                    h: 40,
+                },
+                quad: a_quad(),
+            },
+            Op::ShapePerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::ShapeSloppiness {
+                id: 5,
+                sloppiness: 80,
+            },
+        ] {
+            let mut v7_bytes = vec![7u8];
+            v7_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v7_bytes)
+                .unwrap_or_else(|e| panic!("v7 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v7 op must mean the same thing under v8");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_font_id_field() {
+        // FOURTH instance of the measurement, and the one that matters most:
+        // `font_id` is a String, so if it ever reached the wire it would add a
+        // length prefix AND its bytes, shifting every persisted
+        // TextAdd/TextEdit payload in every user's IndexedDB by a variable
+        // amount. Zero is the only acceptable answer.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.font_id = "a-very-long-typeface-identifier".into();
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "font_id must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_font_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextFont {
+                id: 2,
+                font_id: "liberation-mono".into(),
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].font_id, "", "untouched");
+        assert_eq!(doc.texts[1].font_id, "liberation-mono");
     }
 
     #[test]

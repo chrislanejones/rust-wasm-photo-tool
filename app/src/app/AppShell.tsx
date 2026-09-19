@@ -3297,6 +3297,7 @@ export function AppShell() {
                           textSettings={{
                             fontSize: toolSettings.fontSize,
                             fontFamily: toolSettings.fontFamily,
+                            textFontId: toolSettings.textFontId,
                             fontWeight: toolSettings.fontWeight,
                             textColor: toolSettings.textColor,
                             bgKind: toolSettings.bgKind,
@@ -3433,6 +3434,7 @@ export function AppShell() {
                       textSettings={{
                         fontSize: toolSettings.fontSize,
                         fontFamily: toolSettings.fontFamily,
+                        textFontId: toolSettings.textFontId,
                         fontWeight: toolSettings.fontWeight,
                         textColor: toolSettings.textColor,
                         bgKind: toolSettings.bgKind,
