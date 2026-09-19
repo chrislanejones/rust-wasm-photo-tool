@@ -39,6 +39,10 @@ interface AnnotationMeta {
   g: number;
   b: number;
   bold: boolean;
+  /** Engine typeface id; `""` = the embedded Liberation Sans. Absent on
+   *  annotations from before v8.76, hence optional — `annotations_to_json`
+   *  always writes it now, but a payload can outlive a reload. */
+  font_id?: string;
   rotation_deg: number;
   tile_w: number;
   tile_h: number;
@@ -259,6 +263,12 @@ export function useTextTool({
 
     // Pull background settings from the current toolSettings snapshot.
     const s = settingsRef.current;
+    // The ENGINE's typeface id. `""` = the embedded Liberation Sans, which is
+    // what a settings object written before v8.76 (or a panel that never
+    // touched the dropdown) means. `TextSettings` only ever offers a face the
+    // engine reports it HAS — see `engineFonts.ts` on why that ordering is
+    // load-bearing for the metrics cache.
+    const fontId = s.textFontId ?? "";
     const bgKind = BG_KIND_MAP[s.bgKind];
     const [bgR, bgG, bgB] = hexToRgb(s.bgColor);
     const bgA = Math.round(
@@ -296,6 +306,7 @@ export function useTextTool({
           bold,
           bgKind,
           bgPadding,
+          fontId,
         );
         // NOT `?? [0, 0]`. A zero offset is not a neutral default here — it is
         // a wrong correction, and it would land committed text `bg_padding` +
@@ -351,7 +362,15 @@ export function useTextTool({
         bgPadding,
         bgCornerRadius,
         bgTail,
+        fontId,
       );
+    }
+    // v8.76 — and the typeface, by the identical argument to the wrap width
+    // below. `update_text_annotation` takes no font parameter (it PRESERVES
+    // the annotation's own), so an edit that changes the face has to say so
+    // here; Rust no-ops when it is unchanged.
+    if (targetId !== null && typeof tool.set_text_font === "function") {
+      await tool.set_text_font(targetId, fontId);
     }
     // v8.40 — carry the box's reflow width onto the committed annotation.
     // A separate call rather than another argument on the two entry points
@@ -430,6 +449,10 @@ export function useTextTool({
           ann.bold,
           ann.background_kind,
           ann.bg_padding,
+          // The annotation's OWN face, not the panel's current pick — a
+          // re-edit has to invert the mapping the commit applied, and the
+          // commit used whatever face this annotation was written in.
+          ann.font_id ?? "",
         );
         // Same reasoning as the commit path: no metric means no correction,
         // not a zero one. This is the exact inverse of the mapping applied on

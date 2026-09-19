@@ -59,9 +59,24 @@ src/
 │                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles;
 │                   Bézier pen paths — flatten_cubic_path (de Casteljau) strokes the curve via
 │                   draw_polyline, fill_polygon (scanline even-odd) backs the optional path background
-├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
-│                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
-│                   annotation tiles
+├── text.rs         Renders text → pixel buffer with ab_glyph; rotate_pixels for annotation
+│                   tiles; word-wrap that the JS preview mirrors line for line. Every layout
+│                   function takes a font_id — "" is the embedded face. Also holds the
+│                   wasm-bindgen commit_text / measure_text pair (moved out of lib.rs, which
+│                   is a line ratchet)
+├── fonts.rs        The typeface registry (ADR-058). Liberation Sans Regular+Bold are embedded
+│                   at compile time and are the fallback for any id this binary has no bytes
+│                   for. They ARE subset — 430 codepoints / 460 glyphs each, against 2,620
+│                   glyphs in the stock 410,820 B face — and since 2026-09-17 also UNHINTED:
+│                   ab_glyph runs no TrueType bytecode interpreter, so hinting was 32,542 B of
+│                   Regular (52.5%) and 31,770 B of Bold (51.6%) that shipped and never ran.
+│                   The pair went 123,492 → 60,020 B, pixel-identical. ⚠️ The hinting TABLES
+│                   are the small part (fpgm+prep+cvt+gasp = 3,471 / 3,804 B); the bulk is the
+│                   per-glyph instruction streams inside glyf. Other faces arrive at RUNTIME
+│                   via register_font rather than embedded — three families do not fit the
+│                   band the deploy sentinel holds. ⚠️ Registration is MONOTONE: an id is
+│                   never re-pointed at new bytes, because textMetricsCache keys on it and
+│                   can never be invalidated
 ├── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
 │                   history snapshot serialization (get/inject undo/redo PNG blobs)
 ├── utils.rs        Shared leaf helpers — json_escape, flat_to_points, points_bbox,
