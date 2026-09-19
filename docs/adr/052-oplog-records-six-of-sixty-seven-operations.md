@@ -1,5 +1,5 @@
 # ADR-052: The op log records six of the engine's operation families, and the rest break it
-Date: 2026-09-09   Status: draft (decision extended 2026-09-11 — part 2 built, part 3 proposed)
+Date: 2026-09-09   Status: draft (decision extended 2026-09-11 — part 2 built, part 3 proposed; amended 2026-09-18 — part 2 is a status-bar readout, depth table corrected)
 
 ## Context
 
@@ -56,6 +56,22 @@ real photo the byte cap binds first:
 | 4000×3000 (12 MP phone) | 48 MB | **~10** |
 | 6000×4000 (24 MP) | 96 MB | **~5** |
 
+> **Corrected 09-18-2026: the table above counts one layer, and a default
+> document has two.** A photo imports as Canvas + Photo (ADR-016), and
+> `Snapshot::bytes` (`src/history.rs`) adds up every layer's full buffer, the
+> Canvas included. One step costs twice the column above:
+>
+> | Image | One step (Canvas + Photo) | Steps in 512 MB |
+> |---|---|---|
+> | 1024×1024 | 8 MB | 50 (count cap binds) |
+> | 4000×3000 (12 MP phone) | 96 MB | **~5** |
+> | 6000×4000 (24 MP) | 192 MB | **~2** |
+>
+> Where this ADR says "five to ten", "~10" or "about five", read ~5 for 12 MP
+> and ~2 for 24 MP. Checked in the browser: a 2068×1385 two-layer document with
+> the op log off shows "Undo 46%", which is 23 of 50 steps, the same as
+> `floor(512 MB ÷ (2068 × 1385 × 4 × 2))`.
+
 So on the images this app exists to edit, breaking the log takes undo depth from
 the op history down to about five to ten steps, silently, the first time
 somebody touches the Adjust panel.
@@ -80,8 +96,11 @@ families out of sixty-seven sites, that the gap degrades undo depth rather than
 corrupting data, and that closing it is a per-operation cost.
 
 **2. Make the degradation visible, which needs no format change** — DONE
-(2026-09-11). `session/useOplogHealth.ts` warns once per document, on the
-healthy → broken transition, that undo has fallen back to snapshots. This was
+(2026-09-11), and the way it shows changed on 09-18-2026 (see the amendment
+below). It first shipped as a toast: `session/useOplogHealth.ts` warned once per
+document, on the healthy → broken transition, that undo had fallen back to
+snapshots. It is now a quiet status-bar readout, "Undo NN%", from
+`session/useUndoDepth.ts` and `lib/undoDepth.ts`. This was
 already named below as "the cheapest real improvement"; it is correct whichever
 way part 3 lands, so it did not wait for it.
 
@@ -153,3 +172,34 @@ making it urgent.
 Early warning sign: a bug report about undo depth that gets closed as "working
 as designed, see ADR-052". That is this ADR being used as a shield rather than
 a plan.
+
+## Amendment (09-18-2026): the warning is a readout, not a popup
+
+**What changed.** Chris asked for the toast to go, because popups "make our app
+look angry". Part 2 is now "Undo NN%" in the status bar, left of the size
+readouts, always on screen. NN is estimated undo depth ÷ the History depth
+setting:
+
+- **100%** while the op log drives undo (`isOplogUndoEnabled() && oplog_active()`).
+- Otherwise `floor(history_max_bytes ÷ (W × H × 4 × layerCount))` steps,
+  clamped to 1..History depth. The floor is 1 because `History::trim` always
+  keeps one copy.
+
+The tooltip says it in plain words. It never turns red: a readout that alarms
+is just the toast again.
+
+**`history_max_bytes` finally has a caller.** `src/settings.rs` exported it in
+#127 for this exact estimate, and nothing ever called it. The readout now reads
+the 512 MB budget from Rust instead of keeping a second copy (PARKING_LOT entry
+marked resolved).
+
+**Costs.**
+- A number in the corner is easier to miss than a toast. Nothing interrupts
+  anymore, so the person who most needs to know may never hover it.
+- It's an estimate, and it has to count exactly what `Snapshot::bytes` counts
+  or it drifts from the eviction it predicts. The first cut left out one term
+  — the selection mask, one byte a pixel, cloned into every snapshot — and
+  read high with a selection active (the 2068×1385 document above keeps 20
+  steps then, not 23). Caught in review and fixed before it shipped: the hook
+  asks `has_selection()` and `snapshotBytes` adds W×H for it. Layer masks are
+  still left out on both sides, because `Snapshot::bytes` leaves them out.

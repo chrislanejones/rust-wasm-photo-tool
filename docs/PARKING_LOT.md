@@ -4,6 +4,21 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+
+Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not
+investigated. Production build, demo mode, a 6000×4000 PNG (the demo downscale
+made it 2048×1365 inside a 2068×1385 artboard):
+
+| Moment | Status bar showed |
+|---|---|
+| Right after import | `Photo: 2048×1365` (the photo — correct, #81) |
+| After reload → **Resume editing** | `Photo: 2068×1385` (the document) |
+
+2068×1385 is the photo plus 2 × the 10 px padding, which is exactly what #81
+fixed. Observation only; no cause guessed. First check whether it corrects
+itself after the next edit.
+
 ## OPEN — a trailing-slash URL hydrates with the 404 head (09-18-2026)
 
 Found while checking the worker post's header banner (branch
@@ -236,7 +251,15 @@ yet observed on a phone. The desktop export paths append `-revised` + the real
 extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
 decide first whether mobile should save the original (as now) or the edit.
 
-## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+## RESOLVED — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+
+> **RESOLVED 2026-09-18 — it was a missing wire, and it is wired.** The
+> status bar's "Undo NN%" readout (`lib/undoDepth.ts`, fed by
+> `session/useUndoDepth.ts`) divides this budget by one whole-image copy to
+> estimate undo depth, which is the job the export's doc comment described.
+> It replaced the once-per-photo toast. One correction to the numbers the
+> estimate was first sketched with: a default document is Canvas + Photo, and
+> `Snapshot::bytes` counts both, so a 24 MP photo gets ~2 steps, not ~5.
 
 Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
 is a plain `#[wasm_bindgen]` export in `src/settings.rs:62`, not feature-gated,
@@ -258,6 +281,9 @@ vacuous check #15 in `docs/vacuous-checks.md`. Fixing it is a one-line job
 change (build wasm before the script), but it turns CI **red** on the export
 above the moment it lands — so the two are one decision, not two. Sequence:
 resolve `history_max_bytes`, then make the gate able to see it.
+**First half done 2026-09-18** — `history_max_bytes` now has a caller, so this
+one-line job change no longer turns CI red on it. Re-run the audit to check
+nothing else surfaced before flipping it.
 
 ## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
 
@@ -3055,7 +3081,7 @@ Fix when someone is next in that file: strip `//` and `/* */` before matching,
 then re-baseline. Expect the count to RISE, and expect some of the new entries
 to be real.
 
-## `history_max_bytes` is exported and never called (found 2026-09-12)
+## `history_max_bytes` is exported and never called (found 2026-09-12) — RESOLVED 2026-09-18, see the entry near the top
 
 `src/settings.rs:62` exports it through `wasm_bindgen`, and its own doc comment
 says why: *"JS estimates the depth from the live document size and this number;

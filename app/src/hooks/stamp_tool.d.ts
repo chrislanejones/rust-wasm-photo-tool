@@ -4,6 +4,10 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** The undo history's byte budget (512 MB). The status bar's undo-depth
+   *  readout divides it by one whole-image copy — see lib/undoDepth.ts. */
+  export function history_max_bytes(): number;
+
   /** Stroke-stabilizer leash in px for a UI level ("off"/"low"/"med"/"high");
    *  0 = off.
    *
