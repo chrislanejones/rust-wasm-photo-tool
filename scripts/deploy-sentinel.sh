@@ -51,14 +51,6 @@ set -uo pipefail
 #   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
 SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
-# 860000 -> 880000 (Chris, 2026-09-18). Same reason as the step below, and the
-# same kind of growth: shape rotation, the triangle and star point counts, and
-# op-log v8 (ADR-059) added 6,059 B, taking the engine 858,087 -> 864,146 B —
-# 4,146 over the old ceiling. Reviewed features again, so the number was out of
-# date, not the build. 880000 leaves ~15,850 B of headroom: still less than one
-# embedded TTF (61,972 B), so the ADR-051 font argument below keeps failing
-# loudly.
-#
 # 840000 -> 860000 (Chris, 2026-09-16). The FLOOR is the featureless detector
 # and stays at 800000 — that decision was made on 09-15 and is not revisited
 # here. This is the ceiling, and it is a drift alarm, not a budget.
@@ -73,7 +65,7 @@ MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
 # embedded TTF (61,972 B) — ADR-051's argument that a font cannot be embedded
 # without moving this band has to keep failing loudly, and a ceiling raised far
 # enough to absorb one would silence it.
-MAX_WASM="${SENTINEL_MAX_WASM:-880000}"
+MAX_WASM="${SENTINEL_MAX_WASM:-860000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
 # `oplog_active` is the tiles/op-log surface; `remove_object` is PatchMatch.
 #

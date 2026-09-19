@@ -92,11 +92,10 @@ four. The edit overlay moved out of `CanvasArea.tsx` into
   rotated, warped seven-point star through persist, restore and a
   post-reload undo, byte-exact.
 - **Wasm +6,059 B (858,087 → 864,146), 4,146 B over the 860,000 sentinel
-  ceiling.** An `fmod` and a duplicated decode branch are already cut, and
-  nothing further comes out without dropping v8 persistence. **Decided
-  2026-09-18 (Chris): the ceiling goes to 880,000** — the #160 pattern,
-  attributable reviewed growth, ~15,850 B of headroom, still under one
-  embedded TTF so ADR-051's font alarm keeps working.
+  ceiling.** The first deploy that carries this goes red. Raising the ceiling
+  (as #160 did) or trimming something else is Chris's call, and it is not
+  made here. An `fmod` and a duplicated decode branch are already cut, and
+  nothing further comes out without dropping v8 persistence.
 - **Op-log undo can take two presses.** One gesture records `ShapeAdd` plus a
   side op under ONE snapshot, and op-log undo rewinds one op per snapshot. So
   the first press after drawing a turned shape or a seven-point star changes
