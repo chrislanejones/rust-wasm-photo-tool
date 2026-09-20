@@ -166,7 +166,19 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # followed by a standalone `//` comment makes rustfmt align that comment to the
 # annotation column, shoving unrelated prose out to column ~70. A blank line
 # between them prevents it.
-check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
+# 47 -> 46 (2026-09-20). Paid down by #131 (`2d188420`, "fonts arrive at
+# runtime"), which annotated two test-only sites `// allow: rust-panic` —
+# ⚠️ and then did not record it: that commit touches ZERO lines of this file.
+# Measured in a clean clone at both commits rather than inferred from the diff:
+#   6a3de6be (the commit before #131)  47
+#   2d188420 (#131)                    46
+#   5bd73cce (v8.80, master today)     46
+# ADR-058 documents the lowering as part of the change; the branch carried it,
+# the merge did not. Three CI runs have printed "IMPROVED rust-panics: 46 < 47"
+# since, which is this script asking to be told. A ratchet left loose is not a
+# ratchet — 46 is the new ceiling and the two annotated sites can no longer be
+# un-annotated for free.
+check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
@@ -209,8 +221,16 @@ check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 # Two branches ratcheting the same counter independently is the only way this
 # number can move UP without new slop, and the check for it is the one below:
 # 4808 must be lower than the baseline on the branch you are merging INTO.
+# 4808 -> 4732 (2026-09-20), and for the same reason as `rust-panics` above:
+# #131 (`2d188420`) moved the font bindings into `src/fonts.rs`'s own
+# `#[wasm_bindgen] impl` and `commit_text`/`measure_text` into `src/text.rs`,
+# then landed without touching this file. Measured in a clean clone:
+#   6a3de6be  4808      2d188420  4732      5bd73cce (v8.80)  4732
+# This is the ordinary case the header describes — lower it when an extraction
+# lands — arriving three commits late. It is a LOWERING, not the raise the
+# 4798 -> 4808 note above had to defend.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4808 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4732 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
@@ -235,6 +255,71 @@ if [ -z "$n_deadexp" ]; then
 fi
 check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
 
+# ── THE BASE COMMIT THE THREE MATCHED PAIRS DIFF AGAINST ──
+#
+# All three co-change checks below ask one question — did one side of a pair
+# move without the other? — and all three need one thing to ask it: a commit to
+# diff HEAD against. Resolved ONCE, here, because three copies of the same
+# resolution are three chances for them to drift apart.
+#
+# ⚠️ THIS IS WHERE ALL THREE WERE VACUOUS UNTIL 2026-09-20, AND THE MESSAGE
+# THEY PRINTED SAID THE OPPOSITE. It read "no origin/master to diff against
+# (runs in CI)", and CI was the one place it did not run: `actions/checkout`
+# clones at depth 1 by default, so `origin/master` is absent on the runner, and
+# 12 of the 13 checkout steps in ci.yml took that default. Measured on two real
+# runs, not inferred:
+#   pull_request 35487378044 → skip, skip, skip
+#   push master  35456540646 → ok (0 hunks), ok (0 hunks), ok (0 hunks)
+# So they never compared a one-sided edit on a PULL REQUEST — the only event
+# where one is still catchable before it lands — and on master they reported a
+# pass against an empty diff, because there origin/master IS HEAD. Both states
+# were empty; only one of them admitted it. The other half of the fix is in
+# ci.yml, which now gives this job the history; this half is the part that
+# refuses to go quiet again.
+#
+# Three HONEST states, none of which flatters:
+#   compare  a base exists and there is something to diff → the check has teeth
+#   n/a      the base IS HEAD and the tree is clean       → nothing to compare,
+#            and printing "ok" for that is the exact lie this block removes
+#   absent   no origin/master at all                      → a bare local clone,
+#            and FATAL in CI, where it means a broken checkout rather than a
+#            local convenience. A gate that no-ops on its own misconfiguration
+#            is the class of check this repo keeps finding green and empty.
+pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+pair_head=$(git rev-parse HEAD 2>/dev/null || true)
+
+if [ -z "$pair_base" ] && [ -n "${GITHUB_ACTIONS:-}" ]; then
+  echo "::error::matched-pair checks have no base commit — origin/master is missing from this checkout."
+  echo "FATAL: the three co-change checks cannot run, so this job cannot substantiate a pass." >&2
+  echo "  The guardrails job needs 'fetch-depth: 0' on its checkout (.github/workflows/ci.yml)." >&2
+  exit 1
+fi
+
+# Returns 0 when a pair check can do real work. When it cannot it PRINTS why
+# and returns 1, so the reason always reaches the log and all three call sites
+# read the same way.
+#
+# ⚠️ The `git status` half of the n/a test is load-bearing, not decoration. The
+# diffs below are TWO-DOT on purpose so they see the working tree — that is what
+# makes this usable as a pre-push guard on uncommitted work. On a local master
+# branch the base IS HEAD while the edit sits unstaged, and calling that "n/a"
+# would switch the check off in precisely the situation it was written for. So
+# n/a needs both: base == HEAD *and* nothing modified. `-uno` keeps a stray
+# untracked file (a scratch note, SESSION_LOG.md) from counting as an edit.
+pair_can_compare() {
+  if [ -z "$pair_base" ]; then
+    echo "  skip $1: no origin/master in this checkout — run 'git fetch origin master' first."
+    echo "       (Local-only state. On a CI runner this is fatal, not a skip — see above.)"
+    return 1
+  fi
+  if [ "$pair_base" = "$pair_head" ] && [ -z "$(git status --porcelain -uno 2>/dev/null)" ]; then
+    echo "  n/a $1: HEAD is origin/master with a clean tree — no one-sided edit to compare."
+    echo "       (This check has teeth on a pull request, which is where it now runs.)"
+    return 1
+  fi
+  return 0
+}
+
 # ── MATCHED PAIR: the blur oracle (ADR-030) ──
 # `src/simd/blur.rs` (what the engine actually runs) and
 # `app/src/lib/webgpu/blurReference.ts` (the oracle the GPU shader is checked
@@ -249,13 +334,10 @@ check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)
 # Same scoping rule as the anchor pair below: match a changed line carrying the
 # blur's actual arithmetic, not any edit to the file, so a comment cannot turn
 # this red.
-blur_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$blur_base" ]; then
-  echo "  skip blur-oracle-pair: no origin/master to diff against (runs in CI)"
-else
-  rust_blur=$(git diff "$blur_base" -- src/simd/blur.rs \
+if pair_can_compare blur-oracle-pair; then
+  rust_blur=$(git diff "$pair_base" -- src/simd/blur.rs \
     | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
-  ts_blur=$(git diff "$blur_base" -- app/src/lib/webgpu/blurReference.ts \
+  ts_blur=$(git diff "$pair_base" -- app/src/lib/webgpu/blurReference.ts \
     | grep -cE '^[+-].*(F\(|Math\.fround|kernel\[|buildGaussianKernel)' || true)
   if [ "$rust_blur" -gt 0 ] && [ "$ts_blur" -eq 0 ]; then
     echo "FAIL blur-oracle-pair: src/simd/blur.rs changed, blurReference.ts did not."
@@ -291,11 +373,10 @@ fi
 # ⚠️ NEEDS A BASE REF, so it cannot run in a bare local checkout. It SAYS so
 # rather than passing quietly — a co-change check that silently no-ops is worth
 # less than no check, and "verified in one environment" is this repo's most
-# expensive recurring mistake.
-pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$pair_base" ]; then
-  echo "  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)"
-else
+# expensive recurring mistake. That warning was right and the code under it was
+# wrong for months: the message it printed named CI as the place this runs, and
+# CI was the one place it did not. See the base-commit block above.
+if pair_can_compare rotated-anchor-pair; then
   formula_changed=$(git diff "$pair_base" -- src/text.rs \
     | grep -cE '^[+-].*(hw \* cos|hw \* sin|hh \* cos|hh \* sin)' || true)
   pivot_changed=$(git diff "$pair_base" -- app/src/features/canvas/CanvasArea.tsx \
@@ -329,13 +410,10 @@ fi
 #
 # Two-dot diff, so the working tree counts -- a pre-push guard that only sees
 # committed work passes on the very change it was written for.
-shader_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$shader_base" ]; then
-  echo "  skip blur-shader-pair: no origin/master to diff against (runs in CI)"
-else
-  rust_arith=$(git diff "$shader_base" -- src/simd/blur.rs \
+if pair_can_compare blur-shader-pair; then
+  rust_arith=$(git diff "$pair_base" -- src/simd/blur.rs \
     | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
-  wgsl_arith=$(git diff "$shader_base" -- app/src/lib/webgpu/gpuBlur.ts \
+  wgsl_arith=$(git diff "$pair_base" -- app/src/lib/webgpu/gpuBlur.ts \
     | grep -cE '^[+-].*(acc = acc \+|kernel\[|floor\(c\.|clamp\(floor)' || true)
   if [ "$rust_arith" -gt 0 ] && [ "$wgsl_arith" -eq 0 ]; then
     echo "FAIL blur-shader-pair: src/simd/blur.rs changed, the WGSL shader did not."
