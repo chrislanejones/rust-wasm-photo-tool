@@ -53,6 +53,28 @@ export const FIELD_NUMERIC = `${FIELD_BASE} px-2 py-1.5 text-sm tabular-nums`;
  *  and a user-dragged corner fights the layout. */
 export const FIELD_TEXTAREA = `${FIELD_BASE} resize-none px-3 py-2 text-sm`;
 
+/** A `<select>`, in the spelling the TOOL PANELS already shipped — Text ›
+ *  Font Family, Layers › Layer, Resize › Method and Format all carried this
+ *  exact string, and the Create AI Image dialog's model picker is the fourth
+ *  reader rather than a fifth spelling.
+ *
+ *  ⚠️ NOT `FIELD_BASE`, and the difference is deliberate: a native select
+ *  keeps its own OS chrome unless `appearance-none` removes it, and the
+ *  border is transparent-until-focus because these sit in dense panels where
+ *  four boxed outlines in a column read as a table. Matching the panels is
+ *  the point — a dialog field that agrees with the toolbar is one the user
+ *  has already learned.
+ *
+ *  ⚠️ PAIRS WITH A CHEVRON. `appearance-none` deletes the disclosure arrow,
+ *  so every caller renders its own `<ChevronDown>` inside a `relative`
+ *  wrapper (`pointer-events-none absolute right-2 top-1/2 -translate-y-1/2`)
+ *  — `pr-8` here is the room that chevron sits in. A select using this class
+ *  with no chevron looks like a text field that ignores typing. */
+export const FIELD_SELECT =
+  "w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs " +
+  "text-theme-foreground border border-transparent focus:outline-none " +
+  "focus:border-theme-ring cursor-pointer";
+
 /* ─────────────────────────────────────────────────────────────────────────────
    TOOL-TILE SELECTION — the ToolGrid rail tile and the SubtoolRow tile.
 

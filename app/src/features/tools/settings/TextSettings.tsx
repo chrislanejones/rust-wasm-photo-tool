@@ -17,6 +17,7 @@ import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
+import { FIELD_SELECT } from "@/lib/styles";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -224,7 +225,7 @@ export function TextSettings({
                       fontFamily: faceCss(e.target.value),
                     })
                   }
-                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring"
+                  className={FIELD_SELECT}
                   style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
                 >
                   {faces.map((f) => (
