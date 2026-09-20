@@ -57,6 +57,12 @@ export interface Route {
   sources: string[];
   /** `og:type`. "website" for the home page, "article" for the log. */
   ogType?: "website" | "article";
+  /** Footer only: in the sitemap and the prerender, out of the nav and the
+   *  palette. The legal pages are reference documents — a reader goes looking
+   *  for them, so they do not earn a slot in a nav that is otherwise seven
+   *  places you might want to go. They stay in ROUTES because the sitemap and
+   *  the prerendered <head> are exactly what they need. */
+  footerOnly?: boolean;
 }
 
 /** Every page, in nav order. A new page appears in the nav, the mobile sheet,
@@ -134,6 +140,24 @@ export const ROUTES: readonly Route[] = [
     ogImage: "/og/trail-log.png",
     sources: ["marketing/src/data/releases.ts", "marketing/src/pages/Trail.tsx"],
     ogType: "article",
+  },
+  {
+    to: "/privacy-policy",
+    label: "Privacy Policy",
+    title: "Privacy Policy — Image Horse",
+    description:
+      "What stays on your machine, what leaves it, and what you can switch off. Editing runs in your browser; the exceptions are named here one by one.",
+    sources: ["marketing/src/pages/PrivacyPolicy.tsx"],
+    footerOnly: true,
+  },
+  {
+    to: "/terms-of-service",
+    label: "Terms of Service",
+    title: "Terms of Service — Image Horse",
+    description:
+      "The terms for using Image Horse: your pictures stay yours, the software is beta and free, and the paid tier bills monthly through Stripe.",
+    sources: ["marketing/src/pages/TermsOfService.tsx"],
+    footerOnly: true,
   },
 ] as const;
 

@@ -10,6 +10,8 @@ import BlogPost from "./pages/BlogPost";
 import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import Trail from "./pages/Trail";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 import useHead from "./useHead";
 import { trackPageView } from "./lib/analytics";
@@ -89,6 +91,8 @@ export default function App() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/about" element={<About />} />
         <Route path="/trail-log" element={<Trail />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
         {/* A catch-all, so an unknown URL gets a page that says so instead of a
             bare nav over empty space. Paired with a real 404 status from the
             host — see scripts/prerender.mjs. */}
