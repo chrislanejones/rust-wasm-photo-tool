@@ -366,6 +366,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: ./scripts/guardrails.sh
 
+      # scripts/gate-run.sh is the shared helper for RUNNING a gate: it takes
+      # the exit code before anything can print over it, reads what the gate
+      # printed, and will refuse a pass that shows no working. It rides in this
+      # job because it needs nothing but bash and coreutils and takes ~2s.
+      #
+      # The second line is a MUTATION run. It sabotages a COPY of the helper —
+      # once with the printed-failure scan stubbed out, once with the
+      # proof-of-run check stubbed out — and requires the suite to go red
+      # against each. THE RED TEXT INSIDE THAT STEP IS THE EVIDENCE, not a
+      # problem: the step is green only when both sabotages were caught. A
+      # helper written to catch checks that cannot fail, never once watched
+      # failing, would be the joke writing itself.
+      - name: Gate helper proof + mutation run (expected reds inside)
+        run: |
+          ./scripts/gate-run.test.sh
+          ./scripts/gate-run.test.sh --prove-red
+
   # ---------- Service-worker e2e (ADR-049 gate 1) ----------
   # ADR-049 found that this repo had NINE CI jobs and none of them ran
   # Playwright, so every test guarding the service worker was hand-run only.
