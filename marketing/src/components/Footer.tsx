@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { GITHUB_URL, CODEBERG_URL, PAGES, external } from "../config";
+import { GITHUB_URL, CODEBERG_URL, PAGES, LEGAL_PAGES, external } from "../config";
 import { CodebergIcon, GitHubIcon } from "./Icons";
 
 interface FooterProps {
@@ -9,8 +9,11 @@ interface FooterProps {
 
 export default function Footer({ line }: FooterProps) {
   const { pathname } = useLocation();
-  // Never link a page to itself — the footer's job is where to go next.
+  // Never link a page to itself — the footer's job is where to go next. The
+  // same rule applies to the legal row, which is why it is filtered here too
+  // rather than rendered straight from LEGAL_PAGES.
   const links = PAGES.filter((p) => p.to !== pathname);
+  const legal = LEGAL_PAGES.filter((p) => p.to !== pathname);
 
   return (
     <footer className="foot-stmt">
@@ -23,6 +26,14 @@ export default function Footer({ line }: FooterProps) {
 
         <ul className="foot-stmt__links">
           {links.map((p) => (
+            <li key={p.to}>
+              <Link to={p.to}>{p.label}</Link>
+            </li>
+          ))}
+        </ul>
+
+        <ul className="foot-stmt__links foot-stmt__links--legal">
+          {legal.map((p) => (
             <li key={p.to}>
               <Link to={p.to}>{p.label}</Link>
             </li>

@@ -10,8 +10,19 @@ export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo
 /** Every page, in nav order. The nav, the mobile sheet, the footer and the ⌘K
  *  palette all read this — and it is now a projection of `ROUTES` in seo.ts, so
  *  the sitemap and the prerender read the same list too. A page that is in the
- *  nav is in the sitemap, always; there is no longer a second place to forget. */
-export const PAGES = ROUTES.map(({ to, label }) => ({ to, label }));
+ *  nav is in the sitemap, always; there is no longer a second place to forget.
+ *
+ *  `footerOnly` routes are filtered out here rather than being kept out of
+ *  ROUTES: the legal pages still need a sitemap entry and a prerendered head,
+ *  they just do not belong in a nav of places to go. */
+export const PAGES = ROUTES.filter((r) => !r.footerOnly).map(({ to, label }) => ({ to, label }));
+
+/** The legal documents, for the footer's second row. Same projection, opposite
+ *  filter, so a new `footerOnly: true` route lands here and nowhere else. */
+export const LEGAL_PAGES = ROUTES.filter((r) => r.footerOnly).map(({ to, label }) => ({
+  to,
+  label,
+}));
 
 /** A file in the repository, on GitHub's default branch.
  *
