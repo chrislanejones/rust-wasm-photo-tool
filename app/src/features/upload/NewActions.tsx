@@ -203,6 +203,16 @@ export function NewActions({
   const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
   const setOnlineFeaturesEnabled = useUIStore((s) => s.setOnlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
+  // Publish that step to the store so Settings → Security can lock ITS copy of
+  // the online-features switch for the same reason this one locks: flipping off
+  // mid-step unmounts the tile that owns the prompt. Local state is invisible to
+  // a pane in another subtree. Cleared on unmount so a closed dialog can never
+  // leave the pane locked.
+  const setAiComposerOpen = useUIStore((s) => s.setAiComposerOpen);
+  useEffect(() => {
+    setAiComposerOpen(aiMode);
+    return () => setAiComposerOpen(false);
+  }, [aiMode, setAiComposerOpen]);
   // ⚠️ THE ONLY PIECE OF THE AI DRAFT HELD HERE, and on purpose: the prompt
   // and the references die with the panel on Back, but which model you like
   // is a PREFERENCE and would not feel like it took if stepping back to the

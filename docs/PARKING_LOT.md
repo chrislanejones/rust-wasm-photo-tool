@@ -3136,3 +3136,27 @@ exactly the "clean up while I'm here" edit the rules forbid.
 
 **Do it when** a modal primitive consolidation happens anyway — the three-modal
 convergence onto `ui/dialog` already tracked above is the natural moment.
+
+---
+
+## `ToggleButtonGroup` never says which button is on
+
+Every Settings pane states its choices with `ToggleButtonGroup`, and the active
+button is marked **visually only** — a raised `bg-bg-elevated` pill with
+`shadow-md`. The component sets `aria-label` on icon-only buttons and nothing
+else: no `aria-pressed`, no `role="radiogroup"`, no `aria-checked`. A screen
+reader hears two buttons and cannot tell Keep EXIF from Strip EXIF, or "In your
+browser" from "Online features".
+
+Found while adding the online-features control to Settings → Security, where
+the whole point of the control is which of the two is currently true.
+
+**Left alone deliberately.** This is a shared primitive with callers across the
+top bar, the tool rail and six panes; `aria-pressed` on a button whose group is
+really a radio set is the wrong fix, and choosing between `aria-pressed` and a
+real radiogroup is a change to every caller's semantics at once. That is a
+pass of its own, not a rider on a feature.
+
+**Do it when** the WCAG sweep happens, or the next time a pane is built around
+"which one is on" — the second occurrence is the signal. The fix belongs in
+`app/src/components/ui/toggle-button-group.tsx`, one place.
