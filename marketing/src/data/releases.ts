@@ -24,6 +24,50 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.80",
+    date: "2026-09-20",
+    headline:
+      "The font menu picks real fonts, object removal is a brush on the canvas, and an undo no longer comes back after a reload",
+    entries: [
+      {
+        tag: "feature",
+        text: "The Text tool's font menu picks real fonts. It used to be decoration — the engine took no font at all, so every choice drew the same face and three surfaces disagreed about the result by as much as 26%. Liberation Sans, Serif and Mono ship as real files now and load when you pick one. None of them went into the engine: they are handed to it at runtime, so the menu can grow later without the download growing with it.",
+      },
+      {
+        tag: "rust",
+        text: "Three new font families made the engine smaller. The faces carry TrueType hinting instructions and the rasterizer has never run them, so stripping the dead hinting gave back more than the families cost: 845,156 to 814,202 bytes, 30,954 smaller than v8.79 and 45,798 under the ceiling. A test fails on any face that arrives with hinting still in it, so a routine font update cannot quietly spend those bytes again.",
+      },
+      {
+        tag: "feature",
+        text: "Remove Object is a brush on the real image, not a popup. Paint over the thing you want gone at whatever zoom you are on, with the app still visible behind the mask. The old popup painted on a private copy of the frame capped at 640 pixels wide — about a third of actual size — and you could not zoom or pan while you worked. Undo Stroke takes back the last stroke and Clear Mask starts over. What gets sent to the server is byte-for-byte what it was.",
+      },
+      {
+        tag: "fix",
+        text: "An undo no longer comes back after a reload. Apply an edit, press Ctrl+Z, reload, and the change you had just discarded was there again — the autosave never wrote the undo, so the copy on disk still held the old edit. That was silent data loss and it was live.",
+      },
+      {
+        tag: "ui",
+        text: "The status bar says Undo NN% — how far undo can actually reach right now, as a share of your History depth setting. It replaces the toast that appeared once per photo to say undo was getting shallower. It is always there and it is never red. The wordmark slides away after five minutes and leaves the horse as the link.",
+      },
+      {
+        tag: "fix",
+        text: "Shape sloppiness is a ramp instead of a switch. It went from computer-drawn to hand-drawn with nothing in between because three things jumped the moment the slider left zero, and one was a real bug: the firm path drew a circle and the sketchy path drew the bounding-box ellipse, so any non-square drag changed shape and size at sloppiness 1. The fill had been sitting inside a wider outline the whole time.",
+      },
+      {
+        tag: "feature",
+        text: "Phones can reach settings. A gear in the header opens a sheet with Theme and Motion, so a phone is no longer stuck on whatever theme it booted with.",
+      },
+      {
+        tag: "infra",
+        text: "Signing in works against the production Clerk instance. A Convex deploy that deployed nothing used to report success — it ran green three times with the secret unset. The check now fails when it cannot verify and says what to do about it.",
+      },
+      {
+        tag: "ui",
+        text: "The site has a blog. The first post is about moving the engine into a worker and its figures move. There is an About page with real photos, the home page tiles have names and a press you can feel, and the hero has a slider that runs the edit backwards.",
+      },
+    ],
+  },
+  {
     version: "v8.79",
     date: "2026-09-16",
     headline: "Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop",
