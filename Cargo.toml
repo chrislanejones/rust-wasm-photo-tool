@@ -137,6 +137,10 @@ required-features = ["tiles"]
 name = "oplog_v8_text_settings_replay"
 required-features = ["tiles"]
 
+[[test]]
+name = "oplog_v7_v8_fixture_resume"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.

@@ -132,6 +132,29 @@ export interface PersistedAnnotation {
   shadow_dx?: number;
   shadow_dy?: number;
   shadow_blur?: number;
+  /** Reflow width in px (0 / absent = don't wrap, size the box to the text).
+   *  The box handle the user drags. v8.81 — ADR-060.
+   *
+   *  ⚠️ THE ENGINE HAS EMITTED THIS SINCE v8.40 AND THE ARCHIVE NEVER CARRIED
+   *  IT. Declaring it here is half the repair; the other half is that the two
+   *  strippers below stopped being allowlists, so the next field the engine
+   *  grows arrives on disk without anyone remembering to add a line.
+   *
+   *  OPTIONAL AND NOT INDEXED, so no Dexie `.version()` bump and no upgrade
+   *  function — the same reasoning `font_id` states above and `db.ts` spells
+   *  out on `stale?`: Dexie versions key paths and indexes, not blob shape. An
+   *  archive written before v8.81 reads back `undefined`, which the restore
+   *  path passes to the engine as 0: "size the box to the text", which is
+   *  exactly what that archive meant. Nothing is rewritten. */
+  wrap_width?: number;
+  /** Box height in px (0 / absent = size the box to the text). The vertical
+   *  twin of `wrap_width` — read that comment, it applies word for word. */
+  box_height?: number;
+  /** Normalized projective corner quad as the engine writes it: a FLAT
+   *  `[x0,y0,x1,y1,x2,y2,x3,y3]`, TL/TR/BR/BL. Absent on every archive written
+   *  before v8.81, and on any text the Perspective tool never touched; the
+   *  restore path reads an absent or wrong-length value as the identity. */
+  perspective?: number[];
 }
 
 /** One live (non-destructive) shape/arrow annotation, as emitted by Rust's
@@ -373,11 +396,36 @@ export interface SavedEdit {
   activeLayerId?: number;
 }
 
+/** The tile cache the engine re-renders on restore. The ONLY thing either
+ *  stripper below removes.
+ *
+ *  Persisting it would bake in something stale — and possibly pre-rotated, so
+ *  a restored annotation would be drawn twice-rotated. */
+const TILE_FIELDS = ["tile_w", "tile_h", "tile_offset_x", "tile_offset_y"] as const;
+
 /** THE one place live text annotations are prepared for persistence.
  *
- *  Drops `tile_*` (the pre-rendered, possibly pre-rotated tile cache — it is
- *  re-rendered on restore, so persisting it bakes in something stale) and keeps
- *  every field of `PersistedAnnotation`.
+ *  Drops `tile_*` and keeps EVERYTHING ELSE the engine emitted.
+ *
+ *  ⚠️ IT IS A DENYLIST ON PURPOSE, AND IT USED TO BE AN ALLOWLIST (ADR-060).
+ *  Naming the fields to keep means a field the engine grows is silently absent
+ *  from disk rather than an error, and that has now happened twice. #22 lost
+ *  all nine `shadow_*` on the cloud path. Then `wrap_width` (v8.40),
+ *  `box_height` (v8.41) and `perspective` (v8.42) were emitted by
+ *  `annotations_to_json` for four versions and NEVER reached a user's
+ *  IndexedDB — measured 2026-09-20 against a live production archive record,
+ *  which is why a dragged text box came back unwrapped after a reload.
+ *
+ *  A denylist inverts the default: the engine is the source of truth for what
+ *  an annotation is, and the archive follows it automatically. `parseShapes`
+ *  has always worked this way, which is precisely why the shape twins
+ *  (`sloppiness`, the shape quad) never went missing. This is the text side
+ *  catching up, not a new idea.
+ *
+ *  The cost is real and accepted: a field the engine adds now lands in
+ *  IndexedDB before anyone decides it should be persisted. It is bounded —
+ *  `annotations_to_json` writes a fixed struct, not arbitrary data — and the
+ *  alternative cost was measured at four versions of silent loss.
  *
  *  WHY IT IS SHARED (#22). This map existed TWICE — here for the local
  *  IndexedDB save, and again inline in the cloud-archive path in
@@ -386,95 +434,41 @@ export interface SavedEdit {
  *  restore kept your drop shadows; cross-device restore lost them, with no
  *  error either side. Two copies of an allowlist is the bug; one exported
  *  function is the fix, and `editPersistence.stripDrift.test.ts` pins that the
- *  set it emits is exactly the input minus `tile_*`.
+ *  set it emits is exactly what the ENGINE emits minus `tile_*` — the engine's
+ *  own captured JSON, not a type declared in this file, because a guard built
+ *  from the app's allowlist cannot see a field the allowlist never had.
  *
  *  Invisible until v7.56, because the cloud path never ran in production. */
 export function stripLiveAnnotations(raw: string): PersistedAnnotation[] {
   try {
-    const parsed = JSON.parse(raw) as Array<
-      PersistedAnnotation & {
-        tile_w: number; tile_h: number;
-        tile_offset_x: number; tile_offset_y: number;
-      }
-    >;
-    return parsed.map((a) => ({
-      id: a.id,
-      text: a.text,
-      x: a.x,
-      y: a.y,
-      font_size: a.font_size,
-      r: a.r,
-      g: a.g,
-      b: a.b,
-      bold: a.bold,
-      font_id: a.font_id,
-      rotation_deg: a.rotation_deg,
-      background_kind: a.background_kind,
-      bg_r: a.bg_r,
-      bg_g: a.bg_g,
-      bg_b: a.bg_b,
-      bg_a: a.bg_a,
-      bg_padding: a.bg_padding,
-      bg_corner_radius: a.bg_corner_radius,
-      bg_tail: a.bg_tail,
-      shadow_box: a.shadow_box,
-      shadow_text: a.shadow_text,
-      shadow_r: a.shadow_r,
-      shadow_g: a.shadow_g,
-      shadow_b: a.shadow_b,
-      shadow_a: a.shadow_a,
-      shadow_dx: a.shadow_dx,
-      shadow_dy: a.shadow_dy,
-      shadow_blur: a.shadow_blur,
-    }));
+    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+    return parsed.map((a) => {
+      const kept: Record<string, unknown> = { ...a };
+      for (const k of TILE_FIELDS) delete kept[k];
+      return kept as unknown as PersistedAnnotation;
+    });
   } catch {
     return [];
   }
 }
 
-/** Parse the JSON emitted by `get_*_snapshot_annotations`. Drops tile_*
- *  fields since the tile is re-rendered on injection. */
-export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as Array<
-      PersistedAnnotation & {
-        tile_w?: number; tile_h?: number;
-        tile_offset_x?: number; tile_offset_y?: number;
-      }
-    >;
-    return parsed.map((a) => ({
-      id: a.id,
-      text: a.text,
-      x: a.x,
-      y: a.y,
-      font_size: a.font_size,
-      r: a.r, g: a.g, b: a.b,
-      bold: a.bold,
-      font_id: a.font_id,
-      rotation_deg: a.rotation_deg,
-      background_kind: a.background_kind,
-      bg_r: a.bg_r,
-      bg_g: a.bg_g,
-      bg_b: a.bg_b,
-      bg_a: a.bg_a,
-      bg_padding: a.bg_padding,
-      bg_corner_radius: a.bg_corner_radius,
-      bg_tail: a.bg_tail,
-      shadow_box: a.shadow_box,
-      shadow_text: a.shadow_text,
-      shadow_r: a.shadow_r,
-      shadow_g: a.shadow_g,
-      shadow_b: a.shadow_b,
-      shadow_a: a.shadow_a,
-      shadow_dx: a.shadow_dx,
-      shadow_dy: a.shadow_dy,
-      shadow_blur: a.shadow_blur,
-    }));
-  } catch {
-    return [];
-  }
-}
+/** Parse the JSON emitted by `get_*_snapshot_annotations` — the per-layer and
+ *  per-history-step overlays.
+ *
+ *  ⚠️ IT IS `stripLiveAnnotations`, DELIBERATELY. This used to be a second
+ *  hand-maintained allowlist with the same 28 lines in it, and it is the one
+ *  that matters most: `decodeCapture` builds `PersistedLayer.annotations` from
+ *  THIS function, and `restoreLayerStack` reads those — so a field missing
+ *  here is a field the resume path can never give back, no matter what the
+ *  save path carried. It dropped `wrap_width` / `box_height` / `perspective`
+ *  for four versions alongside its twin (ADR-060).
+ *
+ *  #22's lesson was "two copies of an allowlist is the bug". Two copies of a
+ *  denylist is the same bug with better odds, so there is one implementation
+ *  and two names. The names stay because the call sites mean different things
+ *  — live overlays vs. a history step's overlays — and the engine emits the
+ *  identical JSON for both. */
+export const parseSnapshotAnnotations = stripLiveAnnotations;
 
 // ── Public API ─────────────────────────────────────────────────────────────
 

@@ -1878,31 +1878,57 @@ impl ImageHorseTool {
         shadow_dx: i32,
         shadow_dy: i32,
         shadow_blur: u32,
-        // ⚠️ Unlike the three gaps documented below, the typeface IS carried
-        // here. It has to be: wrap width, box height and the corner quad all
-        // degrade to a LOOK the user can restore with a drag, while a lost
-        // font silently re-renders every word in the wrong face with no handle
-        // to grab. `annotations_to_json` writes it, so this path can read it.
+        // The typeface. Carried since v8.76 - it was the first of the four
+        // appended text axes to reach this path, and for two versions it was
+        // the ONLY one, on the argument that a lost font has no handle to grab
+        // while a lost box "degrades to a look the user can restore with a
+        // drag". That argument was wrong about the user: a box dragged narrow
+        // comes back as text running off the canvas, and the drag that would
+        // restore it is the same drag that got lost. The other three follow
+        // below.
         font_id: &str,
+        // THE THREE AXES THAT USED TO BE DROPPED HERE - ADR-060.
+        //
+        // Until v8.81 this path hard-coded `0`, `0` and the identity quad and
+        // said so in three comments filed as ADR-024-F7: "the op-log path
+        // (which DOES carry it) is the one the resume actually uses." That
+        // premise is FALSE in the case that matters. Measured on production
+        // 2026-09-20: in every run where the user dragged the text box before
+        // the first save, no op log was persisted at all, so the resume landed
+        // on exactly this path - the one that carried none of it - and the
+        // text came back unwrapped, on one line, running off the canvas.
+        //
+        // `annotations_to_json` has always written all three. The archive
+        // stripper dropped them on the way to disk and this signature had
+        // nowhere to put them if it had not; both halves are fixed together
+        // because either one alone still loses the box.
+        wrap_width: u32,
+        box_height: u32,
+        // The normalized corner quad as a flat `[x0,y0,x1,y1,x2,y2,x3,y3]` -
+        // `annotations_to_json`'s own layout, so the persisted JSON rides
+        // straight in. Any OTHER length means "no quad recorded", which is
+        // every archive written before v8.81, and restores to the identity:
+        // exactly what those documents meant.
+        perspective: &[f32],
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let quad = if perspective.len() == 8 {
+            [
+                (perspective[0], perspective[1]),
+                (perspective[2], perspective[3]),
+                (perspective[4], perspective[5]),
+                (perspective[6], perspective[7]),
+            ]
+        } else {
+            crate::perspective::IDENTITY_QUAD
+        };
         let ann = build_text_annotation(
             id,
             text,
-            // ⚠️ The layer-JSON restore path does not carry a reflow width yet, so a
-            // text annotation rebuilt from it comes back unwrapped. Filed as
-            // ADR-024-F7; the op-log path (which DOES carry it, via
-            // Op::TextWrap) is the one the resume actually uses.
-            0,
-            // Same gap on the second axis (v8.41): no box height in layer JSON,
-            // so a restore through here comes back sized to its text.
-            // Op::TextBoxHeight carries it on the path that matters.
-            0,
-            // Third instance of the same gap (v8.42): layer JSON carries no
-            // corner quad, so a restore through here comes back unwarped.
-            // Op::TextPerspective carries it on the path that matters.
-            crate::perspective::IDENTITY_QUAD,
+            wrap_width,
+            box_height,
+            quad,
             font_size,
             r,
             g,

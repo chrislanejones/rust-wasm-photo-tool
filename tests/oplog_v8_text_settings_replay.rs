@@ -1,6 +1,5 @@
-//! ⚠️ EXPECTED RED. This file pins a bug that is NOT fixed yet, on purpose —
-//! see FINDINGS-oplog-and-text-0919.md and docs/PARKING_LOT.md ("a dragged
-//! text box does not survive a reload").
+//! **The text settings survive the whole log.** ADR-060, and the two rows
+//! below were RED when this file was written.
 //!
 //! The input is not a log this test wrote. It is
 //! `tests/fixtures/oplog/v8-text-font-wrap-shape.frames.bin`: the bytes the
@@ -12,37 +11,40 @@
 //!   0 TextAdd   1 TextFont   2 TextWrap   3 TextEdit   4 ShapeAdd   5 ShapeSloppiness
 //! ```
 //!
-//! Replaying it through the real resume entry point, one op at a time:
+//! ## The bug this pins, measured one op at a time
 //!
-//! | cursor | ops applied      | font_id            | wrap_width |
-//! |--------|------------------|--------------------|------------|
-//! | 1      | TextAdd          | `""`               | 0          |
-//! | 2      | + TextFont       | `"liberation-serif"` | 0        |
-//! | 3      | + TextWrap       | `"liberation-serif"` | **299**  |
-//! | 4      | + **TextEdit**   | **`""`**           | **0**      |
-//! | 6      | + the shape ops  | `""`               | 0          |
+//! | cursor | ops applied      | font_id (v8.80)      | wrap_width (v8.80) |
+//! |--------|------------------|----------------------|--------------------|
+//! | 1      | TextAdd          | `""`                 | 0                  |
+//! | 2      | + TextFont       | `"liberation-serif"` | 0                  |
+//! | 3      | + TextWrap       | `"liberation-serif"` | **299**            |
+//! | 4      | + **TextEdit**   | **`""`**             | **0**              |
+//! | 6      | + the shape ops  | `""`                 | 0                  |
 //!
-//! **`Op::TextEdit` erases both.** It carries a whole `TextParams`, and applying
-//! it REPLACES the annotation: `font_id` is `#[serde(skip)]` on `TextParams`
-//! (ops.rs — that is what kept the v2 wire layout byte-identical when the face
-//! was added in v8) so it decodes as the default `""`, and `wrap_width` /
-//! `box_height` come back as whatever the writer happened to hold. Everything
-//! `TextFont` and `TextWrap` established before it is gone.
+//! **`Op::TextEdit` erased both.** It carries a whole `TextParams`, and
+//! applying it REPLACED the annotation: `font_id`, `wrap_width`, `box_height`
+//! and `perspective` are `#[serde(skip)]` on `TextParams` (ops.rs — that is
+//! what kept the v2 wire layout byte-identical while four fields were added
+//! beside it), so they decoded as defaults and everything `TextFont` and
+//! `TextWrap` established before them was gone.
 //!
 //! The user-visible bug, reproduced in the browser the same night: type a text
 //! in Liberation Serif, drag its box narrower, reload, "Resume editing" — the
-//! text returns in Liberation Sans on one unwrapped line.
+//! text came back in Liberation Sans on one unwrapped line.
 //!
-//! WHY NO FIX HERE. Every repair is a format or format-semantics decision —
-//! make `TextEdit` carry the appended fields, make apply MERGE instead of
-//! replace, or re-emit `TextFont`/`TextWrap` after every edit — and the op-log
-//! format is on its way from v8 to v9 (#187). Persisted formats get an ADR and
-//! an attended session in this repo. This test is the red light that session
-//! starts from.
+//! ## The fix these rows now hold down
 //!
-//! The shape rows below pass today and are the harness control: `ShapeAdd` +
-//! `ShapeSloppiness` ride the same replay and keep their setting, so a red text
-//! row means the text path, not a broken fixture or a mis-built engine.
+//! Applying `TextEdit` MERGES: the payload's skipped fields are absent, not
+//! chosen, so the annotation keeps its own. The whole argument lives on
+//! `TextParams::carry_skipped_from`. No format version was taken — the wire
+//! layout is untouched, so these exact production bytes replay correctly with
+//! no migration step, and `tests/oplog_v7_v8_fixture_resume.rs` proves the same
+//! for a v7 log.
+//!
+//! The shape rows below passed before the fix as well and are the harness
+//! control: `ShapeAdd` + `ShapeSloppiness` ride the same replay and keep their
+//! setting, so a red text row means the text path, not a broken fixture or a
+//! mis-built engine.
 
 use stamp_tool::ImageHorseTool;
 
@@ -86,7 +88,7 @@ fn control_the_captured_log_restores_at_all() {
 
 #[test]
 fn control_a_shape_keeps_its_sloppiness_across_the_same_replay() {
-    // The twin setting that was fixed for shapes. Green today.
+    // The twin setting shapes already kept. Green before the fix and after it.
     let t = replay_to(OP_COUNT);
     let j = t.get_shape_annotations();
     assert_eq!(
@@ -98,8 +100,8 @@ fn control_a_shape_keeps_its_sloppiness_across_the_same_replay() {
 
 #[test]
 fn control_the_font_is_applied_before_the_edit() {
-    // Proves the log really contains the face, so the failure below is a LOSS
-    // and not a never-recorded value.
+    // Proves the log really contains the face, so the failure this file was
+    // written to catch was a LOSS and not a never-recorded value.
     let t = replay_to(2);
     let j = t.get_text_annotations();
     assert_eq!(
@@ -117,23 +119,23 @@ fn control_the_dragged_width_is_applied_before_the_edit() {
 }
 
 #[test]
-fn red_the_font_survives_the_whole_log() {
+fn the_font_survives_the_whole_log() {
     let t = replay_to(OP_COUNT);
     let j = t.get_text_annotations();
     assert_eq!(
         field(&j, "\"font_id\":"),
         "\"liberation-serif\"",
-        "the face the user picked must survive replay (TextEdit erases it today): {j}"
+        "the face the user picked must survive replay (TextEdit erased it before ADR-060): {j}"
     );
 }
 
 #[test]
-fn red_the_dragged_box_width_survives_the_whole_log() {
+fn the_dragged_box_width_survives_the_whole_log() {
     let t = replay_to(OP_COUNT);
     let j = t.get_text_annotations();
     assert_eq!(
         field(&j, "\"wrap_width\":"),
         "299",
-        "the box the user dragged must survive replay (TextEdit erases it today): {j}"
+        "the box the user dragged must survive replay (TextEdit erased it before ADR-060): {j}"
     );
 }
