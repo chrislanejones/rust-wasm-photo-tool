@@ -5,9 +5,13 @@ import { describe, it, expect } from "vitest";
 import {
   ASPECT_RATIOS,
   ATTACHMENT_LONGEST_EDGE,
+  DEFAULT_IMAGE_MODEL_ID,
+  IMAGE_MODELS,
   MAX_ATTACHMENTS,
+  attachmentsSent,
   consentSentence,
   downscaledSize,
+  modelById,
   rejectReason,
 } from "./aiImageDraft";
 
@@ -93,5 +97,77 @@ describe("ASPECT_RATIOS", () => {
       expect(r.h).toBeGreaterThan(0);
       expect(r.label).toBeTruthy();
     }
+  });
+});
+
+describe("IMAGE_MODELS", () => {
+  it("offers a real choice, every entry well-formed", () => {
+    expect(IMAGE_MODELS.length).toBeGreaterThan(1);
+    for (const m of IMAGE_MODELS) {
+      // A Replicate slug is `owner/name` — the stable half of a reference.
+      // A bare name or a pinned `...:hash` here is the bug this catches.
+      expect(m.id).toMatch(/^[^/:\s]+\/[^/:\s]+$/);
+      expect(m.label).toBeTruthy();
+      expect(m.blurb).toBeTruthy();
+      expect(typeof m.supportsReferences).toBe("boolean");
+    }
+  });
+
+  it("never ships a version hash — the server pins those", () => {
+    for (const m of IMAGE_MODELS) expect(m.id).not.toContain(":");
+  });
+
+  it("has no duplicate ids or labels", () => {
+    expect(new Set(IMAGE_MODELS.map((m) => m.id)).size).toBe(IMAGE_MODELS.length);
+    expect(new Set(IMAGE_MODELS.map((m) => m.label)).size).toBe(IMAGE_MODELS.length);
+  });
+
+  it("defaults to a model that is actually in the list", () => {
+    expect(IMAGE_MODELS.some((m) => m.id === DEFAULT_IMAGE_MODEL_ID)).toBe(true);
+  });
+
+  it("keeps at least one model that can read a reference image", () => {
+    // The dialog offers attachments at all only because one of these can use
+    // them. If this ever goes to zero, the whole reference-image section is
+    // dead UI and should go with it.
+    expect(IMAGE_MODELS.some((m) => m.supportsReferences)).toBe(true);
+  });
+});
+
+describe("modelById", () => {
+  it("finds a listed model", () => {
+    expect(modelById(IMAGE_MODELS[2].id).label).toBe(IMAGE_MODELS[2].label);
+  });
+
+  it("falls back rather than throwing on a stale id", () => {
+    // A persisted preference that names a model since removed must reopen the
+    // dialog, not break it.
+    expect(modelById("someone/deleted-this").id).toBe(DEFAULT_IMAGE_MODEL_ID);
+  });
+});
+
+describe("attachmentsSent", () => {
+  const withRefs = IMAGE_MODELS.find((m) => m.supportsReferences)!;
+  const withoutRefs = IMAGE_MODELS.find((m) => !m.supportsReferences)!;
+
+  it("counts attachments for a model that reads them", () => {
+    expect(attachmentsSent(withRefs.id, 2)).toBe(2);
+  });
+
+  it("counts ZERO for a model that ignores them, however many are attached", () => {
+    expect(attachmentsSent(withoutRefs.id, 3)).toBe(0);
+  });
+
+  it("makes the consent sentence stop claiming a send that will not happen", () => {
+    // The whole point of the indirection: three files attached, a model that
+    // cannot read them, and the sentence must not say three images are sent.
+    const s = consentSentence(attachmentsSent(withoutRefs.id, 3));
+    expect(s).not.toMatch(/attach/i);
+    expect(s).toMatch(/stay in this tab/i);
+  });
+
+  it("still names them for a model that can", () => {
+    const s = consentSentence(attachmentsSent(withRefs.id, 3));
+    expect(s).toContain("3 images");
   });
 });

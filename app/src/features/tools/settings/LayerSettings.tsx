@@ -29,6 +29,7 @@ import {
 } from "@/lib/colors";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
+import { FIELD_SELECT } from "@/lib/styles";
 import type { LayerInfo } from "@/hooks/useEngineCore";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
@@ -257,7 +258,7 @@ export function LayerSettings({
               value={activeLayer?.id ?? ""}
               disabled={disabled}
               onChange={(e) => onSelectLayer(Number(e.target.value))}
-              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              className={FIELD_SELECT}
               title="Layer these controls act on"
             >
               {[...layers].reverse().map((l) => (
