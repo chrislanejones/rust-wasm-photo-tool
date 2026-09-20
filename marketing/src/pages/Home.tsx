@@ -222,13 +222,15 @@ export default function Home() {
               Measured against the engine's own SIMD blur on real hardware, not estimated:{" "}
               <span className="fig">5.3×</span> at 512 pixels, <span className="fig">17.6×</span> at
               2048, and <span className="fig">53.8×</span> once the radius gets wide. There is no
-              crossover — the GPU wins on a single image.
+              crossover — the GPU wins on a single image. Those are bench numbers, taken beside the
+              editor rather than through it.
             </p>
             <p className="gpu__caveat">
-              None of it touches a pixel in the editor yet. It sits behind an opt-in flag while the
-              correctness harness runs, because the GPU library does not fit the engine's size
-              budget and the path has to live outside the WebAssembly boundary. When it lands it
-              will be the same picture, sooner.
+              It is behind an opt-in flag and the flag is off. Turn it on and the GPU does the blur
+              you commit; leave it alone, which is how it ships, and nothing you do reaches the GPU.
+              Every failure falls back to the processor — no adapter, a lost device, a software
+              rasterizer pretending to be one. The path lives outside the WebAssembly boundary
+              because the GPU library does not fit the engine's size budget.
             </p>
             <p className="gpu__hint">
               The letters are the real thing. Click, drag or press a key — they spring back.

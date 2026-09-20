@@ -371,15 +371,19 @@ it, since its own spec pins the dark default. It is not run in CI.
 counterpart under `app/src/lib/webgpu/`, and
 [ADR-030](adr/030-webgpu-runs-in-js-not-in-the-crate.md) (status: **draft**)
 records why it runs in JS beside the engine rather than as `wgpu` inside the
-crate. It is opt-in — `ih_webgpu=1` in `localStorage` — and what the opt-in
-buys is a self-test: `main.tsx` installs `window.__ihGpuBlurSelfTest()`, which
-compares the WGSL blur against the CPU reference. The Features panel can
-probe for an adapter and show what it found.
+crate. It is opt-in — `ih_webgpu=1` in `localStorage`. The flag buys two things: a
+self-test, where `main.tsx` installs `window.__ihGpuBlurSelfTest()` to compare
+the WGSL blur against the CPU reference, and, since v8.73, the real thing.
 
-**No pixel in the app goes near the GPU.** Not in preview, not in export, not
-behind a flag — the only consumers of the WebGPU modules outside their own
-tests are that self-test installer and the adapter probe. Anything describing
-a shipped GPU accelerator is describing something that is not in this tree.
+**With the flag on, the GPU blurs pixels.** `applyGlobalBlur` hands the
+committed whole-image blur to `gaussianBlurGpu` and takes the result back
+through `apply_blurred_layer_rgba` (`hooks/useTransforms.ts:328`). It is the
+committed blur, not a live preview. The flag is **off by default**, so on a
+stock install nothing reaches the GPU, and every failure falls back to the
+processor — no adapter, a software adapter, a lost device, a dispatch error,
+or an older engine without the hand-off methods. A software rasterizer is
+rejected by name (`swiftshader`, `llvmpipe`, `lavapipe`), because it passes the
+capability probe while being slower than the CPU path it would replace.
 
 ### Metadata scrub (Settings → Security)
 
