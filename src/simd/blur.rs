@@ -88,7 +88,8 @@ mod scalar {
                 for ki in -kr..=kr {
                     let sx = (rx as i32 + ki).clamp(0, bw as i32 - 1) as usize;
                     let si = (ry * bw + sx) * 4;
-                    let w = kernel[(ki + kr) as usize];
+                    let kidx = (ki + kr) as usize;
+                    let w = kernel[kidx];
                     r += region[si] as f32 * w;
                     g += region[si + 1] as f32 * w;
                     b += region[si + 2] as f32 * w;
