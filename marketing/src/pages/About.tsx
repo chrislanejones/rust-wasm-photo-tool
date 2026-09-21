@@ -92,7 +92,7 @@ export default function About() {
           <div className="close__body">
             <p className="close__line">The editor is free and needs no account.</p>
             <p className="close__sub">
-              It runs on your own machine. Nothing you open is uploaded anywhere.
+              It runs on your own machine. Nothing you open is uploaded to edit it.
             </p>
             <div className="close__actions">
               <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>

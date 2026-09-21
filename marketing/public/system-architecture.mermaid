@@ -1,4 +1,4 @@
-%%-- Image Horse — whole-app system architecture (AS SHIPPED, v8.79, 2026-09-16)
+%%-- Image Horse — whole-app system architecture (AS SHIPPED, v8.81, 2026-09-21)
 %%--
 %%-- The downloadable source behind the hand-drawn map on /architecture. Both
 %%-- are maintained BY HAND and have drifted apart before; when they disagree,
@@ -25,6 +25,12 @@
 %%--   - PatchMatch SHIPPED in v7.46 (Magic Eraser). Built --features
 %%--     tiles,patchmatch.
 %%--   - React 19, not 18. Seven Zustand stores, not five.
+%%--   - The cloud copy is the EDIT ARCHIVE, uploaded for ANY signed-in user
+%%--     (useEditPersistence.ts). It is not the op log and it is not Pro-only;
+%%--     this file used to draw it as both.
+%%--   - Fonts are NOT in the wasm beyond one fallback face. Liberation Sans,
+%%--     Serif and Mono are static files, fetched at runtime and handed to the
+%%--     engine through register_font (ADR-058).
 %%--
 %%-- ⚠️ EVERY COMMENT LINE HERE CARRIES CHARACTERS AFTER THE %% ON PURPOSE.
 %%-- Mermaid strips comments with [^\n]+, which needs at least one character
@@ -61,6 +67,7 @@ flowchart TB
         end
 
         LOCAL["localStorage<br/>lightweight prefs · kill switches"]
+        FONTS["Static font files<br/>Liberation Sans · Serif · Mono<br/>fetched at runtime, same origin"]
         SW["Service worker · BUILT, NOT SHIPPED<br/>statically removed from the default<br/>build (ADR-019) — never registered"]
         WGPU["WebGPU · one blur kernel + self-test<br/>zero consumers on the pixel path"]
     end
@@ -80,6 +87,7 @@ flowchart TB
     SESS -->|batched pointer events| ENGINE
     ENGINE -->|zero-copy blit| OSC
     OSC -->|presented in place| SHELL
+    FONTS -->|register_font| ENGINE
 
     %% encode + persist
     SESS -->|pixels transferable| CODEC
@@ -96,7 +104,7 @@ flowchart TB
     %% optional network plane
     ui -. auth .-> CLERK
     STORES -. signed in .-> CONVEX
-    OPS -. paid: cloud backup .-> CONVEX
+    SESS -. signed in: edit archive .-> CONVEX
     SESS -. paid: server op .-> AIPROXY
     AIPROXY -. result .-> SESS
     GAL -. free+: create link .-> SHARE
