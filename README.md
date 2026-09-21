@@ -85,57 +85,54 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.80 — 2026-09-20
+### v8.81 — 2026-09-21
 
-**The font menu picks real fonts, object removal is a brush on the canvas, and an undo no longer comes back after a reload.**
+**Twelve presets instead of six, H is the hand key, and the legal pages Google kept asking for are live.**
 
-The Text tool's font menu used to be decoration. `render_text` took no font at
-all, so every choice drew the same face, and three different surfaces disagreed
-about the result by as much as 26%. Liberation Sans, Serif and Mono now ship as
-real files that load when you pick one. None of them went into the engine — they
-are handed to it at runtime, so the menu can grow later without the download
-growing with it.
+Enhance › Presets has twelve looks now. Mono and Noir are the two black-and-whites
+— one that leaves the tones where they were, one with hard contrast and heavy
+blacks. Airy opens a picture up bright and light, Moody closes the shadows down,
+and Recover and Lift pull detail back out of a blown-out sky or a backlit
+subject. Hover any of them to see it on your photo before you commit. Clicking
+is still one undo step.
 
-Paying for that made the engine smaller, not bigger. The faces carry TrueType
-hinting instructions, and the rasterizer has never run them. Stripping the dead
-hinting gave back more than the three new families cost: **845,156 → 814,202
-bytes**, 30,954 smaller than v8.79. A test fails on any face that arrives with
-hinting still in it, so a routine font update cannot quietly spend those bytes
-again.
+There is no hue or temperature knob in the engine, and that is why the twelve
+look the way they do. Shadows and highlights add the same amount to red, green
+and blue, so every preset moves brightness, contrast or how much color is there
+— never the color itself. Warm and Cool have always been saturation, not
+temperature. A sepia cannot be written as a row in that table at all.
 
-Remove Object is a brush on the real image now, not a popup. You paint over the
-thing you want gone, at whatever zoom you are on, and the app stays visible
-behind the mask. The old popup painted on a private copy of the frame capped at
-640 pixels wide — about a third of actual size — and you could not zoom or pan
-while you worked. Undo Stroke takes back the last stroke; Clear Mask starts
-over. The mask that goes to the server is byte-for-byte what it was.
+A preset is five numbers, and two of them are absolute 8-bit values where a
+tenth of a level does nothing. A new test hovers all twelve and compares pixels,
+to the untouched photo and to every preset before it, so a preset that quietly
+does less than it says — or one that duplicates another — fails instead of
+shipping.
 
-Undo back to nothing used to come back. Apply an edit, press Ctrl+Z, reload, and
-the change you had just discarded was there again — the autosave never wrote the
-undo, so the archive on disk still held the old edit. That was silent data loss
-and it was live.
+**H is the hand key.** Hold it to pan and it stops when you let go; tap it and
+panning stays on until you tap again or press Esc. Space still pans. But Space
+can never be the reliable pan key, because a focused button takes it — that is
+how Tab-then-Space presses things. H is not an activation key, so nothing on the
+page can steal it.
 
-The status bar says **Undo NN%** — how far undo can actually reach right now, as
-a share of your History depth setting. It replaces the toast that appeared once
-per photo to say undo was getting shallower. It is always there and it is never
-red.
+`/privacy-policy` and `/terms-of-service` exist. Google's consent screen will
+not pass the sign-in client without both on an authorized domain, and both were
+404. The privacy page names each thing that leaves the device one at a time, and
+says what stays: the gallery in IndexedDB, with no backup and no copy anyone
+here can read. The paragraph a template would have got wrong is analytics — GA4
+runs on both sites, ungated, and sets cookies. Once there is a privacy policy,
+saying so is the only honest option.
 
-Shape sloppiness is a ramp instead of a switch. It went from computer-drawn to
-hand-drawn with nothing in between, because three things jumped the moment the
-slider left zero — and one of them was a real bug: the firm path drew a circle
-and the sketchy path drew the bounding-box ellipse, so any non-square drag
-changed shape *and* size at sloppiness 1. The fill had been sitting inside a
-wider outline the whole time.
+Create AI Image speaks the sidebar's language. The panel moved into its own
+component and picked up the shared form controls on the way, so it looks like
+the rest of the app instead of hand-rolled, and it scrolls on a short screen. It
+picks its own model now — six of them, differing in speed, cost and whether they
+can take a reference image at all. Your references are kept when you switch
+models but only counted in the consent sentence when the model can use them.
+Generate is still disabled: there is no text-to-image job on the server yet.
 
-Phones can reach settings. A gear in the header opens a sheet with Theme and
-Motion, so a phone is no longer stuck on whatever theme it booted with.
+The engine did not change this release. It is the same 814,202 bytes v8.80
+shipped.
 
-Signing in works against the production Clerk instance.
-
-The site has a blog. The first post is about moving the engine into a worker,
-and it has figures that move. There is an About page with real photos, the home
-page tiles have names and a press you can feel, and the hero has a slider that
-runs the edit backwards.
 
 ## License
 
