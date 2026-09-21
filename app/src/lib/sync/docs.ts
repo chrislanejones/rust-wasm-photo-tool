@@ -34,15 +34,10 @@ import {
   serializePreferences,
   subscribePreferences,
 } from "@/lib/preferences";
-import { useUIStore, MASTER_TABS, type MasterTab } from "@/stores/useUIStore";
+import { useUIStore, UI_PERSISTED_FIELDS, type MasterTab } from "@/stores/useUIStore";
 import {
   useToolStore,
-  BRUSH_MODES,
-  STAMP_SUB_MODES,
-  SHAPES_MODES,
-  ERASER_MODE_VALUES,
-  TEXT_MODES,
-  BATCH_MODES,
+  TOOL_PERSISTED_FIELDS,
   type BrushMode,
   type StampSubMode,
   type ShapesMode,
@@ -50,13 +45,8 @@ import {
   type TextMode,
   type BatchMode,
 } from "@/stores/useToolStore";
-import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
-import {
-  validated,
-  validatedNumberInRange,
-  validatedNumberRecord,
-  validatedStringArray,
-} from "@/stores/_shared";
+import type { ExportFormat } from "@/lib/exportImage";
+import { validateFields, type FieldValidators } from "@/stores/_shared";
 import { defineSyncedDoc, type SyncedDoc } from "./syncedDoc";
 
 // ── prefs ────────────────────────────────────────────────────────────────────
@@ -113,9 +103,10 @@ interface StoreDocOptions<S extends object> {
    *  From another device they are held back from a session already under way
    *  and take effect on the next load (see `AdoptContext.live`). */
   deferred: readonly (keyof S)[];
-  /** Field-by-field validation of a blob from elsewhere, falling back to
-   *  `current` for anything missing or invalid. */
-  validate: (raw: Record<string, unknown>, current: S) => S;
+  /** The store's own per-field validators — the SAME table its `merge` runs
+   *  on rehydrate, so a blob from another device is held to exactly the
+   *  rules a blob from IndexedDB is. Only the fields in `fields` are used. */
+  validators: FieldValidators<S>;
 }
 
 /**
@@ -135,6 +126,14 @@ interface StoreDocOptions<S extends object> {
  * A held field is released the moment the user changes that field here: the
  * newer choice is theirs, on this device, and it is what gets sent.
  */
+/** The validators for the fields this document carries, and no others. The
+ *  store's table can be wider — `ui` leaves the consent switch on the device. */
+function pickValidators<S extends object>(o: StoreDocOptions<S>): FieldValidators<S> {
+  const out = {} as FieldValidators<S>;
+  for (const f of o.fields) out[f] = o.validators[f];
+  return out;
+}
+
 function defineStoreDoc<S extends object>(o: StoreDocOptions<S>): SyncedDoc {
   function pick(state: S): S {
     const out = {} as S;
@@ -174,7 +173,7 @@ function defineStoreDoc<S extends object>(o: StoreDocOptions<S>): SyncedDoc {
       try {
         const p: unknown = JSON.parse(json);
         if (!p || typeof p !== "object" || Array.isArray(p)) return null;
-        return o.validate(p as Record<string, unknown>, read());
+        return validateFields(pickValidators(o), p as Record<string, unknown>, read());
       } catch {
         return null;
       }
@@ -217,13 +216,7 @@ const uiDoc = defineStoreDoc<UiSlice>({
   // The palette's history is a record of habits and is safe to update under a
   // running session; which tab is open is not.
   deferred: ["masterTab"],
-  validate: (o, current) => ({
-    masterTab: validated(o.masterTab, MASTER_TABS, current.masterTab),
-    recentCommands: o.recentCommands
-      ? validatedStringArray(o.recentCommands)
-      : current.recentCommands,
-    commandUsage: o.commandUsage ? validatedNumberRecord(o.commandUsage) : current.commandUsage,
-  }),
+  validators: UI_PERSISTED_FIELDS,
 });
 
 // ── tools ────────────────────────────────────────────────────────────────────
@@ -265,16 +258,7 @@ const toolsDoc = defineStoreDoc<ToolSlice>({
   // format and quality are preferences read when an export starts, and apply
   // live like the rest of Settings.
   deferred: ["brushMode", "stampSubMode", "shapesMode", "eraserMode", "textMode", "batchMode"],
-  validate: (o, current) => ({
-    brushMode: validated(o.brushMode, BRUSH_MODES, current.brushMode),
-    stampSubMode: validated(o.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
-    shapesMode: validated(o.shapesMode, SHAPES_MODES, current.shapesMode),
-    eraserMode: validated(o.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
-    textMode: validated(o.textMode, TEXT_MODES, current.textMode),
-    batchMode: validated(o.batchMode, BATCH_MODES, current.batchMode),
-    exportFormat: validated(o.exportFormat, EXPORT_FORMATS, current.exportFormat),
-    quality: validatedNumberInRange(o.quality, 1, 100, current.quality),
-  }),
+  validators: TOOL_PERSISTED_FIELDS,
 });
 
 // ── zustand plumbing ─────────────────────────────────────────────────────────
