@@ -158,9 +158,12 @@ export default function Architecture() {
             </div>
 
             <p className="plane__foot">
-              Plus <code>localStorage</code> for lightweight prefs. A service worker that precaches
-              the shell and the WASM binary is written and tested, and switched off — it has never
-              been on in a build that shipped.
+              Plus <code>localStorage</code> for lightweight prefs, and a sync layer over the top
+              of both: a <code>BroadcastChannel</code> keeps every tab on this device showing the
+              same settings, and — only if you are signed in — Convex carries them to your other
+              devices. Your photos are not in it. A service worker that precaches the shell and the
+              WASM binary is written and tested, and switched off — it has never been on in a build
+              that shipped.
             </p>
           </div>
 
@@ -181,7 +184,7 @@ export default function Architecture() {
               </article>
               <article className={node("free pro", " node--quiet")}>
                 <h3 className="node__title">Convex</h3>
-                <p className="node__sub">prefs sync · entitlements · gallery</p>
+                <p className="node__sub">settings across devices · entitlements · gallery</p>
               </article>
               <article className={node("pro", " node--quiet")}>
                 <h3 className="node__title">AI proxy → Replicate</h3>
@@ -272,6 +275,7 @@ export default function Architecture() {
               ["aiJobs.ts", "job status (useQuery)", "pro"],
               ["shares.ts", "public share links", "free pro"],
               ["textHistory.ts", "recent texts", "free pro"],
+              ["sync.ts", "settings across devices", "free pro"],
               ["stripe.ts", "checkout / portal", "free pro"],
             ].map(([title, sub, tiers]) => (
               <article key={title} className={node(tiers, " node--quiet")}>
@@ -346,7 +350,10 @@ export default function Architecture() {
             <p className="lede">
               Every table, its fields and its indexes. Flatter than a typical projects → images tree:
               each row hangs straight off <code>users</code>, keyed by the client's own{" "}
-              <code>photoKey</code> string rather than a server-side image id.
+              <code>photoKey</code> string rather than a server-side image id. The newest of them,{" "}
+              <code>sync_docs</code>, is what makes two signed-in devices agree: one row per
+              document, holding settings and remembered choices — and never a pixel, which stays in
+              the browser that made it.
             </p>
           </header>
 
@@ -390,6 +397,7 @@ export default function Architecture() {
                 ["users", "1 ─ 1", "subscriptions"],
                 ["users", "1 ─ ∞", "photo_edits"],
                 ["users", "1 ─ ∞", "recent_texts"],
+                ["users", "1 ─ ∞", "sync_docs"],
                 ["users", "1 ─ ∞", "shares"],
                 ["users", "1 ─ ∞", "ai_jobs"],
               ].map(([a, card, b]) => (
@@ -406,7 +414,7 @@ export default function Architecture() {
               <h4 className="node__title">Real-time</h4>
               <p className="node__sub">
                 <span className="mono">useQuery</span> hooks auto-update when data changes. No
-                polling.
+                polling — it is what carries a setting from a phone to a laptop.
               </p>
             </article>
             <article className="node node--quiet">

@@ -23,6 +23,7 @@ import type * as router from "../router.js";
 import type * as shares from "../shares.js";
 import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as sync from "../sync.js";
 import type * as testReplicate from "../testReplicate.js";
 import type * as textHistory from "../textHistory.js";
 import type * as userColors from "../userColors.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   shares: typeof shares;
   stripe: typeof stripe;
   subscriptions: typeof subscriptions;
+  sync: typeof sync;
   testReplicate: typeof testReplicate;
   textHistory: typeof textHistory;
   userColors: typeof userColors;

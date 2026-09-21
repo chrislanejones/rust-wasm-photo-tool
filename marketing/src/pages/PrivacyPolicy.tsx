@@ -84,10 +84,19 @@ export default function PrivacyPolicy() {
 
           <h2>Cloud features, when you are signed in</h2>
           <p>
-            Signing in enables features that need a server: share links, syncing preferences across
-            devices, and keeping edit history off-device. These run on Convex. What is stored there
-            is the material those features need — the document you chose to share or sync, and the
-            account it belongs to. Signed out, none of it runs.
+            Signing in enables features that need a server: share links, syncing your settings
+            across devices, and keeping edit history off-device. These run on Convex. What is
+            stored there is the material those features need — the document you chose to share or
+            sync, and the account it belongs to. Signed out, none of it runs.
+          </p>
+          <p>
+            The settings sync is named in full because it is the one that happens without you
+            asking each time. Three things travel: your preferences (the Settings dialog), which
+            panels and tabs you last had open along with the command palette's recent list, and
+            which mode each tool was left in. That is the whole list. Your photos, your edits and
+            your gallery are not in it — they stay in this browser, on this device, exactly as they
+            do signed out. Settings &rsaquo; General shows what sync is doing and has a button that
+            deletes the synced copy from your account.
           </p>
 
           <h2>The AI tools</h2>

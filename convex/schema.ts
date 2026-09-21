@@ -230,6 +230,38 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_userId", ["userId"]),
 
+  // ── Synced client documents (cross-device / cross-tab state) ───────────
+  // ONE ROW PER (user, key). `value` is a canonical JSON blob written by
+  // app/src/lib/sync — `prefs`, `ui` and `tools` today. The client compares
+  // `value` strings directly rather than a hash: these blobs are under a
+  // couple of kilobytes, and an exact comparison cannot collide the way a
+  // short hash can (which would look like "my change didn't sync").
+  //
+  // `key` is an OPEN string, not a union, on purpose: a new synced document
+  // must be a code change in convex/sync.ts (which validates against
+  // SYNC_KEYS) and not a schema migration. Convex validates the whole table
+  // on push, so a union here would make every new document type a deploy
+  // risk for rows that already exist.
+  //
+  // `rev` is server-assigned and strictly increasing per row. `origin` is the
+  // writing DEVICE's id, so a client can tell its own echo from a real change
+  // on another device — which is what the "changed on another device" status
+  // reads.
+  //
+  // NOT the photo archive. Replicating edited pixels across devices is a
+  // separate, larger thing and is blocked on the op-log breakage tracked in
+  // docs/PARKING_LOT.md; see docs/adr/061.
+  sync_docs: defineTable({
+    userId: v.id("users"),
+    key: v.string(),
+    value: v.string(),
+    rev: v.number(),
+    updatedAt: v.number(),
+    origin: v.string(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_key", ["userId", "key"]),
+
   // ── AI Jobs ─────────────────────────────────────────────
   // Keyed by photoKey (the editor's string id, same as photo_edits) rather
   // than the unused `images` table. Input/output frames live in Convex file

@@ -1,5 +1,6 @@
 import { Clock, History } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
+import { SyncStatusRow } from "@/components/SyncStatusRow";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
   MAX_HISTORY_MIN,
@@ -137,6 +138,11 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
           ]}
         />
       </section>
+
+      {/* Reads its own state (lib/sync) rather than taking props — it reports
+          what the sync layer is doing, which is not part of the preferences
+          draft this pane edits and must not be gated behind Apply. */}
+      <SyncStatusRow />
     </div>
   );
 }

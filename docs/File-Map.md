@@ -299,6 +299,29 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
+    ├── preferences.ts                App-wide prefs (Settings → General / Appearance / Rulers &
+    │                                 Grids / Security / Layers and Canvas): the shape, the defaults,
+    │                                 the clamps, and the canonical serializer that is ALSO the sync
+    │                                 wire format. Talks to localStorage and to nothing else —
+    │                                 replication is lib/sync's job (ADR-061)
+    ├── sync/                         One value, shown the same way in every tab and on every
+    │                                 signed-in device. ADR-061
+    │   ├── keys.ts                   The three documents — prefs / ui / tools. Mirrored by SYNC_KEYS
+    │   │                             in convex/sync.ts; keys.test.ts asserts the two agree
+    │   ├── docs.ts                   What each document IS: read / adopt / serialize / validate, and
+    │   │                             the zustand bridge. ⚠️ Read the header before adding one — the
+    │   │                             photo archive is deliberately NOT here
+    │   ├── syncedDoc.ts              A document's bookkeeping: canonical value, server revision,
+    │   │                             and whether the server is still owed a write
+    │   ├── channel.ts                Cross-TAB transport (BroadcastChannel). Not useTabClaim's
+    │   │                             channel — that one decides who may EDIT, this one carries state
+    │   │                             to every tab including the parked ones
+    │   ├── useCloudSync.ts           Cross-DEVICE transport: one reactive Convex query + one mutation
+    │   ├── reconcile.ts              THE decision — adopt / push / idle. Pure, import-free,
+    │   │                             enumerated in reconcile.test.ts
+    │   ├── status.ts                 What it is doing, for Settings → General to show
+    │   ├── identity.ts               Tab id (echo suppression) + device id (who wrote it)
+    │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
     ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,
     │                                 SVG rejection (staged; wire before decode)
     ├── security/sanitizeFilename.ts  Path-traversal-safe basename for ZIP / download names (staged)

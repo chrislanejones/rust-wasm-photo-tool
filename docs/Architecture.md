@@ -104,7 +104,7 @@
 │  │                                                               │ │
 │  │  users · subscriptions · projects · images · layers ·         │ │
 │  │  annotations · history · recent_texts · user_colors ·         │ │
-│  │  photo_edits · shares · ai_jobs                               │ │
+│  │  photo_edits · shares · ai_jobs · sync_docs                   │ │
 │  │                                                               │ │
 │  │  Auth via Clerk (AUTH_ENABLED false path = fully local)       │ │
 │  └───────────────────────────────────────────────────────────────┘ │
@@ -302,6 +302,37 @@ still describes only the original three stores and predates
 `useAnnotationStore`/`useGuidesStore` — flagged stale, out of scope for
 this pass).
 
+### Sync: one document, every tab and every signed-in device
+
+Settings, the remembered UI choices and the tool modes are replicated
+as three canonically-serialized JSON **documents** (`prefs`, `ui`,
+`tools`) by `app/src/lib/sync/`. Two hops, and they are not the same
+hop: a `BroadcastChannel` carries a change to every other tab on this
+device instantly, needs no account and works offline — it is the only
+sync a signed-out user gets, and it is a real one — while a single
+reactive Convex query over the generic `sync_docs` table carries it to
+the user's other devices when signed in. Both land through the same
+`adopt` on the same document, so there is exactly one code path by
+which app state changes from outside.
+
+The only decision the layer makes is `reconcile(local, remote) →
+adopt | push | idle`, which is pure, imports nothing, and is
+enumerated in `reconcile.test.ts`. A document is pushed only when it
+is locally **dirty** (changed here, never sent), and that dirty flag
+crosses tabs so a change made in a background tab cannot be shown
+everywhere on the device and stored nowhere.
+
+⚠️ **The photo archive is deliberately outside this layer** — see
+`lib/sync/docs.ts` and [ADR-061](adr/061-sync-is-a-document-layer-and-the-archive-is-not-in-it.md).
+Replicating edits is a different problem, and it is blocked on the
+open op-log entry in [PARKING_LOT.md](PARKING_LOT.md).
+
+`lib/preferences.ts` used to hold its own Convex pull/push against
+`users.settings`; that field is legacy now, read once to seed an
+account's `prefs` document and then ignored. `user_colors` and
+`recent_texts` keep their own tables — a row per item is the right
+shape for a capped list, and a whole-document blob is not.
+
 ### Persistence: Dexie originals read-through
 
 Original photo bytes are content-addressed (SHA-256) and read through
@@ -422,6 +453,10 @@ editing path.
 - **Annotations** — arrow/shape/text commits save geometry/color/
   timestamp to the Convex `annotations` table for cross-session
   recovery.
+- **Synced documents** — `convex/sync.ts` stores one canonical JSON
+  blob per (user, key) in `sync_docs`, and knows nothing about what is
+  in them. Everything that decides anything lives on the client; see
+  "Sync" above.
 - **AI Jobs Pipeline** — UI triggers → `convex/aiJobs.ts` /
   `convex/ai.ts` call Replicate → webhook updates status → `useQuery`
   auto-updates the UI → result loaded into WASM memory.
