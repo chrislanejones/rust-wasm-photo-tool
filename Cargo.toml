@@ -129,6 +129,18 @@ required-features = ["tiles"]
 name = "oplog_v3_resume"
 required-features = ["tiles"]
 
+# Same registration rule, same reason — it replays a captured v8 log through
+# `oplog_restore_png`. EXPECTED RED: it pins the TextEdit setting loss, which
+# is a format-semantics decision left for an attended session (see the file
+# header and FINDINGS-oplog-and-text-0919.md).
+[[test]]
+name = "oplog_v8_text_settings_replay"
+required-features = ["tiles"]
+
+[[test]]
+name = "oplog_v7_v8_fixture_resume"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.

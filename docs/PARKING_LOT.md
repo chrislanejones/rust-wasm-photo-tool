@@ -907,7 +907,7 @@ mapped corners are exact and lines/arrows/polylines/pen paths are just their
 control points — but a circle becomes a conic needing polygon approximation,
 and the shape render path has no tile cache to warp the way text does.
 
-## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
+## ✅ FIXED 2026-09-20 (ADR-060) — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
 
 Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,
 and that is measured rather than assumed.**
@@ -939,6 +939,42 @@ session should instrument which branch fires before fixing either.
 master-written database looked like a migration fixture and was not one — with
 no op log in that origin, only the archive path was exercised. **An absent
 fixture reads exactly like a passing one.**
+
+### Closed 2026-09-20 — and the "likely mechanism" above was only half of it
+
+ADR-060. The unconfirmed guess was right about the archive path and **wrong that
+it was the only loss**. There were two, either of which loses the box on its own:
+
+| # | Where | What it did |
+|---|---|---|
+| a | `Op::TextEdit` apply (src/ops.rs) | REPLACED the annotation. `wrap_width`, `box_height`, `perspective` and `font_id` are `#[serde(skip)]`, so the payload cannot carry them and they decoded as defaults. Replaying a captured PRODUCTION log: cursor 3 = serif/299, cursor 4 (`TextEdit`) = `""`/0. `Op::ShapeEdit` had the same latent defect. |
+| b | `stripLiveAnnotations` + `restore_text_annotation` | The archive stripper was an allowlist without the three axes on it, so they had never reached disk at all — and the restore signature had nowhere to put them if they had. |
+
+So "fix the archive path" alone would still have lost the box on any origin that
+DID have an op log, and the merge alone would still have lost it on any origin
+that did not. Both halves shipped together.
+
+**No op-log version was taken** — the wire layout is unchanged, so `v9` stays
+free for #187, and every v7/v8 log already on disk replays better with no
+migration step. Measured on the v7 fixture: `wrap_width` 0 → 338.
+
+Fixed by: `TextParams::carry_skipped_from` / `ShapeParams::carry_skipped_from`,
+`stripLiveAnnotations` becoming a denylist, and three new arguments on
+`restore_text_annotation`. Pinned by `tests/oplog_v8_text_settings_replay.rs`,
+`tests/oplog_v7_v8_fixture_resume.rs` and
+`app/src/lib/textBoxSurvivesReload.test.ts`.
+
+### Still open, carried out of the same session
+
+- **A box drag before the first save stops the op log from EVER being
+  persisted.** Observed 2026-09-20, three runs: with the drag, no manifest row
+  and no chunk row for the whole session; the identical run without it persisted
+  `TextAdd + TextFont` within the debounce. One variable, contrast measured,
+  mechanism NOT isolated. It no longer loses the box (the archive path carries it
+  now), but it costs cross-reload undo depth, so it is worth chasing.
+- **The text corner quad is carried and restored now, but nothing exercises a
+  warped text through a real reload** — `perspective` rides the same three new
+  arguments on faith from a unit test, not from a browser.
 
 ## The v8.34 brush fix was never applied to the other brushes (2026-08-14) — clone stamp AND blur NOW FIXED
 
