@@ -7,6 +7,8 @@
 // parked tab that comes back with "Use here" should already be current rather
 // than start catching up.
 import { useCloudSync } from "./useCloudSync";
+import { SyncErrorBoundary } from "./SyncErrorBoundary";
+import { SyncErrorToast } from "./SyncErrorToast";
 
 // Importing the registry is what CREATES the three documents and subscribes
 // them to the cross-tab channel. Side-effecting on purpose: cross-tab sync
@@ -33,5 +35,15 @@ export function SyncProvider() {
   // mount on this branch. Writing it from a render body would be a side effect
   // during render, which wakes every subscriber mid-render (ADR-020).
   if (!CLOUD_CONFIGURED) return null;
-  return <CloudSync />;
+  // The toast sits OUTSIDE the boundary on purpose: when `CloudSync` throws,
+  // everything inside the boundary unmounts, and the thing that reports the
+  // failure must not be one of the things that just went away.
+  return (
+    <>
+      <SyncErrorToast />
+      <SyncErrorBoundary>
+        <CloudSync />
+      </SyncErrorBoundary>
+    </>
+  );
 }
