@@ -120,7 +120,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   effects: [
     { id: "adjust", label: "Adjustments", icon: SunDim, keywords: ["brightness", "contrast", "saturation", "adjust"] },
     { id: "levels", label: "Levels", icon: Aperture, keywords: ["levels", "black point", "white point", "midtones", "gamma"] },
-    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click"] },
+    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click", "mono", "black and white", "noir", "moody", "recover"] },
   ],
 };
 
