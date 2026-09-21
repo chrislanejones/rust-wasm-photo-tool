@@ -110,6 +110,9 @@ const md = readFileSync(resolve(root, "docs", "Features.md"), "utf8");
 const plain = (s) =>
   s
     .replace(/\*\*(.+?)\*\*/g, "$1") // bold
+    // Italic, AFTER bold so no `**` is left to half-match. Without this an
+    // `*emphasized*` word reaches /features with its asterisks on.
+    .replace(/\*(.+?)\*/g, "$1")
     .replace(/`(.+?)`/g, "$1") // code
     .replace(/\[(.+?)\]\((.+?)\)/g, "$1") // links → their text
     .trim();

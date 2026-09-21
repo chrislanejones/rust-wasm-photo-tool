@@ -6,7 +6,7 @@ import { EDITOR_URL, GITHUB_URL, external } from "../config";
  *
  * Kept honest about two things the software actually is: it is beta, and it is
  * local-first. The second one is why the content clause is short — we cannot
- * grant ourselves a licence to pictures we never receive, and saying otherwise
+ * grant ourselves a license to pictures we never receive, and saying otherwise
  * to look thorough would contradict the privacy policy next door.
  *
  * Reuses `.post` for the body; see PrivacyPolicy.tsx for why that needs no CSS
@@ -55,7 +55,7 @@ export default function TermsOfService() {
           <p>
             You keep every right you have in what you open, edit and export. We claim nothing.
             Because the editing runs on your machine, we do not receive your pictures at all, so
-            there is no licence for us to ask for.
+            there is no license for us to ask for.
           </p>
           <p>
             The exceptions are the ones named in the{" "}
@@ -68,7 +68,7 @@ export default function TermsOfService() {
           <ul>
             <li>Break the law with it, or use it on material you have no right to use.</li>
             <li>
-              Make images that sexualise children, impersonate someone to deceive, or harass a
+              Make images that sexualize children, impersonate someone to deceive, or harass a
               person.
             </li>
             <li>Attack the service — overload it, break into it, or work around its limits.</li>
@@ -102,11 +102,11 @@ export default function TermsOfService() {
 
           <h2>The source code</h2>
           <p>
-            Image Horse is open source under the MIT licence and the repository is{" "}
+            Image Horse is open source under the MIT license and the repository is{" "}
             <a href={GITHUB_URL} {...external}>
               public
             </a>
-            . That licence covers the code. It is not a licence to the hosted service, the name or
+            . That license covers the code. It is not a license to the hosted service, the name or
             the horse.
           </p>
 

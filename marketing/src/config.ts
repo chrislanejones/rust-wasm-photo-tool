@@ -30,10 +30,10 @@ export const LEGAL_PAGES = ROUTES.filter((r) => r.footerOnly).map(({ to, label }
  *  hand-written absolute URL per citation is how those rot silently after a
  *  rename. Built from GITHUB_URL so the org and repo are written once.
  *
- *  `blob/main` and not a tag: the point of the link is to show the reader what
+ *  `blob/master` and not a tag: the point of the link is to show the reader what
  *  the document says now, including the corrections it picked up afterwards —
  *  several of which the posts are about. */
-export const repoFile = (path: string) => `${GITHUB_URL}/blob/main/${path}`;
+export const repoFile = (path: string) => `${GITHUB_URL}/blob/master/${path}`;
 
 /** Props for an off-site link. `noopener` is not optional — without it the
  *  opened page gets a handle on ours through window.opener. */
