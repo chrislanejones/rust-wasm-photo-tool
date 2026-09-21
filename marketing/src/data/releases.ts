@@ -24,6 +24,34 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.82",
+    date: "2026-09-21",
+    headline:
+      "Text keeps its typeface and its box through a reload, and the pricing page stops selling two things that don't exist",
+    entries: [
+      {
+        tag: "fix",
+        text: "A committed text box lost its typeface and its size on reload, and only on reload. Pick Liberation Mono, commit, reload, and the words came back proportional; Serif came back without its serifs, and the box you dragged came back at the default. It had been live since v8.80.",
+      },
+      {
+        tag: "rust",
+        text: "There were two losses, and either one was enough on its own. Replaying the undo history treated a text edit as a replacement, so the typeface and the box fell back to their defaults whenever an edit replayed. And the copy saved to this browser had never kept the box at all \u2014 the wrap width, box height and perspective have existed since v8.40 and none of them had ever reached disk. Both are fixed, along with the same hidden bug in shape edits, and work already on your disk comes back closer to what you left.",
+      },
+      {
+        tag: "fix",
+        text: "The pricing page stops selling two things that don't exist. Pro said \u201ccloud originals\u201d and every tier said \u201cprojects\u201d. No tier uploads your originals \u2014 they stay on your device \u2014 and there is no Projects screen. Both are gone, and Pro's AI allowance now says 50 a day and 300 a month, which is what the server actually enforces.",
+      },
+      {
+        tag: "ui",
+        text: "The rest of the site caught up. The features page lists all twelve presets, the three real typefaces, 38 sub-tools, H for pan and the Magic Eraser as shipped. The two architecture diagrams agree with each other again, and the blog post's eight source links, which all pointed at a branch this repo has never had, work now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's TypeScript config is ready for TypeScript 7 \u2014 it was the only thing in the repo that wasn't. The upgrade itself waits on the linter, which does not support TypeScript 7 yet.",
+      },
+    ],
+  },
+  {
     version: "v8.81",
     date: "2026-09-21",
     headline:
