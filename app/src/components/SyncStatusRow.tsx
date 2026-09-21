@@ -11,6 +11,12 @@
 // costs nothing, and the cross-device half is what signing in is for. A user
 // who wants their settings to stop following them signs out, or presses
 // Forget below.
+//
+// The Forget copy is a promise the server keeps (convex/sync.ts `clear`): the
+// documents become forgotten markers rather than deleted rows, so no device
+// that happens to be online can send them straight back, and an older unsent
+// change is dropped rather than resurrecting them. Only a change made after
+// the forget brings a document back, and only that document.
 import { useEffect, useState } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { Check, CloudOff, RefreshCw, TriangleAlert, Laptop } from "lucide-react";
@@ -46,6 +52,11 @@ const COPY: Record<SyncState, { icon: typeof Check; title: string; body: string 
     title: "Connecting",
     body: "Fetching what your other devices last saved.",
   },
+  standby: {
+    icon: Laptop,
+    title: "Another tab is syncing",
+    body: "Image Horse is open in another tab here, and that tab sends and fetches for this device. This one follows along.",
+  },
   syncing: {
     icon: RefreshCw,
     title: "Syncing",
@@ -59,8 +70,17 @@ const COPY: Record<SyncState, { icon: typeof Check; title: string; body: string 
   error: {
     icon: TriangleAlert,
     title: "Could not reach the server",
-    body: "Nothing is lost — your settings are saved here and will be sent again automatically.",
+    body: "Nothing is lost. Your settings are saved on this device, and so is the list of changes still to send. It will keep trying.",
   },
+};
+
+/** The error copy when the server turned a change down outright. "Could not
+ *  reach the server" and "It will keep trying" would both be false there:
+ *  nothing retries a permanent refusal on a timer (useCloudSync), only a new
+ *  change or a reload does. */
+const REFUSED = {
+  title: "The server turned a change down",
+  body: "Nothing is lost. Your settings are saved on this device. It will not keep retrying this one — it tries again the next time you change something.",
 };
 
 export function SyncStatusRow() {
@@ -78,7 +98,8 @@ export function SyncStatusRow() {
     return () => window.clearInterval(id);
   }, []);
 
-  const copy = COPY[status.state];
+  const refused = status.state === "error" && !status.willRetry;
+  const copy = refused ? { ...COPY.error, ...REFUSED } : COPY[status.state];
   const Icon = copy.icon;
   const spinning = status.state === "syncing" || status.state === "connecting";
 
@@ -130,8 +151,10 @@ export function SyncStatusRow() {
       )}
       {isAuthenticated && (
         <p className="text-xs leading-relaxed text-text-muted">
-          Removes the shared copy from your account. This device keeps what it
-          has — the next change you make here starts the shared copy again.
+          Deletes the settings stored in your account. Every device keeps what
+          it has, and nothing goes back up until you change something that
+          syncs — a setting, the open panel, a tool mode or the command
+          palette&rsquo;s recent list — on a device where you are signed in.
         </p>
       )}
     </section>

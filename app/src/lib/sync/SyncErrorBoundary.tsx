@@ -47,7 +47,8 @@ export class SyncErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    setSyncStatus({ state: "error", lastError: message });
+    // willRetry: the boundary remounts its child on a backoff below.
+    setSyncStatus({ state: "error", lastError: message, willRetry: true });
     logDiagnostic("CONVEX_DB", `Sync: the cloud half stopped — ${message}`);
 
     const delay = Math.min(RETRY_FIRST_MS * 2 ** this.attempts, RETRY_MAX_MS);

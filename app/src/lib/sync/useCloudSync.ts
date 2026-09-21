@@ -3,20 +3,27 @@
 // back. `reconcile` decides which of those happens, per document.
 //
 // There is exactly ONE place where a document is acted on — `runSync` below —
-// and four things that call it: the query updating (another device wrote), a
-// local change (this device wrote), auth flipping, and a retry timer. Keeping
-// it to one function is deliberate: every sync bug this design can still have
-// is a bug in the reconcile rule, which is pure and enumerated in
-// reconcile.test.ts, rather than a race between two effects that each thought
-// they owned the document.
-import { useCallback, useEffect, useRef } from "react";
+// and the things that call it: the query updating (another device wrote), a
+// local change (this device wrote), auth flipping, this tab taking the tab
+// claim, and a retry timer. Keeping it to one function is deliberate: every
+// sync bug this design can still have is a bug in the reconcile rule, which
+// is pure and enumerated in reconcile.test.ts, rather than a race between two
+// effects that each thought they owned the document.
+//
+// ONE TAB PER DEVICE DOES THIS. Only the tab holding the tab claim (the one
+// the user can edit in — leader.ts) reconciles with the server. The others
+// are kept current by that tab over the cross-tab channel, and the pending
+// changes they would otherwise each push live in the shared ledger.
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
-import { deviceId } from "./identity";
 import { SYNCED_DOCS } from "./docs";
-import { onLocalChange } from "./syncedDoc";
+import { onLocalChange, type SyncedDoc } from "./syncedDoc";
 import { reconcile, type RemoteDocState } from "./reconcile";
+import { setCurrentAccount } from "./ledger";
+import { holdsTabClaim, subscribeTabClaim } from "./leader";
 import { setSyncStatus } from "./status";
 import type { SyncKey } from "./keys";
 
@@ -26,44 +33,229 @@ import type { SyncKey } from "./keys";
  *  there. The same debounce the settings blob used before this layer. */
 const PUSH_DEBOUNCE_MS = 600;
 
-/** Backoff after a failed push. The failure modes worth surviving are a
- *  dropped connection and a cold Convex deployment; both clear in seconds. A
- *  local change also retries immediately, so this only carries the case where
- *  the user has stopped touching anything. */
-const RETRY_MS = 5_000;
+/** Backoff after a failed push: 5 s, doubling, capped at 5 minutes, reset by
+ *  the next success. The failures worth surviving — a dropped connection, a
+ *  cold deployment — clear in seconds; one that does not clear should not
+ *  cost a request every five seconds for as long as the tab is open. */
+const RETRY_FIRST_MS = 5_000;
+const RETRY_MAX_MS = 5 * 60_000;
+
+/** How long one document may wait on its store's hydration before this pass
+ *  goes on without it. zustand never finishes hydrating when IndexedDB is
+ *  blocked, and an unbounded wait here held the pass lock forever — one stuck
+ *  store stopped sync for every document. */
+const READY_TIMEOUT_MS = 5_000;
+
+/** Compare-and-set rounds per document per pass. A conflict means someone
+ *  wrote between our read and our write; re-reconciling against what is
+ *  actually there settles it in one round unless another device is writing
+ *  the same document continuously. */
+const MAX_CONFLICT_ROUNDS = 3;
+
+type Pull = NonNullable<FunctionReturnType<typeof api.sync.pull>>;
+type PushArgs = { key: string; value: string; format: number; baseRev: number };
+type PushResult = FunctionReturnType<typeof api.sync.push>;
+type PushRejection = Extract<PushResult, { status: "rejected" }>["reason"];
+
+/** What a rejection means, for the one line of detail Settings shows. */
+const REJECTION_TEXT: Record<PushRejection, string> = {
+  "unknown-key": "This version of Image Horse is out of step with the server. Reload to update it.",
+  "bad-format": "This version of Image Horse is out of step with the server. Reload to update it.",
+  "too-large": "One of your synced documents is larger than the server accepts.",
+  "signed-out": "The server did not recognize your sign-in. Sign in again to resume syncing.",
+};
+
+type Outcome =
+  | { kind: "ok" }
+  /** Still owed, and a later pull — not a timer — is what will move it. */
+  | { kind: "waiting" }
+  | { kind: "failed"; message: string; permanent: boolean };
+
+/** Resolve true if `p` settles within `ms`, false if it does not. */
+function settlesWithin(p: Promise<void>, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms);
+    p.then(
+      () => {
+        clearTimeout(timer);
+        resolve(true);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
+    );
+  });
+}
 
 /**
- * Drive the cloud half of the sync layer. Mount ONCE, at the composition root
- * (`SyncProvider`) — a second instance would double every push.
+ * Reconcile ONE document against the pull, pushing if that is the answer,
+ * and re-reconciling against the server's reply when a push is refused
+ * because someone else wrote first.
+ *
+ * `rejected` remembers values the server has turned down PERMANENTLY, so a
+ * retry pass does not send the same doomed write again; a new edit is a new
+ * value and is tried.
+ */
+async function syncOne(
+  doc: SyncedDoc,
+  pull: Pull,
+  push: (args: PushArgs) => Promise<PushResult>,
+  live: boolean,
+  rejected: Map<SyncKey, { value: string; message: string }>,
+): Promise<Outcome> {
+  const row = pull.docs.find((d) => d.key === doc.key);
+  let remote: RemoteDocState | null = row
+    ? { value: row.value, rev: row.rev, updatedAt: row.updatedAt, format: row.format }
+    : null;
+
+  // ── The pre-ADR-061 settings blob ──────────────────────────────────────────
+  // An account that predates `sync_docs` has its real preferences in
+  // `users.settings` and nowhere else. Treated as a remote document at
+  // revision 0 and format 0, so it flows through the SAME rules as any other:
+  // a device that has not changed anything adopts it (which is what the old
+  // code did on load), and one with a pending change pushes over it and
+  // creates the real row. The server stops sending it the moment the account
+  // has ANY `prefs` row — live or forgotten — so it cannot resurrect after a
+  // Forget. Ignored by a device that already holds a revision: it has seen a
+  // real `prefs` row, which is newer than the legacy blob by definition.
+  if (!remote && doc.key === "prefs" && pull.legacySettings !== null && doc.snapshot().rev === 0) {
+    remote = { value: pull.legacySettings, rev: 0, updatedAt: 0, format: 0 };
+  }
+
+  for (let round = 0; round < MAX_CONFLICT_ROUNDS; round++) {
+    const local = doc.snapshot();
+    const raw = remote?.value ?? null;
+    // Compare what the server holds as THIS build reads it: a blob from
+    // another build that differs only in fields this one does not have is
+    // agreement, not a change to adopt.
+    const action = reconcile(local, remote && { ...remote, value: raw === null ? null : doc.canonical(raw) });
+
+    if (action === "hold") return local.dirty ? { kind: "waiting" } : { kind: "ok" };
+
+    if (action === "idle") {
+      doc.markIdle(remote?.rev ?? 0);
+      return { kind: "ok" };
+    }
+
+    if (action === "adopt") {
+      if (remote && raw !== null && doc.applyRemote(raw, remote.rev, { live })) {
+        logDiagnostic("CONVEX_DB", `Sync: took "${doc.key}" from another device.`);
+      }
+      return { kind: "ok" };
+    }
+
+    // push
+    const refused = rejected.get(doc.key);
+    if (refused && refused.value === local.value) {
+      return { kind: "failed", message: refused.message, permanent: true };
+    }
+
+    let result: PushResult;
+    try {
+      result = await push({
+        key: doc.key,
+        value: local.value,
+        format: doc.format,
+        baseRev: remote?.rev ?? 0,
+      });
+    } catch (err) {
+      // A thrown error is the transport — offline, a cold deployment, a
+      // function not deployed yet. Transient: the change stays owed (and
+      // survives a reload, see ledger.ts) and is retried on the backoff.
+      return {
+        kind: "failed",
+        message: err instanceof Error ? err.message : String(err),
+        permanent: false,
+      };
+    }
+
+    if (result.status === "stored" || result.status === "unchanged") {
+      // The reply carries the new revision, and recording it here is what
+      // makes the pull that is STILL on screen — the one from before this
+      // push — read as stale (reconcile rule 2) instead of as a newer value
+      // to adopt. Without it the rerun that follows a push reverted the
+      // change it had just sent, until the query caught up.
+      doc.markPushed(local.value, result.rev);
+      return { kind: "ok" };
+    }
+
+    if (result.status === "rejected") {
+      const message = REJECTION_TEXT[result.reason];
+      rejected.set(doc.key, { value: local.value, message });
+      return { kind: "failed", message, permanent: true };
+    }
+
+    // Conflict: someone wrote since the revision this push was based on — a
+    // queued offline mutation replayed late, or another device quicker off
+    // the mark. Decide again against what is actually there now.
+    remote = result.current;
+  }
+
+  return {
+    kind: "failed",
+    message: `"${doc.key}" kept changing on another device while this one was sending.`,
+    permanent: false,
+  };
+}
+
+/**
+ * Drive the cloud half of the sync layer. Mount ONCE per tab, at the
+ * composition root (`SyncProvider`).
  */
 export function useCloudSync(): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const remote = useQuery(api.sync.pull, isAuthenticated ? {} : "skip");
   const push = useMutation(api.sync.push);
+  const leader = useSyncExternalStore(subscribeTabClaim, holdsTabClaim, holdsTabClaim);
 
   // The latest pull, read inside async work that may outlive the render it
-  // started in. A stale closure here would reconcile against a snapshot of
-  // the account from before the change that woke us up.
-  //
-  // Typed by INFERENCE from the query rather than by a hand-written shape:
-  // `api.sync.pull`'s return type is generated from convex/sync.ts, so adding
-  // or renaming a field there is a typecheck error here instead of a silently
-  // wrong read at runtime.
+  // started in. Typed by INFERENCE from the query (see `Pull`), so a field
+  // added or renamed in convex/sync.ts is a typecheck error here.
   const remoteRef = useRef(remote);
   remoteRef.current = remote;
+  const authedRef = useRef(false);
+  authedRef.current = isAuthenticated;
 
   const runningRef = useRef(false);
   const rerunRef = useRef(false);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const authedRef = useRef(false);
-  authedRef.current = isAuthenticated;
+  const failuresRef = useRef(0);
+  /** Documents already reconciled in this session (this load, or since this
+   *  tab took the claim). The first reconcile of each is "at load" and may
+   *  change anything; later ones are adopted into a running session and hold
+   *  back navigation-like fields — see `AdoptContext`. */
+  const settledRef = useRef(new Set<SyncKey>());
+  /** Documents whose store missed the hydration deadline, already waited on. */
+  const lateRef = useRef(new Set<SyncKey>());
+  const rejectedRef = useRef(new Map<SyncKey, { value: string; message: string }>());
+  const accountRef = useRef<string | null>(null);
+  const runRef = useRef<() => Promise<void>>(async () => {});
+
+  const clearTimers = useCallback(() => {
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    pushTimerRef.current = null;
+    retryTimerRef.current = null;
+  }, []);
 
   const runSync = useCallback(async () => {
     if (!authedRef.current) return;
     const pull = remoteRef.current;
     if (pull === undefined) return; // still loading — never push into the dark
-    if (pull === null) return; // signed out, or the users row is not created yet
+    if (pull === null) return; // the users row is not created yet
+
+    // Every tab records who is signed in: it is what a local edit in ANY tab
+    // is filed under (ledger.ts), whichever tab ends up sending it.
+    setCurrentAccount(pull.account);
+    if (accountRef.current !== pull.account) {
+      // A different account: nothing this tab was refused for the last one
+      // says anything about this one.
+      accountRef.current = pull.account;
+      rejectedRef.current.clear();
+    }
+    if (!holdsTabClaim()) return;
 
     // Serialize passes. Each pass awaits store hydration and a network
     // round-trip; two overlapping passes would both read the same dirty
@@ -75,136 +267,151 @@ export function useCloudSync(): void {
     runningRef.current = true;
 
     try {
-      const byKey = new Map<string, RemoteDocState>();
-      for (const d of pull.docs) {
-        byKey.set(d.key, { value: d.value, rev: d.rev, updatedAt: d.updatedAt });
-      }
-
       const pending: SyncKey[] = [];
-      let failure: string | null = null;
-      let adoptedFrom: string | null = null;
+      let transient: string | null = null;
+      let permanent: string | null = null;
 
       for (const doc of SYNCED_DOCS) {
-        await doc.whenReady();
-
-        let remoteDoc = byKey.get(doc.key) ?? null;
-
-        // ── One-time seed from the pre-ADR-061 settings blob ──────────────
-        // An account that predates `sync_docs` has its real preferences in
-        // `users.settings` and nowhere else. Treated as a remote document at
-        // revision 0 so it flows through the SAME rules as any other: a
-        // device with no pending change adopts it (which is exactly what the
-        // old code did on load), and a device with one pushes over it and
-        // creates the real row. Once that row exists this branch is dead for
-        // the account, forever.
-        if (!remoteDoc && doc.key === "prefs" && pull.legacySettings) {
-          remoteDoc = { value: pull.legacySettings, rev: 0, updatedAt: 0 };
-        }
-
-        const local = doc.snapshot();
-        const action = reconcile(local, remoteDoc);
-
-        if (action === "idle") {
-          if (remoteDoc) doc.markPushed(remoteDoc.value, remoteDoc.rev);
-          continue;
-        }
-
-        if (action === "adopt" && remoteDoc) {
-          const changed = doc.applyRemote(remoteDoc.value, remoteDoc.rev, remoteDoc.updatedAt);
-          if (changed) {
-            adoptedFrom = pull.docs.find((d) => d.key === doc.key)?.origin ?? null;
-            logDiagnostic("CONVEX_DB", `Sync: adopted "${doc.key}" from another device.`);
+        if (!(await settlesWithin(doc.whenReady(), READY_TIMEOUT_MS))) {
+          // Its store has not loaded (blocked IndexedDB never does). Skip it
+          // THIS pass — reconciling it now would adopt into, or push, the
+          // constructed defaults — and come back if it ever does load.
+          if (!lateRef.current.has(doc.key)) {
+            lateRef.current.add(doc.key);
+            logDiagnostic("CONVEX_DB", `Sync: "${doc.key}" is not loaded yet; syncing the rest.`);
+            void doc.whenReady().then(() => {
+              lateRef.current.delete(doc.key);
+              void runRef.current();
+            });
           }
           continue;
         }
 
-        // push
-        try {
-          const result = await push({ key: doc.key, value: local.value, origin: deviceId() });
-          doc.markPushed(local.value, result.rev);
-        } catch (err) {
-          // The document stays dirty, so the retry below (or the user's next
-          // change) sends it again. Surfaced rather than swallowed: a push
-          // that never lands is a setting the other device never sees, and
-          // the old code's one failure mode was exactly this, silently.
-          failure = err instanceof Error ? err.message : String(err);
+        const live = settledRef.current.has(doc.key);
+        const outcome = await syncOne(doc, pull, push, live, rejectedRef.current);
+        settledRef.current.add(doc.key);
+
+        if (outcome.kind === "waiting") pending.push(doc.key);
+        if (outcome.kind === "failed") {
           pending.push(doc.key);
-          logDiagnostic("CONVEX_DB", `Sync: pushing "${doc.key}" failed — ${failure}`);
+          logDiagnostic("CONVEX_DB", `Sync: sending "${doc.key}" failed — ${outcome.message}`);
+          if (outcome.permanent) permanent = outcome.message;
+          else transient = outcome.message;
         }
       }
 
-      if (failure) {
-        setSyncStatus({ state: "error", lastError: failure, pending });
+      if (!holdsTabClaim()) {
+        // The claim moved while this pass was out: the other tab reports now.
+        setSyncStatus({ state: "standby", pending: [] });
+      } else if (transient) {
+        // Backoff, not a fixed beat. Only for failures that can clear on
+        // their own: a permanent refusal is not retried on a timer at all.
+        const delay = Math.min(RETRY_FIRST_MS * 2 ** failuresRef.current, RETRY_MAX_MS);
+        failuresRef.current += 1;
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         retryTimerRef.current = setTimeout(() => {
-          void runSync();
-        }, RETRY_MS);
+          retryTimerRef.current = null;
+          void runRef.current();
+        }, delay);
+        setSyncStatus({ state: "error", lastError: transient, willRetry: true, pending });
+      } else if (permanent) {
+        failuresRef.current = 0;
+        setSyncStatus({ state: "error", lastError: permanent, willRetry: false, pending });
       } else {
+        failuresRef.current = 0;
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
         setSyncStatus({
           state: "synced",
           lastSyncedAt: Date.now(),
           lastError: null,
-          pending: [],
-          ...(adoptedFrom ? { lastRemoteDevice: adoptedFrom } : {}),
+          willRetry: false,
+          pending,
         });
       }
     } finally {
       runningRef.current = false;
       if (rerunRef.current) {
         rerunRef.current = false;
-        void runSync();
+        // Safe to run straight away even though React may not have re-rendered
+        // with the pull that reflects this pass's pushes: every push recorded
+        // its new revision, so the old pull reads as stale (reconcile rule 2).
+        void runRef.current();
       }
     }
   }, [push]);
+  runRef.current = runSync;
 
-  // A pull landed (first load, or another device wrote) → reconcile.
+  // Taking the tab claim starts a SESSION: the next reconcile of each document
+  // is "at load" again. Losing it stops this tab talking to the server — the
+  // tab that took it does that now.
+  useEffect(() => {
+    if (leader) {
+      settledRef.current.clear();
+    } else {
+      clearTimers();
+    }
+  }, [leader, clearTimers]);
+
+  // A pull landed (first load, or another device wrote), auth changed, or the
+  // claim moved → reconcile.
   useEffect(() => {
     if (!isAuthenticated) {
+      // Signed out, for certain: nothing edited from here on is owed to any
+      // account. (While auth is still LOADING the last account stays, so an
+      // edit in the first second of a signed-in session is not orphaned.)
+      if (!isLoading) {
+        setCurrentAccount(null);
+        accountRef.current = null;
+      }
       setSyncStatus({ state: isLoading ? "connecting" : "local", pending: [] });
       return;
     }
-    if (remote === undefined) {
+    if (remote === undefined || remote === null) {
       setSyncStatus({ state: "connecting" });
+      return;
+    }
+    if (!leader) {
+      setCurrentAccount(remote.account);
+      setSyncStatus({ state: "standby", pending: [] });
       return;
     }
     setSyncStatus({ state: "syncing" });
     void runSync();
-  }, [isAuthenticated, isLoading, remote, runSync]);
+  }, [isAuthenticated, isLoading, remote, leader, runSync]);
 
   // This device changed something → debounce, then reconcile (which pushes).
   useEffect(() => {
     const off = onLocalChange((key) => {
-      if (!authedRef.current) return;
+      if (!authedRef.current || !holdsTabClaim()) return;
       setSyncStatus({ state: "syncing", pending: [key] });
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(() => {
-        void runSync();
+        pushTimerRef.current = null;
+        void runRef.current();
       }, PUSH_DEBOUNCE_MS);
     });
     return off;
-  }, [runSync]);
+  }, []);
 
   // Flush on the way out. A debounced change that the tab closes on top of is
-  // a change the user made and nothing kept — `visibilitychange` is the hook
-  // browsers actually honour for this (`beforeunload` is not fired on mobile
-  // Safari at all, and `unload` is being removed).
+  // still owed (the ledger keeps it), but sending it now means the other
+  // device has it without waiting for this one to come back. `visibilitychange`
+  // is the hook browsers actually honor for this (`beforeunload` is not fired
+  // on mobile Safari at all, and `unload` is being removed).
   useEffect(() => {
     const flush = () => {
       if (document.visibilityState !== "hidden") return;
+      if (!holdsTabClaim()) return;
       if (pushTimerRef.current) {
         clearTimeout(pushTimerRef.current);
         pushTimerRef.current = null;
       }
-      void runSync();
+      void runRef.current();
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
-  }, [runSync]);
-
-  useEffect(() => {
-    return () => {
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    };
   }, []);
+
+  useEffect(() => clearTimers, [clearTimers]);
 }

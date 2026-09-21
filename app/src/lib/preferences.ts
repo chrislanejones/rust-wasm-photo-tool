@@ -25,7 +25,7 @@ export type ThemeChoice = "system" | "dark" | "light";
 export type GridKind = "square" | "golden" | "grid";
 
 /** Ruler tick units. Pixels are the document's own unit; inches and
- *  centimetres are derived at a FIXED 96 DPI — the CSS reference pixel — because
+ *  centimeters are derived at a FIXED 96 DPI — the CSS reference pixel — because
  *  a web image carries no inherent physical size. That makes "1 inch" a
  *  consistent 96px here rather than a promise about print output. */
 export type RulerUnit = "px" | "in" | "cm";
@@ -318,8 +318,10 @@ const prefListeners = new Set<(p: Preferences) => void>();
 
 /** Commit a value: normalize, store, persist, wake every listener. The single
  *  writer — a user edit and an adopted remote value take the same path, so
- *  there is no second way for the applied preferences to change. */
-function commitPreferences(next: Preferences): Preferences {
+ *  there is no second way for the applied preferences to change. Exported as
+ *  the non-React way to make a user edit (what `usePreferences`' `apply`
+ *  calls), which is also how the sync tests drive the real path. */
+export function commitPreferences(next: Preferences): Preferences {
   const value = normalize(next);
   currentPreferences = value;
   savePreferences(value);

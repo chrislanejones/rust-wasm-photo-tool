@@ -16,11 +16,17 @@ export type SyncState =
   | "local"
   /** Signed in, waiting for the account's documents to arrive. */
   | "connecting"
+  /** Signed in, and another tab on this device is the one talking to the
+   *  server (the tab holding the "Use Image Horse here?" claim). This tab
+   *  follows along over the cross-tab channel. */
+  | "standby"
   /** A document is being adopted or pushed right now. */
   | "syncing"
   /** Every document agrees with the server. */
   | "synced"
-  /** The last attempt failed. Local state is intact; it will retry. */
+  /** The last attempt failed. Local state is intact, and so is the record
+   *  of what is still owed (ledger.ts); `willRetry` says whether a timer will
+   *  try again or the server refused it outright. */
   | "error";
 
 export interface SyncStatus {
@@ -31,9 +37,10 @@ export interface SyncStatus {
   pending: SyncKey[];
   /** Message from the last failure, cleared by the next success. */
   lastError: string | null;
-  /** Device id that wrote the last change this device ADOPTED — i.e. the
-   *  other device. Null when nothing has arrived from elsewhere. */
-  lastRemoteDevice: string | null;
+  /** In the "error" state: true when a backoff timer will retry, false when
+   *  the server refused the write permanently and only a new change (or a
+   *  reload into a fixed build) will try again. */
+  willRetry: boolean;
 }
 
 const INITIAL: SyncStatus = {
@@ -41,7 +48,7 @@ const INITIAL: SyncStatus = {
   lastSyncedAt: null,
   pending: [],
   lastError: null,
-  lastRemoteDevice: null,
+  willRetry: false,
 };
 
 // One frozen object, replaced wholesale on every change. useSyncExternalStore
@@ -60,7 +67,7 @@ export function setSyncStatus(patch: Partial<SyncStatus>): void {
     next.state === status.state &&
     next.lastSyncedAt === status.lastSyncedAt &&
     next.lastError === status.lastError &&
-    next.lastRemoteDevice === status.lastRemoteDevice &&
+    next.willRetry === status.willRetry &&
     next.pending.length === status.pending.length &&
     next.pending.every((k, i) => k === status.pending[i])
   ) {

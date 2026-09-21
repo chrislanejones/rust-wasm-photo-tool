@@ -18,8 +18,11 @@ import { isSyncKey, type SyncKey } from "./keys";
 /** Versioned, because a message from a tab running an older build is a real
  *  possibility (a tab left open across a deploy). A mismatched version is
  *  dropped rather than parsed — the receiving tab keeps its own value, which
- *  is the safe direction. */
-const PROTOCOL = 1;
+ *  is the safe direction. 2: the message lost `rev`/`dirty`/`updatedAt` (now
+ *  in the shared ledger) and gained the document's `format`; a protocol-1 tab
+ *  (this PR's first preview build) would have read the missing revision as
+ *  NaN. */
+const PROTOCOL = 2;
 
 /** Deliberately NOT the tab-claim channel ("image-horse-tab-claim"). That one
  *  decides which tab may EDIT; this one carries state to all of them,
@@ -32,18 +35,18 @@ export interface DocMessage {
   protocol: number;
   type: "doc";
   key: SyncKey;
+  /** The sending build's format for this document. A receiver on a different
+   *  format drops the message and keeps its own value — see `applyFromTab`. */
+  format: number;
   /** The canonical JSON blob — the same string the server stores. */
   value: string;
-  /** When the SENDING tab last changed this value (its own clock). */
-  updatedAt: number;
-  /** Server revision the sender has seen, 0 if it has never synced. */
-  rev: number;
-  /** True when the sender still owes the server this value. Carried so a tab
-   *  that adopts it inherits the obligation — otherwise a change made in a
-   *  background tab could be adopted everywhere locally and pushed nowhere. */
-  dirty: boolean;
   from: string;
 }
+
+// NO revision and NO dirty flag on the wire. Both used to ride along here, so
+// a receiving tab could inherit the sender's obligation to push. They now live
+// in the ledger (ledger.ts), which every tab of the profile reads directly —
+// one record instead of a copy per tab that each message had to keep in step.
 
 type Listener = (msg: DocMessage) => void;
 
@@ -63,7 +66,9 @@ function open(): BroadcastChannel | null {
     const msg = e.data;
     if (!msg || msg.type !== "doc" || msg.protocol !== PROTOCOL) return;
     if (msg.from === tabId()) return; // our own message, echoed back
-    if (!isSyncKey(msg.key) || typeof msg.value !== "string") return;
+    if (!isSyncKey(msg.key) || typeof msg.value !== "string" || typeof msg.format !== "number") {
+      return;
+    }
     for (const listener of listeners) listener(msg);
   };
   // Node's BroadcastChannel holds the event loop open; the browser's has no

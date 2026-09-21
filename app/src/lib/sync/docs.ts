@@ -16,11 +16,17 @@
 //
 // THE GALLERY. Same reason: it names archives that only exist on one device.
 //
-// USER COLOURS and RECENT TEXTS. They already cross devices, each on its own
+// USER COLORS and RECENT TEXTS. They already cross devices, each on its own
 // Convex table with its own reactive query (hooks/useUserColors.ts,
 // hooks/useRecentTexts.ts). Moving them into a blob here would be a data
 // migration that buys nothing — a row per swatch is the right shape for a
 // list that is appended to and capped, which a whole-document LWW blob is not.
+//
+// THE ONLINE-FEATURES SWITCH (`onlineFeaturesEnabled`). It is CONSENT — "this
+// tab may send data to a server" — and consent is given on the device in
+// front of you. Syncing it meant that switching it on at work switched it on
+// at home, on a device where nobody had agreed to anything. It stays in
+// useUIStore's own persisted state, per browser, and never travels.
 import {
   readPreferences,
   adoptPreferences,
@@ -56,90 +62,173 @@ import { defineSyncedDoc, type SyncedDoc } from "./syncedDoc";
 // ── prefs ────────────────────────────────────────────────────────────────────
 // Settings → General / Appearance / Rulers & Grids / Security / Layers and
 // Canvas. The blob `users.settings` used to hold on its own.
+//
+// Applied LIVE from another device: these are preferences — theme, rulers,
+// the grid — and seeing the phone's choice arrive is the feature. No ready
+// gate, because preferences.ts reads localStorage synchronously at import, so
+// `defineSyncedDoc` records the value the moment it is defined.
+
+/** Format 1: the field list of `serializePreferences`. The legacy
+ *  `users.settings` blob is treated as format 0. */
+const PREFS_FORMAT = 1;
 
 const prefsDoc = defineSyncedDoc({
   key: "prefs",
+  format: PREFS_FORMAT,
   read: readPreferences,
-  adopt: adoptPreferences,
+  adopt: (p) => adoptPreferences(p),
   serialize: serializePreferences,
   parse: parsePreferences,
 });
 
-// A commit — from anywhere, including an adopted value — re-serializes and
-// compares. An adopted value serializes to what the document already holds, so
-// the echo dies here rather than looping back out onto the channel.
+// Every commit — a user edit or an adopted value — reaches the document. An
+// adopted one is ignored inside `changedLocally` (adopting is never an edit),
+// so the echo dies there rather than looping back out onto the channel.
 subscribePreferences(() => prefsDoc.changedLocally());
 
+// ── zustand-backed documents ─────────────────────────────────────────────────
+
+/** Minimal shape of a persisted zustand store, typed locally rather than
+ *  imported: zustand's `StoreApi & { persist: ... }` needs the full state
+ *  parameter, and all this needs is read, write, listen, and the hydration
+ *  gate. */
+interface SyncableStore<S> {
+  getState: () => S;
+  setState: (partial: Partial<S>) => void;
+  subscribe: (listener: () => void) => () => void;
+  persist: {
+    hasHydrated: () => boolean;
+    onFinishHydration: (cb: () => void) => () => void;
+  };
+}
+
+interface StoreDocOptions<S extends object> {
+  key: "ui" | "tools";
+  format: number;
+  store: SyncableStore<S>;
+  /** The fields that travel, in wire order. APPEND ONLY: the order is the
+   *  canonical serialization, and reordering changes every stored blob. */
+  fields: readonly (keyof S)[];
+  /** Navigation-like fields — which panel is open, which mode a tool is in.
+   *  From another device they are held back from a session already under way
+   *  and take effect on the next load (see `AdoptContext.live`). */
+  deferred: readonly (keyof S)[];
+  /** Field-by-field validation of a blob from elsewhere, falling back to
+   *  `current` for anything missing or invalid. */
+  validate: (raw: Record<string, unknown>, current: S) => S;
+}
+
+/**
+ * A document over a persisted zustand store's slice.
+ *
+ * ── HELD-BACK FIELDS ─────────────────────────────────────────────────────────
+ * Before, a phone switching to the eraser's magic mode changed the laptop's
+ * eraser mode the moment the query delivered it — mid-edit, under the
+ * pointer, so the laptop's NEXT stroke did something the person at the laptop
+ * never chose. A navigation-like field arriving from another device while
+ * this tab's session is under way is therefore not written into the store.
+ * It is HELD: the document reports it (so a later push from this tab carries
+ * the phone's choice instead of reverting it) while the running session keeps
+ * what it had. The next load reconciles with the server again, before anyone
+ * is mid-anything, and applies it.
+ *
+ * A held field is released the moment the user changes that field here: the
+ * newer choice is theirs, on this device, and it is what gets sent.
+ */
+function defineStoreDoc<S extends object>(o: StoreDocOptions<S>): SyncedDoc {
+  function pick(state: S): S {
+    const out = {} as S;
+    for (const f of o.fields) out[f] = state[f];
+    return out;
+  }
+
+  /** Fields from another device that the running session has not taken yet. */
+  let held: Partial<S> = {};
+
+  /** The document's value: the store's slice, with any held fields on top. */
+  const read = (): S => ({ ...pick(o.store.getState()), ...held });
+
+  const doc = defineSyncedDoc<S>({
+    key: o.key,
+    format: o.format,
+    read,
+    adopt: (value, { live }) => {
+      const now = pick(o.store.getState());
+      const apply: Partial<S> = {};
+      const hold: Partial<S> = {};
+      for (const f of o.fields) {
+        if (live && o.deferred.includes(f)) {
+          if (!Object.is(value[f], now[f])) hold[f] = value[f];
+        } else {
+          apply[f] = value[f];
+        }
+      }
+      held = hold;
+      o.store.setState(apply);
+    },
+    serialize: (value) => JSON.stringify(pick(value)),
+    // Validated against TODAY'S unions rather than trusted because it came
+    // from the server: this blob was written by another build, whose union for
+    // `masterTab` may have had a member this one does not.
+    parse: (json) => {
+      try {
+        const p: unknown = JSON.parse(json);
+        if (!p || typeof p !== "object" || Array.isArray(p)) return null;
+        return o.validate(p as Record<string, unknown>, read());
+      } catch {
+        return null;
+      }
+    },
+    ready: () => whenHydrated(o.store),
+  });
+
+  bridge(o.store, doc, (previous, next) => {
+    // Release any held field the user has just changed here.
+    for (const f of Object.keys(held) as (keyof S)[]) {
+      if (!Object.is(previous[f], next[f])) delete held[f];
+    }
+  }, pick);
+
+  return doc;
+}
+
 // ── ui ───────────────────────────────────────────────────────────────────────
-// The persisted slice of useUIStore: which master-bar tab, the command
-// palette's recency and usage counts, and the online-features switch. The
-// SAME fields its `partialize` allowlist names — this document replicates what
-// the store already chose to remember, it does not widen it. Transient chrome
-// (open dialogs, the boot flags) is not persisted and is not synced: a dialog
-// that opened on the laptop because the phone opened one is not "the same
-// thing", it is a haunting.
+// The synced part of useUIStore's persisted slice: which master-bar tab, and
+// the command palette's recency and usage counts. Its `partialize` allowlist
+// also names `onlineFeaturesEnabled`, which is deliberately NOT here — see the
+// header. Transient chrome (open dialogs, the boot flags) is not persisted and
+// is not synced: a dialog that opened on the laptop because the phone opened
+// one is not "the same thing", it is a haunting.
 
 interface UiSlice {
   masterTab: MasterTab;
   recentCommands: string[];
   commandUsage: Record<string, number>;
-  onlineFeaturesEnabled: boolean;
 }
 
-function readUi(): UiSlice {
-  const s = useUIStore.getState();
-  return {
-    masterTab: s.masterTab,
-    recentCommands: s.recentCommands,
-    commandUsage: s.commandUsage,
-    onlineFeaturesEnabled: s.onlineFeaturesEnabled,
-  };
-}
+/** Format 1: masterTab, recentCommands, commandUsage. */
+const UI_FORMAT = 1;
 
-const uiDoc = defineSyncedDoc<UiSlice>({
+const uiDoc = defineStoreDoc<UiSlice>({
   key: "ui",
-  read: readUi,
-  adopt: (v) => useUIStore.setState(v),
-  serialize: (v) =>
-    JSON.stringify({
-      masterTab: v.masterTab,
-      recentCommands: v.recentCommands,
-      commandUsage: v.commandUsage,
-      onlineFeaturesEnabled: v.onlineFeaturesEnabled,
-    }),
-  // The same guard the store's own `merge` applies on rehydrate, for the same
-  // reason: this blob was written by another build, whose union for `masterTab`
-  // may have had a member this one does not. Checked field by field against
-  // TODAY'S values rather than trusted because it came from the server.
-  parse: (json) => {
-    try {
-      const p: unknown = JSON.parse(json);
-      if (!p || typeof p !== "object" || Array.isArray(p)) return null;
-      const o = p as Partial<UiSlice>;
-      const current = useUIStore.getState();
-      return {
-        masterTab: validated(o.masterTab, MASTER_TABS, current.masterTab),
-        recentCommands: o.recentCommands
-          ? validatedStringArray(o.recentCommands)
-          : current.recentCommands,
-        commandUsage: o.commandUsage
-          ? validatedNumberRecord(o.commandUsage)
-          : current.commandUsage,
-        onlineFeaturesEnabled:
-          typeof o.onlineFeaturesEnabled === "boolean"
-            ? o.onlineFeaturesEnabled
-            : current.onlineFeaturesEnabled,
-      };
-    } catch {
-      return null;
-    }
-  },
-  ready: () => whenHydrated(useUIStore),
+  format: UI_FORMAT,
+  store: useUIStore as unknown as SyncableStore<UiSlice>,
+  fields: ["masterTab", "recentCommands", "commandUsage"],
+  // The palette's history is a record of habits and is safe to update under a
+  // running session; which tab is open is not.
+  deferred: ["masterTab"],
+  validate: (o, current) => ({
+    masterTab: validated(o.masterTab, MASTER_TABS, current.masterTab),
+    recentCommands: o.recentCommands
+      ? validatedStringArray(o.recentCommands)
+      : current.recentCommands,
+    commandUsage: o.commandUsage ? validatedNumberRecord(o.commandUsage) : current.commandUsage,
+  }),
 });
 
 // ── tools ────────────────────────────────────────────────────────────────────
 // The persisted slice of useToolStore: which sub-mode each tool was left in,
-// and the export format/quality. Again exactly its `partialize` allowlist.
+// and the export format/quality. Exactly its `partialize` allowlist.
 // `activeTool` is not in it — the store deliberately starts on the default
 // tool rather than mid-edit, and syncing which tool a phone is holding to a
 // laptop would be the same mistake one layer up.
@@ -155,70 +244,40 @@ interface ToolSlice {
   quality: number;
 }
 
-function readTools(): ToolSlice {
-  const s = useToolStore.getState();
-  return {
-    brushMode: s.brushMode,
-    stampSubMode: s.stampSubMode,
-    shapesMode: s.shapesMode,
-    eraserMode: s.eraserMode,
-    textMode: s.textMode,
-    batchMode: s.batchMode,
-    exportFormat: s.exportFormat,
-    quality: s.quality,
-  };
-}
+/** Format 1: the eight fields below, in this order. */
+const TOOLS_FORMAT = 1;
 
-const toolsDoc = defineSyncedDoc<ToolSlice>({
+const toolsDoc = defineStoreDoc<ToolSlice>({
   key: "tools",
-  read: readTools,
-  adopt: (v) => useToolStore.setState(v),
-  serialize: (v) =>
-    JSON.stringify({
-      brushMode: v.brushMode,
-      stampSubMode: v.stampSubMode,
-      shapesMode: v.shapesMode,
-      eraserMode: v.eraserMode,
-      textMode: v.textMode,
-      batchMode: v.batchMode,
-      exportFormat: v.exportFormat,
-      quality: v.quality,
-    }),
-  parse: (json) => {
-    try {
-      const p: unknown = JSON.parse(json);
-      if (!p || typeof p !== "object" || Array.isArray(p)) return null;
-      const o = p as Partial<ToolSlice>;
-      const current = useToolStore.getState();
-      return {
-        brushMode: validated(o.brushMode, BRUSH_MODES, current.brushMode),
-        stampSubMode: validated(o.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
-        shapesMode: validated(o.shapesMode, SHAPES_MODES, current.shapesMode),
-        eraserMode: validated(o.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
-        textMode: validated(o.textMode, TEXT_MODES, current.textMode),
-        batchMode: validated(o.batchMode, BATCH_MODES, current.batchMode),
-        exportFormat: validated(o.exportFormat, EXPORT_FORMATS, current.exportFormat),
-        quality: validatedNumberInRange(o.quality, 1, 100, current.quality),
-      };
-    } catch {
-      return null;
-    }
-  },
-  ready: () => whenHydrated(useToolStore),
+  format: TOOLS_FORMAT,
+  store: useToolStore as unknown as SyncableStore<ToolSlice>,
+  fields: [
+    "brushMode",
+    "stampSubMode",
+    "shapesMode",
+    "eraserMode",
+    "textMode",
+    "batchMode",
+    "exportFormat",
+    "quality",
+  ],
+  // Every sub-mode decides what the next stroke or click does. The export
+  // format and quality are preferences read when an export starts, and apply
+  // live like the rest of Settings.
+  deferred: ["brushMode", "stampSubMode", "shapesMode", "eraserMode", "textMode", "batchMode"],
+  validate: (o, current) => ({
+    brushMode: validated(o.brushMode, BRUSH_MODES, current.brushMode),
+    stampSubMode: validated(o.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
+    shapesMode: validated(o.shapesMode, SHAPES_MODES, current.shapesMode),
+    eraserMode: validated(o.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
+    textMode: validated(o.textMode, TEXT_MODES, current.textMode),
+    batchMode: validated(o.batchMode, BATCH_MODES, current.batchMode),
+    exportFormat: validated(o.exportFormat, EXPORT_FORMATS, current.exportFormat),
+    quality: validatedNumberInRange(o.quality, 1, 100, current.quality),
+  }),
 });
 
 // ── zustand plumbing ─────────────────────────────────────────────────────────
-
-/** Minimal shape of the `persist` API the two stores expose. Typed locally
- *  rather than imported: zustand's `StoreApi & { persist: ... }` type needs the
- *  full state parameter, and all this needs is the hydration gate. */
-interface PersistedStore {
-  persist: {
-    hasHydrated: () => boolean;
-    onFinishHydration: (cb: () => void) => () => void;
-  };
-  subscribe: (listener: () => void) => () => void;
-}
 
 /** Resolves once the store's persisted state has been read back.
  *
@@ -227,8 +286,12 @@ interface PersistedStore {
  *  defaults, not what the user left behind. Adopting a remote document in that
  *  window looks like it worked and is then overwritten by the hydration a
  *  moment later, on the device that has just been told the truth. Every
- *  document waits on this before it is reconciled. */
-function whenHydrated(store: PersistedStore): Promise<void> {
+ *  document waits on this before it is reconciled.
+ *
+ *  ⚠️ It NEVER resolves if hydration fails (IndexedDB blocked, some private
+ *  modes): zustand calls its finish listeners on success only. Anything that
+ *  awaits it must bound the wait — `useCloudSync` does. */
+function whenHydrated(store: SyncableStore<unknown>): Promise<void> {
   if (store.persist.hasHydrated()) return Promise.resolve();
   return new Promise<void>((resolve) => {
     const off = store.persist.onFinishHydration(() => {
@@ -252,15 +315,23 @@ function whenHydrated(store: PersistedStore): Promise<void> {
  *  open, every pan — so the serialize-and-compare inside `changedLocally` is
  *  what keeps this from being a write amplifier: only a change to a field the
  *  document actually carries gets past it. */
-function bridge(store: PersistedStore, doc: SyncedDoc): void {
-  void whenHydrated(store).then(() => {
+function bridge<S>(
+  store: SyncableStore<S>,
+  doc: SyncedDoc,
+  observe: (previous: S, next: S) => void,
+  pick: (state: S) => S,
+): void {
+  void whenHydrated(store as SyncableStore<unknown>).then(() => {
+    let previous = pick(store.getState());
     doc.prime();
-    store.subscribe(() => doc.changedLocally());
+    store.subscribe(() => {
+      const next = pick(store.getState());
+      observe(previous, next);
+      previous = next;
+      doc.changedLocally();
+    });
   });
 }
-
-bridge(useUIStore as unknown as PersistedStore, uiDoc);
-bridge(useToolStore as unknown as PersistedStore, toolsDoc);
 
 /** Every synced document, in the order they are reconciled. */
 export const SYNCED_DOCS: readonly SyncedDoc[] = [prefsDoc, uiDoc, toolsDoc];

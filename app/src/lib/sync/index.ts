@@ -4,11 +4,14 @@
 // ── SHAPE ────────────────────────────────────────────────────────────────────
 //
 //   docs.ts        the three documents — prefs, ui, tools
-//   syncedDoc.ts   what a document is: a canonical string, a revision, and
-//                  whether the server still owes a write
+//   syncedDoc.ts   what a document is: a canonical string, plus the glue to
+//                  the ledger; adopting a value is never an edit
+//   ledger.ts      per account, kept across reloads: the revision a value is
+//                  based on, and whether the server is still owed a write
 //   channel.ts     cross-TAB transport (BroadcastChannel, same profile)
+//   leader.ts      which tab talks to the server — the tab-claim holder
 //   useCloudSync   cross-DEVICE transport (one Convex query + one mutation)
-//   reconcile.ts   the only decision: adopt, push, or nothing
+//   reconcile.ts   the only decision: adopt, push, hold, or nothing
 //   status.ts      what it is doing, for the UI to show
 //
 // ── THE TWO HOPS ARE NOT THE SAME HOP ────────────────────────────────────────
@@ -31,4 +34,3 @@
 export { SyncProvider } from "./SyncProvider";
 export { useSyncStatus, type SyncStatus, type SyncState } from "./status";
 export { SYNC_KEYS, type SyncKey } from "./keys";
-export { deviceId } from "./identity";

@@ -9,6 +9,7 @@
 import { useCloudSync } from "./useCloudSync";
 import { SyncErrorBoundary } from "./SyncErrorBoundary";
 import { SyncErrorToast } from "./SyncErrorToast";
+import { setCurrentAccount } from "./ledger";
 
 // Importing the registry is what CREATES the three documents and subscribes
 // them to the cross-tab channel. Side-effecting on purpose: cross-tab sync
@@ -18,6 +19,12 @@ import "./docs";
 
 /** True when this build has a Convex deployment to talk to. */
 const CLOUD_CONFIGURED = Boolean(import.meta.env.VITE_CONVEX_URL);
+
+// A build with no cloud half is signed out by definition. An account recorded
+// by a keyed build on the same origin (a developer switching env files) would
+// otherwise have every edit made here filed as owed to it, and sent the next
+// time that build ran.
+if (!CLOUD_CONFIGURED) setCurrentAccount(null);
 
 function CloudSync() {
   useCloudSync();
