@@ -148,6 +148,7 @@ shifted pair is now the layer reorder above.
 | Shortcut               | Action |
 | ---------------------- | ------ |
 | `Space` (hold)         | Pan mode (grab to drag the canvas) |
+| `H`                    | Pan mode: hold for as long as it's down, or tap to leave it on until the next tap or `Esc` |
 | `Alt + Scroll`         | Zoom in / out |
 | `Alt + =` / `Alt + -`  | Zoom in / out |
 | `Alt + 0`              | Reset zoom (100%) |

@@ -30,6 +30,7 @@ export const SHORTCUT_GROUPS = [
     title: "Navigation",
     shortcuts: [
       { keys: ["Space"], action: "Hold to Pan (drag image)" },
+      { keys: ["H"], action: "Pan: hold, or tap to stay on" },
       { keys: ["PgUp"], action: "Previous Photo" },
       { keys: ["PgDn"], action: "Next Photo" },
     ],
