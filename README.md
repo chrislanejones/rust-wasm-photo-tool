@@ -85,53 +85,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.81 — 2026-09-21
+### v8.82 — 2026-09-21
 
-**Twelve presets instead of six, H is the hand key, and the legal pages Google kept asking for are live.**
+**Text keeps its typeface and its box through a reload, and the pricing page stops selling two things that don't exist.**
 
-Enhance › Presets has twelve looks now. Mono and Noir are the two black-and-whites
-— one that leaves the tones where they were, one with hard contrast and heavy
-blacks. Airy opens a picture up bright and light, Moody closes the shadows down,
-and Recover and Lift pull detail back out of a blown-out sky or a backlit
-subject. Hover any of them to see it on your photo before you commit. Clicking
-is still one undo step.
+A committed text box lost its typeface and its size on reload, and only on
+reload. Pick Liberation Mono, commit, reload, and the words came back
+proportional; Serif came back without its serifs. The box you dragged came back
+at the default. It had been live since v8.80.
 
-There is no hue or temperature knob in the engine, and that is why the twelve
-look the way they do. Shadows and highlights add the same amount to red, green
-and blue, so every preset moves brightness, contrast or how much color is there
-— never the color itself. Warm and Cool have always been saturation, not
-temperature. A sepia cannot be written as a row in that table at all.
+There were two losses, and either one was enough on its own. Replaying the undo
+history treated a text edit as a replacement, so the typeface and the box fell
+back to their defaults the moment an edit replayed. And the copy that saves your
+work to this browser had never kept the box at all — the wrap width, box height
+and perspective have been written by the engine since v8.40 and not one of them
+had ever reached disk. Both halves are fixed, and the same latent bug in shape
+edits is fixed with them. Saved work already on your disk comes back closer to
+what you left, never further from it.
 
-A preset is five numbers, and two of them are absolute 8-bit values where a
-tenth of a level does nothing. A new test hovers all twelve and compares pixels,
-to the untouched photo and to every preset before it, so a preset that quietly
-does less than it says — or one that duplicates another — fails instead of
-shipping.
+The pricing page stops selling two things that don't exist. Pro said "cloud
+originals" and every tier said "projects". No tier uploads your originals — they
+stay on your device — and there is no Projects screen. Both are gone, and the
+page now says Pro's AI allowance is 50 a day and 300 a month, which is what the
+server actually enforces.
 
-**H is the hand key.** Hold it to pan and it stops when you let go; tap it and
-panning stays on until you tap again or press Esc. Space still pans. But Space
-can never be the reliable pan key, because a focused button takes it — that is
-how Tab-then-Space presses things. H is not an activation key, so nothing on the
-page can steal it.
+The rest of the site caught up. The features page lists all twelve presets,
+the three real typefaces, 38 sub-tools, H for pan and the Magic Eraser as
+shipped. The two architecture diagrams agree with each other again. The blog
+post's eight source links all went to a `main` branch this repo has never had;
+they work now.
 
-`/privacy-policy` and `/terms-of-service` exist. Google's consent screen will
-not pass the sign-in client without both on an authorized domain, and both were
-404. The privacy page names each thing that leaves the device one at a time, and
-says what stays: the gallery in IndexedDB, with no backup and no copy anyone
-here can read. The paragraph a template would have got wrong is analytics — GA4
-runs on both sites, ungated, and sets cookies. Once there is a privacy policy,
-saying so is the only honest option.
-
-Create AI Image speaks the sidebar's language. The panel moved into its own
-component and picked up the shared form controls on the way, so it looks like
-the rest of the app instead of hand-rolled, and it scrolls on a short screen. It
-picks its own model now — six of them, differing in speed, cost and whether they
-can take a reference image at all. Your references are kept when you switch
-models but only counted in the consent sentence when the model can use them.
-Generate is still disabled: there is no text-to-image job on the server yet.
-
-The engine did not change this release. It is the same 814,202 bytes v8.80
-shipped.
+The engine grew by 230 bytes, to 814,432.
 
 
 ## License

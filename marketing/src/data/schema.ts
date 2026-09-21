@@ -36,6 +36,8 @@ export const TABLES: Table[] = [
       { name: "tier", type: "'free' | 'pro' | 'team'" },
       { name: "dailyUsage", type: "number" },
       { name: "usageResetAt", type: "number" },
+      { name: "monthlyUsage", type: "number?", comment: "AI passes this month" },
+      { name: "monthResetAt", type: "number?" },
       { name: "settings", type: "string?", comment: "legacy prefs blob — see sync_docs" },
       { name: "settingsHash", type: "string?", comment: "legacy, SHA-256 of the above" },
       { name: "createdAt", type: "number" },
@@ -103,6 +105,18 @@ export const TABLES: Table[] = [
     ],
     indexes: ["by_userId_key"],
     note: "Settings and remembered UI choices, the same on every signed-in device — never pixels",
+  },
+  {
+    name: "user_colors",
+    tiers: "free pro",
+    fields: [
+      { name: "_id", type: "Id<'user_colors'>", key: "pk" },
+      { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+      { name: "color", type: "string", comment: "#rrggbb or #rrggbbaa, lowercase" },
+      { name: "createdAt", type: "number" },
+    ],
+    indexes: ["by_userId", "by_userId_createdAt"],
+    note: "The saved “+” palette — capped at 32 per user, newest first",
   },
   {
     name: "shares",

@@ -160,8 +160,8 @@ export default function Home() {
           </table>
 
           <p className="runs__note">
-            The engine is roughly <span className="fig">310&nbsp;KB</span> gzipped. That is the whole
-            download, and after it lands the tab does the work.
+            The engine is roughly <span className="fig">350&nbsp;KB</span> gzipped. After it lands, the
+            tab does the work.
           </p>
         </section>
 
@@ -181,16 +181,17 @@ export default function Home() {
           <div className="editor__text">
             <h2 className="section__title section__title--sm">In the editor</h2>
             <p className="editor__run">
-              Brightness · Contrast · Blur · Crop · Align · Magic-wand select · Live histogram ·
-              Stroke stabilizer · Rectangles · Ellipses · Arrows · Bézier pen with fill · Callout
-              pins · Text with drop shadows · Emoji · Blur, pixelate and black-box redaction · Layer
-              masks · Eraser · Rulers and grids · Batch logo stamping · Grid mosaic gallery ·
-              OpenRaster export · Light, dark and system themes
+              Brightness · Contrast · Levels · Twelve presets · Blur · Crop · Perspective and skew ·
+              Align · Magic-wand select · Live histogram · Stroke stabilizer · Rectangles · Ellipses
+              · Arrows · Bézier pen with fill · Callout pins · Text in three typefaces, with drop
+              shadows · Emoji · Blur, pixelate and black-box redaction · Magic eraser · Layer masks
+              · Eraser · Rulers and grids · Batch logo stamping · Grid mosaic gallery · OpenRaster
+              export · Light, dark and system themes
             </p>
             <p className="lede editor__lede">
-              Everything above is free and local. Sign in only when you want persistence, share
-              links, or the AI passes — and the padlock in the UI tells you which is which before you
-              click.
+              Everything above is free and local, and your edits are kept in this browser between
+              visits. Sign in only when you want a copy of them off this machine, share links, or
+              the AI passes — and the padlock in the UI tells you which is which before you click.
             </p>
           </div>
         </section>
