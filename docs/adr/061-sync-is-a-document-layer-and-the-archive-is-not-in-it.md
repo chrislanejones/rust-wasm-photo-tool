@@ -56,20 +56,54 @@ The shape, in `app/src/lib/sync/`:
   one mutation over a generic `sync_docs` table. Both land through the same
   `adopt` on the same document, so there is exactly one code path by which app
   state changes from outside.
-- **One decision, pure.** `reconcile(local, remote)` returns `adopt`, `push` or
-  `idle` and imports nothing. Every sync bug this design can still have is a
-  bug in that function, which `reconcile.test.ts` enumerates, rather than a
-  race between two effects that each thought they owned the document.
+- **One decision, pure.** `reconcile(local, remote)` returns `adopt`, `push`,
+  `hold` or `idle` and imports nothing. Every sync bug this design can still
+  have is a bug in that function, which `reconcile.test.ts` enumerates, rather
+  than a race between two effects that each thought they owned the document.
+- **Revisions decide; clocks only break real ties.** A pending change on top of
+  the revision this device last saw is pushed, whatever either clock says; a
+  snapshot older than that revision is ignored. Only when ANOTHER device has
+  written since does the rule fall back to comparing timestamps.
+- **The server checks the revision.** `sync:push` carries the revision the
+  change was based on and is refused (a `conflict` result carrying the current
+  row, never a throw) when the row has moved. The client re-reconciles against
+  it. Convex queues mutations while offline and replays them on reconnect, so
+  without this a laptop's day-old change landed on top of the phone's.
 - **Equality is a string compare, not a hash.** The blobs are under a couple of
   kilobytes and both sides serialize through the same canonical writer. A hash
   could only add a collision, whose symptom would be "my change didn't sync".
 - **A document is pushed only when locally DIRTY** — changed by the user on
-  this device and never sent. Adopting clears the flag. So the losing side of a
-  race is always an earlier change by the same user, which is what last-write-
-  wins should discard.
-- **Dirty crosses tabs.** A tab that adopts another tab's unsent change
-  inherits the obligation to push it, so a change made in a background tab
-  cannot be shown everywhere on the device and stored nowhere.
+  this device, signed in, and never sent. An account is never seeded from a
+  device that changed nothing, and ADOPTING IS NEVER AN EDIT: a value written
+  into the app from elsewhere does not count as a change even when this build
+  re-serializes it differently (which is what made two builds trade one value
+  forever).
+- **The pending change lives in a ledger, per account** (`ledger.ts`,
+  localStorage, shared by every tab of the profile). It survives a reload, it
+  is filed under the Convex user id, and it records the VALUE owed rather
+  than a flag, so it lapses the moment the device stops holding that value. A
+  change made signed out is owed to nobody. A device's FIRST CONTACT with an
+  account adopts the account's copy; it never pushes.
+- **One tab per device talks to the server** — the tab holding the
+  "Use Image Horse here?" claim (`useTabClaim` reports into `leader.ts`). The
+  others are kept current over the channel. Failed pushes back off (5 s
+  doubling to 5 min); a permanent refusal (unknown key, too large, signed out)
+  is not retried on a timer at all.
+- **Forget leaves markers, not holes.** `sync:clear` turns every document into
+  a row with `value: null` and a bumped revision, and clears the legacy
+  `users.settings` blob. A deleted row read as "never had one", and the
+  online devices re-seeded it within one reactive tick.
+- **Formats travel with the blob.** Each document has a format number on the
+  channel message and on the row. A tab on another format is ignored; no
+  build writes over a row from a newer format.
+- **Navigation waits for the next load.** Which panel is open and which mode
+  each tool is in are adopted from another device only at load (or when a tab
+  takes the claim). Mid-session they are held in the document, not written
+  into the store — a phone switching to the eraser must not change the
+  laptop's next stroke. Preferences still apply live.
+- **Consent does not travel.** `onlineFeaturesEnabled` is not in the `ui`
+  document: it is agreement to send data from THIS device. And no device
+  identifier is uploaded — the row has no `origin`.
 - **The ready gate.** Both zustand documents hydrate from IndexedDB
   asynchronously. Nothing reads or writes a document before its store has
   hydrated, and the store subscription is attached only afterwards — rehydration
@@ -77,10 +111,17 @@ The shape, in `app/src/lib/sync/`:
   would read the user's own persisted settings landing from disk as a change
   they had just made, and push the laptop over the phone on every boot.
 
-`users.settings` stays in the schema as the legacy prefs blob. A device seeds
-the `prefs` document from it once, when the account has no `prefs` row, through
-the same rules as any other remote document; after that it is dead for that
-account.
+`users.settings` stays in the schema as the legacy prefs blob. A device adopts
+it, through the same rules as any other remote document, while the account has
+no `prefs` row; the server stops offering it once any `prefs` row exists, live
+or forgotten, and Forget clears it.
+
+*Amended 09-21-2026, before merge, after review:* the first version decided
+conflicts by timestamp alone, kept the pending flag in memory, pushed from
+every tab, deleted rows on Forget, seeded accounts from any online device, and
+synced the consent switch and the tool modes live. Each of those reverted or
+resurrected a setting in a reproducible case; the bullets above are what
+replaced them. The unit, the two hops and the archive line are unchanged.
 
 ## Alternatives considered
 
@@ -93,14 +134,18 @@ account.
 - **Keep the per-feature hand-rolled sync and just add BroadcastChannel to
   each.** Cheapest diff, and it makes the third copy of the reconcile rule into
   a fifth. The rule is the part that can be wrong in a way the user sees, and
-  having it appear five times in files about preferences, colours and text is
+  having it appear five times in files about preferences, colors and text is
   how it ends up five slightly different rules.
 - **CRDT / per-field merge.** The right answer for two people editing one
   document at once. These are one person's preferences, where "the last thing I
   did wins" is what they actually expect, and where the merge machinery would be
   larger than everything it merges.
-- **Compare-and-set with a conflict surfaced to the user.** A dialog asking
-  which theme they meant is worse than silently taking the most recent one.
+- **Compare-and-set with a conflict surfaced to the user.** The server does
+  compare and set now, but a conflict goes back to the reconcile rule, not to a
+  dialog: asking which theme they meant is worse than taking the most recent.
+- **Dirty as a boolean, in memory.** What shipped first. Lost on reload, and a
+  flag outlives the value it was about — on a shared browser, person B's
+  settings could be pushed into person A's account.
 - **Sync the archive too, since the ask says "the same thing".** Blocked, on
   evidence, by the open op-log entry in `docs/PARKING_LOT.md`. It is also a
   different problem: megabytes rather than kilobytes, and a merge rule that
@@ -109,26 +154,33 @@ account.
 ## Pre-mortem (mandatory)
 
 **It is March. A user reports that their laptop keeps reverting a setting they
-change on their phone.** The cause is the clock: rule 4 in `reconcile` compares
-a local `Date.now()` against the Convex server's, and the laptop's clock is
-half an hour fast. Its unsent change therefore looks newer than everything the
-phone sends, forever, so it pushes over each one.
+change on their phone.** The cause is the clock: rule 8 in `reconcile` compares
+a local `Date.now()` against the Convex server's when two devices both changed
+a document, and the laptop's clock is half an hour fast. Its unsent change
+looks newer than the phone's, so it wins the tie.
 
-*What mitigates it:* the window is narrow by construction — a document is only
-a candidate for that rule while it is dirty, and a successful push clears
-dirty within 600ms of the change. A laptop that is online cannot stay in the
-state that exhibits this. The damage ceiling is also fixed: one preference
-blob, re-toggleable, never pixels. And the rule is one line in a pure function
-with no imports, so changing it to "arrival order always" is a one-line
-revert with its own test — no migration, no stored data to fix up.
+*What mitigates it:* since the amendment the clock is consulted only for a
+genuine conflict — both devices changed the document since the last revision
+the laptop saw. A second edit on top of this device's own push is decided by
+revision (rule 7), which is where the original version lost changes to a slow
+clock. The damage ceiling is fixed: one preference blob, re-toggleable, never
+pixels. And the rule is one line in a pure function, so changing it is a
+revert with its own test.
+
+**Also plausible: nothing is sent for a while.** Only the claim-holding tab
+talks to the server. If that tab closes, the parked tabs stay quiet until one
+of them is chosen with "Use here". Nothing is lost — the pending change is in
+the ledger — but a user who never returns to a parked tab sees their other
+device lag. Warning sign: "it only synced after I clicked Use here".
 
 **Second walk: a document adopts something that crashes the editor.** A blob
 from a future build carries a `masterTab` this build has no panel for.
 *Mitigated:* every document's `parse` validates field by field against TODAY'S
-unions — the same guard the zustand stores already apply on rehydrate — and a
-blob that fails validation is rejected whole, leaving the device on its own
-value. The channel protocol is versioned, so a message from a tab left open
-across a deploy is dropped rather than parsed.
+unions using the store's own validator table — the one its `merge` runs on
+rehydrate, asserted against `partialize` by `syncParity.test.ts` — and a blob
+that fails validation is rejected whole. The channel protocol and each
+document carry a version, so a message from a tab left open across a deploy
+is dropped rather than parsed.
 
 **Third: the layer becomes a write amplifier.** The zustand subscription fires
 on every state change, including every dialog open. *Mitigated:* `changedLocally`
@@ -141,6 +193,15 @@ value is unchanged; and pushes are debounced 600ms.
 - One place to add the next synced thing: a key in `lib/sync/keys.ts` and in
   `SYNC_KEYS` in `convex/sync.ts` (a test asserts they agree), plus one
   `defineSyncedDoc`. No table, no migration, no new Convex function.
+- **Nothing ever deletes a `sync_docs` row.** Forget writes markers. A row
+  deleted by hand in the dashboard restarts at rev 1 under devices that
+  remember a higher one, and they will ignore it until it passes their number.
+- A signed-out change is not sent when the user signs back in: the account's
+  copy wins, as it did before this layer. That is the conservative direction
+  (it cannot write one browser's state into an account), and it can revert a
+  signed-out tweak.
+- The ledger keeps a copy of any unsent setting, and the Convex user id, in
+  localStorage. Local only; never uploaded.
 - Signed-out users gain cross-tab sync they did not have. This is the supported
   default path and it is now better, not merely intact.
 - `lib/preferences.ts` no longer imports Convex. It is importable by anything.
@@ -152,7 +213,7 @@ value is unchanged; and pushes are debounced 600ms.
   signed-in device would read as "the other device changed something".
 - The `users.settings` / `settingsHash` pair is legacy from this commit. It
   cannot be dropped — removing a field from a table with rows fails a Convex
-  push — so it stays, labelled, in the schema and on the marketing
+  push — so it stays, labeled, in the schema and on the marketing
   `/architecture` page.
 - **The line is load-bearing and is written down in three places** (this ADR,
   the head of `lib/sync/docs.ts`, the privacy policy). The next person asked to

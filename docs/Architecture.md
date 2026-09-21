@@ -316,11 +316,16 @@ the user's other devices when signed in. Both land through the same
 which app state changes from outside.
 
 The only decision the layer makes is `reconcile(local, remote) →
-adopt | push | idle`, which is pure, imports nothing, and is
-enumerated in `reconcile.test.ts`. A document is pushed only when it
-is locally **dirty** (changed here, never sent), and that dirty flag
-crosses tabs so a change made in a background tab cannot be shown
-everywhere on the device and stored nowhere.
+adopt | push | hold | idle`, which is pure, imports nothing, and is
+enumerated in `reconcile.test.ts`. Revisions decide it; the clock is
+only a tiebreak when two devices both changed a document. A document
+is pushed only when it is locally **dirty** (changed here, signed in,
+never sent), and that pending change lives in a per-account ledger in
+localStorage — shared by every tab, kept across a reload, and never
+owed to an account other than the one it was made in. `sync:push` is a
+compare-and-set on the revision the change was based on, so a
+mutation Convex queued offline cannot land on top of newer work. Only
+the tab holding the "Use Image Horse here?" claim talks to the server.
 
 ⚠️ **The photo archive is deliberately outside this layer** — see
 `lib/sync/docs.ts` and [ADR-061](adr/061-sync-is-a-document-layer-and-the-archive-is-not-in-it.md).
@@ -328,8 +333,9 @@ Replicating edits is a different problem, and it is blocked on the
 open op-log entry in [PARKING_LOT.md](PARKING_LOT.md).
 
 `lib/preferences.ts` used to hold its own Convex pull/push against
-`users.settings`; that field is legacy now, read once to seed an
-account's `prefs` document and then ignored. `user_colors` and
+`users.settings`; that field is legacy now, adopted while an account
+has no `prefs` row and ignored after one exists. "Forget the synced
+copy" turns every document into a `value: null` marker and clears it. `user_colors` and
 `recent_texts` keep their own tables — a row per item is the right
 shape for a capped list, and a whole-document blob is not.
 

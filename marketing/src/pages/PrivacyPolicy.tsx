@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
             a few of them.
           </p>
           <p className="lede">
-            Last updated <time dateTime="2026-09-20">09-20-2026</time>.
+            Last updated <time dateTime="2026-09-21">09-21-2026</time>.
           </p>
         </header>
 
@@ -93,10 +93,17 @@ export default function PrivacyPolicy() {
             The settings sync is named in full because it is the one that happens without you
             asking each time. Three things travel: your preferences (the Settings dialog), which
             panels and tabs you last had open along with the command palette's recent list, and
-            which mode each tool was left in. That is the whole list. Your photos, your edits and
-            your gallery are not in it — they stay in this browser, on this device, exactly as they
-            do signed out. Settings &rsaquo; General shows what sync is doing and has a button that
-            deletes the synced copy from your account.
+            which mode each tool was left in. That is the whole list. The online-features switch is
+            not on it, because agreeing to send data to a server is something you do on each device,
+            and nothing that identifies your device or browser is sent along. Your photos, your edits
+            and your gallery are not in it — they stay in this browser, on this device, exactly as
+            they do signed out.
+          </p>
+          <p>
+            Settings &rsaquo; General shows what sync is doing and has a button that deletes the
+            synced copy from your account. What is left afterwards is a note that each item was
+            deleted and when, so your other devices do not send it straight back. Nothing is sent
+            again until you change one of those settings on a device where you are signed in.
           </p>
 
           <h2>The AI tools</h2>
