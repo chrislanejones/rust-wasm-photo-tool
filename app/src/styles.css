@@ -49,6 +49,7 @@
   --z-mobile-viewer: 49; /* mobile single-photo viewer — above the mobile grid, still under dialogs */
   --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
   --z-modal: 60; /* modals layered above dialogs */
+  --z-over-modal: 70; /* a confirm opened from inside a modal (Settings › Shared › Delete) */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */

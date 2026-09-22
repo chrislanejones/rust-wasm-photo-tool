@@ -15,12 +15,13 @@
 //     convex/shares.ts), so the pane never has to flip a flag.
 //   • PAUSE / RESUME — the owner's own switch, kept as its own field so a
 //     manual pause and a limit hit are told apart in the status.
-//   • DELETE — what "revoke" was: link and image gone, with a confirm.
+//   • DELETE — what "revoke" was: link and image gone, with a confirm. The
+//     confirm is `overModal`: Settings is a modal, and a plain dialog opens
+//     underneath it, so Delete looked dead.
 //
-// THE CHART is a row of thirty bars, one per day, from the `share_views`
-// timestamps (a timestamp is all a view stores — no IP, no browser; the
-// privacy policy says so). It is decorative: the numbers a screen reader
-// needs are in the text beside it.
+// NO CHART. There was a thirty-day bar row here; with views on one or two
+// days it drew a lone block at the right edge that read as a stray box, not a
+// chart. The view count and "last opened" beside the thumbnail say it.
 import { useEffect, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -82,28 +83,6 @@ function StatusBadge({ status }: { status: Status }) {
     <span className={cn("rounded-full border px-2 py-0.5 text-2xs font-semibold", s.className)}>
       {s.label}
     </span>
-  );
-}
-
-/** Thirty bars, one per day, newest on the right. */
-function ViewsChart({ daily, total }: { daily: number[]; total: number }) {
-  const peak = Math.max(1, ...daily);
-  const busiest = Math.max(...daily);
-  const last30 = daily.reduce((a, b) => a + b, 0);
-  return (
-    <div
-      role="img"
-      aria-label={`${last30} of ${total} views were in the last 30 days; the busiest day had ${busiest}.`}
-      className="flex h-8 items-end gap-px"
-    >
-      {daily.map((n, i) => (
-        <span
-          key={i}
-          className={cn("min-w-0 flex-1 rounded-[1px]", n > 0 ? "bg-theme-accent" : "bg-theme-muted")}
-          style={{ height: n > 0 ? `${Math.max(12, (n / peak) * 100)}%` : "2px" }}
-        />
-      ))}
-    </div>
   );
 }
 
@@ -194,8 +173,6 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
         </div>
       </div>
 
-      <ViewsChart daily={link.daily} total={link.views} />
-
       <div className="flex flex-wrap items-end gap-2">
         <NumberField
           label="Stop after views"
@@ -269,6 +246,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
         confirmLabel="Delete"
         confirmIcon={Trash2}
         tone="destructive"
+        overModal
         onConfirm={() => {
           setConfirmDelete(false);
           void run("delete", () => remove({ token: link.token }), "Share link deleted");

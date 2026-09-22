@@ -103,6 +103,7 @@ beforeEach(() => {
   h.setLimits.mockClear();
   h.pause.mockClear();
   h.resume.mockClear();
+  h.remove.mockClear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -195,5 +196,34 @@ describe("Settings › Shared", () => {
       button("Resume").click();
     });
     expect(h.resume).toHaveBeenCalledWith({ token: "tok-b" });
+  });
+
+  it("Delete opens a confirm ABOVE the Settings modal, and only the confirm deletes", async () => {
+    h.links = [link()];
+    await render();
+    await act(async () => {
+      button("Delete").click();
+    });
+    expect(h.remove, "the card's Delete only asks").not.toHaveBeenCalled();
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("Delete this share link?");
+    // Settings is z-modal (60); a plain dialog is z-dialog (50) and opens
+    // behind it. The confirm and its backdrop must sit on z-over-modal.
+    expect(dialog!.className).toContain("z-[var(--z-over-modal)]");
+    expect(dialog!.className).not.toContain("z-[var(--z-dialog)]");
+
+    const confirm = [...dialog!.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Delete");
+    await act(async () => {
+      confirm!.click();
+    });
+    expect(h.remove).toHaveBeenCalledWith({ token: "tok-a" });
+  });
+
+  it("draws no views chart — the stray single bar is gone", async () => {
+    h.links = [link()];
+    await render();
+    expect(document.body.querySelector('[role="img"]')).toBeNull();
+    expect(document.body.textContent).toContain("3 views");
   });
 });
