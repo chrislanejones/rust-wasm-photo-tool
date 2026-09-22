@@ -1,0 +1,278 @@
+/* ── the animated figures of "The hotel Wi-Fi died. The editor kept running." ────
+   Imported by the post file, so these rules ship in the site's one stylesheet
+   but live beside the components they style
+   (offline-by-construction.figures.tsx). Everything here is on the tokens;
+   the WebGL side resolves the same tokens at mount. No raw colors.
+
+   `.scene` is the framed box a three.js scene renders into — a 16:9 canvas,
+   a label layer over it, and for FIG 2/FIG 3 a step caption and a transport
+   bar under it. Sized by CSS alone, so the prerendered HTML holds the space
+   the scene will take before any script runs.
+
+   Byte-for-byte the same ruleset as engine-in-a-worker.figures.css's `.scene`
+   block — this post reuses the same React component (Scene) and the same
+   class names, just against a different scene runtime. See
+   offline-by-construction.scenes.ts's header for why that runtime is a second
+   copy rather than a shared import, and PARKING_LOT.md for the matching note
+   on this file.
+*/
+
+.scene {
+  --scene-bar: 65px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+
+.scene__gl {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.scene__slot,
+.scene__canvas,
+.scene__labels {
+  position: absolute;
+  inset: 0;
+}
+
+.scene__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scene__labels {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.scene__label {
+  --label-size: 12px;
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  font-family: var(--font-outlier);
+  font-size: var(--label-size);
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: color-mix(in oklch, var(--color-paper-2) 78%, transparent);
+  max-width: min(46%, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+.scene__label--sans { font-family: var(--font-body); letter-spacing: -0.01em; }
+.scene__label--bare { background: transparent; }
+
+.scene__label--wrap {
+  white-space: normal;
+  max-width: min(22%, 180px);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.scene__label--wrap-wide { max-width: min(40%, 330px); text-align: center; }
+
+.scene__label--end { text-align: right; }
+.scene__label--ink { color: var(--color-ink); }
+.scene__label--ink2 { color: var(--color-ink-2); }
+.scene__label--ink3 { color: var(--color-ink-3); }
+.scene__label--accent { color: var(--color-accent); }
+.scene__label--accent2 { color: var(--color-accent-2); }
+
+.scene__step {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--scene-bar) + 14px);
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-ink);
+  text-wrap: pretty;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--color-paper-2) 85%, transparent);
+}
+
+.scene__step:empty { display: none; }
+
+.scene__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--scene-bar);
+  padding: 10px 14px;
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+  background: var(--color-paper-2);
+}
+
+.scene__play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  cursor: pointer;
+  font: 700 13px/1 var(--font-outlier);
+}
+
+.scene__play:hover { border-color: var(--color-accent); }
+
+.scene__scrub {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.scene__steps {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.scene__chip {
+  width: 32px;
+  height: 44px;
+  border: 1px solid var(--color-rule);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-ink-2);
+  cursor: pointer;
+  font: 600 12px/1 var(--font-outlier);
+}
+
+.scene__chip:hover { border-color: var(--color-rule-strong); color: var(--color-ink); }
+
+.scene__chip[aria-current="step"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 14%, transparent);
+}
+
+.scene__readout {
+  flex: 0 0 auto;
+  min-width: 7ch;
+  text-align: right;
+  font: 500 11px/1 var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-2);
+}
+
+.scene__play:focus-visible,
+.scene__chip:focus-visible,
+.scene__scrub:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.scene__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg);
+  text-align: center;
+  font: 500 13px/1.5 var(--font-outlier);
+  color: var(--color-ink-2);
+  background: repeating-linear-gradient(135deg, transparent 0 14px, var(--color-paper-3) 14px 16px);
+}
+
+.scene--backdrop {
+  position: absolute;
+  inset: -6% -2% -10%;
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.scene--backdrop .scene__gl {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.scene--backdrop .scene__slot { opacity: 0; }
+.scene--backdrop[data-status="ready"] .scene__slot { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .scene--backdrop .scene__slot { transition: opacity var(--dur-long) var(--ease-out); }
+}
+
+@media (max-width: 40rem) {
+  .scene__gl { aspect-ratio: 4 / 3; }
+
+  .scene__label { font-size: calc(var(--label-size) * 0.85); padding: 2px 5px; }
+
+  .scene__label--minor { display: none !important; }
+
+  .scene__step {
+    position: static;
+    margin: var(--space-xs) var(--space-sm) 0;
+  }
+  .scene__bar { flex-wrap: wrap; }
+  .scene__scrub { order: -1; flex-basis: 100%; }
+}
+
+.scene__header {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.scene__header-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scene__header-title {
+  font: 700 14px/1.2 var(--font-body);
+  letter-spacing: -0.01em;
+}
+
+.scene__header-sub {
+  font: 500 11px/1.4 var(--font-mono);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .scene__header { top: 8px; padding: 0 10px; gap: 10px; }
+  .scene__header-title { font-size: 12px; }
+  .scene__header-sub {
+    font-size: 10px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
