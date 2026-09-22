@@ -270,3 +270,23 @@ describe("ensureEngineFontsForRestore — a resume never hangs on a font", () =>
     expect(waited, "then went ahead without them").toBeLessThan(1_000);
   });
 });
+
+describe("a face that failed to fetch is retried, not cached as gone", () => {
+  // The resume paths call this at boot, when the network is busiest. A
+  // transient miss must not remove Mono for the rest of the session.
+  it("registers Mono on the next call after its first fetch failed", async () => {
+    let monoFails = true;
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      if (monoFails && /mono/i.test(String(url))) return { ok: false } as unknown as Response;
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(String(url).length) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const tool = fakeTool();
+
+    await ensureEngineFonts(tool as never);
+    expect(tool.calls.some((c) => c.startsWith("register:liberation-mono")), "not on the failed pass").toBe(false);
+
+    monoFails = false;
+    await ensureEngineFonts(tool as never);
+    expect(tool.calls.some((c) => c.startsWith("register:liberation-mono")), "registered on the retry").toBe(true);
+  });
+});

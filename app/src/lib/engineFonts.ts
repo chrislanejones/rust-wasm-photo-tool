@@ -160,6 +160,16 @@ function loadFaces(): Promise<Loaded[]> {
     }
     return (await Promise.all(jobs)).filter((x): x is Loaded => x !== null);
   })();
+  // A FACE THAT FAILED TO FETCH IS NOT CACHED AS GONE. The resume paths call
+  // this at boot now (see `ensureEngineFontsForRestore`), when the network is
+  // busiest, and caching a transient miss would remove Mono or Serif for the
+  // whole session. So an incomplete result is served to this caller and then
+  // forgotten, and the next caller fetches again — the files are same-origin
+  // and HTTP-cached, so the ones that did arrive cost nothing to ask for twice.
+  const attempt = facesPromise;
+  void attempt.then((list) => {
+    if (list.length < ENGINE_FACES.length * 2 && facesPromise === attempt) facesPromise = null;
+  });
   return facesPromise;
 }
 
@@ -181,7 +191,8 @@ export function ensureEngineFonts(tool: ImageHorseTool | null | undefined): Prom
   const existing = registered.get(key);
   if (existing) return existing;
   const job = (async () => {
-    for (const { face, bold, bytes } of await loadFaces()) {
+    const faces = await loadFaces();
+    for (const { face, bold, bytes } of faces) {
       if (!face.id) continue; // the embedded face needs no registering
       try {
         // Awaited one at a time on purpose: behind the worker each call is a
@@ -195,6 +206,10 @@ export function ensureEngineFonts(tool: ImageHorseTool | null | undefined): Prom
         console.warn(`[fonts] ${face.label} ${bold ? "bold" : "regular"} rejected`, err);
       }
     }
+    // Came up short (a face failed to fetch): let the next call try again
+    // rather than answering from this engine's cache forever. The Text panel's
+    // `resolveFacesWhenReady` polls for exactly this case.
+    if (faces.length < ENGINE_FACES.length * 2) registered.delete(key);
   })();
   registered.set(key, job);
   return job;
