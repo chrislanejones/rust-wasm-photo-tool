@@ -69,10 +69,9 @@ export function MasterBar({
   // are both ACTIONS while the middle three are tabs, so a rule after New
   // grouped one action with three tabs and left the other action outside.
   //
-  // The height is the expensive half: three files position their docked panel
-  // under this bar with a hardcoded `top-[58px]` (= `top-2` gutter + chrome) —
-  // ToolsSidebar, ReviewPanel and GalleryBar. Change the chrome, change those.
-  // Noted in constants.ts too, since that is where anyone would look first.
+  // The height is the expensive half: the docked panel under this bar sits at
+  // `top-[58px]` (= `top-2` gutter + chrome). That offset lives once, in
+  // constants.ts MASTER_BAR_CONTENT_BOX, beside the chrome height itself.
   return (
     <motion.div
       variants={slideFromLeft}
@@ -81,8 +80,8 @@ export function MasterBar({
       exit="exit"
       role="region"
       aria-label="Master bar"
-      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center justify-between overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
-      style={{ height: MASTER_BAR_CHROME_H, boxShadow: "var(--shadow-panel)" }}
+      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center justify-between overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5 shadow-panel"
+      style={{ height: MASTER_BAR_CHROME_H }}
     >
       {/* New · Tools · Gallery · Review · Export, one run of five, then
           settings/user. New and Export are actions; the middle three are tabs. */}

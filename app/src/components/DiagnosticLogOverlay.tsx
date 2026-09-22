@@ -16,9 +16,10 @@ import {
   getDiagnostics,
   subscribeDiagnostics,
   type LogEntry,
-  type LogSource,
 } from "@/lib/diagnosticsLog";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { WINDOW_TITLE } from "@/lib/styles";
+import { SUBSYSTEM_COLOR } from "@/components/subsystemColors";
 
 interface Props {
   open: boolean;
@@ -27,16 +28,6 @@ interface Props {
 }
 
 type Tab = "resources" | "telemetry" | "imagemeta" | "flags";
-
-const SOURCE_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "bg-warning/10 text-warning border-warning/20",
-  CONVEX_DB: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  // Local IndexedDB — teal to sit next to the cloud blue without being it.
-  INDEXEDDB: "bg-teal-500/10 text-teal-400 border-teal-500/20",
-  REPLICATE_AI: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  UI_THREAD: "bg-success/10 text-success border-success/20",
-  CONSOLE: "bg-bg-elevated/40 text-text-secondary border-border/40",
-};
 
 function fmtTime(ts: number): string {
   const d = new Date(ts);
@@ -80,7 +71,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
         {/* Header block: title row + the tab toolbar share one bottom border. */}
         <div className="border-b border-border">
           <DialogHeader className="border-b-0 px-4 py-2.5">
-            <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+            <DialogTitle className={WINDOW_TITLE}>
               <Activity className="h-4 w-4" />
               Diagnostics Window
             </DialogTitle>
@@ -143,7 +134,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                     </td>
                     <td className="px-3 py-1">
                       <span
-                        className={`rounded border px-1.5 py-0.5 text-2xs font-bold ${SOURCE_CLASS[log.source]}`}
+                        className={`rounded border px-1.5 py-0.5 text-2xs font-bold ${SUBSYSTEM_COLOR[log.source].badge}`}
                       >
                         {log.source}
                       </span>

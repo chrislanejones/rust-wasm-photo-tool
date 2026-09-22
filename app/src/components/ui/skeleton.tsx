@@ -38,7 +38,7 @@ const skeletonVariants = cva(SKELETON_BASE, {
   },
 });
 
-export interface SkeletonProps
+interface SkeletonProps
   extends HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof skeletonVariants> {
   /** When `false`, renders `children` instead of the placeholder (Chakra idiom). */

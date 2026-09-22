@@ -37,6 +37,7 @@ import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
 import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
+import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
 /** One placed object shown in the Reselect list (text or shape annotation). */
 export interface ReselectObject {
@@ -232,7 +233,7 @@ export function ReviewPanel({
       className={
         embedded
           ? // Compact master-bar content box: flush below the 48px chrome.
-            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
+            MASTER_BAR_CONTENT_BOX
           : "review-panel group"
       }
     >

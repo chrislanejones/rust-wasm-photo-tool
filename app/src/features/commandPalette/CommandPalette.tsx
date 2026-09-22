@@ -52,6 +52,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { WINDOW_TITLE } from "@/lib/styles";
 
 /** Tab filter: the three registry groups, plus an "All" that shows every one. */
 type TabId = "all" | PaletteGroup;
@@ -223,7 +224,7 @@ export function CommandPalette() {
               Start-ish padding — this is the part you look at first. ── */}
           <div className="border-b border-border">
             <DialogHeader className="border-b-0 px-5 py-3">
-              <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+              <DialogTitle className={WINDOW_TITLE}>
                 <CommandIcon className="h-4 w-4" />
                 Command Palette
               </DialogTitle>

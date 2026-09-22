@@ -68,7 +68,7 @@ import type {
  *  something to show a human, an icon for the tile, and fuzzy-search terms.
  *  (The rich `ToolMode` — per-mode lightbulb info copy — stays in the registry
  *  / panel modules; this is the thin projection of it.) */
-export interface ToolModeInfo {
+interface ToolModeInfo {
   id: string;
   label: string;
   icon?: React.ComponentType<{ className?: string }>;

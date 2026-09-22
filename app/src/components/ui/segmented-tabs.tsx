@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import { BUTTON_PILL } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
-export interface SegmentedTab<T extends string> {
+interface SegmentedTab<T extends string> {
   id: T;
   label: string;
   icon?: LucideIcon;

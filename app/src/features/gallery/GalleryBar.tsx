@@ -10,6 +10,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { formatBytes } from "@/lib/format";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
+import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
 export interface PhotoEntry {
   id: string;
@@ -602,10 +603,9 @@ export function GalleryBar({
       className={
         vertical
           ? // Master-bar content box: flush below the 48px chrome (top 56).
-            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] flex w-[252px] flex-col overflow-hidden rounded-b-xl border border-t-0 border-border bg-bg-secondary"
+            MASTER_BAR_CONTENT_BOX
           : "fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
       }
-      style={vertical ? { boxShadow: "var(--shadow-panel)" } : undefined}
     >
       <motion.div
         animate={
@@ -711,7 +711,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollLeft}
-              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="btn-icon flex-shrink-0"
               aria-label={vertical ? "Scroll up" : "Scroll left"}
             >
               {vertical ? (
@@ -819,7 +819,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollRight}
-              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="btn-icon flex-shrink-0"
               aria-label={vertical ? "Scroll down" : "Scroll right"}
             >
               {vertical ? (

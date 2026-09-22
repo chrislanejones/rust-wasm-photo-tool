@@ -18,6 +18,12 @@ export const HOVER_RING =
  *  with the caller — this is only the box. */
 export const BUTTON_PILL = "gap-1 p-1 rounded-lg bg-bg-tertiary";
 
+/** Title of the app's "window" dialogs — Settings, Command Palette,
+ *  Diagnostics: an `h-4 w-4` icon and a mono caps label. Three copies of this
+ *  string, one per window, before it lived here. */
+export const WINDOW_TITLE =
+  "flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary";
+
 /* ─────────────────────────────────────────────────────────────────────────────
    TEXT FIELDS — the one definition behind every typed-into surface.
 
