@@ -85,29 +85,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.88 — 2026-09-22
+### v8.89 — 2026-09-22
 
-**Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs.**
+**"Everything in your browser" now stops photo uploads too, which is what that page always said it did.**
 
-Some things here are finished but not trusted yet. The Smart Brush, where a
-stroke stops at an edge instead of running over it, has been tested every
-way except the one that matters: whether it feels right to paint with.
-Blur on the graphics card is the same story. Until now the only way to try
-either was to type a key into the browser's developer tools, which means
-the only people who could were people who already knew the key.
+Settings › Security promises that with the switch off, your photos never
+leave this tab. If you were signed in, that was not true. A flattened copy
+of every photo you edited was sent to your account, because that backup
+checked whether you were signed in and never checked the switch. The AI
+tools were gated properly; this path is not a tool, so it slipped through.
 
-Settings › Beta lists them. Each is off until you turn it on, and turning
-one on changes nothing for anybody else. **Copy invite link** gives you a
-link that turns one feature on for whoever opens it, on the device they
-open it with, so trying an experiment is one message instead of a
-paragraph of instructions. Anyone can switch it back off in the same
-place, or open the app with `?beta=none` to clear them all.
+It is gated now. With the switch off — which is how it ships — nothing
+about a photo is uploaded, and a photo with no copy on this machine no
+longer reaches for one on the server. Turn the switch on and both come
+back.
 
-These choices live in your browser. Nothing about them is sent anywhere,
-and there is no way for me to know who is in a beta — which is the point,
-and also why feedback has to be asked for.
+Deleting still works either way. Removing a copy you already uploaded
+sends nothing, and refusing it while the switch is off would strand your
+photos on a server you just asked the app to stop using.
 
-The engine did not change. It is the same 814,432 bytes as v8.87.
+Settings › Security now lists the backup among the things "on" turns on,
+and the privacy policy says the same.
+
+The engine did not change. It is the same 814,432 bytes as v8.88.
 
 ## License
 

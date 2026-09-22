@@ -10817,3 +10817,20 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust or Convex change. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1099 across 96 files** (19 new: 14 `beta.test.ts`, 5 `BetaPane.test.ts`), production build + `inert-class-audit` 0, marketing build clean. Mutations: **6 of 6 killed** — a kill switch entering the ring, the parameter left in the URL, `?beta=none` disabled, an unknown id not skipped, storage read instead of the module's predicate, and a beta id that is not URL-safe. PR CI: #221 **16/16** Actions green. |
 | **QC** | Browser, production build: `?beta=smart-brush` set `ih_smart_edge=1` and left the URL at `/`; the pane read On; toggling GPU blur wrote `ih_webgpu=1`; `?beta=none` cleared both. Features.md gains a Beta line (features.ts 55 → 56). |
+
+## v8.89 Change Summary — 2026-09-22
+
+**"Everything in your browser" now stops photo uploads too, which is what that page always said it did.**
+
+| Area | Change |
+| --- | --- |
+| **The bug** | `useEditPersistence` uploaded a flattened archive of every edited photo on `isAuthenticated` **alone**. The switch gated the AI tools, which carry `requiresNetwork` (v8.84, #198); this path is not a tool, so it went straight through the net. Settings › Security said "your photos never leave this tab" with the switch off, and for a signed-in person that was false. |
+| **Measured** | On the live deployment the same day, all of it from this path: **207 files, 6.9 GB**, median **31.7 MB**, largest **123 MB** — against an advertised quota of 100 MB signed in and 5 GB paid, which nothing enforces. |
+| **The gate** | New `cloudPhotosAllowed(isAuthenticated, onlineFeaturesEnabled)`. Both cloud legs go through it: the upload in `savePhotoEdit`, and the cloud fallback in `loadPhotoEdit`. |
+| **Deletes stay open** | `removeEdit` and `clearAll` keep the bare auth check, deliberately. Taking a copy back sends no pixels, and refusing it while the switch is off would strand data on a server the person has just asked to stop using. |
+| **⚠️ Behavior change** | Signed in with the switch off — its shipped default — an edit is no longer copied to the account, and a photo with no local archive no longer falls back to the cloud. Turning the switch on restores both. |
+| **Says so** | Settings › Security lists the edit backup in "what on turns on" and notes that deleting still works with the switch off. The privacy policy says the switch governs the backup exactly as it governs the AI tools. |
+| **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust or Convex change. |
+| **Tests** | 5 new in `cloudPhotosAllowed.test.ts`: the rule, a fresh signed-in profile at the shipped default, that exactly the two cloud legs are gated, that both delete legs are not, and that the file still names the promise it keeps. Mutations: ignoring the switch, and putting the upload back on auth alone, each turn **2 tests red**. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1104 across 97 files**, production build + `inert-class-audit` 0, marketing build clean. PR CI: #223 **17/17** Actions green. |
+| **Next** | This is stage 0 of a synced gallery (Chris, 09-22): the switch had to mean what it says before more photo data moves. Stage 1 is the gallery list and thumbnails, paid-gated, with an entitlement model where admin is a role rather than a fourth tier. |

@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.89",
+    date: "2026-09-22",
+    headline: "“Everything in your browser” now stops photo uploads too, which is what that page always said it did",
+    entries: [
+      {
+        tag: "fix",
+        text: "Settings › Security promised that with the switch off your photos never leave this tab. Signed in, that wasn’t true: a flattened copy of every photo you edited was sent to your account, because that backup only checked whether you were signed in. It checks the switch now.",
+      },
+      {
+        tag: "fix",
+        text: "With the switch off — how it ships — nothing about a photo is uploaded, and a photo with no copy on this machine no longer reaches for one on the server. Turning the switch on brings both back.",
+      },
+      {
+        tag: "ui",
+        text: "Deleting a copy you already uploaded works either way: it sends nothing, and refusing it would strand your photos on a server you just asked the app to stop using. Security lists the backup, and the privacy policy says the same.",
+      },
+    ],
+  },
+  {
     version: "v8.88",
     date: "2026-09-22",
     headline: "Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs",
