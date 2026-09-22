@@ -142,6 +142,15 @@ export const ROUTES: readonly Route[] = [
     ogType: "article",
   },
   {
+    to: "/contact",
+    label: "Contact",
+    title: "Contact Image Horse — email, bugs and security",
+    description:
+      "Email the developer, report a bug on GitHub or Codeberg, send a security problem privately, or ask for your account to be deleted. One person reads all of it.",
+    sources: ["marketing/src/pages/Contact.tsx"],
+    footerOnly: true,
+  },
+  {
     to: "/privacy-policy",
     label: "Privacy Policy",
     title: "Privacy Policy — Image Horse",

@@ -44,6 +44,12 @@ export interface Shot {
   sourceLabel: string;
   /** Spoken only while this frame is the current one. */
   alt: string;
+  /** Smaller encodes of the same capture, for the frame that loads first.
+   *  Only today's frame has them: it is the LCP image on every screen size,
+   *  and a phone was downloading all 2000px of it to draw about 400. The
+   *  older frames load only when someone drags the rail, so they stay one
+   *  file each. `src` remains the largest size and the fallback. */
+  srcSet?: string;
 }
 
 const REPO = "https://github.com/chrislanejones/rust-wasm-photo-tool/commit";
@@ -139,6 +145,8 @@ export const SHOTS: Shot[] = [
   },
   {
     src: "/IH-Hero-Image-September-2026.webp",
+    srcSet:
+      "/IH-Hero-Image-September-2026-800w.webp 800w, /IH-Hero-Image-September-2026-1200w.webp 1200w, /IH-Hero-Image-September-2026.webp 2000w",
     width: 2000,
     height: 1198,
     date: "2026-09-17",

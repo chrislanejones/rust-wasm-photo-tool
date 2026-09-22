@@ -77,12 +77,12 @@ export default function Architecture() {
               {FILTERS.map(({ key, label, Icon }) => (
                 <button
                   key={key}
-                  className="seg seg--tier"
+                  className="seg seg--where"
                   type="button"
                   aria-pressed={tier === key}
                   onClick={() => setTier(key)}
                 >
-                  <Icon size={22} className="seg__icon" />
+                  <Icon className="seg__icon" />
                   <span className="seg__label">{label}</span>
                 </button>
               ))}
@@ -447,7 +447,7 @@ export default function Architecture() {
         </section>
 
         {/* The argument, then the source that backs it, then both ways out. */}
-        <section className="why">
+        <section className="coda">
           <h2 className="section__title section__title--sm">Why draw it this way</h2>
           <p className="lede">
             Because the boundary is the product. An editor that needs a server is an editor that can
@@ -460,7 +460,7 @@ export default function Architecture() {
             flowchart the repo ships. Take the original and render it wherever you like — Mermaid
             Live, a VS&nbsp;Code preview, your own docs.
           </p>
-          <div className="why__actions">
+          <div className="coda__actions">
             {/* A download rather than a live render: mermaid's color parser
                 rejects OKLCH outright, so theming it from these tokens would
                 mean a second hex palette plus ~1MB of CDN to draw what the

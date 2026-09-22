@@ -147,6 +147,10 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
   const model = useRef(buildCubes());
   const pointer = useRef<{ x: number; y: number; down: boolean }>({ x: 0, y: 0, down: false });
   const nudge = useRef(0);
+  /** Restarts the frame loop after it has gone to sleep. The loop stops when
+   *  every cube is at rest or the box is off screen, so input has to wake it.
+   *  Set by the effect below; a no-op until a backend is running. */
+  const wake = useRef<() => void>(() => {});
 
   useEffect(() => {
     onCount?.(model.current.cubes.length);
@@ -185,11 +189,31 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
     let disposed = false;
     let device: GPUDevice | null = null;
 
+    /* ── when this runs at all ─────────────────────────────────────────
+     * The loop used to start at hydration and run every frame for the life of
+     * the page: off screen, at rest, and during the hero's first paint, where
+     * it read layout (getBoundingClientRect) and redrew all 103 cubes on each
+     * frame. It was the one thing on the page that never went idle.
+     *
+     * Now three things gate it, and none of them changes what a visitor sees:
+     * - the GPU is not asked for until the box is within 300px of the viewport,
+     * - frames stop while the box is off screen,
+     * - frames stop once every cube is back at rest, and the pointer, a key or
+     *   a resize wakes them. A still frame costs nothing to keep on screen.
+     */
+    let visible = false;
+    let started = false;
+    /** One frame: physics, then draw. Set by whichever backend came up. */
+    let render: ((now: number) => void) | null = null;
+
+    // The box's size, read when it changes rather than on every frame.
+    let size = frame.getBoundingClientRect();
+
     // ── geometry shared by both backends ──────────────────────────────
     // One place decides where the word sits, so the 2D fallback and the GPU
     // path cannot disagree about layout.
     const layout = () => {
-      const r = frame.getBoundingClientRect();
+      const r = size;
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const w = Math.max(1, Math.round(r.width * dpr));
       const h = Math.max(1, Math.round(r.height * dpr));
@@ -201,6 +225,8 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
     };
 
     const gridFromClient = (clientX: number, clientY: number) => {
+      // A live read, because scrolling moves the box. Only runs while the
+      // pointer is held down.
       const r = frame.getBoundingClientRect();
       const { dpr, cell, ox, oy } = layout();
       const px = (clientX - r.left) * dpr;
@@ -234,6 +260,37 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
           c.vy += (Math.random() - 0.5) * 26;
         }
       }
+    };
+
+    /** Nothing is moving and nothing is about to push. A thousandth of a grid
+     *  cell is far below one pixel at any size the box is drawn. */
+    const EPS = 1e-3;
+    const atRest = () =>
+      !pointer.current.down &&
+      nudge.current === 0 &&
+      cubes.every(
+        (c) =>
+          Math.abs(c.dx) < EPS &&
+          Math.abs(c.dy) < EPS &&
+          Math.abs(c.vx) < EPS &&
+          Math.abs(c.vy) < EPS,
+      );
+
+    // Always draws at least one frame, so a wake after a resize repaints the
+    // canvas the resize cleared, even when nothing is moving.
+    const tick = (now: number) => {
+      raf = 0;
+      if (disposed || !render) return;
+      render(now);
+      if (visible && !atRest()) raf = requestAnimationFrame(tick);
+    };
+
+    wake.current = () => {
+      if (disposed || !render || !visible || raf) return;
+      // Measured from now, or the first step after a long sleep would use the
+      // full 1/20 s clamp and shove three times harder than a held drag does.
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
     };
 
     // ── backend: canvas 2d ────────────────────────────────────────────
@@ -272,13 +329,11 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
           ctx.fillRect(x, y, s, s);
         }
       };
-      const loop = (now: number) => {
-        if (disposed) return;
+      render = (now) => {
         step(now);
         draw();
-        raf = requestAnimationFrame(loop);
       };
-      raf = requestAnimationFrame(loop);
+      wake.current();
       return true;
     };
 
@@ -346,8 +401,8 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
 
       setBackend("webgpu");
 
-      const loop = (now: number) => {
-        if (disposed || !device) return;
+      render = (now) => {
+        if (!device) return;
         step(now);
 
         const { w, h, cell, ox, oy } = layout();
@@ -390,28 +445,54 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
         pass.draw(18, cubes.length);
         pass.end();
         device.queue.submit([enc.finish()]);
-
-        raf = requestAnimationFrame(loop);
       };
-      raf = requestAnimationFrame(loop);
+      wake.current();
       return true;
     };
 
     // Try the GPU, fall back without ceremony. `startGpu` resolves false on
     // every failure path rather than throwing, so one `catch` is enough.
-    void (async () => {
-      let ok = false;
-      try {
-        ok = await startGpu();
-      } catch {
-        ok = false;
-      }
-      if (!ok && !disposed) start2d();
-    })();
+    const start = () => {
+      started = true;
+      void (async () => {
+        let ok = false;
+        try {
+          ok = await startGpu();
+        } catch {
+          ok = false;
+        }
+        if (!ok && !disposed) start2d();
+      })();
+    };
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry.isIntersecting;
+        if (!visible) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        } else if (!started) {
+          start();
+        } else {
+          wake.current();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+    io.observe(frame);
+
+    const ro = new ResizeObserver(() => {
+      size = frame.getBoundingClientRect();
+      wake.current();
+    });
+    ro.observe(frame);
 
     return () => {
       disposed = true;
+      io.disconnect();
+      ro.disconnect();
       cancelAnimationFrame(raf);
+      wake.current = () => {};
       device?.destroy();
     };
   }, [shove]);
@@ -439,6 +520,7 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
         setFromEvent(e);
         pointer.current.down = true;
+        wake.current();
       }}
       onPointerMove={(e) => {
         if (pointer.current.down) setFromEvent(e);
@@ -457,6 +539,7 @@ export default function CubeLetters({ onBackend, onCount }: Props) {
         // and space would otherwise scroll the page out from under them.
         if (e.key === " " || e.key.startsWith("Arrow")) e.preventDefault();
         nudge.current = 1;
+        wake.current();
       }}
     >
       <canvas ref={canvasRef} className="cubes__canvas" />

@@ -40,7 +40,7 @@
 // adds a <Route> without adding the route — and a hard 404 makes that mistake
 // visible on the first click instead of silently serving the wrong page.
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -60,7 +60,45 @@ const {
   robotsTxt,
   sitemapXml,
   NOT_FOUND_HEAD,
+  pageSourceFor,
 } = await import(join(marketing, "dist-ssr", "entry-server.js"));
+
+// ── each page's own chunk ─────────────────────────────────────────────────
+// Every page is a separate chunk (src/routes.ts), so the entry script in the
+// template is no longer the whole site. Each document names its page's chunk,
+// and the chunks that chunk imports, as <link rel="modulepreload">, so they
+// download in parallel with the entry instead of after it. A page that
+// imports CSS of its own (the worker post's figures) also gets that stylesheet
+// linked in <head>. Otherwise it would render unstyled until its script ran.
+//
+// The names come from the client build's manifest (vite.config.ts sets
+// `build.manifest`), which is deleted once read: it is build metadata, not
+// something the site should serve.
+const manifestPath = join(dist, ".vite", "manifest.json");
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+rmSync(join(dist, ".vite"), { recursive: true, force: true });
+
+function pageAssetTags(url) {
+  const source = pageSourceFor(url);
+  if (!manifest[source]) {
+    throw new Error(`prerender: no chunk for ${source} in the build manifest.`);
+  }
+  const js = new Set();
+  const css = new Set();
+  const walk = (key) => {
+    const chunk = manifest[key];
+    // The entry is already a <script> in the template. Its CSS is already linked.
+    if (!chunk || chunk.isEntry || js.has(chunk.file)) return;
+    js.add(chunk.file);
+    for (const c of chunk.css ?? []) css.add(c);
+    for (const i of chunk.imports ?? []) walk(i);
+  };
+  walk(source);
+  return [
+    ...[...css].map((f) => `<link rel="stylesheet" crossorigin href="/${f}">`),
+    ...[...js].map((f) => `<link rel="modulepreload" crossorigin href="/${f}">`),
+  ].join("\n    ");
+}
 
 // ── the template ──────────────────────────────────────────────────────────
 // index.html as the client build left it: correct <script>/<link> tags with the
@@ -96,13 +134,11 @@ const headEnd = template.indexOf(SEO_END) + SEO_END.length;
  *  Takes the head as a string rather than a route, because a post builds its
  *  own (`postHeadTagsFor` — different og:type, `article:*` properties, a
  *  BlogPosting graph) and the splice is identical for both. */
-function documentFor(to, head) {
-  const body = render(to);
-  return (
-    template.slice(0, headStart) +
-    head +
-    template.slice(headEnd)
-  ).replace(ROOT_DIV, `<div id="root">${body}</div>`);
+async function documentFor(to, head) {
+  const body = await render(to);
+  return (template.slice(0, headStart) + head + template.slice(headEnd))
+    .replace("</head>", `  ${pageAssetTags(to)}\n  </head>`)
+    .replace(ROOT_DIV, `<div id="root">${body}</div>`);
 }
 
 /** Where a path's file goes. "/" is the shell's own path so it overwrites
@@ -112,9 +148,9 @@ function documentFor(to, head) {
 const fileFor = (to) => (to === "/" ? join(dist, "index.html") : join(dist, to, "index.html"));
 
 /** Write one document and log its size and date. */
-function emit(to, head, lastmodDate) {
+async function emit(to, head, lastmodDate) {
   const out = fileFor(to);
-  const html = documentFor(to, head);
+  const html = await documentFor(to, head);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, html);
   const size = (Buffer.byteLength(html) / 1024).toFixed(1);
@@ -187,7 +223,7 @@ const lastmod = {};
 
 for (const route of ROUTES) {
   lastmod[route.to] = lastCommitDate(route.sources);
-  emit(route.to, headTagsFor(route), lastmod[route.to]);
+  await emit(route.to, headTagsFor(route), lastmod[route.to]);
 }
 
 // The posts. Same shell, same renderer, same lastmod rule — a post's `sources`
@@ -198,7 +234,7 @@ for (const route of ROUTES) {
 for (const post of POSTS) {
   const to = postPath(post);
   lastmod[to] = lastCommitDate(post.sources);
-  emit(to, postHeadTagsFor(post), lastmod[to]);
+  await emit(to, postHeadTagsFor(post), lastmod[to]);
 }
 
 // The 404 renders through the same router, on a path guaranteed not to match a
@@ -211,13 +247,7 @@ const notFoundHead = [
   `<title>${NOT_FOUND_HEAD.title}</title>`,
   `<meta name="robots" content="${NOT_FOUND_HEAD.robots}" />`,
 ].join("\n    ");
-writeFileSync(
-  join(dist, "404.html"),
-  (template.slice(0, headStart) + notFoundHead + template.slice(headEnd)).replace(
-    ROOT_DIV,
-    `<div id="root">${render("/__not_found__")}</div>`,
-  ),
-);
+writeFileSync(join(dist, "404.html"), await documentFor("/__not_found__", notFoundHead));
 console.log("  404            → dist/404.html (noindex)");
 
 writeFileSync(join(dist, "sitemap.xml"), sitemapXml(lastmod));
