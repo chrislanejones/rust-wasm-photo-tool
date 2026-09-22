@@ -90,6 +90,13 @@ export default function PrivacyPolicy() {
             sync, and the account it belongs to. Signed out, none of it runs.
           </p>
           <p>
+            Keeping edit history off-device means a flattened copy of an edited photo, stored under
+            your account so another device can pick it up. It is governed by the &ldquo;Everything
+            in your browser&rdquo; switch, like the AI tools: with the switch off, no copy of a
+            photo is uploaded, signed in or not. Deleting a copy you already uploaded works either
+            way — that sends nothing, and it is how you take something back.
+          </p>
+          <p>
             A share link keeps the flattened image you shared, a count of how many times it was
             opened, and the time of each opening — the time only. Nothing about who opened it is
             recorded: no address, no browser, no account. Settings &rsaquo; Shared shows every link
