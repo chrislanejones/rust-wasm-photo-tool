@@ -290,13 +290,17 @@ export default function EngineInAWorker() {
               a value — that is tabular data, and a screen reader should get the
               numbers rather than a wall of unlabeled bars. The bar itself is
               decorative and the figure it depicts is in the next cell as text. */}
-          <table className="scale__grid">
-            <tbody>
+          {/* Roles stated explicitly: the phone layout (styles.css) changes
+              these elements' `display`, which drops implicit table semantics
+              in some screen readers. */}
+          <table className="scale__grid" role="table">
+            <tbody role="rowgroup">
               {PAYLOADS.map((p) => {
                 const over = overBudget(p);
                 return (
                   <tr
                     key={p.label}
+                    role="row"
                     className={[
                       "scale__row",
                       p.budget && "scale__row--budget",
@@ -305,18 +309,18 @@ export default function EngineInAWorker() {
                       .filter(Boolean)
                       .join(" ")}
                   >
-                    <th scope="row" className="scale__label">
+                    <th scope="row" role="rowheader" className="scale__label">
                       {p.label}
                       {p.note && <span className="scale__note">{p.note}</span>}
                     </th>
-                    <td className="scale__track">
+                    <td role="cell" className="scale__track">
                       <span
                         className="scale__bar"
                         style={{ width: `${widthOf(p.bytes).toFixed(2)}%` }}
                         aria-hidden="true"
                       />
                     </td>
-                    <td className="scale__value">
+                    <td role="cell" className="scale__value">
                       <span className="fig">{p.size}</span>
                       {over !== null && (
                         <span className="scale__over">{over.toLocaleString("en-US")}× over</span>

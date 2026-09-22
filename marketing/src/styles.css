@@ -3396,6 +3396,63 @@ a { color: inherit; }
   color: var(--color-ink-3);
 }
 
+/* Phone width: each row goes onto two lines — the label on its own, the bar
+   and the value under it. MEASURED at 390px before this: label 190 + track 96
+   (its 6rem floor) + value 96, both outer columns `nowrap`, came to a 382px
+   table inside a 287px content box, so the value column was clipped off the
+   figure — "~60 B" and "10 KiB" gone, "810× over" cut to "81". The numbers
+   are the figure's content (see the table note above), so they are what must
+   survive; the label is what gives up its row.
+
+   Changing a table's `display` drops its table semantics in some screen
+   readers, so the component states the roles explicitly (role="table" and
+   friends) and a screen reader still gets label, magnitude, value per row.
+   The dashed budget rule is drawn per row's track, so here it shows as short
+   dashes under one another at the same x — still the 10 KiB line. */
+@media (max-width: 40rem) {
+  .scale { padding: var(--space-md); }
+
+  .scale__grid,
+  .scale__grid > tbody { display: block; }
+
+  .scale__row {
+    display: grid;
+    /* A FIXED value column, not `auto`: each row is its own grid, so `auto`
+       sized every row's value separately and gave every track a different
+       width — 285 to 242px, measured — which moved the dashed rule and bent
+       the log scale row to row. One width for all rows keeps one axis.
+       5.5rem clears the widest value, "6,554× over" (80px at 390). */
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
+    grid-template-areas:
+      "label label"
+      "track value";
+    column-gap: var(--space-md);
+    align-items: center;
+    padding-block: var(--space-xs);
+  }
+
+  .scale__row > * { padding-block: 0; }
+
+  .scale__label {
+    grid-area: label;
+    width: auto;
+    white-space: normal;
+    padding-inline-end: 0;
+  }
+
+  .scale__track {
+    grid-area: track;
+    width: auto;
+    min-width: 0;
+  }
+
+  .scale__value {
+    grid-area: value;
+    width: auto;
+    padding-inline-start: 0;
+  }
+}
+
 /* ── the close: actions, sources, kicker ──────────────────────── */
 
 .post__actions {
