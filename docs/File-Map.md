@@ -236,7 +236,6 @@ app/src/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
 │   │   ├── ToolGrid.tsx              Gradient icon buttons
 │   │   ├── ToolButton.tsx            Individual tool button
-│   │   ├── toolConfig.ts             Tool definitions (10 tools)
 │   │   └── settings/
 │   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
 │   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)

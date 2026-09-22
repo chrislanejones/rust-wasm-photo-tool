@@ -62,13 +62,13 @@ import {
   Eraser,
 } from "lucide-react";
 
-export const GROUP_ICONS: Record<string, ElementType> = {
+const GROUP_ICONS: Record<string, ElementType> = {
   // Same glyph as Home's "Your machine" tab — one meaning, one icon, site-wide.
   "Image Processing (Rust/WASM)": CpuIcon,
   "UI (React)": AppWindow,
 };
 
-export const FEATURE_ICONS: Record<string, ElementType> = {
+const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
   "Red Stamps": BadgeCheck,
   "Edit group (Crop · Transform · Perspective · Color Picker · Layers · Canvas Size · Guides · Rulers and Grid)": Move,

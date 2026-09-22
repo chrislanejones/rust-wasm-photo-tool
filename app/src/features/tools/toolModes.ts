@@ -189,7 +189,7 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
 
 /** The tool's sub-modes: registry first, legacy list as the fallback. Empty
  *  array for single-mode tools (Adjust, Effects, Layer Settings). */
-export function modesFor(tool: ToolType): ToolModeInfo[] {
+function modesFor(tool: ToolType): ToolModeInfo[] {
   const registered = TOOL_MODULES[tool]?.modes;
   if (registered?.length) {
     return registered.map((m) => ({

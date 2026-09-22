@@ -117,21 +117,3 @@ export const SkeletonText = forwardRef<HTMLDivElement, SkeletonTextProps>(
   },
 );
 SkeletonText.displayName = "SkeletonText";
-
-export interface SkeletonCircleProps extends Omit<SkeletonProps, "variant"> {
-  /** Diameter — a number (px) or any CSS length. Falls back to className sizing. */
-  size?: number | string;
-}
-
-export const SkeletonCircle = forwardRef<HTMLDivElement, SkeletonCircleProps>(
-  ({ size, className, style, ...props }, ref) => (
-    <Skeleton
-      ref={ref}
-      variant="circle"
-      className={cn("aspect-square", className)}
-      style={size != null ? { width: size, height: size, ...style } : style}
-      {...props}
-    />
-  ),
-);
-SkeletonCircle.displayName = "SkeletonCircle";

@@ -1,0 +1,29 @@
+{
+  // fallow config (fallow.tools). Every entry below says WHY it exists, the
+  // same rule scripts/dead-exports-audit.mjs keeps for its exceptions: an
+  // unexplained exemption is how a real finding gets buried.
+  "$schema": "https://fallow.tools/schema.json",
+
+  // Hand-run Node CLIs. Nothing imports them and no package.json script names
+  // them, so fallow read all seven as "unused files" — but they are run by
+  // name: guardrails.sh (a BLOCKING CI job) runs dead-exports-audit.mjs,
+  // CLAUDE.md prescribes inert-class-audit.mjs, and the others are cited by
+  // ADR-024 / ADR-030 / PARKING_LOT as the way to reproduce a measurement.
+  "entry": [
+    "scripts/*.mjs",
+    "scripts/*.js",
+    // Produces the op-log fixtures under tests/fixtures/oplog/.
+    "tests/fixtures/**/*.mjs"
+  ],
+
+  "ignoreExports": [
+    // Reached only through `import("./engine-in-a-worker.three")` and
+    // `typeof import(...)` — a dynamic-import namespace, whose member reads
+    // fallow cannot attribute to single exports.
+    { "file": "marketing/src/posts/engine-in-a-worker.three.ts", "exports": ["*"] },
+    // `lazy(() => import("./components/CommandPalette"))` in marketing/App.tsx.
+    { "file": "marketing/src/components/CommandPalette.tsx", "exports": ["default"] },
+    // Read off the dynamically imported scenes module in the figures file.
+    { "file": "marketing/src/posts/engine-in-a-worker.scenes.ts", "exports": ["createScene"] }
+  ]
+}
