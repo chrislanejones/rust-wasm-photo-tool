@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SyncPane } from "@/components/SyncPane";
+import { setSyncEnabled, useSyncEnabled } from "@/lib/sync";
 import {
   serializePreferences,
   usePreferences,
@@ -69,15 +70,34 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
     if (open) setDraft(prefs); // re-seed on open / after a commit
   }, [open, prefs]);
 
-  const dirty = serializePreferences(draft) !== serializePreferences(prefs);
+  // The sync switch is drafted here too, for the same reasons — and because a
+  // switch that committed on tap left Apply grayed out, which read as the tap
+  // doing nothing. It is not a preference (lib/sync/enabled.ts), so it has
+  // its own draft, and Apply commits whichever of the two moved.
+  const syncEnabled = useSyncEnabled();
+  const [syncDraft, setSyncDraft] = useState(syncEnabled);
+  useEffect(() => {
+    if (open) setSyncDraft(syncEnabled);
+  }, [open, syncEnabled]);
+
+  const prefsDirty = serializePreferences(draft) !== serializePreferences(prefs);
+  const syncDirty = syncDraft !== syncEnabled;
+  const dirty = prefsDirty || syncDirty;
 
   const handleApply = () => {
-    applyPreferences(draft);
-    // No per-field description here (the desktop modal's `describeChanges`
-    // covers ten preferences; this pane has two, and the theme repaint IS the
-    // feedback). The toast exists for Reduce motion, which has no visible
-    // before/after on a gallery screen.
-    toast.success("Settings applied");
+    if (prefsDirty) applyPreferences(draft);
+    if (syncDirty) setSyncEnabled(syncDraft);
+    // No per-field description for the preferences (the desktop modal's
+    // `describeChanges` covers ten; this pane has two, and the theme repaint
+    // IS the feedback). The toast exists for Reduce motion, which has no
+    // visible before/after on a gallery screen — and for sync, which has none
+    // on this device at all.
+    toast.success(
+      "Settings applied",
+      syncDirty
+        ? { description: syncDraft ? "Sync is on for this device." : "Sync is off for this device." }
+        : undefined,
+    );
     onOpenChange(false);
   };
 
@@ -138,12 +158,12 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               }
             />
           </div>
-          {/* Sync commits IMMEDIATELY, not on Apply — its three controls are
-              not preferences in the draft (see SyncPane). Its buttons are
-              labels in a row, not icon-over-label tiles, so they only get the
-              44px touch floor, not the stacked layout above. */}
+          {/* The switch waits for Apply, like the rest of the sheet; Send and
+              Forget are actions and happen when pressed (see SyncPane). Its
+              buttons are labels in a row, not icon-over-label tiles, so they
+              only get the 44px touch floor, not the stacked layout above. */}
           <div className="[&_button]:min-h-11">
-            <SyncPane />
+            <SyncPane draftEnabled={syncDraft} onDraftEnabledChange={setSyncDraft} />
           </div>
         </DialogBody>
 

@@ -9,13 +9,17 @@
 // General, because the phone shows it too: a phone that "shows nothing" has
 // to be able to say why.
 //
-// THREE CONTROLS, ALL IMMEDIATE — none of them is a preference in the Settings
-// draft, so none waits for Apply:
+// THREE CONTROLS. Send and Forget are actions and happen when pressed. The
+// switch follows the surface it sits on:
 //
 //  • THE SWITCH (lib/sync/enabled.ts). Per device, never synced. Off behaves
 //    as signed out for the sync layer; on again is first contact, so this
 //    device takes the account's copy. That is the reset: a device that has
 //    been off must not come back and overwrite what the others did meanwhile.
+//    On the desktop pane it commits on tap — that tab has no Apply. In the
+//    phone's sheet it is a DRAFT the sheet's Apply commits, like everything
+//    else there: committing on tap left Apply grayed out after a tap, which
+//    read as "nothing happened" (Chris, 09-22, on a real phone).
 //
 //  • SEND THIS DEVICE'S SETTINGS. Shown only while the account holds nothing.
 //    An account is never seeded from whichever device happens to be online
@@ -111,9 +115,22 @@ const REFUSED = {
 /** States with no "last matched" time worth showing: nothing is matched. */
 const UNMATCHED: SyncState[] = ["disabled", "local", "off"];
 
-export function SyncPane() {
+interface SyncPaneProps {
+  /** The switch as a DRAFT, for a surface that commits on Apply (the phone's
+   *  Settings sheet). Pass both, or neither: omitted, the switch commits on
+   *  tap (the desktop pane). */
+  draftEnabled?: boolean;
+  onDraftEnabledChange?: (on: boolean) => void;
+}
+
+export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps = {}) {
   const status = useSyncStatus();
+  // What the device is actually doing — the status line, and whether Send can
+  // be heard, follow this, never the draft.
   const enabled = useSyncEnabled();
+  const drafting = onDraftEnabledChange !== undefined;
+  const shown = drafting ? (draftEnabled ?? enabled) : enabled;
+  const choose = onDraftEnabledChange ?? setSyncEnabled;
   const { isAuthenticated } = useConvexAuth();
   const clear = useMutation(api.sync.clear);
   const [forgetting, setForgetting] = useState(false);
@@ -161,18 +178,23 @@ export function SyncPane() {
                   key: "on",
                   icon: RefreshCw,
                   label: "Sync on",
-                  active: enabled,
-                  onToggle: () => setSyncEnabled(true),
+                  active: shown,
+                  onToggle: () => choose(true),
                 },
                 {
                   key: "off",
                   icon: CloudOff,
                   label: "Sync off",
-                  active: !enabled,
-                  onToggle: () => setSyncEnabled(false),
+                  active: !shown,
+                  onToggle: () => choose(false),
                 },
               ]}
             />
+            {shown !== enabled && (
+              <p className="pl-1 text-2xs font-semibold text-text-secondary">
+                Press Apply to turn sync {shown ? "on" : "off"}.
+              </p>
+            )}
             <p className="pl-1 text-2xs leading-relaxed text-text-muted">
               Just this device — your other devices keep syncing. Off, nothing
               is fetched or sent, and tabs here still match each other. Turning

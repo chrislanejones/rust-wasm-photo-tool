@@ -238,8 +238,11 @@ gallery-only shell showed no sync status at all.
   Shown only while `accountEmpty` (no live row, no legacy `users.settings`),
   only in the claim-holding tab.
 - **Settings › Sync is its own tab** (`#/settings/sync`); the same `SyncPane`
-  renders in the phone's settings sheet. Its controls commit at once, not on
-  Apply. The privacy policy names the switch and the button.
+  renders in the phone's settings sheet. Send and Forget act when pressed.
+  The switch commits on tap on desktop (that tab has no Apply) but is a draft
+  in the phone sheet, committed by its Apply like theme and motion. Tapping
+  it on a real phone left Apply grayed out and read as broken (v8.85, fixed
+  the same day). The privacy policy names the switch and the button.
 - **Reversed:** `SyncStatusRow`'s "no on/off switch, sign out instead". Signing
   out also turns off shares, AI and billing, and offers no reset.
 - **Cost:** two switches with opposite defaults (online features OFF, sync ON).
