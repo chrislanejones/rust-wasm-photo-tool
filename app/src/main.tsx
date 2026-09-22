@@ -15,7 +15,15 @@ import {
   installRotatedTextAudit,
 } from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
+import { applyBetaFromUrl } from "@/lib/beta";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
+
+// `?beta=<id>` — an invite link opting this DEVICE into an experiment. Applied
+// BEFORE anything reads a beta key (the WebGPU gate below is one), and before
+// React renders, so a link works on the first paint rather than the second.
+// See lib/beta.ts: it writes the same localStorage keys the features already
+// read, then takes the parameter out of the URL.
+applyBetaFromUrl();
 
 // GPU blur correctness harness (Phase 0, ADR-030). Installs a
 // `window.__ihGpuBlurSelfTest()` that compares the WGSL blur against the CPU

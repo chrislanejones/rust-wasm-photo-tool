@@ -36,6 +36,7 @@ import {
   Shield,
   RefreshCw,
   Share2,
+  Beaker,
   Sun,
   Undo2,
 } from "lucide-react";
@@ -207,6 +208,15 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       keywords: ["share", "shared", "links", "views", "revoke", "pause", "expire"],
       icon: Share2,
       run: () => openSettingsTab("shared"),
+    },
+    {
+      id: "settings.beta",
+      label: "Beta Features",
+      group: "settings",
+      keywords: ["beta", "experiment", "preview", "early", "smart brush",
+        "webgpu", "gpu"],
+      icon: Beaker,
+      run: () => openSettingsTab("beta"),
     },
     {
       id: "settings.toggle-rulers",
