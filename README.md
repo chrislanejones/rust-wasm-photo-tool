@@ -85,45 +85,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.84 — 2026-09-22
+### v8.85 — 2026-09-22
 
-**Your settings follow you between devices, and "Everything in your browser" now turns off every tool that uploads.**
+**Sync gets its own page in Settings, on your phone too, with an off switch and a button that sends this device's settings.**
 
-Sign in on two devices and your settings travel with you: your preferences,
-which panels and tabs you last had open, the command palette's recent list,
-and which mode each tool was left in. Two tabs on the same machine update
-each other instantly. Your photos, edits and gallery do not sync. They stay
-in this browser, exactly as they do signed out. The online-features switch
-doesn't sync either, because agreeing to send data to a server is something
-you do on each device. Settings › General shows what sync is doing, and it
-has a button that deletes the synced copy from your account.
+On v8.84 I signed in on my PC and my phone, and the phone showed nothing.
+Sync was working exactly as built: it only sends a setting after you change
+one, so two devices signing in for the first time had nothing to trade. That
+rule stays, because letting whichever device connects first win means a fresh
+phone can wipe out your laptop's real settings. But you couldn't see any of
+it, and nothing let you pick a side.
 
-The privacy policy said the AI tools aren't offered while online features are
-off. That was only true for Create AI Image: background removal, object
-removal and OCR still sent the picture to a server. Now all of them are off
-with the switch. They're grayed out with a note saying why, and a link or the
-command palette can't open them either. Settings › Security has the same
-switch as the New dialog and lists exactly what it turns on. Magic Eraser
-runs on your machine, so it stays.
+Settings › Sync is its own page now, and the phone's Settings sheet has the
+same section. It says what sync is doing on that device. While your account
+has no synced settings yet, it shows a **Send this device's settings** button:
+press it on the device that's set up the way you like, and your other devices
+take it.
 
-Switching tools in the middle of Remove Object used to leave its mask on the
-canvas, where it swallowed every click the new tool made. It ends the mask
-now. Apply Crop waits until you've drawn a rectangle.
+There's also a switch. **Sync off** stops this device fetching or sending
+anything. Your other devices keep syncing, and tabs on this device still match
+each other. Turning it back **on** starts fresh: the device takes your
+account's copy instead of pushing its own over it. So it doubles as a reset.
+The switch itself never syncs. It belongs to the device it's on.
 
-Canvas Size's two buttons, Remove and Resize, fit side by side on one line.
-They used to wrap into a staircase.
+The privacy policy names the new page, the switch and the button.
 
-Alt + ← takes you back to the last tool you used, and Alt + → forward again.
-That's the browser's own Back button, and it always worked. Now the shortcut
-list says so.
-
-Under the hood, 13 unused files and 53 unused exports are gone, and the
-dialogs, dropdowns and headings that were written out by hand in several
-places are one component each. A few things look a little more consistent
-for it: the Batch text font picker matches the Text tool's, and the
-Diagnostics tabs line up.
-
-The engine did not change. It is the same 814,432 bytes as v8.83.
+The engine did not change. It is the same 814,432 bytes as v8.84.
 
 ## License
 

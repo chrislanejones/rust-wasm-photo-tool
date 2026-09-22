@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.85",
+    date: "2026-09-22",
+    headline: "Sync gets its own page in Settings, on your phone too, with an off switch and a button that sends this device’s settings",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Sync is its own page, and the phone’s Settings sheet has it too. It says what sync is doing on that device, instead of a line at the bottom of General that the phone never showed.",
+      },
+      {
+        tag: "feature",
+        text: "Sync only sends a setting after you change one, so two devices signing in for the first time had nothing to trade — my phone showed nothing. While your account has no synced settings, a “Send this device’s settings” button now lets you pick the device that’s right, and the others take it.",
+      },
+      {
+        tag: "feature",
+        text: "Sync on / Sync off, per device. Off, this device fetches and sends nothing while your other devices keep syncing. Back on, it takes your account’s copy instead of pushing its own, so it doubles as a reset. The switch itself never syncs.",
+      },
+      {
+        tag: "infra",
+        text: "The privacy policy names the new page, the switch and the button.",
+      },
+    ],
+  },
+  {
     version: "v8.84",
     date: "2026-09-22",
     headline: "Your settings follow you between devices, and “Everything in your browser” now turns off every tool that uploads",
