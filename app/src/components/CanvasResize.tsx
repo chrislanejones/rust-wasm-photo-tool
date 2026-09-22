@@ -100,27 +100,31 @@ export function CanvasResize({
         onToggleLock={() => setLockAspect((v) => !v)}
       />
 
-      {/* SOURCE ORDER IS THE LAYOUT: the two-up bar puts the first action on
-          the left and the last on the right, so the destructive one now leads
-          and the primary — whose label GROWS ("Resize canvas → 1920×1080") —
-          hugs the right edge at its own width. Under the old two `flex-1`
-          halves the growing label wrapped to three lines and dragged "Remove
-          canvas" to the same height with it (measured 54px → 70px for BOTH
-          buttons the moment the dimensions changed). */}
+      {/* Side by side, on ONE line. The two-up bar pushes the pair apart at
+          their own widths, and "Remove canvas" + "Resize canvas → 1168×784"
+          never fit the 226px column: 246px idle, 325px with a target, so the
+          bar wrapped into a staircase (ADR-056's open question; Chris,
+          09-22-2026: side by side). The panel's heading already says what
+          these act on, and the width/height fields right above show the
+          target, so the visible labels are the verbs; the accessible names
+          keep the object ("Remove canvas" contains "Remove", WCAG 2.5.3).
+          Destructive first, primary on the right edge — source order is the
+          layout. */}
       <PanelActionBar layout="split">
         <PanelAction
           tone="destructive"
           disabled={disabled || !canRemove}
           onClick={onRemove}
+          aria-label="Remove canvas"
         >
-          Remove canvas
+          Remove
         </PanelAction>
         <PanelAction
           disabled={disabled || !changed}
           onClick={() => onApply(targetW, targetH)}
+          aria-label={changed ? `Resize canvas to ${targetW}×${targetH}` : "Resize canvas"}
         >
-          Resize canvas
-          {changed ? ` → ${targetW}×${targetH}` : ""}
+          Resize
         </PanelAction>
       </PanelActionBar>
     </div>
