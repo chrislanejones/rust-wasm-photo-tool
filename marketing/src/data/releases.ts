@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.86",
+    date: "2026-09-22",
+    headline: "On the phone, Sync on and Sync off wait for Apply, and the worker post’s message-size chart fits a phone screen",
+    entries: [
+      {
+        tag: "fix",
+        text: "On a phone, tapping Sync on or Sync off switched straight away while everything else in Settings waits for Apply, so Apply stayed gray and the tap looked dead. Now a tap lights Apply, Apply saves it, and Cancel throws it away — the same as theme and motion.",
+      },
+      {
+        tag: "ui",
+        text: "The worker post’s message-size chart (FIG 3) cut off its own numbers on a phone — “10 KiB” vanished and “810× over” read “81”. Each row now wraps onto two lines on a narrow screen, and every bar still shares one scale.",
+      },
+    ],
+  },
+  {
     version: "v8.85",
     date: "2026-09-22",
     headline: "Sync gets its own page in Settings, on your phone too, with an off switch and a button that sends this device’s settings",

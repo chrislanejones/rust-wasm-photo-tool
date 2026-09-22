@@ -85,32 +85,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.85 — 2026-09-22
+### v8.86 — 2026-09-22
 
-**Sync gets its own page in Settings, on your phone too, with an off switch and a button that sends this device's settings.**
+**On the phone, Sync on and Sync off wait for Apply, and the worker post's message-size chart fits a phone screen.**
 
-On v8.84 I signed in on my PC and my phone, and the phone showed nothing.
-Sync was working exactly as built: it only sends a setting after you change
-one, so two devices signing in for the first time had nothing to trade. That
-rule stays, because letting whichever device connects first win means a fresh
-phone can wipe out your laptop's real settings. But you couldn't see any of
-it, and nothing let you pick a side.
+On my phone, tapping Sync on or Sync off in Settings did nothing I could see.
+It worked, but it switched the moment I tapped. Everything else in that sheet
+waits for Apply, so Apply stayed gray and the tap looked dead. Now the switch
+behaves like theme and motion. Tap it and Apply lights up. Apply saves it and
+Cancel throws it away. On a computer, Settings › Sync still switches as soon
+as you click, because that page has no Apply.
 
-Settings › Sync is its own page now, and the phone's Settings sheet has the
-same section. It says what sync is doing on that device. While your account
-has no synced settings yet, it shows a **Send this device's settings** button:
-press it on the device that's set up the way you like, and your other devices
-take it.
+The blog post about moving the engine into a worker has a chart of message
+sizes (FIG 3). On a phone it cut off its own numbers: "10 KiB" disappeared,
+and "810× over" read "81". On a narrow screen each row now wraps onto two
+lines, and every bar still shares one scale.
 
-There's also a switch. **Sync off** stops this device fetching or sending
-anything. Your other devices keep syncing, and tabs on this device still match
-each other. Turning it back **on** starts fresh: the device takes your
-account's copy instead of pushing its own over it. So it doubles as a reset.
-The switch itself never syncs. It belongs to the device it's on.
-
-The privacy policy names the new page, the switch and the button.
-
-The engine did not change. It is the same 814,432 bytes as v8.84.
+The engine did not change. It is the same 814,432 bytes as v8.85.
 
 ## License
 
