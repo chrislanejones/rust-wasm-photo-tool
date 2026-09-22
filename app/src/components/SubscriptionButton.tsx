@@ -21,6 +21,7 @@ import {
   Layers,
   RefreshCw,
   Share2,
+  Beaker,
   Check,
   ExternalLink,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
 import { SyncPane } from "@/components/SyncPane";
 import { SharedPane } from "@/components/SharedPane";
+import { BetaPane } from "@/components/BetaPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -71,6 +73,7 @@ export type SettingsTab =
   | "sync"
   | "shared"
   | "export"
+  | "beta"
   | "storage"
   | "billing"
   | "aiusage"
@@ -157,6 +160,7 @@ export function SubscriptionButton({
     sync: RefreshCw,
     shared: Share2,
     export: Package,
+    beta: Beaker,
     storage: Cloud,
     billing: CreditCard,
     aiusage: Gauge,
@@ -174,6 +178,7 @@ export function SubscriptionButton({
     "storage",
     "billing",
     "aiusage",
+    "beta",
     "devtests",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
@@ -351,6 +356,9 @@ export function SubscriptionButton({
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (
               <AIUsagePane />
+            ) : tab === "beta" ? (
+              /* Switches commit as pressed (see BetaPane), so no Apply. */
+              <BetaPane />
             ) : tab === "devtests" ? (
               <DevTestsPane />
             ) : tab === "superuser" && superUser ? (
