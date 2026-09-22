@@ -22,6 +22,7 @@
 // import direction between lib/ and hooks/.
 import type { ImageHorseTool } from "stamp_tool";
 import type { PersistedLayer } from "@/lib/editPersistence";
+import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 
 /** Decode a PNG to raw RGBA. Signature matches the existing local helpers. */
 export type PngDecoder = (
@@ -52,6 +53,17 @@ export async function restoreLayerStack(
   decodePng: PngDecoder,
 ): Promise<boolean> {
   if (!layers || layers.length === 0) return false;
+
+  // REGISTER BEFORE YOU RESTORE. `restore_text_annotation` rasterizes on the
+  // spot, and a `font_id` the engine has no bytes for is drawn in the embedded
+  // Sans — so a Mono or Serif text came back proportional after every reload,
+  // and in every batch/ZIP export, while its `font_id` stayed correct. Only
+  // waited on when a saved text actually names a runtime face: a document with
+  // no text, or only the embedded face, pays nothing. See
+  // `ensureEngineFontsForRestore`.
+  if (layers.some((l) => l.annotations?.some((a) => Boolean(a.font_id)))) {
+    await ensureEngineFontsForRestore(tool);
+  }
 
   tool.begin_layer_restore();
   for (const layer of layers) {

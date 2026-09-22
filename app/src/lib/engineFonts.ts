@@ -200,6 +200,45 @@ export function ensureEngineFonts(tool: ImageHorseTool | null | undefined): Prom
   return job;
 }
 
+/** How long a RESTORE waits for the faces before it redraws without them. */
+const RESTORE_FONT_WAIT_MS = 4_000;
+
+/**
+ * `ensureEngineFonts` for the paths that REDRAW SAVED TEXT — resume from the op
+ * log, resume from the archive, and the batch/ZIP composite.
+ *
+ * WHY THIS EXISTS. Faces arrive at runtime (ADR-058), and until v8.82 the only
+ * callers of `ensureEngineFonts` were the Text and Batch panels. A reload opens
+ * on Enhance, so nothing registered Liberation Mono or Serif before the resume
+ * replayed the document — and the engine, asked to rasterize a `font_id` it has
+ * no bytes for, falls back to the embedded Sans. The annotation still said
+ * `liberation-mono`; the pixels were proportional. #195 made the id survive the
+ * reload and was right to; the face was lost one step later, here. Measured on
+ * a v8.82 production build: glyph spacing 12.5–13 px committed, i-stems 4.5–5 px
+ * after Resume, and registering first turned the same test pixel-identical.
+ *
+ * BOUNDED, because a resume must never hang on a font. A stalled fetch waits at
+ * most `waitMs`, then the document is redrawn with whatever faces made it — the
+ * same result as before this fix, and nothing worse. Registration keeps running
+ * in the background and is cached per engine, so the NEXT redraw gets them.
+ */
+export async function ensureEngineFontsForRestore(
+  tool: ImageHorseTool | null | undefined,
+  waitMs: number = RESTORE_FONT_WAIT_MS,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      ensureEngineFonts(tool),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, waitMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 /** Which faces this engine can actually render right now. Anything else must
  *  not be offered — see the "register before you measure" note above. */
 export async function availableFaces(

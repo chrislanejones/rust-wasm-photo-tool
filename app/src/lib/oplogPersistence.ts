@@ -43,6 +43,7 @@ import {
   type PhotoOplogManifest,
 } from "@/lib/dexie/db";
 import { USE_OPLOG_PERSISTENCE } from "@/lib/dexie/flags";
+import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 import { registerOplogPersistStats } from "@/lib/resourceMonitor";
 
 const BRANCH = "main";
@@ -706,6 +707,17 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
     // Preferred: hand the PNG bytes straight to the engine codec (the blob
     // stores the engine's own encode when the surface exists). Fallback:
     // decode in JS and use the RGBA entry point.
+    // REGISTER BEFORE YOU REPLAY. The replay rasterizes every text it rebuilds,
+    // and a `font_id` with no registered bytes is drawn in the embedded Sans —
+    // the op log carries `TextFont` faithfully (#195), and the face was still
+    // lost here, one step later. Unlike the archive path this cannot cheaply
+    // tell whether the log names a runtime face (it is postcard frames), so it
+    // always waits, bounded. See `ensureEngineFontsForRestore`.
+    // Through `unknown`: this module sees the engine only as `OplogPersistWasm`,
+    // and the registrar checks for `register_font` itself before calling it.
+    await ensureEngineFontsForRestore(
+      tool as unknown as Parameters<typeof ensureEngineFontsForRestore>[0],
+    );
     let ok: boolean;
     if (typeof tool.oplog_restore_png === "function") {
       const png = new Uint8Array(await base.blob.arrayBuffer());
