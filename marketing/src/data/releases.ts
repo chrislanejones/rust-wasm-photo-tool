@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.87",
+    date: "2026-09-22",
+    headline: "Settings › Shared shows every share link you’ve made and how often it was opened, a link can switch itself off after a number of views or on a date, and the blog has a second post",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Shared lists every share link you’ve made: the image, how many times it was opened, when it was last opened, and a row of bars for the last 30 days. A link you copied used to be gone for good the moment you shared it.",
+      },
+      {
+        tag: "feature",
+        text: "Each link can stop after a number of views, on a date, or both. Hitting a limit pauses it and keeps the image, so raising the limit turns it back on. You can also pause, resume or delete a link by hand.",
+      },
+      {
+        tag: "ui",
+        text: "Opening a stopped link says why — turned off, expired, or reached its view limit — instead of “no longer available”. The image isn’t sent, and the visit isn’t counted.",
+      },
+      {
+        tag: "infra",
+        text: "Each opening is stored as a time and nothing else: no address, no browser, no account. The privacy policy says so.",
+      },
+      {
+        tag: "feature",
+        text: "A second blog post: “The hotel Wi-Fi died. The editor kept running.” Why editing keeps working with no network, and what that buys a ward, an operating room, or anyone whose work can’t wait for a signal. Its figures move.",
+      },
+    ],
+  },
+  {
     version: "v8.86",
     date: "2026-09-22",
     headline: "On the phone, Sync on and Sync off wait for Apply, and the worker post’s message-size chart fits a phone screen",

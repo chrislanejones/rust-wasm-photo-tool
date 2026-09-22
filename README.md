@@ -85,23 +85,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.86 — 2026-09-22
+### v8.87 — 2026-09-22
 
-**On the phone, Sync on and Sync off wait for Apply, and the worker post's message-size chart fits a phone screen.**
+**Settings › Shared shows every share link you've made and how often it was opened, a link can switch itself off after a number of views or on a date, and the blog has a second post.**
 
-On my phone, tapping Sync on or Sync off in Settings did nothing I could see.
-It worked, but it switched the moment I tapped. Everything else in that sheet
-waits for Apply, so Apply stayed gray and the tap looked dead. Now the switch
-behaves like theme and motion. Tap it and Apply lights up. Apply saves it and
-Cancel throws it away. On a computer, Settings › Sync still switches as soon
-as you click, because that page has no Apply.
+A share link used to be a one-way trip. You made it, it got copied, and
+from then on there was no way to see it again, let alone find out whether
+anyone had opened it. The only way to stop one was to know its token.
 
-The blog post about moving the engine into a worker has a chart of message
-sizes (FIG 3). On a phone it cut off its own numbers: "10 KiB" disappeared,
-and "810× over" read "81". On a narrow screen each row now wraps onto two
-lines, and every bar still shares one scale.
+Settings › Shared now lists every link you've made. Each one shows the
+image, how many times it has been opened, when it was last opened, and a
+row of bars for the last 30 days. At the top are your totals.
 
-The engine did not change. It is the same 814,432 bytes as v8.85.
+Each link has its own limits. **Stop after** a number of views, **stop on**
+a date, or both. When a link hits one, it pauses. The image stays, and
+raising the limit or clearing the date turns the link back on. You can also
+pause and resume a link by hand, or delete it, which removes the image too.
+
+Someone opening a stopped link is told why: it was turned off, it expired,
+or it reached its view limit. They don't get the image, and the visit isn't
+counted.
+
+Each opening is stored as a time and nothing else: no address, no browser,
+no account. The privacy policy says so.
+
+There's a new post on the blog, "The hotel Wi-Fi died. The editor kept
+running." It explains why the editor keeps working with no network: the
+engine runs in a worker and your work lives in the browser. It also covers
+what that means for a ward, an operating room, or anyone whose work can't
+wait for a signal. Its figures move, like the worker post's.
+
+The engine did not change. It is the same 814,432 bytes as v8.86.
 
 ## License
 
