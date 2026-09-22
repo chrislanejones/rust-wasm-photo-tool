@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.88",
+    date: "2026-09-22",
+    headline: "Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Beta lists the unfinished things you can try early — today the Smart Brush, whose strokes stop at an edge, and blur on the graphics card. Both existed already; the only way in was typing a key into developer tools, so the only people who could were people who already knew the key.",
+      },
+      {
+        tag: "feature",
+        text: "Copy invite link hands someone a link that turns one feature on for the device they open it with. They can switch it off in the same place, or open the app with ?beta=none to clear them all.",
+      },
+      {
+        tag: "infra",
+        text: "These choices live in your browser and are never sent anywhere — no account, no id, no request. There is no way to know who is in a beta, which is the point, and also why feedback has to be asked for.",
+      },
+    ],
+  },
+  {
     version: "v8.87",
     date: "2026-09-22",
     headline: "Settings › Shared shows every share link you’ve made and how often it was opened, a link can switch itself off after a number of views or on a date, and the blog has a second post",

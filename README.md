@@ -85,37 +85,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.87 — 2026-09-22
+### v8.88 — 2026-09-22
 
-**Settings › Shared shows every share link you've made and how often it was opened, a link can switch itself off after a number of views or on a date, and the blog has a second post.**
+**Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs.**
 
-A share link used to be a one-way trip. You made it, it got copied, and
-from then on there was no way to see it again, let alone find out whether
-anyone had opened it. The only way to stop one was to know its token.
+Some things here are finished but not trusted yet. The Smart Brush, where a
+stroke stops at an edge instead of running over it, has been tested every
+way except the one that matters: whether it feels right to paint with.
+Blur on the graphics card is the same story. Until now the only way to try
+either was to type a key into the browser's developer tools, which means
+the only people who could were people who already knew the key.
 
-Settings › Shared now lists every link you've made. Each one shows the
-image, how many times it has been opened, when it was last opened, and a
-row of bars for the last 30 days. At the top are your totals.
+Settings › Beta lists them. Each is off until you turn it on, and turning
+one on changes nothing for anybody else. **Copy invite link** gives you a
+link that turns one feature on for whoever opens it, on the device they
+open it with, so trying an experiment is one message instead of a
+paragraph of instructions. Anyone can switch it back off in the same
+place, or open the app with `?beta=none` to clear them all.
 
-Each link has its own limits. **Stop after** a number of views, **stop on**
-a date, or both. When a link hits one, it pauses. The image stays, and
-raising the limit or clearing the date turns the link back on. You can also
-pause and resume a link by hand, or delete it, which removes the image too.
+These choices live in your browser. Nothing about them is sent anywhere,
+and there is no way for me to know who is in a beta — which is the point,
+and also why feedback has to be asked for.
 
-Someone opening a stopped link is told why: it was turned off, it expired,
-or it reached its view limit. They don't get the image, and the visit isn't
-counted.
-
-Each opening is stored as a time and nothing else: no address, no browser,
-no account. The privacy policy says so.
-
-There's a new post on the blog, "The hotel Wi-Fi died. The editor kept
-running." It explains why the editor keeps working with no network: the
-engine runs in a worker and your work lives in the browser. It also covers
-what that means for a ward, an operating room, or anyone whose work can't
-wait for a signal. Its figures move, like the worker post's.
-
-The engine did not change. It is the same 814,432 bytes as v8.86.
+The engine did not change. It is the same 814,432 bytes as v8.87.
 
 ## License
 
