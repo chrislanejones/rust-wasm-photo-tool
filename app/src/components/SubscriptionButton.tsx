@@ -20,6 +20,7 @@ import {
   FlaskConical,
   Layers,
   RefreshCw,
+  Share2,
   Check,
   ExternalLink,
 } from "lucide-react";
@@ -38,6 +39,7 @@ import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
 import { SyncPane } from "@/components/SyncPane";
+import { SharedPane } from "@/components/SharedPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -67,6 +69,7 @@ export type SettingsTab =
   | "appearance"
   | "security"
   | "sync"
+  | "shared"
   | "export"
   | "storage"
   | "billing"
@@ -152,6 +155,7 @@ export function SubscriptionButton({
     canvas: Layers,
     security: Shield,
     sync: RefreshCw,
+    shared: Share2,
     export: Package,
     storage: Cloud,
     billing: CreditCard,
@@ -165,6 +169,7 @@ export function SubscriptionButton({
     "canvas",
     "security",
     "sync",
+    "shared",
     "export",
     "storage",
     "billing",
@@ -336,6 +341,10 @@ export function SubscriptionButton({
               /* Every control here commits immediately (lib/sync), so the
                  footer's Restore / Apply do not show for this pane. */
               <SyncPane />
+            ) : tab === "shared" ? (
+              /* Per-link actions commit as pressed (see SharedPane), so the
+                 footer's Restore / Apply do not show for this pane either. */
+              <SharedPane />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />
             ) : tab === "storage" ? (
