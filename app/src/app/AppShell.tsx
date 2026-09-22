@@ -46,7 +46,7 @@ import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
-import { ADMIN_EMAIL } from "@/lib/superuser";
+import { useSession, effectiveMode } from "@/hooks/useEntitlement";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
@@ -422,25 +422,32 @@ export function AppShell() {
     setAuthResolved(true);
   }, [setUserMode, setAuthResolved]);
 
-  // Tier override (set from the Super User settings tab). When set, it wins over
-  // the Clerk-derived mode so the No Login / Logged In / Paid versions can be
-  // tested without real auth. Only the admin can reach the tab that sets it.
+  // ── Who you are, and what you may see (ADR: role, not a fourth tier) ──────
+  //
+  // `session` comes from the SERVER (`users.me` → convex/entitlement.ts): the
+  // role from ADMIN_EMAILS, and the entitlement, in which an admin is entitled
+  // to paid WITHOUT a tier grant. The browser no longer decides either; it used
+  // to compare the signed-in email to a hardcoded address.
+  //
+  // The Super User preview may only TAKE AWAY (`effectiveMode` → `previewOf`),
+  // so the UI can never offer what the server would refuse — the mismatch that
+  // used to happen when the override raised a free account to "paid".
+  const session = useSession();
   const devTierOverride = useUIStore((s) => s.devTierOverride);
   const setDevTierOverride = useUIStore((s) => s.setDevTierOverride);
-  const effectiveUserMode = devTierOverride ?? userMode;
+  // While Convex is still answering, fall back to the Clerk-derived mode so the
+  // first paint is not "signed out" for someone who is signed in.
+  const effectiveUserMode = session.ready
+    ? effectiveMode(session, devTierOverride)
+    : (devTierOverride ?? userMode);
 
-  // Super User settings tab — only the admin account sees it. The tier override
-  // is client-side UI gating only (the real tier stays enforced server-side by
-  // Convex), so this is a convenience gate, not a security boundary.
-  const { user } = useUser();
-  const isSuperUser =
-    user?.primaryEmailAddress?.emailAddress?.toLowerCase() === ADMIN_EMAIL;
-  const superUser: SuperUserControls | null = isSuperUser
+  const superUser: SuperUserControls | null = session.role === "admin"
     ? {
         mode: effectiveUserMode,
         overridden: devTierOverride !== null,
         onSelect: (m) => setDevTierOverride(m),
         onReset: () => setDevTierOverride(null),
+        entitlement: session.entitlement,
       }
     : null;
 
