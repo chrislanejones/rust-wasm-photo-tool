@@ -48,6 +48,7 @@ import {
 } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { navigateTo, currentRouteUrl, currentRouteLabel } from "@/features/routing";
+import { isBlockedOffline } from "@/features/tools/activateSubTool";
 
 export type PaletteGroup = "tools" | "settings" | "actions";
 
@@ -75,6 +76,10 @@ export interface PaletteCommand {
  *  disabled. */
 interface PaletteContext {
   photoCount: number;
+  /** `useUIStore.onlineFeaturesEnabled`. Absent reads as OFF — the shipped
+   *  default — so a caller that forgets it can only under-offer, never offer
+   *  an upload the switch has turned off. */
+  onlineFeatures?: boolean;
   /** Rulers/grid/theme hot-toggles (preferences live outside Zustand —
    *  usePreferences broadcasts commits to every instance, AppShell included). */
   prefs?: {
@@ -158,7 +163,9 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       group: "tools",
       keywords: [...subTool.keywords, group.label, subTool.description],
       icon: subTool.icon,
-      disabled: group.id === "batch" && ctx.photoCount <= 1,
+      disabled:
+        (group.id === "batch" && ctx.photoCount <= 1) ||
+        isBlockedOffline(subTool, ctx.onlineFeatures === true),
       run: () => jumpToSubTool(group.id, subTool.id),
     });
   }

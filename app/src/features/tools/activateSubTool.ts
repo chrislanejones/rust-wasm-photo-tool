@@ -13,6 +13,7 @@
 import { useCallback } from "react";
 import { useToolStore } from "@/stores/useToolStore";
 import type { ToolState } from "@/stores/useToolStore";
+import { useUIStore } from "@/stores/useUIStore";
 import { setModeOf, selectModeOf } from "./toolModes";
 import {
   ALL_SUB_TOOLS,
@@ -21,6 +22,7 @@ import {
   subToolForToolMode,
   type LiveSubTool,
   type ResolvedSubTool,
+  type SubToolDefinition,
   type ToolGroupDefinition,
 } from "./toolGroups";
 
@@ -49,6 +51,11 @@ export function activateSubTool(resolved: ResolvedSubTool): void {
   // rather than throw: a hand-typed route reaching here is untrusted input, and
   // the route layer already refuses these.
   if (subTool.comingSoon) return;
+  // A sub-tool that sends the image to a server is not offered while the
+  // "Everything in your browser" switch is on. Refused HERE, not only at the
+  // tile, because the rail, a pasted route and the command palette all
+  // activate through this one function.
+  if (isBlockedOffline(subTool)) return;
 
   const store = useToolStore.getState();
   const live: LiveSubTool = subTool;
@@ -93,22 +100,48 @@ export function activateGroup(group: ToolGroupDefinition): void {
  * re-derive.
  */
 export function useActiveSubTool(): ResolvedSubTool | undefined {
-  return useToolStore(
-    useCallback((s: ToolState) => {
-      const stored = subToolByKey(s.activeSubTool);
-      const mode = modeOfTool(s);
-      if (
-        stored &&
-        !stored.subTool.comingSoon &&
-        stored.subTool.tool === s.activeTool &&
-        (stored.subTool.mode === undefined || stored.subTool.mode === mode)
-      ) {
-        return stored;
-      }
-      return subToolForToolMode(s.activeTool, mode);
-    }, []),
-  );
+  return useToolStore(useCallback((s: ToolState) => litSubTool(s), []));
 }
+
+/** The lit sub-tool for a given store state — the one derivation behind the
+ *  reactive read above and the imperative switch-off handler below. */
+function litSubTool(s: ToolState): ResolvedSubTool | undefined {
+  const stored = subToolByKey(s.activeSubTool);
+  const mode = modeOfTool(s);
+  if (
+    stored &&
+    !stored.subTool.comingSoon &&
+    stored.subTool.tool === s.activeTool &&
+    (stored.subTool.mode === undefined || stored.subTool.mode === mode)
+  ) {
+    return stored;
+  }
+  return subToolForToolMode(s.activeTool, mode);
+}
+
+/** True when this sub-tool needs the online-features switch and it is off.
+ *  `requiresNetwork` is the one honest list of what leaves the tab
+ *  (toolGroups.ts), so this reads it rather than naming tools. */
+export function isBlockedOffline(
+  subTool: SubToolDefinition,
+  onlineFeaturesEnabled = useUIStore.getState().onlineFeaturesEnabled,
+): boolean {
+  return !subTool.comingSoon && subTool.requiresNetwork === true && !onlineFeaturesEnabled;
+}
+
+// Turning the switch OFF while a server-backed sub-tool is lit moves to its
+// group's first sub-tool (Enhance › Resize, Create › Brush — both local), the
+// way picking any other tile would. Leaving it lit would show a tile the rail
+// says is not offered, over a panel whose buttons all refuse.
+//
+// A store subscription rather than a line in the setter, because the switch
+// lives in two places (the New dialog and Settings › Security) and both call
+// the store directly; this is the one spot that sees every change.
+useUIStore.subscribe((state, prev) => {
+  if (!prev.onlineFeaturesEnabled || state.onlineFeaturesEnabled) return;
+  const lit = litSubTool(useToolStore.getState());
+  if (lit && isBlockedOffline(lit.subTool, false)) activateGroup(lit.group);
+});
 
 /** REACTIVE read of the lit group — whichever owns the lit sub-tool. */
 export function useActiveGroup(): ToolGroupDefinition | undefined {

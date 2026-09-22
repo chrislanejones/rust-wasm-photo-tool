@@ -18,6 +18,8 @@ import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
 import { FIELD_SELECT } from "@/lib/styles";
+import { useUIStore } from "@/stores/useUIStore";
+import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -146,7 +148,11 @@ export function TextSettings({
   const { run: runOcr, phase: ocrPhase, busy: ocrBusy, error: ocrError, textResult } =
     useAIJob(() => {});
   const [copied, setCopied] = useState(false);
-  const canRunOcr = aiEnabled && !!activePhotoId && !!stampToolRef.current;
+  // OCR uploads the image — not offered while "Everything in your browser" is
+  // on (useAIJob refuses it too).
+  const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  const canRunOcr =
+    aiEnabled && onlineFeaturesEnabled && !!activePhotoId && !!stampToolRef.current;
 
   const runOcrJob = async () => {
     const tool = stampToolRef.current;
@@ -406,7 +412,10 @@ export function TextSettings({
 
         {m === "ocr" && (
           <div className="space-y-3">
-            {!aiEnabled && (
+            {!onlineFeaturesEnabled && (
+              <OnlineFeaturesOffNotice what="OCR sends the image to a server to read the text." />
+            )}
+            {onlineFeaturesEnabled && !aiEnabled && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
                 <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
                 <p className="text-2xs text-warning/90">

@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
             a few of them.
           </p>
           <p className="lede">
-            Last updated <time dateTime="2026-09-20">09-20-2026</time>.
+            Last updated <time dateTime="2026-09-22">09-22-2026</time>.
           </p>
         </header>
 
@@ -93,11 +93,11 @@ export default function PrivacyPolicy() {
           <h2>The AI tools</h2>
           <p>
             <strong>These are off by default and they are the only part of the editor that sends a
-            picture to a server.</strong> The New dialog has a switch for online features; while it
-            is off, the AI tools are not offered. When you turn it on and use one, the prompt you
-            wrote and the image or mask you are working on are sent to our server and processed by
-            Replicate, which runs the model. They are used to produce your result and are not used
-            to train anything by us.
+            picture to a server.</strong> The switch for online features is in the New dialog and
+            in Settings &rsaquo; Security; while it is off, the AI tools are not offered. When you
+            turn it on and use one, the prompt you wrote and the image or mask you are working on
+            are sent to our server and processed by Replicate, which runs the model. They are used
+            to produce your result and are not used to train anything by us.
           </p>
 
           <h2>Payment</h2>

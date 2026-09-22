@@ -1,6 +1,10 @@
 import { Tag, MapPinOff, Eraser, Laptop, Cloud } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { MetadataStripMode } from "@/lib/exif";
+import { LIVE_SUB_TOOLS } from "@/features/tools/toolGroups";
+
+/** Every sub-tool that sends the image off the machine. */
+const NETWORK_SUB_TOOLS = LIVE_SUB_TOOLS.filter((r) => r.subTool.requiresNetwork);
 
 interface SecurityPaneProps {
   /** Keep EXIF metadata on export (true) or strip it (false). */
@@ -93,10 +97,26 @@ export function SecurityPane({
           <h4 className="text-xs font-semibold text-text-secondary">
             What "on" turns on
           </h4>
-          <p className="mt-0.5 text-2xs leading-relaxed text-text-muted">
-            Today, one thing: <strong>Create AI Image</strong> in the New
-            dialog, which sends your prompt and any images you attach to it to a
-            generation server. Off, that tile is not in the grid.
+          {/* Built from `requiresNetwork` (toolGroups.ts), the one list of
+              what leaves the tab — so this page cannot promise less than the
+              app does. Create AI Image isn't a sub-tool, so it's named here. */}
+          <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-2xs leading-relaxed text-text-muted">
+            <li>
+              <strong>Create AI Image</strong> in the New dialog — your prompt
+              and any images you attach go to a generation server.
+            </li>
+            {NETWORK_SUB_TOOLS.map(({ group, subTool, key }) => (
+              <li key={key}>
+                <strong>
+                  {group.label} › {subTool.label}
+                </strong>{" "}
+                — {subTool.description.toLowerCase()}; the image goes to a server.
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-2xs leading-relaxed text-text-muted">
+            Off, those are grayed out and nothing is uploaded. Tools that run on
+            your machine, like Magic Eraser, stay available either way.
           </p>
           <h4 className="mt-2 text-xs font-semibold text-text-secondary">
             What it does not cover
