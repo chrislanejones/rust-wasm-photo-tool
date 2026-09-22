@@ -105,6 +105,12 @@ export function SecurityPane({
               <strong>Create AI Image</strong> in the New dialog — your prompt
               and any images you attach go to a generation server.
             </li>
+            <li>
+              <strong>Your edits, backed up to your account</strong> — signed
+              in, a flattened copy of each edited photo is kept on the server so
+              another device can pick it up. Off, the copy stays in this browser
+              and nothing is uploaded.
+            </li>
             {NETWORK_SUB_TOOLS.map(({ group, subTool, key }) => (
               <li key={key}>
                 <strong>
@@ -116,7 +122,9 @@ export function SecurityPane({
           </ul>
           <p className="mt-1 text-2xs leading-relaxed text-text-muted">
             Off, those are grayed out and nothing is uploaded. Tools that run on
-            your machine, like Magic Eraser, stay available either way.
+            your machine, like Magic Eraser, stay available either way. Deleting
+            a copy you already uploaded still works with the switch off — it
+            sends nothing and it is how you take something back.
           </p>
           <h4 className="mt-2 text-xs font-semibold text-text-secondary">
             What it does not cover
