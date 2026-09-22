@@ -27,7 +27,7 @@ job, runs `scripts/dead-exports-audit.mjs`.
 
 Not aliased on purpose: `--primary`/`--accent` and `--ring`/`--border-active`
 are equal today (`#c98f3f` light), but GeneralPane sketches a runtime accent
-picker. One token or two is Chris's call.
+picker. Chris decided 09-22-2026: they stay separate tokens.
 
 ## Consequences
 + Pixel diff against master, 53 surfaces: identical except six intended changes

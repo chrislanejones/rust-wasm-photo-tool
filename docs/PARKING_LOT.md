@@ -52,7 +52,7 @@ how something looks or need a decision:
 
 | Item | Where | Why it waits |
 |---|---|---|
-| `--primary` = `--accent` and `--ring` = `--border-active` in both themes | styles.css | GeneralPane sketches an accent picker that sets them at runtime — one token or two is a design call |
+| ~~`--primary` = `--accent` and `--ring` = `--border-active` in both themes~~ | styles.css | **DECIDED 09-22-2026 (Chris): keep them separate.** An accent picker may need them to differ |
 | `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
 | Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
 | Plain inputs with NO focus ring (`inputCls`) | BatchSettings:785, AIRenamePanel:213, SuperUserPane:90/100 | Adopting FIELD_NUMERIC fixes a WCAG focus-visible gap but restyles them |
