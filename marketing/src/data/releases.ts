@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.83",
+    date: "2026-09-22",
+    headline: "Mono and Serif survive a reload for real this time, and the site paints in half the time",
+    entries: [
+      {
+        tag: "fix",
+        text: "v8.82 said a text keeps its typeface through a reload. It didn't: pick Liberation Mono, commit, reload, press Resume, and it came back in Sans. The text still knew it was Mono \u2014 the fonts only loaded when you opened the Text panel, and a reload opens on Enhance, so the text was redrawn before Mono existed. Exporting a batch as a ZIP had the same problem. The fonts now load first, on every path that redraws saved text.",
+      },
+      {
+        tag: "fix",
+        text: "Waiting for the fonts is capped at four seconds, so a slow font can never stop a photo from opening, and a font that fails to download is tried again instead of being written off for the session. A browser test fails on v8.81 and v8.82 and passes on this build.",
+      },
+      {
+        tag: "perf",
+        text: "The site's first paint is about twice as fast. On a phone, Lighthouse went from 64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts come from the site itself instead of from Google, every page loads only its own code, the hero image has phone-sized copies, and the animated letters stop drawing once you scroll past them.",
+      },
+      {
+        tag: "feature",
+        text: "There's a Contact page: email, bug reports, a private route for security issues, and how to delete your account. No form \u2014 there is nothing on the other end to receive one. The footer has three columns now, with a copyright line.",
+      },
+      {
+        tag: "ui",
+        text: "The tab icon is the horse on a rounded black square, on both sites, and the home-screen icons finally match it. They were still a placeholder orange square.",
+      },
+    ],
+  },
+  {
     version: "v8.82",
     date: "2026-09-21",
     headline:
@@ -48,6 +75,10 @@ export const RELEASES: Release[] = [
       {
         tag: "infra",
         text: "The marketing site's TypeScript config is ready for TypeScript 7 \u2014 it was the only thing in the repo that wasn't. The upgrade itself waits on the linter, which does not support TypeScript 7 yet.",
+      },
+      {
+        tag: "fix",
+        text: "Correction, added in v8.83: the typeface half of this was not fixed here. The text still knew it was Mono, but the font had not loaded when a reload redrew it, so it came back in Sans. v8.83 is the real fix. The box half was fixed.",
       },
     ],
   },
