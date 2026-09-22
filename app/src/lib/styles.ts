@@ -192,7 +192,7 @@ export const SUBTILE_IDLE =
    back when the sub-row's border was 1px.) The width still matters — a
    disabled tile sits in the same grid as enabled ones, and a 0px border there
    would give it a 4px-wider content box (and a bigger icon) than its
-   neighbours. */
+   neighbors. */
 export const TILE_DISABLED =
   "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
 

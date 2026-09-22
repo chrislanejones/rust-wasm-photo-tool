@@ -56,7 +56,7 @@ export type TextMode = (typeof TEXT_MODES)[number];
 // The ordered list (button order, icons, labels) lives ONCE, in
 // PerspectiveSettings.tsx `PERSPECTIVE_MODES` — typed against this union.
 // Renaming an id would break saved routes; reordering is free — nothing
-// serialises the index, the engine stores a quad, not a mode.
+// serializes the index, the engine stores a quad, not a mode.
 export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename, and AI Rename (names every photo from what the engine sees in it).

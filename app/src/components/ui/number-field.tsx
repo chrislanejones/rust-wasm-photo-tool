@@ -1,4 +1,4 @@
-// A labelled number box: the word above, the field below, and the word
+// A labeled number box: the word above, the field below, and the word
 // ATTACHED to the field with a real `<label htmlFor>`.
 //
 // The New Canvas width/height boxes used `<span>`s for their words, so they
