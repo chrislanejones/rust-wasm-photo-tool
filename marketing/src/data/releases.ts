@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.84",
+    date: "2026-09-22",
+    headline: "Your settings follow you between devices, and “Everything in your browser” now turns off every tool that uploads",
+    entries: [
+      {
+        tag: "feature",
+        text: "Sign in on two devices and your settings travel with you: preferences, which panels and tabs you last had open, the palette’s recent list, and which mode each tool was left in. Two tabs on one machine update each other instantly. Photos, edits and your gallery don’t sync — they stay in this browser. Settings › General shows what sync is doing and can delete the synced copy.",
+      },
+      {
+        tag: "fix",
+        text: "The privacy policy said the AI tools aren’t offered while online features are off, and only Create AI Image actually was. Background removal, object removal and OCR are now off with the switch too: grayed out with a note, and a link or the palette can’t open them. Settings › Security has the same switch and lists what it turns on.",
+      },
+      {
+        tag: "fix",
+        text: "Switching tools in the middle of Remove Object ends its mask, instead of leaving it on the canvas to swallow every click. Apply Crop waits until you’ve drawn a rectangle.",
+      },
+      {
+        tag: "ui",
+        text: "Canvas Size’s Remove and Resize fit side by side on one line instead of wrapping into a staircase.",
+      },
+      {
+        tag: "ui",
+        text: "Alt + ← takes you back to the last tool you used, and Alt + → forward again — the browser’s own Back and Forward, which always worked. The shortcut list says so now.",
+      },
+      {
+        tag: "infra",
+        text: "13 unused files and 53 unused exports are gone, and the dialogs, dropdowns and headings that were written out by hand in several places are one component each. The Batch text font picker now matches the Text tool’s, and the Diagnostics tabs line up.",
+      },
+    ],
+  },
+  {
     version: "v8.83",
     date: "2026-09-22",
     headline: "Mono and Serif survive a reload for real this time, and the site paints in half the time",

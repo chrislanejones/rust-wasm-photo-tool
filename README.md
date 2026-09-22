@@ -85,38 +85,45 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.83 — 2026-09-22
+### v8.84 — 2026-09-22
 
-**Mono and Serif survive a reload for real this time, and the site paints in half the time.**
+**Your settings follow you between devices, and "Everything in your browser" now turns off every tool that uploads.**
 
-v8.82 said a text keeps its typeface through a reload. It didn't. Pick
-Liberation Mono, commit a text, reload, press Resume, and it came back in Sans.
-v8.82 fixed where the typeface is stored, and that part was right — the text
-still knew it was Mono. The loss happened one step later. The fonts only loaded
-when you opened the Text panel, and a reload opens on Enhance, so the text was
-redrawn before Mono existed and fell back to the built-in Sans. Exporting a
-batch as a ZIP had the same problem.
+Sign in on two devices and your settings travel with you: your preferences,
+which panels and tabs you last had open, the command palette's recent list,
+and which mode each tool was left in. Two tabs on the same machine update
+each other instantly. Your photos, edits and gallery do not sync. They stay
+in this browser, exactly as they do signed out. The online-features switch
+doesn't sync either, because agreeing to send data to a server is something
+you do on each device. Settings › General shows what sync is doing, and it
+has a button that deletes the synced copy from your account.
 
-The fonts now load before anything redraws your saved text, on every path that
-does it. The wait is capped at four seconds, so a slow font can never stop a
-photo from opening; the worst case is the old behavior. A font that fails to
-download is tried again instead of being written off for the session. A browser
-test now fails on v8.81 and on v8.82 and passes on this build.
+The privacy policy said the AI tools aren't offered while online features are
+off. That was only true for Create AI Image: background removal, object
+removal and OCR still sent the picture to a server. Now all of them are off
+with the switch. They're grayed out with a note saying why, and a link or the
+command palette can't open them either. Settings › Security has the same
+switch as the New dialog and lists exactly what it turns on. Magic Eraser
+runs on your machine, so it stays.
 
-The site's first paint is about twice as fast. On a phone, Lighthouse went from
-64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts are served from
-the site itself instead of from Google, every page loads only its own code, the
-hero image has phone-sized copies, and the animated letters stop drawing once
-you scroll past them.
+Switching tools in the middle of Remove Object used to leave its mask on the
+canvas, where it swallowed every click the new tool made. It ends the mask
+now. Apply Crop waits until you've drawn a rectangle.
 
-There's a Contact page: email, bug reports, a private route for security
-issues, and how to delete your account. No form — there is nothing on the other
-end to receive one. The footer has three columns now, with a copyright line.
+Canvas Size's two buttons, Remove and Resize, fit side by side on one line.
+They used to wrap into a staircase.
 
-The tab icon is the horse on a rounded black square, on both sites, and the
-home-screen icons finally match it. They were still a placeholder orange square.
+Alt + ← takes you back to the last tool you used, and Alt + → forward again.
+That's the browser's own Back button, and it always worked. Now the shortcut
+list says so.
 
-The engine did not change. It is the same 814,432 bytes as v8.82.
+Under the hood, 13 unused files and 53 unused exports are gone, and the
+dialogs, dropdowns and headings that were written out by hand in several
+places are one component each. A few things look a little more consistent
+for it: the Batch text font picker matches the Text tool's, and the
+Diagnostics tabs line up.
+
+The engine did not change. It is the same 814,432 bytes as v8.83.
 
 ## License
 
