@@ -306,9 +306,9 @@ export default function Pricing() {
           </div>
         </section>
 
-        <section className="principle">
+        <section className="coda">
           <h2 className="section__title section__title--sm">The principle</h2>
-          <p className="principle__body">
+          <p className="lede">
             Demo mode costs us nothing, because WASM runs on your device. So there are no artificial
             “sign in to use blur” gates on tools that never touch our servers. The gallery limit is
             the honest nudge: edit a dozen photos, want to keep them, and that's the moment an

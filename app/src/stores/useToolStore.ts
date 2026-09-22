@@ -24,13 +24,13 @@ import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
  *  the eraser (scrubs the active layer's alpha). */
-export const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
+const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
-export const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
+const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
 export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
-export const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
+const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
 export type ShapesMode = (typeof SHAPES_MODES)[number];
 /** Eraser tool (id "ai") sub-modes: `brush` = drag-to-erase on the canvas;
  *  `magic` = local Magic Eraser (PatchMatch); `rembg` = Background Removal and
@@ -42,7 +42,7 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  Named `ERASER_MODE_VALUES` (not `ERASER_MODES`) — AISettings.tsx already
  *  has a richer `ERASER_MODES` (icon/label/info per tile); this is just the
  *  bare value tuple for hydration validation. */
-export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
+const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** The `effects` tool's two panels: `adjust` = the Adjustments sliders,
  *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
@@ -54,17 +54,17 @@ export type EffectsMode = "adjust" | "levels" | "presets";
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
  *  component state the mode was invisible to the command palette, hash routing
  *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
-export const TEXT_MODES = ["text", "background", "ocr"] as const;
+const TEXT_MODES = ["text", "background", "ocr"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
 
 /** Perspective tool sub-modes (v8.42). Not three tools — ONE quad and three
  *  rules about what dragging a handle does to the other corners. See
  *  `lib/perspective.ts` `dragCorner` for the rules themselves. */
-// Order IS the panel button order (Chris, 2026-08-17: "perspective | distort
-// | skew"). Renaming an id would break saved routes; reordering is free —
-// nothing serializes the index, the engine stores a quad, not a mode.
-export const PERSPECTIVE_MODES = ["perspective", "distort", "skew"] as const;
-export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
+// The ordered list (button order, icons, labels) lives ONCE, in
+// PerspectiveSettings.tsx `PERSPECTIVE_MODES` — typed against this union.
+// Renaming an id would break saved routes; reordering is free — nothing
+// serializes the index, the engine stores a quad, not a mode.
+export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename, and AI Rename (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
@@ -73,7 +73,7 @@ export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-export const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
@@ -219,6 +219,12 @@ export interface ToolState {
    *  `dexie-migration` gate is not triggered. A half-painted mask surviving a
    *  reload would also point at whatever image happened to load next. */
   objectRemovalMasking: boolean;
+  /** Whether the Crop tool has a rectangle drawn. Published by
+   *  `useDrawingTools` (the rectangle itself stays hook state) so the panel's
+   *  Apply Crop can be disabled without threading a prop through AppShell,
+   *  which must gain nothing. NOT persisted — outside the `partialize`
+   *  allowlist, like every other transient field here. */
+  cropSelectionActive: boolean;
   /** The painted strokes, in IMAGE-space pixels (see `lib/objectRemovalMask`).
    *  Image space, not screen space, is what makes the uploaded mask land in
    *  register at any zoom. */
@@ -351,13 +357,34 @@ export const useToolStore = create<ToolState>()(
       selectionTolerance: 24,
       selectionMask: null,
       objectRemovalMasking: false,
+      cropSelectionActive: false,
       objectRemovalStrokes: [],
       objectRemovalBrush: 40,
       objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
 
-      setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
+      setActiveTool: (v) =>
+        set((s) => {
+          const next = resolveSet(v, s.activeTool);
+          // LEAVING THE AI TOOL ENDS REMOVE OBJECT'S MASK MODE. The mask
+          // overlay is mounted for every tool and only `objectRemovalMasking`
+          // hides it, but the only things that turned masking off lived in
+          // AISettings — which unmounts the moment another tool is picked. So
+          // switching tools mid-mask left the half-opacity paint on the canvas,
+          // and the overlay (pointer-events on, z 25) swallowed every click the
+          // new tool made, with Esc the only way out (QC §3, 09-22). Leaving is
+          // treated exactly like Cancel: the same clears as `setObjectRemovalMasking`.
+          if (next !== "ai" && s.objectRemovalMasking) {
+            return {
+              activeTool: next,
+              objectRemovalMasking: false,
+              objectRemovalStrokes: [],
+              objectRemovalBusy: false,
+            };
+          }
+          return { activeTool: next };
+        }),
       setActiveSubTool: (v) =>
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       // Newest first, case-insensitively de-duplicated (the engine hands back

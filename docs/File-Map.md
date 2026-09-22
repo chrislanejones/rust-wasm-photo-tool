@@ -168,6 +168,11 @@ app/src/
 │   │                                 when signed in; a failed Convex write falls back to local
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
+│   ├── ui/                           Shared primitives — the ONE copy of each: buttons/tiles,
+│   │                                 dialog + confirm-dialog, select-field, number-field,
+│   │                                 pane-heading, status-note, segmented-tabs, swatch, tooltip
+│   │                                 (+ HintTooltip). Repeated class strings live in lib/styles.ts
+│   ├── ParkedScreen.tsx              "This tab is parked" card behind IdleScreen + MultiTabScreen
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
@@ -236,7 +241,6 @@ app/src/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
 │   │   ├── ToolGrid.tsx              Gradient icon buttons
 │   │   ├── ToolButton.tsx            Individual tool button
-│   │   ├── toolConfig.ts             Tool definitions (10 tools)
 │   │   └── settings/
 │   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
 │   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)

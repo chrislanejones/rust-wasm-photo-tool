@@ -5,7 +5,10 @@ import App from "./App";
 // tokens first — styles.css consumes every one of these custom properties.
 import "./tokens.css";
 import "./styles.css";
+// After styles.css: its reduced-motion overrides have to win the cascade.
+import "./animations.css";
 import { initAnalytics } from "./lib/analytics";
+import { preloadRoute } from "./routes";
 
 initAnalytics();
 
@@ -35,8 +38,26 @@ const app = (
   </React.StrictMode>
 );
 
-if (container.firstElementChild) {
-  hydrateRoot(container, app);
-} else {
-  createRoot(container).render(app);
-}
+/* The page's own chunk first (see routes.ts). prerender.mjs already lists it
+ * as a <link rel="modulepreload">, so it has usually arrived before this line
+ * runs. Hydrating before it resolves would leave the whole page inert until it
+ * did. */
+void preloadRoute(window.location.pathname).then(() => {
+  if (container.firstElementChild) {
+    hydrateRoot(container, app);
+  } else {
+    createRoot(container).render(app);
+  }
+});
+
+/* Fetch the next page's chunk the moment a link to it is pointed at or
+ * focused, so the click finds it already loaded. One delegated listener for
+ * every internal link, nav, footer and body alike. A preload that has already
+ * run is a no-op, so repeat hovers cost nothing. */
+const prefetch = (e: Event) => {
+  const a = (e.target as Element | null)?.closest?.("a[href^='/']");
+  if (a) void preloadRoute(new URL((a as HTMLAnchorElement).href).pathname);
+};
+document.addEventListener("pointerover", prefetch, { passive: true });
+document.addEventListener("focusin", prefetch);
+document.addEventListener("touchstart", prefetch, { passive: true });

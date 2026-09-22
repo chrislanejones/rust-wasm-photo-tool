@@ -68,7 +68,7 @@ import type {
  *  something to show a human, an icon for the tile, and fuzzy-search terms.
  *  (The rich `ToolMode` — per-mode lightbulb info copy — stays in the registry
  *  / panel modules; this is the thin projection of it.) */
-export interface ToolModeInfo {
+interface ToolModeInfo {
   id: string;
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
@@ -189,7 +189,7 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
 
 /** The tool's sub-modes: registry first, legacy list as the fallback. Empty
  *  array for single-mode tools (Adjust, Effects, Layer Settings). */
-export function modesFor(tool: ToolType): ToolModeInfo[] {
+function modesFor(tool: ToolType): ToolModeInfo[] {
   const registered = TOOL_MODULES[tool]?.modes;
   if (registered?.length) {
     return registered.map((m) => ({

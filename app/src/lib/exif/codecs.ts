@@ -46,7 +46,7 @@ function concatRanges(b: Bytes, ranges: Array<[number, number]>): Bytes {
 // behind an "Exif\0\0" identifier; XMP also rides APP1; IPTC/Photoshop is APP13
 // (FFED). SOS (FFDA) begins the compressed scan — no metadata after it.
 
-export const EXIF_ID = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // "Exif\0\0"
+const EXIF_ID = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // "Exif\0\0"
 
 export function isJpeg(b: Bytes): boolean {
   return b.length > 3 && b[0] === 0xff && b[1] === 0xd8;
@@ -160,7 +160,7 @@ export function injectJpegExif(jpeg: Bytes, tiff: Bytes): Bytes {
 // ── PNG ──────────────────────────────────────────────────────────────────
 // 8-byte signature then length(4 BE) + type(4) + data + crc(4) chunks.
 
-export const PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
+const PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
 
 export function isPng(b: Bytes): boolean {
   return b.length > 8 && PNG_SIG.every((v, i) => b[i] === v);
@@ -227,7 +227,7 @@ export function stripPngMetadata(b: Bytes): Bytes {
 // extended container "VP8X" carries a flags byte; EXIF=0x08, XMP=0x04,
 // alpha=0x10. Simple "VP8 "/"VP8L" files must be upgraded to VP8X to hold EXIF.
 
-export const ASCII = (s: string) => s.split("").map((c) => c.charCodeAt(0));
+const ASCII = (s: string) => s.split("").map((c) => c.charCodeAt(0));
 
 export function isWebp(b: Bytes): boolean {
   return (
@@ -264,7 +264,7 @@ export function parseWebpChunks(b: Bytes): WebpChunk[] | null {
 }
 
 /** Reassemble a WebP RIFF container from a list of chunk byte-payloads. */
-export function buildWebp(parts: Array<{ fourcc: string; data: Bytes }>): Bytes {
+function buildWebp(parts: Array<{ fourcc: string; data: Bytes }>): Bytes {
   let body = 4; // "WEBP"
   for (const p of parts) body += 8 + p.data.length + (p.data.length & 1);
   const out = new Uint8Array(8 + body);

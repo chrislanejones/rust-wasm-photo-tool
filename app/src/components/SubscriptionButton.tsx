@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
-import { DIALOG_OVERLAY } from "@/lib/styles";
+import { DIALOG_OVERLAY, WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -133,6 +133,12 @@ export function SubscriptionButton({
   const openSettings = useUIStore((s) => s.openSettings);
   const closeSettings = useUIStore((s) => s.closeSettings);
   const setTab = useUIStore((s) => s.setSettingsTab);
+  // Settings → Security shows the New dialog's online-features switch a second
+  // time. Same store field, so the two mirror by construction; `aiComposerOpen`
+  // carries that dialog's "locked mid-prompt" state across to this copy.
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
+  const setOnlineFeatures = useUIStore((s) => s.setOnlineFeaturesEnabled);
+  const aiComposerOpen = useUIStore((s) => s.aiComposerOpen);
 
   // Labels come from the route table (features/routing) — one source, so the
   // pane the URL names and the tab the rail shows can't drift apart. Icons and
@@ -262,7 +268,7 @@ export function SubscriptionButton({
           overlayClassName="z-[var(--z-modal)]"
         >
           <DialogHeader className="px-4 py-2.5">
-            <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+            <DialogTitle className={WINDOW_TITLE}>
               <Settings className="h-4 w-4" />
               Settings
             </DialogTitle>
@@ -317,6 +323,9 @@ export function SubscriptionButton({
                 onStripModeChange={(exifStripMode) =>
                   setDraft((d) => ({ ...d, exifStripMode }))
                 }
+                onlineFeatures={onlineFeatures}
+                onOnlineFeaturesChange={setOnlineFeatures}
+                onlineFeaturesLocked={aiComposerOpen}
               />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />

@@ -29,8 +29,8 @@ export const SITE_NAME = "Image Horse";
  *  Raster, not the SVG logo: X/Twitter and LinkedIn both ignore SVG in
  *  `og:image`, so an SVG here is the same as no card at all. */
 export const DEFAULT_OG_IMAGE = "/og/default.png";
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 /** Absolute URL for a site-relative path. Open Graph requires absolute URLs —
  *  a relative `og:image` is silently dropped by most scrapers. */
@@ -140,6 +140,15 @@ export const ROUTES: readonly Route[] = [
     ogImage: "/og/trail-log.png",
     sources: ["marketing/src/data/releases.ts", "marketing/src/pages/Trail.tsx"],
     ogType: "article",
+  },
+  {
+    to: "/contact",
+    label: "Contact",
+    title: "Contact Image Horse — email, bugs and security",
+    description:
+      "Email the developer, report a bug on GitHub or Codeberg, send a security problem privately, or ask for your account to be deleted. One person reads all of it.",
+    sources: ["marketing/src/pages/Contact.tsx"],
+    footerOnly: true,
   },
   {
     to: "/privacy-policy",

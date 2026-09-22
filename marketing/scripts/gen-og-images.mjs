@@ -8,6 +8,7 @@
 //
 //   node marketing/scripts/gen-og-images.mjs      (needs playwright; see below)
 //   node marketing/scripts/gen-og-images.mjs --posts    the post cards only
+//   node marketing/scripts/gen-og-images.mjs --icons    the three icons only
 //
 // `--posts` exists because the other ten files are pixel-stable but not
 // byte-stable: a newer Chromium encodes the same pixels into a different PNG,
@@ -152,8 +153,11 @@ const page = await browser.newPage({
 });
 
 const postsOnly = process.argv.includes("--posts");
+// The same reason `--posts` exists, the other way round: a new icon should not
+// arrive wrapped in a dozen byte-churned share cards.
+const iconsOnly = process.argv.includes("--icons");
 
-for (const route of postsOnly ? [] : ROUTES) {
+for (const route of postsOnly || iconsOnly ? [] : ROUTES) {
   const [headline, kicker] = HEADLINE[route.to] ?? [route.title, ""];
   await page.setContent(card(headline.replace(/\n/g, "<br>"), kicker), {
     waitUntil: "load",
@@ -359,7 +363,7 @@ const postCard = (post, plate) => `<!doctype html>
 
 mkdirSync(join(outDir, "blog"), { recursive: true });
 
-for (const post of POSTS) {
+for (const post of iconsOnly ? [] : POSTS) {
   const plate = await scenePlate(post);
   await page.setViewportSize({ width: 1200, height: 630 });
   await page.setContent(postCard(post, plate), { waitUntil: "load" });
@@ -392,21 +396,19 @@ await siteContext.close();
  * and the web app manifest, whose icons Chrome will not use as an install
  * prompt unless at least one is a 192px and one a 512px raster.
  *
- * Same two shapes as favicon.svg, scaled — a rounded square of paper with an
- * accent tile inside — so the home-screen icon and the tab favicon are visibly
- * the same mark rather than two designs that happen to share a color.
+ * They are favicon.svg ITSELF, rasterized — the horse on a rounded square of
+ * the site's near-black — so the home-screen icon and the tab favicon cannot
+ * drift into two designs. (Until 09-21-2026 these were a separately drawn
+ * placeholder, a dark square with an orange tile, while the tab had already
+ * moved to the horse.) The corners outside the rounded square stay transparent.
  */
+const FAVICON_SVG = readFileSync(join(marketing, "public", "favicon.svg"), "utf8");
 const icon = (px) => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   * { margin: 0; padding: 0; }
-  html, body { width: ${px}px; height: ${px}px; }
-  body { background: oklch(13% 0.018 35); display: grid; place-items: center; }
-  .tile {
-    width: ${Math.round(px * 0.5625)}px; height: ${Math.round(px * 0.5625)}px;
-    border-radius: ${Math.round(px * 0.125)}px;
-    background: oklch(74% 0.180 55);
-  }
-</style></head><body><div class="tile"></div></body></html>`;
+  html, body { width: ${px}px; height: ${px}px; background: transparent; }
+  img { display: block; width: ${px}px; height: ${px}px; }
+</style></head><body><img src="data:image/svg+xml;base64,${Buffer.from(FAVICON_SVG).toString("base64")}"></body></html>`;
 
 const ICONS = [
   ["apple-touch-icon", 180],
@@ -417,7 +419,10 @@ const ICONS = [
 for (const [name, px] of postsOnly ? [] : ICONS) {
   await page.setViewportSize({ width: px, height: px });
   await page.setContent(icon(px), { waitUntil: "load" });
-  writeFileSync(join(marketing, "public", `${name}.png`), await page.screenshot({ type: "png" }));
+  writeFileSync(
+    join(marketing, "public", `${name}.png`),
+    await page.screenshot({ type: "png", omitBackground: true }),
+  );
   console.log(`  ${name}.png`);
 }
 

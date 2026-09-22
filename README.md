@@ -85,38 +85,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.82 — 2026-09-21
+### v8.83 — 2026-09-22
 
-**Text keeps its typeface and its box through a reload, and the pricing page stops selling two things that don't exist.**
+**Mono and Serif survive a reload for real this time, and the site paints in half the time.**
 
-A committed text box lost its typeface and its size on reload, and only on
-reload. Pick Liberation Mono, commit, reload, and the words came back
-proportional; Serif came back without its serifs. The box you dragged came back
-at the default. It had been live since v8.80.
+v8.82 said a text keeps its typeface through a reload. It didn't. Pick
+Liberation Mono, commit a text, reload, press Resume, and it came back in Sans.
+v8.82 fixed where the typeface is stored, and that part was right — the text
+still knew it was Mono. The loss happened one step later. The fonts only loaded
+when you opened the Text panel, and a reload opens on Enhance, so the text was
+redrawn before Mono existed and fell back to the built-in Sans. Exporting a
+batch as a ZIP had the same problem.
 
-There were two losses, and either one was enough on its own. Replaying the undo
-history treated a text edit as a replacement, so the typeface and the box fell
-back to their defaults the moment an edit replayed. And the copy that saves your
-work to this browser had never kept the box at all — the wrap width, box height
-and perspective have been written by the engine since v8.40 and not one of them
-had ever reached disk. Both halves are fixed, and the same latent bug in shape
-edits is fixed with them. Saved work already on your disk comes back closer to
-what you left, never further from it.
+The fonts now load before anything redraws your saved text, on every path that
+does it. The wait is capped at four seconds, so a slow font can never stop a
+photo from opening; the worst case is the old behavior. A font that fails to
+download is tried again instead of being written off for the session. A browser
+test now fails on v8.81 and on v8.82 and passes on this build.
 
-The pricing page stops selling two things that don't exist. Pro said "cloud
-originals" and every tier said "projects". No tier uploads your originals — they
-stay on your device — and there is no Projects screen. Both are gone, and the
-page now says Pro's AI allowance is 50 a day and 300 a month, which is what the
-server actually enforces.
+The site's first paint is about twice as fast. On a phone, Lighthouse went from
+64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts are served from
+the site itself instead of from Google, every page loads only its own code, the
+hero image has phone-sized copies, and the animated letters stop drawing once
+you scroll past them.
 
-The rest of the site caught up. The features page lists all twelve presets,
-the three real typefaces, 38 sub-tools, H for pan and the Magic Eraser as
-shipped. The two architecture diagrams agree with each other again. The blog
-post's eight source links all went to a `main` branch this repo has never had;
-they work now.
+There's a Contact page: email, bug reports, a private route for security
+issues, and how to delete your account. No form — there is nothing on the other
+end to receive one. The footer has three columns now, with a copyright line.
 
-The engine grew by 230 bytes, to 814,432.
+The tab icon is the horse on a rounded black square, on both sites, and the
+home-screen icons finally match it. They were still a placeholder orange square.
 
+The engine did not change. It is the same 814,432 bytes as v8.82.
 
 ## License
 

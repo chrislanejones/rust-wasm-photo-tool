@@ -49,17 +49,10 @@ const E2E = join(ROOT, "e2e");
 // These read as dead to any name-scan and are alive. Each needs a REASON, not
 // just an entry — an exception without one is how a real finding gets buried.
 const EXCEPT = new Map([
-  // The persist-`merge` validation pattern: these tuples exist so a rehydrated
-  // store value can be checked against the union it claims to be. They are
-  // referenced as a whole inside their own store's merge(), which the scan
-  // sees as same-file-only. Fallow's standing false positive too.
-  ["BRUSH_MODES", "useToolStore persist-merge validation tuple"],
-  ["STAMP_SUB_MODES", "useToolStore persist-merge validation tuple"],
-  ["SHAPES_MODES", "useToolStore persist-merge validation tuple"],
-  ["ERASER_MODE_VALUES", "useToolStore persist-merge validation tuple"],
-  ["TEXT_MODES", "useToolStore persist-merge validation tuple"],
-  ["BATCH_MODES", "useToolStore persist-merge validation tuple"],
-  ["MASTER_TABS", "useUIStore persist-merge validation tuple"],
+  // (empty) The seven persist-`merge` validation tuples that used to sit here
+  // (BRUSH_MODES … MASTER_TABS) were only ever read inside their own store,
+  // so they are no longer exported at all — which is what "same-file only"
+  // asks for, and it ends fallow's matching false positive too.
 ]);
 
 function walk(dir, out = []) {

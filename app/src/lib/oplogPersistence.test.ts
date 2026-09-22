@@ -4,6 +4,12 @@
 // trip is proven byte-exact in Rust: src/ops_engine_parity.rs).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// The font registrar fetches faces over the network; here it resolves at once,
+// so every other test in this file is unaffected. The ordering test below
+// swaps in a promise it releases by hand.
+const fontsForRestore = vi.hoisted(() => vi.fn(async (): Promise<void> => {}));
+vi.mock("@/lib/engineFonts", () => ({ ensureEngineFontsForRestore: fontsForRestore }));
+
 import { db } from "@/lib/dexie/db";
 import {
   __resetOplogPersistenceForTests,
@@ -829,5 +835,38 @@ describe("the F6 save-race: a mid-save invalidation wins", () => {
     const m = (await db.oplogManifests.get("p1"))!;
     expect(m.stale).toBe(false);
     expect(m.opCount).toBe(2);
+  });
+});
+
+describe("restore registers the runtime faces BEFORE it replays", () => {
+  // The replay rasterizes every text it rebuilds. Until v8.82 nothing on the
+  // resume path registered Liberation Mono or Serif, so a text committed in
+  // either came back in the embedded Sans after a reload — its `font_id`
+  // intact, its pixels proportional. Measured on a v8.82 production build:
+  // glyph spacing 12.5–13 px committed, i-stems 4.5–5 px after Resume.
+  it("does not hand the engine the log until the faces are in", async () => {
+    await seedPhoto("p1");
+    const writer = new FakeTool();
+    writer.push(10, 11);
+    await saveOplogNow(writer, "p1");
+
+    let release!: () => void;
+    fontsForRestore.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const reader = new FakeTool();
+    const pending = restoreOplog(reader, "p1");
+    await vi.waitFor(() => expect(fontsForRestore).toHaveBeenCalledWith(reader));
+    // Give a fire-and-forget version every chance to run the replay anyway.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(reader.restoreArgs, "the replay waited for the faces").toBeNull();
+
+    release();
+    expect(await pending).toBe("restored");
+    expect(reader.restoreArgs, "and ran once they were in").not.toBeNull();
   });
 });

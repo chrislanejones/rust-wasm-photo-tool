@@ -58,6 +58,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { useToolStore } from "@/stores/useToolStore";
 import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
 import type { PerspectiveMode } from "@/stores/useToolStore";
+import { PANEL_SECTION } from "@/lib/styles";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 
 /** The three drag rules, as the registry / palette / SubtoolRow consume them.
  *
@@ -148,7 +150,7 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
 
       {/* Actions sit OUTSIDE the ToolModeToggle body so they don't re-animate
           on every mode switch — same placement rule as SelectSettings. */}
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+      <div className={PANEL_SECTION}>
         <SectionHeader
           title="Transform"
           info={
@@ -173,36 +175,40 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
             <Scan /> Place box
           </ToolButton>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            <ToolButton
-              stacked
-              disabled={disabled || !ready || !dirty || !valid}
-              onClick={() => void api?.apply()}
-              title={
-                !valid
+          <ToolButtonGroup
+            stacked
+            columns={3}
+            options={[
+              {
+                id: "apply",
+                label: "Apply",
+                icon: Check,
+                disabled: disabled || !ready || !dirty || !valid,
+                title: !valid
                   ? "The corners cross — untangle the quad first"
-                  : "Apply the perspective transform"
-              }
-            >
-              <Check /> Apply
-            </ToolButton>
-            <ToolButton
-              stacked
-              disabled={disabled || !ready || !dirty}
-              onClick={() => api?.reset()}
-              title="Reset the quad to a rectangle"
-            >
-              <RotateCcw /> Reset
-            </ToolButton>
-            <ToolButton
-              stacked
-              disabled={disabled || !ready}
-              onClick={() => api?.cancel()}
-              title="Cancel — take the box off the canvas (Esc)"
-            >
-              <X /> Cancel
-            </ToolButton>
-          </div>
+                  : "Apply the perspective transform",
+              },
+              {
+                id: "reset",
+                label: "Reset",
+                icon: RotateCcw,
+                disabled: disabled || !ready || !dirty,
+                title: "Reset the quad to a rectangle",
+              },
+              {
+                id: "cancel",
+                label: "Cancel",
+                icon: X,
+                disabled: disabled || !ready,
+                title: "Cancel — take the box off the canvas (Esc)",
+              },
+            ]}
+            onChange={(id) => {
+              if (id === "apply") void api?.apply();
+              else if (id === "reset") api?.reset();
+              else api?.cancel();
+            }}
+          />
         )}
       </div>
     </div>

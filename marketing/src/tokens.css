@@ -5,6 +5,29 @@
  * token first, then gets referenced.
  */
 
+/* === Font files ================================================
+ * Geist and JetBrains Mono, self-hosted from /public/fonts. index.html
+ * preloads the two latin files. Both are variable fonts, so each subset is
+ * ONE file for every weight. The faces are still declared per weight (400,
+ * 500, 700 / 400, 500), exactly as Google Fonts declared them, so a
+ * `font-weight: 600` resolves to the 700 face just as it did before the move.
+ * One `font-weight: 400 700` range would render 600 as a true 600 and change
+ * the look of three rules for no reason.
+ *
+ * The file names carry Google's version (v5, v24) so vercel.json can cache
+ * /fonts/ as immutable. A new version gets a new name, never a new body.
+ * Both fonts are SIL Open Font License 1.1: public/fonts/LICENSE.txt. */
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/geist-latin-v5.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 500; font-display: swap; src: url(/fonts/geist-latin-v5.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/geist-latin-v5.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/geist-latin-ext-v5.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 500; font-display: swap; src: url(/fonts/geist-latin-ext-v5.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/geist-latin-ext-v5.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/jetbrains-mono-latin-v24.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(/fonts/jetbrains-mono-latin-v24.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/jetbrains-mono-latin-ext-v24.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(/fonts/jetbrains-mono-latin-ext-v24.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
 :root {
   color-scheme: dark;
 
@@ -38,12 +61,16 @@
 
   /* === Typography ==============================================
    * 2 families (2+1 rule): Geist display+body, JetBrains Mono outlier.
-   * Outlier is scoped to exactly 2 slots: wordmark + spec-table figures.
+   * The outlier is for figures, labels and code: numbers in the spec tables,
+   * dates, version tags, keycaps. Never for running text or headings.
    */
   --font-display: "Geist", system-ui, sans-serif;
   --font-body:    "Geist", system-ui, sans-serif;
   --font-outlier: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
+  /* The tool-tile names under the home page's button set, and nothing else:
+   * the tiles are sized to the editor's own rail, where the labels are 11px. */
+  --text-2xs:     0.6875rem;
   --text-xs:      0.75rem;
   --text-sm:      0.8125rem;
   --text-base:    1rem;
@@ -57,6 +84,10 @@
    * than gravity. The hero line is 60, so it caps here. */
   --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
   --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
+  /* The closing line above every footer. */
+  --text-statement: clamp(1.75rem, 4.5vw, 3rem);
+  /* A single number set larger than any headline: the $0 on /pricing. */
+  --text-figure:  clamp(5rem, 15vw, 11rem);
 
   /* Long-form reading, and only that. --text-base is sized for prose that sits
      beside controls and gets scanned; an article is read start to finish, and
@@ -125,9 +156,14 @@
   --shadow-float: 0 1.75rem 3.5rem -1.25rem oklch(0% 0 0 / 0.55);
 
   /* === Radius ================================================== */
+  /* Keycaps and code chips: small enough that --radius-sm would read round. */
+  --radius-xs:   2px;
   --radius-sm:   6px;
   --radius-md:   10px;
   --radius-pill: 999px;
+  /* The horse mark, at any size: a proportion, so the 44px logo and the 32px
+   * one in the mobile sheet have the same corner. */
+  --radius-logo: 20%;
 
   /* === Motion ================================================== */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
@@ -137,6 +173,13 @@
   --dur-micro: 120ms;
   --dur-short: 220ms;
   --dur-long:  420ms;
+  /* A slow loop for something that idles, not something that responds: the
+   * GPU section's hint line breathes on this. */
+  --dur-ambient: 3.2s;
+  /* What every animation and transition collapses to under
+   * prefers-reduced-motion (animations.css). Short enough to read as a state
+   * change, long enough that nothing jumps. */
+  --dur-reduced: 150ms;
   /* The nav scroll-morph. Every morphed property shares this one duration and
    * one curve, or the bar reads as several animations instead of one.
    * The curve is --ease-in-out, NOT --ease-out: exponential ease-out is right

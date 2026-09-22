@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
-import CommandPalette from "./components/CommandPalette";
-import Home from "./pages/Home";
-import Architecture from "./pages/Architecture";
-import About from "./pages/About";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import Features from "./pages/Features";
-import Pricing from "./pages/Pricing";
-import Trail from "./pages/Trail";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import NotFound from "./pages/NotFound";
 import useHead from "./useHead";
 import { trackPageView } from "./lib/analytics";
+import { PAGE_ROUTES } from "./routes";
+
+/* The ⌘K palette is its own chunk, mounted after the page has loaded. Before,
+ * it rendered all ~70 of its results (closed) into the prerendered markup of
+ * every page, and it pulled the whole feature list and its icon set into the
+ * entry bundle. Now it loads on idle once the page is up, and mounts closed so
+ * its first open still fades in. A ⌘K pressed before then mounts it directly. */
+const loadPalette = () => import("./components/CommandPalette");
+const CommandPalette = lazy(loadPalette);
 
 /** Client-side routing keeps the scroll position across pages, which is the
  *  wrong default for a set of documents: follow a link and you land halfway
@@ -56,6 +53,29 @@ export default function App() {
   }, [analyticsPath, analyticsSearch]);
 
   const [searchOpen, setSearchOpen] = useState(false);
+  const [paletteMounted, setPaletteMounted] = useState(false);
+  useEffect(() => {
+    if (searchOpen) setPaletteMounted(true);
+  }, [searchOpen]);
+  useEffect(() => {
+    let cancelled = false;
+    const mount = () => {
+      void loadPalette().then(() => !cancelled && setPaletteMounted(true));
+    };
+    const whenIdle = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(mount, { timeout: 4000 });
+      } else {
+        window.setTimeout(mount, 2000);
+      }
+    };
+    if (document.readyState === "complete") whenIdle();
+    else window.addEventListener("load", whenIdle, { once: true });
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", whenIdle);
+    };
+  }, []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   // ⌘K on mac, Ctrl-K elsewhere. Lives here rather than in the palette so the
@@ -78,27 +98,22 @@ export default function App() {
       </a>
       <ScrollBehaviour />
       <Nav onOpenSearch={() => setSearchOpen((o) => !o)} searchOpen={searchOpen} />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/architecture" element={<Architecture />} />
-        <Route path="/blog" element={<Blog />} />
-        {/* The one parameterized route on the site. It is NOT in ROUTES — see
-            the note in seo.ts — so prerender.mjs writes these files from POSTS
-            instead, and an unknown slug renders NotFound rather than a blank
-            article. */}
-        <Route path="/blog/:slug" element={<BlogPost />} />
-        <Route path="/features" element={<Features />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/trail-log" element={<Trail />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
-        {/* A catch-all, so an unknown URL gets a page that says so instead of a
-            bare nav over empty space. Paired with a real 404 status from the
-            host — see scripts/prerender.mjs. */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <CommandPalette open={searchOpen} onClose={closeSearch} />
+      {/* Pages are separate chunks (see routes.ts). The fallback never shows
+          on a first load, because the page is preloaded before render, and a
+          later navigation runs in a transition, which keeps the old page up
+          until the new one is ready. It is here because lazy() requires it. */}
+      <Suspense fallback={null}>
+        <Routes>
+          {PAGE_ROUTES.map(({ path, page: { Component } }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
+        </Routes>
+      </Suspense>
+      {paletteMounted && (
+        <Suspense fallback={null}>
+          <CommandPalette open={searchOpen} onClose={closeSearch} />
+        </Suspense>
+      )}
     </>
   );
 }

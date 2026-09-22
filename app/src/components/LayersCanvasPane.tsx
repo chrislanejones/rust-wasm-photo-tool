@@ -3,6 +3,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { Preferences } from "@/lib/preferences";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 /**
  * Settings → Layers and Canvas pane. Controls how a freshly-imported photo lands
@@ -52,18 +53,13 @@ export function LayersCanvasPane({
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">
-            Importing: Canvas on every new image or background
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            How a freshly-opened photo lands. “Canvas + photo” places the image
-            on a slightly larger backing canvas as two layers (a Background and
-            the Photo on top), Photoshop-style. “Photo only” keeps the classic
-            single full-bleed layer at the exact photo size. Applies to new
-            imports.
-          </p>
-        </div>
+        <PaneHeading title="Importing: Canvas on every new image or background">
+          How a freshly-opened photo lands. “Canvas + photo” places the image
+          on a slightly larger backing canvas as two layers (a Background and
+          the Photo on top), Photoshop-style. “Photo only” keeps the classic
+          single full-bleed layer at the exact photo size. Applies to new
+          imports.
+        </PaneHeading>
         <ToggleButtonGroup
           fill
           items={[
@@ -110,20 +106,15 @@ export function LayersCanvasPane({
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">
-            Exporting: Export Canvas as a background (copy canvas to clipboard)
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            The backing canvas above (“Canvas + photo”) is a compositional
-            guide. “Photo only” — the default — leaves it out of downloads,
-            shares, and copies, so an export is the photo at the photo’s own
-            size. “Include canvas” bakes the full padded backing in instead.
-            This applies to copying a selection as well as the whole canvas.
-            JPEG has no transparency, so a transparent backing is left out of a
-            JPEG either way — it would otherwise be written as a black border.
-          </p>
-        </div>
+        <PaneHeading title="Exporting: Export Canvas as a background (copy canvas to clipboard)">
+          The backing canvas above (“Canvas + photo”) is a compositional
+          guide. “Photo only” — the default — leaves it out of downloads,
+          shares, and copies, so an export is the photo at the photo’s own
+          size. “Include canvas” bakes the full padded backing in instead.
+          This applies to copying a selection as well as the whole canvas.
+          JPEG has no transparency, so a transparent backing is left out of a
+          JPEG either way — it would otherwise be written as a black border.
+        </PaneHeading>
         <ToggleButtonGroup
           fill
           items={[
