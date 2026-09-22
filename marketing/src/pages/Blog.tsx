@@ -46,7 +46,7 @@ export default function Blog() {
                   </time>
                   {post.version && <span className="postcard__version">{post.version}</span>}
                   {post === latest && rest.length > 0 && (
-                    <span className="postcard__latest">Latest</span>
+                    <span className="tag--latest">Latest</span>
                   )}
                 </div>
 

@@ -89,6 +89,13 @@ export default function ShotTimeline({ shots }: ShotTimelineProps) {
                 key={s.src}
                 className="shot-stack__frame"
                 src={s.src}
+                srcSet={s.srcSet}
+                /* The frame is the column's full width up to --page-max
+                   (72rem = 1152px). Below that it is the viewport less two
+                   gutters: about 90% (5vw a side), more like 88% on a 320px
+                   phone. 92vw slightly overstates it, which only ever errs
+                   toward the larger file. */
+                sizes={s.srcSet ? "(min-width: 80rem) 72rem, 92vw" : undefined}
                 width={s.width}
                 height={s.height}
                 /* Today's frame is the LCP image and keeps exactly the loading

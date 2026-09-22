@@ -4,6 +4,50 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — the home page's mobile LCP is bimodal: a ~2 s element render delay in some runs (09-21-2026)
+
+Observation from the speed work on `feat/marketing-speed-contact`. No cause
+found. Lighthouse 12, mobile preset, `/`, three sets of runs:
+
+| Build | Runs | Runs with element render delay ≥ 1.2 s | Their LCP | The other runs' LCP |
+|---|---|---|---|---|
+| Baseline (master) | 6 | **5** | 5.5–6.7 s (all six) | — |
+| Speed branch | 5 | **2** | 4.9 s and 5.3 s | 2.1–2.3 s (render delay 29–64 ms) |
+| Live imagehorse.app | 3 | **1** | 6.8 s | 3.2–3.3 s |
+
+The delay is the last LCP phase: the image has finished loading and the paint
+waits. The branch made the fast mode the common one (3 of 5) and made the slow
+mode faster than the baseline's normal, but did not remove it.
+
+Not tested, and only a guess at where to look: the image and the entry script
+are requested together, so whichever finishes first may decide whether hydration
+runs before the hero paints. One cheap experiment is to start hydration after
+the first `requestAnimationFrame` and compare a dozen runs each way. It defers
+interactivity by a frame or two, which is why it was not folded into the speed
+PR unasked.
+
+## OPEN — marketing design-audit leftovers (09-21-2026)
+
+From the token/consistency audit run on `feat/marketing-speed-contact`. That
+branch fixed the safe items (one tier filter, one `.coda`, one "latest" pill,
+radius/type/motion tokens, focus-ring radius, the mobile sheet's CTA, Pricing's
+phone header, two dead selectors). These change how something looks, or need
+a decision, so they wait:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| "Selected" is drawn three ways: inset bar (`.seg`), accent border (Trail month tiles), border + tint + ring (home tool tiles) | styles.css `.seg[aria-pressed]`, `.month`, `.buttonset__btn` | Picking one changes two of the three |
+| The small uppercase label is written ~10 times with 0.08 / 0.1 / 0.12em tracking and mono or Geist | `.spec thead th`, `.stack__label`, `.cmdk__group`, `.foot-stmt__head`, … | One `.label` class + `--tracking-label` token; visible where the tracking differs |
+| Text links are styled 7 ways (underline vs bottom border, 3px / 0.14em / 0.2em offsets) | `.person__links a`, `.foot-stmt__links a`, `.notfound__links a`, `.postcard__title a`, … | One link style is a visible change |
+| Features and Trail Log end with no closing block (`.close` or `.coda`) | pages/Features.tsx, pages/Trail.tsx | Needs copy |
+| Blog shows date then version; Trail shows version then date, in the same meta column | `.postcard__meta`, `.release__meta` | Pick an order |
+| Top-level `.tbl` and stack `.node` cards use `--radius-sm`, other top-level cards `--radius-md` | styles.css | Visible |
+| `theme-color` is `#1b1210`; `--color-paper` is `#0d0504` (converted, verified) | marketing/index.html | May be deliberate: it tints the phone's address bar to match the hero's glow |
+| WebGPU cubes and the Canvas 2D fallback paint different oranges: the shader's "linear sRGB" accent is the sRGB value, not the linear one | components/CubeLetters.tsx WGSL `fs` | Changes the effect's color; the 2D path also hardcodes three oklch values |
+| Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
+| Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
+| The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+
 ## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
 
 Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not

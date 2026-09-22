@@ -335,7 +335,7 @@ export default function Trail() {
                     <div className="release__meta">
                       <span className="release__version">{r.version}</span>
                       <span className="release__date">{fmtDate(r.date)}</span>
-                      {r.version === latest && <span className="release__latest">latest</span>}
+                      {r.version === latest && <span className="tag--latest">latest</span>}
                     </div>
                     <div>
                       <h2 className="release__headline">{r.headline}</h2>
