@@ -14,6 +14,7 @@ import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import { ActionTile } from "@/components/ui/action-tile";
 import { SectionHeader } from "@/components/ui/section-header";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { PANEL_SECTION } from "@/lib/styles";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
@@ -192,7 +193,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     original brush path and paints byte-for-byte what it did
                     before. */}
                 {smartEdge && (
-                  <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+                  <div className={PANEL_SECTION}>
                     <ToolButton
                       active={smartBrush}
                       onClick={() => setSmartBrush(!smartBrush)}
@@ -230,7 +231,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     that has to live here instead, and without it Hide/
                     Reveal would be unreachable UI. */}
                 {maskEditing && (
-                  <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+                  <div className={PANEL_SECTION}>
                     <SectionHeader
                       title="Painting Layer Mask"
                       info={

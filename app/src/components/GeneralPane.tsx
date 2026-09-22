@@ -6,6 +6,7 @@ import {
   MAX_HISTORY_MAX,
   type Preferences,
 } from "@/lib/preferences";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 /**
  * Settings → General pane. App-wide preferences, persisted via
@@ -67,14 +68,11 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Undo history</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            How many undo steps the editor keeps. Higher = more undo, but more
-            memory. Applied to the WASM engine on Apply (trims immediately if
-            lowered).
-          </p>
-        </div>
+        <PaneHeading title="Undo history">
+          How many undo steps the editor keeps. Higher = more undo, but more
+          memory. Applied to the WASM engine on Apply (trims immediately if
+          lowered).
+        </PaneHeading>
         <SizeSlider
           label="History depth"
           value={value.maxHistory}
@@ -87,13 +85,10 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Idle screen</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            After this long with no activity, Image Horse dims to a “Continue”
-            screen and pauses background work to save CPU. Your edits are kept.
-          </p>
-        </div>
+        <PaneHeading title="Idle screen">
+          After this long with no activity, Image Horse dims to a “Continue”
+          screen and pauses background work to save CPU. Your edits are kept.
+        </PaneHeading>
         <ToggleButtonGroup
           fill
           noIcons
@@ -108,14 +103,11 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">When you return</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            After you close the tab and come back, reopen your last gallery right
-            where you left off — or start with a clean upload. Either way your
-            edits stay saved.
-          </p>
-        </div>
+        <PaneHeading title="When you return">
+          After you close the tab and come back, reopen your last gallery right
+          where you left off — or start with a clean upload. Either way your
+          edits stay saved.
+        </PaneHeading>
         <ToggleButtonGroup
           fill
           noIcons

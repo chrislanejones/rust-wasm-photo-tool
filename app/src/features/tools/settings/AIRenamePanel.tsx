@@ -27,6 +27,7 @@ import {
   type ImageDescription,
 } from "@/lib/describeImage";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 
 interface Props {
   photos: PhotoEntry[];
@@ -341,17 +342,13 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
       )}
 
       {renamedCount !== null && !scanning && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
-        >
+        <SuccessCallout>
           {`✓ Renamed ${renamedCount} image${renamedCount === 1 ? "" : "s"}`}
-        </div>
+        </SuccessCallout>
       )}
 
       {errorMsg && (
-        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
+        <ErrorNote>{errorMsg}</ErrorNote>
       )}
     </div>
   );

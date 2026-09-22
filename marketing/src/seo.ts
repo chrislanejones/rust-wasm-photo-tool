@@ -29,8 +29,8 @@ export const SITE_NAME = "Image Horse";
  *  Raster, not the SVG logo: X/Twitter and LinkedIn both ignore SVG in
  *  `og:image`, so an SVG here is the same as no card at all. */
 export const DEFAULT_OG_IMAGE = "/og/default.png";
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 /** Absolute URL for a site-relative path. Open Graph requires absolute URLs —
  *  a relative `og:image` is silently dropped by most scrapers. */

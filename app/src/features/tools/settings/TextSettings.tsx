@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MutableRefObject } from "react";
-import { ChevronDown, Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
+import { Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -17,7 +17,9 @@ import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
-import { FIELD_SELECT } from "@/lib/styles";
+import { SelectField } from "@/components/ui/select-field";
+import { ErrorNote } from "@/components/ui/status-note";
+import { PANEL_SECTION } from "@/lib/styles";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -212,30 +214,26 @@ export function TextSettings({
                   }
                 />
               </div>
-              <div className="relative">
-                <select
-                  value={settings.textFontId ?? ""}
-                  onChange={(e) =>
-                    onChange({
-                      ...settings,
-                      textFontId: e.target.value,
-                      // `fontFamily` follows the id rather than being picked
-                      // independently — one of the three surfaces ADR-051
-                      // found disagreeing was exactly this one drifting.
-                      fontFamily: faceCss(e.target.value),
-                    })
-                  }
-                  className={FIELD_SELECT}
-                  style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
-                >
-                  {faces.map((f) => (
-                    <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-              </div>
+              <SelectField
+                value={settings.textFontId ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...settings,
+                    textFontId: e.target.value,
+                    // `fontFamily` follows the id rather than being picked
+                    // independently — one of the three surfaces ADR-051
+                    // found disagreeing was exactly this one drifting.
+                    fontFamily: faceCss(e.target.value),
+                  })
+                }
+                style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
+              >
+                {faces.map((f) => (
+                  <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                    {f.label}
+                  </option>
+                ))}
+              </SelectField>
             </div>
 
             {/* Font Weight */}
@@ -429,7 +427,7 @@ export function TextSettings({
                   : "Extract Text"}
             </button>
             {ocrError && (
-              <p className="text-2xs text-destructive leading-relaxed">{ocrError}</p>
+              <ErrorNote>{ocrError}</ErrorNote>
             )}
             {ocrPhase === "done" && !ocrError && (
               <div>
@@ -466,7 +464,7 @@ export function TextSettings({
     {/* Placement only applies to the Text mode — Background/OCR aren't
         placing a new object on the canvas. */}
     {mode === "text" && onPlace && (
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+      <div className={PANEL_SECTION}>
         <PlacementGrid
           label="Placement"
           info={

@@ -83,7 +83,7 @@ function probe(ctx: CanvasRenderingContext2D, css: string): number | null {
   return (r << 16) | (g << 8) | b;
 }
 
-export function resolvePalette(): GlPalette {
+function resolvePalette(): GlPalette {
   const out = { ...DESIGN_HEX };
   try {
     const style = getComputedStyle(document.documentElement);

@@ -28,7 +28,7 @@ import {
 import { hoverPop, springStandard } from "@/lib/animations";
 import {
   HOVER_RING,
-  SUBTILE_DISABLED,
+  TILE_DISABLED,
   SUBTILE_IDLE,
   SUBTILE_SELECTED,
 } from "@/lib/styles";
@@ -86,7 +86,7 @@ function SubtoolButton({
             "group flex aspect-square w-full items-center justify-center rounded-xl",
             "transition-all duration-200 ease-out",
             disabled
-              ? SUBTILE_DISABLED
+              ? TILE_DISABLED
               : [
                   active ? SUBTILE_SELECTED : SUBTILE_IDLE,
                   HOVER_RING,

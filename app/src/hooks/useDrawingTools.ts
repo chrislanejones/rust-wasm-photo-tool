@@ -11,12 +11,12 @@ import {
   sloppyCirclePoints,
   sloppyPolylinePoints,
   starVertices,
+  type Point,
 } from "@/lib/shapeSloppiness";
 
-export interface Point {
-  x: number;
-  y: number;
-}
+// One `Point` for the drawing stack: defined in lib/shapeSloppiness.ts,
+// re-exported here so canvas code can keep importing it beside CropSelection.
+export type { Point };
 
 export interface CropSelection {
   x: number;

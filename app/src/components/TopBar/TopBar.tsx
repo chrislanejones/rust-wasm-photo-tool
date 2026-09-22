@@ -32,6 +32,10 @@ import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import type { OpenRasterControls } from "@/components/ExportPane";
+import { BUTTON_PILL } from "@/lib/styles";
+
+/** One button group in the bar: the shared pill, kept on one row. */
+const GROUP_PILL = `flex items-center shrink-0 ${BUTTON_PILL}`;
 
 interface TopBarProps {
   zoom: number;
@@ -176,37 +180,23 @@ export function TopBar({
             {!narrow && (
               <>
                 {/* Undo / Redo — see the shape note on the Zoom group below. */}
-                <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <IconButton
-                        icon={Undo2}
-                        label="Undo"
-                        onClick={onUndo}
-                        disabled={!canUndo}
-                        standalone={compact}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p className="font-semibold">Undo</p>
-                      <p className="text-muted-foreground text-xs">Ctrl+Z</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <IconButton
-                        icon={Redo2}
-                        label="Redo"
-                        onClick={onRedo}
-                        disabled={!canRedo}
-                        standalone={compact}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p className="font-semibold">Redo</p>
-                      <p className="text-muted-foreground text-xs">Ctrl+Shift+Z</p>
-                    </TooltipContent>
-                  </Tooltip>
+                <div className={compact ? "contents" : GROUP_PILL}>
+                  <IconButton
+                    icon={Undo2}
+                    label="Undo"
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    standalone={compact}
+                    tooltip={{ shortcut: "Ctrl+Z" }}
+                  />
+                  <IconButton
+                    icon={Redo2}
+                    label="Redo"
+                    onClick={onRedo}
+                    disabled={!canRedo}
+                    standalone={compact}
+                    tooltip={{ shortcut: "Ctrl+Shift+Z" }}
+                  />
                 </div>
 
                 {!compact && <div className="w-px h-6 bg-border shrink-0" />}
@@ -227,7 +217,7 @@ export function TopBar({
                     widgets. Note the buttons and their container do NOT share
                     a radius, and should not: 6px inside 10px is the nesting,
                     and it is the panel's, not an invention here. */}
-                <div className={compact ? "flex items-center gap-1 shrink-0" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
+                <div className={compact ? "flex items-center gap-1 shrink-0" : GROUP_PILL}>
                   <IconButton
                     icon={ZoomOut}
                     label="Zoom out"
@@ -290,42 +280,28 @@ export function TopBar({
                   New mirrors a panel so it can report `active`; Export fires a
                   download and never does, and disables instead when there is
                   nothing loaded. */}
-              <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <IconButton
-                      icon={ArrowUpFromLine}
-                      label="New"
-                      onClick={onToggleUpload}
-                      active={showUpload}
-                      standalone={compact}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-semibold">New</p>
-                    <p className="text-muted-foreground text-xs">Alt + N</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <IconButton
-                      icon={ArrowDownFromLine}
-                      label="Export"
-                      onClick={onExport}
-                      disabled={!canExport}
-                      standalone={compact}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-semibold">Export</p>
-                    <p className="text-muted-foreground text-xs">Alt + E</p>
-                  </TooltipContent>
-                </Tooltip>
+              <div className={compact ? "contents" : GROUP_PILL}>
+                <IconButton
+                  icon={ArrowUpFromLine}
+                  label="New"
+                  onClick={onToggleUpload}
+                  active={showUpload}
+                  standalone={compact}
+                  tooltip={{ shortcut: "Alt + N" }}
+                />
+                <IconButton
+                  icon={ArrowDownFromLine}
+                  label="Export"
+                  onClick={onExport}
+                  disabled={!canExport}
+                  standalone={compact}
+                  tooltip={{ shortcut: "Alt + E" }}
+                />
               </div>
 
               {!compact && <div className="w-px h-6 bg-border shrink-0" />}
 
-              <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
+              <div className={compact ? "contents" : GROUP_PILL}>
                 <SubscriptionButton
                   general={general}
                   superUser={superUser}

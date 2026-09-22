@@ -2,7 +2,8 @@ import { forwardRef } from "react";
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { hoverPop } from "@/lib/animations";
 import { cn } from "@/lib/utils";
-import { HOVER_RING } from "@/lib/styles";
+import { HOVER_RING, TILE_SELECTED } from "@/lib/styles";
+import { HintTooltip, type ButtonHint } from "@/components/ui/tooltip";
 
 /**
  * A single square icon button — the top bar's Undo / Redo / Zoom controls,
@@ -89,58 +90,70 @@ export interface IconButtonProps
    *  upload dialog and inside the Settings modal, where there is no pill. Those
    *  two pass it via `UserMenu`'s `grouped={false}` default. */
   standalone?: boolean;
+  /** Hover hint (the shared `HintTooltip`). `true` shows the label alone;
+   *  an object can add the keyboard shortcut. Omit for no tooltip. */
+  tooltip?: true | ButtonHint;
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ icon: Icon, label, active = false, standalone = false, className, ...props }, ref) => (
-    <motion.button
-      ref={ref}
-      whileHover="hover"
-      type="button"
-      aria-label={label}
-      aria-pressed={active || undefined}
-      className={cn(
-        "group flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md",
-        "transition-all duration-200 ease-out",
-        // Same border-carries-state rule as the rail: the width is on BOTH
-        // branches so the content box never changes size between them.
-        active
-          ? "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm"
-          : [
-              // --text-secondary, not --text-muted. Muted measures only 3.00:1
-              // against the pill in LIGHT mode, which left no room below it
-              // for a disabled state that was both dimmer AND visible — see
-              // the disabled rule further down. Secondary is 5.75:1 light /
-              // 7.67:1 dark, and matches the status bar (v8.64).
-              "border-2 border-transparent text-text-secondary",
-              // The rail's own idle fill when there is no pill to supply one.
-              standalone && "bg-bg-tertiary",
-              "hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
-            ]
-              .filter(Boolean)
-              .join(" "),
-        !active && HOVER_RING,
-        // DISABLED IS A COLOR, NOT AN OPACITY. `opacity-30` over the pill
-        // rendered 1.33:1 in light mode and 1.56:1 in dark — invisible, not
-        // dimmed. Opacity could never fix it either: the old enabled color
-        // was 3.00:1 at FULL strength, so every reduction of it lands below
-        // the floor. Enabled is secondary now and disabled is muted at full
-        // opacity — 3.00:1 light / 4.61:1 dark, clearly quieter than enabled
-        // and still perceivable.
-        "disabled:text-text-muted disabled:cursor-not-allowed disabled:hover:bg-transparent",
-        "disabled:hover:text-text-muted",
-        "disabled:hover:ring-0 disabled:active:scale-100",
-        className,
-      )}
-      {...props}
-    >
-      <motion.span
-        variants={hoverPop}
-        className="flex h-[18px] w-[18px] items-center justify-center"
+  ({ icon: Icon, label, active = false, standalone = false, tooltip, className, ...props }, ref) => {
+    const button = (
+      <motion.button
+        ref={ref}
+        whileHover="hover"
+        type="button"
+        aria-label={label}
+        aria-pressed={active || undefined}
+        className={cn(
+          "group flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md",
+          "transition-all duration-200 ease-out",
+          // Same border-carries-state rule as the rail: the width is on BOTH
+          // branches so the content box never changes size between them.
+          active
+            ? TILE_SELECTED
+            : [
+                // --text-secondary, not --text-muted. Muted measures only 3.00:1
+                // against the pill in LIGHT mode, which left no room below it
+                // for a disabled state that was both dimmer AND visible — see
+                // the disabled rule further down. Secondary is 5.75:1 light /
+                // 7.67:1 dark, and matches the status bar (v8.64).
+                "border-2 border-transparent text-text-secondary",
+                // The rail's own idle fill when there is no pill to supply one.
+                standalone && "bg-bg-tertiary",
+                "hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
+              ]
+                .filter(Boolean)
+                .join(" "),
+          !active && HOVER_RING,
+          // DISABLED IS A COLOR, NOT AN OPACITY. `opacity-30` over the pill
+          // rendered 1.33:1 in light mode and 1.56:1 in dark — invisible, not
+          // dimmed. Opacity could never fix it either: the old enabled color
+          // was 3.00:1 at FULL strength, so every reduction of it lands below
+          // the floor. Enabled is secondary now and disabled is muted at full
+          // opacity — 3.00:1 light / 4.61:1 dark, clearly quieter than enabled
+          // and still perceivable.
+          "disabled:text-text-muted disabled:cursor-not-allowed disabled:hover:bg-transparent",
+          "disabled:hover:text-text-muted",
+          "disabled:hover:ring-0 disabled:active:scale-100",
+          className,
+        )}
+        {...props}
       >
-        <Icon className="h-full w-full" />
-      </motion.span>
-    </motion.button>
-  ),
+        <motion.span
+          variants={hoverPop}
+          className="flex h-[18px] w-[18px] items-center justify-center"
+        >
+          <Icon className="h-full w-full" />
+        </motion.span>
+      </motion.button>
+    );
+    if (!tooltip) return button;
+    const hint = tooltip === true ? {} : tooltip;
+    return (
+      <HintTooltip label={hint.label ?? label} shortcut={hint.shortcut}>
+        {button}
+      </HintTooltip>
+    );
+  },
 );
 IconButton.displayName = "IconButton";

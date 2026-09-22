@@ -31,7 +31,7 @@ let loadInterval: ReturnType<typeof setInterval> | null = null;
 let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
-export const MASTER_TABS = ["tools", "gallery", "review"] as const;
+const MASTER_TABS = ["tools", "gallery", "review"] as const;
 export type MasterTab = (typeof MASTER_TABS)[number];
 
 interface UIState {
