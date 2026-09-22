@@ -4,6 +4,84 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
+against the master build and the branch build, same machine and hour:
+
+| Build | Spec runs | Tests failed | Replays of the raw flow (paste → 1 s → Alt+E) |
+|---|---|---|---|
+| master `6b59460e` | 4 | **1 of 12** | 1 miss of 10 |
+| branch | 4 | **1 of 12** | 1 miss of 10; cold starts 8/8 on both |
+
+The failing test is whichever one hits it: `waitForEvent("download")` times out
+after Alt+E. Every miss in the replays coincided with the harness's "Failed to
+load Clerk" page error, but some runs had that error and still downloaded.
+
+Unverified suspect: `useCanvasActions.handleExport` calls `a.click()` and then
+`URL.revokeObjectURL(url)` on the very next line. Chrome starts a download
+asynchronously, so revoking synchronously can race it. The usual fix is to
+revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
+after a short delay). Reproduce the miss rate first, then change one line and
+re-measure. Isolate the fix before explaining it.
+
+## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+
+Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
+`StampSettings`' `handleModeChange` clears the highlighted preset
+(`setSelectedStampId(null)`) because "sub-mode teardown clears the armed stamp
+(useStampTeardown), so the panel's own selection highlight must not survive the
+switch either". But it only runs from `ToolModeToggle`'s `onModeChange`, which
+fires only from the in-panel icon row behind `showModeRow` — and nothing has
+passed `showModeRow` since the row moved to `SubtoolRow` (the new-ui-toolbar arc). The panel is
+not keyed on the mode, so nothing remounts it either. Expected symptom: pick a
+red stamp, switch Stamps › Clone › Stamps in the header, and the tile is still
+lit while clicks no longer place it.
+
+Paint and Shapes route through the same dead prop; their handlers only mirror
+state the store already holds, so they are harmless. Reproduce first; the fix
+is probably an effect on `activeMode` in StampSettings, after which the whole
+`onModeChange`/`showModeRow`/`columns`/`disabled` surface of ToolModeToggle can
+be deleted (the shim note there asks for exactly that).
+
+## OPEN — app SSOT leftovers that change pixels or need a call (09-22-2026)
+
+From the fallow + style/UI survey on `refactor/ssot-ui-cleanup`. That branch did
+the pixel-identical consolidations (see its three commits); these either change
+how something looks or need a decision:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| `--primary` = `--accent` and `--ring` = `--border-active` in both themes | styles.css | GeneralPane sketches an accent picker that sets them at runtime — one token or two is a design call |
+| `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
+| Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
+| Plain inputs with NO focus ring (`inputCls`) | BatchSettings:785, AIRenamePanel:213, SuperUserPane:90/100 | Adopting FIELD_NUMERIC fixes a WCAG focus-visible gap but restyles them |
+| Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
+| ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
+| Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
+| RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
+| GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
+| The rename form (Start # / Pad / preview) is copied | AIRenamePanel:280 vs BatchSettings:845 | Its own component; the two copies have drifted slightly |
+| Label/value row x3, progress bar x4 | ImageMetaPanel, SuperUserPane, StoragePane / ResourceMonitor, AIUsagePane, ResizeSettings | New primitives, small visual unification |
+| PenOverlay hardcodes `#fcdfc2` (the DARK accent) — wrong in light theme; `#5af` vs Lasso `#4d9bff` are two selection blues | PenOverlay:694, LassoOverlay | Visible fix; needs a selection-color token |
+| The orange "grid selection" color is written 4x with no token; a `bg-black/40` scrim skips DIALOG_OVERLAY | AppShell:2684/3269/3359, GridThumbnails:128/146, CanvasArea | Token + scrim change |
+| ~8 uppercase mono labels with 3 different trackings | various | `.label-caps` was the fix once and is deleted now (unused); a new one restyles them |
+| 16 inline numeric `zIndex` values off the z ladder (guardrails only counts classes) | CanvasArea 40-52, overlays 20-29 | Mapping to `var(--z-*)` may reorder stacking |
+| Stale `var()` fallbacks that no longer match the tokens | `var(--accent, #6366f1)` x4, `var(--color-theme-accent, #b6764e)` x3 | Harmless today, misleading |
+| `--shadow-sm/md/lg` in `:root` share Tailwind's theme namespace, apparently unread | styles.css:28-30 | Could not prove them dead overnight |
+| Duplicate exports in the Dexie layer | originalsAdapter vs originalsStore (`getOriginal`, `deleteOriginal`), db.ts vs adapter (`putOriginal`) | IndexedDB — dexie-migration skill territory |
+
+## OPEN — ~14 KB of the wasm is ttf-parser variable-font code (09-22-2026)
+
+Twiggy on a name-keeping build of master `6b59460e` (same code, `wasm-opt -O -g`):
+ttf_parser is 87,213 B, and the variable-font half of it — `gvar` outlines,
+`parse_variation_data`, `ItemVariationStore` — is roughly 14 KB. `ab_glyph = "0.2"`
+pulls it in through its default `variable-fonts` feature. If every face the
+engine loads is static (no `fvar` table), `ab_glyph = { version = "0.2",
+default-features = false, features = ["std"] }` should drop it. Check the fonts
+first, then the rust-wasm-loop gates and a text pixel diff. The same run found
+only 240 B of genuinely unreachable wasm, so this is the one real lead.
+
 ## OPEN — the home page's mobile LCP is bimodal: a ~2 s element render delay in some runs (09-21-2026)
 
 Observation from the speed work on `feat/marketing-speed-contact`. No cause

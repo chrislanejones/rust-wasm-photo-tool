@@ -1,7 +1,7 @@
 // "This tab is parked — press the button to resume." The shape behind both
 // IdleScreen (paused to save power) and MultiTabScreen (another tab took over):
-// a chrome-less Dialog whose visible box is a notice card, riding at --z-idle
-// so it covers every panel and dialog.
+// ui/dialog's `sm` notice card, riding at --z-idle so it covers every panel and
+// dialog.
 //
 // The two screens mean the same thing to the user, so they are the same
 // component — they used to be two byte-identical cards, plus a third wrapper
@@ -20,7 +20,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export interface ParkedScreenProps {
   open: boolean;
@@ -51,25 +50,23 @@ export function ParkedScreen({
         if (!o && preview) onAction();
       }}
     >
+      {/* `size="sm"` is ui/dialog's notice card — this used to be a
+          transparent DialogContent wrapping a hand-built copy of it. */}
       <DialogContent
+        size="sm"
         overlayClassName={preview ? undefined : "z-[var(--z-idle)]"}
-        className={cn(
-          "w-auto max-w-xs overflow-visible border-0 bg-transparent p-0 shadow-none",
-          preview ? "z-[var(--z-devpreview)]" : "z-[var(--z-idle)]",
-        )}
+        className={preview ? "z-[var(--z-devpreview)]" : "z-[var(--z-idle)]"}
       >
-        <div className="max-w-xs rounded-2xl border border-border bg-card p-6 text-center shadow-panel">
-          <Icon className="mx-auto h-8 w-8 text-text-muted" aria-hidden />
-          <DialogTitle className="mt-3 text-base font-semibold leading-normal tracking-normal text-text-primary">
-            {title}
-          </DialogTitle>
-          <DialogDescription className="mt-1.5 text-sm leading-relaxed text-text-secondary">
-            {children}
-          </DialogDescription>
-          <Button size="large" className="mt-4 w-full" onClick={onAction}>
-            {actionLabel}
-          </Button>
-        </div>
+        <Icon className="mx-auto h-8 w-8 text-text-muted" aria-hidden />
+        <DialogTitle className="mt-3 text-base font-semibold leading-normal tracking-normal text-text-primary">
+          {title}
+        </DialogTitle>
+        <DialogDescription className="mt-1.5 text-sm leading-relaxed text-text-secondary">
+          {children}
+        </DialogDescription>
+        <Button size="large" className="mt-4 w-full" onClick={onAction}>
+          {actionLabel}
+        </Button>
       </DialogContent>
     </Dialog>
   );
