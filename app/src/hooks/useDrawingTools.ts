@@ -893,6 +893,14 @@ export function useDrawingTools({
     return () => window.removeEventListener("keydown", onKey);
   }, [activeTool, cropSelection]);
 
+  // Publish only WHETHER a crop rectangle exists, for the panel's Apply Crop.
+  // The Enter shortcut is already gated on the same condition (`hasCropSelection`
+  // in useKeyboardShortcuts); the button was not, so it clicked through to
+  // `applyCrop`'s early return and did nothing, silently (QC §3, 09-22).
+  useEffect(() => {
+    useToolStore.setState({ cropSelectionActive: cropSelection !== null });
+  }, [cropSelection]);
+
   // Pointerdown anywhere outside the overlay commits, except:
   //   • the overlay itself (handles/body — `[data-draw-overlay]`),
   //   • the shapes/arrows settings panel (`[data-draw-panel]`) so stroke and

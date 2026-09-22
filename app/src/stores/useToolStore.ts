@@ -212,6 +212,12 @@ export interface ToolState {
    *  `dexie-migration` gate is not triggered. A half-painted mask surviving a
    *  reload would also point at whatever image happened to load next. */
   objectRemovalMasking: boolean;
+  /** Whether the Crop tool has a rectangle drawn. Published by
+   *  `useDrawingTools` (the rectangle itself stays hook state) so the panel's
+   *  Apply Crop can be disabled without threading a prop through AppShell,
+   *  which must gain nothing. NOT persisted — outside the `partialize`
+   *  allowlist, like every other transient field here. */
+  cropSelectionActive: boolean;
   /** The painted strokes, in IMAGE-space pixels (see `lib/objectRemovalMask`).
    *  Image space, not screen space, is what makes the uploaded mask land in
    *  register at any zoom. */
@@ -307,13 +313,34 @@ export const useToolStore = create<ToolState>()(
       selectionTolerance: 24,
       selectionMask: null,
       objectRemovalMasking: false,
+      cropSelectionActive: false,
       objectRemovalStrokes: [],
       objectRemovalBrush: 40,
       objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
 
-      setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
+      setActiveTool: (v) =>
+        set((s) => {
+          const next = resolveSet(v, s.activeTool);
+          // LEAVING THE AI TOOL ENDS REMOVE OBJECT'S MASK MODE. The mask
+          // overlay is mounted for every tool and only `objectRemovalMasking`
+          // hides it, but the only things that turned masking off lived in
+          // AISettings — which unmounts the moment another tool is picked. So
+          // switching tools mid-mask left the half-opacity paint on the canvas,
+          // and the overlay (pointer-events on, z 25) swallowed every click the
+          // new tool made, with Esc the only way out (QC §3, 09-22). Leaving is
+          // treated exactly like Cancel: the same clears as `setObjectRemovalMasking`.
+          if (next !== "ai" && s.objectRemovalMasking) {
+            return {
+              activeTool: next,
+              objectRemovalMasking: false,
+              objectRemovalStrokes: [],
+              objectRemovalBusy: false,
+            };
+          }
+          return { activeTool: next };
+        }),
       setActiveSubTool: (v) =>
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       // Newest first, case-insensitively de-duplicated (the engine hands back
