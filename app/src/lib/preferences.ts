@@ -1,12 +1,22 @@
 // App-wide user preferences (Settings → General/Appearance). Persisted to
-// localStorage immediately, and — when signed in — synced to the Convex `users`
-// row as a JSON blob + its SHA-256 (so we skip redundant writes and can verify
-// on load). Logged-out users stay localStorage-only.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { sha256Hex } from "@/lib/originalsStore";
-import { logDiagnostic } from "@/lib/diagnosticsLog";
+// localStorage immediately, and replicated from there by the sync layer —
+// instantly to every other tab, and (when signed in) to every other device as
+// the `prefs` document. See lib/sync/ and docs/adr/061.
+//
+// THIS MODULE DOES NOT TALK TO CONVEX. It used to: it held its own pull/push
+// against `users.settings` with a SHA-256 to skip redundant writes. That code
+// moved to lib/sync/ wholesale, because the same three problems (a canonical
+// serialization, a validator for a blob written by another build, and a rule
+// for who wins) had to be solved again for every other piece of state that
+// should follow a user between devices. What is left here is the part that is
+// actually about preferences: the shape, the defaults, and the clamps.
+//
+// The seam is at the bottom: `readPreferences` / `adoptPreferences` /
+// `parsePreferences` / `subscribePreferences`, which lib/sync/docs.ts wires
+// into a synced document. The dependency runs ONE WAY — sync imports
+// preferences, never the reverse — so this module stays importable by anything
+// (including the marketing prerender) without dragging a Convex client in.
+import { useCallback, useSyncExternalStore } from "react";
 import type { MetadataStripMode } from "@/lib/exif";
 
 export type ThemeChoice = "system" | "dark" | "light";
@@ -15,7 +25,7 @@ export type ThemeChoice = "system" | "dark" | "light";
 export type GridKind = "square" | "golden" | "grid";
 
 /** Ruler tick units. Pixels are the document's own unit; inches and
- *  centimetres are derived at a FIXED 96 DPI — the CSS reference pixel — because
+ *  centimeters are derived at a FIXED 96 DPI — the CSS reference pixel — because
  *  a web image carries no inherent physical size. That makes "1 inch" a
  *  consistent 96px here rather than a promise about print output. */
 export type RulerUnit = "px" | "in" | "cm";
@@ -236,7 +246,18 @@ export function canvasBgToRgba(c: string): {
   };
 }
 
-/** Canonical JSON (explicit field order) so the hash is stable across builds. */
+/** Canonical JSON — an EXPLICIT field order, so two devices that hold the same
+ *  preferences produce byte-identical strings and the sync layer's equality
+ *  check (a string compare) is exact. Adding a field means adding it HERE as
+ *  well as to the interface; a field that is missing from this list is not
+ *  persisted at all, let alone synced.
+ *
+ *  `rulerUnit` was exactly that until this commit: it shipped on the interface
+ *  and in `normalize`, was never written here, and so was silently dropped by
+ *  every reload — this is the only writer localStorage has. Appended at the
+ *  END rather than beside `rulers`, because the order is the wire format: any
+ *  other position renames nothing but changes every stored blob, which would
+ *  read to every signed-in device as "the other device changed something". */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
     maxHistory: p.maxHistory,
@@ -258,11 +279,8 @@ export function serializePreferences(p: Preferences): string {
     canvasPadding: p.canvasPadding,
     canvasBgColor: p.canvasBgColor,
     exportCanvasBackground: p.exportCanvasBackground,
+    rulerUnit: p.rulerUnit,
   });
-}
-
-async function hashPreferences(p: Preferences): Promise<string> {
-  return sha256Hex(new TextEncoder().encode(serializePreferences(p)));
 }
 
 function loadPreferences(): Preferences {
@@ -282,83 +300,84 @@ function savePreferences(p: Preferences): void {
   }
 }
 
-// ── Cross-instance sync ──────────────────────────────────────────────────────
-// More than one component calls usePreferences() (AppShell owns the applied
-// prefs; the command palette hot-toggles rulers/grid/theme). Each instance has
-// its own useState, so a commit from one must be pushed to the others or they
-// silently drift until reload. Every instance subscribes here; `apply` and the
-// Convex pull broadcast to all of them (same-tab only — localStorage `storage`
-// events never fire in the writing tab). Listeners only setState — no
-// re-broadcast, so no loops.
+// ── The live value, and the seam the sync layer plugs into ──────────────────
+//
+// ONE module-level value, not one useState per caller. More than one component
+// calls usePreferences() (AppShell owns the applied prefs; the command palette
+// hot-toggles rulers/grid/theme), and before this was module state each of them
+// held its own copy that drifted until a reload. Now they all read the same
+// value through useSyncExternalStore and a commit wakes every one of them.
+//
+// This is also what makes the sync layer possible without an import cycle:
+// lib/sync/docs.ts reads `readPreferences`, writes `adoptPreferences`, and
+// listens on `subscribePreferences`. It knows about preferences; preferences
+// knows nothing about it.
+let currentPreferences: Preferences = loadPreferences();
+
 const prefListeners = new Set<(p: Preferences) => void>();
 
-function broadcastPreferences(p: Preferences): void {
-  for (const listener of prefListeners) listener(p);
+/** Commit a value: normalize, store, persist, wake every listener. The single
+ *  writer — a user edit and an adopted remote value take the same path, so
+ *  there is no second way for the applied preferences to change. Exported as
+ *  the non-React way to make a user edit (what `usePreferences`' `apply`
+ *  calls), which is also how the sync tests drive the real path. */
+export function commitPreferences(next: Preferences): Preferences {
+  const value = normalize(next);
+  currentPreferences = value;
+  savePreferences(value);
+  for (const listener of prefListeners) listener(value);
+  return value;
+}
+
+/** The preferences the app is applying right now. Stable between commits —
+ *  useSyncExternalStore compares snapshots by identity. */
+export function readPreferences(): Preferences {
+  return currentPreferences;
+}
+
+/** Subscribe to commits. Returns the unsubscribe. */
+export function subscribePreferences(listener: (p: Preferences) => void): () => void {
+  prefListeners.add(listener);
+  return () => {
+    prefListeners.delete(listener);
+  };
+}
+
+/** Apply a value that arrived from another tab or another device. Identical to
+ *  a local commit on purpose: a preference adopted from a phone must reach the
+ *  engine and the UI by exactly the path a preference set here does, or the
+ *  two devices agree about the stored blob and disagree on screen. */
+export function adoptPreferences(p: Preferences): void {
+  commitPreferences(p);
+}
+
+/** Parse a serialized blob from elsewhere. `null` rejects it (malformed JSON
+ *  or a non-object), which leaves this device on its own value. Anything that
+ *  IS an object goes through `normalize`, so an unknown or out-of-range field
+ *  from another build clamps to a default rather than landing in state. */
+export function parsePreferences(json: string): Preferences | null {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return normalize(parsed as Partial<Preferences>);
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Live preferences + an `apply` that commits them. Reads localStorage first;
- * when signed in, pulls the Convex-saved settings (server wins on load) and
- * pushes on apply as a JSON blob + SHA-256, skipping the write when the hash is
- * unchanged.
+ * Live preferences + an `apply` that commits them.
+ *
+ * Applying writes localStorage and wakes every other caller in this tab
+ * immediately. Propagation beyond that — the other tabs, and the user's other
+ * devices when signed in — is the sync layer's job and happens off the same
+ * commit; nothing here waits on a network, and a signed-out user gets the
+ * cross-tab half regardless.
  */
 export function usePreferences() {
-  const [prefs, setPrefs] = useState<Preferences>(loadPreferences);
-  const { isAuthenticated } = useConvexAuth();
-  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
-  const saveSettings = useMutation(api.users.saveSettings);
-  // Last hash reconciled with the server — guards the pull (don't re-adopt our
-  // own write) and the push (skip identical writes).
-  const syncedHashRef = useRef<string | null>(null);
-
-  // Stay in sync with commits made through OTHER usePreferences() instances
-  // (e.g. the command palette's rulers/grid/theme hot-toggles → AppShell).
-  useEffect(() => {
-    prefListeners.add(setPrefs);
-    return () => {
-      prefListeners.delete(setPrefs);
-    };
+  const prefs = useSyncExternalStore(subscribePreferences, readPreferences, readPreferences);
+  const apply = useCallback((next: Preferences) => {
+    commitPreferences(next);
   }, []);
-
-  // Pull: adopt the server's settings when they differ from what we last synced.
-  useEffect(() => {
-    if (!me || !me.settings || !me.settingsHash) return;
-    if (me.settingsHash === syncedHashRef.current) return;
-    try {
-      const remote = normalize(JSON.parse(me.settings));
-      syncedHashRef.current = me.settingsHash;
-      savePreferences(remote);
-      broadcastPreferences(remote); // includes this instance's setPrefs
-    } catch {
-      // malformed server blob — keep local
-    }
-  }, [me]);
-
-  const apply = useCallback(
-    (next: Preferences) => {
-      const value = normalize(next);
-      savePreferences(value);
-      broadcastPreferences(value); // includes this instance's setPrefs
-      if (!isAuthenticated) return;
-      void (async () => {
-        const hash = await hashPreferences(value);
-        if (hash === syncedHashRef.current) return; // unchanged
-        syncedHashRef.current = hash;
-        try {
-          await saveSettings({ settings: serializePreferences(value), hash });
-        } catch (err) {
-          syncedHashRef.current = null; // allow a retry on the next apply
-          logDiagnostic(
-            "CONVEX_DB",
-            `Settings sync failed (saved locally): ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
-        }
-      })();
-    },
-    [isAuthenticated, saveSettings],
-  );
-
   return [prefs, apply] as const;
 }

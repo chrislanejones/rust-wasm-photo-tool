@@ -10,7 +10,14 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
-import { resolveSet, validated, validatedNumberInRange, type SetArg } from "./_shared";
+import {
+  resolveSet,
+  validated,
+  validatedNumberInRange,
+  validateFields,
+  type FieldValidators,
+  type SetArg,
+} from "./_shared";
 import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
 import type { MaskPoint, MaskStroke } from "@/lib/objectRemovalMask";
 import { idbStorage } from "./storage/idbStorage";
@@ -277,6 +284,43 @@ export interface ToolState {
   setToolSettings: (v: SetArg<ToolSettings>) => void;
 }
 
+/** The persisted slice of this store: exactly what `partialize` below writes. */
+type ToolPersisted = Pick<
+  ToolState,
+  | "brushMode"
+  | "stampSubMode"
+  | "shapesMode"
+  | "eraserMode"
+  | "textMode"
+  | "batchMode"
+  | "exportFormat"
+  | "quality"
+>;
+
+/**
+ * How each persisted field is checked on its way back in — from IndexedDB on
+ * rehydrate (`merge` below) and from another device through the sync layer's
+ * `tools` document (lib/sync/docs.ts). One table for both; see the note on
+ * UI_PERSISTED_FIELDS in useUIStore.ts, and lib/sync/syncParity.test.ts.
+ *
+ * Each sub-mode is checked against ITS CURRENT union, so a value from an old
+ * build that dropped or renamed one falls back instead of landing in state as
+ * a value the running code cannot switch on. exportFormat and quality
+ * tolerate a blob written before they existed: `undefined` fails the check
+ * and falls back to the constructed default, which is the pre-#14 behavior —
+ * no version bump, no migration.
+ */
+export const TOOL_PERSISTED_FIELDS: FieldValidators<ToolPersisted> = {
+  brushMode: (v, fallback) => validated(v, BRUSH_MODES, fallback),
+  stampSubMode: (v, fallback) => validated(v, STAMP_SUB_MODES, fallback),
+  shapesMode: (v, fallback) => validated(v, SHAPES_MODES, fallback),
+  eraserMode: (v, fallback) => validated(v, ERASER_MODE_VALUES, fallback),
+  textMode: (v, fallback) => validated(v, TEXT_MODES, fallback),
+  batchMode: (v, fallback) => validated(v, BATCH_MODES, fallback),
+  exportFormat: (v, fallback) => validated(v, EXPORT_FORMATS, fallback),
+  quality: (v, fallback) => validatedNumberInRange(v, 1, 100, fallback),
+};
+
 export const useToolStore = create<ToolState>()(
   persist(
     (set) => ({
@@ -396,7 +440,7 @@ export const useToolStore = create<ToolState>()(
         set((s) => {
           const next = resolveSet(v, s.objectRemovalMasking);
           // Leaving clears. Entering clears too, so the panel never opens onto
-          // paint left over from a mask that was cancelled or already sent.
+          // paint left over from a mask that was canceled or already sent.
           // Busy is a property of the mode, so it goes with it — otherwise a
           // job that ended by leaving the mode would leave the next mask
           // un-paintable.
@@ -454,7 +498,7 @@ export const useToolStore = create<ToolState>()(
       // stamp.setBrushSize/… so persisting them would need a one-time WASM sync
       // on rehydrate — deferred to the AppShell wiring; see
       // docs/State-Management.md §6).
-      partialize: (s): Partial<ToolState> => ({
+      partialize: (s): ToolPersisted => ({
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,
         shapesMode: s.shapesMode,
@@ -466,29 +510,16 @@ export const useToolStore = create<ToolState>()(
       }),
       // Runs on every rehydrate (unlike `migrate`, which only fires on a
       // version bump) — the persisted blob is same-origin-writable IndexedDB,
-      // not a value this code just wrote, so each partialized field is
-      // checked against ITS CURRENT union before it's allowed to overwrite
-      // the freshly-constructed default. A value from an old build that
-      // dropped/renamed a sub-mode rehydrates to the default instead of
-      // silently landing in state as a value the running code can't switch on.
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<ToolState>;
-        return {
-          ...current,
-          brushMode: validated(p.brushMode, BRUSH_MODES, current.brushMode),
-          stampSubMode: validated(p.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
-          shapesMode: validated(p.shapesMode, SHAPES_MODES, current.shapesMode),
-          eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
-          textMode: validated(p.textMode, TEXT_MODES, current.textMode),
-          batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
-          // Both tolerate a blob written before these keys existed: `undefined`
-          // fails every check and falls back to the freshly-constructed default,
-          // which is exactly the pre-#14 behavior. No version bump, no
-          // migration — the allowlist grew, the schema did not.
-          exportFormat: validated(p.exportFormat, EXPORT_FORMATS, current.exportFormat),
-          quality: validatedNumberInRange(p.quality, 1, 100, current.quality),
-        };
-      },
+      // not a value this code just wrote. The per-field rules are
+      // TOOL_PERSISTED_FIELDS above.
+      merge: (persisted, current) => ({
+        ...current,
+        ...validateFields(
+          TOOL_PERSISTED_FIELDS,
+          (persisted ?? {}) as Record<string, unknown>,
+          current,
+        ),
+      }),
     },
   ),
 );

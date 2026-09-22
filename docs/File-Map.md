@@ -7,7 +7,7 @@
 ```
 src/
 ├── lib.rs          #[wasm_bindgen] coordinator (v0.9.34: the former ~4,760-line god-object was
-│                   split into the focused modules below — behaviour-identical, identical WASM API).
+│                   split into the focused modules below — behavior-identical, identical WASM API).
 │                   Holds the ImageHorseTool struct + all fields; constructor/dimensions;
 │                   load_image / get_image_data / has_transparency / data_ptr / data_len;
 │                   calculate_histogram; zoom; history wrappers (undo/redo/jump, snapshot
@@ -28,7 +28,7 @@ src/
 │                   add/remove/apply/invert/has_layer_mask; move_preview + translate_active_layer;
 │                   layer persistence get_layer_png / get_layer_*_annotations + begin/push_restored_layer/finish
 ├── annotations.rs  Live (non-destructive) overlays: TextAnnotation + ShapeAnnotation types,
-│                   build_text_annotation, JSON (de)serialise, render_shape_into / render_pin, and the
+│                   build_text_annotation, JSON (de)serialize, render_shape_into / render_pin, and the
 │                   text + shape CRUD impls (add/update/remove/get/at/restore, draw_arrow / draw_shape,
 │                   align_annotation, bézier + polyline + pin, set_editing_*, render_with_annotations,
 │                   flatten_text_annotations)
@@ -180,7 +180,7 @@ app/src/
 │   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
 │   ├── ColorSwatchGrid.tsx           Preset swatches + the user's saved palette + a "+" that opens
 │   │                                 the ColorPickerDialog; translucent picks sit on a checkerboard
-│   ├── ColorPickerDialog.tsx         The colour dialog behind every "+": wheel / rectangle picker
+│   ├── ColorPickerDialog.tsx         The color dialog behind every "+": wheel / rectangle picker
 │   │                                 (HSV is the source of truth so hue survives black/white),
 │   │                                 hue · brightness · opacity sliders, hex / RGBA / HSL fields,
 │   │                                 and the palette row whose own "+" saves to the global list
@@ -303,6 +303,32 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
+    ├── preferences.ts                App-wide prefs (Settings → General / Appearance / Rulers &
+    │                                 Grids / Security / Layers and Canvas): the shape, the defaults,
+    │                                 the clamps, and the canonical serializer that is ALSO the sync
+    │                                 wire format. Talks to localStorage and to nothing else —
+    │                                 replication is lib/sync's job (ADR-061)
+    ├── sync/                         One value, shown the same way in every tab and on every
+    │                                 signed-in device. ADR-061
+    │   ├── keys.ts                   The three documents — prefs / ui / tools. Mirrored by SYNC_KEYS
+    │   │                             in convex/sync.ts; keys.test.ts asserts the two agree
+    │   ├── docs.ts                   What each document IS: read / adopt / serialize / validate, and
+    │   │                             the zustand bridge. ⚠️ Read the header before adding one — the
+    │   │                             photo archive is deliberately NOT here
+    │   ├── syncedDoc.ts              What a document is: its canonical value, plus the glue to the
+    │   │                             ledger. Adopting a value is never counted as an edit
+    │   ├── ledger.ts                 Per account, in localStorage, across reloads: the revision a
+    │   │                             value is based on and the value still owed to the server
+    │   ├── channel.ts                Cross-TAB transport (BroadcastChannel). Not useTabClaim's
+    │   │                             channel — that one decides who may EDIT, this one carries state
+    │   │                             to every tab including the parked ones
+    │   ├── leader.ts                 Which tab talks to the server: the useTabClaim holder
+    │   ├── useCloudSync.ts           Cross-DEVICE transport: one reactive Convex query + one mutation
+    │   ├── reconcile.ts              THE decision — adopt / push / hold / idle. Pure, import-free,
+    │   │                             enumerated in reconcile.test.ts
+    │   ├── status.ts                 What it is doing, for Settings → General to show
+    │   ├── identity.ts               Tab id (echo suppression). No device id — nothing uploads one
+    │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
     ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,
     │                                 SVG rejection (staged; wire before decode)
     ├── security/sanitizeFilename.ts  Path-traversal-safe basename for ZIP / download names (staged)
