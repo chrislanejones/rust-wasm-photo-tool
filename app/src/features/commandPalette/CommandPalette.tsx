@@ -127,6 +127,7 @@ export function CommandPalette() {
   const usage = useUIStore((s) => s.commandUsage);
   const pushRecentCommand = useUIStore((s) => s.pushRecentCommand);
   const photoCount = useGalleryStore((s) => s.photos.length);
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
   // Same-source prefs as AppShell — usePreferences broadcasts commits across
   // instances, so hot-toggles here update the live overlays/theme instantly.
   const [prefs, applyPrefs] = usePreferences();
@@ -148,6 +149,7 @@ export function CommandPalette() {
     () =>
       buildPaletteCommands({
         photoCount,
+        onlineFeatures,
         prefs: {
           rulers: prefs.rulers,
           grid: prefs.grid,
@@ -159,7 +161,7 @@ export function CommandPalette() {
         // opening a second dialog for a text input the palette already has.
         promptRoute: () => setQuery("#/"),
       }),
-    [photoCount, prefs, applyPrefs, actions],
+    [photoCount, onlineFeatures, prefs, applyPrefs, actions],
   );
 
   /** Typing a route into the search field (`#/settings/security`) offers a jump

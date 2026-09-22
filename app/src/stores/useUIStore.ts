@@ -48,6 +48,17 @@ interface UIState {
    *  to be right before it shipped. AI is the first thing behind it, not the
    *  only candidate — index.html's Google Fonts are the other live example. */
   onlineFeaturesEnabled: boolean;
+  /** True while the New dialog is sitting inside its Create AI Image step.
+   *  Ephemeral on purpose — it describes a dialog that is open right now, so
+   *  it is NOT in `partialize` and must never join it.
+   *
+   *  It exists because Settings → Security carries a second copy of the
+   *  online-features control. The New dialog's own switch already disables
+   *  itself during this step (flipping off unmounts the tile that owns the
+   *  step, taking the prompt and references with it); a control in another
+   *  subtree cannot see that local flag, so the lock is published here.
+   *  Guard the door from BOTH sides. */
+  aiComposerOpen: boolean;
   showGallery: boolean;
   showHistory: boolean;
   /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
@@ -120,6 +131,7 @@ interface UIState {
   setMasterTab: (v: SetArg<MasterTab>) => void;
   setShowTools: (v: SetArg<boolean>) => void;
   setOnlineFeaturesEnabled: (v: SetArg<boolean>) => void;
+  setAiComposerOpen: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
   setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
@@ -165,6 +177,7 @@ export const useUIStore = create<UIState>()(
       masterTab: "tools",
       showTools: false,
       onlineFeaturesEnabled: false,
+      aiComposerOpen: false,
       showGallery: false,
       showHistory: false,
       mobileNoticeDismissed: false,
@@ -201,6 +214,8 @@ export const useUIStore = create<UIState>()(
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
       setOnlineFeaturesEnabled: (v) =>
         set((s) => ({ onlineFeaturesEnabled: resolveSet(v, s.onlineFeaturesEnabled) })),
+      setAiComposerOpen: (v) =>
+        set((s) => ({ aiComposerOpen: resolveSet(v, s.aiComposerOpen) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
       setMobileNoticeDismissed: (v) =>

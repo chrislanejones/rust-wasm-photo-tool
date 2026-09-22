@@ -32,8 +32,18 @@ import {
   SUBTILE_IDLE,
   SUBTILE_SELECTED,
 } from "@/lib/styles";
-import { activateSubTool, useActiveGroup, useActiveSubTool } from "./activateSubTool";
+import {
+  activateSubTool,
+  isBlockedOffline,
+  useActiveGroup,
+  useActiveSubTool,
+} from "./activateSubTool";
+import { useUIStore } from "@/stores/useUIStore";
 import type { ResolvedSubTool } from "./toolGroups";
+
+/** Tooltip note on a server-backed tile while online features are off. */
+const OFFLINE_NOTE =
+  "Sends the image to a server. Turn on online features in Settings › Security to use it.";
 
 interface Props {
   /** Fade + block the tiles when there is no image to act on. */
@@ -123,6 +133,7 @@ function SubtoolButton({
 export function SubtoolRow({ disabled = false }: Props) {
   const group = useActiveGroup();
   const activeSubTool = useActiveSubTool();
+  const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
 
   const show = Boolean(group && group.subTools.length > 1);
 
@@ -162,6 +173,11 @@ export function SubtoolRow({ disabled = false }: Props) {
               // clickable. They are also absent from LIVE_SUB_TOOLS, which is
               // what keeps them off routes and out of the palette.
               const comingSoon = subTool.comingSoon === true;
+              // A server-backed tile while "Everything in your browser" is on:
+              // shown, so the tool is discoverable, but disabled with a note
+              // naming the switch — the same treatment as Coming Soon.
+              const offline = isBlockedOffline(subTool, onlineFeaturesEnabled);
+              const unavailable = comingSoon || offline;
               const resolved: ResolvedSubTool = {
                 group,
                 subTool,
@@ -172,12 +188,18 @@ export function SubtoolRow({ disabled = false }: Props) {
                   key={subTool.id}
                   icon={subTool.icon}
                   label={subTool.label}
-                  active={!comingSoon && resolved.key === activeSubTool?.key}
-                  disabled={disabled || comingSoon}
+                  active={!unavailable && resolved.key === activeSubTool?.key}
+                  disabled={disabled || unavailable}
                   description={subTool.description}
-                  note={comingSoon ? subTool.note : undefined}
+                  note={
+                    comingSoon
+                      ? subTool.note
+                      : offline
+                        ? OFFLINE_NOTE
+                        : undefined
+                  }
                   onClick={() => {
-                    if (disabled || comingSoon) return;
+                    if (disabled || unavailable) return;
                     activateSubTool(resolved);
                   }}
                 />

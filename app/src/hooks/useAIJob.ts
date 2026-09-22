@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useUIStore } from "@/stores/useUIStore";
+
+/** What a refused job says. */
+const ONLINE_FEATURES_OFF_ERROR =
+  "Online features are off, so nothing is sent. Turn them on in Settings › Security to use this.";
 
 export type AIJobType = "rembg" | "upscale" | "inpaint" | "ocr" | "alt";
 
@@ -93,6 +98,17 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       png: Uint8Array,
       maskPng?: Uint8Array,
     ) => {
+      // THE choke point. Every upload a panel can start goes through here, so
+      // this is where "Everything in your browser" is enforced rather than
+      // only drawn: a tile or button that forgot the switch still cannot send
+      // a picture. Read at call time, not captured, so a switch flipped a
+      // moment ago counts.
+      if (!useUIStore.getState().onlineFeaturesEnabled) {
+        setTextResult(null);
+        setError(ONLINE_FEATURES_OFF_ERROR);
+        setPhase("error");
+        return;
+      }
       setError(null);
       setTextResult(null);
       setPhase("uploading");
