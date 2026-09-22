@@ -33,6 +33,11 @@ export const SHORTCUT_GROUPS = [
       { keys: ["H"], action: "Pan: hold, or tap to stay on" },
       { keys: ["PgUp"], action: "Previous Photo" },
       { keys: ["PgDn"], action: "Next Photo" },
+      // Not an app binding: the browser's own Back / Forward. Every tool you
+      // pick writes the address (`#/create/brush`, …), so Back steps through
+      // the tools you used. Listed because it works and nothing said so.
+      { keys: ["Alt", "←"], action: "Previous Tool (browser Back)" },
+      { keys: ["Alt", "→"], action: "Next Tool (browser Forward)" },
     ],
   },
   {

@@ -17,12 +17,16 @@
 > `TOOL_GROUPS` rather than against the modal, because the modal generates only
 > the digit rows from the registry; every sub-tool list in this file is still
 > hand-written and can drift exactly like this one did.
+>
+> Corrected 09-22-2026: the Enhance row lacked **Levels** and **Presets**, the
+> sub-tool count read 34 (it is 38), and browser Back / Forward, which walks
+> your tool history, was not listed anywhere.
 
 ## Tools
 
 | Shortcut  | Action |
 | --------- | ------ |
-| `1`       | Enhance group (Resize & Compress · Adjustments · AI) |
+| `1`       | Enhance group (Resize & Compress · Adjustments · Levels · Presets · AI) |
 | `2`       | Select group (Marquee · Magic Wand · Lasso · …) |
 | `3`       | Create group (Brush · Pen · Clone Stamp · Text · Shapes · …) |
 | `4`       | Edit group (Crop · Transform · Color Picker · …) |
@@ -30,7 +34,7 @@
 
 The digits select a **tool group**, not an individual tool — that changed when
 the toolbar became five groups. Sub-tools are reachable by click or through the
-command palette (`Alt + ,`); they have no bare-key bindings, because 34 of them
+command palette (`Alt + ,`); they have no bare-key bindings, because 38 of them
 would exhaust the number row several times over.
 
 **`6`, `7`, `8`, `9` and `0` are not bound to anything.** (`Alt + 0` is still
@@ -153,6 +157,7 @@ shifted pair is now the layer reorder above.
 | `Alt + =` / `Alt + -`  | Zoom in / out |
 | `Alt + 0`              | Reset zoom (100%) |
 | `PgUp` / `PgDn`        | Previous / next photo |
+| `Alt + ←` / `Alt + →`  | Previous / next tool you used — the browser's own Back and Forward (`Cmd + [` / `Cmd + ]` on a Mac). Picking a tool writes the address, so Back walks your tool history |
 
 ## Export
 
