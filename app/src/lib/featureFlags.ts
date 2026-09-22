@@ -119,7 +119,7 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     label: "WebGPU (Phase 0)",
     kind: "optin",
     isOn: webgpuEnabled,
-    effect: "Attaches the GPU blur correctness harness. No pixel in the app goes near the GPU yet — this only exposes window.__ihGpuBlurSelfTest() (ADR-030).",
+    effect: "Sends the committed whole-image blur to the GPU, and attaches the correctness harness at window.__ihGpuBlurSelfTest(). Falls back to the processor on any failure, and refuses a software adapter (ADR-030).",
     source: "lib/webgpu/detect.ts",
   },
 ];
