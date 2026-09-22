@@ -36,7 +36,7 @@ const FILTERS = [
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
   demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the demo everyone gets, and it is the whole editor.",
-  free: "Signing in adds sync, history and one share link. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
+  free: "Signing in adds sync, history and share links. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
   pro: "Everything that ships today. Pro is the only tier where a photo of yours reaches an inference server.",
 };
 
@@ -77,12 +77,12 @@ export default function Architecture() {
               {FILTERS.map(({ key, label, Icon }) => (
                 <button
                   key={key}
-                  className="seg seg--tier"
+                  className="seg seg--where"
                   type="button"
                   aria-pressed={tier === key}
                   onClick={() => setTier(key)}
                 >
-                  <Icon size={22} className="seg__icon" />
+                  <Icon className="seg__icon" />
                   <span className="seg__label">{label}</span>
                 </button>
               ))}
@@ -132,9 +132,14 @@ export default function Architecture() {
                     the main thread
                   </li>
                   <li>
-                    <strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog
+                    <strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog,
+                    PatchMatch
                   </li>
                   <li>Codec worker — WebP/JPEG encode · gallery thumbnails</li>
+                  <li>
+                    Fonts — three families served as static files and registered with the engine
+                    at runtime
+                  </li>
                   <li className={`node__planned${dim("planned")}`}>
                     rayon worker pool — tried and dropped: 8–31× slower than the single-threaded
                     kernel
@@ -225,11 +230,14 @@ export default function Architecture() {
             {[
               ["core · layer", "ImageBuffer · layer stack · composite / mask"],
               ["paint · effects", "Brush / eraser / mask · blur / pixelate / redact"],
-              ["annotations · selection", "Live text & shape overlays · magic-wand"],
+              ["annotations · selection", "Live text & shape overlays · magic-wand, edge-aware and lasso selection"],
               ["stamp · transform", "Clone brush · flip / rotate / resize / crop"],
-              ["filters", "Brightness · contrast · gaussian blur"],
-              ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, rasterised in Rust"],
+              ["filters", "Brightness · contrast · saturation · shadows / highlights · sharpen · gaussian blur"],
+              ["levels · presets", "Black / white / midtones · a preset is a stack of the filters · one shared preview slot"],
+              ["perspective", "Four-corner warp for shapes, text and pixels · homography solved in Rust"],
+              ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust"],
               ["codec · history", "PNG encode (Rust) · undo snapshots"],
+              ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill"],
               ["simd", "v128/f32x4 kernels · scalar fallback"],
               ["utils", "json · point math · shared helpers"],
             ].map(([title, sub]) => (
@@ -267,11 +275,13 @@ export default function Architecture() {
           </h3>
           <div className="stack__grid stack__grid--3">
             {[
+              ["users.ts", "account row · saved preferences", "free pro"],
               ["photoEdits.ts", "save / getEdit", "free pro"],
               ["ai.ts", "dispatch to Replicate", "pro"],
               ["aiJobs.ts", "job status (useQuery)", "pro"],
               ["shares.ts", "public share links", "free pro"],
               ["textHistory.ts", "recent texts", "free pro"],
+              ["userColors.ts", "saved color palette", "free pro"],
               ["stripe.ts", "checkout / portal", "free pro"],
             ].map(([title, sub, tiers]) => (
               <article key={title} className={node(tiers, " node--quiet")}>
@@ -344,9 +354,11 @@ export default function Architecture() {
           <header className="head-hang">
             <h2 className="section__title section__title--sm">Convex database schema</h2>
             <p className="lede">
-              Every table, its fields and its indexes. Flatter than a typical projects → images tree:
-              each row hangs straight off <code>users</code>, keyed by the client's own{" "}
-              <code>photoKey</code> string rather than a server-side image id.
+              Every table the app reads or writes, with its fields and its indexes. Flatter than a
+              typical projects → images tree: each row hangs straight off <code>users</code>, keyed
+              by the client's own <code>photoKey</code> string rather than a server-side image id.
+              Five tables from an earlier design — projects, images, layers, annotations and history
+              — are still in the schema, and the app calls none of them.
             </p>
           </header>
 
@@ -390,6 +402,7 @@ export default function Architecture() {
                 ["users", "1 ─ 1", "subscriptions"],
                 ["users", "1 ─ ∞", "photo_edits"],
                 ["users", "1 ─ ∞", "recent_texts"],
+                ["users", "1 ─ ∞", "user_colors"],
                 ["users", "1 ─ ∞", "shares"],
                 ["users", "1 ─ ∞", "ai_jobs"],
               ].map(([a, card, b]) => (
@@ -434,7 +447,7 @@ export default function Architecture() {
         </section>
 
         {/* The argument, then the source that backs it, then both ways out. */}
-        <section className="why">
+        <section className="coda">
           <h2 className="section__title section__title--sm">Why draw it this way</h2>
           <p className="lede">
             Because the boundary is the product. An editor that needs a server is an editor that can
@@ -447,7 +460,7 @@ export default function Architecture() {
             flowchart the repo ships. Take the original and render it wherever you like — Mermaid
             Live, a VS&nbsp;Code preview, your own docs.
           </p>
-          <div className="why__actions">
+          <div className="coda__actions">
             {/* A download rather than a live render: mermaid's color parser
                 rejects OKLCH outright, so theming it from these tokens would
                 mean a second hex palette plus ~1MB of CDN to draw what the
@@ -471,7 +484,7 @@ export default function Architecture() {
           </div>
           <p className="diagram__foot muted">
             <span className="mono">system-architecture.mermaid</span> · Mermaid{" "}
-            <span className="mono">flowchart TB</span> · <span className="fig">113</span> lines · the
+            <span className="mono">flowchart TB</span> · <span className="fig">121</span> lines · the
             dashed subgraph is the plane you can cut.
           </p>
         </section>

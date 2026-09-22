@@ -29,8 +29,8 @@ export const SITE_NAME = "Image Horse";
  *  Raster, not the SVG logo: X/Twitter and LinkedIn both ignore SVG in
  *  `og:image`, so an SVG here is the same as no card at all. */
 export const DEFAULT_OG_IMAGE = "/og/default.png";
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 /** Absolute URL for a site-relative path. Open Graph requires absolute URLs —
  *  a relative `og:image` is silently dropped by most scrapers. */
@@ -116,7 +116,7 @@ export const ROUTES: readonly Route[] = [
     label: "Pricing",
     title: "Image Horse pricing — free with no account, Pro at $10/mo",
     description:
-      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, text extraction and 5 GB of originals.",
+      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, text extraction and 5 GB of storage.",
     ogImage: "/og/pricing.png",
     sources: ["marketing/src/pages/Pricing.tsx"],
   },
@@ -140,6 +140,15 @@ export const ROUTES: readonly Route[] = [
     ogImage: "/og/trail-log.png",
     sources: ["marketing/src/data/releases.ts", "marketing/src/pages/Trail.tsx"],
     ogType: "article",
+  },
+  {
+    to: "/contact",
+    label: "Contact",
+    title: "Contact Image Horse — email, bugs and security",
+    description:
+      "Email the developer, report a bug on GitHub or Codeberg, send a security problem privately, or ask for your account to be deleted. One person reads all of it.",
+    sources: ["marketing/src/pages/Contact.tsx"],
+    footerOnly: true,
   },
   {
     to: "/privacy-policy",
@@ -261,7 +270,7 @@ const softwareApplication = () => ({
         name: "Free",
         price: "0",
         priceCurrency: "USD",
-        description: "Adds cloud sync for edits, 24 images and 3 projects.",
+        description: "Adds cloud sync for edits, 24 images and 100 MB of cloud storage.",
       },
       {
         "@type": "Offer",
@@ -269,7 +278,7 @@ const softwareApplication = () => ({
         price: "10",
         priceCurrency: "USD",
         description:
-          "Cloud originals (5 GB), 16 layers, background and object removal, text extraction, 50 AI passes a day.",
+          "5 GB of cloud storage, 16 layers, background and object removal, text extraction, 50 AI passes a day and 300 a month.",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
           price: "10",

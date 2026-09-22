@@ -19,7 +19,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
-import { FIELD_NUMERIC } from "@/lib/styles";
+import { NumberField } from "@/components/ui/number-field";
 import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { IconButton } from "@/components/ui/icon-button";
@@ -418,33 +418,25 @@ export function NewActions({
               >
                 {/* ── New Canvas setup (Photoshop-style "New Document") ── */}
                 <div className="flex items-end gap-2">
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <span className="text-xs text-text-secondary">width</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={blankW}
-                      onChange={(e) => {
-                        setBlankW(e.target.value);
-                        setBlankPreset("");
-                      }}
-                      className={FIELD_NUMERIC}
-                    />
-                  </div>
+                  <NumberField
+                    label="width"
+                    min={1}
+                    value={blankW}
+                    onChange={(e) => {
+                      setBlankW(e.target.value);
+                      setBlankPreset("");
+                    }}
+                  />
                   <span className="pb-2 text-text-muted">×</span>
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <span className="text-xs text-text-secondary">height</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={blankH}
-                      onChange={(e) => {
-                        setBlankH(e.target.value);
-                        setBlankPreset("");
-                      }}
-                      className={FIELD_NUMERIC}
-                    />
-                  </div>
+                  <NumberField
+                    label="height"
+                    min={1}
+                    value={blankH}
+                    onChange={(e) => {
+                      setBlankH(e.target.value);
+                      setBlankPreset("");
+                    }}
+                  />
                 </div>
 
                 {/* Use-case tabs — swap which preset sizes are offered. */}

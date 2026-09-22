@@ -1,0 +1,104 @@
+/* Animations — every @keyframes on the site, the rules that run them, and
+ * what reduced motion does to all of it.
+ *
+ * One file, so "what moves on this site?" has one answer. The timing values
+ * are tokens (--dur-*, --ease-* in tokens.css), not literals.
+ *
+ * What is NOT here, on purpose:
+ * - `transition:` declarations. A transition belongs to the state it animates
+ *   (a hover, `.is-open`, `[data-current]`), so it stays beside that state's
+ *   rule in styles.css. The reduced-motion block below still reaches them.
+ * - The blog posts' figures (src/posts/*.figures.css) and their Three.js
+ *   scenes. A post owns its own figures, and those are where the heavier 3D
+ *   work goes.
+ * - JavaScript motion: the WebGPU cube letters (components/CubeLetters.tsx)
+ *   are a spring simulation, not a keyframe.
+ *
+ * Imported by main.tsx AFTER styles.css. The reduced-motion overrides at the
+ * bottom depend on that order, because they have to beat the base rules. */
+
+/* ── home: the editor's tool tiles ────────────────────────────
+   The press. The name lands like a stamp: it arrives large and faint and
+   settles into place, and the glyph dips under it as if it took the weight.
+   Both run once, on the tile that was just pressed, and are re-triggered by a
+   remount in ButtonSet.tsx rather than a class flip so a second press on the
+   same tile plays them again. */
+@keyframes buttonset-land {
+  0%   { transform: scale(1.4); opacity: 0.35; }
+  55%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes buttonset-dip {
+  0%   { transform: scale(0.86) translateY(2px); }
+  55%  { transform: scale(1.06) translateY(-1px); }
+  100% { transform: none; }
+}
+
+.buttonset__face.is-pop .buttonset__label {
+  animation: buttonset-land var(--dur-long) var(--ease-out) both;
+}
+
+.buttonset__face.is-pop .buttonset__icon {
+  animation: buttonset-dip var(--dur-long) var(--ease-out) both;
+}
+
+/* ── home: the GPU section's hint line ────────────────────────
+   Breathes, because it is an invitation and a static line of mono type next
+   to a toy does not read as one. Motion-safe: the animation is only declared
+   inside the no-preference query, so reduced motion gets the line at full
+   opacity with nothing to opt out of. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes gpu-hint {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  .gpu__hint { animation: gpu-hint var(--dur-ambient) var(--ease-in-out) infinite; }
+}
+
+/* ── nav: the mobile menu sheet ───────────────────────────────
+   The sheet arrives instead of appearing. `hidden` is a binary and cannot be
+   transitioned, so the animation runs on the element when it mounts. There is
+   no exit half, which is correct here: a menu that lingers on the way out is
+   a menu that is still covering what you just tapped. */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-sheet:not([hidden]) {
+    animation: nav-sheet-in var(--dur-short) var(--ease-out) both;
+  }
+}
+
+@keyframes nav-sheet-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── reduced motion ───────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: var(--dur-reduced) !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: var(--dur-reduced) !important;
+  }
+  /* Pin the spotlight to a sensible static position, don't flatten it. */
+  .hero__spotlight {
+    transition: none;
+    --mx: 50%;
+    --my: 30%;
+  }
+  .cta:active { transform: none; }
+  /* The scrub is a state change, not a journey: keep the swap, drop the fade. */
+  .shot-stack__frame { transition: none; }
+  /* The glide and the condense are spatial: keep the state change, drop the
+     travel. The rule still marks the current page and still lands under what
+     you point at. It just doesn't slide there. */
+  .nav-pill__glide { transition: opacity var(--dur-micro) linear; }
+  .nav-pill__word,
+  .nav-pill__source { transition: opacity var(--dur-micro) linear; }
+  .nav-pill__mark { transition: none; }
+  /* The tool tiles keep their selection and lose the press. */
+  .buttonset__btn { transition: none; }
+  .buttonset__btn:active { transform: none; }
+  .buttonset__face.is-pop .buttonset__label,
+  .buttonset__face.is-pop .buttonset__icon { animation: none; }
+}

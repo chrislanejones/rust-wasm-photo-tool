@@ -2,6 +2,7 @@ import { Crown, User, UserX } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { UserMode } from "@/components/StatusBar";
 import { TIERS } from "@/lib/tiers";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 /**
  * Super User settings pane — the account-tier override (was the Alt+L dialog).
@@ -52,14 +53,11 @@ const TEST_PASSWORD =
 export function SuperUserPane({ mode, onSelect }: SuperUserControls) {
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">Super User</h3>
-        <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          The toggle is a local UI override. Use <strong>Apply</strong> in the
-          footer to grant the tier to your real account (admin only) so AI works
-          for real, or <strong>Restore Settings</strong> to clear the override.
-        </p>
-      </div>
+      <PaneHeading title="Super User">
+        The toggle is a local UI override. Use <strong>Apply</strong> in the
+        footer to grant the tier to your real account (admin only) so AI works
+        for real, or <strong>Restore Settings</strong> to clear the override.
+      </PaneHeading>
 
       <ToggleButtonGroup
         fill

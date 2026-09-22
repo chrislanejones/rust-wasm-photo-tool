@@ -24,6 +24,97 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.83",
+    date: "2026-09-22",
+    headline: "Mono and Serif survive a reload for real this time, and the site paints in half the time",
+    entries: [
+      {
+        tag: "fix",
+        text: "v8.82 said a text keeps its typeface through a reload. It didn't: pick Liberation Mono, commit, reload, press Resume, and it came back in Sans. The text still knew it was Mono \u2014 the fonts only loaded when you opened the Text panel, and a reload opens on Enhance, so the text was redrawn before Mono existed. Exporting a batch as a ZIP had the same problem. The fonts now load first, on every path that redraws saved text.",
+      },
+      {
+        tag: "fix",
+        text: "Waiting for the fonts is capped at four seconds, so a slow font can never stop a photo from opening, and a font that fails to download is tried again instead of being written off for the session. A browser test fails on v8.81 and v8.82 and passes on this build.",
+      },
+      {
+        tag: "perf",
+        text: "The site's first paint is about twice as fast. On a phone, Lighthouse went from 64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts come from the site itself instead of from Google, every page loads only its own code, the hero image has phone-sized copies, and the animated letters stop drawing once you scroll past them.",
+      },
+      {
+        tag: "feature",
+        text: "There's a Contact page: email, bug reports, a private route for security issues, and how to delete your account. No form \u2014 there is nothing on the other end to receive one. The footer has three columns now, with a copyright line.",
+      },
+      {
+        tag: "ui",
+        text: "The tab icon is the horse on a rounded black square, on both sites, and the home-screen icons finally match it. They were still a placeholder orange square.",
+      },
+    ],
+  },
+  {
+    version: "v8.82",
+    date: "2026-09-21",
+    headline:
+      "Text keeps its typeface and its box through a reload, and the pricing page stops selling two things that don't exist",
+    entries: [
+      {
+        tag: "fix",
+        text: "A committed text box lost its typeface and its size on reload, and only on reload. Pick Liberation Mono, commit, reload, and the words came back proportional; Serif came back without its serifs, and the box you dragged came back at the default. It had been live since v8.80.",
+      },
+      {
+        tag: "rust",
+        text: "There were two losses, and either one was enough on its own. Replaying the undo history treated a text edit as a replacement, so the typeface and the box fell back to their defaults whenever an edit replayed. And the copy saved to this browser had never kept the box at all \u2014 the wrap width, box height and perspective have existed since v8.40 and none of them had ever reached disk. Both are fixed, along with the same hidden bug in shape edits, and work already on your disk comes back closer to what you left.",
+      },
+      {
+        tag: "fix",
+        text: "The pricing page stops selling two things that don't exist. Pro said \u201ccloud originals\u201d and every tier said \u201cprojects\u201d. No tier uploads your originals \u2014 they stay on your device \u2014 and there is no Projects screen. Both are gone, and Pro's AI allowance now says 50 a day and 300 a month, which is what the server actually enforces.",
+      },
+      {
+        tag: "ui",
+        text: "The rest of the site caught up. The features page lists all twelve presets, the three real typefaces, 38 sub-tools, H for pan and the Magic Eraser as shipped. The two architecture diagrams agree with each other again, and the blog post's eight source links, which all pointed at a branch this repo has never had, work now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's TypeScript config is ready for TypeScript 7 \u2014 it was the only thing in the repo that wasn't. The upgrade itself waits on the linter, which does not support TypeScript 7 yet.",
+      },
+      {
+        tag: "fix",
+        text: "Correction, added in v8.83: the typeface half of this was not fixed here. The text still knew it was Mono, but the font had not loaded when a reload redrew it, so it came back in Sans. v8.83 is the real fix. The box half was fixed.",
+      },
+    ],
+  },
+  {
+    version: "v8.81",
+    date: "2026-09-21",
+    headline:
+      "Twelve presets instead of six, H is the hand key, and the legal pages Google kept asking for are live",
+    entries: [
+      {
+        tag: "feature",
+        text: "Enhance \u203a Presets has twelve looks instead of six. Mono and Noir are the two black-and-whites \u2014 one that leaves the tones where they were, one with hard contrast and heavy blacks. Airy opens a picture up bright and light, Moody closes the shadows down, and Recover and Lift pull detail back out of a blown-out sky or a backlit subject. Hover any of them to see it on your photo before you commit. Clicking is still one undo step.",
+      },
+      {
+        tag: "feature",
+        text: "There is no hue or temperature knob in the engine, and that is why the twelve look the way they do. Shadows and highlights add the same amount to red, green and blue, so every preset moves brightness, contrast or how much color is there \u2014 never the color itself. Warm and Cool have always been saturation, not temperature. A sepia cannot be written as a row in that table at all.",
+      },
+      {
+        tag: "fix",
+        text: "A preset is five numbers, and two of them are absolute 8-bit values where a tenth of a level does nothing at all. A new test hovers all twelve and compares pixels, to the untouched photo and to every preset before it, so a preset that quietly does less than it says \u2014 or one that duplicates another \u2014 fails instead of shipping.",
+      },
+      {
+        tag: "feature",
+        text: "H is the hand key. Hold it to pan and it stops when you let go; tap it and panning stays on until you tap again or press Esc. Space still pans. But Space can never be the reliable pan key, because a keyboard-focused button takes it \u2014 that is how Tab-then-Space presses things. H is not an activation key, so nothing on the page can steal it.",
+      },
+      {
+        tag: "infra",
+        text: "The site has a privacy policy and terms of service. Google's consent screen will not pass the sign-in client without both on an authorized domain, and both were 404. The privacy page names each thing that leaves the device one at a time, and says what stays: the gallery in your browser, with no backup and no copy anyone here can read. The paragraph a template would have got wrong is analytics \u2014 Google Analytics runs on both sites, ungated, and sets cookies. Once there is a privacy policy, saying so is the only honest option.",
+      },
+      {
+        tag: "ui",
+        text: "Create AI Image speaks the sidebar's language. The panel moved into its own component and picked up the shared form controls on the way, so it looks like the rest of the app instead of hand-rolled, and it scrolls on a short screen. It picks its own model now \u2014 six of them, differing in speed, cost and whether they can take a reference image at all. Your references are kept when you switch models but only counted in the consent sentence when the model can use them. Generate is still disabled: there is no text-to-image job on the server yet.",
+      },
+    ],
+  },
+  {
     version: "v8.80",
     date: "2026-09-20",
     headline:

@@ -22,6 +22,7 @@
 // import direction between lib/ and hooks/.
 import type { ImageHorseTool } from "stamp_tool";
 import type { PersistedLayer } from "@/lib/editPersistence";
+import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 
 /** Decode a PNG to raw RGBA. Signature matches the existing local helpers. */
 export type PngDecoder = (
@@ -52,6 +53,17 @@ export async function restoreLayerStack(
   decodePng: PngDecoder,
 ): Promise<boolean> {
   if (!layers || layers.length === 0) return false;
+
+  // REGISTER BEFORE YOU RESTORE. `restore_text_annotation` rasterizes on the
+  // spot, and a `font_id` the engine has no bytes for is drawn in the embedded
+  // Sans — so a Mono or Serif text came back proportional after every reload,
+  // and in every batch/ZIP export, while its `font_id` stayed correct. Only
+  // waited on when a saved text actually names a runtime face: a document with
+  // no text, or only the embedded face, pays nothing. See
+  // `ensureEngineFontsForRestore`.
+  if (layers.some((l) => l.annotations?.some((a) => Boolean(a.font_id)))) {
+    await ensureEngineFontsForRestore(tool);
+  }
 
   tool.begin_layer_restore();
   for (const layer of layers) {
@@ -90,6 +102,27 @@ export async function restoreLayerStack(
         a.shadow_dy ?? 0,
         a.shadow_blur ?? 0,
         a.font_id ?? "",
+        // ── The box and the quad — ADR-060 ─────────────────────────────────
+        //
+        // These three arguments are new in v8.81, and the reason they were not
+        // here before is a premise that was measured FALSE. `layer.rs` carried
+        // three comments saying the gap was fine because "the op-log path
+        // (which DOES carry it, via Op::TextWrap) is the one the resume
+        // actually uses". On production, 2026-09-20: in every run where the
+        // user dragged the text box before the first save, NO op log was
+        // persisted at all — so the resume landed here, on the path that
+        // carried none of it, and the text came back unwrapped on one line.
+        //
+        // Absent on every archive written before v8.81, which is what the
+        // `?? 0` and the empty array mean: 0 is "size the box to the text" and
+        // a wrong-length quad is "no perspective recorded". Both are exactly
+        // what those documents meant, so an old archive restores unchanged.
+        a.wrap_width ?? 0,
+        a.box_height ?? 0,
+        // Flat [x0,y0,x1,y1,x2,y2,x3,y3] — `annotations_to_json`'s own layout,
+        // so the persisted array rides straight through. The engine reads any
+        // length but 8 as the identity.
+        new Float32Array(a.perspective ?? []),
       );
     }
     for (const s of layer.shapes ?? []) {

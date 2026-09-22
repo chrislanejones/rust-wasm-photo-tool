@@ -42,8 +42,8 @@ interface ToolModule<M extends string = string> {
    *  during that tool's own migration session, never here (shortcuts and
    *  persistence keys depend on them). */
   id: ToolType;
-  /** Display label — mirrors `toolConfig.ts` TOOLS until the registry becomes
-   *  the single definition site for tool metadata. */
+  /** Display label. The rail and palette read `toolGroups.ts` since phase 3a
+   *  (the old `toolConfig.ts` TOOLS table was retired with it). */
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Sub-modes rendered by the shared ToolModeToggle (icon-row + title +
@@ -68,7 +68,7 @@ const paintModule: ToolModule<PaintMode> = {
 /** Resize/Compress — second registered module (tool-UI arc Session 2.1).
  *  Registered under its legacy id `compress` (shortcut `1` and the ToolType
  *  union depend on it); the display label has been "Resize" since
- *  toolConfig.ts.
+ *  before the registry existed.
  *
  *  SINGLE-MODE since the Compress/Resize merge: both halves feed the same two
  *  scores, so they share one panel and there is no sub-mode left to store.

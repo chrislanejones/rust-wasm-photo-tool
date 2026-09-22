@@ -18,7 +18,7 @@
 // so the second vocabulary was pure cost. It is now the same components, the
 // same tokens and the same field classes (`@/lib/styles`) the sidebar ships.
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ChevronDown, ChevronLeft, Plus, Sparkles, X } from "lucide-react";
+import { ChevronLeft, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -26,7 +26,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { FIELD_SELECT, FIELD_TEXTAREA } from "@/lib/styles";
+import { FIELD_TEXTAREA } from "@/lib/styles";
 import {
   ASPECT_RATIOS,
   ATTACHMENT_LONGEST_EDGE,
@@ -37,6 +37,7 @@ import {
   modelById,
   rejectReason,
 } from "./aiImageDraft";
+import { SelectField } from "@/components/ui/select-field";
 
 /**
  * ⚠️ GENERATE IS NOT WIRED, AND SAYING SO BEFORE THE CLICK IS THE POINT.
@@ -152,27 +153,23 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
           reference image at all, and none of that is guessable from
           a name — so the choice is the user's and the blurb below
           says what they are choosing. Same select spelling as
-          Text › Font Family and Resize › Method (FIELD_SELECT). */}
+          Text › Font Family and Resize › Method (SelectField). */}
       <div className="space-y-2">
         <FieldLabel
           title="Model"
           info="Which Replicate model draws the image. Schnell is the cheap, fast default; 1.1 Pro looks best and costs most; Ideogram is the one that renders readable text; Kontext and SD 3.5 are the two that actually look at a reference image."
         />
-        <div className="relative">
-          <select
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            className={FIELD_SELECT}
-            title="Which Replicate model draws the image"
-          >
-            {IMAGE_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-        </div>
+        <SelectField
+          value={model}
+          onChange={(e) => onModelChange(e.target.value)}
+          title="Which Replicate model draws the image"
+        >
+          {IMAGE_MODELS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </SelectField>
         {/* The menu can only carry a name, and a name does not say
             which one is the cheap one. */}
         <p className="text-2xs leading-relaxed text-theme-muted-foreground">

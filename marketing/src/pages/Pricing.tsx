@@ -33,7 +33,13 @@ const CARDS: Card[] = [
     tagKind: "local",
     price: "$0",
     unit: "forever",
-    perks: ["All WASM tools", "8 layers per image", "12 image gallery", "Session-only", "No signup"],
+    perks: [
+      "All WASM tools",
+      "8 layers per image",
+      "12 image gallery",
+      "Edits kept in this browser",
+      "No signup",
+    ],
     cta: "Try it now",
   },
   {
@@ -60,11 +66,11 @@ const CARDS: Card[] = [
     price: "$10",
     unit: "per month",
     perks: [
-      <>Cloud originals — 5&nbsp;GB</>,
+      <>5&nbsp;GB of cloud storage</>,
       "16 layers per image",
       "Background and object removal",
       "Read text out of an image",
-      "50 AI passes a day",
+      "50 AI passes a day, 300 a month",
       "100 photos",
     ],
     cta: "Start Pro",
@@ -125,18 +131,18 @@ const MATRIX: Group[] = [
     rows: [
       { feature: "Gallery", cells: [num("12 images"), num("24 images"), num("100 images")] },
       { feature: "Auto compress all", cells: [yes, yes, yes] },
-      { feature: sub("Edit persistence", "saved across sessions"), cells: [no, yes, yes] },
+      { feature: sub("Edit persistence", "kept in this browser between visits"), cells: [yes, yes, yes] },
+      { feature: sub("Off-device copy of your edits", "Convex, once you sign in"), cells: [no, yes, yes] },
       {
         feature: "Original files",
-        cells: [num("local"), num("on your device"), num("cloud")],
+        cells: [num("on your device"), num("on your device"), num("on your device")],
       },
       { feature: "Cloud storage quota", cells: [no, num("100 MB"), num("5 GB")] },
     ],
   },
   {
-    name: "Projects and data — Convex",
+    name: "Your data in the cloud — Convex",
     rows: [
-      { feature: "Projects", cells: [no, yes, yes] },
       { feature: "Persistent history", cells: [no, yes, yes] },
       { feature: "Annotations sync", cells: [no, yes, yes] },
       { feature: "Share links", cells: [no, yes, yes] },
@@ -146,9 +152,10 @@ const MATRIX: Group[] = [
     name: "AI features — Replicate, billed to us",
     rows: [
       { feature: sub("Background removal", "rembg"), cells: [no, no, yes] },
-      { feature: sub("Object removal", "SD Inpaint"), cells: [no, no, yes] },
+      { feature: sub("Object removal", "LaMa"), cells: [no, no, yes] },
       { feature: sub("Read text out of an image", "OCR"), cells: [no, no, yes] },
       { feature: sub("Daily AI passes", "resets every 24 hours"), cells: [no, no, num("50 a day")] },
+      { feature: sub("Monthly AI passes", "resets every 30 days"), cells: [no, no, num("300 a month")] },
     ],
   },
 ];
@@ -299,9 +306,9 @@ export default function Pricing() {
           </div>
         </section>
 
-        <section className="principle">
+        <section className="coda">
           <h2 className="section__title section__title--sm">The principle</h2>
-          <p className="principle__body">
+          <p className="lede">
             Demo mode costs us nothing, because WASM runs on your device. So there are no artificial
             “sign in to use blur” gates on tools that never touch our servers. The gallery limit is
             the honest nudge: edit a dozen photos, want to keep them, and that's the moment an

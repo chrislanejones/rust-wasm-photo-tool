@@ -6,7 +6,6 @@ import {
   Minus,
   Lock,
   LockOpen,
-  ChevronDown,
   Aperture,
   Contrast,
   Check,
@@ -29,8 +28,9 @@ import {
 } from "@/lib/colors";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
-import { FIELD_SELECT } from "@/lib/styles";
 import type { LayerInfo } from "@/hooks/useEngineCore";
+import { SelectField } from "@/components/ui/select-field";
+import { PANEL_DIVIDER, PANEL_SECTION } from "@/lib/styles";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
  *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
@@ -40,14 +40,6 @@ function MinusVertical({ className }: { className?: string }) {
   return <Minus className={cn("rotate-90", className)} />;
 }
 
-/** The house section separator (Select / Paint / Shapes all use this exact
- *  rule + padding above a SectionHeader). Named rather than inlined so the
- *  three sections below cannot drift apart from each other. */
-const SECTION_SEP = "border-t border-theme-sidebar-border pt-3";
-/** Mask sits INSIDE the Move/Resize section (same selected layer), so it takes
- *  the separator without the section-level `sep` gate — it is always stacked
- *  under something. */
-const MASK_SECTION_SEP = SECTION_SEP;
 
 /** The mask's brush-value choice (Hide/Reveal) lives in PaintSettings, not
  *  here — see the Paint mask tile below for why it cannot render on this
@@ -218,7 +210,7 @@ export function LayerSettings({
   const show = (v: NonNullable<LayerSettingsProps["section"]>) =>
     section === undefined || section === v;
   /** The separator rule only earns its keep when sections are stacked. */
-  const sep = section === undefined ? SECTION_SEP : "";
+  const sep = section === undefined ? PANEL_DIVIDER : "";
 
   return (
     <div className="space-y-6 -mt-2">
@@ -253,12 +245,10 @@ export function LayerSettings({
             <label className="text-2xs text-theme-muted-foreground">
               Layer
             </label>
-            <div className="relative">
-            <select
+            <SelectField
               value={activeLayer?.id ?? ""}
               disabled={disabled}
               onChange={(e) => onSelectLayer(Number(e.target.value))}
-              className={FIELD_SELECT}
               title="Layer these controls act on"
             >
               {[...layers].reverse().map((l) => (
@@ -271,9 +261,7 @@ export function LayerSettings({
                   {l.textCount > 0 ? ` · ${l.textCount} text` : ""}
                 </option>
               ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            </SelectField>
           </div>
         )}
         {/* Move / Resize / Add mask in ONE row. Add mask used to sit alone in
@@ -322,7 +310,7 @@ export function LayerSettings({
             "none of those mask buttons will be on each layer"): same
             handlers, new home, wired to the dropdown's selection. */}
         {mask && activeLayer && activeLayer.hasMask && (
-          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
+          <div className={PANEL_SECTION}>
             <SectionHeader
               title="Layer Mask"
               info={
@@ -391,7 +379,7 @@ export function LayerSettings({
             layer's own alpha and applied UNDER the mask — so masking a
             tinted layer hides the tint with it, as Photoshop does. */}
         {overlay && activeLayer && (
-          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
+          <div className={PANEL_SECTION}>
             <SectionHeader
               title="Color Overlay"
               info={

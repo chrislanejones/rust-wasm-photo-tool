@@ -5,8 +5,7 @@
 //
 // SOURCES (in priority order):
 //   1. TOOL_MODULES — the tool registry (features/tools/toolModules.ts).
-//   2. toolConfig.ts TOOLS — tools not yet migrated into the registry.
-//   3. features/tools/toolModes.ts — the sub-mode axis, registry-first with
+//   2. features/tools/toolModes.ts — the sub-mode axis, registry-first with
 //      hand-written lists for the not-yet-migrated tools. That table used to
 //      live in this file; it moved out when the router needed the same
 //      knowledge, because the alternative was two copies of it.

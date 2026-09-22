@@ -85,57 +85,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.80 — 2026-09-20
+### v8.83 — 2026-09-22
 
-**The font menu picks real fonts, object removal is a brush on the canvas, and an undo no longer comes back after a reload.**
+**Mono and Serif survive a reload for real this time, and the site paints in half the time.**
 
-The Text tool's font menu used to be decoration. `render_text` took no font at
-all, so every choice drew the same face, and three different surfaces disagreed
-about the result by as much as 26%. Liberation Sans, Serif and Mono now ship as
-real files that load when you pick one. None of them went into the engine — they
-are handed to it at runtime, so the menu can grow later without the download
-growing with it.
+v8.82 said a text keeps its typeface through a reload. It didn't. Pick
+Liberation Mono, commit a text, reload, press Resume, and it came back in Sans.
+v8.82 fixed where the typeface is stored, and that part was right — the text
+still knew it was Mono. The loss happened one step later. The fonts only loaded
+when you opened the Text panel, and a reload opens on Enhance, so the text was
+redrawn before Mono existed and fell back to the built-in Sans. Exporting a
+batch as a ZIP had the same problem.
 
-Paying for that made the engine smaller, not bigger. The faces carry TrueType
-hinting instructions, and the rasterizer has never run them. Stripping the dead
-hinting gave back more than the three new families cost: **845,156 → 814,202
-bytes**, 30,954 smaller than v8.79. A test fails on any face that arrives with
-hinting still in it, so a routine font update cannot quietly spend those bytes
-again.
+The fonts now load before anything redraws your saved text, on every path that
+does it. The wait is capped at four seconds, so a slow font can never stop a
+photo from opening; the worst case is the old behavior. A font that fails to
+download is tried again instead of being written off for the session. A browser
+test now fails on v8.81 and on v8.82 and passes on this build.
 
-Remove Object is a brush on the real image now, not a popup. You paint over the
-thing you want gone, at whatever zoom you are on, and the app stays visible
-behind the mask. The old popup painted on a private copy of the frame capped at
-640 pixels wide — about a third of actual size — and you could not zoom or pan
-while you worked. Undo Stroke takes back the last stroke; Clear Mask starts
-over. The mask that goes to the server is byte-for-byte what it was.
+The site's first paint is about twice as fast. On a phone, Lighthouse went from
+64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts are served from
+the site itself instead of from Google, every page loads only its own code, the
+hero image has phone-sized copies, and the animated letters stop drawing once
+you scroll past them.
 
-Undo back to nothing used to come back. Apply an edit, press Ctrl+Z, reload, and
-the change you had just discarded was there again — the autosave never wrote the
-undo, so the archive on disk still held the old edit. That was silent data loss
-and it was live.
+There's a Contact page: email, bug reports, a private route for security
+issues, and how to delete your account. No form — there is nothing on the other
+end to receive one. The footer has three columns now, with a copyright line.
 
-The status bar says **Undo NN%** — how far undo can actually reach right now, as
-a share of your History depth setting. It replaces the toast that appeared once
-per photo to say undo was getting shallower. It is always there and it is never
-red.
+The tab icon is the horse on a rounded black square, on both sites, and the
+home-screen icons finally match it. They were still a placeholder orange square.
 
-Shape sloppiness is a ramp instead of a switch. It went from computer-drawn to
-hand-drawn with nothing in between, because three things jumped the moment the
-slider left zero — and one of them was a real bug: the firm path drew a circle
-and the sketchy path drew the bounding-box ellipse, so any non-square drag
-changed shape *and* size at sloppiness 1. The fill had been sitting inside a
-wider outline the whole time.
-
-Phones can reach settings. A gear in the header opens a sheet with Theme and
-Motion, so a phone is no longer stuck on whatever theme it booted with.
-
-Signing in works against the production Clerk instance.
-
-The site has a blog. The first post is about moving the engine into a worker,
-and it has figures that move. There is an About page with real photos, the home
-page tiles have names and a press you can feel, and the hero has a slider that
-runs the edit backwards.
+The engine did not change. It is the same 814,432 bytes as v8.82.
 
 ## License
 

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
-import { DIALOG_OVERLAY } from "@/lib/styles";
+import { DIALOG_OVERLAY, WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -268,7 +268,7 @@ export function SubscriptionButton({
           overlayClassName="z-[var(--z-modal)]"
         >
           <DialogHeader className="px-4 py-2.5">
-            <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+            <DialogTitle className={WINDOW_TITLE}>
               <Settings className="h-4 w-4" />
               Settings
             </DialogTitle>

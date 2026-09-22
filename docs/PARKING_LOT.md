@@ -4,6 +4,128 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
+against the master build and the branch build, same machine and hour:
+
+| Build | Spec runs | Tests failed | Replays of the raw flow (paste → 1 s → Alt+E) |
+|---|---|---|---|
+| master `6b59460e` | 4 | **1 of 12** | 1 miss of 10 |
+| branch | 4 | **1 of 12** | 1 miss of 10; cold starts 8/8 on both |
+
+The failing test is whichever one hits it: `waitForEvent("download")` times out
+after Alt+E. Every miss in the replays coincided with the harness's "Failed to
+load Clerk" page error, but some runs had that error and still downloaded.
+
+Unverified suspect: `useCanvasActions.handleExport` calls `a.click()` and then
+`URL.revokeObjectURL(url)` on the very next line. Chrome starts a download
+asynchronously, so revoking synchronously can race it. The usual fix is to
+revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
+after a short delay). Reproduce the miss rate first, then change one line and
+re-measure. Isolate the fix before explaining it.
+
+## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+
+Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
+`StampSettings`' `handleModeChange` clears the highlighted preset
+(`setSelectedStampId(null)`) because "sub-mode teardown clears the armed stamp
+(useStampTeardown), so the panel's own selection highlight must not survive the
+switch either". But it only runs from `ToolModeToggle`'s `onModeChange`, which
+fires only from the in-panel icon row behind `showModeRow` — and nothing has
+passed `showModeRow` since the row moved to `SubtoolRow` (the new-ui-toolbar arc). The panel is
+not keyed on the mode, so nothing remounts it either. Expected symptom: pick a
+red stamp, switch Stamps › Clone › Stamps in the header, and the tile is still
+lit while clicks no longer place it.
+
+Paint and Shapes route through the same dead prop; their handlers only mirror
+state the store already holds, so they are harmless. Reproduce first; the fix
+is probably an effect on `activeMode` in StampSettings, after which the whole
+`onModeChange`/`showModeRow`/`columns`/`disabled` surface of ToolModeToggle can
+be deleted (the shim note there asks for exactly that).
+
+## OPEN — app SSOT leftovers that change pixels or need a call (09-22-2026)
+
+From the fallow + style/UI survey on `refactor/ssot-ui-cleanup`. That branch did
+the pixel-identical consolidations (see its three commits); these either change
+how something looks or need a decision:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| ~~`--primary` = `--accent` and `--ring` = `--border-active` in both themes~~ | styles.css | **DECIDED 09-22-2026 (Chris): keep them separate.** An accent picker may need them to differ |
+| `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
+| Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
+| Plain inputs with NO focus ring (`inputCls`) | BatchSettings:785, AIRenamePanel:213, SuperUserPane:90/100 | Adopting FIELD_NUMERIC fixes a WCAG focus-visible gap but restyles them |
+| Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
+| ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
+| Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
+| RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
+| GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
+| The rename form (Start # / Pad / preview) is copied | AIRenamePanel:280 vs BatchSettings:845 | Its own component; the two copies have drifted slightly |
+| Label/value row x3, progress bar x4 | ImageMetaPanel, SuperUserPane, StoragePane / ResourceMonitor, AIUsagePane, ResizeSettings | New primitives, small visual unification |
+| PenOverlay hardcodes `#fcdfc2` (the DARK accent) — wrong in light theme; `#5af` vs Lasso `#4d9bff` are two selection blues | PenOverlay:694, LassoOverlay | Visible fix; needs a selection-color token |
+| The orange "grid selection" color is written 4x with no token; a `bg-black/40` scrim skips DIALOG_OVERLAY | AppShell:2684/3269/3359, GridThumbnails:128/146, CanvasArea | Token + scrim change |
+| ~8 uppercase mono labels with 3 different trackings | various | `.label-caps` was the fix once and is deleted now (unused); a new one restyles them |
+| 16 inline numeric `zIndex` values off the z ladder (guardrails only counts classes) | CanvasArea 40-52, overlays 20-29 | Mapping to `var(--z-*)` may reorder stacking |
+| Stale `var()` fallbacks that no longer match the tokens | `var(--accent, #6366f1)` x4, `var(--color-theme-accent, #b6764e)` x3 | Harmless today, misleading |
+| `--shadow-sm/md/lg` in `:root` share Tailwind's theme namespace, apparently unread | styles.css:28-30 | Could not prove them dead overnight |
+| Duplicate exports in the Dexie layer | originalsAdapter vs originalsStore (`getOriginal`, `deleteOriginal`), db.ts vs adapter (`putOriginal`) | IndexedDB — dexie-migration skill territory |
+
+## OPEN — ~14 KB of the wasm is ttf-parser variable-font code (09-22-2026)
+
+Twiggy on a name-keeping build of master `6b59460e` (same code, `wasm-opt -O -g`):
+ttf_parser is 87,213 B, and the variable-font half of it — `gvar` outlines,
+`parse_variation_data`, `ItemVariationStore` — is roughly 14 KB. `ab_glyph = "0.2"`
+pulls it in through its default `variable-fonts` feature. If every face the
+engine loads is static (no `fvar` table), `ab_glyph = { version = "0.2",
+default-features = false, features = ["std"] }` should drop it. Check the fonts
+first, then the rust-wasm-loop gates and a text pixel diff. The same run found
+only 240 B of genuinely unreachable wasm, so this is the one real lead.
+
+## OPEN — the home page's mobile LCP is bimodal: a ~2 s element render delay in some runs (09-21-2026)
+
+Observation from the speed work on `feat/marketing-speed-contact`. No cause
+found. Lighthouse 12, mobile preset, `/`, three sets of runs:
+
+| Build | Runs | Runs with element render delay ≥ 1.2 s | Their LCP | The other runs' LCP |
+|---|---|---|---|---|
+| Baseline (master) | 6 | **5** | 5.5–6.7 s (all six) | — |
+| Speed branch | 5 | **2** | 4.9 s and 5.3 s | 2.1–2.3 s (render delay 29–64 ms) |
+| Live imagehorse.app | 3 | **1** | 6.8 s | 3.2–3.3 s |
+
+The delay is the last LCP phase: the image has finished loading and the paint
+waits. The branch made the fast mode the common one (3 of 5) and made the slow
+mode faster than the baseline's normal, but did not remove it.
+
+Not tested, and only a guess at where to look: the image and the entry script
+are requested together, so whichever finishes first may decide whether hydration
+runs before the hero paints. One cheap experiment is to start hydration after
+the first `requestAnimationFrame` and compare a dozen runs each way. It defers
+interactivity by a frame or two, which is why it was not folded into the speed
+PR unasked.
+
+## OPEN — marketing design-audit leftovers (09-21-2026)
+
+From the token/consistency audit run on `feat/marketing-speed-contact`. That
+branch fixed the safe items (one tier filter, one `.coda`, one "latest" pill,
+radius/type/motion tokens, focus-ring radius, the mobile sheet's CTA, Pricing's
+phone header, two dead selectors). These change how something looks, or need
+a decision, so they wait:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| "Selected" is drawn three ways: inset bar (`.seg`), accent border (Trail month tiles), border + tint + ring (home tool tiles) | styles.css `.seg[aria-pressed]`, `.month`, `.buttonset__btn` | Picking one changes two of the three |
+| The small uppercase label is written ~10 times with 0.08 / 0.1 / 0.12em tracking and mono or Geist | `.spec thead th`, `.stack__label`, `.cmdk__group`, `.foot-stmt__head`, … | One `.label` class + `--tracking-label` token; visible where the tracking differs |
+| Text links are styled 7 ways (underline vs bottom border, 3px / 0.14em / 0.2em offsets) | `.person__links a`, `.foot-stmt__links a`, `.notfound__links a`, `.postcard__title a`, … | One link style is a visible change |
+| Features and Trail Log end with no closing block (`.close` or `.coda`) | pages/Features.tsx, pages/Trail.tsx | Needs copy |
+| Blog shows date then version; Trail shows version then date, in the same meta column | `.postcard__meta`, `.release__meta` | Pick an order |
+| Top-level `.tbl` and stack `.node` cards use `--radius-sm`, other top-level cards `--radius-md` | styles.css | Visible |
+| `theme-color` is `#1b1210`; `--color-paper` is `#0d0504` (converted, verified) | marketing/index.html | May be deliberate: it tints the phone's address bar to match the hero's glow |
+| WebGPU cubes and the Canvas 2D fallback paint different oranges: the shader's "linear sRGB" accent is the sRGB value, not the linear one | components/CubeLetters.tsx WGSL `fs` | Changes the effect's color; the 2D path also hardcodes three oklch values |
+| Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
+| Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
+| The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+
 ## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
 
 Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not
@@ -907,7 +1029,7 @@ mapped corners are exact and lines/arrows/polylines/pen paths are just their
 control points — but a circle becomes a conic needing polygon approximation,
 and the shape render path has no tile cache to warp the way text does.
 
-## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
+## ✅ FIXED 2026-09-20 (ADR-060) — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
 
 Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,
 and that is measured rather than assumed.**
@@ -939,6 +1061,42 @@ session should instrument which branch fires before fixing either.
 master-written database looked like a migration fixture and was not one — with
 no op log in that origin, only the archive path was exercised. **An absent
 fixture reads exactly like a passing one.**
+
+### Closed 2026-09-20 — and the "likely mechanism" above was only half of it
+
+ADR-060. The unconfirmed guess was right about the archive path and **wrong that
+it was the only loss**. There were two, either of which loses the box on its own:
+
+| # | Where | What it did |
+|---|---|---|
+| a | `Op::TextEdit` apply (src/ops.rs) | REPLACED the annotation. `wrap_width`, `box_height`, `perspective` and `font_id` are `#[serde(skip)]`, so the payload cannot carry them and they decoded as defaults. Replaying a captured PRODUCTION log: cursor 3 = serif/299, cursor 4 (`TextEdit`) = `""`/0. `Op::ShapeEdit` had the same latent defect. |
+| b | `stripLiveAnnotations` + `restore_text_annotation` | The archive stripper was an allowlist without the three axes on it, so they had never reached disk at all — and the restore signature had nowhere to put them if they had. |
+
+So "fix the archive path" alone would still have lost the box on any origin that
+DID have an op log, and the merge alone would still have lost it on any origin
+that did not. Both halves shipped together.
+
+**No op-log version was taken** — the wire layout is unchanged, so `v9` stays
+free for #187, and every v7/v8 log already on disk replays better with no
+migration step. Measured on the v7 fixture: `wrap_width` 0 → 338.
+
+Fixed by: `TextParams::carry_skipped_from` / `ShapeParams::carry_skipped_from`,
+`stripLiveAnnotations` becoming a denylist, and three new arguments on
+`restore_text_annotation`. Pinned by `tests/oplog_v8_text_settings_replay.rs`,
+`tests/oplog_v7_v8_fixture_resume.rs` and
+`app/src/lib/textBoxSurvivesReload.test.ts`.
+
+### Still open, carried out of the same session
+
+- **A box drag before the first save stops the op log from EVER being
+  persisted.** Observed 2026-09-20, three runs: with the drag, no manifest row
+  and no chunk row for the whole session; the identical run without it persisted
+  `TextAdd + TextFont` within the debounce. One variable, contrast measured,
+  mechanism NOT isolated. It no longer loses the box (the archive path carries it
+  now), but it costs cross-reload undo depth, so it is worth chasing.
+- **The text corner quad is carried and restored now, but nothing exercises a
+  warped text through a real reload** — `perspective` rides the same three new
+  arguments on faith from a unit test, not from a browser.
 
 ## The v8.34 brush fix was never applied to the other brushes (2026-08-14) — clone stamp AND blur NOW FIXED
 

@@ -59,6 +59,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
 import { isMarqueeKind } from "@/stores/useToolStore";
+import { PANEL_SECTION } from "@/lib/styles";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
@@ -210,7 +211,7 @@ export function SelectSettings({
           lives in this bulb now, per the no-permanent-paragraphs rule.
           Outside the ToolModeToggle body: these actions are kind-independent
           and shouldn't re-animate on every kind switch. */}
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+      <div className={PANEL_SECTION}>
         <SectionHeader
           title="Selection"
           info={
@@ -293,7 +294,7 @@ export function SelectSettings({
           heavier operation than Delete. Still the single-resolution kernel —
           large holes show soft smearing until the pyramid lands (ADR-018). */}
       {patchmatch && (
-        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+        <div className={PANEL_SECTION}>
           <SectionHeader
             title="Remove Object"
             info="Erases the selection and rebuilds it from the rest of the image, on your device. Cover the whole object — a partial selection lets it rebuild the object from its own leftovers. Big areas can come out soft."

@@ -11,6 +11,19 @@
 export const HOVER_RING =
   "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-2 hover:ring-offset-theme-sidebar";
 
+/** The pill a row of toolbar buttons sits in. `ToggleButtonGroup`'s own
+ *  container; the top bar's Undo/Redo, Zoom, New/Export and account groups and
+ *  the two segmented tab rows (Command Palette, Diagnostics) had each copied it
+ *  "literally", in their own words. Layout (`flex`, `grid`, `shrink-0`) stays
+ *  with the caller — this is only the box. */
+export const BUTTON_PILL = "gap-1 p-1 rounded-lg bg-bg-tertiary";
+
+/** Title of the app's "window" dialogs — Settings, Command Palette,
+ *  Diagnostics: an `h-4 w-4` icon and a mono caps label. Three copies of this
+ *  string, one per window, before it lived here. */
+export const WINDOW_TITLE =
+  "flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary";
+
 /* ─────────────────────────────────────────────────────────────────────────────
    TEXT FIELDS — the one definition behind every typed-into surface.
 
@@ -74,6 +87,21 @@ export const FIELD_SELECT =
   "w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs " +
   "text-theme-foreground border border-transparent focus:outline-none " +
   "focus:border-theme-ring cursor-pointer";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PANEL SECTIONS — the hairline that opens a new group inside a tool panel.
+
+   Select, Paint, Shapes, Text, Perspective, Layers and Adjust all draw the same
+   rule + padding above a SectionHeader. LayerSettings had already named it
+   locally "so the sections cannot drift apart"; the other six inlined it. One
+   definition here is that same promise kept across panels.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** The rule and the room above it. Use alone when the caller owns spacing. */
+export const PANEL_DIVIDER = "border-t border-theme-sidebar-border pt-3";
+
+/** A whole section: divider plus the panel's standard `space-y-2` rhythm. */
+export const PANEL_SECTION = `space-y-2 ${PANEL_DIVIDER}`;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    TOOL-TILE SELECTION — the ToolGrid rail tile and the SubtoolRow tile.
@@ -158,15 +186,14 @@ export const SUBTILE_SELECTED =
 export const SUBTILE_IDLE =
   "border-2 border-transparent bg-bg-tertiary/60 text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]";
 
-/* Disabled — no image to act on. Tier-specific only so each keeps its own
-   border WIDTH: a disabled tile sits in the same grid as enabled ones, and a
-   0px border there would give it a 4px-wider content box (and a bigger icon)
-   than its neighbours. Every constant above carries its width for the same
-   reason — that invariant is what keeps the two rows dimensionally identical
-   in all three states. */
+/* Disabled — no image to act on. ONE constant for both tiers: the rail and the
+   sub-row both carry a 2px border in every state, so there is nothing tier-
+   specific left to say. (It used to be two byte-identical copies, kept apart
+   back when the sub-row's border was 1px.) The width still matters — a
+   disabled tile sits in the same grid as enabled ones, and a 0px border there
+   would give it a 4px-wider content box (and a bigger icon) than its
+   neighbors. */
 export const TILE_DISABLED =
-  "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
-export const SUBTILE_DISABLED =
   "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -197,7 +224,7 @@ export const CONFIRM_AFFIRMATIVE =
 
 /**
  * Base class-string for every Skeleton placeholder — the ONE definition site
- * behind the `Skeleton` / `SkeletonText` / `SkeletonCircle` primitives
+ * behind the `Skeleton` / `SkeletonText` primitives
  * (components/ui/skeleton.tsx). `bg-muted` is the semantic token base color
  * (Refactor-Playbook §2 — no raw colors); the `.skeleton` class (styles.css)
  * layers the shimmer sweep on top and degrades to this static muted block under

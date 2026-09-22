@@ -1226,6 +1226,13 @@ declare module "stamp_tool" {
       shadow_r: number, shadow_g: number, shadow_b: number, shadow_a: number,
       shadow_dx: number, shadow_dy: number, shadow_blur: number,
       font_id: string,
+      /** Reflow width in px; 0 = size the box to the text. ADR-060. */
+      wrap_width: number,
+      /** Box height in px; 0 = size the box to the text. ADR-060. */
+      box_height: number,
+      /** Flat [x0,y0,x1,y1,x2,y2,x3,y3] normalized quad. Any length but 8 is
+       *  read as the identity, which is what every pre-v8.81 archive means. */
+      perspective: Float32Array,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;

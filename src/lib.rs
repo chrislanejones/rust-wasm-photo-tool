@@ -4581,9 +4581,40 @@ mod layer_persistence_tests {
             1.0,
         );
         t.restore_text_annotation(
-            "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi",
+            16.0,
+            0,
+            0,
+            0,
+            false,
+            2,
+            2,
+            0.0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
             // shadow params (box, text, r, g, b, a, dx, dy, blur)
-            false, false, 0, 0, 0, 0, 0, 0, 0, "",
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            // font_id, then the box axes and the quad (ADR-060). An empty
+            // slice is the "no quad recorded" case every pre-v8.81 archive
+            // hits.
+            0,
+            0,
+            &[],
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

@@ -67,11 +67,7 @@
   --overlay-scrim: rgb(0 0 0 / 0.65);
   --overlay-blur: 8px;
 
-  /* ── Motion — durations + shared easing. ── */
-  --dur-fast: 0.1s;
-  --dur-base: 0.15s;
-  --dur-slow: 0.2s;
-  --dur-slower: 0.3s;
+  /* ── Motion — shared easing. ── */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ── Layout heights. ── */
@@ -83,7 +79,7 @@
   /* ── LIGHT palette — warm paper counterpart to the dark earth-tone ──
      Brand accent (--accent/--primary) stays the warm cream #fcdfc2 in both
      themes (matches the accent picker). The thin-line contrast roles
-     (--ring/--border-active/--current-color) use a deeper warm tan so focus
+     (--ring/--border-active) use a deeper warm tan so focus
      and selection stay visible on light surfaces. */
   --bg-primary: #f3efe8;
   --bg-secondary: #fbf9f5;
@@ -103,27 +99,27 @@
   --accent-dim: rgba(201, 143, 63, 0.15);
   --accent-glow: rgba(201, 143, 63, 0.3);
   --success: #16a34a;
-  --success-dim: rgba(22, 163, 74, 0.15);
   --warning: #d97706;
-  --undo-color: #5c554c;
-  --redo-color: #c2bbae;
-  --current-color: #c98f3f;
 
-  /* shadcn/ui CSS variables — light */
-  --background: #f3efe8;
-  --foreground: #2a2622;
-  --card: #fbf9f5;
-  --card-foreground: #2a2622;
+  /* shadcn/ui CSS variables — light.
+     Where a shadcn name means the same thing as a brand token (page, card,
+     text on a surface) it is an ALIAS of that token, not a second copy of
+     its hex: seven of these used to repeat the brand values by hand, which
+     is two places to edit for one color. Same rule in the dark block. */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
   --popover: #ffffff;
-  --popover-foreground: #2a2622;
+  --popover-foreground: var(--text-primary);
   --primary: #c98f3f;
   --primary-foreground: #3a3128;
   --secondary: #efe7d8;
   --secondary-foreground: #5c4326;
   --muted: #ece6db;
-  --muted-foreground: #5c554c;
+  --muted-foreground: var(--text-secondary);
   --accent-ui: #ece6db;
-  --accent-ui-foreground: #2a2622;
+  --accent-ui-foreground: var(--text-primary);
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   /* Destructive TEXT on a destructive TINT — the "Remove canvas" action, and
@@ -188,27 +184,23 @@
   --accent-dim: rgba(252, 223, 194, 0.15);
   --accent-glow: rgba(252, 223, 194, 0.3);
   --success: #22c55e;
-  --success-dim: rgba(34, 197, 94, 0.15);
   --warning: #f59e0b;
-  --undo-color: #b4b4b4;
-  --redo-color: #484848;
-  --current-color: #fcdfc2;
 
   /* shadcn/ui CSS variables — dark */
-  --background: #121212;
-  --foreground: #eeeeee;
-  --card: #181818;
-  --card-foreground: #eeeeee;
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
   --popover: #181818;
-  --popover-foreground: #eeeeee;
+  --popover-foreground: var(--text-primary);
   --primary: #fcdfc2;
   --primary-foreground: #3a3128;
   --secondary: #3a3128;
   --secondary-foreground: #fcdfc2;
   --muted: #222222;
-  --muted-foreground: #b4b4b4;
+  --muted-foreground: var(--text-secondary);
   --accent-ui: #2b2b2b;
-  --accent-ui-foreground: #eeeeee;
+  --accent-ui-foreground: var(--text-primary);
   /* Dark counterpart — neutral ink, 15.3:1 against the sidebar (#181818).
      Contrast was never the dark theme's problem (the cream accent is 13.9:1
      here); the problem was that cream and "selected" were the same color. */
@@ -369,16 +361,6 @@
   --text-base: 1rem;      /* 16px */
   --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);    /* 17→20px (fluid) */
   --text-2xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.75rem);  /* 20→28px (fluid) */
-  --tracking-label: 0.06em;
-}
-
-/* Recurring uppercase mono label (panel headers / section captions). Task 1. */
-.label-caps {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

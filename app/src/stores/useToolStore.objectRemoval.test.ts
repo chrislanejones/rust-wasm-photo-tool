@@ -132,3 +132,37 @@ describe("useToolStore — Object Removal mask strokes", () => {
     expect(persisted).not.toContain("objectRemovalBusy");
   });
 });
+
+describe("useToolStore — leaving the AI tool ends Remove Object's mask", () => {
+  // QC §3, 09-22. The mask overlay is mounted for every tool and only
+  // `objectRemovalMasking` hides it; the things that turned it off lived in
+  // AISettings, which unmounts on a tool switch. So picking another tool
+  // mid-mask left the paint on the canvas and the overlay eating every click.
+  beforeEach(() => {
+    s().setActiveTool("ai");
+    s().setObjectRemovalMasking(false);
+  });
+
+  it("switching to another tool clears the mask, the paint and busy — like Cancel", () => {
+    s().setObjectRemovalMasking(true);
+    s().beginObjectRemovalStroke({ x: 10, y: 10 });
+    s().setObjectRemovalBusy(true);
+
+    s().setActiveTool("effects");
+
+    expect(s().activeTool).toBe("effects");
+    expect(s().objectRemovalMasking, "no mask left over the new tool").toBe(false);
+    expect(s().objectRemovalStrokes).toEqual([]);
+    expect(s().objectRemovalBusy).toBe(false);
+  });
+
+  it("re-selecting the AI tool keeps the mask the user is painting", () => {
+    s().setObjectRemovalMasking(true);
+    s().beginObjectRemovalStroke({ x: 10, y: 10 });
+
+    s().setActiveTool("ai");
+
+    expect(s().objectRemovalMasking).toBe(true);
+    expect(s().objectRemovalStrokes).toHaveLength(1);
+  });
+});

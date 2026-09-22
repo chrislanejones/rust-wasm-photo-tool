@@ -4,6 +4,10 @@
 call-site changes, nothing merged but this document and a throwaway spike on
 `spike/engine-worker`.
 
+> The `spike/` harness files named in this document were deleted on 09-22-2026 (the
+> experiment is finished; ADR-024 shipped). Read any of them with
+> `git show 65c25d2b:spike/<file>`.
+
 Everything below is measured unless it says otherwise. Where something could
 not be settled it is logged as **OPEN** rather than guessed.
 
