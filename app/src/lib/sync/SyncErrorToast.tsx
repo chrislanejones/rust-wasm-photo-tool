@@ -13,7 +13,7 @@
 // over a sync that is working again.
 //
 // Deliberately NOT a toast for success, for "connecting", or for the signed-out
-// state: a sync that works is silent. Settings → General has the detail.
+// state: a sync that works is silent. Settings → Sync has the detail.
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useSyncStatus } from "./status";
@@ -34,7 +34,7 @@ export function SyncErrorToast() {
         // refused outright is not retried on a timer (useCloudSync).
         description: willRetry
           ? "Your settings are saved on this device. It will keep trying."
-          : "Your settings are saved on this device. Settings › General says what went wrong.",
+          : "Your settings are saved on this device. Settings › Sync says what went wrong.",
       });
       return;
     }

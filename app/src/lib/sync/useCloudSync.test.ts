@@ -109,6 +109,8 @@ let modules: {
   ledger: typeof import("./ledger");
   status: typeof import("./status");
   channel: typeof import("./channel");
+  enabled: typeof import("./enabled");
+  cloud: typeof import("./useCloudSync");
 };
 
 async function flush(ms = 0): Promise<void> {
@@ -148,16 +150,17 @@ async function mountDevice(values: Record<Key, string> = { prefs: "dark", ui: "t
   h.docs = { prefs: make("prefs"), ui: make("ui", () => h.uiReady) };
   h.docList.splice(0, h.docList.length, h.docs.prefs, h.docs.ui);
 
-  const [{ useCloudSync }, leader, ledger, status, channel] = await Promise.all([
+  const [cloud, leader, ledger, status, channel, enabled] = await Promise.all([
     import("./useCloudSync"),
     import("./leader"),
     import("./ledger"),
     import("./status"),
     import("./channel"),
+    import("./enabled"),
   ]);
-  modules = { leader, ledger, status, channel };
+  modules = { leader, ledger, status, channel, enabled, cloud };
   function Host() {
-    useCloudSync();
+    cloud.useCloudSync();
     h.status = status.useSyncStatus();
     return null;
   }
@@ -485,5 +488,149 @@ describe("one pusher per device, backing off (finding 13)", () => {
     await flush(600_000);
     expect(h.pushes).toHaveLength(1);
     expect(h.status).toMatchObject({ state: "error", willRetry: false });
+  });
+});
+
+describe("the sync switch (this device only)", () => {
+  it("off: fetches nothing, sends nothing, and a change made while off is owed to nobody", async () => {
+    await phoneWrites("prefs", "dark");
+    await mountDevice();
+    expect(h.status?.state).toBe("synced");
+
+    await act(async () => {
+      modules.enabled.setSyncEnabled(false);
+    });
+    await flush();
+    expect(h.status?.state).toBe("off");
+    expect(localStorage.getItem("image-horse-sync-account")).toBeNull();
+
+    edit("prefs", "light");
+    await flush(10_000);
+    await phoneWrites("prefs", "blue"); // the phone keeps going meanwhile
+    await flush(1_000);
+
+    expect(h.pushes).toEqual([]); // nothing was sent
+    expect(h.values.prefs).toBe("light"); // and nothing was taken
+    expect(h.server.row("prefs")).toMatchObject({ value: blob("blue") });
+  });
+
+  it("on again: starts fresh — takes the account's copy instead of sending its own", async () => {
+    await phoneWrites("prefs", "dark");
+    await mountDevice();
+    await act(async () => {
+      modules.enabled.setSyncEnabled(false);
+    });
+    edit("prefs", "light"); // made while off
+    await phoneWrites("prefs", "blue");
+    await flush(1_000);
+
+    await act(async () => {
+      modules.enabled.setSyncEnabled(true);
+    });
+    await flush(1_000);
+
+    expect(h.values.prefs).toBe("blue");
+    expect(h.pushes).toEqual([]);
+    expect(h.status?.state).toBe("synced");
+    expect(h.adopted.at(-1)).toBe("prefs:blue");
+    // Adopted as a LOAD, not into a running session: switching on is a fresh
+    // start, so held-back (navigation) fields apply straight away.
+    expect(h.contexts.at(-1)).toBe("prefs:blue:load");
+  });
+
+  it("drops a change still owed when it was switched off, instead of sending it on the way back", async () => {
+    await phoneWrites("prefs", "dark");
+    await mountDevice();
+    h.mode = "throw"; // offline: this change cannot be sent
+    edit("prefs", "light");
+    await flush(600);
+    expect(h.docs.prefs.snapshot().dirty).toBe(true);
+
+    await act(async () => {
+      modules.enabled.setSyncEnabled(false);
+    });
+    h.mode = "live";
+    const tried = h.pushes.length;
+    await act(async () => {
+      modules.enabled.setSyncEnabled(true);
+    });
+    await flush(10_000);
+
+    // Back on is first contact: the account's copy wins, the stale change is gone.
+    expect(h.pushes.slice(tried)).toEqual([]);
+    expect(h.server.row("prefs")).toMatchObject({ value: blob("dark"), rev: 1 });
+    expect(h.values.prefs).toBe("dark");
+  });
+
+  it("is per device: the switch itself never reaches the server", async () => {
+    await mountDevice();
+    await act(async () => {
+      modules.enabled.setSyncEnabled(false);
+    });
+    await act(async () => {
+      modules.enabled.setSyncEnabled(true);
+    });
+    await flush(1_000);
+    expect(h.pushes).toEqual([]);
+  });
+});
+
+describe("Send this device's settings", () => {
+  it("an empty account is never seeded by itself; Send seeds it on purpose", async () => {
+    await mountDevice({ prefs: "dark", ui: "tools" });
+    await flush(10_000);
+    expect(h.pushes).toEqual([]); // rule 1: nobody changed anything
+    expect(h.status?.accountEmpty).toBe(true);
+
+    await act(async () => {
+      await modules.cloud.sendThisDevice();
+    });
+    await flush(600); // the push debounce
+    await flush(10); // the pull that shows it
+
+    expect(h.server.row("prefs")).toMatchObject({ value: blob("dark"), rev: 1 });
+    expect(h.server.row("ui")).toMatchObject({ value: blob("tools"), rev: 1 });
+    expect(h.status?.accountEmpty).toBe(false);
+    expect(h.status?.state).toBe("synced");
+  });
+
+  it("brings the copy back after Forget", async () => {
+    await phoneWrites("prefs", "dark");
+    await mountDevice();
+    await h.server.clear();
+    await act(async () => {
+      await h.refresh();
+    });
+    await flush(1_000);
+    expect(h.status?.accountEmpty).toBe(true);
+
+    await act(async () => {
+      await modules.cloud.sendThisDevice();
+    });
+    await flush(600);
+
+    expect(h.server.row("prefs")).toMatchObject({ value: blob("dark") });
+    expect(h.server.row("ui")).toMatchObject({ value: blob("tools") });
+  });
+
+  it("does not report an empty account while the legacy settings blob can seed it", async () => {
+    await h.server.signIn("user_legacy", blob("legacy-light"));
+    h.pull = await h.server.pull();
+    await mountDevice();
+    // Adopted from the legacy blob at first contact; the rows are still absent.
+    expect(h.values.prefs).toBe("legacy-light");
+    expect(h.status?.accountEmpty).toBe(false);
+  });
+
+  it("sends nothing while sync is off", async () => {
+    await mountDevice();
+    await act(async () => {
+      modules.enabled.setSyncEnabled(false);
+    });
+    await act(async () => {
+      await modules.cloud.sendThisDevice();
+    });
+    await flush(10_000);
+    expect(h.pushes).toEqual([]);
   });
 });

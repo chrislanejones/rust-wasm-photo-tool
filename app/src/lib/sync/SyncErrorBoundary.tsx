@@ -13,7 +13,7 @@
 // The boundary wraps `CloudSync` and NOTHING ELSE. It renders null either way,
 // so there is no fallback UI to design: tripping it turns sync off and leaves
 // the app exactly as it was. The failure is reported through the status store,
-// which is what Settings → General and the error toast both read.
+// which is what Settings → Sync and the error toast both read.
 //
 // It retries by remounting its child, on a backoff, because the likely cause
 // clears on its own — a deployment catching up, a cold start — and a tab left

@@ -323,10 +323,13 @@ app/src/
     │   │                             channel — that one decides who may EDIT, this one carries state
     │   │                             to every tab including the parked ones
     │   ├── leader.ts                 Which tab talks to the server: the useTabClaim holder
-    │   ├── useCloudSync.ts           Cross-DEVICE transport: one reactive Convex query + one mutation
+    │   ├── useCloudSync.ts           Cross-DEVICE transport: one reactive Convex query + one mutation.
+    │   │                             Also `sendThisDevice()`, the Send button's explicit seed
     │   ├── reconcile.ts              THE decision — adopt / push / hold / idle. Pure, import-free,
     │   │                             enumerated in reconcile.test.ts
-    │   ├── status.ts                 What it is doing, for Settings → General to show
+    │   ├── status.ts                 What it is doing, for Settings → Sync to show (desktop + phone)
+    │   ├── enabled.ts                This device's on/off switch (localStorage, never synced). Off =
+    │   │                             signed out for sync; on again = first contact
     │   ├── identity.ts               Tab id (echo suppression). No device id — nothing uploads one
     │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
     ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   FlaskConical,
   Layers,
+  RefreshCw,
   Check,
   ExternalLink,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
+import { SyncPane } from "@/components/SyncPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -64,6 +66,7 @@ export type SettingsTab =
   | "canvas"
   | "appearance"
   | "security"
+  | "sync"
   | "export"
   | "storage"
   | "billing"
@@ -148,6 +151,7 @@ export function SubscriptionButton({
     appearance: Palette,
     canvas: Layers,
     security: Shield,
+    sync: RefreshCw,
     export: Package,
     storage: Cloud,
     billing: CreditCard,
@@ -160,6 +164,7 @@ export function SubscriptionButton({
     "appearance",
     "canvas",
     "security",
+    "sync",
     "export",
     "storage",
     "billing",
@@ -327,6 +332,10 @@ export function SubscriptionButton({
                 onOnlineFeaturesChange={setOnlineFeatures}
                 onlineFeaturesLocked={aiComposerOpen}
               />
+            ) : tab === "sync" ? (
+              /* Every control here commits immediately (lib/sync), so the
+                 footer's Restore / Apply do not show for this pane. */
+              <SyncPane />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />
             ) : tab === "storage" ? (

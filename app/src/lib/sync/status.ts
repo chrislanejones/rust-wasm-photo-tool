@@ -2,8 +2,9 @@
 //
 // Sync that works is invisible, which is also how sync that is broken looks.
 // This is the difference: a single status any part of the UI can read (today
-// Settings → General), so "my laptop never got it" has an answer on screen
-// instead of in the Diagnostics log.
+// Settings → Sync, on desktop and in the phone's Settings sheet), so "my
+// laptop never got it" has an answer on screen instead of in the Diagnostics
+// log.
 import { useSyncExternalStore } from "react";
 import type { SyncKey } from "./keys";
 
@@ -14,6 +15,9 @@ export type SyncState =
   /** Signed out. Cross-tab only, which is the supported logged-out path and
    *  not a degraded one. */
   | "local"
+  /** Signed in, but the person turned sync off on this device (enabled.ts).
+   *  Cross-tab only, as signed out. */
+  | "off"
   /** Signed in, waiting for the account's documents to arrive. */
   | "connecting"
   /** Signed in, and another tab on this device is the one talking to the
@@ -41,6 +45,10 @@ export interface SyncStatus {
    *  the server refused the write permanently and only a new change (or a
    *  reload into a fixed build) will try again. */
   willRetry: boolean;
+  /** The account holds no synced settings at all — nothing any device has
+   *  sent, or only forgotten markers. Nothing goes up on its own from here
+   *  (reconcile.ts rule 1), so the UI offers to send this device's copy. */
+  accountEmpty: boolean;
 }
 
 const INITIAL: SyncStatus = {
@@ -49,6 +57,7 @@ const INITIAL: SyncStatus = {
   pending: [],
   lastError: null,
   willRetry: false,
+  accountEmpty: false,
 };
 
 // One frozen object, replaced wholesale on every change. useSyncExternalStore
@@ -68,6 +77,7 @@ export function setSyncStatus(patch: Partial<SyncStatus>): void {
     next.lastSyncedAt === status.lastSyncedAt &&
     next.lastError === status.lastError &&
     next.willRetry === status.willRetry &&
+    next.accountEmpty === status.accountEmpty &&
     next.pending.length === status.pending.length &&
     next.pending.every((k, i) => k === status.pending[i])
   ) {

@@ -100,6 +100,12 @@ export interface SyncedDoc {
    *  owner the moment the underlying store is readable — see `bridge` in
    *  docs.ts. A no-op if the document already knows a value. */
   prime: () => void;
+  /** Owe the signed-in account the value the app holds NOW, exactly as if the
+   *  user had just set it — the "Send this device's settings" button. Marks
+   *  the document met (`seen`), because a person pressing that button has
+   *  decided this device is the source; first contact would adopt instead.
+   *  A no-op signed out: it is owed to nobody. */
+  owe: () => void;
   /** Ready gate; see `SyncedDocSpec.ready`. */
   whenReady: () => Promise<void>;
 }
@@ -238,11 +244,19 @@ export function defineSyncedDoc<T>(spec: SyncedDocSpec<T>): SyncedDoc {
     current();
   }
 
+  function owe(): void {
+    if (!currentAccount()) return;
+    const now = Date.now();
+    update((e) => ({ ...e, pending: current(), updatedAt: now, seen: true }));
+    emitLocalChange(spec.key);
+  }
+
   const doc: SyncedDoc = {
     key: spec.key,
     format: spec.format,
     changedLocally,
     prime,
+    owe,
     snapshot: () => {
       const e = entry();
       return {

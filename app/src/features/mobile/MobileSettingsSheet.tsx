@@ -1,8 +1,13 @@
-// The phone surface's Settings. A bottom sheet over MobileShell holding ONE
-// pane — <AppearancePane/>, the same component the desktop Settings modal
-// renders on its Appearance tab. Reused whole, not re-implemented: a second
-// theme control is how two surfaces drift into disagreeing about what "System"
-// means.
+// The phone surface's Settings. A bottom sheet over MobileShell holding TWO
+// panes — <AppearancePane/> and <SyncPane/>, the same components the desktop
+// Settings modal renders on its Appearance and Sync tabs. Reused whole, not
+// re-implemented: a second theme control is how two surfaces drift into
+// disagreeing about what "System" means.
+//
+// Sync is here because the phone is where "it shows nothing" gets noticed:
+// the phone surface is the gallery, and the gallery is exactly what does not
+// sync. Without the status line the phone had no way to say whether sync was
+// working, and no way to switch it off or send its own settings.
 //
 // NOT the desktop Settings modal. That one is 760px of tab rail plus ten panes
 // and is unusable at 390px, and because dialogs portal ABOVE `--z-mobile` it
@@ -21,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { AppearancePane } from "@/components/AppearancePane";
+import { SyncPane } from "@/components/SyncPane";
 import {
   serializePreferences,
   usePreferences,
@@ -103,13 +109,13 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               other dialog in the app and re-toning all of them is its own
               session — see the report. */}
           <DialogDescription className="text-xs text-text-secondary">
-            Theme and motion. Saved here, and to your account when signed in.
+            Theme and motion, and whether this device syncs with your account.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Two descendant rules, both aimed at <AppearancePane/>'s shared
-            ToggleButtonGroup, so the pane and the group stay untouched for the
-            desktop that also renders them:
+        {/* Two descendant rules on the wrapper around <AppearancePane/>, both
+            aimed at its shared ToggleButtonGroup, so the pane and the group
+            stay untouched for the desktop that also renders them:
 
             · min-h-16 — the 30px desktop box is under the 44px touch target.
             · flex-col — MEASURED at 390px: three `fill` toggles come out 110.7px
@@ -121,15 +127,24 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               height we already owe the touch target and gives the label the
               button's full 86.7px, which fits every label but "System setting"
               — and that one now breaks between its two words. */}
-        <DialogBody className="min-h-0 flex-1 overflow-y-auto [&_button]:min-h-16 [&_button]:flex-col [&_button]:gap-1">
-          <AppearancePane
-            value={draft.theme}
-            onChange={(theme) => setDraft((d) => ({ ...d, theme }))}
-            reduceMotion={draft.reduceMotion}
-            onReduceMotionChange={(reduceMotion) =>
-              setDraft((d) => ({ ...d, reduceMotion }))
-            }
-          />
+        <DialogBody className="min-h-0 flex-1 space-y-6 overflow-y-auto">
+          <div className="[&_button]:min-h-16 [&_button]:flex-col [&_button]:gap-1">
+            <AppearancePane
+              value={draft.theme}
+              onChange={(theme) => setDraft((d) => ({ ...d, theme }))}
+              reduceMotion={draft.reduceMotion}
+              onReduceMotionChange={(reduceMotion) =>
+                setDraft((d) => ({ ...d, reduceMotion }))
+              }
+            />
+          </div>
+          {/* Sync commits IMMEDIATELY, not on Apply — its three controls are
+              not preferences in the draft (see SyncPane). Its buttons are
+              labels in a row, not icon-over-label tiles, so they only get the
+              44px touch floor, not the stacked layout above. */}
+          <div className="[&_button]:min-h-11">
+            <SyncPane />
+          </div>
         </DialogBody>
 
         <DialogFooter className="shrink-0 flex-row gap-2">

@@ -100,10 +100,13 @@ export default function PrivacyPolicy() {
             they do signed out.
           </p>
           <p>
-            Settings &rsaquo; General shows what sync is doing and has a button that deletes the
-            synced copy from your account. What is left afterwards is a note that each item was
-            deleted and when, so your other devices do not send it straight back. Nothing is sent
-            again until you change one of those settings on a device where you are signed in.
+            Settings &rsaquo; Sync shows what sync is doing, on a phone too. It has a switch that
+            turns sync off for that device alone: nothing is fetched or sent from it until you turn
+            it back on. It also has a button that deletes the synced copy from your account. What
+            is left afterwards is a note that each item was deleted and when, so your other devices
+            do not send it straight back. Nothing is sent again until you change one of those
+            settings, or press &ldquo;Send this device&rsquo;s settings&rdquo;, on a device where you
+            are signed in.
           </p>
 
           <h2>The AI tools</h2>

@@ -154,6 +154,16 @@ export function setCurrentAccount(account: string | null): void {
   }
 }
 
+/** Drop everything this device knows about `account`: its revisions, what it
+ *  still owed, and whether it has met the account at all. The next reconcile
+ *  with that account is first contact. Used by the sync switch (enabled.ts). */
+export function forgetAccount(account: string): void {
+  const ledger = readLedger();
+  if (!(account in ledger)) return;
+  delete ledger[account];
+  writeLedger(ledger);
+}
+
 export function readEntry(account: string, key: SyncKey): LedgerEntry {
   return readLedger()[account]?.[key] ?? EMPTY_ENTRY;
 }
