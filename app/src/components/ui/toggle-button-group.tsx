@@ -2,13 +2,9 @@ import { Fragment } from "react";
 import { motion } from "framer-motion";
 import { hoverPop } from "@/lib/animations";
 import type { LucideIcon } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { HintTooltip, type ButtonHint } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { HOVER_RING } from "@/lib/styles";
+import { HOVER_RING, BUTTON_PILL } from "@/lib/styles";
 
 /** One independently-toggleable button in a {@link ToggleButtonGroup}. */
 export interface ToggleGroupItem {
@@ -29,7 +25,7 @@ export interface ToggleGroupItem {
   disabled?: boolean;
   /** Optional rich hover tooltip (e.g. label + keyboard shortcut). When
    *  omitted the label is used as a plain `title`. */
-  tooltip?: { label?: string; shortcut?: string };
+  tooltip?: ButtonHint;
 }
 
 interface ToggleButtonGroupProps {
@@ -97,7 +93,7 @@ export function ToggleButtonGroup({
         bare
           ? "contents"
           : [
-              "gap-1 p-1 rounded-lg bg-bg-tertiary",
+              BUTTON_PILL,
               equalWidth ? "grid grid-flow-col auto-cols-fr" : "flex",
             ],
         className,
@@ -167,17 +163,9 @@ export function ToggleButtonGroup({
         // `fill` / flex-1 still divides the row evenly.
         if (!tooltip) return <Fragment key={key}>{button}</Fragment>;
         return (
-          <Tooltip key={key}>
-            <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p className="font-semibold">{tooltip.label ?? label}</p>
-              {tooltip.shortcut && (
-                <p className="text-muted-foreground text-xs">
-                  {tooltip.shortcut}
-                </p>
-              )}
-            </TooltipContent>
-          </Tooltip>
+          <HintTooltip key={key} label={tooltip.label ?? label} shortcut={tooltip.shortcut}>
+            {button}
+          </HintTooltip>
         );
       })}
     </div>

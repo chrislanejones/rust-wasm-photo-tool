@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import {
   Upload,
   Wrench,
@@ -8,11 +7,6 @@ import {
   Download,
 } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { IconButton } from "@/components/ui/icon-button";
 import { MASTER_BAR_CHROME_H } from "./constants";
 import type { MasterTab } from "@/stores/useUIStore";
@@ -32,56 +26,6 @@ interface Props {
   /** Settings + user controls (rendered as-is from the desktop top bar). */
   settingsSlot: React.ReactNode;
   userSlot: React.ReactNode;
-}
-
-/**
- * Tooltip + the shared `IconButton`. This used to be a private 32px button with
- * 16px glyphs and its own active treatment — a fourth icon-button vocabulary,
- * and the one that showed. The `settingsSlot` / `userSlot` below are the
- * desktop top bar's controls passed straight through, and those are `IconButton`
- * at 36px with 18px glyphs, so the master bar shipped four small tabs sitting
- * next to two larger ones. Now everything in this strip is the same button.
- *
- * `aria-pressed` is passed explicitly (it spreads after IconButton's own) so an
- * inactive tab still announces `false`. IconButton's default drops the
- * attribute entirely when off, which is right for the actions it was written
- * for — Undo, the cog — and wrong for a tab.
- */
-function IconBtn({
-  icon: Icon,
-  label,
-  onClick,
-  disabled,
-  active,
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  active?: boolean;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <IconButton
-          icon={Icon}
-          label={label}
-          active={active}
-          standalone
-          // NOT `aria-pressed={active ?? false}`. IconButton already sets
-          // `aria-pressed={active || undefined}` so the attribute is absent
-          // when it means nothing; passing an explicit `false` overrode that
-          // and put "toggle button, not pressed" on New and Export — which are
-          // actions, never toggles, as the comment beside their JSX says.
-          disabled={disabled}
-          onClick={onClick}
-        />
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <p className="text-xs font-semibold">{label}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
 }
 
 const TABS: { id: MasterTab; icon: typeof Wrench; label: string }[] = [
@@ -142,21 +86,33 @@ export function MasterBar({
     >
       {/* New · Tools · Gallery · Review · Export, one run of five, then
           settings/user. New and Export are actions; the middle three are tabs. */}
-      <IconBtn icon={Upload} label="New" onClick={onNew} active={newActive} />
+      {/* The shared `IconButton` + its hint tooltip, `standalone` because
+          there is no group pill behind this strip. This was a private
+          `IconBtn` wrapper; before that, a 32px button with its own active
+          treatment — a fourth icon-button vocabulary. Now everything in the
+          strip is the same button as the slots beside it.
+          NOT `aria-pressed={active ?? false}`: IconButton omits the
+          attribute when off, which is right for New and Export (actions,
+          never toggles). */}
+      <IconButton icon={Upload} label="New" onClick={onNew} active={newActive} standalone tooltip />
       {TABS.map((t) => (
-        <IconBtn
+        <IconButton
           key={t.id}
           icon={t.icon}
           label={t.label}
           onClick={() => onTab(t.id)}
           active={activeTab === t.id}
+          standalone
+          tooltip
         />
       ))}
-      <IconBtn
+      <IconButton
         icon={Download}
         label="Export"
         onClick={onExport}
         disabled={!canExport}
+        standalone
+        tooltip
       />
       {/* Settings + user, loose like everything else: this bar is ONE flat row
           now, justify-between across the box and no group pills — the same rule

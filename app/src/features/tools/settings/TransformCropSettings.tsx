@@ -19,6 +19,7 @@ import { ReselectBar } from "@/components/ui/reselect-bar";
 import { useToolStore } from "@/stores/useToolStore";
 import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
+import { PANEL_DIVIDER } from "@/lib/styles";
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
  * "free" leaves the user dragging without constraint; everything else
@@ -123,7 +124,7 @@ export function TransformCropSettings({
     section === undefined || section === s;
   /** The separator rule only earns its keep when sections are stacked; scoped
    *  to one section it would be a hairline above nothing. */
-  const sep = section === undefined ? "pt-3 border-t border-theme-sidebar-border" : "";
+  const sep = section === undefined ? PANEL_DIVIDER : "";
   const ratio = ratioIdFromLock(cropRatio);
   const displayColor = pickedColor ?? "#000000";
 

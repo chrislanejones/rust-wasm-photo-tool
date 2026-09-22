@@ -1,6 +1,6 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Scaling, ChevronDown, FileArchive } from "lucide-react";
+import { SlidersHorizontal, Scaling, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
@@ -15,7 +15,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
-import { FIELD_SELECT } from "@/lib/styles";
+import { SelectField } from "@/components/ui/select-field";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -435,21 +435,17 @@ export function ResizeSettings({
             <label className="block text-2xs text-theme-muted-foreground">
               Method
             </label>
-            <div className="relative">
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as ResampleMethod)}
-                disabled={disabled}
-                className={FIELD_SELECT}
-              >
-                {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
-                  <option key={m} value={m}>
-                    {METHOD_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            <SelectField
+              value={method}
+              onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+              disabled={disabled}
+            >
+              {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {METHOD_LABELS[m]}
+                </option>
+              ))}
+            </SelectField>
           </div>
 
           {/* ── Format ── */}
@@ -460,23 +456,19 @@ export function ResizeSettings({
             <label className="block text-2xs text-theme-muted-foreground">
               Format
             </label>
-            <div className="relative">
-              <select
-                value={exportFormat}
-                onChange={(e) =>
-                  onExportFormatChange(e.target.value as ExportFormat)
-                }
-                disabled={disabled}
-                className={FIELD_SELECT}
-              >
-                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                  <option key={f} value={f}>
-                    {FORMAT_LABELS[f]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            <SelectField
+              value={exportFormat}
+              onChange={(e) =>
+                onExportFormatChange(e.target.value as ExportFormat)
+              }
+              disabled={disabled}
+            >
+              {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                <option key={f} value={f}>
+                  {FORMAT_LABELS[f]}
+                </option>
+              ))}
+            </SelectField>
             {formatNote && (
               <p className="text-2xs text-theme-muted-foreground leading-snug">
                 {formatNote}

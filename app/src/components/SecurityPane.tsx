@@ -1,6 +1,7 @@
 import { Tag, MapPinOff, Eraser } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { MetadataStripMode } from "@/lib/exif";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 interface SecurityPaneProps {
   /** Keep EXIF metadata on export (true) or strip it (false). */
@@ -26,16 +27,11 @@ export function SecurityPane({
 }: SecurityPaneProps) {
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">
-          Export metadata (EXIF)
-        </h3>
-        <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          Keep your camera metadata — GPS, capture time, lens — embedded in
-          exported JPEG / WebP files, or strip it for privacy before an image ever
-          leaves the tab. Applies to Export, Export All, and Export Selected.
-        </p>
-      </div>
+      <PaneHeading title="Export metadata (EXIF)">
+        Keep your camera metadata — GPS, capture time, lens — embedded in
+        exported JPEG / WebP files, or strip it for privacy before an image ever
+        leaves the tab. Applies to Export, Export All, and Export Selected.
+      </PaneHeading>
       <ToggleButtonGroup
         fill
         items={[

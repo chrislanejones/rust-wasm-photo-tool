@@ -58,6 +58,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { useToolStore } from "@/stores/useToolStore";
 import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
 import type { PerspectiveMode } from "@/stores/useToolStore";
+import { PANEL_SECTION } from "@/lib/styles";
 
 /** The three drag rules, as the registry / palette / SubtoolRow consume them.
  *
@@ -148,7 +149,7 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
 
       {/* Actions sit OUTSIDE the ToolModeToggle body so they don't re-animate
           on every mode switch — same placement rule as SelectSettings. */}
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+      <div className={PANEL_SECTION}>
         <SectionHeader
           title="Transform"
           info={

@@ -55,7 +55,7 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { MultiTabScreen } from "@/components/MultiTabScreen";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
-import { CONFIRM_DESTRUCTIVE } from "@/lib/styles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useTabClaim } from "@/hooks/useTabClaim";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
@@ -150,9 +150,7 @@ import {
   DialogDescription,
   DialogBody,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ShareButton } from "@/components/ShareButton";
 import {
@@ -2826,96 +2824,55 @@ export function AppShell() {
           in components/UpdatePrompt.tsx. */}
       <UpdatePrompt />
 
-      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete all images?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={confirmDeleteAll}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete all
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteAllOpen}
+        onOpenChange={setDeleteAllOpen}
+        title="Delete all images?"
+        cancelLabel="Cancel"
+        confirmLabel="Delete all"
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={confirmDeleteAll}
+      >
+        This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
+      </ConfirmDialog>
 
       {/* Single-image delete confirm — per-image trashcan + right-click "Delete image". */}
-      <Dialog
+      <ConfirmDialog
         open={deletePhotoId !== null}
         onOpenChange={(o) => !o && setDeletePhotoId(null)}
+        title="Delete this image?"
+        cancelLabel="Cancel"
+        confirmLabel="Delete image"
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={() => {
+          const id = deletePhotoId;
+          setDeletePhotoId(null);
+          if (id) handleRemovePhoto(id);
+        }}
       >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this image?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              This removes the image and its edit history. This cannot be undone.
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={() => {
-                const id = deletePhotoId;
-                setDeletePhotoId(null);
-                if (id) handleRemovePhoto(id);
-              }}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete image
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        This removes the image and its edit history. This cannot be undone.
+      </ConfirmDialog>
 
       {/* Delete-selected confirm. */}
-      <Dialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
-            </DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              {selectedIds.size === 1
-                ? "This removes the selected image and its edit history. This cannot be undone."
-                : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={() => {
-                setDeleteSelectedOpen(false);
-                handleDeleteSelected();
-              }}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              {selectedIds.size === 1 ? "Delete image" : "Delete selected"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteSelectedOpen}
+        onOpenChange={setDeleteSelectedOpen}
+        title={selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
+        cancelLabel="Cancel"
+        confirmLabel={selectedIds.size === 1 ? "Delete image" : "Delete selected"}
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={() => {
+          setDeleteSelectedOpen(false);
+          handleDeleteSelected();
+        }}
+      >
+        {selectedIds.size === 1
+          ? "This removes the selected image and its edit history. This cannot be undone."
+          : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
+      </ConfirmDialog>
 
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="max-w-lg">

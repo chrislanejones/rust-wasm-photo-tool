@@ -1,17 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { RefreshCw } from "lucide-react";
-import {
-  Dialog,
-  DialogBody,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { CONFIRM_AFFIRMATIVE } from "@/lib/styles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   acceptUpdatePrompt,
   dismissUpdatePrompt,
@@ -22,8 +11,8 @@ import {
 /**
  * "A new version is ready" — Yes or No.
  *
- * Deliberately the same shape as the delete confirms in AppShell (`max-w-sm`
- * Dialog, header / body / two-button footer) rather than a bespoke banner: both
+ * Deliberately the same shape as the delete confirms in AppShell — literally:
+ * both are `ConfirmDialog` — rather than a bespoke banner: both
  * are the app asking permission for something that changes what is in front of
  * you, and they should not look like two different kinds of question. The state
  * lives in lib/pwa/updatePrompt.ts, which is what the non-React triggers can
@@ -37,39 +26,21 @@ export function UpdatePrompt() {
   const open = useSyncExternalStore(subscribeUpdatePrompt, isUpdatePromptOpen);
 
   return (
-    <Dialog
+    <ConfirmDialog
       open={open}
       onOpenChange={(next) => {
         if (!next) dismissUpdatePrompt();
       }}
+      title="Update to the latest version?"
+      cancelLabel="No"
+      confirmLabel="Yes"
+      confirmIcon={RefreshCw}
+      tone="affirmative"
+      onConfirm={acceptUpdatePrompt}
     >
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Update to the latest version?</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <DialogDescription>
-            A new version of Image Horse is ready. Updating reloads this tab.
-            Your photos and edits are stored in this browser and stay where they
-            are.
-          </DialogDescription>
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button size="large" className="flex-1">
-              No
-            </Button>
-          </DialogClose>
-          <Button
-            size="large"
-            onClick={acceptUpdatePrompt}
-            className={`flex-1 ${CONFIRM_AFFIRMATIVE}`}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Yes
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      A new version of Image Horse is ready. Updating reloads this tab.
+      Your photos and edits are stored in this browser and stay where they
+      are.
+    </ConfirmDialog>
   );
 }

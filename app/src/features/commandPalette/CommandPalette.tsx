@@ -51,6 +51,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 
 /** Tab filter: the three registry groups, plus an "All" that shows every one. */
 type TabId = "all" | PaletteGroup;
@@ -249,28 +250,13 @@ export function CommandPalette() {
               {/* Group tabs — the Diagnostics window's segmented rail, stretched
                   edge to edge so it lines up with the search field above it
                   (each tab takes an equal quarter via flex-1). */}
-              <div
-                role="tablist"
-                aria-label="Command groups"
-                className="flex w-full items-center gap-1 rounded-lg bg-bg-tertiary p-1"
-              >
-                {TABS.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === id}
-                    onClick={() => setTab(id)}
-                    className={`flex-1 rounded-md px-2.5 py-1.5 font-mono text-2xs uppercase tracking-wider transition-colors ${
-                      tab === id
-                        ? "bg-bg-elevated text-text-primary"
-                        : "text-text-muted hover:text-text-primary"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs
+                label="Command groups"
+                tabs={TABS}
+                value={tab}
+                onChange={setTab}
+                fill
+              />
             </div>
           </div>
 

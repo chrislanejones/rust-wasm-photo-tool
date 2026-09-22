@@ -5,7 +5,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Type, FileEdit, ScanEye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -31,6 +30,15 @@ import { toast } from "@/components/ui/sonner";
 import { measureTextAwaited } from "@/lib/engine/textMetricsCache";
 import { ensureEngineFonts, faceCss } from "@/lib/engineFonts";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
+import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
+import { SelectField } from "@/components/ui/select-field";
+
+/** Batch › Text weight — a two-tile pick, the same group every other
+ *  pick-one-of-N control in the panels uses. */
+const WEIGHT_OPTIONS = [
+  { id: "normal", label: "Normal" },
+  { id: "bold", label: "Bold" },
+] as const;
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -711,17 +719,13 @@ export function BatchSettings({
       </Button>
 
       {appliedCount !== null && !running && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
-        >
+        <SuccessCallout>
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
-        </div>
+        </SuccessCallout>
       )}
 
       {errorMsg && (
-        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
+        <ErrorNote>{errorMsg}</ErrorNote>
       )}
       </>
       )
@@ -1308,26 +1312,26 @@ function TextBatchPanel({
         <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Font
         </p>
-        <select
+        {/* The Text tool's own font picker (Text › Font Family), not a
+            sixth spelling of a select — this one had its own padding, fill
+            and focus ring and no chevron. */}
+        <SelectField
           value={fontId}
           onChange={(e) => setFontId(e.target.value)}
           style={{ fontFamily: faceCss(fontId) }}
-          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         >
           {faces.map((f) => (
             <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
               {f.label}
             </option>
           ))}
-        </select>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <ToolButton active={!bold} onClick={() => setBold(false)}>
-            Normal
-          </ToolButton>
-          <ToolButton active={bold} onClick={() => setBold(true)}>
-            Bold
-          </ToolButton>
-        </div>
+        </SelectField>
+        <ToolButtonGroup
+          className="mt-2"
+          options={WEIGHT_OPTIONS}
+          value={bold ? "bold" : "normal"}
+          onChange={(id) => setBold(id === "bold")}
+        />
       </div>
 
       <ColorSwatchGrid
@@ -1411,17 +1415,13 @@ function TextBatchPanel({
       </Button>
 
       {appliedCount !== null && !running && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
-        >
+        <SuccessCallout>
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
-        </div>
+        </SuccessCallout>
       )}
 
       {errorMsg && (
-        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
+        <ErrorNote>{errorMsg}</ErrorNote>
       )}
     </div>
   );

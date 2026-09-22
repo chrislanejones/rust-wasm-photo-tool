@@ -18,6 +18,7 @@ import {
   type LogEntry,
   type LogSource,
 } from "@/lib/diagnosticsLog";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 
 interface Props {
   open: boolean;
@@ -86,27 +87,14 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
           </DialogHeader>
           <div className="px-4 pb-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 rounded-lg bg-bg-tertiary p-1">
-                {tabs.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setTab(id)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-2xs uppercase tracking-wider transition-colors ${
-                      tab === id
-                        ? "bg-bg-elevated text-text-primary"
-                        : "text-text-muted hover:text-text-primary"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                    {id === "telemetry" && (
-                      <span className={tab === id ? "text-text-secondary" : "text-text-muted"}>
-                        ({entries.length})
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs
+                label="Diagnostics sections"
+                tabs={tabs.map((t) =>
+                  t.id === "telemetry" ? { ...t, count: entries.length } : t,
+                )}
+                value={tab}
+                onChange={setTab}
+              />
               {tab === "telemetry" && (
                 <button
                   onClick={clearDiagnostics}

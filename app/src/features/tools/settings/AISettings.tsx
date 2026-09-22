@@ -32,6 +32,7 @@ import {
   hasMaskPaint,
   pngDimensions,
 } from "@/lib/objectRemovalMask";
+import { ErrorNote } from "@/components/ui/status-note";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
@@ -471,7 +472,7 @@ export function AISettings({
           />
           )}
           {lastType === "rembg" && error && (
-            <p className="text-2xs text-destructive leading-relaxed">{error}</p>
+            <ErrorNote>{error}</ErrorNote>
           )}
           {lastType === "rembg" && phase === "done" && !error && (
             <p className="text-2xs text-success">
@@ -480,7 +481,7 @@ export function AISettings({
           )}
 
           {lastType === "inpaint" && error && (
-            <p className="text-2xs text-destructive leading-relaxed">{error}</p>
+            <ErrorNote>{error}</ErrorNote>
           )}
           {lastType === "inpaint" && phase === "done" && !error && (
             <p className="text-2xs text-success">

@@ -6,6 +6,7 @@
 // provider → Convex `images` row + webhook) and the secure credential store
 // aren't wired yet. This is the entry point that lights up once they land.
 import { Server, UploadCloud, Cloud, Lock } from "lucide-react";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 interface Provider {
   id: string;
@@ -114,15 +115,10 @@ function ProviderRow({ provider }: { provider: Provider }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">
-          S3 / Image Hosting
-        </h3>
-        <p className="mt-0.5 text-2xs text-text-muted">
-          Connect where your original full-res uploads are stored. Pro only —
-          Free and demo keep originals on-device.
-        </p>
-      </div>
+      <PaneHeading title="S3 / Image Hosting" compact>
+        Connect where your original full-res uploads are stored. Pro only —
+        Free and demo keep originals on-device.
+      </PaneHeading>
       {children}
     </div>
   );
