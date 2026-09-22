@@ -35,6 +35,7 @@ import {
   Settings,
   Shield,
   RefreshCw,
+  Share2,
   Sun,
   Undo2,
 } from "lucide-react";
@@ -198,6 +199,14 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
         "send", "turn off sync"],
       icon: RefreshCw,
       run: () => openSettingsTab("sync"),
+    },
+    {
+      id: "settings.shared",
+      label: "Shared Links",
+      group: "settings",
+      keywords: ["share", "shared", "links", "views", "revoke", "pause", "expire"],
+      icon: Share2,
+      run: () => openSettingsTab("shared"),
     },
     {
       id: "settings.toggle-rulers",

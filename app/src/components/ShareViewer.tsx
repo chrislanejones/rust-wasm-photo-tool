@@ -28,9 +28,11 @@ export function ShareViewer({ token }: { token: string }) {
   const recordView = useMutation(api.shares.recordView);
   const counted = useRef(false);
 
-  // Count a view once per open (best-effort; ignore failures).
+  // Count a view once per open (best-effort; ignore failures). Not for a
+  // stopped link: the server would refuse it anyway, and a paused link that
+  // still counted openings would make "Paused" a lie in Settings › Shared.
   useEffect(() => {
-    if (share && !counted.current) {
+    if (share && share.status === "live" && !counted.current) {
       counted.current = true;
       recordView({ token }).catch(() => {});
     }
@@ -65,7 +67,7 @@ export function ShareViewer({ token }: { token: string }) {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <p className="text-sm font-semibold">This link is no longer available.</p>
             <p className="text-xs text-text-muted">
-              The share may have been revoked, or the link is incorrect.
+              The share may have been deleted, or the link is incorrect.
             </p>
             <a href={editorUrl}>
               <Button size="large">
@@ -76,7 +78,32 @@ export function ShareViewer({ token }: { token: string }) {
           </div>
         )}
 
-        {share && (
+        {/* Paused, expired, or past its view limit: the owner's choice, so it
+            says so instead of pretending the link never existed. The image is
+            not sent for these — `shares.get` withholds it server-side. */}
+        {share && share.status === "unavailable" && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <p className="text-sm font-semibold">
+              {share.reason === "expired"
+                ? "This link has expired."
+                : share.reason === "views"
+                  ? "This link has reached its view limit."
+                  : "The owner has turned this link off."}
+            </p>
+            <p className="text-xs text-text-muted">
+              {share.title ? `“${share.title}”, ` : ""}shared {formatShareDate(share.createdAt)}. Ask
+              whoever sent it to turn it back on.
+            </p>
+            <a href={editorUrl}>
+              <Button size="large">
+                <Pencil className="h-4 w-4" />
+                Open the editor
+              </Button>
+            </a>
+          </div>
+        )}
+
+        {share && share.status === "live" && (
           <ShareReady share={share} editorUrl={editorUrl} />
         )}
       </main>

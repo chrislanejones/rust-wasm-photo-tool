@@ -90,6 +90,13 @@ export default function PrivacyPolicy() {
             sync, and the account it belongs to. Signed out, none of it runs.
           </p>
           <p>
+            A share link keeps the flattened image you shared, a count of how many times it was
+            opened, and the time of each opening — the time only. Nothing about who opened it is
+            recorded: no address, no browser, no account. Settings &rsaquo; Shared shows every link
+            you have made with those counts, lets you stop a link after a number of views or on a
+            date, pause and resume it, or delete it, which removes the image too.
+          </p>
+          <p>
             The settings sync is named in full because it is the one that happens without you
             asking each time. Three things travel: your preferences (the Settings dialog), which
             panels and tabs you last had open along with the command palette's recent list, and

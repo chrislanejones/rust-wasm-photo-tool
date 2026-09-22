@@ -20,6 +20,15 @@ vi.mock("convex/react", () => ({
   useMutation: () => vi.fn(),
 }));
 
+// STATIC imports, loaded once at collection. They were imported inside each
+// test after `vi.resetModules`, so the first test paid the sheet's whole cold
+// import inside its 5 s budget and timed out under full-suite load — and the
+// timed-out test went on to press Apply during the NEXT test, which then saw
+// "off" in storage it had just cleared. Nothing here needs fresh modules: the
+// switch reads localStorage on every call, and the status is set per render.
+import { MobileSettingsSheet } from "./MobileSettingsSheet";
+import { setSyncStatus } from "@/lib/sync/status";
+
 const ENABLED_KEY = "image-horse-sync-enabled";
 
 let container: HTMLDivElement;
@@ -30,9 +39,7 @@ async function render(): Promise<void> {
   // The pane hides the switch in a build with no cloud half, and "disabled" is
   // the status store's initial value until the app's sync layer (not mounted
   // here) reports. A keyed build reports straight away; so does this.
-  const { setSyncStatus } = await import("@/lib/sync/status");
   setSyncStatus({ state: "local" });
-  const { MobileSettingsSheet } = await import("./MobileSettingsSheet");
   onOpenChange = vi.fn();
   act(() => {
     root.render(React.createElement(MobileSettingsSheet, { open: true, onOpenChange }));
@@ -54,7 +61,6 @@ function click(label: string): void {
 
 beforeEach(() => {
   localStorage.clear();
-  vi.resetModules();
   // framer-motion and the theme code ask for media queries jsdom lacks.
   window.matchMedia ??= ((query: string) => ({
     matches: false,
