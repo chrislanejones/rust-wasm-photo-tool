@@ -85,29 +85,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.89 — 2026-09-22
+### v8.90 — 2026-09-22
 
-**"Everything in your browser" now stops photo uploads too, which is what that page always said it did.**
+**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
 
-Settings › Security promises that with the switch off, your photos never
-leave this tab. If you were signed in, that was not true. A flattened copy
-of every photo you edited was sent to your account, because that backup
-checked whether you were signed in and never checked the switch. The AI
-tools were gated properly; this path is not a tool, so it slipped through.
+Image Horse has three kinds of account: not signed in, signed in, and paid.
+Being the person who runs it was quietly becoming a fourth, which is the
+wrong shape — a tier is something you bought, and running the place is not.
 
-It is gated now. With the switch off — which is how it ships — nothing
-about a photo is uploaded, and a photo with no copy on this machine no
-longer reaches for one on the server. Turn the switch on and both come
-back.
+So it is a role. An admin is entitled to everything a paid account gets,
+the server included, without anyone granting themselves a paid plan or
+paying for one. The app used to decide who the admin was by comparing your
+email address inside the browser, with the address written into the code;
+now the server decides, from a list kept with the deployment.
 
-Deleting still works either way. Removing a copy you already uploaded
-sends nothing, and refusing it while the switch is off would strand your
-photos on a server you just asked the app to stop using.
+Super User becomes a way to look at the app as another kind of account —
+signed out, or signed in and free — to check those views. It can only ever
+show you **less** than you are entitled to. Before, it could put the
+interface into "paid" for an account that wasn't, so the buttons appeared
+and then the server turned them down. That can no longer happen.
 
-Settings › Security now lists the backup among the things "on" turns on,
-and the privacy policy says the same.
-
-The engine did not change. It is the same 814,432 bytes as v8.88.
+The engine did not change. It is the same 814,432 bytes as v8.89.
 
 ## License
 

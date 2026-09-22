@@ -10834,3 +10834,21 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Tests** | 5 new in `cloudPhotosAllowed.test.ts`: the rule, a fresh signed-in profile at the shipped default, that exactly the two cloud legs are gated, that both delete legs are not, and that the file still names the promise it keeps. Mutations: ignoring the switch, and putting the upload back on auth alone, each turn **2 tests red**. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1104 across 97 files**, production build + `inert-class-audit` 0, marketing build clean. PR CI: #223 **17/17** Actions green. |
 | **Next** | This is stage 0 of a synced gallery (Chris, 09-22): the switch had to mean what it says before more photo data moves. Stage 1 is the gallery list and thumbnails, paid-gated, with an entitlement model where admin is a role rather than a fourth tier. |
+
+## v8.90 Change Summary — 2026-09-22
+
+**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | Chris, 09-22: "the levels should be — not logged in \| logged in free \| paid \| Superuser … default superusers to paid … but they can drop down status. what do you recommend?" The recommendation, taken: keep superuser OFF the pricing ladder. Folding it in turns every gate into "paid OR superuser", and that trailing clause is what rots — miss it once and a paid feature is free, or the person debugging cannot see what they are debugging. A second admin would also be a new rung in a *pricing* ladder. |
+| **Three words, kept apart** | `convex/entitlement.ts`: **tier** is what the account paid for (free / pro / team), **role** is what the person is trusted to do (user / admin), **entitlement** is what this session may use (none / free / paid). One pure module, imported by the server and the client, so a gate cannot drift from the rule. |
+| **Admin ⇒ paid** | An admin is entitled to paid, server included, with no tier grant. Testing paid needs no fake `pro` on the row — which matters here, because one person had accumulated **three** `users` rows, two of them already pro, and `devGrantTier` picks the first by email. |
+| **The server decides** | `users.me` returns `role` and `entitlement`, computed from `ADMIN_EMAILS` (plural, comma separated; the older `ADMIN_EMAIL` still works). `app/src/lib/superuser.ts` — which compared the signed-in email to an address hardcoded **in the browser** — is deleted. |
+| **A preview may only take away** | `previewOf`. Super User is now "look at the app as another kind of account": rungs above your entitlement are shown but disabled. The old override could raise a free account to "paid", so the UI offered what the server refused; that mismatch is impossible by construction now. |
+| **Fails closed** | A missing `ADMIN_EMAILS` makes **nobody** an admin. A deployment that forgot the variable must not hand the role to whoever signs in first. Set on `brave-ant-608` before this shipped. |
+| **Deploy order** | Functions pushed to the live deployment **before** the merge: 77 functions, `users.me` present, sync and shares intact. `me` only gains fields, so an older client is unaffected. |
+| **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust changed. |
+| **Tests** | 21 new in `entitlement.test.ts`: the ladder and its `UserMode` round trip, an unknown or junk tier never opening a paid door, admin entitled to paid without a grant, the preview never raising anyone (every combination of rung and preview), and the admin list tolerating spaces and case while refusing substrings, lookalikes, and an empty list. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1125 across 98 files**. PR CI: #224 **16/16** Actions green. |
+| **Next** | Stage 1 of the synced gallery — the photo list and thumbnails, gated on this entitlement, with the server enforcing the real one. |

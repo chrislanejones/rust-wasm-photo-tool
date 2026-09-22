@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.90",
+    date: "2026-09-22",
+    headline: "Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less",
+    entries: [
+      {
+        tag: "infra",
+        text: "There are three kinds of account — not signed in, signed in, paid — and running the place was quietly becoming a fourth. It is a role instead: an admin gets everything paid gets, server included, without granting themselves a plan or paying for one.",
+      },
+      {
+        tag: "fix",
+        text: "The app used to work out who the admin was by comparing your email inside the browser, against an address written into the code. The server decides now, from a list kept with the deployment — and if that list is missing, nobody is an admin.",
+      },
+      {
+        tag: "ui",
+        text: "Super User is now a way to look at the app as another kind of account, and it can only show you less than you are entitled to. It used to be able to show “paid” to an account that wasn’t, so the buttons appeared and the server then turned them down.",
+      },
+    ],
+  },
+  {
     version: "v8.89",
     date: "2026-09-22",
     headline: "“Everything in your browser” now stops photo uploads too, which is what that page always said it did",
