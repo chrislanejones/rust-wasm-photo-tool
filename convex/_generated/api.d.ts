@@ -13,6 +13,7 @@ import type * as aiJobs from "../aiJobs.js";
 import type * as annotations from "../annotations.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
+import type * as entitlement from "../entitlement.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as images from "../images.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   annotations: typeof annotations;
   auth: typeof auth;
   crons: typeof crons;
+  entitlement: typeof entitlement;
   history: typeof history;
   http: typeof http;
   images: typeof images;
