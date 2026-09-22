@@ -115,6 +115,9 @@ export function TransformCropSettings({
   const pickedColorHistory = useToolStore((s) => s.pickedColorHistory);
   const removePickedColor = useToolStore((s) => s.removePickedColor);
   const clearPickedColors = useToolStore((s) => s.clearPickedColors);
+  // Apply Crop is only live with a rectangle to crop to — the same gate the
+  // Enter shortcut already had.
+  const hasCropSelection = useToolStore((s) => s.cropSelectionActive);
   /** Render this section? All of them when unscoped. */
   const show = (s: NonNullable<TransformCropSettingsProps["section"]>) =>
     section === undefined || section === s;
@@ -183,7 +186,7 @@ export function TransformCropSettings({
               which was the only icon in any of the six panel action bars —
               and "Apply Crop" was already saying it. */}
           <PanelActionBar>
-            <PanelAction disabled={disabled} onClick={onApplyCrop}>
+            <PanelAction disabled={disabled || !hasCropSelection} onClick={onApplyCrop}>
               Apply Crop
             </PanelAction>
           </PanelActionBar>
