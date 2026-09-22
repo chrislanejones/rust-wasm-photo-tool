@@ -4,6 +4,28 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
+post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and
+the whole `createScene()` render loop that `engine-in-a-worker.scenes.ts`
+already has — ~350 lines, copied rather than shared, matching that file's own
+stated convention (each post's scene runtime is self-contained so its chunk
+loads only on that page). Same story for the `.scene`/`.scene__*` CSS block in
+`offline-by-construction.figures.css`, copied byte-for-byte from
+`engine-in-a-worker.figures.css`.
+
+**Left alone deliberately.** With one prior post there was no established
+sharing pattern to follow, and extracting one now would mean editing the
+already-shipped post's files inside a session whose target was the new post —
+exactly what hard rule 4 says not to do.
+
+**Do it when** a third post needs a WebGL scene. Two identical copies is the
+established (if regrettable) convention here; a third copy is the signal to
+lift `SceneKit`/`stream`/`fade`/`createScene` into one shared module both
+posts' `figures.tsx` import, and the `.scene`/`.scene__*` CSS into one file
+both posts' bodies import instead of duplicating.
+
 ## OPEN — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
 
 Found while adding the Sync switch on `feat/sync-settings-pane`. The group's

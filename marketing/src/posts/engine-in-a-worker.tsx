@@ -92,7 +92,7 @@ export default function EngineInAWorker() {
           of these three documents, and they are linked rather than summarized
           so a reader who doubts a number can go and check it. */}
       <p className="post__sourcenote">
-        Shipped as the default in v8.32 on 13 August 2026. Everything measured below comes from the
+        Shipped as the default in v8.32 on September 18th, 2026. Everything measured below comes from the
         repository's own records —{" "}
         <a href={repoFile("docs/adr/024-engine-in-a-worker.md")} {...external}>
           ADR-024
@@ -698,7 +698,7 @@ export default function EngineInAWorker() {
 
       <p>
         Every stage was reversible by itself, and the whole arc sat behind a flag that stayed off for
-        five weeks. It became the default on 13 August 2026, in v8.32.
+        five weeks. It became the default on September 18th, 2026, in v8.32.
       </p>
 
       <h2 id="see-it">See it yourself</h2>
