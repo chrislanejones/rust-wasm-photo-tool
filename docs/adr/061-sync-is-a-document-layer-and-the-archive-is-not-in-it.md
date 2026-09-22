@@ -219,3 +219,33 @@ value is unchanged; and pushes are debounced 600ms.
   the head of `lib/sync/docs.ts`, the privacy policy). The next person asked to
   "sync the gallery too" needs to find the op-log entry in `PARKING_LOT.md`
   before they start, not after.
+
+## Amended 09-22-2026 — a per-device off switch, and a Send button
+
+v8.84, Win11 and Android signed in: `sync:pull` at three loads (9:30:54–
+9:33:45), zero `sync:push`, zero `sync_docs` rows. That is the "never seeded from a device
+that changed nothing" rule working as written, and invisible: the phone's
+gallery-only shell showed no sync status at all.
+
+- **A switch per device, never synced** (`lib/sync/enabled.ts`, localStorage
+  `image-horse-sync-enabled`, absent = on). A synced "off" could never be
+  turned back on from the device that received it. Off is signed out to this
+  layer and the ledger forgets the account; cross-tab still runs. On again is
+  first contact: the account's copy wins and anything still owed is dropped.
+  That is the reset, and the safe direction.
+- **Send is the one explicit exit from that rule.** `sendThisDevice()` owes
+  every document as this device holds it, once each store hydrates (5 s cap).
+  Shown only while `accountEmpty` (no live row, no legacy `users.settings`),
+  only in the claim-holding tab.
+- **Settings › Sync is its own tab** (`#/settings/sync`); the same `SyncPane`
+  renders in the phone's settings sheet. Its controls commit at once, not on
+  Apply. The privacy policy names the switch and the button.
+- **Reversed:** `SyncStatusRow`'s "no on/off switch, sign out instead". Signing
+  out also turns off shares, AI and billing, and offers no reset.
+- **Cost:** two switches with opposite defaults (online features OFF, sync ON).
+  `owe()` is a general "make this device the source", held back only by the
+  button's `accountEmpty` gate. `ToggleButtonGroup` emits no `aria-pressed`, so
+  the switch's state is visual-only to a screen reader (parked, every pane).
+- 13 new tests, suite 1039/1039; four targeted mutations each turn a test red.
+  *Warning sign:* an `owe()` / `sendThisDevice()` caller other than the Send
+  button, or that button losing its `accountEmpty` gate.

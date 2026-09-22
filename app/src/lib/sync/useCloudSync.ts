@@ -24,6 +24,7 @@ import { onLocalChange, type SyncedDoc } from "./syncedDoc";
 import { reconcile, type RemoteDocState } from "./reconcile";
 import { setCurrentAccount } from "./ledger";
 import { holdsTabClaim, subscribeTabClaim } from "./leader";
+import { useSyncEnabled } from "./enabled";
 import { setSyncStatus } from "./status";
 import type { SyncKey } from "./keys";
 
@@ -70,6 +71,13 @@ type Outcome =
   /** Still owed, and a later pull — not a timer — is what will move it. */
   | { kind: "waiting" }
   | { kind: "failed"; message: string; permanent: boolean };
+
+/** True when the account holds nothing any device has sent: no document, or
+ *  only the markers Forget leaves, and no legacy settings blob to seed from.
+ *  From here nothing goes up by itself (reconcile.ts rule 1). */
+function isAccountEmpty(pull: Pull): boolean {
+  return pull.legacySettings === null && pull.docs.every((d) => d.value === null);
+}
 
 /** Resolve true if `p` settles within `ms`, false if it does not. */
 function settlesWithin(p: Promise<void>, ms: number): Promise<boolean> {
@@ -205,7 +213,10 @@ async function syncOne(
  */
 export function useCloudSync(): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const remote = useQuery(api.sync.pull, isAuthenticated ? {} : "skip");
+  // The person's switch for this device (enabled.ts). Off, the query is not
+  // even subscribed: the device neither fetches the account's copy nor sends.
+  const enabled = useSyncEnabled();
+  const remote = useQuery(api.sync.pull, isAuthenticated && enabled ? {} : "skip");
   const push = useMutation(api.sync.push);
   const leader = useSyncExternalStore(subscribeTabClaim, holdsTabClaim, holdsTabClaim);
 
@@ -216,6 +227,8 @@ export function useCloudSync(): void {
   remoteRef.current = remote;
   const authedRef = useRef(false);
   authedRef.current = isAuthenticated;
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const runningRef = useRef(false);
   const rerunRef = useRef(false);
@@ -241,7 +254,7 @@ export function useCloudSync(): void {
   }, []);
 
   const runSync = useCallback(async () => {
-    if (!authedRef.current) return;
+    if (!authedRef.current || !enabledRef.current) return;
     const pull = remoteRef.current;
     if (pull === undefined) return; // still loading — never push into the dark
     if (pull === null) return; // the users row is not created yet
@@ -353,6 +366,19 @@ export function useCloudSync(): void {
     }
   }, [leader, clearTimers]);
 
+  // Turning sync back on is a fresh start, like a load: every document is "at
+  // load" again, and nothing refused before says anything now. Turning it off
+  // stops the timers — the switch has already dropped what was owed.
+  useEffect(() => {
+    if (enabled) {
+      settledRef.current.clear();
+      rejectedRef.current.clear();
+      failuresRef.current = 0;
+    } else {
+      clearTimers();
+    }
+  }, [enabled, clearTimers]);
+
   // A pull landed (first load, or another device wrote), auth changed, or the
   // claim moved → reconcile.
   useEffect(() => {
@@ -364,26 +390,38 @@ export function useCloudSync(): void {
         setCurrentAccount(null);
         accountRef.current = null;
       }
-      setSyncStatus({ state: isLoading ? "connecting" : "local", pending: [] });
+      setSyncStatus({
+        state: !enabled ? "off" : isLoading ? "connecting" : "local",
+        pending: [],
+        accountEmpty: false,
+      });
+      return;
+    }
+    if (!enabled) {
+      // Signed in, switched off: as signed out, for the sync layer. The switch
+      // already cleared the account (enabled.ts); keep it cleared.
+      accountRef.current = null;
+      setSyncStatus({ state: "off", pending: [], accountEmpty: false });
       return;
     }
     if (remote === undefined || remote === null) {
-      setSyncStatus({ state: "connecting" });
+      setSyncStatus({ state: "connecting", accountEmpty: false });
       return;
     }
+    const accountEmpty = isAccountEmpty(remote);
     if (!leader) {
       setCurrentAccount(remote.account);
-      setSyncStatus({ state: "standby", pending: [] });
+      setSyncStatus({ state: "standby", pending: [], accountEmpty });
       return;
     }
-    setSyncStatus({ state: "syncing" });
+    setSyncStatus({ state: "syncing", accountEmpty });
     void runSync();
-  }, [isAuthenticated, isLoading, remote, leader, runSync]);
+  }, [isAuthenticated, isLoading, enabled, remote, leader, runSync]);
 
   // This device changed something → debounce, then reconcile (which pushes).
   useEffect(() => {
     const off = onLocalChange((key) => {
-      if (!authedRef.current || !holdsTabClaim()) return;
+      if (!authedRef.current || !enabledRef.current || !holdsTabClaim()) return;
       setSyncStatus({ state: "syncing", pending: [key] });
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(() => {
@@ -414,4 +452,25 @@ export function useCloudSync(): void {
   }, []);
 
   useEffect(() => clearTimers, [clearTimers]);
+}
+
+/**
+ * "Send this device's settings to my account": owe the account every document
+ * as this device holds it now, as if each had just been set here. The cloud
+ * layer then pushes them on its usual debounce, and every other signed-in
+ * device takes them.
+ *
+ * The one way a device that has not changed anything becomes the source.
+ * Nothing does it automatically — see reconcile.ts rule 1 for why an account
+ * is never seeded from whichever device happened to be online — so it is a
+ * button the person presses, on the device they mean.
+ *
+ * Waits for each store to finish loading (bounded, like a sync pass): owing a
+ * store's constructed defaults would send exactly the "never-used browser"
+ * values rule 1 exists to keep out.
+ */
+export async function sendThisDevice(): Promise<void> {
+  for (const doc of SYNCED_DOCS) {
+    if (await settlesWithin(doc.whenReady(), READY_TIMEOUT_MS)) doc.owe();
+  }
 }

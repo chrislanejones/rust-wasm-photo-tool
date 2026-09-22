@@ -34,6 +34,7 @@ import {
   Ruler,
   Settings,
   Shield,
+  RefreshCw,
   Sun,
   Undo2,
 } from "lucide-react";
@@ -188,6 +189,15 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
         "online", "offline", "network", "ai"],
       icon: Shield,
       run: () => openSettingsTab("security"),
+    },
+    {
+      id: "settings.sync",
+      label: "Sync Settings",
+      group: "settings",
+      keywords: ["sync", "devices", "phone", "account", "cloud", "forget",
+        "send", "turn off sync"],
+      icon: RefreshCw,
+      run: () => openSettingsTab("sync"),
     },
     {
       id: "settings.toggle-rulers",

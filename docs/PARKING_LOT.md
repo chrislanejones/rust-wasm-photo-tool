@@ -4,6 +4,21 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
+
+Found while adding the Sync switch on `feat/sync-settings-pane`. The group's
+buttons carry no `aria-pressed`, so a screen reader hears "Sync on, button" and
+"Sync off, button" with nothing to say which one is lit. The lit state is
+visual only (the filled pill). Same for every caller of the component: the
+Security pane's online-features switch, EXIF keep/strip, Appearance's theme and
+motion, General's reopen-last-session.
+
+Measured in the browser: `aria-pressed` is `null` on both Sync buttons, lit or
+not. `ToolButtonOption.active` already solved this for `ToolButtonGroup`
+(ADR-056: emit `aria-pressed` only for tiles that opt in), so the fix is
+probably the same one-line pattern here. It touches every pane, so it wants its
+own PR and a screen-reader check, not a ride-along.
+
 ## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
 
 Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec

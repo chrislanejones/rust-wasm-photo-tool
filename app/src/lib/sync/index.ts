@@ -13,6 +13,7 @@
 //   useCloudSync   cross-DEVICE transport (one Convex query + one mutation)
 //   reconcile.ts   the only decision: adopt, push, hold, or nothing
 //   status.ts      what it is doing, for the UI to show
+//   enabled.ts     this device's on/off switch — off behaves as signed out
 //
 // ── THE TWO HOPS ARE NOT THE SAME HOP ────────────────────────────────────────
 //
@@ -32,5 +33,7 @@
 // a different problem and is blocked on an open op-log bug. Nothing in this
 // directory reads a photo, an original or a layer.
 export { SyncProvider } from "./SyncProvider";
+export { useSyncEnabled, setSyncEnabled } from "./enabled";
+export { sendThisDevice } from "./useCloudSync";
 export { useSyncStatus, type SyncStatus, type SyncState } from "./status";
 export { SYNC_KEYS, type SyncKey } from "./keys";
