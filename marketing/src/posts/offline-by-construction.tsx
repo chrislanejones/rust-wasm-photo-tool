@@ -31,8 +31,8 @@ export default function OfflineByConstruction() {
 
       <p>
         A wound-care nurse photographs a dressing change on a ward tablet, circles the margin, drops
-        an arrow on the thing the consultant needs to see, and blurs the wristband. Halfway through,
-        the tablet leaves the access point's reach — a lead-lined imaging suite, a lift, the far bay
+        an arrow on the thing the attending needs to see, and blurs the wristband. Halfway through,
+        the tablet leaves the access point's reach — a lead-lined imaging suite, an elevator, the far bay
         nobody's Wi-Fi survey covered. In most web tools that is the moment the spinner appears and the
         last two minutes of work become a question.
       </p>
@@ -46,8 +46,8 @@ export default function OfflineByConstruction() {
       </p>
 
       <p>
-        This post is about how that falls out of the architecture rather than being bolted on — the
-        worker, the op log on disk, and the one piece that is built but not yet switched on. Image
+        This post is how that falls out of the architecture instead of being bolted on: the worker,
+        the op log on disk, and the one piece that's built but not switched on yet. Image
         Horse is an annotation tool, not a medical device, and nothing here claims otherwise. But the
         failure modes it was designed against are exactly the ones a hospital has.
       </p>
@@ -59,8 +59,8 @@ export default function OfflineByConstruction() {
       <h2 id="wire">What the wire was ever for</h2>
 
       <p>
-        The honest way to talk about "offline" is to list what needs a network and what doesn't. This
-        was measured, not argued: the production build was served with every third-party origin
+        The honest way to talk about "offline" is to list what needs a network and what doesn't. I
+        measured it instead of arguing it: the production build was served with every third-party origin
         blocked, and it booted to the same shell — <span className="fig">same 166 characters of UI text</span>,
         canvas present, nine buttons down to eight. The missing one was sign-in (
         <a href={repoFile("docs/adr/049-the-service-worker-is-blocked-on-eviction-reach-not-the-precache.md")} {...external}>
@@ -160,7 +160,7 @@ export default function OfflineByConstruction() {
       <p>
         A worker that keeps running is half of it. A tablet on a ward gets locked, put down, and picked
         up by someone else; a battery dies mid-shift. Offline only counts if the work is still there
-        afterwards, and that is a storage question, not a compute one.
+        afterward, and that is a storage question, not a compute one.
       </p>
 
       <p>
@@ -315,10 +315,10 @@ export default function OfflineByConstruction() {
           <tr>
             <th scope="row">Imaging suite</th>
             <td className="muted">Shielded room. Wi-Fi stops at the door; the tablet came in with the patient.</td>
-            <td>Engine in the tab. Annotate, crop, blur, export — all local. Sync resumes in the corridor.</td>
+            <td>Engine in the tab. Annotate, crop, blur, export — all local. Sync resumes in the hallway.</td>
           </tr>
           <tr>
-            <th scope="row">Ward round</th>
+            <th scope="row">Rounds</th>
             <td className="muted">
               Roaming between access points; the device is locked and unlocked forty times a shift.
             </td>
@@ -363,7 +363,7 @@ export default function OfflineByConstruction() {
       </p>
 
       <p>
-        One thing worth being precise about, because it is where offline tools usually cheat: when the
+        Here's where offline tools usually cheat. When the
         wire comes back, a signed-in user's device does not simply overwrite the cloud. Sync is a
         compare-and-set on the revision the change was based on, so a mutation Convex queued while
         offline <em>cannot land on top of newer work</em> from another device. Photo edits are
