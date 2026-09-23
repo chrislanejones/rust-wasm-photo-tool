@@ -85,23 +85,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.91 — 2026-09-23
+### v8.92 — 2026-09-23
 
-**A/B Compare lives in the top bar now, between New and Export, and works over every tool.**
+**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
 
-It used to be a button at the bottom of Enhance › Compress, and nowhere
-else. Walk to another tool and the button was gone, so the overlay closed
-itself rather than get stuck on screen with nothing left to turn it off.
+`scripts/compare-clean-view.js`. Paste it into Chrome DevTools › Sources ›
+Snippets and run it with a photo loaded. It turns Compare on, puts the
+divider three quarters of the way across, and hides the rest of the page.
+Zoom with Alt + = and Alt + -, and press Esc to get everything back.
 
-Now it sits with New and Export and stays put. Paint, crop, adjust, then
-drag the divider to see what you changed against the photo you uploaded.
-
-It is grayed out when there is nothing to compare: no photo, a photo with
-no stored upload to compare against, or the Batch editor, where one edit
-goes to every photo at once and there is no single before and after.
-Opening Batch closes the overlay.
-
-The engine did not change. It is the same 814,432 bytes as v8.90.
+It adds one style tag and takes it away again. Nothing in the app changed,
+and the engine is the same 814,432 bytes as v8.91.
 
 ## License
 
