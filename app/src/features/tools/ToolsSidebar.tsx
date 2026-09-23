@@ -120,10 +120,6 @@ interface ToolsSidebarProps {
   quality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
-  onToggleCompare: () => void;
-  /** An immutable upload baseline exists for the active photo, so A/B compare
-   *  has something to show. See ResizeSettings' `compareDisabled`. */
-  hasCompareBaseline: boolean;
   compressProgress: { completed: number; total: number };
   onApplyCrop?: () => void;
   /** Allows the Crop tool ratio buttons to drop a centered crop selection
@@ -216,8 +212,6 @@ export function ToolsSidebar({
   quality,
   onQualityChange,
   onQualityCommit,
-  onToggleCompare,
-  hasCompareBaseline,
   compressProgress,
   onApplyCrop,
   onSetCropSelection,
@@ -332,7 +326,7 @@ export function ToolsSidebar({
       <motion.div
         layout
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
-        // (Apply Compression & Resize, Show A/B Compare) sits the same 6px off
+        // (Apply Compression & Resize) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
         // the two chrome edges agree instead of each picking a number
         // (Chris, 2026-09-11 — "follow the reference of top bar, button to
@@ -358,8 +352,6 @@ export function ToolsSidebar({
             onResizeOnly={onResizeOnly}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
-            onToggleCompare={onToggleCompare}
-            hasCompareBaseline={hasCompareBaseline}
             compressProgress={compressProgress}
           />
         )}
