@@ -10852,3 +10852,19 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Tests** | 21 new in `entitlement.test.ts`: the ladder and its `UserMode` round trip, an unknown or junk tier never opening a paid door, admin entitled to paid without a grant, the preview never raising anyone (every combination of rung and preview), and the admin list tolerating spaces and case while refusing substrings, lookalikes, and an empty list. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1125 across 98 files**. PR CI: #224 **16/16** Actions green. |
 | **Next** | Stage 1 of the synced gallery — the photo list and thumbnails, gated on this entitlement, with the server enforcing the real one. |
+
+## v8.91 Change Summary — 2026-09-23
+
+**A/B Compare lives in the top bar now, between New and Export, and works over every tool.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | The only Compare control was a button at the bottom of Enhance › Compress. Leave that group and the button vanished, so `CompareSlider` closed the overlay on any group change to avoid a comparison pinned with no off switch. Compare was really a Compress-only feature. |
+| **Top bar** | `TopBar.tsx`: a Compare `IconButton` between New and Export. A real toggle — `active` plus `aria-pressed`, tooltip flips between "A/B Compare" and "Hide A/B Compare". New `CompareIcon` drawn in lucide's 24-unit, 2px-stroke style. |
+| **When it's available** | `canCompare` in AppShell: a photo is loaded, it has a stored upload baseline (`activeOriginalKey`), and the active tool is not Batch (`emoji`). Disabled otherwise, never hidden. |
+| **Auto-close** | `CompareSlider.tsx` closes the overlay only on entering Batch, whose edits go to every loaded photo and have no single before/after. It used to close on leaving `enhance/*`. |
+| **Compress panel** | `ResizeSettings` loses `hasCompareBaseline`, `onToggleCompare` and the button + tooltip. |
+| **Tests** | `e2e/compare-photo-rect.spec.ts` drives the top-bar button instead of the Compress one. |
+| **Also since v8.90** | #225 — the deploy check no longer counts a pure rule module (`convex/entitlement.ts`) as a missing function, which had turned master CI red on v8.90. #226/#227 — the offline blog post gets its own share card, shipped uncompressed, and reads in US English. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | PR #229 CI: **17** Actions checks green incl. Static guardrails, Frontend typecheck + build, SW e2e; Convex prod deploy skipped (no function change). The 4 Netlify rows are the lapsed free plan. |

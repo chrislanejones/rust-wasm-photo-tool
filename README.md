@@ -85,27 +85,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.90 — 2026-09-22
+### v8.91 — 2026-09-23
 
-**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
+**A/B Compare lives in the top bar now, between New and Export, and works over every tool.**
 
-Image Horse has three kinds of account: not signed in, signed in, and paid.
-Being the person who runs it was quietly becoming a fourth, which is the
-wrong shape — a tier is something you bought, and running the place is not.
+It used to be a button at the bottom of Enhance › Compress, and nowhere
+else. Walk to another tool and the button was gone, so the overlay closed
+itself rather than get stuck on screen with nothing left to turn it off.
 
-So it is a role. An admin is entitled to everything a paid account gets,
-the server included, without anyone granting themselves a paid plan or
-paying for one. The app used to decide who the admin was by comparing your
-email address inside the browser, with the address written into the code;
-now the server decides, from a list kept with the deployment.
+Now it sits with New and Export and stays put. Paint, crop, adjust, then
+drag the divider to see what you changed against the photo you uploaded.
 
-Super User becomes a way to look at the app as another kind of account —
-signed out, or signed in and free — to check those views. It can only ever
-show you **less** than you are entitled to. Before, it could put the
-interface into "paid" for an account that wasn't, so the buttons appeared
-and then the server turned them down. That can no longer happen.
+It is grayed out when there is nothing to compare: no photo, a photo with
+no stored upload to compare against, or the Batch editor, where one edit
+goes to every photo at once and there is no single before and after.
+Opening Batch closes the overlay.
 
-The engine did not change. It is the same 814,432 bytes as v8.89.
+The engine did not change. It is the same 814,432 bytes as v8.90.
 
 ## License
 
