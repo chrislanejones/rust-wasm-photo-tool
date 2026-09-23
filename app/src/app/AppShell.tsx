@@ -2636,6 +2636,11 @@ export function AppShell() {
   });
 
   const hasImage = stamp.state.ready;
+  // The top bar's Compare toggle: needs a loaded photo and its stored upload
+  // baseline, and is off in the Batch editor (`emoji`), where edits hit every
+  // photo at once and there is no single before/after. CompareSlider closes an
+  // open overlay when Batch opens.
+  const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
   const canUndo = stamp.state.undoCount > 0;
   const canRedo = stamp.state.redoCount > 0;
 
@@ -3024,6 +3029,9 @@ export function AppShell() {
             onToggleHistory={() => setShowHistory((v) => !v)}
             onExport={handleExportClick}
             canExport={hasImage}
+            compareActive={compareActive}
+            canCompare={canCompare}
+            onToggleCompare={handleToggleCompare}
             winWidth={bp.width}
             drawerMode={bp.narrow}
             reduceMotion={prefs.reduceMotion}
@@ -3079,8 +3087,6 @@ export function AppShell() {
             quality={quality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
-            onToggleCompare={handleToggleCompare}
-            hasCompareBaseline={!!activeOriginalKey}
             compressProgress={compressProgress}
             onApplyCrop={drawingTools.applyCrop}
             onSetCropSelection={drawingTools.setCropSelection}
