@@ -16,8 +16,9 @@
 ## 1. The ten rules
 
 **R1 — Spacing comes off the scale.** Eight steps, in Tailwind units:
-`0.5 · 1 · 1.5 · 2 · 3 · 4 · 6 · 8` (2, 4, 6, 8, 12, 16, 24, 32 px). They
-already carry 660 of 713 uses. Anything else needs a line in
+`0.5 · 1 · 1.5 · 2 · 3 · 4 · 6 · 8` (2, 4, 6, 8, 12, 16, 24, 32 px), plus `0`
+where a utility exists to remove spacing. They already carry **656 of 713**
+uses, 660 counting the four `-0`s. Anything else needs a line in
 [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md).
 
 **R2 — Type is finished. Do not extend it.** `text-2xs` · `text-xs` ·
@@ -76,6 +77,7 @@ those are wrong for this codebase, and one thing it omitted is in heavy use:
 
 | Step | px | Uses | Proposed? | In R1? | Why |
 | --- | ---: | ---: | --- | --- | --- |
+| 0 | 0 | 4 | ✗ | ✅ | `gap-0`, `p-0`, `py-0`, `space-y-0` — removing spacing, not choosing an amount. |
 | 0.5 | 2 | 24 | ✗ | ✅ | Omitted, but more used than 20px. |
 | 1 | 4 | 103 | ✅ | ✅ | |
 | 1.5 | 6 | 75 | ✅ | ✅ | |
@@ -123,7 +125,7 @@ class-based audit. One more for Night 3.
 
 | Axis | Canonical | Notes |
 | --- | --- | --- |
-| Spacing | `0.5 1 1.5 2 3 4 6 8` | R1. 93% coverage today. |
+| Spacing | `0.5 1 1.5 2 3 4 6 8` (+ `0`) | R1. **92%** coverage today. |
 | Text | `text-2xs` `text-xs` `text-sm`, headings `text-lg`+ | R2. Already a system. |
 | Radius | `rounded-sm` `rounded-md` `rounded-lg` `rounded-full` | R3. Not `rounded`, not `rounded-xl`. |
 | Icon | `h-4 w-4` default (62 uses), `h-3 w-3` dense (14), `h-5 w-5` large (7) | Prefer `size-4` going forward — one class, same result. |

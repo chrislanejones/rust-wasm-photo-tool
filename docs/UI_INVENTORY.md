@@ -297,7 +297,9 @@ Both of those are worth writing down:
 - **`SizeSlider` has 14 importers and lives in `components/`, not
   `components/ui/`.** Counted against the table in §3 it would rank fifth,
   one behind `tool-button-group` and ahead of `tooltip` and `dialog`.
-  There are only 5 raw `<input type="range">` in the tree, so the control is
+  There are 5 raw `<input type="range">` in the tree and **2 of them are inside
+  `SizeSlider.tsx` itself**, so only 3 sliders bypass it
+  (`ColorPickerDialog`, `ReviewPanel`, `LayerSettings`). The control is
   genuinely centralized — the folder is just lying about what is a primitive.
 - **`<kbd>` is styled by a bare element rule**, not a component: 8 files use
   it, and 3 of them override the global with a local class (`font-mono` in
