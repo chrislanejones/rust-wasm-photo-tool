@@ -21,11 +21,15 @@
 //    else there: committing on tap left Apply grayed out after a tap, which
 //    read as "nothing happened" (Chris, 09-22, on a real phone).
 //
-//  • SEND THIS DEVICE'S SETTINGS. Shown only while the account holds nothing.
+//  • SEND THIS DEVICE'S SETTINGS. Shown while the account holds nothing.
 //    An account is never seeded from whichever device happens to be online
 //    (reconcile.ts rule 1), so two devices signing in for the first time sync
 //    NOTHING until someone changes a setting — correct, and confusing. This is
 //    the explicit way out: the person picks the device that is right.
+//    In a tab that is not the one syncing (standby) it stays on screen,
+//    DISABLED, with the reason and a "Use here" that takes the claim. It used
+//    to vanish there, which made the feature look broken for twenty minutes
+//    (constitution rule 5: visible and disabled beats disappearing).
 //
 //  • FORGET THE SYNCED COPY. A promise the server keeps (convex/sync.ts
 //    `clear`): the documents become forgotten markers rather than deleted
@@ -41,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { PaneHeading } from "@/components/ui/pane-heading";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
+  claimTabHere,
   sendThisDevice,
   setSyncEnabled,
   useSyncEnabled,
@@ -140,6 +145,7 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
   // that reads `Date.now()` is impure and the compiler lint fails on it
   // (ADR-020). A minute is the formatter's finest unit, so that is the tick.
   const syncHeadingId = useId();
+  const sendWhyId = useId();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -150,14 +156,29 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
   const copy = refused ? { ...COPY.error, ...REFUSED } : COPY[status.state];
   const Icon = copy.icon;
   const spinning = status.state === "syncing" || status.state === "connecting";
-  // The tab doing the talking is the one whose button would be heard: a
-  // standby tab's pending change waits for the next pass of the other tab.
-  const canSend =
-    isAuthenticated &&
-    enabled &&
-    status.accountEmpty &&
-    status.state !== "standby" &&
-    status.state !== "connecting";
+  // Send applies while the account is empty and this device syncs. It can
+  // only be HEARD from the tab doing the talking: a standby tab's send would
+  // wait for the other tab's next pass, so there it is shown disabled with a
+  // reason rather than hidden. Connecting is still unknown ground (the
+  // account may turn out not to be empty), so it waits.
+  const showSend =
+    isAuthenticated && enabled && status.accountEmpty && status.state !== "connecting";
+  const standby = status.state === "standby";
+
+  const sendButton = (
+    <Button
+      size="large"
+      disabled={sending || standby}
+      aria-describedby={standby ? sendWhyId : undefined}
+      onClick={() => {
+        setSending(true);
+        void sendThisDevice().finally(() => setSending(false));
+      }}
+    >
+      <Upload aria-hidden className="size-3.5" />
+      {sending ? "Sending…" : "Send this device's settings"}
+    </Button>
+  );
 
   return (
     <div className="space-y-6">
@@ -226,24 +247,32 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
           </div>
         </div>
 
-        {canSend && (
+        {showSend && (
           <div className="space-y-2">
             <p className="text-xs leading-relaxed text-text-muted">
               Your account has no synced settings yet, and nothing is sent until
               you change one. Send what this device has now, and your other
               signed-in devices take it.
             </p>
-            <Button
-              size="large"
-              disabled={sending}
-              onClick={() => {
-                setSending(true);
-                void sendThisDevice().finally(() => setSending(false));
-              }}
-            >
-              <Upload aria-hidden className="size-3.5" />
-              {sending ? "Sending…" : "Send this device's settings"}
-            </Button>
+            {standby && (
+              <p id={sendWhyId} className="text-xs leading-relaxed text-text-muted">
+                Another Image Horse tab on this device is the one that syncs, so
+                a send from here would not be heard. Use here makes this tab the
+                one that syncs, and the other tab pauses.
+              </p>
+            )}
+            {standby ? (
+              // Only in standby does Send get a neighbor; the usual path keeps
+              // the lone button exactly as it was.
+              <div className="flex flex-wrap gap-2">
+                {sendButton}
+                <Button size="large" onClick={claimTabHere}>
+                  Use here
+                </Button>
+              </div>
+            ) : (
+              sendButton
+            )}
           </div>
         )}
       </section>

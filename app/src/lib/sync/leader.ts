@@ -44,3 +44,23 @@ export function subscribeTabClaim(listener: () => void): () => void {
     listeners.delete(listener);
   };
 }
+
+// "USE HERE" FROM OUTSIDE THE COVER. The Sync pane shows Send disabled in a
+// standby tab, and offers the one thing that would make it work: take the
+// claim. The claim itself is useTabClaim's, as above, so it registers its
+// `claimHere` with this module and the pane calls through. A callback
+// registry, not a window CustomEvent (forbidden) and not a second channel.
+// No registered claimer (a runtime with no BroadcastChannel, a test) means
+// there is no claim to take, and the call does nothing.
+let claimer: (() => void) | null = null;
+
+export function registerTabClaimer(fn: () => void): () => void {
+  claimer = fn;
+  return () => {
+    if (claimer === fn) claimer = null;
+  };
+}
+
+export function claimTabHere(): void {
+  claimer?.();
+}
