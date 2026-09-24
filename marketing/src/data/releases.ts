@@ -24,6 +24,32 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.92",
+    date: "2026-09-23",
+    headline: "A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom",
+    entries: [
+      {
+        tag: "infra",
+        text: "scripts/compare-clean-view.js: paste it into Chrome DevTools, run it, and the page is just the photo with the Compare divider three quarters across. Alt + = and Alt + - zoom, Esc puts everything back. Nothing in the app changed.",
+      },
+    ],
+  },
+  {
+    version: "v8.91",
+    date: "2026-09-23",
+    headline: "A/B Compare lives in the top bar now, between New and Export, and works over every tool",
+    entries: [
+      {
+        tag: "ui",
+        text: "Compare used to be a button at the bottom of Enhance › Compress and nowhere else. It sits with New and Export now and stays put, so you can paint, crop or adjust and then drag the divider to see what changed against the photo you uploaded.",
+      },
+      {
+        tag: "fix",
+        text: "It grays out when there is nothing to compare: no photo, no stored upload to compare against, or the Batch editor, where one edit goes to every photo. Opening Batch closes the overlay instead of leaving it stuck on screen.",
+      },
+    ],
+  },
+  {
     version: "v8.90",
     date: "2026-09-22",
     headline: "Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less",

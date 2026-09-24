@@ -85,27 +85,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.90 — 2026-09-22
+### v8.92 — 2026-09-23
 
-**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
+**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
 
-Image Horse has three kinds of account: not signed in, signed in, and paid.
-Being the person who runs it was quietly becoming a fourth, which is the
-wrong shape — a tier is something you bought, and running the place is not.
+`scripts/compare-clean-view.js`. Paste it into Chrome DevTools › Sources ›
+Snippets and run it with a photo loaded. It turns Compare on, puts the
+divider three quarters of the way across, and hides the rest of the page.
+Zoom with Alt + = and Alt + -, and press Esc to get everything back.
 
-So it is a role. An admin is entitled to everything a paid account gets,
-the server included, without anyone granting themselves a paid plan or
-paying for one. The app used to decide who the admin was by comparing your
-email address inside the browser, with the address written into the code;
-now the server decides, from a list kept with the deployment.
-
-Super User becomes a way to look at the app as another kind of account —
-signed out, or signed in and free — to check those views. It can only ever
-show you **less** than you are entitled to. Before, it could put the
-interface into "paid" for an account that wasn't, so the buttons appeared
-and then the server turned them down. That can no longer happen.
-
-The engine did not change. It is the same 814,432 bytes as v8.89.
+It adds one style tag and takes it away again. Nothing in the app changed,
+and the engine is the same 814,432 bytes as v8.91.
 
 ## License
 

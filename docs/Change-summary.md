@@ -10852,3 +10852,34 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Tests** | 21 new in `entitlement.test.ts`: the ladder and its `UserMode` round trip, an unknown or junk tier never opening a paid door, admin entitled to paid without a grant, the preview never raising anyone (every combination of rung and preview), and the admin list tolerating spaces and case while refusing substrings, lookalikes, and an empty list. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1125 across 98 files**. PR CI: #224 **16/16** Actions green. |
 | **Next** | Stage 1 of the synced gallery — the photo list and thumbnails, gated on this entitlement, with the server enforcing the real one. |
+
+## v8.91 Change Summary — 2026-09-23
+
+**A/B Compare lives in the top bar now, between New and Export, and works over every tool.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | The only Compare control was a button at the bottom of Enhance › Compress. Leave that group and the button vanished, so `CompareSlider` closed the overlay on any group change to avoid a comparison pinned with no off switch. Compare was really a Compress-only feature. |
+| **Top bar** | `TopBar.tsx`: a Compare `IconButton` between New and Export. A real toggle — `active` plus `aria-pressed`, tooltip flips between "A/B Compare" and "Hide A/B Compare". New `CompareIcon` drawn in lucide's 24-unit, 2px-stroke style. |
+| **When it's available** | `canCompare` in AppShell: a photo is loaded, it has a stored upload baseline (`activeOriginalKey`), and the active tool is not Batch (`emoji`). Disabled otherwise, never hidden. |
+| **Auto-close** | `CompareSlider.tsx` closes the overlay only on entering Batch, whose edits go to every loaded photo and have no single before/after. It used to close on leaving `enhance/*`. |
+| **Compress panel** | `ResizeSettings` loses `hasCompareBaseline`, `onToggleCompare` and the button + tooltip. |
+| **Tests** | `e2e/compare-photo-rect.spec.ts` drives the top-bar button instead of the Compress one. |
+| **Also since v8.90** | #225 — the deploy check no longer counts a pure rule module (`convex/entitlement.ts`) as a missing function, which had turned master CI red on v8.90. #226/#227 — the offline blog post gets its own share card, shipped uncompressed, and reads in US English. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | PR #229 CI: **17** Actions checks green incl. Static guardrails, Frontend typecheck + build, SW e2e; Convex prod deploy skipped (no function change). The 4 Netlify rows are the lapsed free plan. |
+
+## v8.92 Change Summary — 2026-09-23
+
+**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | Chris wanted before/after screenshots at several zoom levels with nothing else on the page. |
+| **The snippet** | `scripts/compare-clean-view.js`, a DevTools snippet like `webgpu-blur-bench.js`, never bundled. It clicks the top-bar Compare button if it's off, sets the divider with one synthetic pointer click on the overlay (the position lives in `useUIStore`, which has no handle on `window`), and adds a `<style>` that hides `body *` except the canvas and overlay, both marked with `data-ih-keep`. A MutationObserver re-marks them if zoom re-renders the overlay. |
+| **Settings** | `POSITION` (default **0.75**), `KEEP_LABELS`, `BACKDROP` at the top of the file. |
+| **Controls** | Alt + = / Alt + - / Alt + 0 and Alt + scroll zoom as usual; Esc or a second run turns it off. |
+| **Verified live** | On edit.imagehorse.app: divider at **75%**, only the canvas and overlay visible, zoom 552 → 668 px wide stayed clean, Esc restored the page, route unchanged, **0** page errors. |
+| **"Different photo" — not a bug** | In the first test the Edited side looked like another picture. Retested with the divider at each end: it is the **same photo**, with a strong contrast edit and a leftover rectangle from an earlier session. At 75% the Edited side is just the photo's right-hand quarter, which is all shop signs. |
+| **Engine size** | Unchanged at **814,432 B**. No app code changed. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings, guardrails OK. |
