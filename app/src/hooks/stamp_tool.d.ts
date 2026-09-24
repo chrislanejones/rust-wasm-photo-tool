@@ -1425,6 +1425,20 @@ declare module "stamp_tool" {
     /** Current selection as an RGBA overlay (empty if nothing selected). */
     selection_overlay(): Uint8Array;
     has_selection(): boolean;
+    /** `[selected, total]` pixels — the "Selected 18.4% · 2.1 MP" readout.
+     *  One count over the selection plane; `[0, w*h]` with nothing selected. */
+    selection_coverage(): Uint32Array;
+    /** Whether `selection_retune` would re-run anything: the last selection
+     *  was a wand / edge-aware / color-range click and nothing has touched the
+     *  history since. */
+    selection_can_retune(): boolean;
+    /** Re-run the last click-once selection from the same seed with a new
+     *  tolerance (and edge threshold, for edge-aware) — the live Tolerance
+     *  slider. Replaces that click's result in place: combines with the
+     *  selection from BEFORE the click and pushes no undo step of its own.
+     *  Returns the overlay RGBA; empty when the result selects nothing OR
+     *  there was nothing to re-run — re-read `selection_overlay` to tell. */
+    selection_retune(tolerance: number, edge_threshold: number): Uint8Array;
     /** Deselect (no history). */
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
@@ -1444,7 +1458,7 @@ declare module "stamp_tool" {
     selection_union(mask: Uint8Array): boolean;
     selection_subtract(mask: Uint8Array): boolean;
     /** Combine mode for the NEXT producer call: 0 = replace, 1 = union,
-     *  2 = subtract (clamped). The producers (wand / edge / color-range /
+     *  2 = subtract, 3 = intersect (clamped). The producers (wand / edge / color-range /
      *  lasso-close) route their mask through this so Shift/Alt-drag adds or
      *  subtracts instead of replacing. Reset to 0 after each use is the
      *  caller's job. */

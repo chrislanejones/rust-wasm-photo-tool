@@ -45,7 +45,7 @@ import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind, RulerUnit } from "@/lib/preferences";
-import { selectionCombineMode } from "@/lib/selectionBool";
+import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
 import type { ShapeName } from "@/lib/types";
@@ -450,7 +450,7 @@ function getCursorForSubTool(
   isPanning?: boolean,
   colorPickerActive?: boolean,
   moveActive?: boolean,
-  combineIntent?: 0 | 1 | 2,
+  combineIntent?: SelectionCombineMode,
   maskEditing?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";
@@ -773,12 +773,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Live Shift/Alt intent while the Select tool hovers — drives the +/−
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
-    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    const [combineIntent, setCombineIntent] = useState<SelectionCombineMode>(0);
     // Ref mirror so the rAF preview closure (below) and the keyboard effect
     // read the LIVE intent, not a stale render's. `setIntent` keeps both in
     // step — the state drives the cursor re-render, the ref the async reads.
-    const combineIntentRef = useRef<0 | 1 | 2>(0);
-    const setIntent = useCallback((next: 0 | 1 | 2) => {
+    const combineIntentRef = useRef<SelectionCombineMode>(0);
+    const setIntent = useCallback((next: SelectionCombineMode) => {
       combineIntentRef.current = next;
       setCombineIntent((cur) => (cur === next ? cur : next));
     }, []);

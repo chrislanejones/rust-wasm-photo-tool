@@ -4,6 +4,20 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+Found during the Select morning run (live tolerance). `pnpm run build` prints
+"Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
+{ z-index: var(--z-*); }`. Tailwind scans text, and three comments spell the
+rule out literally: `app/src/styles.css:42`, `app/src/lib/styles.ts:251`,
+`app/src/components/ui/panel-close-button.tsx:38`. The generated rule is
+invalid and applies to nothing, so it is noise, not a bug — but it is the one
+warning in an otherwise clean build, and a real CSS warning would hide behind it.
+
+**Fix:** reword the three comments (e.g. "`z-[var(--z-…)]`" or "a `--z-*`
+token in a `z-[var(…)]` class") so no complete class string appears, then
+confirm the build prints no CSS warning. Same shape as the guardrails
+comment-counted-as-code trap in CLAUDE.md.
 ## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
 
 Found while ADR-067 was drafted, left out of the release on purpose:

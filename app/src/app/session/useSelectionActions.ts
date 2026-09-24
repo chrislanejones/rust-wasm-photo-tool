@@ -22,6 +22,24 @@ import {
   type SelectionCombineMode,
 } from "@/lib/selectionBool";
 import { toast } from "@/components/ui/sonner";
+import { toCoverage } from "@/lib/selectionCoverage";
+import { createLiveRetune } from "@/lib/liveRetune";
+
+/** Quiet time before a Tolerance tick re-runs the selection. Long enough to
+ *  skip the ticks of one drag, short enough to read as live. */
+const RETUNE_DEBOUNCE_MS = 70;
+/** Above its pixel budget a re-run cannot keep up with a drag, and an overlay
+ *  that trails the handle by most of a second is worse than one that waits.
+ *  So a big document re-runs when the drag PAUSES, not on every tick.
+ *
+ *  Measured 09-24-2026, production build, engine in the worker: the wand
+ *  re-runs a 2068×1385 document (the largest an import produces —
+ *  WORKING_MAX_EDGE is 2048) in 31–43 ms, and a 24 MP one in 237–347 ms.
+ *  Edge-aware recomputes the Sobel map every run: 822–899 ms at 24 MP. The
+ *  budgets put each kind at roughly 100 ms per update, so every import is
+ *  fully live and only a document enlarged past that waits. */
+const RETUNE_PAUSE_MS = 300;
+const LIVE_BUDGET_PX = { edge: 3_200_000, flood: 8_000_000 } as const;
 
 export function useSelectionActions(
   stamp: ReturnType<typeof useCloneStamp>,
@@ -31,6 +49,9 @@ export function useSelectionActions(
   const selectionKind = useToolStore((s) => s.selectionKind);
   const edgeThreshold = useToolStore((s) => s.edgeThreshold);
   const setSelectionMask = useToolStore((s) => s.setSelectionMask);
+  const selectionMask = useToolStore((s) => s.selectionMask);
+  const selectionCombine = useToolStore((s) => s.selectionCombine);
+  const setSelectionCoverage = useToolStore((s) => s.setSelectionCoverage);
   const setMoveActive = useToolStore((s) => s.setMoveActive);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
@@ -54,6 +75,82 @@ export function useSelectionActions(
   // designing this by eye. `combineHint` is the hook/prop it should read;
   // nothing renders off it yet.
   const [combineHint, setCombineHint] = useState<SelectionCombineMode>(0);
+
+  // ── The readout: "Selected 18.4% · 2.1 MP" ─────────────────────────────────
+  // Every path that changes the selection — a click, a marquee, the lasso,
+  // Deselect, undo, redo, a live retune — ends by writing `selectionMask`, so
+  // this one effect keeps the count current for all of them. The count is the
+  // engine's (one pass over its byte plane); the overlay RGBA is never read
+  // for it. `seq` drops an answer that a newer selection has overtaken.
+  const coverageSeq = useRef(0);
+  useEffect(() => {
+    const seq = ++coverageSeq.current;
+    if (!selectionMask) {
+      setSelectionCoverage(null);
+      return;
+    }
+    const tool = stamp.toolRef.current;
+    if (!tool) return;
+    void (async () => {
+      try {
+        const raw = await tool.selection_coverage();
+        if (seq === coverageSeq.current) setSelectionCoverage(toCoverage(raw));
+      } catch {
+        // A build without the export shows no readout rather than a guess.
+        if (seq === coverageSeq.current) setSelectionCoverage(null);
+      }
+    })();
+  }, [stamp, selectionMask, setSelectionCoverage]);
+
+  // ── Live Tolerance ─────────────────────────────────────────────────────────
+  // Moving the slider re-runs the LAST CLICK from the same seed. The engine
+  // remembers the seed, the kind and the combine mode, and replaces that
+  // click's result in place — no undo step per tick, and in Add/Subtract/
+  // Intersect it combines with the selection from before the click, not with
+  // the previous tick's. A marquee, the lasso, Select All, an undo or any edit
+  // makes the click stale, and the slider goes back to only setting the value
+  // for the next click (`selection_can_retune`).
+  // The scheduler is built once, so it reads the engine handle and the
+  // document size through this ref — a captured `stamp` would be the first
+  // render's, with a 0×0 document that would always count as small.
+  const stampRef = useRef(stamp);
+  useEffect(() => {
+    stampRef.current = stamp;
+  });
+  const liveRetune = useRef(
+    createLiveRetune<{ tolerance: number; edge: number }, Uint8Array | null>({
+      delayMs: () => {
+        const { width, height } = stampRef.current.state;
+        const budget =
+          useToolStore.getState().selectionKind === "edge"
+            ? LIVE_BUDGET_PX.edge
+            : LIVE_BUDGET_PX.flood;
+        return width * height > budget ? RETUNE_PAUSE_MS : RETUNE_DEBOUNCE_MS;
+      },
+      run: async ({ tolerance, edge }) => {
+        const tool = stampRef.current.toolRef.current;
+        // TRUTHY TRAP — un-awaited, a Promise would say "yes" every time.
+        if (!tool || !(await tool.selection_can_retune())) return null;
+        const mask = await tool.selection_retune(tolerance, edge);
+        // Empty is ambiguous (refused, or the result selects nothing); the
+        // overlay read settles it — both are empty only if nothing is selected.
+        return mask.length ? mask : await tool.selection_overlay();
+      },
+      onResult: (mask) => {
+        if (mask) useToolStore.getState().setSelectionMask(mask.length ? mask : null);
+      },
+      // The one case where a retune pushes an undo step (the click itself was
+      // a no-op) moves the undo count; sync once the slider settles.
+      onIdle: () => stampRef.current.syncState(),
+    }),
+  );
+  const lastTuned = useRef({ tolerance: selectionTolerance, edge: edgeThreshold });
+  useEffect(() => {
+    const prev = lastTuned.current;
+    if (prev.tolerance === selectionTolerance && prev.edge === edgeThreshold) return;
+    lastTuned.current = { tolerance: selectionTolerance, edge: edgeThreshold };
+    liveRetune.current.schedule({ tolerance: selectionTolerance, edge: edgeThreshold });
+  }, [selectionTolerance, edgeThreshold]);
 
   const getCoords = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
@@ -91,8 +188,9 @@ export function useSelectionActions(
 
       const { x, y } = getCoords(e);
 
-      // Shift = add (union), Alt = subtract; flag-gated, else always 0/replace.
-      const mode = selectionCombineMode(e);
+      // Shift = add (union), Alt = subtract, for this gesture; otherwise the
+      // panel's standing Combine mode.
+      const mode = selectionCombineMode(e, selectionCombine);
 
       if (selectionKind === "lasso") {
         // The lasso is a multi-click SESSION, not click-once — so the add/
@@ -116,6 +214,10 @@ export function useSelectionActions(
         return;
       }
 
+      // A new click supersedes any slider tick still waiting to re-run the
+      // old one.
+      liveRetune.current.cancel();
+
       // Click-once kinds (wand / edge / color-range) resolve the intent at
       // click time. The engine routes the produced mask through union/subtract
       // when mode != 0; mode 0 is the old replace path, byte-for-byte.
@@ -133,7 +235,7 @@ export function useSelectionActions(
             : await tool.magic_wand_select(x, y, selectionTolerance);
       setSelectionMask(mask.length ? mask : null);
     },
-    [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold],
+    [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold, selectionCombine],
   );
 
   /** ADR-024 a10 — drops a preview whose mouse-move has been superseded. */
@@ -315,7 +417,7 @@ export function useSelectionActions(
       // on release, that ordering is the cause — not this call.
       const tool = stamp.toolRef.current;
       if (!tool) return;
-      const mode = selectionCombineMode(mods);
+      const mode = selectionCombineMode(mods, useToolStore.getState().selectionCombine);
       tool.set_selection_combine(mode);
       setCombineHint(mode);
       // Read at commit time, not subscribed — the mode can't change mid-drag.

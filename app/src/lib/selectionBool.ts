@@ -14,8 +14,10 @@
 // it killed, a selection gesture always sets combine mode 0 (replace).
 
 /** Combine mode the engine's `set_selection_combine` takes:
- *  0 = replace (default), 1 = union (add), 2 = subtract (remove). */
-export type SelectionCombineMode = 0 | 1 | 2;
+ *  0 = replace (default), 1 = union (add), 2 = subtract (remove),
+ *  3 = intersect. The panel's Combine group picks the standing mode; the
+ *  modifiers override it for one gesture. */
+export type SelectionCombineMode = 0 | 1 | 2 | 3;
 
 /** Whether additive/subtractive selection is active — ON unless killed with
  *  the "0" switch (see module doc). */
@@ -31,15 +33,17 @@ export function isSelectionBoolEnabled(): boolean {
 }
 
 /** Resolve the combine mode a pointer gesture asks for: Shift → union,
- *  Alt → subtract, neither (or the flag off) → replace. Shift wins if both
- *  are held — "add" is the less destructive intent. Reads the flag itself, so
- *  callers can pass the raw event unconditionally. */
-export function selectionCombineMode(mods: {
-  shiftKey: boolean;
-  altKey: boolean;
-}): SelectionCombineMode {
-  if (!isSelectionBoolEnabled()) return 0;
+ *  Alt → subtract, neither → the panel's standing mode (`base`, replace by
+ *  default). Shift wins if both are held — "add" is the less destructive
+ *  intent. The kill switch turns off the MODIFIERS only: the panel's Combine
+ *  group is a visible control, not a hidden shortcut, so it keeps working.
+ *  Reads the flag itself, so callers can pass the raw event unconditionally. */
+export function selectionCombineMode(
+  mods: { shiftKey: boolean; altKey: boolean },
+  base: SelectionCombineMode = 0,
+): SelectionCombineMode {
+  if (!isSelectionBoolEnabled()) return base;
   if (mods.shiftKey) return 1;
   if (mods.altKey) return 2;
-  return 0;
+  return base;
 }

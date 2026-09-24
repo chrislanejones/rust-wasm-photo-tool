@@ -82,3 +82,9 @@ optional on `ToolDefinition`.
    are per-mode already, so this stays available later.
 3. **Marquee as a 5th tile, shape as a sub-toggle.** Half-measure with the
    worst of both: still two axes, still an unexplained pair.
+
+*Amended 09-24-2026 by [ADR-066](066-a-tolerance-change-re-runs-the-last-click-in-place-and-the-engine-keeps-the-seed.md):*
+the panel no longer HIDES a setting the active mode does not use (the
+Tolerance slider's visibility, above). Both sliders are always shown, disabled
+with a one-line reason, so the panel stops changing height per mode. The six
+modes and their gestures are unchanged.

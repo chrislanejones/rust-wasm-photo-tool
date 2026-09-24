@@ -9,6 +9,8 @@ import { formatBytes } from "@/lib/format";
 import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import { useToolStore } from "@/stores/useToolStore";
+import { describeCoverage } from "@/lib/selectionCoverage";
 
 export interface ShortcutHint {
   keys: string;
@@ -105,6 +107,8 @@ export function StatusBar({
   // Read from the gallery store rather than two more props out of AppShell —
   // see the hook for why `entry.origWidth` is NOT the upload size.
   const uploadDims = useUploadDimensions();
+  // Read from the tool store, like uploadDims above, so AppShell gains no prop.
+  const coverage = useToolStore((s) => s.selectionCoverage);
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -199,6 +203,17 @@ export function StatusBar({
             side by side. Neutral on purpose at every value: this replaced a
             toast that read as a warning, and a readout that turns red at 4%
             would just be the toast again. */}
+        {/* Same slot rules as Undo NN% beside it: here while something is
+            selected, gone when nothing is, and neutral at every value — a
+            0.02% selection is information, not an error. */}
+        {coverage && (
+          <>
+            <span className="status-zoom" data-testid="status-selection">
+              {describeCoverage(coverage)}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {undoDepth && (
           <>
             <span className="status-zoom" title={describeUndoDepth(undoDepth)}>
