@@ -82,7 +82,7 @@ export interface Post {
 export const POSTS: readonly Post[] = [
   {
     slug: "offline-by-construction",
-    headline: "The hotel Wi-Fi died. The editor kept running.",
+    headline: "The network went down. The photo didn't notice.",
     title: "Image Horse works offline by construction",
     deck: "Why an image editor whose engine runs in a Web Worker and whose truth lives in IndexedDB keeps working when the Wi-Fi doesn't — and what that buys a ward, an operating room, or anyone whose work can't wait for a signal.",
     description:

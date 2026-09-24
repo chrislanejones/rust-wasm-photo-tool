@@ -1,4 +1,4 @@
-/* "The hotel Wi-Fi died. The editor kept running."
+/* "The network went down. The photo didn't notice."
  *
  * Body only — the headline, the deck, the dateline and the footer are the
  * shell's (pages/BlogPost.tsx). This file starts at the first paragraph. The
