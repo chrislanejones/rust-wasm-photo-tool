@@ -9,16 +9,27 @@
 import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
+import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
 
 export function useMaskActions(stamp: ReturnType<typeof useCloneStamp>) {
   const maskEditing = useToolStore((s) => s.maskEditing);
   const setMaskEditing = useToolStore((s) => s.setMaskEditing);
 
+  /** Add a mask and start painting it. `source` is the Add mask choice:
+   *  reveal all (the old one-click behavior, and the default), hide all, or
+   *  the selection revealed / hidden — copied byte for byte, softened by the
+   *  Refine section's Feather. The selection stays; the mask brush takes over
+   *  exactly as it always has. */
   const handleAddMask = useCallback(
-    (id: number) => {
+    async (id: number, source: MaskSource = MASK_SOURCE.revealAll) => {
       stamp.setActiveLayer(id);
-      stamp.addLayerMask(id);
-      setMaskEditing(true);
+      const feather = useToolStore.getState().selectionRefine.feather;
+      // TRUTHY TRAP — un-awaited, a refused add would still flush and sync.
+      if (await stamp.toolRef.current?.add_layer_mask_from(id, source, feather)) {
+        stamp.flushToCanvas();
+        stamp.syncState();
+        setMaskEditing(true);
+      }
     },
     [stamp],
   );

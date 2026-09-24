@@ -15,6 +15,7 @@ import { SelectSettings, type SelectionControls } from "./SelectSettings";
 import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
 import { useToolStore, type SelectionKind } from "@/stores/useToolStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CLEAN_UP } from "@/lib/selectionRefine";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,7 +23,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 const noop = () => {};
-function controls(kind: SelectionKind): SelectionControls {
+function controls(kind: SelectionKind, active = false): SelectionControls {
   return {
     tolerance: 24,
     onToleranceChange: noop,
@@ -32,7 +33,7 @@ function controls(kind: SelectionKind): SelectionControls {
     onNewLayerCopy: noop,
     onNewLayerCut: noop,
     onRemoveObject: noop,
-    active: false,
+    active,
     kind,
     onKindChange: noop,
     edgeThreshold: 90,
@@ -40,13 +41,13 @@ function controls(kind: SelectionKind): SelectionControls {
   };
 }
 
-function render(kind: SelectionKind): void {
+function render(kind: SelectionKind, active = false): void {
   act(() => {
     root.render(
       React.createElement(
         TooltipProvider,
         null,
-        React.createElement(SelectSettings, { disabled: false, selection: controls(kind) }),
+        React.createElement(SelectSettings, { disabled: false, selection: controls(kind, active) }),
       ),
     );
   });
@@ -68,7 +69,13 @@ function slider(name: string): HTMLInputElement {
 const text = () => container.textContent ?? "";
 
 beforeEach(() => {
-  useToolStore.setState({ selectionCombine: 0, selectionCoverage: null });
+  useToolStore.setState({
+    selectionCombine: 0,
+    selectionCoverage: null,
+    selectionRefine: CLEAN_UP,
+    refinePreviewing: false,
+    refineRequest: null,
+  });
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -158,3 +165,59 @@ describe("Combine", () => {
     expect(useToolStore.getState().selectionCombine).toBe(1);
   });
 });
+
+describe("Refine", () => {
+  const button = (name: string) => {
+    const b = [...container.querySelectorAll("button")].find((x) => x.textContent?.trim() === name);
+    if (!b) throw new Error(`no ${name} button`);
+    return b as HTMLButtonElement;
+  };
+
+  it("with nothing selected: every control disabled, and it says why", () => {
+    render("wand", false);
+    expect(button("Clean Up").disabled).toBe(true);
+    expect(button("Apply").disabled).toBe(true);
+    for (const name of ["Islands", "Holes", "Smooth", "Feather", "Expand"]) {
+      expect(slider(name).disabled, name).toBe(true);
+    }
+    expect(text()).toContain("Select something to refine it.");
+  });
+
+  it("starts at the Clean Up values", () => {
+    render("wand", true);
+    expect(Number(slider("Islands").value)).toBe(4);
+    expect(Number(slider("Holes").value)).toBe(6);
+    expect(Number(slider("Smooth").value)).toBe(2);
+    expect(Number(slider("Feather").value)).toBe(1);
+    expect(Number(slider("Expand").value)).toBe(-1);
+  });
+
+  it("Clean Up and Apply each send ONE request to the session hook", () => {
+    render("wand", true);
+    act(() => button("Clean Up").click());
+    expect(useToolStore.getState().refineRequest).toEqual({ kind: "cleanUp", n: 1 });
+    act(() => button("Apply").click());
+    expect(useToolStore.getState().refineRequest).toEqual({ kind: "apply", n: 2 });
+  });
+
+  it("Apply is disabled when every selection op is off (feather alone does nothing)", () => {
+    useToolStore.setState({ selectionRefine: { islands: 0, holes: 0, smooth: 0, feather: 3, expand: 0 } });
+    render("wand", true);
+    expect(button("Apply").disabled).toBe(true);
+  });
+
+  it("works in every mode — refine is about the selection, not how it was made", () => {
+    for (const kind of ["lasso", "rect", "colorRange"] as const) {
+      act(() => root.render(React.createElement("div")));
+      render(kind, true);
+      expect(button("Clean Up").disabled, kind).toBe(false);
+    }
+  });
+
+  it("the Apply label says when a preview is what it will apply", () => {
+    useToolStore.setState({ refinePreviewing: true });
+    render("wand", true);
+    expect(() => button("Apply refine")).not.toThrow();
+  });
+});
+
