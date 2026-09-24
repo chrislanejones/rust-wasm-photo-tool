@@ -85,27 +85,30 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.96 — 2026-09-24
+### v8.97 — 2026-09-24
 
-**Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.**
+**Open a .ora file in your browser, and see every layer.**
 
-The WEBGPU word on the home page is built from 103 lit cubes now. Hover to
-ripple them, drag to scatter them, press any key to knock them loose. The line
-underneath says what your machine actually drew them with: WebGPU, WebGL 2, or
-nothing at all.
+There was no site that opens an OpenRaster file. There is one now:
+imagehorse.app/openraster. Drop a .ora on the page and every layer is unzipped
+and drawn in the tab. Nothing is uploaded, and it keeps working with the
+network off. Toggle layers, look at the file's own flattened copy, save any
+layer as a PNG.
 
-A low-poly horse trots beside "Your pictures, your computer." at the foot of
-the home page, on computers with a mouse. A phone never downloads it. Neither
-graphic costs the first page load: three.js arrives only when one of them
-comes near the screen.
+It opens on a five-layer sample, so there is something to look at before you
+have a file. Under the viewer: what a .ora is, what is inside one, how to
+export one from Image Horse and import it back, and what survives the trip.
 
-"Being built now" sits between the cubes and the blog: the five things in
-progress, with a Beta badge on the two you can already switch on.
+The viewer uses the browser's own PNG decoder, every layer at once. 60 MB of
+layers in 0.4 seconds. The engine's decoder measured five times slower here
+and would have cost 354 KB to download, so the page ships without it.
 
-Home is in the menu bar. On a phone the menu opens with Home, Contact and
-Pricing in a group of their own, the same cards as Tools and Learn.
+In the editor, Select got its morning work (#231): drag Tolerance and the
+selection re-runs live from the same click, with one undo step for the whole
+drag instead of one per tick. A "Selected 18.4% · 2.1 MP" readout sits under
+the sliders and in the status bar, and Intersect joins New, Add and Subtract.
 
-Engine unchanged at 814,432 bytes.
+Engine 816,594 bytes (was 814,432).
 
 ## License
 

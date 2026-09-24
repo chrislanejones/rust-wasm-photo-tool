@@ -13,6 +13,7 @@
  */
 
 import { POSTS, postPath, type Post } from "./data/posts";
+import { OPENRASTER_FAQ } from "./data/openraster";
 import { FEATURES } from "./data/features";
 
 /** Counted, not typed: the feature list is generated from docs/Features.md, so a
@@ -73,6 +74,10 @@ export interface Route {
    *  than a list of jobs the editor does. `toolPages.ts` carries their content;
    *  this table carries only what a crawler reads. */
   toolPage?: boolean;
+  /** Questions answered ON the page. Read by the page for its FAQ section and
+   *  by `jsonLdFor` for a FAQPage node — the same list, so the markup can never
+   *  name a question the visitor cannot see. */
+  faq?: readonly { q: string; a: string }[];
 }
 
 /** Every page, in nav order. A new page appears in the nav, the mobile sheet,
@@ -116,6 +121,21 @@ export const ROUTES: readonly Route[] = [
       `All ${FEATURE_COUNT} features of a photo editor that runs in your browser: annotate, select, enhance, export. A plain line for each, and the engineering line underneath.`,
     ogImage: "/og/features.png",
     sources: ["marketing/src/pages/Features.tsx", "marketing/src/data/features.ts"],
+  },
+  {
+    to: "/openraster",
+    label: "OpenRaster (.ora)",
+    title: "Open .ora files in your browser — OpenRaster viewer",
+    description:
+      "See every layer of an OpenRaster (.ora) file in your browser, nothing uploaded. What a .ora holds, how Image Horse exports and imports one, and what survives.",
+    ogImage: "/og/openraster.png",
+    sources: [
+      "marketing/src/pages/OpenRaster.tsx",
+      "marketing/src/components/OraViewer.tsx",
+      "marketing/src/lib/ora.ts",
+      "marketing/src/data/openraster.ts",
+    ],
+    faq: OPENRASTER_FAQ,
   },
   {
     to: "/pricing",
@@ -318,9 +338,9 @@ export const NOT_FOUND_HEAD = {
  * result, and it is the single most tempting thing on this list to invent.
  * There are no reviews to aggregate, so marking any up would be false, is
  * against Google's structured-data policy, and earns a manual action rather
- * than stars. Same reasoning for `FAQPage`: the markup is only allowed for
- * questions and answers actually visible on the page, and none of these pages
- * has an FAQ section yet.
+ * than stars. `FAQPage` is held to the same rule: the markup is only allowed
+ * for questions and answers actually visible on the page, so it appears only
+ * on a route that declares `faq`, and the page renders that same list.
  */
 
 const ORGANIZATION_ID = `${SITE_URL}/#organization`;
@@ -406,6 +426,20 @@ const softwareApplication = () => ({
     ],
   },
 });
+
+/** The page's own questions, only where the page shows them (`Route.faq`). */
+const faqPage = (route: Route) =>
+  route.faq?.length
+    ? {
+        "@type": "FAQPage",
+        "@id": `${abs(route.to)}#faq`,
+        mainEntity: route.faq.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      }
+    : null;
 
 /** Home is the root, so it gets no breadcrumb — a one-item trail is noise. */
 const breadcrumbs = (route: Route) =>
@@ -562,6 +596,7 @@ export const jsonLdFor = (route: Route) =>
       softwareApplication(),
       webPage(route),
       breadcrumbs(route),
+      faqPage(route),
       // /blog is the one route that is also a container of other documents.
       route.to === BLOG_BASE ? blogNode() : null,
       route.to === BLOG_BASE ? person() : null,

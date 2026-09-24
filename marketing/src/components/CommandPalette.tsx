@@ -39,6 +39,7 @@ const ITEMS: Item[] = [
   { group: "Pages", label: "Architecture", hint: "The two planes, and the seam between them", href: "/architecture", kind: "route" },
   { group: "Pages", label: "Blog", hint: "Why it is built the way it is", href: "/blog", kind: "route" },
   { group: "Pages", label: "Features", hint: "The whole list — engine and interface", href: "/features", kind: "route" },
+  { group: "Pages", label: "OpenRaster (.ora)", hint: "Open a layered .ora in the tab, nothing uploaded", href: "/openraster", kind: "route" },
   { group: "Pages", label: "Pricing", hint: "Three tiers, and the access matrix", href: "/pricing", kind: "route" },
   { group: "Pages", label: "Trail Log", hint: "Every release, and the commits behind them", href: "/trail-log", kind: "route" },
   { group: "Pages", label: "Contact", hint: "Email, bug reports, security, your account", href: "/contact", kind: "route" },

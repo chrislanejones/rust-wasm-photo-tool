@@ -1,5 +1,5 @@
-# ADR-068: Refine is four integer ops on the selection plus a feather that only a mask can hold; Apply is one unrecorded snapshot
-Date: 2026-09-24   Status: draft   Builds on: ADR-066
+# ADR-069: Refine is four integer ops on the selection plus a feather that only a mask can hold; Apply is one unrecorded snapshot
+Date: 2026-09-24   Status: accepted (ships in v8.98)   Builds on: ADR-066
 
 ## Context
 The plan was Select → Refine → Mask with nothing modal, "three clicks on one

@@ -148,6 +148,7 @@ const HEADLINE = {
   "/privacy-policy": ["What stays,\nand what leaves.", "Privacy policy"],
   "/terms-of-service": ["Your pictures\nstay yours.", "Terms of service"],
   "/coming-soon": ["What's coming,\nand how sure we are.", "No dates"],
+  "/openraster": ["Open a .ora file\nin your browser.", "OpenRaster viewer"],
   "/image-editor-no-upload": ["Your photos stay\non your computer.", "An editor with no upload"],
   "/photo-editor": ["A photo editor\nthat never uploads.", "Photo editor"],
   "/image-compressor": ["Compress to the size\nyou actually need.", "Image compressor"],

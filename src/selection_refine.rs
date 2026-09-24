@@ -254,7 +254,7 @@ impl ImageHorseTool {
 
     /// Apply the Refine ops to the selection: ONE undo step ("Refine
     /// Selection"), a selection-only snapshot like every other selection
-    /// change — deliberately not an op-log record (ADR-068). Recomputed from
+    /// change — deliberately not an op-log record (ADR-069). Recomputed from
     /// the parameters, never taken from the preview copy, so a stale preview
     /// cannot be committed. Returns the overlay; no step when nothing changes.
     pub fn selection_refine_apply(

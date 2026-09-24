@@ -93,7 +93,7 @@ Early warning sign: a new `self.selection =` site in a diff that does not
 touch `selection_retune`, or a new producer with no "not retunable" test
 beside `marquee_and_select_all_are_not_retunable`.
 
-*Amended 09-24-2026, by ADR-068:* the Consequences line "Anti-alias (no
+*Amended 09-24-2026, by ADR-069:* the Consequences line "Anti-alias (no
 engine support, and morphology is excluded)" is half out of date. Morphology
 now exists: `dilate` / `erode` in `src/selection_refine.rs` drive Refine's
 Smooth and Expand. Anti-alias is still not done, for the reason that remains:
