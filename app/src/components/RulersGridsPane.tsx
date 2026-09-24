@@ -138,6 +138,7 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             }
           />
           <ToolButtonGroup
+            aria-label="Layout"
             options={GRID_LAYOUTS}
             columns={3}
             stacked

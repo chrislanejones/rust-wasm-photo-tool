@@ -59,8 +59,8 @@ interface Props<T extends string> {
   disabled?: boolean;
   className?: string;
   /** The radio group's accessible name, for a SELECT group with no `label`
-   *  of its own. Repeat the visible heading's words. With a `label`, the
-   *  label is the name and this is not needed. */
+   *  of its own, or whose `label` holds more than words. Repeat the visible
+   *  heading's words. A plain-text `label` is already the name. */
   "aria-label"?: string;
   /** Point at a heading rendered elsewhere. Wins over `label`. */
   "aria-labelledby"?: string;
@@ -109,11 +109,16 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
     isDisabled: (i) => disabled || !!options[i].disabled,
     onSelect: onChange,
   });
+  // Explicit beats derived. `label` can hold more than words (a lightbulb
+  // button, whose own name would be read into the group's), so a caller that
+  // passes aria-label gets exactly that.
   const name = props["aria-labelledby"]
     ? { "aria-labelledby": props["aria-labelledby"] }
-    : label
-      ? { "aria-labelledby": labelId }
-      : { "aria-label": props["aria-label"] };
+    : props["aria-label"]
+      ? { "aria-label": props["aria-label"] }
+      : label
+        ? { "aria-labelledby": labelId }
+        : {};
   return (
     <div className={cn("space-y-2", className)}>
       {/* A div, not a <label>: it was never associated with a control (no

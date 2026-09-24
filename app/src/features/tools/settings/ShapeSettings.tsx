@@ -131,6 +131,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Shape selector — stacked tiles (icon on top, label below). */}
                   <ToolButtonGroup
+                    aria-label="Shape"
                     stacked
                     options={SHAPES}
                     value={currentShape}
@@ -180,6 +181,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                         Fill
                       </label>
                       <ToolButtonGroup
+                        aria-label="Fill"
                         options={FILL_MODES}
                         value={settings.fillMode ?? "none"}
                         onChange={(id) =>
@@ -255,6 +257,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Pin label style: Numbers / Letters — first, above the size. */}
                   <ToolButtonGroup
+                    aria-label="Pin label style"
                     stacked
                     options={PIN_LABELS}
                     value={settings.pinLabel ?? "numbers"}
@@ -294,6 +297,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Arrow style: Single / Double — first, above the size. */}
                   <ToolButtonGroup
+                    aria-label="Arrow style"
                     stacked
                     options={ARROW_STYLES}
                     value={settings.arrowStyle ?? "single"}

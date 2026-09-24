@@ -40,6 +40,7 @@ export function StabilizerRow({ value, onChange, label = "Stroke Stabilizer" }: 
     <div className="space-y-2">
       <label className="text-2xs text-theme-muted-foreground">{label}</label>
       <ToolButtonGroup
+        aria-label={label}
         options={STABILIZER_LEVELS}
         value={value ?? "off"}
         onChange={(id) => onChange(id as Level)}

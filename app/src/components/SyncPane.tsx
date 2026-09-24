@@ -33,7 +33,7 @@
 //    back, and an older unsent change is dropped rather than resurrecting
 //    them. Only a change made after the forget — or the Send button — brings
 //    a document back.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { Check, CloudOff, RefreshCw, TriangleAlert, Laptop, Upload } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -139,6 +139,7 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
   // One clock for the line, in state rather than read during render — a render
   // that reads `Date.now()` is impure and the compiler lint fails on it
   // (ADR-020). A minute is the formatter's finest unit, so that is the tick.
+  const syncHeadingId = useId();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -161,7 +162,7 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <PaneHeading title="Sync">
+        <PaneHeading id={syncHeadingId} title="Sync">
           Settings, the panels you left open and the tool modes you were in,
           kept the same on every device you sign in on. Your photos are not
           included — they stay in this browser, on this device, as they always
@@ -173,6 +174,8 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
           <>
             <ToggleButtonGroup
               fill
+              mode="select"
+              aria-labelledby={syncHeadingId}
               items={[
                 {
                   key: "on",

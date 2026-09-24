@@ -271,6 +271,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               <>
                 {/* Mode: Gaussian blur / Pixelate / Solid redaction */}
                 <ToolButtonGroup
+                  aria-label="Blur mode"
                   columns={3}
                   options={BLUR_MODES}
                   value={settings.blurMode ?? "gaussian"}
@@ -356,6 +357,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     Background
                   </label>
                   <ToolButtonGroup
+                    aria-label="Background"
                     options={[
                       { id: "none", label: "None" },
                       { id: "solid", label: "Solid" },
