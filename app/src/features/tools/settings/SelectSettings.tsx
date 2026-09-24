@@ -46,6 +46,10 @@ import {
   Magnet,
   CopyPlus,
   Scissors,
+  Square,
+  SquaresUnite,
+  SquaresSubtract,
+  SquaresIntersect,
 } from "lucide-react";
 import {
   PanelAction,
@@ -58,7 +62,10 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
-import { isMarqueeKind } from "@/stores/useToolStore";
+import { isMarqueeKind, useToolStore } from "@/stores/useToolStore";
+import type { SelectionCombineMode } from "@/lib/selectionBool";
+import { describeCoverage } from "@/lib/selectionCoverage";
+import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
 import { PANEL_SECTION } from "@/lib/styles";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
@@ -133,6 +140,25 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
   },
 ];
 
+type CombineId = "new" | "add" | "subtract" | "intersect";
+const COMBINE_IDS: readonly CombineId[] = ["new", "add", "subtract", "intersect"];
+const COMBINE_OPTIONS = [
+  { id: "new", label: "New", icon: Square, title: "Each selection replaces the last" },
+  { id: "add", label: "Add", icon: SquaresUnite, title: "Add to the selection (or hold Shift)" },
+  {
+    id: "subtract",
+    label: "Subtract",
+    icon: SquaresSubtract,
+    title: "Take away from the selection (or hold Alt)",
+  },
+  {
+    id: "intersect",
+    label: "Intersect",
+    icon: SquaresIntersect,
+    title: "Keep only where the two overlap",
+  },
+] as const;
+
 /** SELECT_MODES with the panel-level how-to appended to every lightbulb (the
  *  instructions that used to live in the old "Selection Tool" header). Built
  *  once at module scope; the palette keeps consuming the pure strings above. */
@@ -160,6 +186,9 @@ export function SelectSettings({
   selection: SelectionControls;
 }) {
   const patchmatch = isPatchmatchEnabled();
+  const combine = useToolStore((s) => s.selectionCombine);
+  const setCombine = useToolStore((s) => s.setSelectionCombine);
+  const coverage = useToolStore((s) => s.selectionCoverage);
 
   return (
     <div className="space-y-4">
@@ -175,35 +204,84 @@ export function SelectSettings({
         onModeChange={selection.onKindChange}
         disabled={disabled}
       >
-        {(kind) => (
-          <>
-            {/* Tolerance drives the flood/color-match kinds only. The marquee
-                kinds sweep pure geometry, so it is hidden for them rather than
-                shown disabled — same rule as Edge sensitivity below. */}
-            {!isMarqueeKind(kind) && (
-              <SizeSlider
-                label="Tolerance"
-                value={selection.tolerance}
-                min={0}
-                max={120}
-                onChange={selection.onToleranceChange}
-              />
-            )}
-            {/* Only meaningful for the edge-aware wand — hidden otherwise
-                rather than shown disabled, so the panel doesn't grow dead
-                controls. */}
-            {kind === "edge" && (
-              <SizeSlider
-                label="Edge sensitivity"
-                value={selection.edgeThreshold}
-                min={10}
-                max={255}
-                onChange={selection.onEdgeThresholdChange}
-              />
-            )}
-          </>
-        )}
+        {(kind) => {
+          // Both sliders are ALWAYS here; a mode that doesn't use one shows it
+          // disabled with the reason underneath. They used to be hidden, which
+          // made the panel change height on every mode switch.
+          const tolReason = toleranceReason(kind);
+          const edgeReason = edgeSensitivityReason(kind);
+          return (
+            <>
+              {/* Live: moving it re-runs the last click from the same seed
+                  (useSelectionActions → selection_retune), so you watch the
+                  sky come in before the building does. */}
+              <div>
+                <SizeSlider
+                  label="Tolerance"
+                  value={selection.tolerance}
+                  min={0}
+                  max={120}
+                  onChange={selection.onToleranceChange}
+                  disabled={disabled || tolReason !== null}
+                />
+                {tolReason && (
+                  <p className="mt-1 text-2xs text-theme-muted-foreground">{tolReason}</p>
+                )}
+              </div>
+              <div>
+                <SizeSlider
+                  label="Edge sensitivity"
+                  value={selection.edgeThreshold}
+                  min={10}
+                  max={255}
+                  onChange={selection.onEdgeThresholdChange}
+                  disabled={disabled || edgeReason !== null}
+                />
+                {edgeReason && (
+                  <p className="mt-1 text-2xs text-theme-muted-foreground">{edgeReason}</p>
+                )}
+              </div>
+            </>
+          );
+        }}
       </ToolModeToggle>
+
+      {/* ── How much is selected ──────────────────────────────────────────
+          Outside the mode body so it does not re-animate on a mode switch.
+          Always present — "Nothing selected" rather than an absent line — so
+          a click that misses reads as a miss, not as nothing happening. The
+          status bar shows the same number, and only while it is non-zero. */}
+      <p
+        className="text-xs tabular-nums text-theme-muted-foreground"
+        aria-live="polite"
+        data-testid="selection-coverage"
+      >
+        {coverage ? describeCoverage(coverage) : "Nothing selected"}
+      </p>
+
+      {/* ── How the next selection combines ──────────────────────────────
+          The standing choice; Shift (add) and Alt (subtract) still override
+          it for one gesture. Applies to every mode, the lasso and marquees
+          included, so it sits outside the mode body. */}
+      <div className={PANEL_SECTION}>
+        <SectionHeader
+          title="Combine"
+          info={
+            <>
+              How the next selection meets the one you have. Holding{" "}
+              <kbd>Shift</kbd> adds and <kbd>Alt</kbd> subtracts for one
+              click, whatever is chosen here.
+            </>
+          }
+        />
+        <ToolButtonGroup<CombineId>
+          columns={2}
+          disabled={disabled}
+          value={COMBINE_IDS[combine]}
+          onChange={(id) => setCombine(COMBINE_IDS.indexOf(id) as SelectionCombineMode)}
+          options={COMBINE_OPTIONS}
+        />
+      </div>
 
       {/* ── Act on the selection: one title + bulb over all five actions ──
           Two 3-column rows out of a single 5-item grid (All/Deselect/Delete,

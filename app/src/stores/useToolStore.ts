@@ -6,6 +6,8 @@
 // existing functional-updater call sites (e.g. `setMoveActive((m) => !m)`,
 // `setToolSettings((p) => ({ ...p, brushSize }))`) migrate untouched.
 import { create } from "zustand";
+import type { SelectionCombineMode } from "@/lib/selectionBool";
+import type { SelectionCoverage } from "@/lib/selectionCoverage";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
@@ -204,6 +206,17 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
+  /** How the next selection combines with the current one — the Select
+   *  panel's Combine group (New / Add / Subtract / Intersect). Shift and Alt
+   *  still override it for one gesture. NOT PERSISTED (outside `partialize`):
+   *  a session-scoped choice, and a reload that came back in Subtract would
+   *  make the first click look broken. No IndexedDB change. */
+  selectionCombine: SelectionCombineMode;
+  /** `[selected, total]` pixels of the live selection, from the engine's
+   *  `selection_coverage` — the "Selected 18.4% · 2.1 MP" readout in the
+   *  panel and the status bar. `null` until the engine has answered, and
+   *  whenever nothing is selected. NOT PERSISTED. */
+  selectionCoverage: SelectionCoverage | null;
   /** AI › Object Removal is painting its mask ON the canvas right now.
    *
    *  This replaced a portal-mounted popup that painted on its own private
@@ -265,6 +278,8 @@ export interface ToolState {
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  setSelectionCombine: (v: SetArg<SelectionCombineMode>) => void;
+  setSelectionCoverage: (v: SelectionCoverage | null) => void;
   /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
    *  the mask describes one object on one image, so carrying it into the next
    *  visit to the panel could only ever remove the wrong thing. */
@@ -356,6 +371,8 @@ export const useToolStore = create<ToolState>()(
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
+      selectionCombine: 0,
+      selectionCoverage: null,
       objectRemovalMasking: false,
       cropSelectionActive: false,
       objectRemovalStrokes: [],
@@ -436,6 +453,9 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setSelectionCombine: (v) =>
+        set((s) => ({ selectionCombine: resolveSet(v, s.selectionCombine) })),
+      setSelectionCoverage: (v) => set({ selectionCoverage: v }),
       setObjectRemovalMasking: (v) =>
         set((s) => {
           const next = resolveSet(v, s.objectRemovalMasking);
