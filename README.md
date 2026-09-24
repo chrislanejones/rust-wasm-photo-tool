@@ -85,27 +85,25 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.95 — 2026-09-24
+### v8.96 — 2026-09-24
 
-**The whole marketing site is redrawn.**
+**Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.**
 
-Every page is rebuilt to the new design: Home, Pricing, Features, Trail Log,
-Blog and its posts, About, Contact, Architecture, Privacy, Terms, the footer,
-and the ten tool pages. The light boards arrive with it — the register-like
-blocks that sit on the dark page for the feature grid, the pricing matrix,
-what runs where, and what's coming.
+The WEBGPU word on the home page is built from 103 lit cubes now. Hover to
+ripple them, drag to scatter them, press any key to knock them loose. The line
+underneath says what your machine actually drew them with: WebGPU, WebGL 2, or
+nothing at all.
 
-The screenshots on the home page carry their callouts again: numbered pins on
-Presets, the Original/Edited split, Compress All, the magic wand, the Stroke
-Stabilizer and History. On a phone the pins stay on the picture and the notes
-read as a list underneath.
+A low-poly horse trots beside "Your pictures, your computer." at the foot of
+the home page, on computers with a mouse. A phone never downloads it. Neither
+graphic costs the first page load: three.js arrives only when one of them
+comes near the screen.
 
-Every page has its own share card now, 21 of them. Before, five did.
+"Being built now" sits between the cubes and the blog: the five things in
+progress, with a Beta badge on the two you can already switch on.
 
-Two things the redesign turned up and fixed: the architecture page was
-describing 8 of the 14 database tables that actually exist and had the op-log
-format a version behind, and it now lists all 14 field for field, saying
-plainly which five nothing uses any more.
+Home is in the menu bar. On a phone the menu opens with Home, Contact and
+Pricing in a group of their own, the same cards as Tools and Learn.
 
 Engine unchanged at 814,432 bytes.
 

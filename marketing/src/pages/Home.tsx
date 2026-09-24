@@ -7,9 +7,17 @@ import CubeLetters from "../components/CubeLetters";
 import { CpuIcon, ListIcon, ServerIcon } from "../components/Icons";
 import { SHOTS } from "../data/shots";
 import { POSTS, fmtPostDate, postPath } from "../data/posts";
+import { GROUPS } from "../data/comingSoon";
 import { EDITOR_URL, GITHUB_URL, external } from "../config";
 
 type Where = "all" | "local" | "server";
+
+/* "Being built now", straight from the /coming-soon register. Beta entries
+ * first: they are the ones you can switch on today, and the GPU blur — the
+ * row directly above — is one of them. */
+const BUILDING = [...(GROUPS.find((g) => g.key === "building")?.items ?? [])].sort(
+  (a, b) => Number(!!b.beta) - Number(!!a.beta),
+);
 
 interface Op {
   op: React.ReactNode;
@@ -291,11 +299,51 @@ export default function Home() {
               pixel for pixel against the current engine. When it lands, nothing about your workflow
               changes. It just finishes sooner.
             </p>
-            <p className="gpu__hint">The letters are live. Drag them, or press a key.</p>
+            <p className="gpu__hint">The letters are live. Hover to ripple them, drag to scatter, or press a key.</p>
           </div>
 
           <CubeLetters />
         </section>
+
+        {/* ── Cream ── Between the two dark rows on purpose: GPU → blog was two
+            dark slabs split by a hairline and read as one long block. This is
+            also where the GPU row's "not switched on yet" leads. */}
+        {BUILDING.length > 0 && (
+          <section className="board board--cream building" id="building" aria-labelledby="building-title">
+            <header className="board__head">
+              <h2 id="building-title" className="board__title">
+                Being built now.
+              </h2>
+              <p className="board__deck">
+                Real work, already in the repo. The ones marked Beta are in the editor behind a flag
+                &mdash; switch them on in Settings &rsaquo; Beta features.
+              </p>
+            </header>
+
+            <ul className="soon-cards">
+              {BUILDING.map((f) => (
+                <li className="soon-card" key={f.name}>
+                  {f.beta && (
+                    <div className="soon-card__top">
+                      <span className="building__badge">Beta</span>
+                      <a className="soon-card__beta" href={EDITOR_URL} {...external}>
+                        try it &rarr;
+                      </a>
+                    </div>
+                  )}
+                  <h3 className="soon-card__name">{f.name}</h3>
+                  {f.body && <p className="soon-card__body">{f.body}</p>}
+                </li>
+              ))}
+            </ul>
+
+            <p className="building__more">
+              <Link to="/coming-soon">
+                Everything that&rsquo;s coming, and how sure we are <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </p>
+          </section>
+        )}
 
         {/* Text only, deliberately. The v2 design put each post's share card
             above it, which made the section the heaviest thing on the page and
@@ -361,7 +409,7 @@ export default function Home() {
         </section>
       </main>
 
-      <Footer line="Your pictures, your computer. The cloud only when you ask." />
+      <Footer line="Your pictures, your computer. The cloud only when you ask." horse />
     </>
   );
 }

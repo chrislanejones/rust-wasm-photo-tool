@@ -24,6 +24,42 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.96",
+    date: "2026-09-24",
+    headline:
+      "Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "The WEBGPU word on the home page is 103 lit cubes now. Hover to ripple them, drag to scatter them, press any key to knock them loose. The line under it says what your machine actually drew them with: WebGPU, WebGL 2, or nothing.",
+      },
+      {
+        tag: "feature",
+        text: "A low-poly horse trots beside \"Your pictures, your computer.\" at the foot of the home page, on computers with a mouse. A phone never downloads it.",
+      },
+      {
+        tag: "perf",
+        text: "Neither graphic costs the first page load. three.js arrives only when the cubes or the horse come near the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"Being built now\" sits between the cubes and the blog: the five things in progress, with a Beta badge on the two you can already switch on.",
+      },
+      {
+        tag: "ui",
+        text: "Home is in the menu bar. On a phone the menu opens with Home, Contact and Pricing as a group of their own, instead of a tall card that pushed Contact off the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"More coming\" in the Tools menu is a real card instead of faint text in an empty box, and the ⌘K button lost its stray white ring.",
+      },
+      {
+        tag: "infra",
+        text: "The contact form can send straight to the inbox once a form key is set. Until then it opens your mail app, as it always has.",
+      },
+    ],
+  },
+  {
     version: "v8.95",
     date: "2026-09-24",
     headline:

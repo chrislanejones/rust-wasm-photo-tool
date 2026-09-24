@@ -1,5 +1,5 @@
 import Footer from "../components/Footer";
-import { EDITOR_URL, GITHUB_URL, external } from "../config";
+import { EDITOR_URL, GITHUB_URL, WEB3FORMS_KEY, external } from "../config";
 
 /* /privacy-policy — what leaves your machine, named one thing at a time.
  *
@@ -101,6 +101,18 @@ export default function PrivacyPolicy() {
               and without identifying you.
             </p>
           </section>
+
+          {WEB3FORMS_KEY && (
+            <section className="legal-board__section">
+              <h2>The contact form</h2>
+              <p>
+                Messages sent from the contact form go through Web3Forms, a form relay, which
+                emails them to one inbox. It receives what you type into the form, including your
+                name and email address if you give them. Nothing from the form is stored on this
+                site.
+              </p>
+            </section>
+          )}
 
           <section className="legal-board__section">
             <h2>Accounts</h2>

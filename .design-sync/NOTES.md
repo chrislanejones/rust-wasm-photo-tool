@@ -37,3 +37,13 @@
   called it a bad tagline on 09-24, and it's now "Free where it runs on your
   machine. Paid where it runs on ours." The mockup still has the old line.
   Fix it there too, or a re-port will bring it back.
+- **09-24-2026: the first sync was started, then PAUSED before any project was
+  created.** Chris redirected to implementing `Home bottom section.dc.html` from
+  design project `054e87bd-f08f-4efa-88cf-0682bc08af31` (three.js WEBGPU cubes +
+  trotting horse in the footer). Re-run the sync only after that work is
+  committed, because it changes `CubeLetters`, `Footer`, `footer.css` and the nav.
+  No `projectId` is pinned yet, so the next run is still a first-time import.
+- **Three.js now lives on the home page, lazily.** `components/*.three.ts` are
+  chunk boundaries importing from `three/webgpu` (three 0.170.0). A design that
+  uses `<gpu-letters>` or `<horse-trot>` maps to `CubeLetters` and
+  `<Footer horse />`, not to a custom element.
