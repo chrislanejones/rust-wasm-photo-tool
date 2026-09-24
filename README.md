@@ -85,23 +85,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.94 — 2026-09-24
+### v8.95 — 2026-09-24
 
-**The ten tools in the new menu have pages now.**
+**The whole marketing site is redrawn.**
 
-Last release added a Tools menu that linked to ten paths — `/photo-editor`,
-`/blur-image`, eight more. None of them had a page behind it, so every one
-returned a hard 404, which on this host is a blank white page. They are real
-pages now: what each tool does, whether it runs on your machine or needs a
-server, and where to go next.
+Every page is rebuilt to the new design: Home, Pricing, Features, Trail Log,
+Blog and its posts, About, Contact, Architecture, Privacy, Terms, the footer,
+and the ten tool pages. The light boards arrive with it — the register-like
+blocks that sit on the dark page for the feature grid, the pricing matrix,
+what runs where, and what's coming.
 
-Two things had to be wrong at once for that to ship. The paths had no routes,
-and the menu used plain anchors rather than router links — so each click was a
-full page load that reached the host instead of the router, and the site's own
-404 page never got a chance to answer.
+The screenshots on the home page carry their callouts again: numbered pins on
+Presets, the Original/Edited split, Compress All, the magic wand, the Stroke
+Stabilizer and History. On a phone the pins stay on the picture and the notes
+read as a list underneath.
 
-Also new: **What's coming**, sixteen entries in three states — being built,
-decided, thinking about it. No dates.
+Every page has its own share card now, 21 of them. Before, five did.
+
+Two things the redesign turned up and fixed: the architecture page was
+describing 8 of the 14 database tables that actually exist and had the op-log
+format a version behind, and it now lists all 14 field for field, saying
+plainly which five nothing uses any more.
 
 Engine unchanged at 814,432 bytes.
 

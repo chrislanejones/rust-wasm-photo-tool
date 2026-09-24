@@ -13,6 +13,11 @@
  */
 
 import { POSTS, postPath, type Post } from "./data/posts";
+import { FEATURES } from "./data/features";
+
+/** Counted, not typed: the feature list is generated from docs/Features.md, so a
+ *  number written into a description goes stale the next time a feature lands. */
+const FEATURE_COUNT = FEATURES.reduce((n, g) => n + g.items.length, 0);
 
 /** Canonical origin. No trailing slash — every helper here joins paths onto it,
  *  and a doubled slash is a different URL to a crawler than the one we claim. */
@@ -96,23 +101,19 @@ export const ROUTES: readonly Route[] = [
   {
     to: "/blog",
     label: "Blog",
-    title: "Blog — how Image Horse is built, in detail",
+    title: "The changelog says what. This says why.",
     description:
       "Long-form notes on how Image Horse is built: what shipped, what it cost, and the measurements behind each decision. No roadmaps, no announcements.",
-    // No `ogImage` yet, so this falls back to /og/default.png, which exists.
-    // scripts/gen-og-images.mjs derives its filename from `to`, so running
-    // `pnpm gen:og` writes public/og/blog.png — point this at it once that
-    // file is committed. A route claiming a card that is not in the repo
-    // unfurls as a broken image, which is worse than the generic one.
+    ogImage: "/og/blog.png",
     sources: ["marketing/src/pages/Blog.tsx", "marketing/src/data/posts.ts"],
     ogType: "website",
   },
   {
     to: "/features",
     label: "Features",
-    title: "Features — every tool in the Image Horse photo editor",
+    title: "Features — everything the Image Horse editor does",
     description:
-      "Clone stamp, crop, layers, Bézier pen, text, shapes, background removal, OCR, batch rename and PNG/JPEG/WebP/AVIF export — the full list, searchable.",
+      `All ${FEATURE_COUNT} features of a photo editor that runs in your browser: annotate, select, enhance, export. A plain line for each, and the engineering line underneath.`,
     ogImage: "/og/features.png",
     sources: ["marketing/src/pages/Features.tsx", "marketing/src/data/features.ts"],
   },
@@ -131,23 +132,22 @@ export const ROUTES: readonly Route[] = [
     title: "About Image Horse — the developer, and the horse",
     description:
       "Image Horse is built by Chris Lane Jones, a web developer in Jacksonville, Florida. This is who works on it, and the horse it is named after.",
-    // No `ogImage` yet, for the same reason /blog has none: gen-og-images.mjs
-    // derives the filename from `to`, so `pnpm gen:og` writes
-    // public/og/about.png — point this at it once that file is committed.
+    ogImage: "/og/about.png",
     sources: ["marketing/src/pages/About.tsx", "marketing/src/data/people.ts"],
   },
   {
     to: "/trail-log",
     label: "Trail Log",
-    title: "Trail Log — every Image Horse release, dated",
+    title: "Trail Log — every Image Horse release, in the open",
     description:
-      "The full changelog: what shipped, when, and how much of it. Commit graphs per month, release notes per version, filterable by feature, fix, perf and infra.",
+      "Every Image Horse release, newest first: what shipped, when, and the commits behind it. Pick a month to see its commit graph and highlights, or read it all.",
     ogImage: "/og/trail-log.png",
     sources: ["marketing/src/data/releases.ts", "marketing/src/pages/Trail.tsx"],
     ogType: "article",
   },
   {
     to: "/contact",
+    ogImage: "/og/contact.png",
     label: "Contact",
     title: "Contact Image Horse — email, bugs and security",
     description:
@@ -157,6 +157,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/privacy-policy",
+    ogImage: "/og/privacy-policy.png",
     label: "Privacy Policy",
     title: "Privacy Policy — Image Horse",
     description:
@@ -166,6 +167,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/terms-of-service",
+    ogImage: "/og/terms-of-service.png",
     label: "Terms of Service",
     title: "Terms of Service — Image Horse",
     description:
@@ -175,6 +177,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/coming-soon",
+    ogImage: "/og/coming-soon.png",
     label: "What's coming",
     title: "What's coming to Image Horse — building, decided, ideas",
     description:
@@ -183,6 +186,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/photo-editor",
+    ogImage: "/og/photo-editor.png",
     label: "Photo editor",
     title: "Free photo editor that runs in your browser — no upload",
     description:
@@ -192,6 +196,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/image-compressor",
+    ogImage: "/og/image-compressor.png",
     label: "Image compressor",
     title: "Image compressor — hit a target file size in your browser",
     description:
@@ -201,6 +206,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/background-remover",
+    ogImage: "/og/background-remover.png",
     label: "Background remover",
     title: "Background remover — cut out a subject cleanly",
     description:
@@ -210,6 +216,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/remove-object-from-photo",
+    ogImage: "/og/remove-object-from-photo.png",
     label: "Remove an object",
     title: "Remove an object from a photo — free, in your browser",
     description:
@@ -219,6 +226,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/annotate-image",
+    ogImage: "/og/annotate-image.png",
     label: "Annotate an image",
     title: "Annotate an image — arrows, boxes, pins and text",
     description:
@@ -228,6 +236,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/clone-stamp",
+    ogImage: "/og/clone-stamp.png",
     label: "Clone stamp",
     title: "Clone stamp tool — paint one part of a photo over another",
     description:
@@ -237,6 +246,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/pixelate-image",
+    ogImage: "/og/pixelate-image.png",
     label: "Pixelate an image",
     title: "Pixelate an image — block out a face or a password",
     description:
@@ -246,6 +256,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/blur-image",
+    ogImage: "/og/blur-image.png",
     label: "Blur an image",
     title: "Blur an image — soften a background or hide a detail",
     description:
@@ -255,6 +266,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/batch-image-editor",
+    ogImage: "/og/batch-image-editor.png",
     label: "Batch image editor",
     title: "Batch image editor — do one thing to a whole folder",
     description:
@@ -264,6 +276,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     to: "/image-editor-no-upload",
+    ogImage: "/og/image-editor-no-upload.png",
     label: "No-upload image editor",
     title: "Image editor with no upload — everything stays on your machine",
     description:

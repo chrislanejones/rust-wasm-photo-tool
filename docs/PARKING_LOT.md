@@ -3359,3 +3359,28 @@ pass of its own, not a rider on a feature.
 **Do it when** the WCAG sweep happens, or the next time a pane is built around
 "which one is on" — the second occurrence is the signal. The fix belongs in
 `app/src/components/ui/toggle-button-group.tsx`, one place.
+
+## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+The v2 port moved every marketing page onto its own stylesheet
+(`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
+`legal.css`, `contact.css`, `architecture.css`, `blog-post.css`, `footer.css`,
+`shot-annotations.css`). Each page's old rules are still sitting in
+`styles.css`, unreferenced — roughly: `.fx*` (Features' old rail and list),
+`.person*` / `.people` (About), `.foot-stmt*` (the old footer, ~22 lines),
+`.tool-head*` / `.tool-badge*` / `.tool-does` / `.tool-related*` (the first
+tool-page pass), and Trail's `.ach*`, `.month__*`, `.graph*`, `.year*`,
+`.release*`, plus Architecture's `.map*`, `.plane__*`, `.stack*`, `.tbl*`,
+`.rels*`, `.coda*`, `.seg*`.
+
+**Why it is parked, not done:** the redesign was already one large diff, and a
+CSS delete that removes one selector too many fails silently — the page still
+renders, just wrong, and no gate catches it. `styles.css` is also still shared
+by the pages that were NOT reskinned, so "unused by the page I ported" is not
+the same as "unused".
+
+**Do it when** there is a session for it. Method: build, then for each candidate
+class grep all of `marketing/src` (tsx AND the other css files, since one
+stylesheet can reference another's class), delete only the ones with zero hits
+outside `styles.css`, and pixel-diff every route before and after with the
+harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.

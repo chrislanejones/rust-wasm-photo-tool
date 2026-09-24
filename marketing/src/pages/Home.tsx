@@ -17,33 +17,66 @@ interface Op {
   detail: React.ReactNode;
 }
 
+/* Every operation, and the machine it runs on.
+ *
+ * The table is the page's proof, not its decoration: "your photos stay on your
+ * computer" is a claim every editor makes, and this is the row-by-row version
+ * that can be checked. The two server rows stay in it for the same reason —
+ * a list of only the flattering half is an advertisement. */
 const OPS: Op[] = [
-  { op: "Crop, filters, transforms", where: "local", detail: "Rust → WASM, SIMD128 kernels" },
-  { op: "Layers, annotations, Bézier pen", where: "local", detail: "Real layer stacks, per-layer opacity" },
-  { op: "Encode PNG · JPEG · WebP · AVIF", where: "local", detail: "Resize and re-compress in one round-trip" },
+  { op: "Crop, resize, filters, presets", where: "local", detail: "Your processor does the maths, in the page" },
+  { op: "Arrows, pins, text, blur and redaction", where: "local", detail: "Real layers, so you can move or undo any of it" },
+  { op: "Shrinking to PNG · JPEG · WebP · AVIF", where: "local", detail: "Resize and compress in one step" },
   {
-    op: "Originals and edit history",
+    op: "Your originals and edit history",
     where: "local",
     detail: (
       <>
-        IndexedDB, undo to <span className="fig">1000</span> steps
+        Kept in this browser, undo to <span className="fig">1000</span> steps
       </>
     ),
   },
-  { op: "Camera metadata", where: "local", detail: "Keep it, strip it, or drop GPS only" },
+  { op: "Camera data (location, device)", where: "local", detail: "Keep it, strip it, or drop just the GPS" },
   {
-    op: "Background removal, object removal, OCR",
+    op: "Remove background, remove object, read text",
     where: "server",
-    detail: "rembg · LaMa · Convex → Replicate",
+    detail: "AI models that don't fit in a browser — sign in first",
   },
-  { op: "Cloud sync and share links", where: "server", detail: "Optional — the demo never uploads" },
+  { op: "Sync and share links", where: "server", detail: "Optional — the free editor never uploads" },
 ];
 
 const FILTERS = [
-  { key: "all", label: "All operations", Icon: ListIcon },
-  { key: "local", label: "Your machine", Icon: CpuIcon },
-  { key: "server", label: "Server, signed in", Icon: ServerIcon },
+  { key: "all", label: "Everything", Icon: ListIcon },
+  { key: "local", label: "Your computer", Icon: CpuIcon },
+  { key: "server", label: "A server, signed in", Icon: ServerIcon },
 ] as const;
+
+/* The three people the five-minute picture job keeps landing on. Numbered
+ * rather than iconed: these are audiences, and an icon for "you run a shop"
+ * is a stock illustration pretending to be information. */
+const AUDIENCES = [
+  {
+    n: "01",
+    who: "You've got a screenshot",
+    title: "Circle the bug, blur the email, paste it in Slack.",
+    body: "Arrows, boxes, numbered pins and text bubbles in the tool rail. Black-box or pixelate anything that shouldn't be in there. Thirty seconds, nothing to install.",
+    tags: ["Arrows", "Callout pins", "Redaction", "Crop"],
+  },
+  {
+    n: "02",
+    who: "You run a shop or a brand",
+    title: "Forty product photos, one pass.",
+    body: "Resize and compress a whole folder at once, stamp your logo on every frame, rename the files by what's actually in them, and export to WebP or AVIF for a faster page.",
+    tags: ["Batch resize", "Logo stamp", "Twelve presets", "WebP · AVIF"],
+  },
+  {
+    n: "03",
+    who: "You'd rather not upload it",
+    title: "Passport scans. Medical images. The kids.",
+    body: "The editing happens on your computer, inside the tab. Once the page has loaded, the network is optional — pull the plug mid-edit and nothing stops.",
+    tags: ["Strip GPS", "Works offline", "Saved in this browser"],
+  },
+];
 
 const CAPTION_BASE = "Every operation, and the machine it runs on.";
 
@@ -57,8 +90,8 @@ export default function Home() {
     where === "all"
       ? CAPTION_BASE
       : where === "local"
-        ? `${shown.length} of ${OPS.length} operations run on your own machine.`
-        : `${shown.length} of ${OPS.length} operations reach a server, and only once you sign in.`;
+        ? `${shown.length} of ${OPS.length} things happen on your own computer.`
+        : `${shown.length} of ${OPS.length} things reach a server — and only once you sign in.`;
 
   // Cursor spotlight — scoped to the hero, never page-wide, and only where
   // there's a real pointer to follow.
@@ -71,192 +104,212 @@ export default function Home() {
 
   return (
     <>
-      <main id="main">
-        {/* The price and the friction are marked with a highlighter band rather
-            than a gradient or an italic — both are tired tells. The marker is
-            also this product's own vocabulary: it's an annotation tool.
-            The headline sells price, place and friction, not the engine: Rust
-            and WASM mean nothing to anyone outside this trade, and "runs on your
-            machine" is a precision claim rather than a selling one — a reader
-            who has never heard of local-first doesn't know the alternative is
-            uploading their photos, so it reads as a shrug. That claim stays
-            below, beside the table that proves it row by row. Every word here
-            is copy this site already ships: the Demo tier is $0 / forever with
-            no signup, and the closing CTA says "No account, no upload." */}
+      <main id="main" className="home">
+        {/* The headline sells the four things people actually come here to do,
+            in the order they do them, and the highlighter band lands on the
+            one that is hardest to do elsewhere without uploading. The marker
+            is this product's own vocabulary: it is an annotation tool. */}
         <header className="hero" id="hero" onPointerMove={spotlight}>
           <div className="hero__spotlight" aria-hidden="true" />
-          <h1 className="hero__display hero__display--long">
-            Crop it, compress it, annotate it, gallop. <mark className="mark">Free</mark> in your
-            browser. <mark className="mark">No account</mark>.
-          </h1>
 
-          {/* A real browser capture, not a redrawn frame — and it happens to show
-              the "annotate it" beat in the headline actually happening: a photo
-              marked up in the tab, nothing uploaded. It's still the LCP and it
-              still loads eagerly; the rail underneath it only ever reaches for
-              an older frame once someone drags it. See ShotTimeline for what
-              that costs (nothing, until it's asked for) and src/data/shots.ts
-              for where each older frame was recovered from. */}
-          <ShotTimeline shots={SHOTS} />
-        </header>
-
-        <hr className="rule-thick" />
-
-        <section className="runs" id="runs">
-          <header className="head-hang">
-            {/* The claim sits here rather than in the hero so it lands with its
-                receipts attached: the lede qualifies it in the next breath and
-                the table proves it line by line. */}
-            <h2 className="section__title">Nothing leaves your tab by accident.</h2>
-            <p className="lede">
-              Image Horse is a Rust engine compiled to WebAssembly. Editing happens on your own CPU,
-              in the page, on every tier — including the free demo. Some things do reach a server.
-              This table is where we say exactly which, so the choice is yours to make rather than
-              ours to bury.
-            </p>
-          </header>
-
-          {/* Filters the table rather than dimming it: this is a lookup, not an
-              argument about what's still there. */}
-          <div className="graph__scroll spec__filter">
-            <div className="graph__group" role="group" aria-label="Filter operations by where they run">
-              {FILTERS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  className="seg seg--where"
-                  type="button"
-                  aria-pressed={where === key}
-                  onClick={() => setWhere(key)}
-                >
-                  <Icon className="seg__icon" />
-                  <span className="seg__label">{label}</span>
-                </button>
-              ))}
+          <div className="hero__grid">
+            <div className="hero__lead">
+              <p className="hero__eyebrow">Free image editor · runs in your browser</p>
+              <h1 className="hero__display">
+                Circle it. Crop it. <mark className="mark">Shrink it.</mark> Send it.
+              </h1>
+            </div>
+            <div className="hero__aside">
+              <p className="hero__deck">
+                The quick way to mark up a screenshot, blur out what shouldn&rsquo;t be there, and
+                get forty photos down to size &mdash; no account, and your pictures never leave this
+                tab.
+              </p>
+              <div className="hero__actions">
+                <a className="cta cta--fill" href={EDITOR_URL} {...external}>
+                  Open an image
+                </a>
+                <a className="cta cta--outline" href="#made-for">
+                  What can it do?
+                </a>
+              </div>
+              <p className="hero__trust">
+                <span>$0, forever</span>
+                <span>No signup</span>
+                <span>Works offline</span>
+                <span>Nothing uploads</span>
+              </p>
             </div>
           </div>
 
-          <table className="spec">
-            <caption className="spec__caption">{caption}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Operation</th>
-                <th scope="col">Runs on</th>
-                <th scope="col">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((o, i) => (
-                <tr key={i}>
-                  <th scope="row">{o.op}</th>
-                  <td>
-                    <span className={`tag tag--${o.where}`}>
-                      {o.where === "local" ? "Your machine" : "Server, signed in"}
-                    </span>
-                  </td>
-                  <td className="muted">{o.detail}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* A real browser capture, not a redrawn frame. It is still the LCP
+              and still loads eagerly; the rail underneath only reaches for an
+              older frame once someone drags it. */}
+          <ShotTimeline shots={SHOTS} />
+        </header>
 
-          <p className="runs__note">
-            The engine is roughly <span className="fig">350&nbsp;KB</span> gzipped. After it lands, the
-            tab does the work.
-          </p>
+        {/* ── Cream ── Who it is for, before what it contains. */}
+        <section className="board board--cream" id="made-for">
+          <header className="board__head">
+            <h2 className="board__title">Made for the jobs in between.</h2>
+            <p className="board__deck">
+              Not a darkroom. Not a design suite. Image Horse is for the five-minute picture job
+              that keeps landing on your desk &mdash; and three people it keeps landing on.
+            </p>
+          </header>
+
+          <ol className="made">
+            {AUDIENCES.map((a) => (
+              <li className="made__item" key={a.n}>
+                <span className="made__eyebrow">
+                  {a.n} &mdash; {a.who}
+                </span>
+                <h3 className="made__title">{a.title}</h3>
+                <p className="made__body">{a.body}</p>
+                <div className="made__tags">
+                  {a.tags.map((t) => (
+                    <span className="made__tag" key={t}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
 
-        {/* The tool run, deliberately a dense typographic list not an icon grid —
-            with the tile set beside it, so the words have faces.
-
-            The set was an 832x859 WebP of the editor's toolbar until 09-16.
-            It is twelve real tiles now, named, in the editor's own glyph-over-
-            label shape: a picture of an interface asks to be taken on trust,
-            and these can be pressed. They select and nothing else — see the
-            note in ButtonSet.tsx for why "Apply" did not survive the change
-            and Download did not survive the names. */}
+        {/* The tool run, beside tiles that can actually be pressed. A picture
+            of an interface asks to be taken on trust; these do not. */}
         <section className="editor" id="editor">
           <div className="editor__shot">
             <ButtonSet />
           </div>
           <div className="editor__text">
-            <h2 className="section__title section__title--sm">In the editor</h2>
+            <h2 className="section__title section__title--sm">
+              Every tool you&rsquo;d reach for. None you&rsquo;d have to learn.
+            </h2>
             <p className="editor__run">
-              Brightness · Contrast · Levels · Twelve presets · Blur · Crop · Perspective and skew ·
-              Align · Magic-wand select · Live histogram · Stroke stabilizer · Rectangles · Ellipses
-              · Arrows · Bézier pen with fill · Callout pins · Text in three typefaces, with drop
-              shadows · Emoji · Blur, pixelate and black-box redaction · Magic eraser · Layer masks
-              · Eraser · Rulers and grids · Batch logo stamping · Grid mosaic gallery · OpenRaster
-              export · Light, dark and system themes
+              Crop · Resize · Brightness and contrast · Twelve presets · Blur · Arrows, boxes and
+              pins · Text bubbles in three typefaces · Emoji · Blur, pixelate and black-box
+              redaction · Magic-wand select · Magic eraser · Layers · Undo to a thousand steps ·
+              Batch logo stamping · Export to PNG, JPEG, WebP or AVIF
             </p>
             <p className="lede editor__lede">
-              Everything above is free and local, and your edits are kept in this browser between
-              visits. Sign in only when you want a copy of them off this machine, share links, or
-              the AI passes — and the padlock in the UI tells you which is which before you click.
+              All of it is free and works offline. Your edits are kept in this browser between
+              visits; sign in only if you want them on another machine, a share link, or the AI
+              tools &mdash; the padlock in the rail tells you which is which.
             </p>
           </div>
         </section>
 
-        {/* The GPU row.
-            Sits between what the editor does and what the blog argues, because
-            it is neither: it is the one measurement on this page that has not
-            shipped yet.
+        {/* ── Cream ── The claim, with its receipts attached. */}
+        <section className="board board--cream" id="runs">
+          <header className="board__head">
+            <h2 className="board__title">Your photos stay on your computer.</h2>
+            <p className="board__deck">
+              Most online editors upload your picture the moment you open it. Image Horse does the
+              work inside the tab instead. A few features do need a server &mdash; this is exactly
+              which ones, so you never have to guess.
+            </p>
+          </header>
 
-            ⚠️ THE COPY HERE IS DELIBERATELY NOT "BLUR RUNS ON YOUR GPU". The
-            design this came from said exactly that, and the repository says
-            otherwise in its own words — featureFlags.ts calls the WebGPU flag
-            an opt-in that "attaches the GPU blur correctness harness. No pixel
-            in the app goes near the GPU yet", and ADR-030 is still a draft. A
-            home page selling a path no pixel takes is the font dropdown that
-            listed twelve families and rendered one (ADR-051), with a bigger
-            audience.
+          {/* Filters the table rather than dimming it: this is a lookup, not an
+              argument about what is still there. */}
+          <div className="runs__filter" role="group" aria-label="Filter operations by where they run">
+            {FILTERS.map(({ key, label, Icon }) => {
+              const n = key === "all" ? OPS.length : OPS.filter((o) => o.where === key).length;
+              return (
+                <button
+                  key={key}
+                  className={`runs__tile${where === key ? " is-on" : ""}`}
+                  type="button"
+                  aria-pressed={where === key}
+                  onClick={() => setWhere(key)}
+                >
+                  <Icon className="runs__tile-icon" />
+                  <span className="runs__tile-label">{label}</span>
+                  <span className="runs__tile-count">
+                    {n} {n === 1 ? "thing" : "things"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-            So the section sells the measurement, which is real and is better
-            than the vague claim anyway, and the cubes are the honest demo: they
-            ARE drawn by WebGPU when the machine has it, and the label under
-            them says which backend actually ran. */}
+          <div className="runs__scroll">
+            <table className="runs__table">
+              <caption className="runs__caption">{caption}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">What you&rsquo;re doing</th>
+                  <th scope="col">Where it happens</th>
+                  <th scope="col">In plain terms</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((o, i) => (
+                  <tr key={i}>
+                    <th scope="row">{o.op}</th>
+                    <td>
+                      <span className={`runs__tag runs__tag--${o.where}`}>
+                        {o.where === "local" ? "Your computer" : "A server, signed in"}
+                      </span>
+                    </td>
+                    <td className="runs__detail">{o.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="runs__note">
+            The whole editor is about <span className="fig">350&nbsp;KB</span> to download &mdash;
+            smaller than most of the photos you&rsquo;ll open in it. After that, your computer does
+            the work.
+          </p>
+        </section>
+
+        {/* The one measurement on this page that has not shipped yet.
+            ⚠️ The copy deliberately does NOT say "blur runs on your GPU". No
+            pixel in the app goes near the GPU yet — the flag attaches a
+            correctness harness and nothing more. The section sells the
+            measurement, which is real, and the cubes are the honest demo: they
+            ARE drawn by WebGPU where the machine has it. */}
         <section className="gpu" id="gpu" aria-labelledby="gpu-title">
           <div className="gpu__text">
             <h2 id="gpu-title" className="section__title section__title--sm">
-              Your GPU does this blur 17× faster.
+              And it&rsquo;s about to get 17× faster.
             </h2>
             <p className="lede">
-              Measured against the engine's own SIMD blur on real hardware, not estimated:{" "}
-              <span className="fig">5.3×</span> at 512 pixels, <span className="fig">17.6×</span> at
-              2048, and <span className="fig">53.8×</span> once the radius gets wide. There is no
-              crossover — the GPU wins on a single image.
+              We ran the same blur on your graphics card and on your processor. The card won every
+              time &mdash; <span className="fig">5.3×</span> on a small image,{" "}
+              <span className="fig">17.6×</span> at full size, <span className="fig">53.8×</span>{" "}
+              once the blur gets wide.
             </p>
             <p className="gpu__caveat">
-              None of it touches a pixel in the editor yet. It sits behind an opt-in flag while the
-              correctness harness runs, because the GPU library does not fit the engine's size
-              budget and the path has to live outside the WebAssembly boundary. When it lands it
-              will be the same picture, sooner.
+              It isn&rsquo;t switched on in the editor yet &mdash; it&rsquo;s still being checked
+              pixel for pixel against the current engine. When it lands, nothing about your workflow
+              changes. It just finishes sooner.
             </p>
-            <p className="gpu__hint">
-              The letters are the real thing. Click, drag or press a key — they spring back.
-            </p>
+            <p className="gpu__hint">The letters are live. Drag them, or press a key.</p>
           </div>
 
           <CubeLetters />
         </section>
 
-        {/* Field notes.
-            Sits here, after the reader has been told what the thing is and what
-            is in it, and before being asked to open it — this is the section
-            for the reader who is convinced and now wants to know whether the
-            people building it know what they are doing.
-
-            It shows the three newest posts and no more. A home page that lists
-            every post becomes an index of the blog, and there is already one of
-            those; the job here is a sample and a way in. The same `.postcard`
-            as /blog rather than a bespoke home-page card, so the two surfaces
-            are the same object at two sizes. */}
+        {/* Text only, deliberately. The v2 design put each post's share card
+            above it, which made the section the heaviest thing on the page and
+            the one least about the editor. The same `.postcard` as /blog, so the
+            two surfaces are the same object at two sizes. */}
         {POSTS.length > 0 && (
-          <section className="notes" id="notes">
+          <section className="notes" id="notes" aria-labelledby="blog-title">
             <header className="head-hang">
-              <h2 className="section__title section__title--sm">From the blog</h2>
+              <h2 id="blog-title" className="section__title section__title--sm">
+                From the blog
+              </h2>
               <p className="lede">
-                The Trail Log says what shipped. These are the ones that needed the argument written
-                out — the decision, what it cost, and the measurements it was made on.
+                The Trail Log says what shipped. These are the decisions that needed the argument
+                written out.
               </p>
             </header>
 
@@ -279,43 +332,36 @@ export default function Home() {
               ))}
             </ol>
 
-            {/* Only worth showing once there is more on /blog than is already
-                on this page. */}
-            {POSTS.length > 3 && (
-              <p className="notes__more">
-                <Link to="/blog">
-                  All {POSTS.length} posts <span aria-hidden="true">→</span>
-                </Link>
-              </p>
-            )}
+            <p className="notes__more">
+              <Link to="/blog">
+                All posts <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </p>
           </section>
         )}
 
-        {/* Two columns: the mark alone on the left, everything that can be read
-            or clicked on the right. The mark is decorative — the sentence beside
-            it carries the meaning — so it is aria-hidden and never focusable. */}
-        <section className="close">
-          <svg className="close__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></svg>
-          <div className="close__body">
-            <p className="close__line">Open an image. No account, no upload.</p>
-            <p className="close__sub">
-              Once it loads, the network is optional. Drop your connection mid-edit and nothing
-              stops — none of the work was leaving this machine anyway. The editing happens in
-              this tab, not on a server, so there is nothing to be slow and nothing to go down.
+        {/* ── Cream ── The ask. */}
+        <section className="board board--cream board--close">
+          <div className="closing">
+            <p className="closing__line">Open an image. That&rsquo;s the whole signup.</p>
+            <p className="closing__sub">
+              No account to make, nothing to install, nothing uploaded. If you decide you want your
+              edits on another machine later, that&rsquo;s the moment to sign in &mdash; not before.
             </p>
-            <div className="close__actions">
-              <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the beta
-              </a>
-              <a className="cta cta--outline cta--lg" href={GITHUB_URL} {...external}>
-                Read the source
-              </a>
-            </div>
+          </div>
+          <div className="closing__actions">
+            <a className="cta cta--ink cta--lg" href={EDITOR_URL} {...external}>
+              Open the editor &mdash; free
+            </a>
+            <a className="cta cta--ink-outline cta--lg" href={GITHUB_URL} {...external}>
+              Read the source
+            </a>
+            <p className="closing__licence">MIT licensed · open source</p>
           </div>
         </section>
       </main>
 
-      <Footer line="Local is the product. The cloud is the upgrade." />
+      <Footer line="Your pictures, your computer. The cloud only when you ask." />
     </>
   );
 }

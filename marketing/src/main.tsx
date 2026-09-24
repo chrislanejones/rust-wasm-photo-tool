@@ -5,6 +5,18 @@ import App from "./App";
 // tokens first — styles.css consumes every one of these custom properties.
 import "./tokens.css";
 import "./styles.css";
+import "./tool-page.css";
+import "./trail.css";
+import "./features.css";
+// One stylesheet per v2 page, so the parallel ports never share a file.
+import "./about.css";
+import "./contact.css";
+import "./blog.css";
+import "./blog-post.css";
+import "./architecture.css";
+import "./legal.css";
+import "./footer.css";
+import "./shot-annotations.css";
 // After styles.css: its reduced-motion overrides have to win the cascade.
 import "./animations.css";
 import { initAnalytics } from "./lib/analytics";

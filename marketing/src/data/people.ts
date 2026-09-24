@@ -22,6 +22,12 @@ export interface Person {
   width: number;
   height: number;
   bio: string[];
+  /** A phrase in `bio` that should render as a link. The first occurrence of
+   *  `text` in any paragraph becomes the anchor, so `bio` stays plain strings. */
+  inlineLinks?: { text: string; href: string }[];
+  /** The name in its own script, set beside the Latin one in the heading. */
+  nameNative?: string;
+  /** Site-relative hrefs ("/contact") are router links; the rest open off-site. */
   links?: { label: string; href: string }[];
 }
 
@@ -46,26 +52,27 @@ export const PEOPLE: Person[] = [
     links: [
       { label: "chrislanejones.com", href: "https://www.chrislanejones.com" },
       { label: "GitHub", href: "https://github.com/chrislanejones" },
+      { label: "Contact", href: "/contact" },
     ],
   },
   {
     id: "naji",
     name: "Naji",
+    nameNative: "ناجي",
     role: "The horse",
     image: "/naji-the-horse.webp",
     imageAlt:
       "Naji, a chestnut horse in a blue and patterned halter, standing under a tree in a fenced green pasture and looking straight at the camera.",
     width: 578,
     height: 778,
-    /* ناجي is Arabic for "survivor", and it is written here in Arabic script
-       because that is the name — the transliteration is the approximation.
-       `lang="ar"` and `dir="rtl"` are set on the span in About.tsx rather
-       than here: a screen reader that is told the language pronounces it,
-       and one that is not reads Arabic letters with an English voice. */
+    /* ناجي sits in the heading (`nameNative`) rather than in the first
+       sentence: the name is the Arabic, and the heading is where a name goes. */
     bio: [
-      'Naji — ناجي, Arabic for "survivor" — is an Arabian horse. He is the only horse of his herd who survived, which is what the name means.',
+      'Naji — Arabic for "survivor" — is an Arabian horse. He is the only horse of his herd who survived, which is what the name means.',
       "He can be ridden, though he does not make it easy. He lives in Louisa, Virginia, and we are hoping to bring him down to Florida.",
+      "He has also worked as a therapy horse: my wife Becky counseled people with him through Heaven's Rays Ministries. A horse notices what a person is carrying before they say it out loud, which turns out to be the whole point.",
       "He is why the editor is named after a horse. A workhorse is a tool that does the job and does not fuss. Image Horse.",
     ],
+    inlineLinks: [{ text: "Heaven's Rays Ministries", href: "https://heavensraysministries.com/" }],
   },
 ];

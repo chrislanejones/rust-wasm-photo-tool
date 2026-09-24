@@ -109,7 +109,7 @@ const GROUPS: Group[] = [
         body: "The furthest thing on the list, and the one everything else is quietly building toward.",
       },
       { name: "Photoshop files, in and out" },
-      { name: "Colour-blind-safe previews" },
+      { name: "Color-blind-safe previews" },
     ],
   },
 ];

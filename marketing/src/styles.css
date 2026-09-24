@@ -548,19 +548,21 @@ a { color: inherit; }
 /* Learn wraps rather than gridding: the card wants a floor and a ceiling on
    its width, and the link grid wants the rest, which is two flex items with
    very different grow factors rather than two fixed columns. */
+/* The SAME track definition as .nav-mega__tools, so the feature card measures
+   one track on both panels. It used to be a flex item with its own basis and a
+   16rem cap, which made it 256px here against 183px on Tools — the two panels
+   swap under the same button, so a card that changes width between them reads
+   as the menu jumping. */
 .nav-mega__learn {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
   align-items: stretch;
   gap: 12px;
 }
-.nav-mega__learn > .nav-mega__feat {
-  flex: 1 1 11rem;
-  max-width: 16rem;
-  min-width: 0;
-}
 .nav-mega__learn-grid {
-  flex: 5 1 24rem;
+  /* Every track after the card. Spanning them also keeps `auto-fit` from
+     collapsing the empty ones, which would stretch the card across the panel. */
+  grid-column: 2 / -1;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
@@ -751,9 +753,10 @@ a { color: inherit; }
 }
 
 .hero__display {
-  font-size: var(--text-display);
-  line-height: var(--leading-display);   /* 1.0 */
-  max-width: 14ch;
+  font-size: var(--text-hero);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  max-width: 12ch;
   text-wrap: balance;
 }
 
@@ -998,6 +1001,10 @@ a { color: inherit; }
   line-height: var(--leading-tight);
 }
 .section__title--sm { font-size: var(--text-2xl); }
+/* The v2 home page sets its section headings a rung larger. Scoped to #main
+   on the home route via .home rather than changing the shared class, because
+   Pricing and Architecture use it too and have not been ported yet. */
+.home .section__title--sm { font-size: var(--text-section); }
 
 .lede {
   max-width: 58ch;
@@ -2126,7 +2133,6 @@ a { color: inherit; }
 
 /* the "what runs where" filter — the same group, icon over label like the
    Architecture tiers, so all three filters on the site read as one component */
-.spec__filter { padding-block-end: var(--space-lg); }
 .seg--where {
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-lg);
@@ -2158,178 +2164,6 @@ a { color: inherit; }
 
 .tnum { font-variant-numeric: tabular-nums; }
 
-.stat-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-md);
-  /* Same nav-clearing expression as .hero and .page-head, so all five pages
-     start their heading at the same height. This comment already knew the
-     figure was crowding the nav — a flat 6rem never actually cleared it, and
-     left the $0 sitting 18px under the bar. The bottom-heavier balance the
-     old ratio was after still holds, and now on the number that matters: the
-     gap a reader perceives at the top is the 80px below the nav, not the full
-     158px of padding, against 144px underneath. */
-  padding: calc(var(--banner-height) + var(--space-2xl)) var(--page-gutter) var(--space-4xl);
-}
-
-.stat-hero__figure {
-  font-family: var(--font-display);
-  font-size: var(--text-figure);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.05em;
-  line-height: 0.85;
-  color: var(--color-accent);
-}
-
-.stat-hero__headline {
-  font-size: var(--text-4xl);
-  line-height: var(--leading-tight);
-  max-width: 20ch;
-}
-
-/* ── tiers ────────────────────────────────────────────────── */
-
-.tiers { padding: var(--space-md) var(--page-gutter) var(--space-2xl); }
-
-.tier-grid {
-  display: grid;
-  /* deliberately uneven — Pro carries more, so it gets more room;
-     three identical columns is the AI feature-grid tell */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: var(--space-md);
-  /* stretch, NOT start: `start` sized every card to its own content, so Pro's
-     six bullets made it tower over Demo's five and the CTAs landed at three
-     different heights. The widths stay uneven on purpose; the heights don't. */
-  align-items: stretch;
-}
-
-.tier {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  border-radius: var(--radius-md);
-  background: var(--color-paper-2);
-}
-/* Pro is the lead: it sits a rung brighter than the other two, and it already
-   carries two amber signals of its own (the $10 tag and the filled CTA). An
-   accent bar on one edge would be the side-stripe card, which is exactly the
-   look we're avoiding — so the surface does the work instead. */
-.tier--lead { background: var(--color-paper-3); }
-
-/* Lift on hover — by lightness, not by glow.
- *
- * The obvious move is "cards lift toward the user with a soft warm shadow",
- * but a shadow-glow on dark paper is a well-worn tell and
- * says elevation on a dark surface is LIGHTNESS: brighter = closer. A halo
- * around a card on near-black paper is the thing it's warning about, so the
- * card climbs a surface rung instead. Same intent, no halo.
- *
- * Exactly ONE signal — the brightening is the lift, so there's no
- * translate stacked on top of it. Lead card starts a rung higher, so it climbs
- * to the next one rather than landing where the others land.
- */
-.tier:not(.is-dim):hover { background: var(--color-paper-3); }
-.tier--lead:not(.is-dim):hover { background: var(--color-paper-4); }
-/* a dimmed card is out of focus on purpose — it must not light up under the
-   pointer and fight the tier you actually selected */
-
-.tier__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
-.tier__name { font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.02em; }
-
-.tier__price {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-xs);
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-.tier__unit {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--color-ink-2);
-}
-
-.tier__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  font-size: var(--text-sm);
-  color: var(--color-ink-2);
-}
-.tier__list li { padding-inline-start: var(--space-md); position: relative; }
-.tier__list li::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  inset-block-start: 0.55em;
-  width: 5px; height: 5px;
-  border-radius: 1px;
-  background: var(--color-rule-strong);
-}
-.tier--lead .tier__list li::before { background: var(--color-accent); }
-
-.tier__cta { margin-block-start: auto; justify-content: center; }
-
-/* ── the access matrix ────────────────────────────────────── */
-
-.matrix { padding: 0 var(--page-gutter) var(--space-2xl); }
-.matrix__scroll { overflow-x: auto; }
-
-.spec--matrix { min-width: 34rem; }
-.spec--matrix thead th:not(:first-child),
-.spec--matrix tbody td { text-align: center; }
-.spec--matrix td { padding-inline: var(--space-sm); font-variant-numeric: tabular-nums; }
-/* Tighter rows than the home page's spec sheet: 24 rows at 16px of padding
- * reads as a wall, and the group gaps do the separating instead.
- * :not(.spec__group) matters — without it this rule (0,1,2) outweighs
- * `.spec__group th` (0,1,1) and silently flattens the group headers' gap. */
-.spec--matrix tbody tr:not(.spec__group) th,
-.spec--matrix tbody tr:not(.spec__group) td { padding-block: var(--space-sm); }
-.spec--matrix tbody tr:not(.spec__group):hover th,
-.spec--matrix tbody tr:not(.spec__group):hover td { background: var(--color-paper-2); }
-
-/* Group headers were sitting in the same vertical rhythm as the rows (24px vs
- * 16px), so a title read as just another row. Three changes: a large gap ABOVE
- * that clearly belongs to the new group, no gap below (the title hugs the rows
- * it introduces), and no top rule — the space is the separator. */
-.spec__group th {
-  padding-block: var(--space-2xl) var(--space-sm);
-  border-block-end: var(--rule-hair) solid var(--color-rule-strong);
-  font-family: var(--font-outlier);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-accent);
-  text-align: left;
-}
-/* the first group opens the table — it doesn't need the big separating gap */
-.spec tbody .spec__group:first-child th { padding-block-start: var(--space-md); }
-/* the last row of a group shouldn't draw a rule into the next group's gap */
-.spec__group + tr th, .spec__group + tr td { border-block-start: 0; }
-.spec__sub {
-  display: block;
-  font-size: var(--text-xs);
-  font-weight: 400;
-  color: var(--color-ink-3);
-}
 .spec .yes { color: var(--color-ink); }
 .spec .no  { color: var(--color-ink-3); }
 .spec .num { color: var(--color-ink-2); }
@@ -2510,19 +2344,10 @@ a { color: inherit; }
   opacity: 0.28;
   filter: saturate(0.4);
 }
-[data-tier], .is-dim, .spec--matrix td, .spec--matrix th {
+[data-tier], .is-dim {
   transition: opacity var(--dur-short) var(--ease-out),
               filter var(--dur-short) var(--ease-out);
 }
-/* the tier cards also animate their surface — named properties, never
-   `transition: all` */
-.tier {
-  transition: opacity var(--dur-short) var(--ease-out),
-              filter var(--dur-short) var(--ease-out),
-              background-color var(--dur-short) var(--ease-out);
-}
-/* the matrix cells dim individually, so the lit column reads as a stripe */
-.spec--matrix td.is-dim, .spec--matrix th.is-dim { opacity: 0.3; }
 
 /* ── the .mermaid source download ──────────────────────────── */
 
@@ -3960,8 +3785,6 @@ a { color: inherit; }
   .map__row, .map__row--4 { grid-template-columns: minmax(0, 1fr); }
   .stack__grid--3, .stack__grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .schema__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* tiers stack; Pro keeps its lead border rather than its extra width */
-  .tier-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 48rem) {
@@ -3974,8 +3797,7 @@ a { color: inherit; }
   .release { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
   .release__meta { flex-direction: row; align-items: baseline; gap: var(--space-sm); flex-wrap: wrap; }
   .entry { grid-template-columns: minmax(0, 1fr); gap: var(--space-2xs); }
-  .page-head,
-  .stat-hero { padding-block-start: calc(var(--banner-height) + var(--space-lg)); }
+  .page-head { padding-block-start: calc(var(--banner-height) + var(--space-lg)); }
 }
 
 @media (max-width: 40rem) {
@@ -4251,7 +4073,7 @@ a { color: inherit; }
 }
 .soon-tile__label {
   font-weight: 600;
-  font-size: var(--text-sm);
+  font-size: var(--text-ui);
   line-height: 1;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -4378,7 +4200,7 @@ a { color: inherit; }
 }
 .soon-card__body {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-ui);
   line-height: 1.5;
   color: var(--board-ink-2);
   text-wrap: pretty;
@@ -4420,3 +4242,704 @@ a { color: inherit; }
   color: var(--color-accent);
 }
 .soon-honest__list strong { font-weight: 600; color: var(--color-ink); }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Home v2
+
+   The page alternates dark and cream full-bleed bands. The cream ones are
+   not a flourish: each is a block that argues something (who it is for, what
+   runs where, the ask), and giving it its own surface says "this is a
+   different kind of thing" before a word is read.
+
+   Every cream band carries its OWN ink scale as local custom properties. The
+   site's tokens are all tuned for light text on the dark paper and every one
+   of them is illegible on cream — so `.board--cream` defines --b-ink* and
+   everything inside it reads from those, never from --color-ink*.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── hero ────────────────────────────────────────────────────────────── */
+
+.hero__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-3xl);
+  align-items: end;
+  width: 100%;
+  max-width: var(--page-max);
+}
+.hero__lead { display: grid; gap: var(--space-md); min-width: 0; }
+.hero__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.hero__aside {
+  display: grid;
+  gap: var(--space-lg);
+  min-width: 0;
+  padding-bottom: 6px;
+}
+.hero__deck {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+/* The four things a reader wants confirmed before they click, in the
+   typeface the rest of the site uses for facts rather than claims. */
+.hero__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-lg);
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  color: var(--color-ink-3);
+}
+
+/* ── the cream bands ─────────────────────────────────────────────────── */
+
+.board {
+  padding: var(--space-4xl) var(--page-gutter);
+}
+.board--cream {
+  --b-ink: oklch(16% 0.02 50);
+  --b-ink-2: oklch(35% 0.02 50);
+  --b-ink-3: oklch(48% 0.02 50);
+  --b-rule: oklch(84% 0.015 70);
+  --b-rule-soft: oklch(80% 0.015 70);
+  --b-accent: oklch(55% 0.16 55);
+  --b-card: oklch(98% 0.006 75);
+
+  background: oklch(95% 0.012 75);
+  color: var(--b-ink);
+}
+
+.board__head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-lg) var(--space-3xl);
+  align-items: end;
+  padding-bottom: var(--space-md);
+}
+.board__title {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  font-size: clamp(2.5rem, 4vw + 1rem, 4.5rem);
+  line-height: 1.02;
+  max-width: 14ch;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.board__deck {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--text-deck);
+  color: var(--b-ink-2);
+  text-wrap: pretty;
+}
+
+/* ── "Made for the jobs in between" — three audiences ────────────────── */
+
+.made {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-2xl) var(--space-2xl);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The rule on top rather than between: with `auto-fit` the columns can rewrap
+   to one, and a separator that only works in a row reads as a mistake in a
+   column. A cap on each item works at every count. */
+.made__item {
+  display: grid;
+  gap: var(--space-md);
+  align-content: start;
+  padding-top: var(--space-2xl);
+  border-top: 1px solid var(--b-rule-soft);
+}
+.made__eyebrow {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--b-accent);
+}
+.made__title {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-size: var(--text-card);
+  line-height: 1.1;
+  text-wrap: balance;
+  color: var(--b-ink);
+}
+.made__body {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--b-ink-2);
+}
+.made__tags { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+.made__tag {
+  padding: 5px 10px;
+  border: 1px solid var(--b-rule-soft);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: oklch(30% 0.02 50);
+}
+
+/* ── "Your photos stay on your computer" — filters + the table ───────── */
+
+.runs__filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-sm);
+  padding-block-end: var(--space-lg);
+}
+.runs__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 0;
+  padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--b-rule);
+  border-radius: var(--radius-md);
+  background: var(--b-card);
+  color: var(--b-ink-2);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out),
+              color var(--dur-micro) var(--ease-out),
+              border-color var(--dur-micro) var(--ease-out);
+}
+.runs__tile:hover { border-color: oklch(70% 0.02 65); }
+.runs__tile:focus-visible { outline: 2px solid var(--b-accent); outline-offset: 2px; }
+.runs__tile.is-on {
+  border-color: var(--b-accent);
+  background: color-mix(in oklch, oklch(55% 0.16 55) 12%, oklch(98% 0.006 75));
+  color: var(--b-ink);
+}
+.runs__tile-icon { display: block; width: 22px; height: 22px; color: var(--b-ink-3); }
+.runs__tile.is-on .runs__tile-icon { color: var(--b-accent); }
+.runs__tile-label {
+  font-weight: 700;
+  font-size: clamp(0.9375rem, 0.5vw + 0.75rem, 1.25rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.runs__tile-count {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--b-ink-3);
+}
+.runs__tile.is-on .runs__tile-count { color: var(--b-accent); }
+
+/* A table is the right shape for this and a table does not wrap, so on a
+   phone it scrolls sideways inside its own box rather than forcing the page
+   to. */
+.runs__scroll { overflow-x: auto; max-width: 100%; }
+.runs__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: var(--text-base);
+}
+.runs__caption {
+  padding-block-end: var(--space-md);
+  color: var(--b-ink-2);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.runs__table th,
+.runs__table td {
+  padding: var(--space-md) var(--space-md) var(--space-md) 0;
+  vertical-align: baseline;
+}
+.runs__table thead th {
+  border-block-end: 2px solid var(--b-ink);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--b-ink-2);
+}
+.runs__table tbody th {
+  border-block-end: 1px solid var(--b-rule);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--b-ink);
+}
+.runs__table tbody td { border-block-end: 1px solid var(--b-rule); }
+.runs__detail { color: var(--b-ink-2); }
+.runs__detail .fig { color: var(--b-accent); }
+
+.runs__tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--b-rule);
+  border-radius: var(--radius-pill);
+  background: var(--b-card);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--b-ink-2);
+  white-space: nowrap;
+}
+.runs__tag--server {
+  border-color: var(--b-accent);
+  background: color-mix(in oklch, oklch(55% 0.16 55) 10%, oklch(98% 0.006 75));
+  color: var(--b-accent);
+}
+
+.runs__note {
+  padding-block-start: var(--space-2xl);
+  max-width: 52ch;
+  margin: 0;
+  color: var(--b-ink-2);
+}
+.runs__note .fig { color: var(--b-accent); }
+
+/* ── the tool tiles' readout ─────────────────────────────────────────── */
+
+.buttonset__wrap { width: 100%; }
+.buttonset__readout {
+  padding-top: var(--space-md);
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+.buttonset__readout-tool { color: var(--color-accent); }
+
+/* ── the closing ask, on cream ───────────────────────────────────────── */
+
+.board--close {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-2xl) var(--space-3xl);
+  align-items: center;
+}
+.closing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+  min-width: 0;
+}
+.closing__line {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(2.25rem, 3.5vw + 0.5rem, 4rem);
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  max-width: 16ch;
+  text-wrap: balance;
+  min-width: 0;
+}
+.closing__sub {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--b-ink-2);
+  max-width: 44ch;
+  text-wrap: pretty;
+}
+.closing__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: stretch;
+  min-width: 0;
+}
+.closing__licence {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--b-ink-3);
+}
+
+/* The dark-on-cream pair. The page's own .cta--fill is accent-on-dark and
+   disappears into the cream, so the closing band gets its own inversion. */
+.cta--ink {
+  background: oklch(16% 0.02 50);
+  color: oklch(95% 0.012 75);
+  border-color: transparent;
+  justify-content: center;
+}
+.cta--ink:hover { background: oklch(28% 0.02 50); }
+.cta--ink-outline {
+  border-color: oklch(70% 0.02 65);
+  color: oklch(16% 0.02 50);
+  background: transparent;
+  justify-content: center;
+}
+.cta--ink-outline:hover {
+  border-color: oklch(16% 0.02 50);
+  background: oklch(98% 0.006 75);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   /pricing — ported from the Pricing v2 design.
+
+   Every size here is the design file's own value, through a token. The first
+   v2 port reused shared heading classes that carry their own sizes and shipped
+   a hero half again too big; nothing on this page borrows a font-size from a
+   class another page owns.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.pr-btn {
+  min-height: 48px;
+  padding: 14px 22px;
+  font-size: var(--text-ui);
+  font-weight: 600;
+  line-height: 1;
+}
+.pr-btn.cta--outline { font-weight: 500; border-color: var(--color-rule); }
+.pr-btn.cta--outline:hover { border-color: var(--color-accent); }
+
+.pr-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  padding: calc(var(--banner-height) + var(--space-2xl)) var(--page-gutter) var(--space-xl);
+}
+.pr-hero__lead { display: grid; gap: 20px; min-width: 0; }
+.pr-hero__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.pr-hero__figure {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-weight: 700;
+  font-size: var(--text-price);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+.pr-hero__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-headline);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  max-width: 16ch;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.pr-hero__aside { display: grid; gap: var(--space-lg); padding-bottom: 6px; }
+.pr-hero__deck {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  max-width: 36ch;
+  text-wrap: pretty;
+}
+.pr-hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+
+.pr-tiers {
+  display: grid;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--page-gutter) 48px;
+}
+.pr-tiers__intro {
+  margin: 0;
+  max-width: 58ch;
+  font-size: var(--text-md);
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+.pr-tiers__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-sm);
+}
+
+.pr-card {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 16px;
+  background: var(--color-paper-2);
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.pr-card--lead {
+  border-color: var(--color-accent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--color-accent) 18%, var(--color-paper-2)),
+    var(--color-paper-2) 70%
+  );
+}
+.pr-card.is-dim { opacity: 0.4; }
+.pr-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.pr-card__name {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-xl);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.pr-card__tag {
+  padding: 4px 8px;
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+}
+/* Accent means "this one costs us a server", the same signal the tool pages'
+   runs-on badge uses. */
+.pr-card__tag--server { border-color: var(--color-accent); color: var(--color-accent); }
+.pr-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-variant-numeric: tabular-nums;
+}
+.pr-card__amount {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.pr-card__unit { font-size: var(--text-sm); color: var(--color-ink-2); }
+.pr-card__perks {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-ui);
+  color: color-mix(in oklch, var(--color-ink) 35%, var(--color-ink-2));
+}
+.pr-card__perks li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+.pr-card__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  transform: translateY(-2px);
+}
+.pr-card__cta { margin-top: 4px; justify-content: center; }
+
+/* The matrix panel — an inset cream board, like /coming-soon's, with its own
+   ink because every site ink token is tuned for light text on dark. */
+.pr-matrix {
+  --m-ink: oklch(20% 0.020 40);
+  --m-ink-2: oklch(25% 0.022 50);
+  --m-ink-3: oklch(38% 0.020 40);
+  --m-ink-4: oklch(44% 0.020 40);
+  --m-mute: oklch(60% 0.020 40);
+  --m-accent: oklch(44% 0.170 45);
+  --m-rule: oklch(86% 0.020 80);
+  --m-tile: oklch(97.5% 0.012 80);
+  --m-tile-rule: oklch(80% 0.020 80);
+  --m-tile-on: oklch(88% 0.060 70);
+
+  display: grid;
+  gap: var(--space-lg);
+  margin: 0 var(--page-gutter);
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: 20px;
+  background: oklch(94% 0.020 80);
+  color: var(--m-ink);
+  scroll-margin-top: calc(var(--banner-height) + var(--space-md));
+}
+.pr-matrix__head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-md) var(--space-xl);
+  align-items: end;
+}
+.pr-matrix__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-panel);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.pr-matrix__deck {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--text-base);
+  color: var(--m-ink-3);
+  text-wrap: pretty;
+}
+.pr-matrix__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.75rem), 1fr));
+  gap: 10px;
+}
+.pr-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: var(--rule-hair) solid var(--m-tile-rule);
+  border-radius: 12px;
+  background: var(--m-tile);
+  color: var(--m-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out),
+              background-color var(--dur-micro) var(--ease-out);
+}
+.pr-tile:hover { border-color: oklch(60% 0.170 50); }
+.pr-tile:focus-visible { outline: 2px solid var(--m-accent); outline-offset: 2px; }
+.pr-tile.is-on { border-color: var(--m-accent); background: var(--m-tile-on); }
+.pr-tile__label {
+  font-weight: 600;
+  font-size: var(--text-ui);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.pr-tile__count {
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  line-height: 1;
+  color: var(--m-ink-4);
+}
+.pr-tile.is-on .pr-tile__count { color: var(--m-accent); }
+
+.pr-matrix__scroll { overflow-x: auto; }
+.pr-table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: var(--text-ui);
+  line-height: 1.4;
+}
+.pr-table thead tr { border-bottom: 2px solid var(--m-ink); }
+.pr-table__feature-head {
+  padding: 10px 12px 10px 0;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--m-ink-3);
+}
+.pr-table__tier {
+  width: 16%;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: var(--text-base);
+  letter-spacing: -0.01em;
+}
+.pr-table__group {
+  padding: 28px 0 8px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--m-accent);
+  text-align: left;
+}
+.pr-table__row { border-top: var(--rule-hair) solid var(--m-rule); }
+.pr-table__feature {
+  padding: 10px 12px 10px 0;
+  font-weight: 500;
+  text-align: left;
+  color: var(--m-ink);
+}
+.pr-table__sub {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--m-ink-4);
+}
+.pr-table__cell {
+  padding: 10px 12px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  vertical-align: top;
+  color: var(--m-ink-2);
+}
+.pr-table__cell--yes { color: var(--m-accent); }
+.pr-table__cell--no { color: var(--m-mute); }
+.pr-table__tier, .pr-table__cell { transition: opacity var(--dur-short) var(--ease-out); }
+/* The focused tier's column stays lit, so it reads as a stripe. */
+.pr-table__tier.is-dim, .pr-table__cell.is-dim { opacity: 0.35; }
+
+.pr-why {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: start;
+  padding: 72px var(--page-gutter) var(--space-3xl);
+}
+.pr-why__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-coda);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  max-width: 14ch;
+  text-wrap: balance;
+}
+.pr-why__body { display: grid; gap: 20px; }
+.pr-why__text {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--text-deck);
+  color: color-mix(in oklch, var(--color-ink) 35%, var(--color-ink-2));
+  text-wrap: pretty;
+}
+.pr-why__link { justify-self: start; }

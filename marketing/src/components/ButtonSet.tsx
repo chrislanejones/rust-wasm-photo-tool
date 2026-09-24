@@ -36,18 +36,18 @@ import {
  */
 
 const TOOLS = [
-  { id: "paint", label: "Paint", Icon: BrushIcon },
-  { id: "stamp", label: "Stamp", Icon: StampIcon },
-  { id: "text", label: "Text", Icon: TextIcon },
-  { id: "shapes", label: "Shapes", Icon: ShapesIcon },
-  { id: "emoji", label: "Emoji", Icon: EmojiIcon },
-  { id: "eraser", label: "Eraser", Icon: EraserIcon },
-  { id: "wand", label: "Wand", Icon: WandIcon },
-  { id: "crop", label: "Crop", Icon: CropIcon },
-  { id: "resize", label: "Resize", Icon: ResizeIcon },
-  { id: "layers", label: "Layers", Icon: LayersIcon },
-  { id: "undo", label: "Undo", Icon: UndoIcon },
-  { id: "export", label: "Export", Icon: ExportIcon },
+  { id: "paint", label: "Paint", Icon: BrushIcon, blurb: "freehand strokes with a stabilizer for shaky hands" },
+  { id: "stamp", label: "Stamp", Icon: StampIcon, blurb: "clone one area over another, or batch-stamp a logo" },
+  { id: "text", label: "Text", Icon: TextIcon, blurb: "labels and speech bubbles in three typefaces" },
+  { id: "shapes", label: "Shapes", Icon: ShapesIcon, blurb: "rectangles, ellipses, arrows and callout pins" },
+  { id: "emoji", label: "Emoji", Icon: EmojiIcon, blurb: "drop one on the photo, sized however you like" },
+  { id: "eraser", label: "Eraser", Icon: EraserIcon, blurb: "rub out strokes or mask parts of a layer" },
+  { id: "wand", label: "Wand", Icon: WandIcon, blurb: "select by color, then blur, cut or recolor it" },
+  { id: "crop", label: "Crop", Icon: CropIcon, blurb: "straighten, fix perspective, trim to a ratio" },
+  { id: "resize", label: "Resize", Icon: ResizeIcon, blurb: "to a pixel size or a file size, one or forty at once" },
+  { id: "layers", label: "Layers", Icon: LayersIcon, blurb: "a real stack, with opacity and masks" },
+  { id: "undo", label: "Undo", Icon: UndoIcon, blurb: "a thousand steps back, kept between visits" },
+  { id: "export", label: "Export", Icon: ExportIcon, blurb: "PNG, JPEG, WebP, AVIF or a layered .ora" },
 ] as const;
 
 type ToolId = (typeof TOOLS)[number]["id"];
@@ -68,6 +68,8 @@ export default function ButtonSet() {
   // tile that is already selected, which a class toggle alone could not do.
   const [press, setPress] = useState(0);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const current = TOOLS.find((t) => t.id === selected) ?? TOOLS[0];
 
   const focus = (i: number) => {
     setRoving(i);
@@ -108,7 +110,8 @@ export default function ButtonSet() {
        state — the ring is the sighted half of the same fact, never the only
        half. The group is labeled because "Paint, Stamp, Text…" read out with
        no preamble is a puzzle. */
-    <div className="buttonset" role="toolbar" aria-label="Some of the editor's tools">
+    <div className="buttonset__wrap">
+      <div className="buttonset" role="toolbar" aria-label="Some of the editor's tools">
       {TOOLS.map(({ id, label, Icon }, i) => {
         const pressed = selected === id;
         return (
@@ -141,6 +144,16 @@ export default function ButtonSet() {
           </button>
         );
       })}
+      </div>
+
+      {/* What the selected tile actually does. The tiles are named but a name
+          is not a description, and this is the line that makes pressing one
+          worth doing. `aria-live` because the only thing that changed on the
+          press is text somewhere else on the page. */}
+      <p className="buttonset__readout" aria-live="polite">
+        Selected: <span className="buttonset__readout-tool">{current.label}</span> &mdash;{" "}
+        {current.blurb}
+      </p>
     </div>
   );
 }

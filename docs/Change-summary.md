@@ -10916,3 +10916,24 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Trail Log** | Untouched and verified: **152 versions**, v8.93 → v0.1, all release text intact in the prerendered HTML. |
 | **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
 | **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, 23/23 routes prerendered. |
+
+## v8.95 Change Summary — 2026-09-24
+
+**The whole marketing site is redrawn — every page, in the new design, with the cream boards and the numbered callouts on the screenshots.**
+
+| Area | Change |
+| --- | --- |
+| **Every page** | Home, Pricing, Features, Trail Log, Blog, blog posts, About, Contact, Architecture, Privacy, Terms, the footer and the ten tool pages, all rebuilt to the v2 designs. Ported in parallel, one agent per page, each owning its own files. |
+| **Cream boards** | The v2 signature: a light, near-black-on-cream board on the dark page for blocks that are a register rather than prose — the feature grid, the pricing matrix, what-runs-where, and /coming-soon. Each carries local `--b-ink*` vars, because every site ink token is tuned for light-on-dark and all of them are wrong on cream. |
+| **Screenshot callouts** | The home timeline's numbered pins, highlight shapes and callout boxes, at the design's own pixel coordinates, on four shots: Presets / Original↔Edited / Compress All (Sep), magic wand (Aug), Stroke Stabilizer (Jul 27), History (Jul 17). Real text for screen readers and in the prerendered HTML. Below 48rem the pins stay on the image and the notes render as a numbered list. |
+| **Menu card width** | The Learn panel's tall card was 256px against Tools' 183px — a flex basis with a 16rem cap versus a grid track. Learn now uses the same track definition, so the card is one column on both panels and matches at every width (183/183 at 1280, 184/184 at 1024). |
+| **Type scale** | Nine rungs added to `tokens.css` from the designs' own values (`--text-hero`, `--text-section`, `--text-card`, `--text-deck`, `--text-ui`, `--text-headline`, and three on Pricing). Every ported page was measured against its mockup at 1280px and every text size matches within 0.5px. The first Home pass had shipped a 119px hero against an 80px design by reusing `.hero__display`, which carries its own size. |
+| **Share cards** | 21 route cards, up from 5. Each uses the real horse logo instead of a plain orange square, is set in Geist (they used to fall back to `system-ui`, which is a different font on every machine that ran the generator), and carries a short share headline rather than the long SEO title. `text-wrap: balance` so a headline cannot widow its last word. |
+| **Schema truth** | `/architecture` documented 8 of the 14 deployed Convex tables and said the op log was format v6 when `src/ops.rs` has `OP_FORMAT_VERSION = 8`. Now 14/14, every field name verified against `convex/schema.ts` by script, with `projects`, `images`, `layers`, `annotations` and `history` marked as what they are: deployed, and called by nothing since the engine moved into the browser. `share_views` and five newer `shares` fields added. |
+| **Copy** | The designs' verbiage throughout, with four refusals: Terms' "your pictures never reach us" (the body names the cloud and AI exceptions, so it overclaims), a contact form that would POST to a site with no backend (it opens your mail app instead), "~12 min read" pills (posts carry no reading time), and British spellings. Pricing's footer line is now "Free where it runs on your machine. Paid where it runs on ours." |
+| **Legal text** | Unchanged and verified: all **99** sentences (56 Privacy, 43 Terms) present word for word, **0** added. Layout only. |
+| **SEO** | New titles and descriptions for /features, /trail-log and /blog; the rest unchanged. The features description counts `features.ts` rather than hard-coding a number that goes stale on the next feature. |
+| **One stylesheet per page** | `about/blog/blog-post/contact/architecture/features/legal/footer/tool-page/trail/shot-annotations.css`, so parallel work cannot collide — and a change to one page cannot reach another. Dead rules left behind in `styles.css` are parked in PARKING_LOT.md, deliberately not deleted in the same diff. |
+| **Trail Log** | All **153** versions and **1196** headline/entry strings verbatim in the prerendered HTML. `releases.ts` was never edited by a port. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |

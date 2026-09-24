@@ -1,11 +1,9 @@
 // Hand-maintained — features.ts is regenerated from docs/Features.md, this
-// isn't. Add an entry here whenever a new feature lands; the sidebar falls
-// back to a plain dot for anything unmapped rather than erroring.
+// isn't. Add an entry here whenever a new feature lands; a card falls back
+// to a plain dot for anything unmapped rather than erroring.
 
 import type { ElementType } from "react";
-import { CpuIcon } from "../components/Icons";
 import {
-  AppWindow,
   BadgeCheck,
   Stamp,
   Move,
@@ -61,12 +59,6 @@ import {
   ScrollText,
   Eraser,
 } from "lucide-react";
-
-const GROUP_ICONS: Record<string, ElementType> = {
-  // Same glyph as Home's "Your machine" tab — one meaning, one icon, site-wide.
-  "Image Processing (Rust/WASM)": CpuIcon,
-  "UI (React)": AppWindow,
-};
 
 const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
@@ -137,10 +129,6 @@ const FALLBACK_ICON = CircleSmall;
 
 export function getFeatureIcon(name: string): ElementType {
   return FEATURE_ICONS[name] ?? FALLBACK_ICON;
-}
-
-export function getGroupIcon(name: string): ElementType {
-  return GROUP_ICONS[name] ?? AppWindow;
 }
 
 /** The anchor id a feature renders under on /features.

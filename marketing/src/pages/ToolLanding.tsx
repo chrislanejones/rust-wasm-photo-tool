@@ -3,17 +3,17 @@ import Footer from "../components/Footer";
 import { EDITOR_URL, external } from "../config";
 import { TOOL_PAGES, toolPageFor, type RunsOn } from "../data/toolPages";
 
-/* One component for all ten tool landing pages.
+/* One component for all ten tool landing pages, ported from the ToolPage v2
+ * design.
  *
  * Each slug is its own route and its own prerendered file with its own <head>,
- * which is what a crawler needs. What it does not need is ten near-identical
- * React files that drift apart the first time one of them is edited, so the
- * page reads its content out of `toolPages.ts` by pathname instead.
+ * which is what a crawler needs. The page reads its content out of
+ * `toolPages.ts` by pathname, so ten pages cannot drift apart. The nav's
+ * mega-menu reads the same file.
  *
- * The nav's mega-menu reads the same file. Before it existed, the menu linked
- * to these ten paths while none of them had a page behind them — every link
- * was a hard 404, which is a white page from the host, not the site's own
- * NotFound.
+ * The body sits on a cream panel, like the home page's. Everything a reader
+ * scans — what it does, the reasoning, the no-account note — is on the light
+ * surface, and the dark page around it carries only the pitch and the way out.
  */
 
 const RUNS_ON: Record<RunsOn, { label: string; note: string }> = {
@@ -31,70 +31,114 @@ const RUNS_ON: Record<RunsOn, { label: string; note: string }> = {
   },
 };
 
+function Check() {
+  return (
+    <svg
+      className="tp-does__check"
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 export default function ToolLanding() {
   const { pathname } = useLocation();
   const tool = toolPageFor(pathname);
 
-  // Only reachable if a route were registered without its data. Rendering the
-  // shell rather than throwing keeps a prerender failure out of the build.
+  // Only reachable if a route were registered without its data. Rendering
+  // nothing rather than throwing keeps a prerender failure out of the build.
   if (!tool) return null;
 
   const runs = RUNS_ON[tool.runsOn];
-  const related = tool.related.map((s) => TOOL_PAGES.find((t) => t.slug === s)).filter(Boolean);
+  const related = tool.related
+    .map((s) => TOOL_PAGES.find((t) => t.slug === s))
+    .filter((t): t is (typeof TOOL_PAGES)[number] => Boolean(t));
 
   return (
     <>
-      <main id="main">
-        <header className="page-head">
-          <p className="tool-head__eyebrow">{tool.group}</p>
-          <h1 className="page-head__title">{tool.h1}</h1>
-          <p className="lede">{tool.lede}</p>
-          <p className="tool-head__runs">
-            <span className={`tool-badge tool-badge--${tool.runsOn}`}>{runs.label}</span>
-            <span className="tool-head__note">{runs.note}</span>
-          </p>
-          <p className="tool-head__actions">
-            <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-              Open the editor
-            </a>
-          </p>
+      <main id="main" className="tp">
+        <header className="tp-head">
+          <div className="tp-head__lead">
+            <p className="tp-head__eyebrow">{tool.group}</p>
+            <h1 className="tp-head__title">{tool.h1}</h1>
+          </div>
+          <div className="tp-head__side">
+            <p className="tp-head__lede">{tool.lede}</p>
+            <div className="tp-actions">
+              <a className="tp-btn tp-btn--fill" href={EDITOR_URL} {...external}>
+                Open the editor
+              </a>
+              <Link className="tp-btn tp-btn--line" to="/features">
+                See every tool
+              </Link>
+            </div>
+          </div>
         </header>
 
-        <article className="post">
-          <h2>What it does</h2>
-          <ul className="tool-does">
-            {tool.does.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
+        {/* A server tool gets the accent border and a warm wash, so "this one
+            uploads" is the loudest thing above the fold rather than a footnote. */}
+        <section className="tp-runs-wrap" aria-label="Where it runs">
+          <div className={`tp-runs tp-runs--${tool.runsOn}`}>
+            <span className="tp-runs__label">
+              <span className="tp-runs__dot" aria-hidden="true" />
+              {runs.label}
+            </span>
+            <p className="tp-runs__note">{runs.note}</p>
+          </div>
+        </section>
+
+        <article className="tp-board">
+          <section className="tp-does">
+            <h2 className="tp-board__h2">What it does</h2>
+            <ul className="tp-does__list">
+              {tool.does.map((d) => (
+                <li className="tp-does__item" key={d}>
+                  <Check />
+                  <span>{d}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           {tool.sections.map((s) => (
-            <section key={s.h2}>
-              <h2>{s.h2}</h2>
-              <p>{s.p}</p>
+            <section className="tp-split" key={s.h2}>
+              <h2 className="tp-split__h2">{s.h2}</h2>
+              <p className="tp-split__p">{s.p}</p>
             </section>
           ))}
 
-          <h2>No account needed</h2>
-          <p>
-            Every tool that runs on your own machine works logged out, with nothing to sign up
-            for. Signing in adds sync across your devices and share links; <Link to="/pricing">Pro</Link>{" "}
-            adds the passes that need a server. The{" "}
-            <Link to="/image-editor-no-upload">no-upload page</Link> draws the line between the
-            two, and <Link to="/architecture">Architecture</Link> shows it table by table.
-          </p>
+          <section className="tp-split">
+            <h2 className="tp-split__h2">No account needed</h2>
+            <p className="tp-split__p">
+              Every tool that runs on your own machine works logged out, with nothing to sign up
+              for. Signing in adds sync across your devices and share links;{" "}
+              <Link to="/pricing">Pro</Link> adds the passes that need a server. The{" "}
+              <Link to="/image-editor-no-upload">no-upload page</Link> draws the line between the
+              two, and <Link to="/architecture">Architecture</Link> shows it table by table.
+            </p>
+          </section>
         </article>
 
         {related.length > 0 && (
-          <nav className="tool-related" aria-label="Related tools">
-            <h2 className="tool-related__title">Next</h2>
-            <ul className="tool-related__list">
+          <nav className="tp-next" aria-label="Related tools">
+            <h2 className="tp-next__h2">Next</h2>
+            <ul className="tp-next__list">
               {related.map((r) => (
-                <li key={r!.slug}>
-                  <Link to={r!.slug} className="tool-related__card">
-                    <span className="tool-related__group">{r!.group}</span>
-                    <span className="tool-related__label">{r!.label}</span>
-                    <span className="tool-related__blurb">{r!.blurb}</span>
+                <li className="tp-next__li" key={r.slug}>
+                  <Link className="tp-next__card" to={r.slug}>
+                    <span className="tp-next__group">{r.group}</span>
+                    <span className="tp-next__label">{r.label}</span>
+                    <span className="tp-next__blurb">{r.blurb}</span>
+                    <span className="tp-next__slug">{r.slug} &rarr;</span>
                   </Link>
                 </li>
               ))}
@@ -102,19 +146,14 @@ export default function ToolLanding() {
           </nav>
         )}
 
-        <section className="close">
-          <div className="close__body">
-            <p className="close__line">It opens in the tab you already have.</p>
-            <p className="close__sub">No account, no upload, nothing to install.</p>
-            <div className="close__actions">
-              <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the editor
-              </a>
-              <Link className="cta cta--outline cta--lg" to="/features">
-                See every tool
-              </Link>
-            </div>
+        <section className="tp-close">
+          <div className="tp-close__text">
+            <p className="tp-close__line">It opens in the tab you already have.</p>
+            <p className="tp-close__sub">No account, no upload, nothing to install.</p>
           </div>
+          <a className="tp-btn tp-btn--fill" href={EDITOR_URL} {...external}>
+            Open the editor
+          </a>
         </section>
       </main>
 

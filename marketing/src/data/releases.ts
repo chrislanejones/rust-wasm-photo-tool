@@ -24,6 +24,46 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.95",
+    date: "2026-09-24",
+    headline:
+      "The whole marketing site is redrawn — every page, in the new design, with the cream boards and the numbered callouts on the screenshots.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Every page is rebuilt to the new design: Home, Pricing, Features, Trail Log, Blog and its posts, About, Contact, Architecture, Privacy, Terms, the footer, and the ten tool pages.",
+      },
+      {
+        tag: "ui",
+        text: "The light boards arrive — the register-like blocks that sit on the dark page: the feature grid, the pricing matrix, what runs where, and what's coming.",
+      },
+      {
+        tag: "feature",
+        text: "The screenshots on the home page carry their callouts again: numbered pins on Presets, the Original/Edited split, Compress All, the magic wand, the Stroke Stabilizer and History. On a phone the pins stay on the picture and the notes read as a list underneath.",
+      },
+      {
+        tag: "ui",
+        text: "The Tools and Learn menus now draw their tall card at exactly the same size, so the menu stops resizing as you move between them.",
+      },
+      {
+        tag: "feature",
+        text: "Every page has its own share card now — 21 of them, the horse on each, set in the same typeface as the site. Before, only five pages had one.",
+      },
+      {
+        tag: "fix",
+        text: "The architecture page was describing 8 of the 14 tables that actually exist, and had the op-log format a version behind. It now lists all 14, field for field, and says plainly which five nothing uses any more.",
+      },
+      {
+        tag: "fix",
+        text: "Dates read as US formats throughout, and the machine-readable ones stay in the markup for crawlers.",
+      },
+      {
+        tag: "infra",
+        text: "Each page owns its own stylesheet instead of one shared file, so a change to one page cannot reach another.",
+      },
+    ],
+  },
+  {
     version: "v8.94",
     date: "2026-09-24",
     headline:
