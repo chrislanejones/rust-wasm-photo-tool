@@ -55,7 +55,7 @@ fully live.
   Intersect stay correct while dragging back down.
 + The readout and the Combine group make the selection's state visible
   without a modifier held.
-- wasm 814,432 → 816,586 B (+2,154). One more engine field: `lib.rs` is at
+- wasm 814,432 → 816,594 B (+2,162; 816,586 before the Magic Eraser clear was added). One more engine field: `lib.rs` is at
   4,767 lines against the 4,808 guardrail cap.
 - Edge-aware re-runs recompute the Sobel map every time (822–899 ms at 24 MP).
   A cached map is the obvious next step if big documents become common.
@@ -92,3 +92,10 @@ while drafting this record; it now clears the record itself, and
 Early warning sign: a new `self.selection =` site in a diff that does not
 touch `selection_retune`, or a new producer with no "not retunable" test
 beside `marquee_and_select_all_are_not_retunable`.
+
+*Amended 09-24-2026, by ADR-068:* the Consequences line "Anti-alias (no
+engine support, and morphology is excluded)" is half out of date. Morphology
+now exists: `dilate` / `erode` in `src/selection_refine.rs` drive Refine's
+Smooth and Expand. Anti-alias is still not done, for the reason that remains:
+the selection is `Vec<bool>`, so a soft edge has nowhere to live except a
+layer mask (Refine's Feather, through `add_layer_mask_from`).

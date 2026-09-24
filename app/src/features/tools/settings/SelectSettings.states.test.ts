@@ -138,17 +138,17 @@ describe("Combine", () => {
     return b;
   };
 
-  it("offers New / Add / Subtract / Intersect, with the store's mode lit", () => {
+  it("offers New selection / Add / Subtract / Intersect, with the store's mode lit", () => {
     useToolStore.setState({ selectionCombine: 3 });
     render("wand");
-    for (const n of ["New", "Add", "Subtract", "Intersect"]) expect(() => radio(n)).not.toThrow();
+    for (const n of ["New selection", "Add", "Subtract", "Intersect"]) expect(() => radio(n)).not.toThrow();
     // Lit = the ToolButton active style on master; once Night 2 (#230) lands
     // the same tile also says so as a checked radio. Either counts.
     const lit = (b: HTMLButtonElement) =>
       b.getAttribute("aria-checked") === "true" ||
       b.className.split(/\s+/).includes("border-theme-primary");
     expect(lit(radio("Intersect"))).toBe(true);
-    expect(lit(radio("New"))).toBe(false);
+    expect(lit(radio("New selection"))).toBe(false);
   });
 
   it("clicking a mode writes it to the store", () => {

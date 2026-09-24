@@ -146,7 +146,10 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
 type CombineId = "new" | "add" | "subtract" | "intersect";
 const COMBINE_IDS: readonly CombineId[] = ["new", "add", "subtract", "intersect"];
 const COMBINE_OPTIONS = [
-  { id: "new", label: "New", icon: Square, title: "Each selection replaces the last" },
+  // "New selection", not "New": the top bar already has a "New" (a new
+  // image), and two buttons with one name that do unrelated things is what a
+  // screen reader user would hear side by side.
+  { id: "new", label: "New selection", icon: Square, title: "Each selection replaces the last" },
   { id: "add", label: "Add", icon: SquaresUnite, title: "Add to the selection (or hold Shift)" },
   {
     id: "subtract",
