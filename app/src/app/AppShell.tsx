@@ -117,6 +117,8 @@ import {
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
+import { useExportFileName } from "@/hooks/useExportFileName";
+import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
@@ -1144,6 +1146,7 @@ export function AppShell() {
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
+    handleExportAs,
   } = useCanvasActions({
     stamp,
     exportFormat,
@@ -1167,6 +1170,16 @@ export function AppShell() {
       canvasBgTransparent,
     }),
   });
+
+  const exportName = useExportFileName(
+    exportDialogOpen,
+    activePhotoId,
+    photos.find((p) => p.id === activePhotoId)?.name,
+  );
+  const downloadFromDialog = () => {
+    setExportDialogOpen(false);
+    void handleExportAs(exportName.stem());
+  };
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -2941,16 +2954,21 @@ export function AppShell() {
                 columns={2}
               />
             </div>
+
+            <ExportFileNameField
+              value={exportName.value}
+              defaultStem={exportName.defaultStem}
+              onChange={exportName.onChange}
+              ext={EXT[effectiveExportFormat]}
+              onSubmit={downloadFromDialog}
+            />
           </DialogBody>
 
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
               label={`Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleExport();
-              }}
+              onClick={downloadFromDialog}
             />
             <ShareButton
               exportPng={async () => {

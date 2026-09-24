@@ -52,7 +52,7 @@ export const WINDOW_TITLE =
    ────────────────────────────────────────────────────────────────────────── */
 
 /** Every text field: surface, border, type color, and a visible focus ring.
- *  Not exported — the two below are the ones components use, and a third
+ *  Not exported — the ones below are the ones components use, and a third
  *  spelling of "a field" is how the drift this replaces started. */
 const FIELD_BASE =
   "w-full rounded-lg bg-theme-muted border border-theme-border text-text-primary " +
@@ -61,6 +61,10 @@ const FIELD_BASE =
 /** A short numeric field — width, height, a quality figure. `tabular-nums` so
  *  digits do not reflow as you type, which is what makes a spinner feel loose. */
 export const FIELD_NUMERIC = `${FIELD_BASE} px-2 py-1.5 text-sm tabular-nums`;
+
+/** A single-line text field — the export dialog's file name. Same padding and
+ *  type size as the textarea, so a dialog holding both reads as one set. */
+export const FIELD_TEXT = `${FIELD_BASE} px-3 py-2 text-sm`;
 
 /** A multi-line field. `resize-none` because the dialogs size their own panels
  *  and a user-dragged corner fights the layout. */
