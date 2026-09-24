@@ -15,6 +15,33 @@
   line-height: 1.55;
 }
 
+/* The closing line, and on Home the horse beside it. `auto` gives the horse its
+   own 420px; the line takes the rest and wraps inside its 38ch. With no horse
+   the second track is empty and the line looks exactly as it did. */
+.sfoot__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-lg) var(--space-xl);
+  align-items: center;
+}
+
+/* Negative block margins, from the design: the model's own canvas has empty
+   room above the ears for the gallop's highest frame, and this pulls the
+   horse up into the footer's top padding instead of stretching the footer. */
+.sfoot__horse {
+  position: relative;
+  width: 420px;
+  height: 240px;
+  margin-block: -40px -8px;
+}
+.sfoot__horse-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .sfoot__line {
   margin: 0;
   max-width: 38ch;

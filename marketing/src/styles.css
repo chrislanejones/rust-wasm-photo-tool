@@ -412,8 +412,10 @@ a { color: inherit; }
   outline-offset: 2px;
 }
 
-/* ⌘K search trigger — desktop only, hidden on mobile with the items list */
-.nav-pill__search { flex-shrink: 0; }
+/* ⌘K search trigger — desktop only, hidden on mobile with the items list.
+   `border: 0` is load-bearing: it is a <button> without .nav-item--btn, so the
+   browser's own 2px outset border drew a white ring round the pill. */
+.nav-pill__search { flex-shrink: 0; border: 0; font-family: inherit; }
 
 /* CTA label variants: full text on desktop, short on very narrow phones */
 .nav-pill__cta-short { display: none; }
@@ -684,18 +686,34 @@ a { color: inherit; }
   color: var(--color-ink-2);
   line-height: 1.4;
 }
-/* Dashed, and no fill: it is a signpost, not a destination. */
+/* Dashed, and no fill: it is a signpost, not a tool. But it is set like its
+   neighbours — eyebrow, title, line — at full contrast, because a faint mono
+   line centred in an empty box read as a missing card, not a link. */
 .nav-mega__page--more {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   border-style: dashed;
+  border-color: var(--color-rule-strong);
   background: transparent;
-  color: var(--color-ink-3);
 }
 .nav-mega__page--more:hover {
-  background: transparent;
-  border-color: var(--color-rule-strong);
+  background: var(--color-paper-2);
+  border-color: var(--color-accent);
+}
+.nav-mega__page--more:hover .nav-mega__page-title { color: var(--color-accent); }
+
+/* "Coming" eyebrow — shared by the mega menu and the mobile sheet. */
+.nav-more__eye {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
 }
 
 /* ── marquee hero + cursor spotlight ──────────────────────── */
@@ -1399,11 +1417,13 @@ a { color: inherit; }
   position: relative;
   aspect-ratio: 16 / 9;
   min-width: 0;
-  cursor: pointer;
+  cursor: grab;
   touch-action: none;
   user-select: none;
   outline: none;
 }
+
+.cubes.is-grabbing { cursor: grabbing; }
 
 .cubes:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -1777,38 +1797,6 @@ a { color: inherit; }
 }
 .nav-sheet[hidden] { display: none; }
 
-/* Principle feature card — full width at top */
-.nav-sheet__principle {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-lg);
-  border: var(--rule-hair) solid var(--color-rule);
-  border-radius: var(--radius-md);
-  background: var(--color-paper-3);
-  text-decoration: none;
-  transition: background-color var(--dur-micro) var(--ease-out);
-}
-.nav-sheet__principle:hover { background: var(--color-paper-4); }
-.nav-sheet__principle-eye {
-  font-family: var(--font-outlier);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-accent);
-}
-.nav-sheet__principle-title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--color-ink);
-  line-height: 1.2;
-}
-.nav-sheet__principle-desc {
-  font-size: var(--text-sm);
-  color: var(--color-ink-2);
-  line-height: 1.5;
-}
-
 /* Section wrapper */
 .nav-sheet__section { display: flex; flex-direction: column; gap: var(--space-sm); }
 .nav-sheet__section-head {
@@ -1879,30 +1867,11 @@ a { color: inherit; }
   color: var(--color-ink-3);
   line-height: 1.4;
 }
-.nav-sheet__card--more { opacity: 0.6; }
-
-/* Pricing / Contact horizontal pair */
-.nav-sheet__pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-xs);
-}
-.nav-sheet__pair-link {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: var(--space-sm);
-  border: var(--rule-hair) solid var(--color-rule);
-  border-radius: var(--radius-sm);
-  background: var(--color-paper-2);
-  text-decoration: none;
-  transition: background-color var(--dur-micro) var(--ease-out);
-}
-.nav-sheet__pair-link:hover { background: var(--color-paper-3); }
-.nav-sheet__pair-link.is-active .nav-sheet__card-title { color: var(--color-accent); }
-.nav-sheet__pair-sub {
-  font-size: var(--text-xs);
-  color: var(--color-ink-3);
+/* Same signpost as the mega menu's: dashed, unfilled, full contrast. */
+.nav-sheet__card--more {
+  border-style: dashed;
+  border-color: var(--color-rule-strong);
+  background: transparent;
 }
 
 /* ⚠️ `.nav-sheet .nav-sheet__cta` beats `.nav-sheet a` (specificity 0,1,1 vs 0,2,0) */
@@ -4351,6 +4320,48 @@ a { color: inherit; }
   font-size: var(--text-deck);
   color: var(--b-ink-2);
   text-wrap: pretty;
+}
+
+/* ── "Being built now" — the /coming-soon cards on the home page's cream ──
+   .soon-card reads --board-*, which .soon-board sets on /coming-soon; here the
+   cream band sets them from its own --b-* so the card is the same object. */
+.building {
+  --board-ink: var(--b-ink);
+  --board-ink-2: var(--b-ink-2);
+  --board-ink-3: var(--b-ink-3);
+  --board-rule: var(--b-rule);
+
+  display: grid;
+  gap: var(--space-xl);
+}
+.building .soon-card { background: var(--b-card); }
+/* Five entries: narrower minimum than /coming-soon's 17rem so they sit on one
+   row on a desktop instead of leaving an orphan under four. */
+.building .soon-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+/* The badge is a label, the pill beside it is the link — two jobs, two shapes. */
+.building__badge {
+  padding: 3px 8px;
+  border: var(--rule-hair) solid oklch(44% 0.170 45);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(44% 0.170 45);
+}
+.building__more { margin: 0; }
+.building__more a {
+  color: oklch(44% 0.170 45);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.building__more a:hover { text-decoration: underline; }
+.building__more a:focus-visible,
+.building .soon-card__beta:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── "Made for the jobs in between" — three audiences ────────────────── */

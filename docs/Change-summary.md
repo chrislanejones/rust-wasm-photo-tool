@@ -10937,3 +10937,23 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Trail Log** | All **153** versions and **1196** headline/entry strings verbatim in the prerendered HTML. `releases.ts` was never edited by a port. |
 | **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
 | **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |
+
+## v8.96 Change Summary — 2026-09-24
+
+**Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.**
+
+| Area | Change |
+| --- | --- |
+| **WEBGPU cubes** | The word on Home is **103** lit 3D cubes through three.js's WebGPU renderer, ported from the design's `gpu-letters.js`. Hover ripples, drag scatters, any key knocks them loose, and they spring back. The label reports what the machine actually gave it: WebGPU, WebGL 2, or no GPU context. It never claims a device it did not get. |
+| **Trotting horse** | The design's `horse-trot.js`: a low-poly horse (`horse.glb`, 181,792 B, 15 morph targets) beside "Your pictures, your computer." in the Home footer. Decoration only, `aria-hidden`. Desktop pointers only, decided before anything is requested, so a phone never downloads the model or three.js. |
+| **Page weight** | Both graphics are chunk boundaries (`gpu-letters.three.ts`, `horse-trot.three.ts`), loaded when their section comes within 300px of the viewport. Home's HTML preloads neither. |
+| **three.js** | 0.165 → **0.170**, which has the `three/webgpu` entry the design's graphics were built on (added in 0.167). ADR-067 amends ADR-057. Both blog-post scenes checked on it: they render, with no console errors. |
+| **Being built now** | A cream band between the cubes and the blog: the five "building" entries from /coming-soon, the two already behind a flag first, each with a **Beta** badge and a link to try it. It reads the same list as /coming-soon (`data/comingSoon.ts`), so the two cannot disagree. It also splits what used to be two dark rows meeting at a hairline. |
+| **Menu bar** | **Home** added: Home · Tools · Learn · Pricing · Contact. The ⌘K button lost a white ring that was the browser's default button border drawn on a pill. |
+| **Phone menu** | Opens with a **MAIN 3** group (Home, Contact, Pricing) built from the same card as Tools and Learn. It replaces the tall "The principle" card and the Pricing/Contact pair at the bottom, where Contact sat below the fold at 1,356px on an 844px screen. |
+| **More coming** | The dashed card in the Tools menu was faint mono text in an empty box. It is a real card now (icon, title, one line) in both menus; the phone version was at 60% opacity. |
+| **Contact form** | Can send straight to the inbox through Web3Forms once `VITE_WEB3FORMS_KEY` is set on the marketing project. With no key it opens your mail app, exactly as before. The Privacy Policy names the relay only while it is switched on. `api.web3forms.com` added to `connect-src`. |
+| **Known, not new** | A React #418 hydration warning on /contact, /pricing, /coming-soon and /privacy-policy when served by `vite preview`. The v8.95 release built the same way shows it on the same four pages; live production shows it on none. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |
+

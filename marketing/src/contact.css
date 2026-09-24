@@ -211,6 +211,26 @@
   line-height: 1.45;
   color: var(--c-ink-2);
 }
+/* The bot trap. Off-screen rather than display:none — some bots skip fields
+   that are not rendered. aria-hidden + tabIndex -1 keep it out of reach. */
+.contact-form__trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.contact-form__error {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--rule-hair) solid oklch(55% 0.180 30);
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: oklch(38% 0.150 30);
+  background: oklch(95% 0.030 30);
+}
+.contact-form__error a { color: inherit; }
 .contact-form__foot {
   display: flex;
   flex-wrap: wrap;
@@ -245,6 +265,7 @@
   cursor: pointer;
 }
 .contact-form__send:hover { background: oklch(66% 0.180 50); }
+.contact-form__send:disabled { opacity: 0.7; cursor: progress; }
 .contact-coda__cta:hover { background: var(--color-accent-soft); color: var(--color-accent-ink); }
 .contact-form__send:focus-visible,
 .contact-coda__cta:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }

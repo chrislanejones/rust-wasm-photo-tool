@@ -16,6 +16,9 @@ const P = {
   checks:    ["m3 7 2 2 4-4","m3 17 2 2 4-4","M13 8h8","M13 18h8"],
   telescope: ["m10 6 8-4 3 5-8 4z","m5 12 5-6 4 3-5 6z","M3 16l4-5 3 2-4 5z","M9 18l3 4","M14 18l-3 4"],
   info:      ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z","M12 11v5","M12 8h.01"],
+  home:      ["M3 10.5 12 3l9 7.5","M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9"],
+  tag:       ["M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z","M7.5 7.5h.01"],
+  mail:      ["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z","m22 7-10 6L2 7"],
 };
 
 // ── data ──────────────────────────────────────────────────────────────────
@@ -49,6 +52,15 @@ const LEARN_ITEMS: LearnItem[] = [
   { key: "features",     href: "/features",     title: "Features",     desc: "The whole list — engine and interface.", paths: P.checks,    detail: "All the features from the repo's own list, regrouped by what you're trying to do — annotate, select, enhance, export. Each has a plain line and the engineering line underneath." },
   { key: "coming",       href: "/coming-soon",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
   { key: "about",        href: "/about",        title: "About",        desc: "Who builds it, and the horse.",          paths: P.info,      detail: "Image Horse is one person's project, and it is named after a horse. Chris builds it. Naji, an Arabian who survived his herd and later worked as a therapy horse, lent the name." },
+];
+
+/* The three pages that belong to no group. On the phone sheet they get a
+ * section of their own, MAIN, laid out exactly like LEARN below it. The subs
+ * for Pricing and Contact are the lines the old two-up pair carried. */
+const MAIN_ITEMS = [
+  { to: "/",        title: "Home",    desc: "The editor, and what runs where.", paths: P.home },
+  { to: "/contact", title: "Contact", desc: "One inbox, one form.",             paths: P.mail },
+  { to: "/pricing", title: "Pricing", desc: "$0 · every tool, every tier.",     paths: P.tag },
 ];
 
 const PRINCIPLE      = { eyebrow: "The principle", title: "An image editor with no upload.", desc: "Your pictures stay on your computer. Every tool below says which parts do, and which need a server.", foot: "/image-editor-no-upload →", href: "/image-editor-no-upload" };
@@ -203,6 +215,16 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
 
           {/* Desktop nav items */}
           <ul className="nav-pill__items" role="menubar">
+            <li role="none">
+              <NavLink
+                to="/"
+                end
+                className={({ isActive }) => `nav-item nav-item--link${isActive ? " is-active" : ""}`}
+                onPointerEnter={scheduleClose}
+              >
+                Home
+              </NavLink>
+            </li>
             {(["tools", "learn"] as const).map((key) => (
               <li key={key} role="none">
                 <button
@@ -314,8 +336,10 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                       </Link>
                     ))}
                     {g.pages.length < 2 && (
-                      <Link to="/coming-soon" className="nav-mega__page nav-mega__page--more" aria-label={`What's coming to ${g.name}`}>
-                        <span style={{ fontFamily: "var(--font-outlier)", fontSize: "var(--text-2xs)", lineHeight: 1.4 }}>more coming →</span>
+                      <Link to="/coming-soon" className="nav-mega__page nav-mega__page--more">
+                        <span className="nav-more__eye"><Paths d={P.telescope} size={12} />Coming</span>
+                        <span className="nav-mega__page-title">More on the way</span>
+                        <span className="nav-mega__page-desc">What&rsquo;s being built, and how sure we are <span aria-hidden="true">&rarr;</span></span>
                       </Link>
                     )}
                   </div>
@@ -357,11 +381,31 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
       {/* ── Mobile sheet ── */}
       <div className="nav-sheet" id="navsheet" ref={sheetRef} hidden={!sheetOpen}>
 
-        <Link to="/image-editor-no-upload" className="nav-sheet__principle">
-          <span className="nav-sheet__principle-eye">The principle</span>
-          <span className="nav-sheet__principle-title">An image editor with no upload.</span>
-          <span className="nav-sheet__principle-desc">Your pictures stay on your computer. Every tool below says which parts do, and which need a server.</span>
-        </Link>
+        {/* The three pages with no group, first — so Home and Contact are on the
+            first screen instead of under seventeen cards. Same section, head
+            and card as LEARN, so the three read as a group, not as buttons. */}
+        <nav className="nav-sheet__section" aria-labelledby="navsheet-main">
+          <h2 className="nav-sheet__section-head" id="navsheet-main">
+            Main
+            <span>{MAIN_ITEMS.length}</span>
+          </h2>
+          <div className="nav-sheet__grid">
+            {MAIN_ITEMS.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                end
+                className={({ isActive }) => `nav-sheet__card${isActive ? " is-active" : ""}`}
+              >
+                <span className="nav-sheet__card-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: "var(--color-accent)", flexShrink: 0 }}><Paths d={l.paths} size={15} /></span>
+                  {l.title}
+                </span>
+                <span className="nav-sheet__card-desc">{l.desc}</span>
+              </NavLink>
+            ))}
+          </div>
+        </nav>
 
         <section className="nav-sheet__section">
           <h2 className="nav-sheet__section-head">
@@ -381,9 +425,10 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                 </Link>
               ))
             )}
-            <Link to="/coming-soon" className="nav-sheet__card nav-sheet__card--more" aria-label="What's coming to Batch">
-              <span className="nav-sheet__card-group">Batch</span>
-              <span className="nav-sheet__card-desc" style={{ fontFamily: "var(--font-outlier)", fontSize: "var(--text-2xs)" }}>more coming →</span>
+            <Link to="/coming-soon" className="nav-sheet__card nav-sheet__card--more">
+              <span className="nav-more__eye"><Paths d={P.telescope} size={12} />Coming</span>
+              <span className="nav-sheet__card-title">More on the way</span>
+              <span className="nav-sheet__card-desc">What&rsquo;s being built, and how sure we are <span aria-hidden="true">&rarr;</span></span>
             </Link>
           </div>
         </section>
@@ -408,17 +453,6 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
               </NavLink>
             ))}
           </div>
-        </section>
-
-        <section className="nav-sheet__pair">
-          <NavLink to="/pricing" className={({ isActive }) => `nav-sheet__pair-link${isActive ? " is-active" : ""}`}>
-            <span className="nav-sheet__card-title">Pricing</span>
-            <span className="nav-sheet__pair-sub">$0 · every tool, every tier</span>
-          </NavLink>
-          <NavLink to="/contact" className={({ isActive }) => `nav-sheet__pair-link${isActive ? " is-active" : ""}`}>
-            <span className="nav-sheet__card-title">Contact</span>
-            <span className="nav-sheet__pair-sub">one inbox, one form</span>
-          </NavLink>
         </section>
 
         <a className="nav-sheet__cta" href={EDITOR_URL} {...external}>

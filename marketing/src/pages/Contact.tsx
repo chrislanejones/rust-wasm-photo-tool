@@ -1,20 +1,26 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
-import { CODEBERG_URL, EDITOR_URL, GITHUB_URL, external } from "../config";
+import { CODEBERG_URL, EDITOR_URL, GITHUB_URL, WEB3FORMS_KEY, external } from "../config";
 
 /* /contact — one inbox, sorted by what the message is about.
  *
- * The form has nothing to POST to: this site is static files with no server
- * behind them. So "Send" builds a mailto: to the same address the Privacy
- * Policy and the Terms already publish, with the topic in the subject line and
- * the fields in the body, and hands it to the reader's own mail app. Nothing is
- * stored here, and nothing pretends to have been sent when it has not — the
- * after-state says the mail app should have opened, and shows the address in
- * case it didn't.
+ * This site is static files with no server behind them, so the form has two
+ * ways out, chosen at build time by WEB3FORMS_KEY:
  *
- * The design's screenshot upload is the one field a mailto: cannot carry, so
- * the Bug topic says to attach it in the mail app instead.
+ *  - Key set: "Send" POSTs to Web3Forms, a form relay that emails the message
+ *    to the inbox the key was made for. The reader never needs a mail app —
+ *    which matters, because on a machine with none set up (common on Windows,
+ *    and for anyone who only uses webmail) a mailto: opens nothing and the
+ *    message is silently lost.
+ *  - No key: "Send" builds a mailto: to the published address and hands it to
+ *    the reader's mail app, as before.
+ *
+ * Either way nothing is stored on this site, and nothing says "sent" until it
+ * was: a failed POST shows the error and offers the mailto: as the way out.
+ *
+ * Files are the one thing neither path carries, so the Bug topic asks for the
+ * screenshot in a reply instead.
  */
 
 const EMAIL = "chrislanejones@gmail.com";
@@ -109,6 +115,8 @@ const TOPICS: Topic[] = [
   },
 ];
 
+type Status = "idle" | "sending" | "sent" | "mailto" | "error";
+
 function mailtoFor(topic: Topic, fields: Record<string, string>) {
   const lines = [fields.message ?? "", "", "—"];
   if (fields.name) lines.push(`Name: ${fields.name}`);
@@ -132,14 +140,46 @@ function TopicLinkPill({ link }: { link: TopicLink }) {
 
 export default function Contact() {
   const [key, setKey] = useState("question");
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [fallback, setFallback] = useState(`mailto:${EMAIL}`);
   const topic = TOPICS.find((t) => t.key === key) ?? TOPICS[0];
+  const sent = status === "sent" || status === "mailto";
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    window.location.href = mailtoFor(topic, data);
-    setSent(true);
+    const mailto = mailtoFor(topic, data);
+    setFallback(mailto);
+
+    if (!WEB3FORMS_KEY) {
+      window.location.href = mailto;
+      setStatus("mailto");
+      return;
+    }
+
+    setStatus("sending");
+    try {
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: `Image Horse — ${topic.label}`,
+          from_name: data.name || "Image Horse contact form",
+          // Web3Forms sets Reply-To from `email`, so answering the notification
+          // answers the sender. Omitted when blank rather than sent empty.
+          ...(data.email ? { email: data.email } : {}),
+          topic: topic.label,
+          ...(topic.askBrowser && data.browser ? { browser: data.browser } : {}),
+          message: data.message ?? "",
+          botcheck: data.botcheck ?? "",
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { success?: boolean };
+      setStatus(res.ok && json.success ? "sent" : "error");
+    } catch {
+      setStatus("error");
+    }
   };
 
   return (
@@ -166,7 +206,7 @@ export default function Contact() {
                 className={`contact-tile${t.key === key ? " is-on" : ""}`}
                 onClick={() => {
                   setKey(t.key);
-                  setSent(false);
+                  setStatus("idle");
                 }}
               >
                 <span className="contact-tile__label">{t.label}</span>
@@ -210,32 +250,74 @@ export default function Contact() {
                 {topic.messageLabel}
                 <textarea name="message" required rows={6} placeholder={topic.placeholder} />
               </label>
+              {/* Honeypot: hidden from people and screen readers, filled in by bots.
+                  Web3Forms drops any submission where it is ticked. */}
+              {WEB3FORMS_KEY && (
+                <input
+                  type="checkbox"
+                  name="botcheck"
+                  className="contact-form__trap"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                />
+              )}
               {topic.attach && (
                 <p className="contact-form__attach">
-                  Got a screenshot? Attach it in your mail app when it opens &mdash; this form
-                  can&rsquo;t carry files.
+                  {WEB3FORMS_KEY ? (
+                    <>
+                      Got a screenshot? Leave an email above and you&rsquo;ll be asked for it in the
+                      reply &mdash; this form can&rsquo;t carry files.
+                    </>
+                  ) : (
+                    <>
+                      Got a screenshot? Attach it in your mail app when it opens &mdash; this form
+                      can&rsquo;t carry files.
+                    </>
+                  )}
+                </p>
+              )}
+              {status === "error" && (
+                <p className="contact-form__error" role="alert">
+                  That didn&rsquo;t go through. Try again, or{" "}
+                  <a href={fallback}>send it from your mail app</a> instead.
                 </p>
               )}
               <div className="contact-form__foot">
                 <p className="contact-form__fine">
-                  Opens your mail app, addressed to one inbox. Nothing is stored on this site.
+                  {WEB3FORMS_KEY
+                    ? "Goes straight to one inbox. Nothing is stored on this site."
+                    : "Opens your mail app, addressed to one inbox. Nothing is stored on this site."}
                 </p>
-                <button type="submit" className="contact-form__send">
-                  {topic.cta}
+                <button type="submit" className="contact-form__send" disabled={status === "sending"}>
+                  {status === "sending" ? "Sending…" : topic.cta}
                 </button>
               </div>
             </form>
           ) : (
             <div className="contact-sent" role="status">
-              <p className="contact-sent__kicker">Ready to send</p>
-              <p className="contact-sent__title">Your mail app should have opened.</p>
-              <p className="contact-sent__body">
-                Send it from there. If nothing opened, write to{" "}
-                <a href={`mailto:${EMAIL}`}>{EMAIL}</a> &mdash; replies come from the same person
-                who wrote the code, usually within a few days.
-              </p>
-              <button type="button" className="contact-sent__again" onClick={() => setSent(false)}>
-                Start over
+              {status === "sent" ? (
+                <>
+                  <p className="contact-sent__kicker">Sent</p>
+                  <p className="contact-sent__title">It&rsquo;s in the inbox.</p>
+                  <p className="contact-sent__body">
+                    If you left an email, the reply comes from the same person who wrote the code,
+                    usually within a few days.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="contact-sent__kicker">Ready to send</p>
+                  <p className="contact-sent__title">Your mail app should have opened.</p>
+                  <p className="contact-sent__body">
+                    Send it from there. If nothing opened, write to{" "}
+                    <a href={`mailto:${EMAIL}`}>{EMAIL}</a> &mdash; replies come from the same
+                    person who wrote the code, usually within a few days.
+                  </p>
+                </>
+              )}
+              <button type="button" className="contact-sent__again" onClick={() => setStatus("idle")}>
+                {status === "sent" ? "Send another" : "Start over"}
               </button>
             </div>
           )}

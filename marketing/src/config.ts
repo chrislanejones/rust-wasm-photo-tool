@@ -4,6 +4,13 @@ import { APP_URL, ROUTES } from "./seo";
  *  and a sign-in cookie both read as Image Horse rather than as some build host. */
 export const EDITOR_URL = APP_URL;
 
+/** Web3Forms access key for the contact form. PUBLIC by design — it only lets
+ *  a form deliver to the inbox it was created for, and it ships in the page
+ *  either way. Empty means the form falls back to opening the reader's mail app
+ *  (the pre-Web3Forms behavior). Set it on the Vercel marketing project as
+ *  VITE_WEB3FORMS_KEY; it is read at build time. */
+export const WEB3FORMS_KEY: string = import.meta.env.VITE_WEB3FORMS_KEY ?? "";
+
 export const GITHUB_URL = "https://github.com/chrislanejones/rust-wasm-photo-tool";
 export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo-tool";
 

@@ -18,6 +18,18 @@ warning in an otherwise clean build, and a real CSS warning would hide behind it
 token in a `z-[var(…)]` class") so no complete class string appears, then
 confirm the build prints no CSS warning. Same shape as the guardrails
 comment-counted-as-code trap in CLAUDE.md.
+## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+Found while ADR-067 was drafted, left out of the release on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The cubes' dynamic `import()` has no `.catch` | `marketing/src/components/CubeLetters.tsx` | If the chunk fails to load, the label says "Starting…" forever instead of "No GPU context". Fix: catch and set the `none` backend. |
+| A comment names three 0.165's `Color.setStyle` | `marketing/src/posts/engine-in-a-worker.figures.tsx:35` | three is 0.170 now. Check whether 0.170 parses `oklch()`; update or drop the comment. |
+
+Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
+Chromium draws WebGPU canvases blank white even for a bare three.js control, so
+only the WebGL 2 path is verified.
 
 ## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
 

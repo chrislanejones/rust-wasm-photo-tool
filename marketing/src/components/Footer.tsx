@@ -1,10 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { GITHUB_URL, CODEBERG_URL, PAGES, LEGAL_PAGES, external, repoFile } from "../config";
 import { CodebergIcon, GitHubIcon } from "./Icons";
+import HorseTrot from "./HorseTrot";
 
 interface FooterProps {
   /** The closing statement. Each page ends on its own sentence. */
   line: string;
+  /** The trotting horse beside the line. Home only, per the design. */
+  horse?: boolean;
 }
 
 /* Three columns under the page's closing line:
@@ -24,7 +27,7 @@ interface FooterProps {
  *  cause a hydration mismatch every January until the next deploy. */
 const YEAR = __BUILD_YEAR__;
 
-export default function Footer({ line }: FooterProps) {
+export default function Footer({ line, horse = false }: FooterProps) {
   const { pathname } = useLocation();
   // Never link a page to itself. The footer's job is where to go next.
   const links = PAGES.filter((p) => p.to !== "/" && p.to !== pathname);
@@ -32,7 +35,10 @@ export default function Footer({ line }: FooterProps) {
 
   return (
     <footer className="sfoot">
-      <p className="sfoot__line">{line}</p>
+      <div className="sfoot__top">
+        <p className="sfoot__line">{line}</p>
+        {horse && <HorseTrot />}
+      </div>
 
       <div className="sfoot__cols">
         <div className="sfoot__col">
