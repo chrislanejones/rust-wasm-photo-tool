@@ -42,7 +42,10 @@ looks right — `SubscriptionButton` has its own confirm dialog while five other
 files use `ui/confirm-dialog`.
 
 **R6 — A control that expresses a choice must say which choice.** Exclusive
-selection needs `aria-pressed`, `aria-checked` or a native radio. A row of
+selection is a radio group: `role="radio"` + `aria-checked` inside a named
+`role="radiogroup"`, or a native radio. `aria-pressed` is for independent
+toggles only; on an exclusive set it announces N unrelated pressed/unpressed
+buttons and never says they are a set (corrected on Night 2, see §7). A row of
 buttons with no state announces itself to a screen reader as a row of
 unrelated buttons. Today **exactly 2 of the app's 43 segmented-control
 call sites expose selection state**; 3 more are action rows where silence is
@@ -211,3 +214,40 @@ numbers would have gone green on documentation.
 
 So R1, R3 and R7 are ratchet candidates for Night 7. R5, R6 and R9 need a real
 parser or a human. R10 needs neither — it needs this file to be kept.
+
+## 7. The semantic contract: four modes (Night 2, 09-24-2026)
+
+Every row-of-buttons control is in exactly one of these modes. Nights 3 to 6
+build on this table. It is the reason R6 reads the way it does.
+
+| Mode | Means | Semantics | Keyboard |
+| --- | --- | --- | --- |
+| **ACTION** | a button that does something | none: a plain `<button>` | one Tab stop per button |
+| **TOGGLE** | independent on/off, several may be on | `aria-pressed` on each | one Tab stop per button |
+| **SELECT** | exactly one of N | `role="radiogroup"` with an accessible name on the container; `role="radio"` + `aria-checked` on each option | **one** Tab stop for the group (the checked option); arrows move and select; Home/End |
+| **SWITCH** | one binary control with no visible pair | `ui/switch`, or `role="switch"` + `aria-checked` | one Tab stop |
+
+**How each primitive picks its mode.**
+
+| Primitive | ACTION | TOGGLE | SELECT |
+| --- | --- | --- | --- |
+| `ui/tool-button-group` | no `value` prop | an option carries its own `active` (per tile; a group can mix ACTION and TOGGLE tiles, as Guides does) | a `value` prop is passed, even `undefined` |
+| `ui/toggle-button-group` | not used today | the default: every item carries `active` | `mode="select"` |
+
+`tool-button-group` derives its mode from props it already had, so none of
+its 29 call sites needed a new prop to be correct. `toggle-button-group`
+cannot do that. Every item carries `active` whether the set is exclusive or
+not, and "exactly one is on right now" does not prove "only one can be on".
+So exclusivity is declared, not inferred. That costs one prop at 12 call
+sites, and it was the honest price.
+
+**The name.** A radio group must have an accessible name. It comes from, in
+order: an explicit `aria-labelledby` pointing at the rendered heading (the
+Settings panes pass the `PaneHeading` id); the group's own `label` prop
+(`tool-button-group` wires it up with `aria-labelledby` automatically); or an
+explicit `aria-label` that repeats the visible heading text (tool panels,
+where the heading is a `SectionHeader` or a bare `<label>`).
+
+**What SELECT does not change.** How it looks. The lit tile, the pill and the
+spacing are the same classes as before. The only visible difference is that
+the focus ring moves with the arrow keys.
