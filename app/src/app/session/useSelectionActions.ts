@@ -24,6 +24,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { toCoverage } from "@/lib/selectionCoverage";
 import { createLiveRetune } from "@/lib/liveRetune";
+import { CLEAN_UP, isNoopRefine, refineArgs, type RefineSettings } from "@/lib/selectionRefine";
 
 /** Quiet time before a Tolerance tick re-runs the selection. Long enough to
  *  skip the ticks of one drag, short enough to read as live. */
@@ -83,17 +84,33 @@ export function useSelectionActions(
   // engine's (one pass over its byte plane); the overlay RGBA is never read
   // for it. `seq` drops an answer that a newer selection has overtaken.
   const coverageSeq = useRef(0);
+  /** The overlay the Refine preview last put on screen. Any OTHER value of
+   *  `selectionMask` means something else changed the selection (a click, an
+   *  undo, Deselect), and the preview no longer describes anything. */
+  const refinePreviewMask = useRef<Uint8Array | null>(null);
   useEffect(() => {
     const seq = ++coverageSeq.current;
+    const tool = stamp.toolRef.current;
+    const previewing = useToolStore.getState().refinePreviewing;
+    const isPreview = previewing && selectionMask !== null && selectionMask === refinePreviewMask.current;
+    if (previewing && !isPreview) {
+      // Overtaken: the preview is gone, and the engine's copy with it.
+      refinePreviewMask.current = null;
+      useToolStore.getState().setRefinePreviewing(false);
+      void tool?.selection_refine_cancel();
+    }
     if (!selectionMask) {
       setSelectionCoverage(null);
       return;
     }
-    const tool = stamp.toolRef.current;
     if (!tool) return;
     void (async () => {
       try {
-        const raw = await tool.selection_coverage();
+        // While a preview is on screen the readout describes IT — the number
+        // always matches the ants that are drawn.
+        const raw = isPreview
+          ? await tool.selection_refine_preview_coverage()
+          : await tool.selection_coverage();
         if (seq === coverageSeq.current) setSelectionCoverage(toCoverage(raw));
       } catch {
         // A build without the export shows no readout rather than a guess.
@@ -144,6 +161,70 @@ export function useSelectionActions(
       onIdle: () => stampRef.current.syncState(),
     }),
   );
+  // ── Refine ───────────────────────────────────────────────────────────────
+  // The sliders preview on a COPY (the engine keeps it, the selection and the
+  // history are untouched); Apply and Clean Up commit ONE undo step. Same
+  // scheduler as live Tolerance: debounced, one run in flight, newest wins.
+  const selectionRefine = useToolStore((s) => s.selectionRefine);
+  const refineRequest = useToolStore((s) => s.refineRequest);
+  const refinePreview = useRef(
+    createLiveRetune<RefineSettings, Uint8Array | null>({
+      delayMs: RETUNE_DEBOUNCE_MS,
+      run: async (r) => {
+        const tool = stampRef.current.toolRef.current;
+        if (!tool || !(await tool.has_selection())) return null;
+        return await tool.selection_refine_preview(...refineArgs(r));
+      },
+      onResult: (mask) => {
+        // Empty = nothing selected to refine. A refine that selects nothing
+        // comes back as a full-size transparent overlay, so the ants clear.
+        if (!mask || !mask.length) return;
+        refinePreviewMask.current = mask;
+        useToolStore.getState().setRefinePreviewing(true);
+        useToolStore.getState().setSelectionMask(mask);
+      },
+    }),
+  );
+  const lastRefine = useRef(selectionRefine);
+  useEffect(() => {
+    const prev = lastRefine.current;
+    lastRefine.current = selectionRefine;
+    // Feather only shapes a mask made later; it cannot change the selection.
+    const same =
+      prev.islands === selectionRefine.islands &&
+      prev.holes === selectionRefine.holes &&
+      prev.smooth === selectionRefine.smooth &&
+      prev.expand === selectionRefine.expand;
+    if (same) return;
+    refinePreview.current.schedule(selectionRefine);
+  }, [selectionRefine]);
+
+  const lastRequest = useRef(refineRequest?.n ?? 0);
+  useEffect(() => {
+    if (!refineRequest || refineRequest.n === lastRequest.current) return;
+    lastRequest.current = refineRequest.n;
+    refinePreview.current.cancel();
+    const store = useToolStore.getState();
+    const r = refineRequest.kind === "cleanUp" ? CLEAN_UP : store.selectionRefine;
+    if (refineRequest.kind === "cleanUp") {
+      lastRefine.current = CLEAN_UP; // the reset below is not a slider move
+      store.setSelectionRefine(CLEAN_UP);
+    }
+    const tool = stampRef.current.toolRef.current;
+    if (!tool) return;
+    void (async () => {
+      refinePreviewMask.current = null;
+      store.setRefinePreviewing(false);
+      const mask = isNoopRefine(r)
+        ? await tool.selection_overlay()
+        : await tool.selection_refine_apply(...refineArgs(r));
+      store.setSelectionMask(mask.length ? mask : null);
+      // Apply pushes a "Refine Selection" step; the History panel and the
+      // Undo NN% readout both read the count.
+      stampRef.current.syncState();
+    })();
+  }, [refineRequest]);
+
   const lastTuned = useRef({ tolerance: selectionTolerance, edge: edgeThreshold });
   useEffect(() => {
     const prev = lastTuned.current;

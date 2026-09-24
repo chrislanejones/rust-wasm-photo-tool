@@ -40,6 +40,7 @@ mod presets;
 // bytes are identical either way.
 pub mod perspective;
 mod selection;
+mod selection_refine;
 mod settings;
 mod stabilizer;
 mod stamp;
@@ -472,6 +473,8 @@ pub struct ImageHorseTool {
     /// The last click-once selection, kept so a tolerance change can re-run
     /// it in place (`selection_retune`). See `selection::SelectionRetune`.
     selection_retune: Option<crate::selection::SelectionRetune>,
+    /// The Refine sliders' preview copy — only feeds the readout.
+    refine_preview: Option<Vec<bool>>,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
     /// RNG seeded and deterministic (never reads system time/entropy) while
@@ -899,6 +902,7 @@ impl ImageHorseTool {
             selection: None,
             selection_combine: 0,
             selection_retune: None,
+            refine_preview: None,
             #[cfg(feature = "patchmatch")]
             patchmatch_seed_counter: 0,
             lasso: None,

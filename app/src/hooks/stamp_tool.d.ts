@@ -1439,6 +1439,23 @@ declare module "stamp_tool" {
      *  Returns the overlay RGBA; empty when the result selects nothing OR
      *  there was nothing to re-run — re-read `selection_overlay` to tell. */
     selection_retune(tolerance: number, edge_threshold: number): Uint8Array;
+    /** Refine preview on a COPY (islands, holes, smooth radius, signed
+     *  expand): the overlay the refined selection would draw. The selection
+     *  and history are untouched. Empty when the result selects nothing. */
+    selection_refine_preview(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** `[selected, total]` of the last refine preview — the readout while a
+     *  Refine slider moves. */
+    selection_refine_preview_coverage(): Uint32Array;
+    /** Drop the refine preview copy. */
+    selection_refine_cancel(): void;
+    /** Apply the refine ops: ONE undo step ("Refine Selection"), recomputed
+     *  from the parameters. Returns the overlay. */
+    selection_refine_apply(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** Add a mask to layer `id` from `source`: 0 reveal all, 1 hide all,
+     *  2 reveal the selection, 3 hide the selection. `feather` softens the
+     *  selection's edge (2 and 3). One undo step. False if the layer is
+     *  missing or already masked, or 2/3 with nothing selected. */
+    add_layer_mask_from(id: number, source: number, feather: number): boolean;
     /** Deselect (no history). */
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */

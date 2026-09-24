@@ -50,7 +50,9 @@ import {
   SquaresUnite,
   SquaresSubtract,
   SquaresIntersect,
+  Sparkles,
 } from "lucide-react";
+import { ActionTile } from "@/components/ui/action-tile";
 import {
   PanelAction,
   PanelActionBar,
@@ -66,6 +68,7 @@ import { isMarqueeKind, useToolStore } from "@/stores/useToolStore";
 import type { SelectionCombineMode } from "@/lib/selectionBool";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
+import { isNoopRefine, type RefineSettings } from "@/lib/selectionRefine";
 import { PANEL_SECTION } from "@/lib/styles";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
@@ -143,7 +146,10 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
 type CombineId = "new" | "add" | "subtract" | "intersect";
 const COMBINE_IDS: readonly CombineId[] = ["new", "add", "subtract", "intersect"];
 const COMBINE_OPTIONS = [
-  { id: "new", label: "New", icon: Square, title: "Each selection replaces the last" },
+  // "New selection", not "New": the top bar already has a "New" (a new
+  // image), and two buttons with one name that do unrelated things is what a
+  // screen reader user would hear side by side.
+  { id: "new", label: "New selection", icon: Square, title: "Each selection replaces the last" },
   { id: "add", label: "Add", icon: SquaresUnite, title: "Add to the selection (or hold Shift)" },
   {
     id: "subtract",
@@ -189,6 +195,13 @@ export function SelectSettings({
   const combine = useToolStore((s) => s.selectionCombine);
   const setCombine = useToolStore((s) => s.setSelectionCombine);
   const coverage = useToolStore((s) => s.selectionCoverage);
+  const refine = useToolStore((s) => s.selectionRefine);
+  const setRefine = useToolStore((s) => s.setSelectionRefine);
+  const requestRefine = useToolStore((s) => s.requestRefine);
+  const previewing = useToolStore((s) => s.refinePreviewing);
+  const setOne = (key: keyof RefineSettings) => (v: number) =>
+    setRefine((r) => ({ ...r, [key]: v }));
+  const canRefine = !disabled && selection.active;
 
   return (
     <div className="space-y-4">
@@ -281,6 +294,56 @@ export function SelectSettings({
           onChange={(id) => setCombine(COMBINE_IDS.indexOf(id) as SelectionCombineMode)}
           options={COMBINE_OPTIONS}
         />
+      </div>
+
+      {/* ── Refine ───────────────────────────────────────────────────────
+          Non-modal, on this panel: Clean Up is the preset, the sliders are the
+          same four operations (plus the feather a mask gets) exposed one by
+          one. Sliders PREVIEW on a copy — the ants and the readout above show
+          the refined result — and Apply commits it as one undo step. The
+          engine work is src/selection_refine.rs; the wiring is store-driven
+          (useSelectionActions answers), so AppShell gains nothing. */}
+      <div className={PANEL_SECTION}>
+        <SectionHeader
+          title="Refine"
+          info={
+            <>
+              Clean Up removes specks under 4 px, fills pinholes under 6 px,
+              smooths the edge and pulls it in 1 px, in one step. The sliders
+              are the same operations one at a time: move one to preview, then
+              Apply. Feather only softens a mask made from the selection
+              (Layer Settings → Add mask). Apply is one undo step, and like any
+              selection change it keeps a full copy of the image, so on a very
+              large photo it spends one of your few undo steps — the Undo
+              readout in the status bar shows when.
+            </>
+          }
+        />
+        <ActionTile
+          icon={Sparkles}
+          label="Clean Up"
+          disabled={!canRefine}
+          onClick={() => requestRefine("cleanUp")}
+          title="Remove specks, fill pinholes, smooth the edge — one undo step"
+        />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <SizeSlider label="Islands" unit=" px" value={refine.islands} min={0} max={200} onChange={setOne("islands")} disabled={!canRefine} />
+          <SizeSlider label="Holes" unit=" px" value={refine.holes} min={0} max={200} onChange={setOne("holes")} disabled={!canRefine} />
+          <SizeSlider label="Smooth" unit=" px" value={refine.smooth} min={0} max={8} onChange={setOne("smooth")} disabled={!canRefine} />
+          <SizeSlider label="Feather" unit=" px" value={refine.feather} min={0} max={8} onChange={setOne("feather")} disabled={!canRefine} />
+          <SizeSlider label="Expand" unit=" px" value={refine.expand} min={-10} max={10} onChange={setOne("expand")} disabled={!canRefine} />
+        </div>
+        {!selection.active && (
+          <p className="text-2xs text-theme-muted-foreground">Select something to refine it.</p>
+        )}
+        <PanelActionBar>
+          <PanelAction
+            disabled={!canRefine || isNoopRefine(refine)}
+            onClick={() => requestRefine("apply")}
+          >
+            {previewing ? "Apply refine" : "Apply"}
+          </PanelAction>
+        </PanelActionBar>
       </div>
 
       {/* ── Act on the selection: one title + bulb over all five actions ──

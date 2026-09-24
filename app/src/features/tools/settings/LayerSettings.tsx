@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Move,
   Scaling,
@@ -12,6 +12,9 @@ import {
   X,
   Eye,
   EyeOff,
+  Scissors,
+  SquareDashed,
+  SquareDashedMousePointer,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
@@ -35,6 +38,7 @@ import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectField } from "@/components/ui/select-field";
 import { PANEL_DIVIDER, PANEL_SECTION } from "@/lib/styles";
+import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
  *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
@@ -64,7 +68,8 @@ export interface LayerMaskControls {
   editing: boolean;
   /** Gray laid down while painting the mask: 0 = hide, 255 = reveal. */
   value: number;
-  onAdd: (id: number) => void;
+  /** Add a mask (from `source`, reveal-all by default) and start painting it. */
+  onAdd: (id: number, source?: MaskSource) => void;
   onRemove: (id: number) => void;
   onApply: (id: number) => void;
   onInvert: (id: number) => void;
@@ -165,6 +170,13 @@ export function LayerSettings({
   // Mask brush size + feather — read straight from the store (PaintSettings'
   // precedent for tool state) rather than threaded through AppShell: the
   // Layer Mask section below is their only consumer.
+  const hasSelection = useToolStore((s) => s.selectionMask !== null);
+  const setActiveTool = useToolStore((s) => s.setActiveTool);
+  const setEraserMode = useToolStore((s) => s.setEraserMode);
+  // The Add mask tile opens its choices inline, under the row — non-modal, no
+  // popover primitive (the app has none, and a new dependency for one menu is
+  // not worth it). Closed again by any choice.
+  const [addMaskOpen, setAddMaskOpen] = useState(false);
   const toolSettings = useToolStore((s) => s.toolSettings);
   const setToolSettings = useToolStore((s) => s.setToolSettings);
   const activeLayer = layers?.find((l) => l.active);
@@ -316,8 +328,10 @@ export function LayerSettings({
               icon={Aperture}
               label="Add mask"
               disabled={disabled}
-              onClick={() => mask.onAdd(activeLayer.id)}
-              title="Add a mask and start painting it — black hides, white reveals"
+              aria-expanded={addMaskOpen}
+              aria-controls="add-mask-choices"
+              onClick={() => setAddMaskOpen((o) => !o)}
+              title="Add a mask — choose what it starts from"
             />
           )}
           {mask && activeLayer && activeLayer.hasMask && (
@@ -334,6 +348,66 @@ export function LayerSettings({
             </ToolButton>
           )}
         </div>
+
+        {/* ── Add mask: what the new mask starts from ─────────────────────
+            The two "entire" choices are the old one-click Add mask and its
+            inverse. The two selection choices copy the selection plane into
+            the mask (byte for byte, same size, softened by Refine's Feather);
+            they are disabled — with the reason — until something is selected.
+            Every choice opens the mask brush exactly as Add mask always has.
+            "Select subject" is a way in, not a path: it opens Background
+            Removal, which is server-side and Pro. */}
+        {mask && activeLayer && !activeLayer.hasMask && addMaskOpen && (
+          <div id="add-mask-choices" className={PANEL_SECTION}>
+            <SectionHeader
+              title="Add mask"
+              info="Start the mask white (everything shows) or black (everything hidden), or from the selection: Reveal shows only what is selected, Hide hides it. Refine's Feather softens the selection's edge. Either way the mask brush opens so you can keep painting."
+            />
+            <ToolButtonGroup<"revealAll" | "hideAll" | "revealSelection" | "hideSelection">
+              columns={2}
+              stacked
+              disabled={disabled}
+              onChange={(id) => {
+                setAddMaskOpen(false);
+                mask.onAdd(activeLayer.id, MASK_SOURCE[id]);
+              }}
+              options={[
+                { id: "revealAll", label: "Show entire layer", icon: Eye, title: "A white mask — paint black to hide" },
+                { id: "hideAll", label: "Hide entire layer", icon: EyeOff, title: "A black mask — paint white to reveal" },
+                {
+                  id: "revealSelection",
+                  label: "Reveal selection",
+                  icon: SquareDashedMousePointer,
+                  disabled: !hasSelection,
+                  title: "Show only what is selected",
+                },
+                {
+                  id: "hideSelection",
+                  label: "Hide selection",
+                  icon: SquareDashed,
+                  disabled: !hasSelection,
+                  title: "Hide what is selected",
+                },
+              ]}
+            />
+            {!hasSelection && (
+              <p className="text-2xs text-theme-muted-foreground">
+                Reveal and Hide selection need a selection — make one with the Select tool.
+              </p>
+            )}
+            <ActionTile
+              icon={Scissors}
+              label="Select subject…"
+              disabled={disabled}
+              onClick={() => {
+                setAddMaskOpen(false);
+                setEraserMode("rembg");
+                setActiveTool("ai");
+              }}
+              title="Opens Background Removal — runs on a server, needs sign-in and Pro"
+            />
+          </div>
+        )}
 
         {/* ── Layer mask — ONE set of controls, for the selected layer.
             Moved here from the per-row buttons in Review → Layers (v8.38,
