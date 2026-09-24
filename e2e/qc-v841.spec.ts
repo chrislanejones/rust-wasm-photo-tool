@@ -207,17 +207,21 @@ test.describe("imagehorse-qc v8.41", () => {
     // Click a DIFFERENT shape in the settings panel. Pre-fix this retyped the
     // shape already on the canvas, because a pending shape read its type live
     // from the panel instead of pinning it at mouse-up.
-    const panelShapes = ["Rectangle", "Ellipse", "Circle", "Triangle", "Line"];
-    let clicked: string | null = null;
-    for (const name of panelShapes) {
-      const btn = page.getByRole("button", { name, exact: true }).first();
-      if ((await btn.count()) > 0 && (await btn.isVisible())) {
-        await btn.click();
-        clicked = name;
-        break;
-      }
-    }
-    expect(clicked, "found a shape-type button in the panel").not.toBeNull();
+    //
+    // The shape tiles are a radio group since UI Night 2 (a SELECT group: one
+    // of N), so they are found as radios in the group named "Shape", not as
+    // buttons. And the one clicked is an UNCHECKED one: clicking the shape
+    // that is already selected would leave the drawn shape alone trivially,
+    // and the assertion below would pass on nothing.
+    const shapes = page.getByRole("radiogroup", { name: "Shape" });
+    const unselected = shapes.getByRole("radio", { checked: false }).first();
+    await expect(unselected, "found an unselected shape in the panel").toBeVisible();
+    // Pin it by NAME: "the first unchecked radio" is re-resolved lazily and
+    // points at a different tile once this one is checked.
+    const clicked = (await unselected.textContent())?.trim() ?? "";
+    const target = shapes.getByRole("radio", { name: clicked, exact: true });
+    await target.click();
+    await expect(target, `${clicked} is now the selected shape`).toHaveAttribute("aria-checked", "true");
     await page.waitForTimeout(700);
 
     expect(await canvasPng(page), `clicking ${clicked} left the drawn shape alone`).toBe(drawn);
