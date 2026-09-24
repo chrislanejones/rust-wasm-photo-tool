@@ -1,4 +1,5 @@
-// ===== FILE: app/src/hooks/useEngineCore.test.ts =====
+// ===== FILE: app/src/lib/engine/uiSnapshot.test.ts =====
+// (was app/src/hooks/useEngineCore.test.ts — moved with the function it tests.)
 // Covers `readUiSnapshot`'s liveness guard — ADR-024 Stage 3.5, a13.
 //
 // a13 made `syncState` async, which is what Stage 4 needs and what the other
@@ -19,7 +20,7 @@
 // The load-bearing case is `checks liveness AFTER the await, not before` —
 // every other test here passes with the guard moved above the await.
 import { describe, it, expect, vi } from "vitest";
-import { readUiSnapshot } from "./useEngineCore";
+import { readUiSnapshot } from "./uiSnapshot";
 import type { UiStateCapture } from "stamp_tool";
 
 /** A capture shaped like the engine's, with a spy on `free`. */
@@ -31,6 +32,7 @@ function capture(over: Partial<UiStateCapture> = {}) {
     undo_count: 3,
     redo_count: 1,
     history_labels: "stroke:Brush|crop:Crop",
+    branches_json: '[{"id":1,"label":"Crop","steps":2,"bytes":2048,"nested":false}]',
     zoom: 1,
     width: 1395,
     height: 2078,
@@ -48,7 +50,7 @@ function asyncEngine(ui: UiStateCapture) {
 }
 
 describe("readUiSnapshot", () => {
-  it("copies all ten fields out when the document is still live", async () => {
+  it("copies all eleven fields out when the document is still live", async () => {
     const { ui } = capture();
     const snap = await readUiSnapshot(asyncEngine(ui), () => true);
 
@@ -57,6 +59,7 @@ describe("readUiSnapshot", () => {
       undo_count: 3,
       redo_count: 1,
       history_labels: "stroke:Brush|crop:Crop",
+      branches_json: '[{"id":1,"label":"Crop","steps":2,"bytes":2048,"nested":false}]',
       zoom: 1,
       width: 1395,
       height: 2078,

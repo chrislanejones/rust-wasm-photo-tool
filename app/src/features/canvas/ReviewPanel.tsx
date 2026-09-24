@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  GitBranch,
   History,
   Layers,
   Layers2,
@@ -35,7 +36,7 @@ import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
-import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
+import type { HistoryBranch, HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
 import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -60,6 +61,13 @@ interface Props {
   history: HistoryEntry[];
   onJump: (index: number) => void;
   onDelete: (index: number) => void;
+  /** Abandoned timelines, newest first — the Time Machine list under History
+   *  (ADR-065). Empty until an edit made after an undo forks the history. */
+  branches: HistoryBranch[];
+  /** Click a Time Machine row → travel to that timeline's tip. */
+  onRestoreBranch: (id: number) => void;
+  /** Hover-X → forget that timeline. */
+  onDeleteBranch: (id: number) => void;
   onClose: () => void;
   /** Undo / redo buttons in the History section header. */
   onUndo: () => void;
@@ -136,6 +144,9 @@ export function ReviewPanel({
   history,
   onJump,
   onDelete,
+  branches,
+  onRestoreBranch,
+  onDeleteBranch,
   onUndo,
   canUndo,
   onRedo,
@@ -315,6 +326,41 @@ export function ReviewPanel({
                 />
               ))}
             </div>
+
+            {/* ── Time Machine: the history that is NOT on this timeline ──
+                Editing after an undo forks the history; the abandoned steps
+                used to vanish and now live here (ADR-065). Rendered inside
+                History rather than as a fifth section, because that is what
+                it is — the same steps, on a path the user walked away from.
+                Hidden entirely when there are no forks, which is most of the
+                time. */}
+            {branches.length > 0 && (
+              <div className="time-machine">
+                <div className="review-section-head time-machine-head">
+                  <GitBranch className="h-3.5 w-3.5" />
+                  <span className="review-section-name">Time Machine</span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <TinyNumberBox>{branches.length}</TinyNumberBox>
+                  </div>
+                </div>
+                <div className="history-list">
+                  {branches.map((b) => (
+                    <ReselectBar
+                      key={b.id}
+                      type="redo"
+                      index={b.steps}
+                      label={b.label}
+                      onSelect={() => onRestoreBranch(b.id)}
+                      onDelete={() => onDeleteBranch(b.id)}
+                      deleteLabel="Forget this timeline"
+                      title={`Travel to: ${b.label} — ${b.steps} step${
+                        b.steps === 1 ? "" : "s"
+                      }${b.nested ? ", branched off another timeline" : ""}. Where you are now is kept.`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

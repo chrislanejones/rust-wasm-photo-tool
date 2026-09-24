@@ -3576,6 +3576,9 @@ export function AppShell() {
             history={stamp.state.history}
             onJump={stamp.jumpToHistory}
             onDelete={stamp.deleteHistoryEntry}
+            branches={stamp.state.branches}
+            onRestoreBranch={stamp.restoreBranch}
+            onDeleteBranch={stamp.deleteBranch}
             onClose={() => setShowHistory(false)}
             closable={panelsClosable}
             onUndo={stamp.undo}

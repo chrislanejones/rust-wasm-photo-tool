@@ -809,7 +809,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // real id for the life of the page. `set_text_font` is awaited for the same
     // reason its siblings `set_text_wrap_width` and `set_text_box_height` are:
     // it must land before the commit's flush reads the tile.
-    expect(gate.awaited, "cumulative converted sites").toBe(149);
+    // Time Machine (ADR-065) — 149 -> 151: two sites in `useHistory`, born
+    // awaited, both truthy traps of the shape this file already names there —
+    // `restore_history_branch` / `delete_history_branch` each return "did
+    // anything move?" and gate the repaint ritual, so un-awaited every click
+    // on a row would flush and re-sync whether or not the branch was there.
+    // ⚠️ The step also MOVED a counted site: `readUiSnapshot` went to
+    // `lib/engine/uiSnapshot.ts`, where its `t` parameter is no longer an
+    // alias of `toolRef.current` and its `await` would have dropped out of the
+    // gate unseen (this would read 150, with one site less coverage). The
+    // parameter is `tool` now, a LITERAL_RECEIVER, so the count is 151.
+    expect(gate.awaited, "cumulative converted sites").toBe(151);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

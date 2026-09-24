@@ -19,7 +19,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDiagnosticsSampler } from "./useDiagnosticsSampler";
 import type { RefObject, MouseEvent } from "react";
-import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
+import { readUiSnapshot } from "@/lib/engine/uiSnapshot";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
@@ -97,6 +98,24 @@ export interface LayerColorOverlay {
   opacity: number;
 }
 
+/** One abandoned timeline in the Time Machine (ADR-065), mirrored from the
+ *  engine's `branches_json`. */
+export interface HistoryBranch {
+  /** Engine-side id — what `restore_history_branch` / `delete_history_branch`
+   *  are called with. Never reused within a session. */
+  id: number;
+  /** The tip's label: the last thing done on that timeline. */
+  label: string;
+  /** How many steps it holds. */
+  steps: number;
+  /** Heap bytes it costs, counted exactly as an undo step is counted — the
+   *  two share one budget, and branches lose it first. */
+  bytes: number;
+  /** True when this branch forks off ANOTHER branch rather than off the live
+   *  timeline. Taking it materialises the parent first. */
+  nested: boolean;
+}
+
 export interface CloneStampState {
   ready: boolean;
   hasSource: boolean;
@@ -108,6 +127,9 @@ export interface CloneStampState {
   // Exposed so components can re-render when dimensions change (e.g. after rotate)
   width: number;
   height: number;
+  /** Abandoned timelines, newest first (ADR-065). Empty until the user undoes
+   *  and then edits, which is the moment a fork is made. */
+  branches: HistoryBranch[];
   /** Layer stack, bottom → top, mirrored from Rust. */
   layers: LayerInfo[];
   /** Id of the active layer (receives all tool edits). */
@@ -128,6 +150,7 @@ const INITIAL_STATE: CloneStampState = {
   undoCount: 0,
   redoCount: 0,
   history: [],
+  branches: [],
   zoom: 1,
   width: 0,
   height: 0,
@@ -138,79 +161,6 @@ const INITIAL_STATE: CloneStampState = {
   exportQuality: 75,
 };
 
-/** The ten values `capture_ui_state()` carries, copied out of wasm memory. */
-export type UiSnapshot = {
-  has_source: boolean;
-  undo_count: number;
-  redo_count: number;
-  history_labels: string;
-  zoom: number;
-  width: number;
-  height: number;
-  layers_json: string;
-  active_layer_id: number;
-  export_quality: number;
-};
-
-/** The minimum of the engine surface this needs — so a test can supply a fake
- *  without standing up a wasm module. */
-type UiStateSource = { capture_ui_state: () => UiStateCapture | Promise<UiStateCapture> };
-
-/**
- * The atomic UI capture, with the liveness guard that makes it safe to await.
- *
- * ADR-024 Stage 3.5, a13. Lifted out of `syncState` for one reason: the guard
- * below is the entire risk of making that call async, and inside a `useCallback`
- * closed over a ref it had no test. Here it does.
- *
- * ── THE GUARD ──
- * `reset()` nulls `toolRef.current` on a photo switch, and it does NOT free the
- * engine — nothing in this codebase calls `tool.free()`. So a capture issued
- * against the OUTGOING document still resolves, happily, carrying that
- * document's width, history and layer list. Without the check, that stale
- * snapshot lands on top of the `INITIAL_STATE` that `reset` just wrote, and the
- * editor shows the previous photo's dimensions and undo stack underneath the
- * new one. Nothing throws; it self-corrects on the next mutation. That is the
- * profile of an intermittent nobody files.
- *
- * The check is engine IDENTITY, not a counter. `t` is the thing the capture was
- * issued against, so comparing it answers the real question — "is this still
- * the live document?" — with no second piece of state to keep in sync.
- * `OpLog::generation` was considered for this in b2 and rejected: it bumps only
- * when a redo tail is dropped, not on edits, and it is not on the wasm surface.
- *
- * @param stillLive re-checked AFTER the await, never before — checking early
- *   tests the wrong moment and always passes.
- * @returns the copied fields, or null if the document was replaced mid-flight.
- */
-export async function readUiSnapshot(
-  t: UiStateSource,
-  stillLive: () => boolean,
-): Promise<UiSnapshot | null> {
-  const ui = await t.capture_ui_state();
-  try {
-    if (!stillLive()) return null;
-    // Read each field once, then free — the capture is a boxed wasm allocation
-    // and every property access crosses the boundary.
-    return {
-      has_source: ui.has_source,
-      undo_count: ui.undo_count,
-      redo_count: ui.redo_count,
-      history_labels: ui.history_labels,
-      zoom: ui.zoom,
-      width: ui.width,
-      height: ui.height,
-      layers_json: ui.layers_json,
-      active_layer_id: ui.active_layer_id,
-      export_quality: ui.export_quality,
-    };
-  } finally {
-    // BOTH paths free. The stale path is the one that matters: it is the new
-    // path a13 added, it runs exactly when the app is busy switching photos,
-    // and a leak there would be per-photo-switch and invisible.
-    ui.free();
-  }
-}
 
 /** The engine context + public core surface. Domain hooks (useHistory,
  *  useLayers, useExport, useTransforms) and the clone-stamp residual receive
@@ -351,6 +301,7 @@ export function useEngineCore(
       layers_json,
       active_layer_id,
       export_quality,
+      branches_json,
     } = snap;
 
     const history: HistoryEntry[] = history_labels
@@ -382,6 +333,15 @@ export function useEngineCore(
     } catch {
       layers = [];
     }
+    // Same treatment as `layers_json`, and the same reason for the catch: a
+    // list the panel cannot parse must not take the document's dimensions and
+    // layer stack down with it. An empty Time Machine is a hidden section.
+    let branches: HistoryBranch[];
+    try {
+      branches = JSON.parse(branches_json) as HistoryBranch[];
+    } catch {
+      branches = [];
+    }
 
     setState({
       ready: true,
@@ -390,6 +350,7 @@ export function useEngineCore(
       undoCount: undo_count,
       redoCount: redo_count,
       history,
+      branches,
       zoom,
       width,
       height,

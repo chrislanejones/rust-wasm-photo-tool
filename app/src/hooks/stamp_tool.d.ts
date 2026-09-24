@@ -229,6 +229,9 @@ declare module "stamp_tool" {
     layers_json: string;
     active_layer_id: number;
     export_quality: number;
+    /** The Time Machine's branch list as JSON (ADR-065) — see
+     *  `history_branches_json`. */
+    branches_json: string;
   }
 
   /**
@@ -334,6 +337,19 @@ declare module "stamp_tool" {
     jump_to_history(index: number): boolean;
     delete_history_entry(index: number): boolean;
     clear_history(): void;
+    /** How many abandoned timelines the engine is holding (ADR-065). */
+    history_branch_count(): number;
+    /** The branch list, newest first:
+     *  `[{"id":3,"label":"Crop","steps":4,"bytes":50331648,"nested":false}]`.
+     *  Also carried on `capture_ui_state()` as `branches_json`, which is what
+     *  the panel actually reads — this one is for tests and one-offs. */
+    history_branches_json(): string;
+    /** Travel to an abandoned timeline, landing on its tip. The timeline it
+     *  displaces is archived as a branch of its own, so the move is
+     *  reversible. `false` = the branch is gone and nothing moved. */
+    restore_history_branch(id: number): boolean;
+    /** Forget one branch. `false` = it was already gone. */
+    delete_history_branch(id: number): boolean;
     get_image_data(): Uint8Array;
     /** Composite cropped to content with the artboard's backing "Background"
      *  layer left out. Dimensions: export_width/height_excluding_background. */

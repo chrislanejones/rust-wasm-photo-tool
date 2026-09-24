@@ -648,8 +648,10 @@ impl ImageHorseTool {
     }
 
     /// Build a history snapshot of the entire current layer stack.
-    fn make_snapshot(&self, label: &str) -> Snapshot {
+    pub(crate) fn make_snapshot(&self, label: &str) -> Snapshot {
         Snapshot {
+            // The live document's identity — see `Snapshot::node`.
+            node: self.hist.current_node(),
             label: label.to_string(),
             layers: self.layers.clone(),
             active: self.active,
@@ -688,7 +690,7 @@ impl ImageHorseTool {
     }
 
     /// Replace the live state with a snapshot's layer stack (used by undo/redo).
-    fn restore_snapshot(&mut self, snap: Snapshot) {
+    pub(crate) fn restore_snapshot(&mut self, snap: Snapshot) {
         // A snapshot restore rewinds the engine in a way an append-only op
         // log cannot represent — if a log with recorded ops exists, it is
         // now stale. Mark it broken (recording + oplog-undo stop; snapshot
@@ -2095,7 +2097,7 @@ impl ImageHorseTool {
             &mut layer.buf.data,
             w,
             h,
-            &mut self.hist.redo_stack,
+            &mut self.hist,
             dest_x,
             dest_y,
             snap,

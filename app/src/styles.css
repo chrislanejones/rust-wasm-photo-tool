@@ -931,6 +931,30 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
+/* ── Time Machine: the forks off the current timeline (ADR-065) ────────
+   Lives INSIDE the History section, under the linear list, and only when
+   there is something in it. A divider and a quieter header keep it read as
+   "history that is not on this path" rather than as a second History. The
+   list is capped in height: the branch store holds at most 12, and the
+   linear history above it must not be pushed off screen by them. */
+.time-machine {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+
+.time-machine-head {
+  padding-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.time-machine .history-list {
+  flex: 0 1 auto;
+  max-height: 148px;
+  padding-top: 0;
+}
+
 /* ── Layers list ─────────────────────────────────────────────────────── */
 .layers-list {
   padding-top: 0;

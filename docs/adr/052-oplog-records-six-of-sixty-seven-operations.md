@@ -1,5 +1,5 @@
 # ADR-052: The op log records six of the engine's operation families, and the rest break it
-Date: 2026-09-09   Status: draft (decision extended 2026-09-11 — part 2 built, part 3 proposed; amended 2026-09-18 — part 2 is a status-bar readout, depth table corrected)
+Date: 2026-09-09   Status: draft (decision extended 2026-09-11 — part 2 built, part 3 proposed; amended 2026-09-18 — part 2 is a status-bar readout, depth table corrected; amended 2026-09-24 — the #8 guess is half wrong, see the last section)
 
 ## Context
 
@@ -203,3 +203,36 @@ marked resolved).
   steps then, not 23). Caught in review and fixed before it shipped: the hook
   asks `has_selection()` and `snapshotBytes` adds W×H for it. Layer masks are
   still left out on both sides, because `Snapshot::bytes` leaves them out.
+
+## Amendment (09-24-2026): #8 was not behind item 37, and half of it shipped
+
+**What this ADR guessed.** The proposal above says leaving the adjustments
+unrecorded "is almost certainly why **#8 (Time Machine DAG)** sits under 'not
+doing'", and that "you cannot build a DAG on a log that goes permanently stale
+the first time somebody moves a slider."
+
+**What was actually true.** The first clause is the reasoning of a survey
+looking at its own subject. #8 never needed the op log — it needed *some*
+representation of an abandoned timeline, and the snapshot stack is one. What
+the log buys is **cheap** branches; what was blocking #8 was the assumption
+that expensive ones are unaffordable. They are not, if they are made to lose
+every contest for memory against the undo stack, which is what ADR-065 does:
+branches share the same 512 MB and are evicted before a single undo step.
+
+**What is still true, and it is the second clause.** A branch made of
+snapshots is ~96 MB a step on a 12 MP photo, so the Time Machine holds a few
+forks on a small document and **nothing at all** on a 24 MP one — and none of
+it survives a reload, because an append-only log that a snapshot restore marks
+stale cannot persist a jump between timelines. Recording the six adjustments
+(part 3 above) is exactly what turns a branch from document copies into
+kilobytes of ops, and item 37 remains the unlock for the half of #8 that did
+not ship.
+
+**Why this matters beyond one backlog row.** This ADR's own pre-mortem warns
+about being "used as a shield rather than a plan" — a bug closed as "working as
+designed, see ADR-052". A feature parked as "blocked by item 37, see ADR-052"
+is the same failure with a different name. The guess above was reasonable and
+it was still a guess, written with no attempt to build the thing it ruled out;
+the ruling then outlived the reasoning for two weeks. Where this ADR says a
+backlog item is blocked, read it as a hypothesis with a test attached, not a
+finding.

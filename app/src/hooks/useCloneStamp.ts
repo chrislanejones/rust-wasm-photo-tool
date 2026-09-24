@@ -20,6 +20,7 @@ import { useTransforms } from "./useTransforms";
 
 export type {
   HistoryEntry,
+  HistoryBranch,
   LayerInfo,
   CloneStampState,
 } from "./useEngineCore";
@@ -60,6 +61,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     undo,
     redo,
     jumpToHistory,
+    restoreBranch,
+    deleteBranch,
     deleteHistoryEntry,
     clearHistory,
   } = useHistory(engine);
@@ -272,6 +275,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     undo,
     redo,
     jumpToHistory,
+    restoreBranch,
+    deleteBranch,
     deleteHistoryEntry,
     clearHistory,
     // Export

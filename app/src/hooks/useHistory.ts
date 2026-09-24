@@ -80,6 +80,32 @@ export function useHistory(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask],
   );
 
+  /** Travel to an abandoned timeline, landing on its tip (ADR-065). The
+   *  timeline being left is archived as a branch of its own, so this is
+   *  reversible — the same four-step ritual as every other history move,
+   *  because a branch restore can change pixels, overlays AND the selection
+   *  exactly like an undo can. */
+  const restoreBranch = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.restore_history_branch(id)) {
+        flushToCanvas();
+        syncState();
+        broadcastAnnotationsChanged();
+        await refreshSelectionMask();
+      }
+    },
+    [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask],
+  );
+
+  /** Forget one abandoned timeline. Nothing on screen changes — only the
+   *  list — so this syncs and stops there. */
+  const deleteBranch = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.delete_history_branch(id)) syncState();
+    },
+    [toolRef, syncState],
+  );
+
   const deleteHistoryEntry = useCallback(
     async (index: number) => {
       if (await toolRef.current?.delete_history_entry(index)) {
@@ -114,10 +140,21 @@ export function useHistory(engine: EngineCore) {
       undo,
       redo,
       jumpToHistory,
+      restoreBranch,
+      deleteBranch,
       deleteHistoryEntry,
       clearHistory,
       refreshSelectionMask,
     }),
-    [undo, redo, jumpToHistory, deleteHistoryEntry, clearHistory, refreshSelectionMask],
+    [
+      undo,
+      redo,
+      jumpToHistory,
+      restoreBranch,
+      deleteBranch,
+      deleteHistoryEntry,
+      clearHistory,
+      refreshSelectionMask,
+    ],
   );
 }

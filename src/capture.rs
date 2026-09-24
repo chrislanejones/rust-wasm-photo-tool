@@ -193,11 +193,15 @@ pub struct ExportDims {
 /// The eleven values `useEngineCore.ts`'s `syncState` publishes to React, out
 /// of one call. Returned by `capture_ui_state()`.
 ///
-/// Scalars plus two strings — no pixels anywhere, which is the whole difference
-/// from `capture_state()`. `getter_with_clone` is needed only for the two
-/// `String` fields; they are a history-label list and the layer metadata JSON,
-/// both small, so the per-access clone that matters for `RgbaCapture` is not a
-/// concern here. Still read each field once and `.free()` when done.
+/// Scalars plus three strings — no pixels anywhere, which is the whole
+/// difference from `capture_state()`. `getter_with_clone` is needed only for
+/// the `String` fields; they are a history-label list, the layer metadata JSON
+/// and the Time Machine's branch list, all small, so the per-access clone that
+/// matters for `RgbaCapture` is not a concern here. Still read each field once
+/// and `.free()` when done.
+///
+/// (The count in the first line was already "eleven" while the struct held
+/// ten — the branch list of ADR-065 makes it true rather than raises it.)
 ///
 /// `history_labels` and `layers_json` stay RAW. The JS already owns both
 /// formats — it splits the label string on `|` and `JSON.parse`s the layer
@@ -238,6 +242,17 @@ pub struct UiStateCapture {
     pub layers_json: String,
     pub active_layer_id: u32,
     pub export_quality: u8,
+    /// The Time Machine's branch list (ADR-065), raw JSON for the same reason
+    /// `layers_json` is raw.
+    ///
+    /// The ELEVENTH field, which this struct's history says to justify: it is
+    /// a `format!` over at most `MAX_BRANCHES` (12) rows of an id, a short
+    /// label and two integers, with no pixel access anywhere in it — the
+    /// opposite of `has_transparency`, whose removal is the note above. It
+    /// rides here rather than on its own call because the panel has to be
+    /// right after EVERY history move, and `syncState` is the one place that
+    /// already is.
+    pub branches_json: String,
 }
 
 /// The layer stack and the canvas it sits on. Returned by
@@ -454,6 +469,7 @@ impl ImageHorseTool {
             layers_json: self.get_layers(),
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
+            branches_json: self.history_branches_json(),
         }
     }
 
