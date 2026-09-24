@@ -10883,3 +10883,18 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **"Different photo" — not a bug** | In the first test the Edited side looked like another picture. Retested with the divider at each end: it is the **same photo**, with a strong contrast edit and a leftover rectangle from an earlier session. At 75% the Edited side is just the photo's right-hand quarter, which is all shop signs. |
 | **Engine size** | Unchanged at **814,432 B**. No app code changed. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings, guardrails OK. |
+
+## v8.93 Change Summary — 2026-09-24
+
+**Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.**
+
+| Area | Change |
+| --- | --- |
+| **Layer mask brush** | Mask painting is now self-contained on the Layers panel. Pressing the mask toggle no longer switches to the Paint brush group. A brush section appears inside the mask row with size, feather and hide/reveal (black/white) controls. |
+| **X key** | While painting a mask, X swaps black and white — the same binding Photoshop uses. The key is dormant outside mask-paint mode so nothing else can collide with it. |
+| **Morphing button** | The "Edit mask" toggle morphs to read "Painting mask" once mask editing is on, making the active state clear without adding a second button below it. |
+| **Toggle bug fix** | `handleToggleMaskEdit` previously compared a Promise to a number (the engine runs in a worker), so it could only ever turn on. Awaiting `active_layer_id()` fixed the toggle. |
+| **Marketing nav** | Nav replaced with a mega-menu. "Tools" and "Learn" open dropdown panels with feature cards that preview descriptions on hover. All tool-specific landing pages and learn pages are linked for SEO. |
+| **Mobile sheet** | The mobile sheet is now a full-screen overlay with a principle card, a 2-column tools grid, a 2-column learn grid, a Pricing/Contact pair and a CTA. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0, eslint 0 errors, guardrails OK (two improvements: rust-panics 46 < 47, librs-lines 4763 < 4808). |

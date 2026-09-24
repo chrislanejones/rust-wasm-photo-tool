@@ -85,17 +85,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.92 — 2026-09-23
+### v8.93 — 2026-09-24
 
-**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
+**Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.**
 
-`scripts/compare-clean-view.js`. Paste it into Chrome DevTools › Sources ›
-Snippets and run it with a photo loaded. It turns Compare on, puts the
-divider three quarters of the way across, and hides the rest of the page.
-Zoom with Alt + = and Alt + -, and press Esc to get everything back.
+Layer mask painting no longer routes you off to the Paint brush. A brush
+section appears inside the mask row on the Layers panel with size, feather,
+and hide/reveal controls. Hit X to swap black and white while painting, same
+as Photoshop. The toggle button morphs to read "Painting mask" once active.
 
-It adds one style tag and takes it away again. Nothing in the app changed,
-and the engine is the same 814,432 bytes as v8.91.
+The marketing site nav now opens dropdowns for Tools and Learn, with feature
+cards that preview descriptions on hover. Mobile gets a full-screen sheet
+with card grids.
+
+Engine unchanged at 814,432 bytes.
 
 ## License
 

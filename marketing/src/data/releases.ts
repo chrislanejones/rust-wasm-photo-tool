@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.93",
+    date: "2026-09-24",
+    headline: "Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Layer mask painting now happens on the Layers panel itself, not on the Paint brush. A brush section appears inside the mask row with size, feather and hide/reveal controls. Hit X to swap black and white while painting, same as Photoshop. The Layers panel stays mounted the whole time.",
+      },
+      {
+        tag: "fix",
+        text: "The Toggle Mask Edit button morphs to read 'Painting mask' once you're in edit mode, making the active state obvious without a second button. The async toggle no longer got stuck in an always-on state by comparing a Promise to a number.",
+      },
+      {
+        tag: "ui",
+        text: "Marketing site nav replaced with a mega-menu: Tools and Learn dropdowns, feature cards that preview descriptions on hover, and a full-screen mobile sheet with card grids. All tool and learn pages are linked for crawlability.",
+      },
+    ],
+  },
+  {
     version: "v8.92",
     date: "2026-09-23",
     headline: "A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom",
