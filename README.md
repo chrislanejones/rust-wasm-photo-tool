@@ -85,18 +85,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.93 — 2026-09-24
+### v8.94 — 2026-09-24
 
-**Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.**
+**The ten tools in the new menu have pages now.**
 
-Layer mask painting no longer routes you off to the Paint brush. A brush
-section appears inside the mask row on the Layers panel with size, feather,
-and hide/reveal controls. Hit X to swap black and white while painting, same
-as Photoshop. The toggle button morphs to read "Painting mask" once active.
+Last release added a Tools menu that linked to ten paths — `/photo-editor`,
+`/blur-image`, eight more. None of them had a page behind it, so every one
+returned a hard 404, which on this host is a blank white page. They are real
+pages now: what each tool does, whether it runs on your machine or needs a
+server, and where to go next.
 
-The marketing site nav now opens dropdowns for Tools and Learn, with feature
-cards that preview descriptions on hover. Mobile gets a full-screen sheet
-with card grids.
+Two things had to be wrong at once for that to ship. The paths had no routes,
+and the menu used plain anchors rather than router links — so each click was a
+full page load that reached the host instead of the router, and the site's own
+404 page never got a chance to answer.
+
+Also new: **What's coming**, sixteen entries in three states — being built,
+decided, thinking about it. No dates.
 
 Engine unchanged at 814,432 bytes.
 

@@ -10898,3 +10898,21 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Mobile sheet** | The mobile sheet is now a full-screen overlay with a principle card, a 2-column tools grid, a 2-column learn grid, a Pricing/Contact pair and a CTA. |
 | **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
 | **Gates** | tsc 0, eslint 0 errors, guardrails OK (two improvements: rust-panics 46 < 47, librs-lines 4763 < 4808). |
+
+## v8.94 Change Summary — 2026-09-24
+
+**The ten tools in the new menu have pages now. Every one of those links was a dead end, and a dead end on this host is a blank white page.**
+
+| Area | Change |
+| --- | --- |
+| **The bug** | v8.93's mega-menu linked to ten tool paths — `/photo-editor`, `/image-compressor`, `/background-remover`, `/remove-object-from-photo`, `/annotate-image`, `/clone-stamp`, `/pixelate-image`, `/blur-image`, `/batch-image-editor`, `/image-editor-no-upload`. None had a route or a page. All ten returned a hard **404** from Vercel, whose 404 page is white. |
+| **Why the catch-all didn't save it** | `routes.ts` has a `*` → NotFound route, so a client-side click would have rendered the site's own 404. The menu used plain `<a href>` for internal links, which is a **full page load** — it reaches the host, not the router, so the catch-all never ran. Both faults had to be fixed. |
+| **Ten tool pages** | One `ToolLanding.tsx` driven by `data/toolPages.ts`: H1, lede, a runs-on badge (your machine / a server / mostly local), what it does, two body sections, and three related-tool links. 860–970 words of real prerendered content each. |
+| **What's coming** | New `/coming-soon`: sixteen entries in three states — being built, decided, thinking about it — with filter tiles and per-state counts. No dates. Ported from the `Coming Soon v2` design, including its light board on the dark page. |
+| **Menu panel height** | The panel had no floor, so it resized as you moved between Tools and Learn and again when a group held one tool rather than two. `min-height: 23rem` on the panel and `height: 20rem` on every column, with tool cards on `flex: 1 1 0` so they fill the column. This is the design's spacing, which the first port dropped. |
+| **Learn panel** | Gained its sixth item, "What's coming", which the first port left out. The feature card's footer counts the list rather than hard-coding five. |
+| **One list** | The menu read its own copy of every tool title and blurb. It now reads `toolPages.ts`, the same file the pages render, so the two cannot drift. |
+| **Sitemap** | 12 → **23 URLs** (21 pages, 2 posts). Tool routes carry a `toolPage` flag so they stay in the sitemap and the prerender but out of the footer's main column. |
+| **Trail Log** | Untouched and verified: **152 versions**, v8.93 → v0.1, all release text intact in the prerendered HTML. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, 23/23 routes prerendered. |

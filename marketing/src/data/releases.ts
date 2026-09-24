@@ -24,6 +24,38 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.94",
+    date: "2026-09-24",
+    headline:
+      "The ten tools in the new menu have pages now. Every one of those links was a dead end, and a dead end on this host is a blank white page.",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Tools menu linked to ten paths that had no page behind them — /photo-editor, /blur-image and eight more all returned a hard 404. They are real pages now.",
+      },
+      {
+        tag: "fix",
+        text: "Menu links were plain anchors, so every click was a full page load that went to the host instead of the router. They are router links now, which is also why the site's own 404 never got a chance to show.",
+      },
+      {
+        tag: "feature",
+        text: "Ten tool pages: what each one does, whether it runs on your machine or needs a server, and where to go next.",
+      },
+      {
+        tag: "feature",
+        text: "What's coming — sixteen entries in three states, being built, decided, or thinking about it. No dates.",
+      },
+      {
+        tag: "ui",
+        text: "The menu panel keeps its height whether a column holds one tool or two, so it stops resizing as you move across it.",
+      },
+      {
+        tag: "infra",
+        text: "The menu and the tool pages read one list, so a blurb cannot say one thing in the menu and another on the page.",
+      },
+    ],
+  },
+  {
     version: "v8.93",
     date: "2026-09-24",
     headline: "Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { EDITOR_URL, external } from "../config";
+import { TOOL_GROUPS } from "../data/toolPages";
 
 // ── SVG path arrays (from the design) ────────────────────────────────────
 const P = {
@@ -18,30 +19,27 @@ const P = {
 };
 
 // ── data ──────────────────────────────────────────────────────────────────
-interface ToolPage  { href: string; title: string; desc: string; detail: string }
-interface ToolGroup { name: string; paths: string[]; pages: ToolPage[] }
+/* The tools come from `toolPages.ts`, which is also what the ten landing pages
+ * render. The menu used to carry its own copy of every title and blurb while
+ * linking to ten paths that had no page behind them — so the text could drift
+ * and every link was a hard 404. One list now, and a group's icon is the only
+ * thing this file still owns, because an icon is presentation. */
+interface ToolGroup { name: string; paths: string[]; pages: readonly ToolPageView[] }
+interface ToolPageView { href: string; title: string; desc: string; detail: string }
 
-const GROUPS: ToolGroup[] = [
-  { name: "Enhance", paths: P.sliders, pages: [
-    { href: "/photo-editor",    title: "Photo editor",    desc: "Crop, straighten, brightness, contrast, twelve presets.", detail: "Crop with rule-of-thirds guides, straighten, fix brightness, contrast, shadows and highlights, or set levels against a live histogram. Twelve one-click presets preview on your own photo before you keep one. Every step is an undo entry, and nothing leaves your computer." },
-    { href: "/image-compressor", title: "Image compressor", desc: "Shrink to a size or a percentage. WebP, AVIF, JPEG, PNG.", detail: "Pick a target file size or a percentage and the editor resamples and re-encodes on your own machine — WebP, AVIF, JPEG or PNG. Page-speed scores update as you drag. Compress All does the whole gallery in one pass." },
-  ]},
-  { name: "Select", paths: P.select, pages: [
-    { href: "/background-remover",      title: "Background remover", desc: "Cut the subject out cleanly. rembg, on a server.", detail: "One click and the subject is lifted off its background with a clean edge. This one runs on a server we pay for, so it needs a Pro account — the photo goes up, the cut-out comes back, and the job is deleted afterwards." },
-    { href: "/remove-object-from-photo", title: "Remove an object",  desc: "Paint over it. Magic eraser locally; an AI pass if you sign in.", detail: "Paint over the thing you want gone. The Magic Eraser fills it in from the surrounding pixels on your own machine, free. For harder cases, Pro adds an AI pass that runs on a server and sends back a cleaner fill." },
-  ]},
-  { name: "Create", paths: P.brush, pages: [
-    { href: "/annotate-image", title: "Annotate an image", desc: "Arrows, boxes, numbered pins, text bubbles, emoji.", detail: "Arrows, boxes, circles, numbered pins, speech bubbles, text in real typefaces, emoji and red review stamps. Everything stays an object you can move, recolor or delete until you export. Snap to a nine-cell grid to line things up." },
-    { href: "/clone-stamp",    title: "Clone stamp",      desc: "Paint one part of a photo over another.", detail: "Alt-click a source point, then paint: the pixels from the source follow your brush. Adjustable size, hardness, opacity and spacing, with the Stroke Stabilizer steadying your hand." },
-  ]},
-  { name: "Edit", paths: P.crop, pages: [
-    { href: "/pixelate-image", title: "Pixelate an image", desc: "Block out a face, a plate, a password.", detail: "Paint a region and it turns to blocks; choose the block size. Or use the black-box redaction for a hard cover. It happens on your computer — the original never goes anywhere, and the export is flattened so the pixels are really gone." },
-    { href: "/blur-image",     title: "Blur an image",     desc: "Soften a background or hide a detail.", detail: "Brush a blur over just the part you want softened, or blur the whole photo with a slider. Radius and strength are yours to set. Runs on your machine; on some computers, on the graphics card." },
-  ]},
-  { name: "Batch", paths: P.images, pages: [
-    { href: "/batch-image-editor", title: "Batch image editor", desc: "Resize, compress, stamp a logo, rename by content — one pass.", detail: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, stamp a logo or text, rename by what's in the picture. One pass, on your own machine, then export the lot." },
-  ]},
-];
+const GROUP_ICON: Record<string, string[]> = {
+  Enhance: P.sliders,
+  Select: P.select,
+  Create: P.brush,
+  Edit: P.crop,
+  Batch: P.images,
+};
+
+const GROUPS: ToolGroup[] = TOOL_GROUPS.map((g) => ({
+  name: g.name,
+  paths: GROUP_ICON[g.name] ?? P.sliders,
+  pages: g.pages.map((p) => ({ href: p.slug, title: p.label, desc: p.blurb, detail: p.lede })),
+}));
 
 interface LearnItem { key: string; href: string; title: string; desc: string; paths: string[]; detail: string }
 const LEARN_ITEMS: LearnItem[] = [
@@ -49,11 +47,12 @@ const LEARN_ITEMS: LearnItem[] = [
   { key: "blog",         href: "/blog",         title: "Blog",         desc: "One decision per post, with the measurements.",       paths: P.pen,      detail: "Longer than a changelog line. Each post takes one engineering decision — moving the engine off the main thread, keeping the editor working with no network — says what it cost, and shows the measurements behind it." },
   { key: "trail",        href: "/trail-log",    title: "Trail Log",    desc: "Every release, newest first, and the commits behind them.", paths: P.commit, detail: "Every release, newest first, with the commits behind it. Press a month to narrow the log; the year pill brings it all back. Each month opens with what it amounted to." },
   { key: "features",     href: "/features",     title: "Features",     desc: "The whole list — engine and interface.", paths: P.checks,    detail: "All the features from the repo's own list, regrouped by what you're trying to do — annotate, select, enhance, export. Each has a plain line and the engineering line underneath." },
+  { key: "coming",       href: "/coming-soon",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
   { key: "about",        href: "/about",        title: "About",        desc: "Who builds it, and the horse.",          paths: P.info,      detail: "Image Horse is one person's project, and it is named after a horse. Chris builds it. Naji, an Arabian who survived his herd and later worked as a therapy horse, lent the name." },
 ];
 
 const PRINCIPLE      = { eyebrow: "The principle", title: "An image editor with no upload.", desc: "Your pictures stay on your computer. Every tool below says which parts do, and which need a server.", foot: "/image-editor-no-upload →", href: "/image-editor-no-upload" };
-const LEARN_PRINCIPLE = { eyebrow: "Learn", title: "How it's built, and why.", desc: "The architecture, the writing, the release log, the feature list, and the people. Hover anything on the right to see what's behind it.", foot: "5 pages →", href: "/architecture" };
+const LEARN_PRINCIPLE = { eyebrow: "Learn", title: "How it's built, and why.", desc: "The architecture, the writing, the release log, the feature list, and the people. Hover anything on the right to see what's behind it.", foot: `${LEARN_ITEMS.length} pages →`, href: "/architecture" };
 const TOOL_HREFS = GROUPS.flatMap((g) => g.pages.map((p) => p.href));
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -68,12 +67,12 @@ function Paths({ d, size = 14 }: { d: string[]; size?: number }) {
 interface FeatCard { eyebrow: string; title: string; desc: string; foot: string; href: string }
 function FeatureCard({ card }: { card: FeatCard }) {
   return (
-    <a href={card.href} className="nav-mega__feat">
+    <Link to={card.href} className="nav-mega__feat">
       <span className="nav-mega__feat-eye">{card.eyebrow}</span>
       <span className="nav-mega__feat-title">{card.title}</span>
       <span className="nav-mega__feat-desc">{card.desc}</span>
       <span className="nav-mega__feat-foot">{card.foot}</span>
-    </a>
+    </Link>
   );
 }
 
@@ -303,21 +302,21 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                       {g.name}
                     </p>
                     {g.pages.map((pg) => (
-                      <a
+                      <Link
                         key={pg.href}
-                        href={pg.href}
+                        to={pg.href}
                         className="nav-mega__page"
                         onPointerEnter={() => setHoveredTool(pg.href)}
                         onFocus={() => setHoveredTool(pg.href)}
                       >
                         <span className="nav-mega__page-title">{pg.title}</span>
                         <span className="nav-mega__page-desc">{pg.desc}</span>
-                      </a>
+                      </Link>
                     ))}
                     {g.pages.length < 2 && (
-                      <a href={EDITOR_URL} className="nav-mega__page nav-mega__page--more" {...external} aria-label={`More ${g.name} tools coming`}>
+                      <Link to="/coming-soon" className="nav-mega__page nav-mega__page--more" aria-label={`What's coming to ${g.name}`}>
                         <span style={{ fontFamily: "var(--font-outlier)", fontSize: "var(--text-2xs)", lineHeight: 1.4 }}>more coming →</span>
-                      </a>
+                      </Link>
                     )}
                   </div>
                 ))}
@@ -358,11 +357,11 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
       {/* ── Mobile sheet ── */}
       <div className="nav-sheet" id="navsheet" ref={sheetRef} hidden={!sheetOpen}>
 
-        <a href="/image-editor-no-upload" className="nav-sheet__principle">
+        <Link to="/image-editor-no-upload" className="nav-sheet__principle">
           <span className="nav-sheet__principle-eye">The principle</span>
           <span className="nav-sheet__principle-title">An image editor with no upload.</span>
           <span className="nav-sheet__principle-desc">Your pictures stay on your computer. Every tool below says which parts do, and which need a server.</span>
-        </a>
+        </Link>
 
         <section className="nav-sheet__section">
           <h2 className="nav-sheet__section-head">
@@ -372,20 +371,20 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
           <div className="nav-sheet__grid">
             {GROUPS.flatMap((g) =>
               g.pages.map((p) => (
-                <a key={p.href} href={p.href} className="nav-sheet__card">
+                <Link key={p.href} to={p.href} className="nav-sheet__card">
                   <span className="nav-sheet__card-group">
                     <Paths d={g.paths} size={12} />
                     {g.name}
                   </span>
                   <span className="nav-sheet__card-title">{p.title}</span>
                   <span className="nav-sheet__card-desc">{p.desc}</span>
-                </a>
+                </Link>
               ))
             )}
-            <a href={EDITOR_URL} className="nav-sheet__card nav-sheet__card--more" {...external} aria-label="More Batch tools coming">
+            <Link to="/coming-soon" className="nav-sheet__card nav-sheet__card--more" aria-label="What's coming to Batch">
               <span className="nav-sheet__card-group">Batch</span>
               <span className="nav-sheet__card-desc" style={{ fontFamily: "var(--font-outlier)", fontSize: "var(--text-2xs)" }}>more coming →</span>
-            </a>
+            </Link>
           </div>
         </section>
 

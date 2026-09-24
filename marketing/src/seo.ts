@@ -63,6 +63,11 @@ export interface Route {
    *  places you might want to go. They stay in ROUTES because the sitemap and
    *  the prerendered <head> are exactly what they need. */
   footerOnly?: boolean;
+  /** A tool landing page: in the sitemap, the prerender and the mega-menu, out
+   *  of the footer's main column, which is a list of places on the site rather
+   *  than a list of jobs the editor does. `toolPages.ts` carries their content;
+   *  this table carries only what a crawler reads. */
+  toolPage?: boolean;
 }
 
 /** Every page, in nav order. A new page appears in the nav, the mobile sheet,
@@ -167,6 +172,104 @@ export const ROUTES: readonly Route[] = [
       "The terms for using Image Horse: your pictures stay yours, the software is beta and free, and the paid tier bills monthly through Stripe.",
     sources: ["marketing/src/pages/TermsOfService.tsx"],
     footerOnly: true,
+  },
+  {
+    to: "/coming-soon",
+    label: "What's coming",
+    title: "What's coming to Image Horse — building, decided, ideas",
+    description:
+      "What is being built, what is decided and what is still an idea. No dates: when something ships it moves to the Trail Log and comes off this page.",
+    sources: ["marketing/src/pages/ComingSoon.tsx"],
+  },
+  {
+    to: "/photo-editor",
+    label: "Photo editor",
+    title: "Free photo editor that runs in your browser — no upload",
+    description:
+      "Crop, straighten and correct exposure without uploading anything. Twelve presets preview on your own photo, every step undoes, and no account is needed.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/image-compressor",
+    label: "Image compressor",
+    title: "Image compressor — hit a target file size in your browser",
+    description:
+      "Compress to an exact file size or a percentage in WebP, AVIF, JPEG or PNG. Runs on your own machine, shows the page-speed effect, and does whole folders at once.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/background-remover",
+    label: "Background remover",
+    title: "Background remover — cut out a subject cleanly",
+    description:
+      "One click lifts the subject off its background with a clean edge, including hair. Runs on a server and needs Pro; the job is deleted once the result comes back.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/remove-object-from-photo",
+    label: "Remove an object",
+    title: "Remove an object from a photo — free, in your browser",
+    description:
+      "Paint over what you want gone and the Magic Eraser fills it from the surrounding pixels on your own machine, free. Pro adds an AI pass for harder cases.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/annotate-image",
+    label: "Annotate an image",
+    title: "Annotate an image — arrows, boxes, pins and text",
+    description:
+      "Add arrows, boxes, numbered pins, speech bubbles, real text and emoji. Everything stays editable until export, snaps to a grid, and never leaves your machine.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/clone-stamp",
+    label: "Clone stamp",
+    title: "Clone stamp tool — paint one part of a photo over another",
+    description:
+      "Alt-click a source, then paint: those pixels follow your brush. Adjustable size, hardness, opacity and spacing, with a stabilizer to steady the stroke.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/pixelate-image",
+    label: "Pixelate an image",
+    title: "Pixelate an image — block out a face or a password",
+    description:
+      "Paint a region into blocks, or use a hard black box. Runs on your machine and exports flattened, so the covered pixels are genuinely gone from the file.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/blur-image",
+    label: "Blur an image",
+    title: "Blur an image — soften a background or hide a detail",
+    description:
+      "Brush a blur over one part of a photo or blur the whole thing with a slider. Radius and strength are yours to set, and it runs on your own machine.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/batch-image-editor",
+    label: "Batch image editor",
+    title: "Batch image editor — do one thing to a whole folder",
+    description:
+      "Resize, compress, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/image-editor-no-upload",
+    label: "No-upload image editor",
+    title: "Image editor with no upload — everything stays on your machine",
+    description:
+      "Edit photos without uploading them anywhere. The engine runs in your browser, your files stay in local storage, and every exception is named on this page.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
   },
 ] as const;
 
