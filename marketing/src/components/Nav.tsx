@@ -16,6 +16,7 @@ const P = {
   checks:    ["m3 7 2 2 4-4","m3 17 2 2 4-4","M13 8h8","M13 18h8"],
   telescope: ["m10 6 8-4 3 5-8 4z","m5 12 5-6 4 3-5 6z","M3 16l4-5 3 2-4 5z","M9 18l3 4","M14 18l-3 4"],
   info:      ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z","M12 11v5","M12 8h.01"],
+  layers:    ["m12 2 10 5-10 5L2 7z","m2 12 10 5 10-5","m2 17 10 5 10-5"],
   home:      ["M3 10.5 12 3l9 7.5","M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9"],
   tag:       ["M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z","M7.5 7.5h.01"],
   mail:      ["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z","m22 7-10 6L2 7"],
@@ -50,6 +51,7 @@ const LEARN_ITEMS: LearnItem[] = [
   { key: "blog",         href: "/blog",         title: "Blog",         desc: "One decision per post, with the measurements.",       paths: P.pen,      detail: "Longer than a changelog line. Each post takes one engineering decision — moving the engine off the main thread, keeping the editor working with no network — says what it cost, and shows the measurements behind it." },
   { key: "trail",        href: "/trail-log",    title: "Trail Log",    desc: "Every release, newest first, and the commits behind them.", paths: P.commit, detail: "Every release, newest first, with the commits behind it. Press a month to narrow the log; the year pill brings it all back. Each month opens with what it amounted to." },
   { key: "features",     href: "/features",     title: "Features",     desc: "The whole list — engine and interface.", paths: P.checks,    detail: "All the features from the repo's own list, regrouped by what you're trying to do — annotate, select, enhance, export. Each has a plain line and the engineering line underneath." },
+  { key: "openraster",   href: "/openraster",   title: "OpenRaster (.ora)", desc: "Open a layered .ora here. Take it to Krita or GIMP.", paths: P.layers, detail: "OpenRaster is the open layered format Krita, GIMP and MyPaint share. Drop a .ora on the page to see every layer — read in the tab, never uploaded — and learn what survives a round trip through Image Horse." },
   { key: "coming",       href: "/coming-soon",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
   { key: "about",        href: "/about",        title: "About",        desc: "Who builds it, and the horse.",          paths: P.info,      detail: "Image Horse is one person's project, and it is named after a horse. Chris builds it. Naji, an Arabian who survived his herd and later worked as a therapy horse, lent the name." },
 ];

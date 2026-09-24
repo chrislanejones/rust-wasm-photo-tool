@@ -24,6 +24,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.97",
+    date: "2026-09-24",
+    headline: "Open a .ora file in your browser, and see every layer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "/openraster: drop any .ora on the page and every layer is unzipped and drawn in the tab. Nothing is uploaded, and it keeps working with the network off. Toggle layers, look at the file's own flattened copy, save any layer as a PNG.",
+      },
+      {
+        tag: "feature",
+        text: "The page opens on a five-layer sample, so there is something to look at before you have a file. Download it and open it in Krita or GIMP.",
+      },
+      {
+        tag: "perf",
+        text: "The viewer uses the browser's own PNG decoder, every layer at once: 60 MB of layers in 0.4 seconds. The engine's decoder measured five times slower and would have cost 354 KB to download, so the page ships without it. Its own code is 8.5 KB.",
+      },
+      {
+        tag: "ui",
+        text: "Every file gets an archive check, and a note before you import when a layer is offset, undersized, grouped or blended, because the editor's importer handles none of those yet.",
+      },
+      {
+        tag: "ui",
+        text: "The guide under the viewer: what a .ora is, what is inside, how to export one from Image Horse and import it back, what survives the round trip, and where else it opens.",
+      },
+      {
+        tag: "infra",
+        text: "OpenRaster (.ora) is in the Learn menu, the phone menu, ⌘K, the footer and the sitemap, with its own share card. Five questions are on the page and in its structured data, from one list.",
+      },
+      {
+        tag: "feature",
+        text: "Select: drag Tolerance and the selection re-runs live from the same click, one undo step for the whole drag. A \"Selected 18.4% · 2.1 MP\" readout under the sliders and in the status bar. Intersect joins New, Add and Subtract.",
+      },
+      {
+        tag: "rust",
+        text: "Engine 816,594 bytes, up 2,162 for the selection retune record and the coverage query.",
+      },
+    ],
+  },
+  {
     version: "v8.96",
     date: "2026-09-24",
     headline:

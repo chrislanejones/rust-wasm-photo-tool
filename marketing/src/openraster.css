@@ -1,0 +1,293 @@
+/* /openraster — the OpenRaster viewer, and the parts of the page the tool-page
+ * template (tool-page.css) does not cover. Sizes are the design file's own.
+ */
+
+.ora-wrap { padding: 0 var(--page-gutter) 56px; scroll-margin-top: 110px; }
+
+/* ── the panel ──────────────────────────────────────────────────────── */
+
+.ora {
+  display: grid;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 20px;
+  background: var(--color-paper-2);
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+.ora.is-drag { border-color: var(--color-accent); }
+
+.ora__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 16px 20px;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+.ora__status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
+.ora__local {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+.ora__dot { width: 8px; height: 8px; border-radius: 999px; background: var(--color-accent); }
+.ora__file { font-size: var(--text-sm); color: var(--color-ink-2); overflow-wrap: anywhere; }
+.ora__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.ora__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: var(--rule-hair) solid transparent;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out),
+              border-color var(--dur-micro) var(--ease-out);
+}
+.ora__btn--fill { font-weight: 600; background: var(--color-accent); color: var(--color-accent-ink); }
+.ora__btn--fill:hover { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.ora__btn--line { font-weight: 500; background: transparent; border-color: var(--color-rule); color: var(--color-ink); }
+.ora__btn--line:hover { border-color: var(--color-accent); color: var(--color-ink); }
+.ora__btn:focus-visible, .ora__btn:focus-within { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+/* The file input is the label's real control: kept in the tree for the
+   keyboard and screen readers, out of sight for everyone else. */
+.ora__input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+.ora__error {
+  margin: 16px 20px 0;
+  padding: 14px 16px;
+  border: var(--rule-hair) solid var(--color-accent);
+  border-radius: 12px;
+  background: var(--color-paper-3);
+  font-size: var(--text-ui);
+}
+
+/* ── empty ──────────────────────────────────────────────────────────── */
+
+.ora__drop {
+  display: grid;
+  place-items: center;
+  min-height: 22rem;
+  margin: 20px;
+  padding: 40px 24px;
+  border: 1px dashed var(--color-rule-2, oklch(40% 0.025 40));
+  border-radius: 14px;
+  text-align: center;
+  transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+}
+.is-drag .ora__drop { border-color: var(--color-accent); background: var(--color-paper-3); }
+.ora__drop-inner { display: grid; gap: 12px; justify-items: center; max-width: 36ch; color: var(--color-accent); }
+.ora__drop-title { margin: 0; font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--color-ink); }
+.ora__drop-sub { margin: 0; font-size: var(--text-ui); color: var(--color-ink-2); text-wrap: pretty; }
+
+/* ── loaded ─────────────────────────────────────────────────────────── */
+
+.ora__body { display: flex; flex-wrap: wrap; }
+.ora__stage { flex: 3 1 28rem; display: grid; gap: 14px; align-content: start; padding: 20px; min-width: 0; }
+.ora__stage-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ora__seg { display: inline-flex; gap: 4px; padding: 4px; border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-pill); }
+.ora__seg-btn {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.ora__seg-btn.is-on { background: var(--color-accent); color: var(--color-accent-ink); }
+.ora__seg-btn:disabled { color: var(--color-ink-3); cursor: default; }
+.ora__seg-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ora__meta { font-family: var(--font-outlier); font-size: var(--text-xs); color: var(--color-ink-3); }
+
+/* A checkerboard so transparency reads as transparency, not as the panel. */
+.ora__canvas-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 18rem;
+  padding: 12px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 12px;
+  background: repeating-conic-gradient(oklch(24% 0.018 40) 0 25%, oklch(20% 0.018 40) 0 50%) 0 0 / 16px 16px;
+}
+.ora__canvas { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; }
+.ora__note { margin: 0; font-size: var(--text-sm); color: var(--color-ink-3); text-wrap: pretty; }
+
+.ora__side {
+  flex: 1 1 18rem;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+  min-width: 0;
+  padding: 20px;
+  border-left: var(--rule-hair) solid var(--color-rule);
+  background: oklch(15% 0.019 35);
+}
+.ora__block { display: grid; gap: 8px; }
+.ora__h {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.ora__h span { font-weight: 400; color: var(--color-ink-3); }
+
+.ora__layers { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ora__layer {
+  display: grid;
+  grid-template-columns: 36px 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px 6px 4px;
+  border: var(--rule-hair) solid oklch(24% 0.018 40);
+  border-radius: 10px;
+  background: var(--color-paper-2);
+}
+.ora__layer.is-selected { border-color: oklch(40% 0.025 40); }
+.ora__layer.is-hidden .ora__thumb, .ora__layer.is-hidden .ora__layer-text { opacity: 0.45; }
+.ora__eye {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.ora__layer.is-hidden .ora__eye { color: var(--color-ink-3); }
+.ora__eye:hover { background: var(--color-paper-3); }
+.ora__eye:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ora__thumb {
+  display: block;
+  width: 44px;
+  height: 32px;
+  border-radius: 4px;
+  /* The layer's PNG over a checkerboard. `--thumb` is set inline per row. */
+  background-image: var(--thumb, none), repeating-conic-gradient(oklch(26% 0.018 40) 0 25%, oklch(20% 0.018 40) 0 50%);
+  background-size: contain, 8px 8px;
+  background-position: center, 0 0;
+  background-repeat: no-repeat, repeat;
+}
+.ora__layer-text { display: grid; gap: 2px; min-width: 0; }
+.ora__layer-name { font-size: var(--text-sm); font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ora__layer-meta { font-family: var(--font-outlier); font-size: var(--text-2xs); color: var(--color-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ora__save { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--color-ink-3); }
+.ora__save:hover { color: var(--color-ink); background: var(--color-paper-3); }
+.ora__save:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.ora__checks { display: grid; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.ora__checks li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: var(--rule-hair) solid oklch(24% 0.018 40);
+  color: var(--color-ink-2);
+}
+.ora__checks li > span:first-child { font-family: var(--font-outlier); color: var(--color-ink-3); }
+.ora__checks li.is-ok > span:first-child { color: var(--color-accent); }
+.ora__warn {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--rule-hair) solid oklch(40% 0.025 40);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: oklch(84% 0.012 65);
+  text-wrap: pretty;
+}
+
+/* ── the article, on the cream board ────────────────────────────────── */
+
+.ora-what {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 16px 64px;
+  align-items: start;
+}
+.ora-what .tp-board__h2 { max-width: 16ch; text-wrap: balance; }
+.ora-what__text { display: grid; gap: 16px; max-width: 60ch; }
+.ora-col { display: grid; gap: 16px; min-width: 0; }
+.ora-col .tp-split__p { max-width: 44ch; }
+.ora-col strong { font-weight: 600; color: var(--tp-ink); }
+.ora-code { font-family: var(--font-outlier); font-size: 0.9em; color: var(--tp-ink); }
+
+.ora-pre {
+  margin: 0;
+  padding: 20px 22px;
+  border: var(--rule-hair) solid var(--tp-card-rule);
+  border-radius: 14px;
+  background: var(--tp-card);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: oklch(30% 0.020 40);
+  overflow-x: auto;
+  white-space: pre;
+}
+.ora-pre span { color: var(--tp-mark); }
+
+.ora-steps { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; max-width: 60ch; }
+.ora-steps li { display: grid; grid-template-columns: 2rem 1fr; gap: 12px; color: var(--tp-ink-3); text-wrap: pretty; }
+.ora-steps__n { font-family: var(--font-outlier); font-weight: 500; color: var(--tp-mark); }
+
+.ora-trip { display: grid; gap: 24px; padding-top: clamp(40px, 5vw, 56px); border-top: var(--rule-hair) solid var(--tp-rule); scroll-margin-top: 110px; }
+.ora-trip .tp-board__h2 { max-width: 20ch; text-wrap: balance; }
+.ora-table-wrap { overflow-x: auto; overflow-y: hidden; }
+.ora-table { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: 1rem; }
+.ora-table th, .ora-table td { text-align: left; padding: 14px 16px 14px 0; border-top: var(--rule-hair) solid var(--tp-rule); }
+.ora-table thead th {
+  padding: 0 16px 12px 0;
+  border-top: 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: oklch(40% 0.020 40);
+}
+.ora-table tbody th { font-weight: 600; color: var(--tp-ink); }
+.ora-table td { color: var(--tp-ink-3); }
+.ora-table tbody tr:last-child th, .ora-table tbody tr:last-child td { border-bottom: var(--rule-hair) solid var(--tp-rule); }
+.ora-mark { font-family: var(--font-outlier); color: var(--tp-mark); }
+
+.ora-apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.ora-apps li {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: var(--rule-hair) solid var(--tp-card-rule);
+  border-radius: 14px;
+  background: var(--tp-card);
+}
+.ora-apps strong { font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--tp-ink); }
+.ora-apps span { font-size: var(--text-ui); line-height: 1.5; color: var(--tp-ink-3); text-wrap: pretty; }
+
+.ora-faq { display: grid; max-width: 62ch; }
+.ora-faq__item { padding: 16px 0; border-top: var(--rule-hair) solid var(--tp-rule); }
+.ora-faq__item:last-child { border-bottom: var(--rule-hair) solid var(--tp-rule); }
+.ora-faq__item h3 { margin: 0 0 6px; font-size: var(--text-md); font-weight: 600; color: var(--tp-ink); }
+.ora-faq__item p { margin: 0; color: var(--tp-ink-3); text-wrap: pretty; }

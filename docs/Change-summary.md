@@ -10957,3 +10957,20 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
 | **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |
 
+## v8.97 Change Summary — 2026-09-24
+
+**Open a .ora file in your browser, and see every layer.**
+
+| Area | Change |
+| --- | --- |
+| **/openraster** | A new Learn page, from the design's `Learn - OpenRaster.dc.html`. Drop any .ora on it and every layer is unzipped and drawn in the tab: a composite from the layer PNGs, the file's own `mergedimage.png` beside it, a layer list with eyes, a thumbnail and a save-as-PNG per layer. Nothing is uploaded; it works with the network off. |
+| **The sample** | The page opens on a five-layer sunset (`makeSample` in `lib/ora.ts`) with a blend mode, an offset layer and a hidden one, so every column of the viewer has something to show. Generated on the client in the tab, not fetched: no extra request on first paint. "Download sample.ora" hands you that file. |
+| **Speed** | The viewer decodes with `createImageBitmap`, all layers in parallel. Measured on 8 layers of 3000×2000 (60.4 MB of PNG): **377 ms**; one layer at a time 1,477 ms; the engine's wasm `decode_png_to_rgba` 1,977 ms plus 354 KB gzipped to download first. So the page ships no wasm and no three.js; its own chunk is **8.5 KB** gzipped. The editor's importer keeps the wasm decoder on purpose, so import and export share one codec. ADR-068. |
+| **Archive check** | Each file gets a five-line report: mimetype is `image/openraster`, it is first and stored, `stack.xml` and its version, `mergedimage.png`, thumbnail. Deflated entries (Krita, GIMP) are read through `DecompressionStream`; the ZIP reader is 60 lines rather than a jszip dependency on the marketing site. |
+| **Before you import** | Warnings when a layer is at an offset, smaller than the canvas, inside a group, uses a blend mode, or names a PNG the archive lacks. Each says what the editor's importer does about it today (`app/src/lib/openraster/import.ts`): top-left placement, full-size expected, flat stack, normal blending. |
+| **The guide** | What a .ora is, the file list and a `stack.xml` sample, export from Image Horse in three steps, import back, a "what survives a round trip" table, where else it opens (Krita, GIMP, MyPaint), and five questions. One copy fix against the design: the editor's tab is **Import / Export**, not "Export". |
+| **SEO** | Title 51 characters, description 158, canonical, its own share card, in the sitemap. The five questions are on the page and in a `FAQPage` JSON-LD node built from the same list (`data/openraster.ts`), so the markup can never name a question a visitor cannot see. The empty drop state and the whole article are in the prerendered HTML. |
+| **Found the page** | OpenRaster (.ora) is in the Learn menu (desktop and phone), ⌘K, the footer's Pages column, and the Learn hover card. |
+| **Select (#231)** | Live Tolerance: dragging the slider re-runs the last click from the same seed against the pre-click selection, so Add/Subtract/Intersect shrink as well as grow, and the whole drag is **one** undo step. 70 ms debounce, one run in flight, newest answer wins; above 8 MP (3.2 MP edge-aware) it waits for the drag to pause. A "Selected 18.4% · 2.1 MP" readout under the sliders and as a status-bar chip. **Intersect** is combine mode 3. Both sliders always shown, disabled with a one-line reason where unused. Engine: `selection_coverage()`, `selection_can_retune()`, `selection_retune()`. ADR-066. Pinned by `e2e/select-live-tolerance.spec.ts`; cargo test 372 / 557 with features. |
+| **Engine size** | **816,594 B** (was 814,432; +2,162 B for #231's retune record and coverage query). |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 24/24 routes prerendered, browser test: sample loads in 519 ms, layer toggle changes pixels, a deflated .ora opens, a non-.ora zip is refused with a reason, phone has no horizontal overflow. |
