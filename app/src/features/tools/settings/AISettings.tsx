@@ -32,6 +32,9 @@ import {
   hasMaskPaint,
   pngDimensions,
 } from "@/lib/objectRemovalMask";
+import { useUIStore } from "@/stores/useUIStore";
+import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
+import { ErrorNote } from "@/components/ui/status-note";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
@@ -160,7 +163,11 @@ export function AISettings({
    *  buttons, not two states. */
   const isReplicate = mode === "rembg" || mode === "inpaint";
 
-  const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
+  // Background and object removal upload the image — not offered while the
+  // "Everything in your browser" switch is on (useAIJob refuses them too).
+  const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  const canRun =
+    aiEnabled && onlineFeaturesEnabled && !!activePhotoId && !!stampToolRef.current;
 
   const runModel = async (type: "rembg") => {
     const tool = stampToolRef.current;
@@ -216,7 +223,7 @@ export function AISettings({
   // away (tool switch, sign-out, the AI sub-tool losing its Replicate mode).
   // A live overlay whose panel is gone would take every canvas click with no
   // way to confirm or cancel — the one way this mode could strand a user.
-  const replicateAvailable = isReplicate && aiEnabled;
+  const replicateAvailable = isReplicate && aiEnabled && onlineFeaturesEnabled;
   useEffect(() => {
     if (!replicateAvailable) setMasking(false);
   }, [replicateAvailable, setMasking]);
@@ -342,7 +349,10 @@ export function AISettings({
 
       {isReplicate && (
         <>
-          {!aiEnabled && (
+          {!onlineFeaturesEnabled && (
+            <OnlineFeaturesOffNotice what="Remove Background and Remove Object send the image to a server." />
+          )}
+          {onlineFeaturesEnabled && !aiEnabled && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
               <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
               <p className="text-2xs text-warning/90">
@@ -471,7 +481,7 @@ export function AISettings({
           />
           )}
           {lastType === "rembg" && error && (
-            <p className="text-2xs text-destructive leading-relaxed">{error}</p>
+            <ErrorNote>{error}</ErrorNote>
           )}
           {lastType === "rembg" && phase === "done" && !error && (
             <p className="text-2xs text-success">
@@ -480,7 +490,7 @@ export function AISettings({
           )}
 
           {lastType === "inpaint" && error && (
-            <p className="text-2xs text-destructive leading-relaxed">{error}</p>
+            <ErrorNote>{error}</ErrorNote>
           )}
           {lastType === "inpaint" && phase === "done" && !error && (
             <p className="text-2xs text-success">

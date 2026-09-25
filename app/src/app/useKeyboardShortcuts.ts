@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
@@ -88,7 +89,8 @@ interface KeyboardShortcutOptions {
   // Item 4: Gallery cycling
   onNextPhoto?: () => void;
   onPrevPhoto?: () => void;
-  // Item 2: Spacebar pan
+  // Item 2: Spacebar pan. Despite the names these are "pan on" / "pan off":
+  // Space and H (see HAND_TAP_MS) both drive them.
   onSpaceDown?: () => void;
   onSpaceUp?: () => void;
 }
@@ -105,6 +107,13 @@ const NON_TEXT_INPUT_TYPES: ReadonlySet<string> = new Set([
   "color",
   "file",
 ]);
+
+/** H is the hand key, spring-loaded the way Photoshop's is: HOLD it and pan
+ *  lasts while the key is down, TAP it and pan stays on until the next tap (or
+ *  Esc). A press shorter than this is a tap. Space stays hold-only — it is also
+ *  the key that activates a keyboard-focused button, so it can never be the
+ *  reliable one, which is why H exists. */
+const HAND_TAP_MS = 300;
 
 export function useKeyboardShortcuts({
   onUndo,
@@ -145,6 +154,13 @@ export function useKeyboardShortcuts({
   onSpaceUp,
 }: KeyboardShortcutOptions) {
   const spaceHeldRef = useRef(false);
+  // H down: the keydown's timeStamp, so the keyup can tell a tap from a hold.
+  const handDownAtRef = useRef<number | null>(null);
+  // H was tapped: pan stays on after the key comes up.
+  const handLatchedRef = useRef(false);
+  // What was last sent to onSpaceDown/onSpaceUp. Pan is ONE state fed by three
+  // sources, so releasing Space must not end a pan that H latched.
+  const panOnRef = useRef(false);
 
   // Publish the session handlers the command palette reuses (undo/redo).
   // This hook already receives them from AppShell for Ctrl+Z/Ctrl+Shift+Z —
@@ -156,6 +172,15 @@ export function useKeyboardShortcuts({
   }, [onUndo, onRedo]);
 
   useEffect(() => {
+    const syncPan = () => {
+      const on =
+        spaceHeldRef.current || handDownAtRef.current !== null || handLatchedRef.current;
+      if (on === panOnRef.current) return;
+      panOnRef.current = on;
+      if (on) onSpaceDown?.();
+      else onSpaceUp?.();
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target;
       // A NON-text input — a range slider, checkbox, radio, button — takes
@@ -230,9 +255,34 @@ export function useKeyboardShortcuts({
         e.preventDefault();
         if (!spaceHeldRef.current) {
           spaceHeldRef.current = true;
-          onSpaceDown?.();
+          syncPan();
         }
         return;
+      }
+
+      // ─── H → hand (hold = while held, tap = stays on) ───
+      // H is not an activation key, so unlike Space it cannot be taken by
+      // whatever button happens to hold keyboard focus.
+      if (e.code === "KeyH" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        if (e.repeat) return;
+        if (handLatchedRef.current) {
+          // The second tap turns it off. handDownAtRef stays null, so this
+          // press's keyup is ignored rather than read as a new tap.
+          handLatchedRef.current = false;
+          syncPan();
+          return;
+        }
+        handDownAtRef.current = e.timeStamp;
+        syncPan();
+        return;
+      }
+
+      // Esc lets go of a tapped H. Not preventDefault'd and no early return:
+      // the same Esc still closes a dialog or cancels a lasso elsewhere.
+      if (e.key === "Escape" && handLatchedRef.current) {
+        handLatchedRef.current = false;
+        syncPan();
       }
 
       // ─── PgUp / PgDn → gallery cycling ──────────────────
@@ -381,6 +431,22 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      // ─── Bare X → swap the mask brush between black and white ──────
+      // Photoshop's X (swap foreground/background colors, which on a mask is
+      // hide↔reveal). Claimed ONLY while mask editing is on, so it takes
+      // nothing from any future binding; typing contexts never reach here
+      // (the input/textarea/contentEditable guard at the top). Read via
+      // getState(), the command-palette precedent — a mode swap is global
+      // chrome, not an AppShell prop.
+      if (e.code === "KeyX") {
+        const t = useToolStore.getState();
+        if (t.maskEditing) {
+          e.preventDefault();
+          t.setMaskPaintValue(t.maskPaintValue < 128 ? 255 : 0);
+          return;
+        }
+      }
+
       // ─── Bare digits 1-5 → tool GROUP switching ────────────────────
       if (onGroupChange && e.code in GROUP_BY_KEY) {
         e.preventDefault();
@@ -396,15 +462,31 @@ export function useKeyboardShortcuts({
       if (e.code === "Space" && spaceHeldRef.current) {
         e.preventDefault();
         spaceHeldRef.current = false;
-        onSpaceUp?.();
+        syncPan();
       }
+      if (e.code === "KeyH" && handDownAtRef.current !== null) {
+        const heldMs = e.timeStamp - handDownAtRef.current;
+        handDownAtRef.current = null;
+        if (heldMs < HAND_TAP_MS) handLatchedRef.current = true;
+        syncPan();
+      }
+    };
+
+    // Alt-Tab with H down means the keyup goes to another window. Without this
+    // the hold never ends and pan is stuck on until H is pressed again.
+    const handleBlur = () => {
+      if (handDownAtRef.current === null) return;
+      handDownAtRef.current = null;
+      syncPan();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
     };
   }, [
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,

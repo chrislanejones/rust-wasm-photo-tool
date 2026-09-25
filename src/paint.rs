@@ -723,6 +723,10 @@ impl ImageHorseTool {
             return;
         }
         self.selection = Some(vec![false; n]);
+        // This replaces the selection WITHOUT a history step, so the history
+        // generation does not move — the Tolerance slider would still think
+        // the last wand click is live and re-run it over the painted mask.
+        self.selection_retune = None;
         self.paint_cov = vec![0u8; n];
         self.paint_base = Vec::new();
         self.paint_mask = false;

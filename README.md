@@ -85,44 +85,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.79 — 2026-09-16
+### v8.98 — 2026-09-24
 
-**Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop.**
+**Refine a selection, then turn it into a mask.**
 
-Point Perspective at a square, a circle, a line, an arrow, a pin, a pen path or
-a piece of text and the warp happens to *that object*, not to the photo
-underneath it. Text was the only thing that worked that way before; everything
-else fell through to the pixel warp, so a square you had just drawn sat still
-while the picture under it moved. The warped object stays an object — recolor
-it, move it, drag it to a new size, undo it, or re-select it and adjust the same
-corners. Apply, Reset and Cancel sit on the canvas under the box now, and Esc
-takes the whole frame away.
+The Select panel has a Refine section now. Clean Up does the usual chores in
+one step: it drops specks under 4 pixels, fills pinholes under 6, smooths the
+edge and pulls it in by one. The sliders underneath are the same operations
+one at a time. Move one and you see the result before you commit it, with the
+"Selected" readout telling you what it cost. Apply is one undo step.
 
-Enhance has a Presets tile. One click applies a whole look, and hovering one
-previews it on your own photo before you commit. A preset is a named stack of
-adjustments the app already had, so applying it is a single undo step. The Quick
-Adjust grid it grew out of is gone, and Adjustments is sliders only.
+Layer Settings' Add mask asks what the mask should start from: show the whole
+layer, hide it, reveal just the selection, or hide the selection. Feather from
+Refine softens that edge. The mask brush opens straight after, as it always
+has. Select subject… is there too, and takes you to Background Removal.
 
-Every dialog has the same backdrop. Export, Settings, the Command Palette,
-Diagnostics and Shortcuts had none at all while the New dialog had one, and the
-rest had drifted to four different shades. The New dialog also opens without its
-stutter — the backdrop used to re-blur the whole screen on every frame of the
-animation.
+The export dialog lets you name the file before it downloads. The name you type
+is cleaned up so every operating system accepts it, and the extension always
+matches the format.
 
-The buttons at the bottom of Crop, Canvas Size, Layers, Levels, Color Picker
-and Remove Object are one shape instead of four. In Rulers & Grid, clicking a
-lit toggle now turns it off, where before clicking it again did nothing.
-
-The Levels histogram is tall enough to read.
-
-The New dialog has a switch. Off, which is the default, everything stays in your
-browser. On adds Create AI Image, which sends your prompt to a server. It is
-named for what it does rather than for AI, because it is where anything that
-leaves your tab will live.
-
-The site and the editor both run Google Analytics now.
-
-The tab icon on imagehorse.app is the horse.
+Engine 824,286 bytes (was 816,594).
 
 ## License
 

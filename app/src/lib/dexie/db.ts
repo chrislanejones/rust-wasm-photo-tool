@@ -72,7 +72,26 @@ export interface PhotoOplogManifest {
   opCount: number;
   /** Chunks making up those ops (chunkSeq 0..chunkCount-1). */
   chunkCount: number;
-  /** Engine op-encoding version (OP_FORMAT_VERSION at write time). */
+  /** CONTAINER version of this manifest + its chunks. Always `1`.
+   *
+   *  ⚠️ IT IS NOT `OP_FORMAT_VERSION`, WHATEVER THIS COMMENT USED TO SAY.
+   *  It said "engine op-encoding version (OP_FORMAT_VERSION at write time)"
+   *  and that has never been true: `oplogPersistence.ts` writes the literal
+   *  `1` at both sites, and restore rejects anything that is not `1`. Verified
+   *  2026-09-20 by reading real records out of a production browser — a v7 log
+   *  and a v8 log both say `formatVersion: 1`.
+   *
+   *  ⚠️ AND MAKING IT "HONEST" WOULD DESTROY EVERY EXISTING LOG. Writing
+   *  `OP_FORMAT_VERSION` here means new manifests say 8 while every manifest
+   *  already on a user's disk says 1, and the `!== 1` guard on the restore
+   *  path would discard all of them. This is user data with no backup. The
+   *  COMMENT was wrong; the code is doing something coherent.
+   *
+   *  Op-format discrimination happens where the op bytes are: every frame
+   *  carries its own version byte and `decode_op` accepts `2..=OP_FORMAT_VERSION`
+   *  (see src/ops.rs). This number versions the ENVELOPE — the manifest/chunk
+   *  shape — and bumping it is how a future change to THAT shape announces
+   *  itself. ADR-060. */
   formatVersion: number;
   /** Engine `oplog_generation()` at write time: unchanged ⇒ persisted
    *  chunks are a valid prefix (append the delta); changed ⇒ history
@@ -113,6 +132,10 @@ export interface OpLogChunkRecord {
   bytes: Uint8Array;
   /** Ops contained in this chunk. */
   opCount: number;
+  /** CONTAINER version, always `1` — read the note on
+   *  `PhotoOplogManifest.formatVersion`. It is NOT the engine's
+   *  `OP_FORMAT_VERSION`, and the two must not be made to agree: this chunk's
+   *  ops each carry their own version byte inside `bytes`. */
   formatVersion: number;
   createdAt: number;
 }

@@ -24,6 +24,517 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.98",
+    date: "2026-09-24",
+    headline: "Refine a selection, then turn it into a mask.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Clean Up on the Select panel drops specks, fills pinholes, smooths the edge and pulls it in a pixel, in one step you can undo.",
+      },
+      {
+        tag: "feature",
+        text: "The Refine sliders do the same things one at a time. Move one and you see the result first, with the Selected readout showing what it cost. Apply is one undo step.",
+      },
+      {
+        tag: "feature",
+        text: "Add mask asks what to start from: show the layer, hide it, reveal the selection or hide it. Feather softens the edge, and the mask brush opens straight after.",
+      },
+      {
+        tag: "feature",
+        text: "Name the file in the export dialog before it downloads. The name is cleaned up for every operating system, and the extension always matches the format.",
+      },
+      {
+        tag: "rust",
+        text: "The refine operations are integer and run in the engine, so every machine selects exactly the same pixels.",
+      },
+      {
+        tag: "fix",
+        text: "The Combine button called New shared its name with the New image button for screen readers. It is New selection now.",
+      },
+    ],
+  },
+  {
+    version: "v8.97",
+    date: "2026-09-24",
+    headline: "Open a .ora file in your browser, and see every layer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "/openraster: drop any .ora on the page and every layer is unzipped and drawn in the tab. Nothing is uploaded, and it keeps working with the network off. Toggle layers, look at the file's own flattened copy, save any layer as a PNG.",
+      },
+      {
+        tag: "feature",
+        text: "The page opens on a five-layer sample, so there is something to look at before you have a file. Download it and open it in Krita or GIMP.",
+      },
+      {
+        tag: "perf",
+        text: "The viewer uses the browser's own PNG decoder, every layer at once: 60 MB of layers in 0.4 seconds. The engine's decoder measured five times slower and would have cost 354 KB to download, so the page ships without it. Its own code is 8.5 KB.",
+      },
+      {
+        tag: "ui",
+        text: "Every file gets an archive check, and a note before you import when a layer is offset, undersized, grouped or blended, because the editor's importer handles none of those yet.",
+      },
+      {
+        tag: "ui",
+        text: "The guide under the viewer: what a .ora is, what is inside, how to export one from Image Horse and import it back, what survives the round trip, and where else it opens.",
+      },
+      {
+        tag: "infra",
+        text: "OpenRaster (.ora) is in the Learn menu, the phone menu, ⌘K, the footer and the sitemap, with its own share card. Five questions are on the page and in its structured data, from one list.",
+      },
+      {
+        tag: "feature",
+        text: "Select: drag Tolerance and the selection re-runs live from the same click, one undo step for the whole drag. A \"Selected 18.4% · 2.1 MP\" readout under the sliders and in the status bar. Intersect joins New, Add and Subtract.",
+      },
+      {
+        tag: "rust",
+        text: "Engine 816,594 bytes, up 2,162 for the selection retune record and the coverage query.",
+      },
+    ],
+  },
+  {
+    version: "v8.96",
+    date: "2026-09-24",
+    headline:
+      "Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "The WEBGPU word on the home page is 103 lit cubes now. Hover to ripple them, drag to scatter them, press any key to knock them loose. The line under it says what your machine actually drew them with: WebGPU, WebGL 2, or nothing.",
+      },
+      {
+        tag: "feature",
+        text: "A low-poly horse trots beside \"Your pictures, your computer.\" at the foot of the home page, on computers with a mouse. A phone never downloads it.",
+      },
+      {
+        tag: "perf",
+        text: "Neither graphic costs the first page load. three.js arrives only when the cubes or the horse come near the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"Being built now\" sits between the cubes and the blog: the five things in progress, with a Beta badge on the two you can already switch on.",
+      },
+      {
+        tag: "ui",
+        text: "Home is in the menu bar. On a phone the menu opens with Home, Contact and Pricing as a group of their own, instead of a tall card that pushed Contact off the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"More coming\" in the Tools menu is a real card instead of faint text in an empty box, and the ⌘K button lost its stray white ring.",
+      },
+      {
+        tag: "infra",
+        text: "The contact form can send straight to the inbox once a form key is set. Until then it opens your mail app, as it always has.",
+      },
+    ],
+  },
+  {
+    version: "v8.95",
+    date: "2026-09-24",
+    headline:
+      "The whole marketing site is redrawn — every page, in the new design, with the cream boards and the numbered callouts on the screenshots.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Every page is rebuilt to the new design: Home, Pricing, Features, Trail Log, Blog and its posts, About, Contact, Architecture, Privacy, Terms, the footer, and the ten tool pages.",
+      },
+      {
+        tag: "ui",
+        text: "The light boards arrive — the register-like blocks that sit on the dark page: the feature grid, the pricing matrix, what runs where, and what's coming.",
+      },
+      {
+        tag: "feature",
+        text: "The screenshots on the home page carry their callouts again: numbered pins on Presets, the Original/Edited split, Compress All, the magic wand, the Stroke Stabilizer and History. On a phone the pins stay on the picture and the notes read as a list underneath.",
+      },
+      {
+        tag: "ui",
+        text: "The Tools and Learn menus now draw their tall card at exactly the same size, so the menu stops resizing as you move between them.",
+      },
+      {
+        tag: "feature",
+        text: "Every page has its own share card now — 21 of them, the horse on each, set in the same typeface as the site. Before, only five pages had one.",
+      },
+      {
+        tag: "fix",
+        text: "The architecture page was describing 8 of the 14 tables that actually exist, and had the op-log format a version behind. It now lists all 14, field for field, and says plainly which five nothing uses any more.",
+      },
+      {
+        tag: "fix",
+        text: "Dates read as US formats throughout, and the machine-readable ones stay in the markup for crawlers.",
+      },
+      {
+        tag: "infra",
+        text: "Each page owns its own stylesheet instead of one shared file, so a change to one page cannot reach another.",
+      },
+    ],
+  },
+  {
+    version: "v8.94",
+    date: "2026-09-24",
+    headline:
+      "The ten tools in the new menu have pages now. Every one of those links was a dead end, and a dead end on this host is a blank white page.",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Tools menu linked to ten paths that had no page behind them — /photo-editor, /blur-image and eight more all returned a hard 404. They are real pages now.",
+      },
+      {
+        tag: "fix",
+        text: "Menu links were plain anchors, so every click was a full page load that went to the host instead of the router. They are router links now, which is also why the site's own 404 never got a chance to show.",
+      },
+      {
+        tag: "feature",
+        text: "Ten tool pages: what each one does, whether it runs on your machine or needs a server, and where to go next.",
+      },
+      {
+        tag: "feature",
+        text: "What's coming — sixteen entries in three states, being built, decided, or thinking about it. No dates.",
+      },
+      {
+        tag: "ui",
+        text: "The menu panel keeps its height whether a column holds one tool or two, so it stops resizing as you move across it.",
+      },
+      {
+        tag: "infra",
+        text: "The menu and the tool pages read one list, so a blurb cannot say one thing in the menu and another on the page.",
+      },
+    ],
+  },
+  {
+    version: "v8.93",
+    date: "2026-09-24",
+    headline: "Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Layer mask painting now happens on the Layers panel itself, not on the Paint brush. A brush section appears inside the mask row with size, feather and hide/reveal controls. Hit X to swap black and white while painting, same as Photoshop. The Layers panel stays mounted the whole time.",
+      },
+      {
+        tag: "fix",
+        text: "The Toggle Mask Edit button morphs to read 'Painting mask' once you're in edit mode, making the active state obvious without a second button. The async toggle no longer got stuck in an always-on state by comparing a Promise to a number.",
+      },
+      {
+        tag: "ui",
+        text: "Marketing site nav replaced with a mega-menu: Tools and Learn dropdowns, feature cards that preview descriptions on hover, and a full-screen mobile sheet with card grids. All tool and learn pages are linked for crawlability.",
+      },
+    ],
+  },
+  {
+    version: "v8.92",
+    date: "2026-09-23",
+    headline: "A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom",
+    entries: [
+      {
+        tag: "infra",
+        text: "scripts/compare-clean-view.js: paste it into Chrome DevTools, run it, and the page is just the photo with the Compare divider three quarters across. Alt + = and Alt + - zoom, Esc puts everything back. Nothing in the app changed.",
+      },
+    ],
+  },
+  {
+    version: "v8.91",
+    date: "2026-09-23",
+    headline: "A/B Compare lives in the top bar now, between New and Export, and works over every tool",
+    entries: [
+      {
+        tag: "ui",
+        text: "Compare used to be a button at the bottom of Enhance › Compress and nowhere else. It sits with New and Export now and stays put, so you can paint, crop or adjust and then drag the divider to see what changed against the photo you uploaded.",
+      },
+      {
+        tag: "fix",
+        text: "It grays out when there is nothing to compare: no photo, no stored upload to compare against, or the Batch editor, where one edit goes to every photo. Opening Batch closes the overlay instead of leaving it stuck on screen.",
+      },
+    ],
+  },
+  {
+    version: "v8.90",
+    date: "2026-09-22",
+    headline: "Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less",
+    entries: [
+      {
+        tag: "infra",
+        text: "There are three kinds of account — not signed in, signed in, paid — and running the place was quietly becoming a fourth. It is a role instead: an admin gets everything paid gets, server included, without granting themselves a plan or paying for one.",
+      },
+      {
+        tag: "fix",
+        text: "The app used to work out who the admin was by comparing your email inside the browser, against an address written into the code. The server decides now, from a list kept with the deployment — and if that list is missing, nobody is an admin.",
+      },
+      {
+        tag: "ui",
+        text: "Super User is now a way to look at the app as another kind of account, and it can only show you less than you are entitled to. It used to be able to show “paid” to an account that wasn’t, so the buttons appeared and the server then turned them down.",
+      },
+    ],
+  },
+  {
+    version: "v8.89",
+    date: "2026-09-22",
+    headline: "“Everything in your browser” now stops photo uploads too, which is what that page always said it did",
+    entries: [
+      {
+        tag: "fix",
+        text: "Settings › Security promised that with the switch off your photos never leave this tab. Signed in, that wasn’t true: a flattened copy of every photo you edited was sent to your account, because that backup only checked whether you were signed in. It checks the switch now.",
+      },
+      {
+        tag: "fix",
+        text: "With the switch off — how it ships — nothing about a photo is uploaded, and a photo with no copy on this machine no longer reaches for one on the server. Turning the switch on brings both back.",
+      },
+      {
+        tag: "ui",
+        text: "Deleting a copy you already uploaded works either way: it sends nothing, and refusing it would strand your photos on a server you just asked the app to stop using. Security lists the backup, and the privacy policy says the same.",
+      },
+    ],
+  },
+  {
+    version: "v8.88",
+    date: "2026-09-22",
+    headline: "Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Beta lists the unfinished things you can try early — today the Smart Brush, whose strokes stop at an edge, and blur on the graphics card. Both existed already; the only way in was typing a key into developer tools, so the only people who could were people who already knew the key.",
+      },
+      {
+        tag: "feature",
+        text: "Copy invite link hands someone a link that turns one feature on for the device they open it with. They can switch it off in the same place, or open the app with ?beta=none to clear them all.",
+      },
+      {
+        tag: "infra",
+        text: "These choices live in your browser and are never sent anywhere — no account, no id, no request. There is no way to know who is in a beta, which is the point, and also why feedback has to be asked for.",
+      },
+    ],
+  },
+  {
+    version: "v8.87",
+    date: "2026-09-22",
+    headline: "Settings › Shared shows every share link you’ve made and how often it was opened, a link can switch itself off after a number of views or on a date, and the blog has a second post",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Shared lists every share link you’ve made: the image, how many times it was opened, when it was last opened, and a row of bars for the last 30 days. A link you copied used to be gone for good the moment you shared it.",
+      },
+      {
+        tag: "feature",
+        text: "Each link can stop after a number of views, on a date, or both. Hitting a limit pauses it and keeps the image, so raising the limit turns it back on. You can also pause, resume or delete a link by hand.",
+      },
+      {
+        tag: "ui",
+        text: "Opening a stopped link says why — turned off, expired, or reached its view limit — instead of “no longer available”. The image isn’t sent, and the visit isn’t counted.",
+      },
+      {
+        tag: "infra",
+        text: "Each opening is stored as a time and nothing else: no address, no browser, no account. The privacy policy says so.",
+      },
+      {
+        tag: "feature",
+        text: "A second blog post: “The hotel Wi-Fi died. The editor kept running.” Why editing keeps working with no network, and what that buys a ward, an operating room, or anyone whose work can’t wait for a signal. Its figures move.",
+      },
+    ],
+  },
+  {
+    version: "v8.86",
+    date: "2026-09-22",
+    headline: "On the phone, Sync on and Sync off wait for Apply, and the worker post’s message-size chart fits a phone screen",
+    entries: [
+      {
+        tag: "fix",
+        text: "On a phone, tapping Sync on or Sync off switched straight away while everything else in Settings waits for Apply, so Apply stayed gray and the tap looked dead. Now a tap lights Apply, Apply saves it, and Cancel throws it away — the same as theme and motion.",
+      },
+      {
+        tag: "ui",
+        text: "The worker post’s message-size chart (FIG 3) cut off its own numbers on a phone — “10 KiB” vanished and “810× over” read “81”. Each row now wraps onto two lines on a narrow screen, and every bar still shares one scale.",
+      },
+    ],
+  },
+  {
+    version: "v8.85",
+    date: "2026-09-22",
+    headline: "Sync gets its own page in Settings, on your phone too, with an off switch and a button that sends this device’s settings",
+    entries: [
+      {
+        tag: "feature",
+        text: "Settings › Sync is its own page, and the phone’s Settings sheet has it too. It says what sync is doing on that device, instead of a line at the bottom of General that the phone never showed.",
+      },
+      {
+        tag: "feature",
+        text: "Sync only sends a setting after you change one, so two devices signing in for the first time had nothing to trade — my phone showed nothing. While your account has no synced settings, a “Send this device’s settings” button now lets you pick the device that’s right, and the others take it.",
+      },
+      {
+        tag: "feature",
+        text: "Sync on / Sync off, per device. Off, this device fetches and sends nothing while your other devices keep syncing. Back on, it takes your account’s copy instead of pushing its own, so it doubles as a reset. The switch itself never syncs.",
+      },
+      {
+        tag: "infra",
+        text: "The privacy policy names the new page, the switch and the button.",
+      },
+    ],
+  },
+  {
+    version: "v8.84",
+    date: "2026-09-22",
+    headline: "Your settings follow you between devices, and “Everything in your browser” now turns off every tool that uploads",
+    entries: [
+      {
+        tag: "feature",
+        text: "Sign in on two devices and your settings travel with you: preferences, which panels and tabs you last had open, the palette’s recent list, and which mode each tool was left in. Two tabs on one machine update each other instantly. Photos, edits and your gallery don’t sync — they stay in this browser. Settings › General shows what sync is doing and can delete the synced copy.",
+      },
+      {
+        tag: "fix",
+        text: "The privacy policy said the AI tools aren’t offered while online features are off, and only Create AI Image actually was. Background removal, object removal and OCR are now off with the switch too: grayed out with a note, and a link or the palette can’t open them. Settings › Security has the same switch and lists what it turns on.",
+      },
+      {
+        tag: "fix",
+        text: "Switching tools in the middle of Remove Object ends its mask, instead of leaving it on the canvas to swallow every click. Apply Crop waits until you’ve drawn a rectangle.",
+      },
+      {
+        tag: "ui",
+        text: "Canvas Size’s Remove and Resize fit side by side on one line instead of wrapping into a staircase.",
+      },
+      {
+        tag: "ui",
+        text: "Alt + ← takes you back to the last tool you used, and Alt + → forward again — the browser’s own Back and Forward, which always worked. The shortcut list says so now.",
+      },
+      {
+        tag: "infra",
+        text: "13 unused files and 53 unused exports are gone, and the dialogs, dropdowns and headings that were written out by hand in several places are one component each. The Batch text font picker now matches the Text tool’s, and the Diagnostics tabs line up.",
+      },
+    ],
+  },
+  {
+    version: "v8.83",
+    date: "2026-09-22",
+    headline: "Mono and Serif survive a reload for real this time, and the site paints in half the time",
+    entries: [
+      {
+        tag: "fix",
+        text: "v8.82 said a text keeps its typeface through a reload. It didn't: pick Liberation Mono, commit, reload, press Resume, and it came back in Sans. The text still knew it was Mono \u2014 the fonts only loaded when you opened the Text panel, and a reload opens on Enhance, so the text was redrawn before Mono existed. Exporting a batch as a ZIP had the same problem. The fonts now load first, on every path that redraws saved text.",
+      },
+      {
+        tag: "fix",
+        text: "Waiting for the fonts is capped at four seconds, so a slow font can never stop a photo from opening, and a font that fails to download is tried again instead of being written off for the session. A browser test fails on v8.81 and v8.82 and passes on this build.",
+      },
+      {
+        tag: "perf",
+        text: "The site's first paint is about twice as fast. On a phone, Lighthouse went from 64 to 97 and the largest paint from 6.4 s to 2.3 s. The fonts come from the site itself instead of from Google, every page loads only its own code, the hero image has phone-sized copies, and the animated letters stop drawing once you scroll past them.",
+      },
+      {
+        tag: "feature",
+        text: "There's a Contact page: email, bug reports, a private route for security issues, and how to delete your account. No form \u2014 there is nothing on the other end to receive one. The footer has three columns now, with a copyright line.",
+      },
+      {
+        tag: "ui",
+        text: "The tab icon is the horse on a rounded black square, on both sites, and the home-screen icons finally match it. They were still a placeholder orange square.",
+      },
+    ],
+  },
+  {
+    version: "v8.82",
+    date: "2026-09-21",
+    headline:
+      "Text keeps its typeface and its box through a reload, and the pricing page stops selling two things that don't exist",
+    entries: [
+      {
+        tag: "fix",
+        text: "A committed text box lost its typeface and its size on reload, and only on reload. Pick Liberation Mono, commit, reload, and the words came back proportional; Serif came back without its serifs, and the box you dragged came back at the default. It had been live since v8.80.",
+      },
+      {
+        tag: "rust",
+        text: "There were two losses, and either one was enough on its own. Replaying the undo history treated a text edit as a replacement, so the typeface and the box fell back to their defaults whenever an edit replayed. And the copy saved to this browser had never kept the box at all \u2014 the wrap width, box height and perspective have existed since v8.40 and none of them had ever reached disk. Both are fixed, along with the same hidden bug in shape edits, and work already on your disk comes back closer to what you left.",
+      },
+      {
+        tag: "fix",
+        text: "The pricing page stops selling two things that don't exist. Pro said \u201ccloud originals\u201d and every tier said \u201cprojects\u201d. No tier uploads your originals \u2014 they stay on your device \u2014 and there is no Projects screen. Both are gone, and Pro's AI allowance now says 50 a day and 300 a month, which is what the server actually enforces.",
+      },
+      {
+        tag: "ui",
+        text: "The rest of the site caught up. The features page lists all twelve presets, the three real typefaces, 38 sub-tools, H for pan and the Magic Eraser as shipped. The two architecture diagrams agree with each other again, and the blog post's eight source links, which all pointed at a branch this repo has never had, work now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's TypeScript config is ready for TypeScript 7 \u2014 it was the only thing in the repo that wasn't. The upgrade itself waits on the linter, which does not support TypeScript 7 yet.",
+      },
+      {
+        tag: "fix",
+        text: "Correction, added in v8.83: the typeface half of this was not fixed here. The text still knew it was Mono, but the font had not loaded when a reload redrew it, so it came back in Sans. v8.83 is the real fix. The box half was fixed.",
+      },
+    ],
+  },
+  {
+    version: "v8.81",
+    date: "2026-09-21",
+    headline:
+      "Twelve presets instead of six, H is the hand key, and the legal pages Google kept asking for are live",
+    entries: [
+      {
+        tag: "feature",
+        text: "Enhance \u203a Presets has twelve looks instead of six. Mono and Noir are the two black-and-whites \u2014 one that leaves the tones where they were, one with hard contrast and heavy blacks. Airy opens a picture up bright and light, Moody closes the shadows down, and Recover and Lift pull detail back out of a blown-out sky or a backlit subject. Hover any of them to see it on your photo before you commit. Clicking is still one undo step.",
+      },
+      {
+        tag: "feature",
+        text: "There is no hue or temperature knob in the engine, and that is why the twelve look the way they do. Shadows and highlights add the same amount to red, green and blue, so every preset moves brightness, contrast or how much color is there \u2014 never the color itself. Warm and Cool have always been saturation, not temperature. A sepia cannot be written as a row in that table at all.",
+      },
+      {
+        tag: "fix",
+        text: "A preset is five numbers, and two of them are absolute 8-bit values where a tenth of a level does nothing at all. A new test hovers all twelve and compares pixels, to the untouched photo and to every preset before it, so a preset that quietly does less than it says \u2014 or one that duplicates another \u2014 fails instead of shipping.",
+      },
+      {
+        tag: "feature",
+        text: "H is the hand key. Hold it to pan and it stops when you let go; tap it and panning stays on until you tap again or press Esc. Space still pans. But Space can never be the reliable pan key, because a keyboard-focused button takes it \u2014 that is how Tab-then-Space presses things. H is not an activation key, so nothing on the page can steal it.",
+      },
+      {
+        tag: "infra",
+        text: "The site has a privacy policy and terms of service. Google's consent screen will not pass the sign-in client without both on an authorized domain, and both were 404. The privacy page names each thing that leaves the device one at a time, and says what stays: the gallery in your browser, with no backup and no copy anyone here can read. The paragraph a template would have got wrong is analytics \u2014 Google Analytics runs on both sites, ungated, and sets cookies. Once there is a privacy policy, saying so is the only honest option.",
+      },
+      {
+        tag: "ui",
+        text: "Create AI Image speaks the sidebar's language. The panel moved into its own component and picked up the shared form controls on the way, so it looks like the rest of the app instead of hand-rolled, and it scrolls on a short screen. It picks its own model now \u2014 six of them, differing in speed, cost and whether they can take a reference image at all. Your references are kept when you switch models but only counted in the consent sentence when the model can use them. Generate is still disabled: there is no text-to-image job on the server yet.",
+      },
+    ],
+  },
+  {
+    version: "v8.80",
+    date: "2026-09-20",
+    headline:
+      "The font menu picks real fonts, object removal is a brush on the canvas, and an undo no longer comes back after a reload",
+    entries: [
+      {
+        tag: "feature",
+        text: "The Text tool's font menu picks real fonts. It used to be decoration — the engine took no font at all, so every choice drew the same face and three surfaces disagreed about the result by as much as 26%. Liberation Sans, Serif and Mono ship as real files now and load when you pick one. None of them went into the engine: they are handed to it at runtime, so the menu can grow later without the download growing with it.",
+      },
+      {
+        tag: "rust",
+        text: "Three new font families made the engine smaller. The faces carry TrueType hinting instructions and the rasterizer has never run them, so stripping the dead hinting gave back more than the families cost: 845,156 to 814,202 bytes, 30,954 smaller than v8.79 and 45,798 under the ceiling. A test fails on any face that arrives with hinting still in it, so a routine font update cannot quietly spend those bytes again.",
+      },
+      {
+        tag: "feature",
+        text: "Remove Object is a brush on the real image, not a popup. Paint over the thing you want gone at whatever zoom you are on, with the app still visible behind the mask. The old popup painted on a private copy of the frame capped at 640 pixels wide — about a third of actual size — and you could not zoom or pan while you worked. Undo Stroke takes back the last stroke and Clear Mask starts over. What gets sent to the server is byte-for-byte what it was.",
+      },
+      {
+        tag: "fix",
+        text: "An undo no longer comes back after a reload. Apply an edit, press Ctrl+Z, reload, and the change you had just discarded was there again — the autosave never wrote the undo, so the copy on disk still held the old edit. That was silent data loss and it was live.",
+      },
+      {
+        tag: "ui",
+        text: "The status bar says Undo NN% — how far undo can actually reach right now, as a share of your History depth setting. It replaces the toast that appeared once per photo to say undo was getting shallower. It is always there and it is never red. The wordmark slides away after five minutes and leaves the horse as the link.",
+      },
+      {
+        tag: "fix",
+        text: "Shape sloppiness is a ramp instead of a switch. It went from computer-drawn to hand-drawn with nothing in between because three things jumped the moment the slider left zero, and one was a real bug: the firm path drew a circle and the sketchy path drew the bounding-box ellipse, so any non-square drag changed shape and size at sloppiness 1. The fill had been sitting inside a wider outline the whole time.",
+      },
+      {
+        tag: "feature",
+        text: "Phones can reach settings. A gear in the header opens a sheet with Theme and Motion, so a phone is no longer stuck on whatever theme it booted with.",
+      },
+      {
+        tag: "infra",
+        text: "Signing in works against the production Clerk instance. A Convex deploy that deployed nothing used to report success — it ran green three times with the secret unset. The check now fails when it cannot verify and says what to do about it.",
+      },
+      {
+        tag: "ui",
+        text: "The site has a blog. The first post is about moving the engine into a worker and its figures move. There is an About page with real photos, the home page tiles have names and a press you can feel, and the hero has a slider that runs the edit backwards.",
+      },
+    ],
+  },
+  {
     version: "v8.79",
     date: "2026-09-16",
     headline: "Perspective reaches everything you drew, Enhance gets Presets, and every dialog shares one backdrop",

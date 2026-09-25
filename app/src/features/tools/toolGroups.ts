@@ -248,6 +248,10 @@ const enhanceGroup: ToolGroupDefinition = {
       keywords: [
         "presets", "looks", "filters", "vivid", "fade", "warm", "cool",
         "one click", "color", "color", "style",
+        // The six added in the twelve-preset pass. "black and white" is the
+        // phrase people actually type; "mono" and "noir" are the labels.
+        "mono", "black and white", "monochrome", "noir", "airy", "moody",
+        "recover", "highlights", "lift", "shadows",
       ],
     },
     {

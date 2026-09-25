@@ -4,8 +4,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 /** Build the public share URL for a token, anchored to wherever the app is
- *  served (origin + path, so it works on localhost and any deploy host). */
-function shareUrlFor(token: string): string {
+ *  served (origin + path, so it works on localhost and any deploy host).
+ *  Exported for Settings › Shared's Copy link — one spelling of the URL. */
+export function shareUrlFor(token: string): string {
   return `${window.location.origin}${window.location.pathname}?v=${token}`;
 }
 

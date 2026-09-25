@@ -6,24 +6,34 @@
 // existing functional-updater call sites (e.g. `setMoveActive((m) => !m)`,
 // `setToolSettings((p) => ({ ...p, brushSize }))`) migrate untouched.
 import { create } from "zustand";
+import type { SelectionCombineMode } from "@/lib/selectionBool";
+import type { SelectionCoverage } from "@/lib/selectionCoverage";
+import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
-import { resolveSet, validated, validatedNumberInRange, type SetArg } from "./_shared";
+import {
+  resolveSet,
+  validated,
+  validatedNumberInRange,
+  validateFields,
+  type FieldValidators,
+  type SetArg,
+} from "./_shared";
 import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
 import type { MaskPoint, MaskStroke } from "@/lib/objectRemovalMask";
 import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
  *  the eraser (scrubs the active layer's alpha). */
-export const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
+const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
-export const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
+const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
 export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
-export const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
+const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
 export type ShapesMode = (typeof SHAPES_MODES)[number];
 /** Eraser tool (id "ai") sub-modes: `brush` = drag-to-erase on the canvas;
  *  `magic` = local Magic Eraser (PatchMatch); `rembg` = Background Removal and
@@ -35,7 +45,7 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  Named `ERASER_MODE_VALUES` (not `ERASER_MODES`) — AISettings.tsx already
  *  has a richer `ERASER_MODES` (icon/label/info per tile); this is just the
  *  bare value tuple for hydration validation. */
-export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
+const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** The `effects` tool's two panels: `adjust` = the Adjustments sliders,
  *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
@@ -47,17 +57,17 @@ export type EffectsMode = "adjust" | "levels" | "presets";
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
  *  component state the mode was invisible to the command palette, hash routing
  *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
-export const TEXT_MODES = ["text", "background", "ocr"] as const;
+const TEXT_MODES = ["text", "background", "ocr"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
 
 /** Perspective tool sub-modes (v8.42). Not three tools — ONE quad and three
  *  rules about what dragging a handle does to the other corners. See
  *  `lib/perspective.ts` `dragCorner` for the rules themselves. */
-// Order IS the panel button order (Chris, 2026-08-17: "perspective | distort
-// | skew"). Renaming an id would break saved routes; reordering is free —
-// nothing serialises the index, the engine stores a quad, not a mode.
-export const PERSPECTIVE_MODES = ["perspective", "distort", "skew"] as const;
-export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
+// The ordered list (button order, icons, labels) lives ONCE, in
+// PerspectiveSettings.tsx `PERSPECTIVE_MODES` — typed against this union.
+// Renaming an id would break saved routes; reordering is free — nothing
+// serializes the index, the engine stores a quad, not a mode.
+export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename, and AI Rename (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
@@ -66,7 +76,7 @@ export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-export const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
@@ -197,6 +207,28 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
+  /** How the next selection combines with the current one — the Select
+   *  panel's Combine group (New / Add / Subtract / Intersect). Shift and Alt
+   *  still override it for one gesture. NOT PERSISTED (outside `partialize`):
+   *  a session-scoped choice, and a reload that came back in Subtract would
+   *  make the first click look broken. No IndexedDB change. */
+  selectionCombine: SelectionCombineMode;
+  /** `[selected, total]` pixels of the live selection, from the engine's
+   *  `selection_coverage` — the "Selected 18.4% · 2.1 MP" readout in the
+   *  panel and the status bar. `null` until the engine has answered, and
+   *  whenever nothing is selected. NOT PERSISTED. */
+  selectionCoverage: SelectionCoverage | null;
+  /** The Refine section's sliders. Start at the Clean Up values. NOT
+   *  PERSISTED (outside `partialize`): no IndexedDB change. */
+  selectionRefine: RefineSettings;
+  /** A Refine preview is on screen: the overlay and the readout show the
+   *  refined copy, not the selection. Cleared by Apply, Clean Up, and any
+   *  other change to the selection. */
+  refinePreviewing: boolean;
+  /** Panel → session hook: "apply now". The panel has no engine handle (it
+   *  would mean threading props through AppShell), so it asks through the
+   *  store and `useSelectionActions` answers. `n` makes each request new. */
+  refineRequest: { kind: "apply" | "cleanUp"; n: number } | null;
   /** AI › Object Removal is painting its mask ON the canvas right now.
    *
    *  This replaced a portal-mounted popup that painted on its own private
@@ -212,6 +244,12 @@ export interface ToolState {
    *  `dexie-migration` gate is not triggered. A half-painted mask surviving a
    *  reload would also point at whatever image happened to load next. */
   objectRemovalMasking: boolean;
+  /** Whether the Crop tool has a rectangle drawn. Published by
+   *  `useDrawingTools` (the rectangle itself stays hook state) so the panel's
+   *  Apply Crop can be disabled without threading a prop through AppShell,
+   *  which must gain nothing. NOT persisted — outside the `partialize`
+   *  allowlist, like every other transient field here. */
+  cropSelectionActive: boolean;
   /** The painted strokes, in IMAGE-space pixels (see `lib/objectRemovalMask`).
    *  Image space, not screen space, is what makes the uploaded mask land in
    *  register at any zoom. */
@@ -252,6 +290,11 @@ export interface ToolState {
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  setSelectionCombine: (v: SetArg<SelectionCombineMode>) => void;
+  setSelectionCoverage: (v: SelectionCoverage | null) => void;
+  setSelectionRefine: (v: SetArg<RefineSettings>) => void;
+  setRefinePreviewing: (v: boolean) => void;
+  requestRefine: (kind: "apply" | "cleanUp") => void;
   /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
    *  the mask describes one object on one image, so carrying it into the next
    *  visit to the panel could only ever remove the wrong thing. */
@@ -270,6 +313,43 @@ export interface ToolState {
   setStampSettings: (v: SetArg<StampSettings>) => void;
   setToolSettings: (v: SetArg<ToolSettings>) => void;
 }
+
+/** The persisted slice of this store: exactly what `partialize` below writes. */
+type ToolPersisted = Pick<
+  ToolState,
+  | "brushMode"
+  | "stampSubMode"
+  | "shapesMode"
+  | "eraserMode"
+  | "textMode"
+  | "batchMode"
+  | "exportFormat"
+  | "quality"
+>;
+
+/**
+ * How each persisted field is checked on its way back in — from IndexedDB on
+ * rehydrate (`merge` below) and from another device through the sync layer's
+ * `tools` document (lib/sync/docs.ts). One table for both; see the note on
+ * UI_PERSISTED_FIELDS in useUIStore.ts, and lib/sync/syncParity.test.ts.
+ *
+ * Each sub-mode is checked against ITS CURRENT union, so a value from an old
+ * build that dropped or renamed one falls back instead of landing in state as
+ * a value the running code cannot switch on. exportFormat and quality
+ * tolerate a blob written before they existed: `undefined` fails the check
+ * and falls back to the constructed default, which is the pre-#14 behavior —
+ * no version bump, no migration.
+ */
+export const TOOL_PERSISTED_FIELDS: FieldValidators<ToolPersisted> = {
+  brushMode: (v, fallback) => validated(v, BRUSH_MODES, fallback),
+  stampSubMode: (v, fallback) => validated(v, STAMP_SUB_MODES, fallback),
+  shapesMode: (v, fallback) => validated(v, SHAPES_MODES, fallback),
+  eraserMode: (v, fallback) => validated(v, ERASER_MODE_VALUES, fallback),
+  textMode: (v, fallback) => validated(v, TEXT_MODES, fallback),
+  batchMode: (v, fallback) => validated(v, BATCH_MODES, fallback),
+  exportFormat: (v, fallback) => validated(v, EXPORT_FORMATS, fallback),
+  quality: (v, fallback) => validatedNumberInRange(v, 1, 100, fallback),
+};
 
 export const useToolStore = create<ToolState>()(
   persist(
@@ -306,14 +386,40 @@ export const useToolStore = create<ToolState>()(
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
+      selectionCombine: 0,
+      selectionCoverage: null,
+      selectionRefine: CLEAN_UP,
+      refinePreviewing: false,
+      refineRequest: null,
       objectRemovalMasking: false,
+      cropSelectionActive: false,
       objectRemovalStrokes: [],
       objectRemovalBrush: 40,
       objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
 
-      setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
+      setActiveTool: (v) =>
+        set((s) => {
+          const next = resolveSet(v, s.activeTool);
+          // LEAVING THE AI TOOL ENDS REMOVE OBJECT'S MASK MODE. The mask
+          // overlay is mounted for every tool and only `objectRemovalMasking`
+          // hides it, but the only things that turned masking off lived in
+          // AISettings — which unmounts the moment another tool is picked. So
+          // switching tools mid-mask left the half-opacity paint on the canvas,
+          // and the overlay (pointer-events on, z 25) swallowed every click the
+          // new tool made, with Esc the only way out (QC §3, 09-22). Leaving is
+          // treated exactly like Cancel: the same clears as `setObjectRemovalMasking`.
+          if (next !== "ai" && s.objectRemovalMasking) {
+            return {
+              activeTool: next,
+              objectRemovalMasking: false,
+              objectRemovalStrokes: [],
+              objectRemovalBusy: false,
+            };
+          }
+          return { activeTool: next };
+        }),
       setActiveSubTool: (v) =>
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       // Newest first, case-insensitively de-duplicated (the engine hands back
@@ -365,11 +471,19 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setSelectionCombine: (v) =>
+        set((s) => ({ selectionCombine: resolveSet(v, s.selectionCombine) })),
+      setSelectionCoverage: (v) => set({ selectionCoverage: v }),
+      setSelectionRefine: (v) =>
+        set((s) => ({ selectionRefine: resolveSet(v, s.selectionRefine) })),
+      setRefinePreviewing: (v) => set({ refinePreviewing: v }),
+      requestRefine: (kind) =>
+        set((s) => ({ refineRequest: { kind, n: (s.refineRequest?.n ?? 0) + 1 } })),
       setObjectRemovalMasking: (v) =>
         set((s) => {
           const next = resolveSet(v, s.objectRemovalMasking);
           // Leaving clears. Entering clears too, so the panel never opens onto
-          // paint left over from a mask that was cancelled or already sent.
+          // paint left over from a mask that was canceled or already sent.
           // Busy is a property of the mode, so it goes with it — otherwise a
           // job that ended by leaving the mode would leave the next mask
           // un-paintable.
@@ -427,7 +541,7 @@ export const useToolStore = create<ToolState>()(
       // stamp.setBrushSize/… so persisting them would need a one-time WASM sync
       // on rehydrate — deferred to the AppShell wiring; see
       // docs/State-Management.md §6).
-      partialize: (s): Partial<ToolState> => ({
+      partialize: (s): ToolPersisted => ({
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,
         shapesMode: s.shapesMode,
@@ -439,29 +553,16 @@ export const useToolStore = create<ToolState>()(
       }),
       // Runs on every rehydrate (unlike `migrate`, which only fires on a
       // version bump) — the persisted blob is same-origin-writable IndexedDB,
-      // not a value this code just wrote, so each partialized field is
-      // checked against ITS CURRENT union before it's allowed to overwrite
-      // the freshly-constructed default. A value from an old build that
-      // dropped/renamed a sub-mode rehydrates to the default instead of
-      // silently landing in state as a value the running code can't switch on.
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<ToolState>;
-        return {
-          ...current,
-          brushMode: validated(p.brushMode, BRUSH_MODES, current.brushMode),
-          stampSubMode: validated(p.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
-          shapesMode: validated(p.shapesMode, SHAPES_MODES, current.shapesMode),
-          eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
-          textMode: validated(p.textMode, TEXT_MODES, current.textMode),
-          batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
-          // Both tolerate a blob written before these keys existed: `undefined`
-          // fails every check and falls back to the freshly-constructed default,
-          // which is exactly the pre-#14 behavior. No version bump, no
-          // migration — the allowlist grew, the schema did not.
-          exportFormat: validated(p.exportFormat, EXPORT_FORMATS, current.exportFormat),
-          quality: validatedNumberInRange(p.quality, 1, 100, current.quality),
-        };
-      },
+      // not a value this code just wrote. The per-field rules are
+      // TOOL_PERSISTED_FIELDS above.
+      merge: (persisted, current) => ({
+        ...current,
+        ...validateFields(
+          TOOL_PERSISTED_FIELDS,
+          (persisted ?? {}) as Record<string, unknown>,
+          current,
+        ),
+      }),
     },
   ),
 );

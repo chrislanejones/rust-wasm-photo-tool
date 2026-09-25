@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Move,
   Scaling,
@@ -6,15 +6,21 @@ import {
   Minus,
   Lock,
   LockOpen,
-  ChevronDown,
   Aperture,
   Contrast,
   Check,
   X,
+  Eye,
+  EyeOff,
+  Scissors,
+  SquareDashed,
+  SquareDashedMousePointer,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ActionTile } from "@/components/ui/action-tile";
+import { SizeSlider } from "@/components/SizeSlider";
+import { useToolStore } from "@/stores/useToolStore";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
@@ -30,6 +36,9 @@ import {
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
+import { SelectField } from "@/components/ui/select-field";
+import { PANEL_DIVIDER, PANEL_SECTION } from "@/lib/styles";
+import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
  *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
@@ -39,18 +48,17 @@ function MinusVertical({ className }: { className?: string }) {
   return <Minus className={cn("rotate-90", className)} />;
 }
 
-/** The house section separator (Select / Paint / Shapes all use this exact
- *  rule + padding above a SectionHeader). Named rather than inlined so the
- *  three sections below cannot drift apart from each other. */
-const SECTION_SEP = "border-t border-theme-sidebar-border pt-3";
-/** Mask sits INSIDE the Move/Resize section (same selected layer), so it takes
- *  the separator without the section-level `sep` gate — it is always stacked
- *  under something. */
-const MASK_SECTION_SEP = SECTION_SEP;
 
-/** The mask's brush-value choice (Hide/Reveal) lives in PaintSettings, not
- *  here — see the Paint mask tile below for why it cannot render on this
- *  panel at all. */
+/** The mask brush's value choice — black hides, white reveals, exactly
+ *  Photoshop's colors, and X swaps them (useKeyboardShortcuts). Lives HERE
+ *  now: mask painting no longer switches the app to the Paint brush (Chris,
+ *  09-24-2026: "don't go to brush, add a brush tool in it"), so this panel
+ *  stays mounted while the strokes are made and can hold the live controls.
+ *  Module-level so the group isn't handed a fresh array each render. */
+const MASK_BRUSH_OPTIONS = [
+  { id: "hide", label: "Hide", icon: EyeOff },
+  { id: "reveal", label: "Reveal", icon: Eye },
+] as const;
 
 /** Mask handlers — the SAME shape ReviewPanel takes, because these are the
  *  same handlers: v8.38 moved the mask controls here (once, acting on the
@@ -60,7 +68,8 @@ export interface LayerMaskControls {
   editing: boolean;
   /** Gray laid down while painting the mask: 0 = hide, 255 = reveal. */
   value: number;
-  onAdd: (id: number) => void;
+  /** Add a mask (from `source`, reveal-all by default) and start painting it. */
+  onAdd: (id: number, source?: MaskSource) => void;
   onRemove: (id: number) => void;
   onApply: (id: number) => void;
   onInvert: (id: number) => void;
@@ -158,6 +167,18 @@ export function LayerSettings({
   canRemoveCanvas,
   section,
 }: LayerSettingsProps) {
+  // Mask brush size + feather — read straight from the store (PaintSettings'
+  // precedent for tool state) rather than threaded through AppShell: the
+  // Layer Mask section below is their only consumer.
+  const hasSelection = useToolStore((s) => s.selectionMask !== null);
+  const setActiveTool = useToolStore((s) => s.setActiveTool);
+  const setEraserMode = useToolStore((s) => s.setEraserMode);
+  // The Add mask tile opens its choices inline, under the row — non-modal, no
+  // popover primitive (the app has none, and a new dependency for one menu is
+  // not worth it). Closed again by any choice.
+  const [addMaskOpen, setAddMaskOpen] = useState(false);
+  const toolSettings = useToolStore((s) => s.toolSettings);
+  const setToolSettings = useToolStore((s) => s.setToolSettings);
   const activeLayer = layers?.find((l) => l.active);
   // #71 — one question about ONE layer, re-asked when the document moves.
   // `undefined` while unknown, and an unknown answer disables nothing.
@@ -217,7 +238,7 @@ export function LayerSettings({
   const show = (v: NonNullable<LayerSettingsProps["section"]>) =>
     section === undefined || section === v;
   /** The separator rule only earns its keep when sections are stacked. */
-  const sep = section === undefined ? SECTION_SEP : "";
+  const sep = section === undefined ? PANEL_DIVIDER : "";
 
   return (
     <div className="space-y-6 -mt-2">
@@ -252,12 +273,10 @@ export function LayerSettings({
             <label className="text-2xs text-theme-muted-foreground">
               Layer
             </label>
-            <div className="relative">
-            <select
+            <SelectField
               value={activeLayer?.id ?? ""}
               disabled={disabled}
               onChange={(e) => onSelectLayer(Number(e.target.value))}
-              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
               title="Layer these controls act on"
             >
               {[...layers].reverse().map((l) => (
@@ -270,21 +289,22 @@ export function LayerSettings({
                   {l.textCount > 0 ? ` · ${l.textCount} text` : ""}
                 </option>
               ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            </SelectField>
           </div>
         )}
-        {/* Move / Resize / Add mask in ONE row. Add mask used to sit alone in
+        {/* Move / Resize / mask in ONE row. Add mask used to sit alone in
             the Layer Mask section below, which meant three things you do TO
             the selected layer were split across two sections with a heading
-            between them (Chris, 2026-09-10). It only appears while the layer
-            has no mask — once it does, the row is the Move/Resize pair and
-            the mask's own controls take over below. */}
+            between them (Chris, 2026-09-10). The third slot MORPHS rather
+            than moves (Chris, 09-24-2026: "change the preexisting button to
+            painting mask — don't make that new button below"): with no mask
+            it is the one-shot Add mask; once the mask exists, the SAME slot
+            is the Paint mask toggle, and the section below holds only the
+            live brush controls and the Invert/Apply/Remove actions. */}
         <div
           className={cn(
             "grid gap-2 [grid-auto-rows:1fr]",
-            mask && activeLayer && !activeLayer.hasMask ? "grid-cols-3" : "grid-cols-2",
+            mask && activeLayer ? "grid-cols-3" : "grid-cols-2",
           )}
         >
           <ToolButton
@@ -302,33 +322,110 @@ export function LayerSettings({
             onClick={onResizeLayer}
           />
           {mask && activeLayer && !activeLayer.hasMask && (
-            /* Announces the tool switch, as "Paint mask" does: `onAdd` creates
-               the mask AND enters mask editing on the Paint brush, which
-               unmounts this panel. It was the only tile changing the active
-               tool without saying so. */
+            /* `onAdd` creates the mask AND starts the mask brush right here —
+               no tool switch, this same slot becomes the toggle. */
             <ActionTile
               icon={Aperture}
               label="Add mask"
               disabled={disabled}
-              onClick={() => mask.onAdd(activeLayer.id)}
-              title="Add a mask and start painting it with the brush — black hides, white reveals"
+              aria-expanded={addMaskOpen}
+              aria-controls="add-mask-choices"
+              onClick={() => setAddMaskOpen((o) => !o)}
+              title="Add a mask — choose what it starts from"
             />
           )}
+          {mask && activeLayer && activeLayer.hasMask && (
+            <ToolButton
+              stacked
+              active={mask.editing}
+              aria-pressed={mask.editing}
+              disabled={disabled}
+              onClick={() => mask.onToggleEdit(activeLayer.id)}
+              title="Brush strokes paint this layer's mask instead of pixels"
+            >
+              <Aperture />{" "}
+              <span>{mask.editing ? "Painting mask" : "Paint mask"}</span>
+            </ToolButton>
+          )}
         </div>
+
+        {/* ── Add mask: what the new mask starts from ─────────────────────
+            The two "entire" choices are the old one-click Add mask and its
+            inverse. The two selection choices copy the selection plane into
+            the mask (byte for byte, same size, softened by Refine's Feather);
+            they are disabled — with the reason — until something is selected.
+            Every choice opens the mask brush exactly as Add mask always has.
+            "Select subject" is a way in, not a path: it opens Background
+            Removal, which is server-side and Pro. */}
+        {mask && activeLayer && !activeLayer.hasMask && addMaskOpen && (
+          <div id="add-mask-choices" className={PANEL_SECTION}>
+            <SectionHeader
+              title="Add mask"
+              info="Start the mask white (everything shows) or black (everything hidden), or from the selection: Reveal shows only what is selected, Hide hides it. Refine's Feather softens the selection's edge. Either way the mask brush opens so you can keep painting."
+            />
+            <ToolButtonGroup<"revealAll" | "hideAll" | "revealSelection" | "hideSelection">
+              columns={2}
+              stacked
+              disabled={disabled}
+              onChange={(id) => {
+                setAddMaskOpen(false);
+                mask.onAdd(activeLayer.id, MASK_SOURCE[id]);
+              }}
+              options={[
+                { id: "revealAll", label: "Show entire layer", icon: Eye, title: "A white mask — paint black to hide" },
+                { id: "hideAll", label: "Hide entire layer", icon: EyeOff, title: "A black mask — paint white to reveal" },
+                {
+                  id: "revealSelection",
+                  label: "Reveal selection",
+                  icon: SquareDashedMousePointer,
+                  disabled: !hasSelection,
+                  title: "Show only what is selected",
+                },
+                {
+                  id: "hideSelection",
+                  label: "Hide selection",
+                  icon: SquareDashed,
+                  disabled: !hasSelection,
+                  title: "Hide what is selected",
+                },
+              ]}
+            />
+            {!hasSelection && (
+              <p className="text-2xs text-theme-muted-foreground">
+                Reveal and Hide selection need a selection — make one with the Select tool.
+              </p>
+            )}
+            <ActionTile
+              icon={Scissors}
+              label="Select subject…"
+              disabled={disabled}
+              onClick={() => {
+                setAddMaskOpen(false);
+                setEraserMode("rembg");
+                setActiveTool("ai");
+              }}
+              title="Opens Background Removal — runs on a server, needs sign-in and Pro"
+            />
+          </div>
+        )}
 
         {/* ── Layer mask — ONE set of controls, for the selected layer.
             Moved here from the per-row buttons in Review → Layers (v8.38,
             "none of those mask buttons will be on each layer"): same
             handlers, new home, wired to the dropdown's selection. */}
         {mask && activeLayer && activeLayer.hasMask && (
-          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
+          <div className={PANEL_SECTION}>
             <SectionHeader
               title="Layer Mask"
               info={
                 <>
-                  Non-destructive hide/reveal for the selected layer. Adding a
-                  mask switches you straight to the Paint brush and starts
-                  editing it — black hides, white reveals. Apply bakes it in
+                  Non-destructive hide/reveal for the selected layer. Switch on{" "}
+                  <strong className="font-semibold text-theme-foreground">
+                    Paint mask
+                  </strong>{" "}
+                  and brush on the image — black hides, white reveals, and{" "}
+                  <strong className="font-semibold text-theme-foreground">X</strong>{" "}
+                  swaps between them, like Photoshop. Apply bakes it in
                   permanently; Remove discards it.
                 </>
               }
@@ -339,25 +436,55 @@ export function LayerSettings({
                 one-shot ACTIONS are `ActionTile`, which never does. The
                 first cut of this section used plain ToolButtons for the
                 actions, which read as four permanently-unlit toggles. */}
-            {/* No "Add mask" branch here any more — the section itself is now
-                gated on `hasMask`, so reaching this point means the mask
-                exists. Adding one is a job you do TO the layer, so it sits
-                with Move and Resize in the row above. */}
-            <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-                {/* One-shot, NOT a toggle — it starts an activity that lives
-                    on another panel. `onToggleEdit` switches the app to the
-                    Paint brush, which unmounts this panel and (by AppShell's
-                    own effect) clears `mask.editing`, so an `active` state
-                    here could never light and the Hide/Reveal pair could
-                    never render. Those live in the Paint panel now; this tile
-                    is the way in. */}
-                <ActionTile
-                  icon={Aperture}
-                  label="Paint mask"
-                  disabled={disabled}
-                  onClick={() => mask.onToggleEdit(activeLayer.id)}
-                  title="Paint this layer's mask with the brush"
+            {/* No "Add mask" and no toggle here — the section is gated on
+                `hasMask`, adding a mask is a job you do TO the layer, and the
+                Paint mask toggle is that same slot in the Move/Resize row
+                above once the mask exists. This section holds only the live
+                brush controls (while editing) and the three actions. */}
+            {mask.editing && (
+              <>
+                {/* Black/white the Photoshop way. `value` is the SSOT in the
+                    store (mask.value / mask.onSetValue), which is what lets
+                    the X shortcut swap it from the keyboard hook without this
+                    panel in the loop. */}
+                <ToolButtonGroup
+                  label="Brush paints"
+                  columns={2}
+                  stacked
+                  value={mask.value < 128 ? "hide" : "reveal"}
+                  onChange={(v) => mask.onSetValue(v === "hide" ? 0 : 255)}
+                  options={MASK_BRUSH_OPTIONS}
                 />
+                <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
+                  Hide paints black, Reveal paints white — press{" "}
+                  <kbd className="font-mono">X</kbd> to swap, and{" "}
+                  <kbd className="font-mono">Ctrl+[</kbd>/
+                  <kbd className="font-mono">]</kbd> to resize the brush.
+                </p>
+                <SizeSlider
+                  label="Size"
+                  value={toolSettings.maskBrushSize}
+                  min={4}
+                  max={200}
+                  unit="px"
+                  onChange={(v) =>
+                    setToolSettings((p) => ({ ...p, maskBrushSize: v }))
+                  }
+                />
+                <SizeSlider
+                  label="Feather"
+                  labelInfo="How soft the stroke's edge is: 0% is a hard rim, 100% fades all the way to the center."
+                  value={toolSettings.maskFeather}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) =>
+                    setToolSettings((p) => ({ ...p, maskFeather: v }))
+                  }
+                />
+              </>
+            )}
+            <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
                 <ActionTile
                   icon={Contrast}
                   label="Invert"
@@ -390,7 +517,7 @@ export function LayerSettings({
             layer's own alpha and applied UNDER the mask — so masking a
             tinted layer hides the tint with it, as Photoshop does. */}
         {overlay && activeLayer && (
-          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
+          <div className={PANEL_SECTION}>
             <SectionHeader
               title="Color Overlay"
               info={

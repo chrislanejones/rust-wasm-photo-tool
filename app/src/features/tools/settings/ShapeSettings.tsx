@@ -22,6 +22,7 @@ import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
+import { PANEL_SECTION } from "@/lib/styles";
 
 const SHAPES = [
   { id: "rect",    label: "Rectangle", icon: Square  },
@@ -330,7 +331,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
       </ToolModeToggle>
 
       {onPlace && (
-        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+        <div className={PANEL_SECTION}>
           <PlacementGrid
             label="Placement"
             info={

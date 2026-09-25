@@ -2,6 +2,8 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
+import { entitlementOf, isAdminEmail, type Role } from "./entitlement";
 
 // ── Helpers (import these in other Convex files) ──────────
 
@@ -57,10 +59,39 @@ export async function getUserId(ctx: QueryCtx | MutationCtx) {
 // ── Public API ────────────────────────────────────────────
 
 /** Get the current user's profile (or null). */
+/** The admin list, from the deployment. `ADMIN_EMAILS` (plural, comma
+ *  separated) is the one to set; `ADMIN_EMAIL` is the older single-address
+ *  name and still works, so the variable already on a deployment keeps
+ *  working. Missing means nobody is an admin — see `isAdminEmail`. */
+function adminList(): string | undefined {
+  return process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL;
+}
+
+/** The signed-in person's role. The SERVER decides this; the browser only
+ *  reads what `me` reports (it used to compare the email itself, in
+ *  app/src/lib/superuser.ts). */
+export async function roleOf(ctx: QueryCtx | MutationCtx, user: Doc<"users"> | null): Promise<Role> {
+  const identity = await ctx.auth.getUserIdentity();
+  const email = user?.email ?? identity?.email ?? null;
+  return isAdminEmail(email, adminList()) ? "admin" : "user";
+}
+
+/**
+ * The signed-in user's row, plus what the app is allowed to do with it.
+ *
+ * `role` and `entitlement` are computed here so there is one answer: the UI
+ * gates on what this returns, and every mutation that guards a paid feature
+ * calls the same `entitlementOf`. An admin is entitled to paid WITHOUT a tier
+ * grant (convex/entitlement.ts explains why).
+ */
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    return await getUser(ctx);
+    const user = await getUser(ctx);
+    const role = await roleOf(ctx, user);
+    return user === null
+      ? null
+      : { ...user, role, entitlement: entitlementOf(user.tier, role, true) };
   },
 });
 
@@ -170,11 +201,12 @@ export const setMyTier = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const user = await requireUser(ctx); // user row (email reliably set by useStoreUser)
-    const admin = process.env.ADMIN_EMAIL;
     // Prefer the stored email; fall back to the JWT claim (which some Clerk JWT
     // templates omit — that was making this throw "Not authorized" when signed in).
-    const email = user.email ?? identity.email;
-    if (!admin || email !== admin) throw new Error("Not authorized");
+    // One admin check for the whole backend, and it takes a LIST now.
+    if (!isAdminEmail(user.email ?? identity.email, adminList())) {
+      throw new Error("Not authorized");
+    }
     await ctx.db.patch(user._id, { tier: args.tier, updatedAt: Date.now() });
     return { ok: true, tier: args.tier };
   },

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { setHoldsTabClaim } from "@/lib/sync/leader";
 
 /** Channel name is the storage identity, not the app name — every tab sharing
  *  these IndexedDB databases must agree on it. */
@@ -78,6 +79,14 @@ export function useTabClaim(): { isStale: boolean; claimHere: () => void } {
       channelRef.current = null;
     };
   }, []);
+
+  // The claim holder is also the one tab on this device that talks to the sync
+  // server (lib/sync/leader.ts). Reported from here rather than re-derived
+  // there, so there is one election, not two that can disagree. The dialog
+  // above is untouched by this: it still decides who may edit.
+  useEffect(() => {
+    setHoldsTabClaim(!isStale);
+  }, [isStale]);
 
   return { isStale, claimHere };
 }

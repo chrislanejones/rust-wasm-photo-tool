@@ -65,7 +65,7 @@ import { NO_CANVAS } from "./canvasGeneration";
  * (`lib/exportImage.ts`, `features/tools/settings/BatchSettings.tsx`) must not
  * pass through here — see the invariant above.
  */
-export function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
+function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
   return tool;
 }
 

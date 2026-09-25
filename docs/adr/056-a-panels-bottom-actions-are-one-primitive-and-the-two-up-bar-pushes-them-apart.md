@@ -78,6 +78,11 @@ and both clear 4.5.
   three lines) but it is ragged. Three options are on the table — leave it, add
   a stacked full-width `layout` for that panel, or drop the redundant dimension
   suffix — and **Chris picks, this ADR does not**.
+  **Resolved 09-22-2026 (Chris: "side by side")** — the third option, taken
+  further: the suffix is gone AND the visible labels are the verbs, **Remove**
+  and **Resize** (80 + 70px, one row, 38px bar, measured in Chromium, with and
+  without a pending target). The accessible names keep the object, "Remove
+  canvas" / "Resize canvas to W×H".
 - **Rulers & Grid changes behavior**, not just looks: 4 buttons (two segmented
   Off/On groups) become 2 toggles, and `onChange` fires unconditionally, so
   **clicking a lit toggle now turns it OFF**. The old "On" was idempotent.

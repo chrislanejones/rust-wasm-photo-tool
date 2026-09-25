@@ -8,6 +8,7 @@
 //
 //   node marketing/scripts/gen-og-images.mjs      (needs playwright; see below)
 //   node marketing/scripts/gen-og-images.mjs --posts    the post cards only
+//   node marketing/scripts/gen-og-images.mjs --icons    the three icons only
 //
 // `--posts` exists because the other ten files are pixel-stable but not
 // byte-stable: a newer Chromium encodes the same pixels into a different PNG,
@@ -69,18 +70,29 @@ const { ROUTES, POSTS, postPath } = await import(join(marketing, "dist-ssr", "en
  * the size these actually appear, and it would go stale on every UI change.
  *
  * Colors are the literal oklch values from src/tokens.css rather than a second
- * palette. Fonts fall back to the system stack: Geist is not installed on the
- * machine running this, and a card is not worth a webfont fetch here — the
- * weight and size carry it.
+ * palette. The face is Geist, fetched the same way the post cards fetch it.
+ * These used to fall back to `system-ui`, which is a different font on every
+ * machine that runs this — DejaVu on one, Helvetica on the next — so the same
+ * card changed typeface depending on who generated it, and none of them was the
+ * face the site is actually set in.
+ *
+ * The mark is the real horse, inlined as a data URI because `setContent` has no
+ * base URL for a relative src to resolve against. It was a plain orange square.
  */
+const LOGO = `data:image/svg+xml;base64,${readFileSync(
+  join(marketing, "public", "Image-Horse-Logo.svg"),
+).toString("base64")}`;
+
 const card = (title, kicker) => `<!doctype html>
-<html><head><meta charset="utf-8"><style>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;700&display=block">
+<style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 1200px; height: 630px; }
   body {
     background: oklch(13% 0.018 35);
     color: oklch(95% 0.010 70);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Geist", system-ui, sans-serif;
     padding: 72px 80px;
     display: flex; flex-direction: column; justify-content: space-between;
     position: relative; overflow: hidden;
@@ -93,16 +105,16 @@ const card = (title, kicker) => `<!doctype html>
     background: radial-gradient(circle, oklch(74% 0.220 50 / 0.28), transparent 68%);
   }
   .top { display: flex; align-items: center; gap: 20px; position: relative; }
-  .dot {
-    width: 56px; height: 56px; border-radius: 13px;
-    background: oklch(74% 0.180 55);
-  }
+  .logo { width: 60px; height: 60px; border-radius: 20%; display: block; }
   .mark { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
   h1 {
     position: relative;
     font-size: ${title.length > 52 ? 68 : 80}px;
     font-weight: 700; line-height: 1.04; letter-spacing: -0.03em;
     max-width: 17ch;
+    /* A headline that overruns a line by one word leaves that word alone on the
+       last line, which at 80px is the loudest thing on the card. */
+    text-wrap: balance;
   }
   .foot {
     position: relative; display: flex; align-items: baseline; gap: 18px;
@@ -112,7 +124,7 @@ const card = (title, kicker) => `<!doctype html>
   .rule { height: 5px; width: 104px; background: oklch(74% 0.180 55); border-radius: 3px; margin-bottom: 28px; position: relative; }
 </style></head>
 <body>
-  <div class="top"><div class="dot"></div><div class="mark">Image Horse</div></div>
+  <div class="top"><img class="logo" src="${LOGO}" alt=""><div class="mark">Image Horse</div></div>
   <div>
     <div class="rule"></div>
     <h1>${title}</h1>
@@ -127,10 +139,26 @@ const card = (title, kicker) => `<!doctype html>
 const HEADLINE = {
   "/": ["Edit photos without uploading them", "Rust · WebAssembly · runs in your tab"],
   "/architecture": ["One plane is the editor.\nThe other is optional.", "How it fits together"],
-  "/features": ["Every tool, and where it runs", "The full feature list"],
+  "/features": ["Everything the editor does,\nin plain words.", "56 features"],
   "/pricing": ["Free with no account.\nPro at $10 a month.", "Pricing"],
-  "/blog": ["Why it is built\nthe way it is", "The blog"],
-  "/trail-log": ["Every release, dated", "The trail log"],
+  "/blog": ["The changelog says what.\nThis says why.", "The blog"],
+  "/trail-log": ["Every release,\nin the open.", "The trail log"],
+  "/about": ["One person,\nand a horse.", "About"],
+  "/contact": ["One inbox. The person\nwho wrote the code.", "Contact"],
+  "/privacy-policy": ["What stays,\nand what leaves.", "Privacy policy"],
+  "/terms-of-service": ["Your pictures\nstay yours.", "Terms of service"],
+  "/coming-soon": ["What's coming,\nand how sure we are.", "No dates"],
+  "/openraster": ["Open a .ora file\nin your browser.", "OpenRaster viewer"],
+  "/image-editor-no-upload": ["Your photos stay\non your computer.", "An editor with no upload"],
+  "/photo-editor": ["A photo editor\nthat never uploads.", "Photo editor"],
+  "/image-compressor": ["Compress to the size\nyou actually need.", "Image compressor"],
+  "/background-remover": ["Cut the subject out,\nclean edge and all.", "Background remover"],
+  "/remove-object-from-photo": ["Paint over it.\nIt's gone.", "Remove an object"],
+  "/annotate-image": ["Arrows, pins and boxes\nthat stay editable.", "Annotate an image"],
+  "/clone-stamp": ["Paint one part of a\nphoto over another.", "Clone stamp"],
+  "/pixelate-image": ["Block it out.\nFlattened means gone.", "Pixelate an image"],
+  "/blur-image": ["Soften a background,\nor hide a detail.", "Blur an image"],
+  "/batch-image-editor": ["One pass over\na whole folder.", "Batch image editor"],
 };
 
 mkdirSync(outDir, { recursive: true });
@@ -152,13 +180,30 @@ const page = await browser.newPage({
 });
 
 const postsOnly = process.argv.includes("--posts");
+// The same reason `--posts` exists, the other way round: a new icon should not
+// arrive wrapped in a dozen byte-churned share cards.
+const iconsOnly = process.argv.includes("--icons");
 
-for (const route of postsOnly ? [] : ROUTES) {
+for (const route of postsOnly || iconsOnly ? [] : ROUTES) {
   const [headline, kicker] = HEADLINE[route.to] ?? [route.title, ""];
   await page.setContent(card(headline.replace(/\n/g, "<br>"), kicker), {
     waitUntil: "load",
   });
+  // Same check as the post cards below: ask for the faces by name, because
+  // `fonts.ready` can resolve before layout has asked for them.
+  const geist = await page.evaluate(async () => {
+    const got = await Promise.all(
+      ['700 80px "Geist"', '500 25px "Geist"'].map((f) => document.fonts.load(f).catch(() => [])),
+    );
+    return got.every((faces) => faces.length > 0 && faces.every((f) => f.status === "loaded"));
+  });
   const name = route.to === "/" ? "default" : route.to.replace(/^\//, "");
+  if (!geist) {
+    console.warn(
+      `  ⚠ og/${name}.png: Geist did not load (offline?). ` +
+        `The card was drawn in the system fallback; re-run with a network before committing it.`,
+    );
+  }
   const file = join(outDir, `${name}.png`);
   writeFileSync(file, await page.screenshot({ type: "png" }));
   console.log(`  og/${name}.png`);
@@ -359,7 +404,7 @@ const postCard = (post, plate) => `<!doctype html>
 
 mkdirSync(join(outDir, "blog"), { recursive: true });
 
-for (const post of POSTS) {
+for (const post of iconsOnly ? [] : POSTS) {
   const plate = await scenePlate(post);
   await page.setViewportSize({ width: 1200, height: 630 });
   await page.setContent(postCard(post, plate), { waitUntil: "load" });
@@ -392,21 +437,19 @@ await siteContext.close();
  * and the web app manifest, whose icons Chrome will not use as an install
  * prompt unless at least one is a 192px and one a 512px raster.
  *
- * Same two shapes as favicon.svg, scaled — a rounded square of paper with an
- * accent tile inside — so the home-screen icon and the tab favicon are visibly
- * the same mark rather than two designs that happen to share a color.
+ * They are favicon.svg ITSELF, rasterized — the horse on a rounded square of
+ * the site's near-black — so the home-screen icon and the tab favicon cannot
+ * drift into two designs. (Until 09-21-2026 these were a separately drawn
+ * placeholder, a dark square with an orange tile, while the tab had already
+ * moved to the horse.) The corners outside the rounded square stay transparent.
  */
+const FAVICON_SVG = readFileSync(join(marketing, "public", "favicon.svg"), "utf8");
 const icon = (px) => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   * { margin: 0; padding: 0; }
-  html, body { width: ${px}px; height: ${px}px; }
-  body { background: oklch(13% 0.018 35); display: grid; place-items: center; }
-  .tile {
-    width: ${Math.round(px * 0.5625)}px; height: ${Math.round(px * 0.5625)}px;
-    border-radius: ${Math.round(px * 0.125)}px;
-    background: oklch(74% 0.180 55);
-  }
-</style></head><body><div class="tile"></div></body></html>`;
+  html, body { width: ${px}px; height: ${px}px; background: transparent; }
+  img { display: block; width: ${px}px; height: ${px}px; }
+</style></head><body><img src="data:image/svg+xml;base64,${Buffer.from(FAVICON_SVG).toString("base64")}"></body></html>`;
 
 const ICONS = [
   ["apple-touch-icon", 180],
@@ -417,7 +460,10 @@ const ICONS = [
 for (const [name, px] of postsOnly ? [] : ICONS) {
   await page.setViewportSize({ width: px, height: px });
   await page.setContent(icon(px), { waitUntil: "load" });
-  writeFileSync(join(marketing, "public", `${name}.png`), await page.screenshot({ type: "png" }));
+  writeFileSync(
+    join(marketing, "public", `${name}.png`),
+    await page.screenshot({ type: "png", omitBackground: true }),
+  );
   console.log(`  ${name}.png`);
 }
 

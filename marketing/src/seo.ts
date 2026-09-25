@@ -13,6 +13,12 @@
  */
 
 import { POSTS, postPath, type Post } from "./data/posts";
+import { OPENRASTER_FAQ } from "./data/openraster";
+import { FEATURES } from "./data/features";
+
+/** Counted, not typed: the feature list is generated from docs/Features.md, so a
+ *  number written into a description goes stale the next time a feature lands. */
+const FEATURE_COUNT = FEATURES.reduce((n, g) => n + g.items.length, 0);
 
 /** Canonical origin. No trailing slash — every helper here joins paths onto it,
  *  and a doubled slash is a different URL to a crawler than the one we claim. */
@@ -29,8 +35,8 @@ export const SITE_NAME = "Image Horse";
  *  Raster, not the SVG logo: X/Twitter and LinkedIn both ignore SVG in
  *  `og:image`, so an SVG here is the same as no card at all. */
 export const DEFAULT_OG_IMAGE = "/og/default.png";
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 /** Absolute URL for a site-relative path. Open Graph requires absolute URLs —
  *  a relative `og:image` is silently dropped by most scrapers. */
@@ -57,6 +63,21 @@ export interface Route {
   sources: string[];
   /** `og:type`. "website" for the home page, "article" for the log. */
   ogType?: "website" | "article";
+  /** Footer only: in the sitemap and the prerender, out of the nav and the
+   *  palette. The legal pages are reference documents — a reader goes looking
+   *  for them, so they do not earn a slot in a nav that is otherwise seven
+   *  places you might want to go. They stay in ROUTES because the sitemap and
+   *  the prerendered <head> are exactly what they need. */
+  footerOnly?: boolean;
+  /** A tool landing page: in the sitemap, the prerender and the mega-menu, out
+   *  of the footer's main column, which is a list of places on the site rather
+   *  than a list of jobs the editor does. `toolPages.ts` carries their content;
+   *  this table carries only what a crawler reads. */
+  toolPage?: boolean;
+  /** Questions answered ON the page. Read by the page for its FAQ section and
+   *  by `jsonLdFor` for a FAQPage node — the same list, so the markup can never
+   *  name a question the visitor cannot see. */
+  faq?: readonly { q: string; a: string }[];
 }
 
 /** Every page, in nav order. A new page appears in the nav, the mobile sheet,
@@ -85,32 +106,43 @@ export const ROUTES: readonly Route[] = [
   {
     to: "/blog",
     label: "Blog",
-    title: "Blog — how Image Horse is built, in detail",
+    title: "The changelog says what. This says why.",
     description:
       "Long-form notes on how Image Horse is built: what shipped, what it cost, and the measurements behind each decision. No roadmaps, no announcements.",
-    // No `ogImage` yet, so this falls back to /og/default.png, which exists.
-    // scripts/gen-og-images.mjs derives its filename from `to`, so running
-    // `pnpm gen:og` writes public/og/blog.png — point this at it once that
-    // file is committed. A route claiming a card that is not in the repo
-    // unfurls as a broken image, which is worse than the generic one.
+    ogImage: "/og/blog.png",
     sources: ["marketing/src/pages/Blog.tsx", "marketing/src/data/posts.ts"],
     ogType: "website",
   },
   {
     to: "/features",
     label: "Features",
-    title: "Features — every tool in the Image Horse photo editor",
+    title: "Features — everything the Image Horse editor does",
     description:
-      "Clone stamp, crop, layers, Bézier pen, text, shapes, background removal, OCR, batch rename and PNG/JPEG/WebP/AVIF export — the full list, searchable.",
+      `All ${FEATURE_COUNT} features of a photo editor that runs in your browser: annotate, select, enhance, export. A plain line for each, and the engineering line underneath.`,
     ogImage: "/og/features.png",
     sources: ["marketing/src/pages/Features.tsx", "marketing/src/data/features.ts"],
+  },
+  {
+    to: "/openraster",
+    label: "OpenRaster (.ora)",
+    title: "Open .ora files in your browser — OpenRaster viewer",
+    description:
+      "See every layer of an OpenRaster (.ora) file in your browser, nothing uploaded. What a .ora holds, how Image Horse exports and imports one, and what survives.",
+    ogImage: "/og/openraster.png",
+    sources: [
+      "marketing/src/pages/OpenRaster.tsx",
+      "marketing/src/components/OraViewer.tsx",
+      "marketing/src/lib/ora.ts",
+      "marketing/src/data/openraster.ts",
+    ],
+    faq: OPENRASTER_FAQ,
   },
   {
     to: "/pricing",
     label: "Pricing",
     title: "Image Horse pricing — free with no account, Pro at $10/mo",
     description:
-      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, text extraction and 5 GB of originals.",
+      "Every editing tool is free and needs no signup. Signing in adds cloud sync; Pro adds background removal, object removal, text extraction and 5 GB of storage.",
     ogImage: "/og/pricing.png",
     sources: ["marketing/src/pages/Pricing.tsx"],
   },
@@ -120,20 +152,157 @@ export const ROUTES: readonly Route[] = [
     title: "About Image Horse — the developer, and the horse",
     description:
       "Image Horse is built by Chris Lane Jones, a web developer in Jacksonville, Florida. This is who works on it, and the horse it is named after.",
-    // No `ogImage` yet, for the same reason /blog has none: gen-og-images.mjs
-    // derives the filename from `to`, so `pnpm gen:og` writes
-    // public/og/about.png — point this at it once that file is committed.
+    ogImage: "/og/about.png",
     sources: ["marketing/src/pages/About.tsx", "marketing/src/data/people.ts"],
   },
   {
     to: "/trail-log",
     label: "Trail Log",
-    title: "Trail Log — every Image Horse release, dated",
+    title: "Trail Log — every Image Horse release, in the open",
     description:
-      "The full changelog: what shipped, when, and how much of it. Commit graphs per month, release notes per version, filterable by feature, fix, perf and infra.",
+      "Every Image Horse release, newest first: what shipped, when, and the commits behind it. Pick a month to see its commit graph and highlights, or read it all.",
     ogImage: "/og/trail-log.png",
     sources: ["marketing/src/data/releases.ts", "marketing/src/pages/Trail.tsx"],
     ogType: "article",
+  },
+  {
+    to: "/contact",
+    ogImage: "/og/contact.png",
+    label: "Contact",
+    title: "Contact Image Horse — email, bugs and security",
+    description:
+      "Email the developer, report a bug on GitHub or Codeberg, send a security problem privately, or ask for your account to be deleted. One person reads all of it.",
+    sources: ["marketing/src/pages/Contact.tsx"],
+    footerOnly: true,
+  },
+  {
+    to: "/privacy-policy",
+    ogImage: "/og/privacy-policy.png",
+    label: "Privacy Policy",
+    title: "Privacy Policy — Image Horse",
+    description:
+      "What stays on your machine, what leaves it, and what you can switch off. Editing runs in your browser; the exceptions are named here one by one.",
+    sources: ["marketing/src/pages/PrivacyPolicy.tsx"],
+    footerOnly: true,
+  },
+  {
+    to: "/terms-of-service",
+    ogImage: "/og/terms-of-service.png",
+    label: "Terms of Service",
+    title: "Terms of Service — Image Horse",
+    description:
+      "The terms for using Image Horse: your pictures stay yours, the software is beta and free, and the paid tier bills monthly through Stripe.",
+    sources: ["marketing/src/pages/TermsOfService.tsx"],
+    footerOnly: true,
+  },
+  {
+    to: "/coming-soon",
+    ogImage: "/og/coming-soon.png",
+    label: "What's coming",
+    title: "What's coming to Image Horse — building, decided, ideas",
+    description:
+      "What is being built, what is decided and what is still an idea. No dates: when something ships it moves to the Trail Log and comes off this page.",
+    sources: ["marketing/src/pages/ComingSoon.tsx"],
+  },
+  {
+    to: "/photo-editor",
+    ogImage: "/og/photo-editor.png",
+    label: "Photo editor",
+    title: "Free photo editor that runs in your browser — no upload",
+    description:
+      "Crop, straighten and correct exposure without uploading anything. Twelve presets preview on your own photo, every step undoes, and no account is needed.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/image-compressor",
+    ogImage: "/og/image-compressor.png",
+    label: "Image compressor",
+    title: "Image compressor — hit a target file size in your browser",
+    description:
+      "Compress to an exact file size or a percentage in WebP, AVIF, JPEG or PNG. Runs on your own machine, shows the page-speed effect, and does whole folders at once.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/background-remover",
+    ogImage: "/og/background-remover.png",
+    label: "Background remover",
+    title: "Background remover — cut out a subject cleanly",
+    description:
+      "One click lifts the subject off its background with a clean edge, including hair. Runs on a server and needs Pro; the job is deleted once the result comes back.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/remove-object-from-photo",
+    ogImage: "/og/remove-object-from-photo.png",
+    label: "Remove an object",
+    title: "Remove an object from a photo — free, in your browser",
+    description:
+      "Paint over what you want gone and the Magic Eraser fills it from the surrounding pixels on your own machine, free. Pro adds an AI pass for harder cases.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/annotate-image",
+    ogImage: "/og/annotate-image.png",
+    label: "Annotate an image",
+    title: "Annotate an image — arrows, boxes, pins and text",
+    description:
+      "Add arrows, boxes, numbered pins, speech bubbles, real text and emoji. Everything stays editable until export, snaps to a grid, and never leaves your machine.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/clone-stamp",
+    ogImage: "/og/clone-stamp.png",
+    label: "Clone stamp",
+    title: "Clone stamp tool — paint one part of a photo over another",
+    description:
+      "Alt-click a source, then paint: those pixels follow your brush. Adjustable size, hardness, opacity and spacing, with a stabilizer to steady the stroke.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/pixelate-image",
+    ogImage: "/og/pixelate-image.png",
+    label: "Pixelate an image",
+    title: "Pixelate an image — block out a face or a password",
+    description:
+      "Paint a region into blocks, or use a hard black box. Runs on your machine and exports flattened, so the covered pixels are genuinely gone from the file.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/blur-image",
+    ogImage: "/og/blur-image.png",
+    label: "Blur an image",
+    title: "Blur an image — soften a background or hide a detail",
+    description:
+      "Brush a blur over one part of a photo or blur the whole thing with a slider. Radius and strength are yours to set, and it runs on your own machine.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/batch-image-editor",
+    ogImage: "/og/batch-image-editor.png",
+    label: "Batch image editor",
+    title: "Batch image editor — do one thing to a whole folder",
+    description:
+      "Resize, compress, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
+  },
+  {
+    to: "/image-editor-no-upload",
+    ogImage: "/og/image-editor-no-upload.png",
+    label: "No-upload image editor",
+    title: "Image editor with no upload — everything stays on your machine",
+    description:
+      "Edit photos without uploading them anywhere. The engine runs in your browser, your files stay in local storage, and every exception is named on this page.",
+    sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
+    toolPage: true,
   },
 ] as const;
 
@@ -169,9 +338,9 @@ export const NOT_FOUND_HEAD = {
  * result, and it is the single most tempting thing on this list to invent.
  * There are no reviews to aggregate, so marking any up would be false, is
  * against Google's structured-data policy, and earns a manual action rather
- * than stars. Same reasoning for `FAQPage`: the markup is only allowed for
- * questions and answers actually visible on the page, and none of these pages
- * has an FAQ section yet.
+ * than stars. `FAQPage` is held to the same rule: the markup is only allowed
+ * for questions and answers actually visible on the page, so it appears only
+ * on a route that declares `faq`, and the page renders that same list.
  */
 
 const ORGANIZATION_ID = `${SITE_URL}/#organization`;
@@ -237,7 +406,7 @@ const softwareApplication = () => ({
         name: "Free",
         price: "0",
         priceCurrency: "USD",
-        description: "Adds cloud sync for edits, 24 images and 3 projects.",
+        description: "Adds cloud sync for edits, 24 images and 100 MB of cloud storage.",
       },
       {
         "@type": "Offer",
@@ -245,7 +414,7 @@ const softwareApplication = () => ({
         price: "10",
         priceCurrency: "USD",
         description:
-          "Cloud originals (5 GB), 16 layers, background and object removal, text extraction, 50 AI passes a day.",
+          "5 GB of cloud storage, 16 layers, background and object removal, text extraction, 50 AI passes a day and 300 a month.",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
           price: "10",
@@ -257,6 +426,20 @@ const softwareApplication = () => ({
     ],
   },
 });
+
+/** The page's own questions, only where the page shows them (`Route.faq`). */
+const faqPage = (route: Route) =>
+  route.faq?.length
+    ? {
+        "@type": "FAQPage",
+        "@id": `${abs(route.to)}#faq`,
+        mainEntity: route.faq.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      }
+    : null;
 
 /** Home is the root, so it gets no breadcrumb — a one-item trail is noise. */
 const breadcrumbs = (route: Route) =>
@@ -413,6 +596,7 @@ export const jsonLdFor = (route: Route) =>
       softwareApplication(),
       webPage(route),
       breadcrumbs(route),
+      faqPage(route),
       // /blog is the one route that is also a container of other documents.
       route.to === BLOG_BASE ? blogNode() : null,
       route.to === BLOG_BASE ? person() : null,

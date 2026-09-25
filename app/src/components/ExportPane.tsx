@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { exportOra, importOraAsNewPhoto } from "@/lib/openraster";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 export interface OpenRasterControls {
   stampToolRef: MutableRefObject<ImageHorseTool | null>;
@@ -110,13 +111,10 @@ export function ExportPane({
     <div className="space-y-6">
       {/* Import */}
       <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Import</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Open an OpenRaster (.ora) project as a new photo, with its full
-            layer stack restored. Your currently open photo is untouched.
-          </p>
-        </div>
+        <PaneHeading title="Import">
+          Open an OpenRaster (.ora) project as a new photo, with its full
+          layer stack restored. Your currently open photo is untouched.
+        </PaneHeading>
         <Button
           size="large"
           disabled={busy !== null}
@@ -141,13 +139,10 @@ export function ExportPane({
 
       {/* Export */}
       <div className="space-y-3 pt-4 border-t border-theme-sidebar-border">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Export</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Export the full project — every layer — to OpenRaster (.ora), an
-            open, layered format that opens in Krita, GIMP, and other editors.
-          </p>
-        </div>
+        <PaneHeading title="Export">
+          Export the full project — every layer — to OpenRaster (.ora), an
+          open, layered format that opens in Krita, GIMP, and other editors.
+        </PaneHeading>
         <Button
           size="large"
           disabled={busy !== null}

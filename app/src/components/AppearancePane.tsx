@@ -1,6 +1,7 @@
 import { Monitor, Moon, Sun, Sparkles, Accessibility } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { ThemeChoice } from "@/lib/preferences";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 const THEMES: { value: ThemeChoice; label: string; icon: typeof Monitor }[] = [
   { value: "system", label: "System setting", icon: Monitor },
@@ -31,13 +32,10 @@ export function AppearancePane({
 }: AppearancePaneProps) {
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">Theme</h3>
-        <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          Match your system, or force dark / light. Applied on Apply &amp; Save;
-          “System” follows your OS setting and updates live.
-        </p>
-      </div>
+      <PaneHeading title="Theme">
+        Match your system, or force dark / light. Applied on Apply &amp; Save;
+        “System” follows your OS setting and updates live.
+      </PaneHeading>
       <ToggleButtonGroup
         fill
         items={THEMES.map(({ value: v, label, icon }) => ({
@@ -50,13 +48,10 @@ export function AppearancePane({
       />
 
       {/* ── Reduce motion — below Theme, same toggle style ─────────────────── */}
-      <div className="pt-2">
-        <h3 className="text-sm font-semibold text-text-primary">Motion</h3>
-        <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          Minimize animations — panel slides, fades and transitions — for a
-          calmer, faster interface. Helpful if motion bothers you.
-        </p>
-      </div>
+      <PaneHeading title="Motion" className="pt-2">
+        Minimize animations — panel slides, fades and transitions — for a
+        calmer, faster interface. Helpful if motion bothers you.
+      </PaneHeading>
       <ToggleButtonGroup
         fill
         items={[
