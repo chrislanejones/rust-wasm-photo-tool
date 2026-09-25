@@ -3529,3 +3529,13 @@ class grep all of `marketing/src` (tsx AND the other css files, since one
 stylesheet can reference another's class), delete only the ones with zero hits
 outside `styles.css`, and pixel-diff every route before and after with the
 harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.
+
+---
+
+### Source comments still cite the retired `librs-lines` ratchet (09-25-2026)
+
+`src/stabilizer.rs:46`, `src/fonts.rs:208`, `src/text.rs:519` and
+`app/src/lib/engine/textMetricsCache.contract.test.ts:58` explain code placement
+by pointing at `librs-lines`, which Chris retired on 09-25-2026. The placements
+are still fine; only the stated reason is stale. Reword them the next time each
+file is touched. Not worth an engine-gate run on its own.

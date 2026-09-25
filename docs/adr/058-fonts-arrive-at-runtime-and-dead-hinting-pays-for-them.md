@@ -241,6 +241,10 @@ touched by this ADR, and the sections above that proposed 872,000 are withdrawn
 rather than deleted, because the reasoning is the record of how a band gets
 raised by a branch that is measuring against a stale baseline.
 
+> **Update 09-25-2026:** the 860,000 ceiling no longer exists. Chris retired it
+> (engine growth is watched in the release metrics instead) and removed it from
+> `scripts/deploy-sentinel.sh`. The 800,000 floor is unchanged.
+
 ⚠️ **Do not apply this swap to master on its own.** Master is 858,087, so the
 same −63,109 would put it near **794,978** — **under the 800,000 floor**, and
 the floor is the featureless-build detector. On this branch the swap lands at
