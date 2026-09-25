@@ -4,6 +4,21 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — storage leaks the orphan sweep will mop up but does not fix (09-24-2026)
+
+Found on `fix/orphan-storage-and-quota`, which adds the server-side sweep
+(`convex/storageSweep.ts`, dry run by default, NOT scheduled) and the storage
+quota. These are the holes that feed the sweep, left out of that diff:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch` | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
+| `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
+| The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
+| `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
+| CI's Convex "typecheck" is vacuous | `.github/workflows/*.yml` `convex` job | `convex codegen` prints "No `tsc` binary found, so skipping typecheck" — `typescript` is an app-level dep, the root has none. Local stand-in: `pnpm -C app exec tsc --noEmit -p ../convex/tsconfig.json` (11 known `process` false positives). |
+| Eight tables exist on brave-ant-608 that `schema.ts` does not declare | `authAccounts`, `authRateLimits`, `authRefreshTokens`, `authSessions`, `authVerificationCodes`, `authVerifiers`, `userProfiles`, `session_edits` | All empty and unwritten by any function; the sweep walks declared tables only. Harmless while empty. |
+
 ## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
 
 Found during the Select morning run (live tolerance). `pnpm run build` prints
