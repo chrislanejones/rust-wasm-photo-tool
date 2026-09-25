@@ -18,6 +18,8 @@ import {
   validated,
   validatedNumberRecord,
   validatedStringArray,
+  validateFields,
+  type FieldValidators,
   type SetArg,
 } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
@@ -31,7 +33,7 @@ let loadInterval: ReturnType<typeof setInterval> | null = null;
 let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
-export const MASTER_TABS = ["tools", "gallery", "review"] as const;
+const MASTER_TABS = ["tools", "gallery", "review"] as const;
 export type MasterTab = (typeof MASTER_TABS)[number];
 
 interface UIState {
@@ -48,6 +50,17 @@ interface UIState {
    *  to be right before it shipped. AI is the first thing behind it, not the
    *  only candidate — index.html's Google Fonts are the other live example. */
   onlineFeaturesEnabled: boolean;
+  /** True while the New dialog is sitting inside its Create AI Image step.
+   *  Ephemeral on purpose — it describes a dialog that is open right now, so
+   *  it is NOT in `partialize` and must never join it.
+   *
+   *  It exists because Settings → Security carries a second copy of the
+   *  online-features control. The New dialog's own switch already disables
+   *  itself during this step (flipping off unmounts the tile that owns the
+   *  step, taking the prompt and references with it); a control in another
+   *  subtree cannot see that local flag, so the lock is published here.
+   *  Guard the door from BOTH sides. */
+  aiComposerOpen: boolean;
   showGallery: boolean;
   showHistory: boolean;
   /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
@@ -80,7 +93,7 @@ interface UIState {
    *  so "which pane is showing" has to be readable, not just settable.
    *  SubscriptionButton (the modal's owner) renders from these instead of its
    *  own `useState`, which also means a request that arrives while no
-   *  SubscriptionButton is mounted (before the top bar reveals) is honoured
+   *  SubscriptionButton is mounted (before the top bar reveals) is honored
    *  when it does mount, rather than being dropped on the floor.
    *  Transient — never persisted. */
   settingsOpen: boolean;
@@ -120,6 +133,7 @@ interface UIState {
   setMasterTab: (v: SetArg<MasterTab>) => void;
   setShowTools: (v: SetArg<boolean>) => void;
   setOnlineFeaturesEnabled: (v: SetArg<boolean>) => void;
+  setAiComposerOpen: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
   setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
@@ -157,6 +171,34 @@ interface UIState {
   setDevTierOverride: (v: SetArg<UserMode | null>) => void;
 }
 
+/** The persisted slice of this store: exactly what `partialize` below writes. */
+type UIPersisted = Pick<
+  UIState,
+  "masterTab" | "recentCommands" | "commandUsage" | "onlineFeaturesEnabled"
+>;
+
+/**
+ * How each persisted field is checked on its way back in — from IndexedDB on
+ * rehydrate (`merge` below) and from another device through the sync layer's
+ * `ui` document (lib/sync/docs.ts, which uses the fields it carries). One
+ * table for both: before, the same rules were spelled out twice more in the
+ * sync layer, with nothing to notice if one copy changed and the other did
+ * not. lib/sync/syncParity.test.ts asserts that this table, `partialize` and
+ * the synced document all name the same fields.
+ *
+ * masterTab is checked against its current union. recentCommands and
+ * commandUsage have no fixed key set (command ids come from the palette
+ * registry, which changes), so they are only shape-checked — a non-array /
+ * non-object blob falls back rather than rehydrating as something the reducers
+ * do not expect.
+ */
+export const UI_PERSISTED_FIELDS: FieldValidators<UIPersisted> = {
+  masterTab: (v, fallback) => validated(v, MASTER_TABS, fallback),
+  recentCommands: (v, fallback) => (v ? validatedStringArray(v) : fallback),
+  commandUsage: (v, fallback) => (v ? validatedNumberRecord(v) : fallback),
+  onlineFeaturesEnabled: (v, fallback) => (typeof v === "boolean" ? v : fallback),
+};
+
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
@@ -165,6 +207,7 @@ export const useUIStore = create<UIState>()(
       masterTab: "tools",
       showTools: false,
       onlineFeaturesEnabled: false,
+      aiComposerOpen: false,
       showGallery: false,
       showHistory: false,
       mobileNoticeDismissed: false,
@@ -201,6 +244,8 @@ export const useUIStore = create<UIState>()(
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
       setOnlineFeaturesEnabled: (v) =>
         set((s) => ({ onlineFeaturesEnabled: resolveSet(v, s.onlineFeaturesEnabled) })),
+      setAiComposerOpen: (v) =>
+        set((s) => ({ aiComposerOpen: resolveSet(v, s.aiComposerOpen) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
       setMobileNoticeDismissed: (v) =>
@@ -302,7 +347,7 @@ export const useUIStore = create<UIState>()(
       // Transient dialog / celebration / diagnostics / upload flags are excluded
       // for the obvious reason (they'd re-open on reload). See
       // docs/State-Management.md §6.
-      partialize: (s): Partial<UIState> => ({
+      partialize: (s): UIPersisted => ({
         masterTab: s.masterTab,
         // Palette recents + usage counts are a pure "remember my habits" pref,
         // same class as masterTab. The palette OPEN flag stays transient.
@@ -312,28 +357,15 @@ export const useUIStore = create<UIState>()(
         onlineFeaturesEnabled: s.onlineFeaturesEnabled,
       }),
       // Same hydration guard as useToolStore: runs every rehydrate, not just
-      // on a version bump. masterTab is checked against its current union;
-      // recentCommands/commandUsage have no fixed key set (command ids come
-      // from the palette registry, which changes), so they're only shape-
-      // checked — a non-array/non-object blob falls back to empty rather than
-      // rehydrating as something the reducers below don't expect.
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<UIState>;
-        return {
-          ...current,
-          masterTab: validated(p.masterTab, MASTER_TABS, current.masterTab),
-          recentCommands: p.recentCommands
-            ? validatedStringArray(p.recentCommands)
-            : current.recentCommands,
-          commandUsage: p.commandUsage
-            ? validatedNumberRecord(p.commandUsage)
-            : current.commandUsage,
-          onlineFeaturesEnabled:
-            typeof p.onlineFeaturesEnabled === "boolean"
-              ? p.onlineFeaturesEnabled
-              : current.onlineFeaturesEnabled,
-        };
-      },
+      // on a version bump. The per-field rules are UI_PERSISTED_FIELDS above.
+      merge: (persisted, current) => ({
+        ...current,
+        ...validateFields(
+          UI_PERSISTED_FIELDS,
+          (persisted ?? {}) as Record<string, unknown>,
+          current,
+        ),
+      }),
     },
   ),
 );

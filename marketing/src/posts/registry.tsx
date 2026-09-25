@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { POSTS } from "../data/posts";
 import EngineInAWorker, { Topper as EngineInAWorkerTopper } from "./engine-in-a-worker";
+import OfflineByConstruction, { Topper as OfflineByConstructionTopper } from "./offline-by-construction";
 
 /* slug → body. The only module that imports both halves of a post.
  *
@@ -9,6 +10,7 @@ import EngineInAWorker, { Topper as EngineInAWorkerTopper } from "./engine-in-a-
  * fallback into the HTML a crawler reads. A post is text. It ships as text.
  */
 export const POST_BODIES: Record<string, ComponentType> = {
+  "offline-by-construction": OfflineByConstruction,
   "engine-in-a-worker": EngineInAWorker,
 };
 
@@ -20,6 +22,7 @@ export const POST_BODIES: Record<string, ComponentType> = {
  * and the scene fades in after the page has loaded.
  */
 export const POST_TOPPERS: Partial<Record<string, ComponentType>> = {
+  "offline-by-construction": OfflineByConstructionTopper,
   "engine-in-a-worker": EngineInAWorkerTopper,
 };
 

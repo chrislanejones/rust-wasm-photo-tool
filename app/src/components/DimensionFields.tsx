@@ -1,7 +1,6 @@
-import { useId } from "react";
 import { Lock, Unlock } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
-import { FIELD_NUMERIC } from "@/lib/styles";
+import { NumberField } from "@/components/ui/number-field";
 
 interface Props {
   /** Width / height as strings (controlled — lets the field hold transient input). */
@@ -34,8 +33,6 @@ export function DimensionFields({
   onPercentChange,
   onToggleLock,
 }: Props) {
-  const widthId = useId();
-  const heightId = useId();
 
   return (
     <div className="space-y-2.5">
@@ -54,40 +51,23 @@ export function DimensionFields({
       />
 
       {/* Dimensions: width / height / lock-aspect on one row.
-          ⚠️ REAL <label htmlFor>, not a <span>. These were spans, so the visible
-          word "width" sat next to the field without being attached to it: it
-          read correctly on screen and announced as a bare "spin button", and
-          clicking the word did nothing. `useId` because this component renders
-          in more than one panel, so a hardcoded id would collide. */}
+          The boxes are the shared NumberField, which owns the real
+          <label htmlFor> this component used to spell out itself. */}
       <div className="flex items-end gap-2">
-        <div className="flex flex-1 flex-col gap-0.5">
-          <label htmlFor={widthId} className="text-xs text-text-secondary">
-            width
-          </label>
-          <input
-            id={widthId}
-            type="number"
-            value={width}
-            onChange={(e) => onWidthChange(e.target.value)}
-            min={1}
-            disabled={disabled}
-            className={FIELD_NUMERIC}
-          />
-        </div>
-        <div className="flex flex-1 flex-col gap-0.5">
-          <label htmlFor={heightId} className="text-xs text-text-secondary">
-            height
-          </label>
-          <input
-            id={heightId}
-            type="number"
-            value={height}
-            onChange={(e) => onHeightChange(e.target.value)}
-            min={1}
-            disabled={disabled}
-            className={FIELD_NUMERIC}
-          />
-        </div>
+        <NumberField
+          label="width"
+          value={width}
+          onChange={(e) => onWidthChange(e.target.value)}
+          min={1}
+          disabled={disabled}
+        />
+        <NumberField
+          label="height"
+          value={height}
+          onChange={(e) => onHeightChange(e.target.value)}
+          min={1}
+          disabled={disabled}
+        />
         <button
           onClick={onToggleLock}
           title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}

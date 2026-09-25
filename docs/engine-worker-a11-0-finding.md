@@ -4,6 +4,10 @@
 `spike/coep-server.mjs` with COOP/COEP on (`crossOriginIsolated: true`).**
 Harness: `spike/a11-0.html` + `spike/a11-0.worker.js`. No product code changed.
 
+> The `spike/` harness files named in this document were deleted on 09-22-2026 (the
+> experiment is finished; ADR-024 shipped). Read any of them with
+> `git show 65c25d2b:spike/<file>`.
+
 This closes the last gap `docs/engine-worker-open-b-finding.md` named: Phase 3
 booted wasm in a worker, OPEN-B transferred a canvas to a worker, and **nothing
 had ever held both at once**.

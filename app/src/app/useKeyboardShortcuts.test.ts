@@ -396,3 +396,126 @@ describe("Ctrl+C never steals a text box's native copy", () => {
     div.remove();
   });
 });
+
+describe("H is the hand key: hold pans while held, tap latches, Space still works", () => {
+  // `timeStamp` cannot be passed to the KeyboardEvent constructor, so it is
+  // pinned on the instance. The handler reads e.timeStamp on BOTH the keydown
+  // and the keyup, so only the difference matters: 40 ms is a tap and 800 ms is
+  // a hold, both well clear of the threshold.
+  function key(
+    type: "keydown" | "keyup",
+    code: "KeyH" | "Space" | "Escape",
+    at: number,
+    opts: { repeat?: boolean; target?: EventTarget } = {},
+  ) {
+    const k = code === "KeyH" ? "h" : code === "Space" ? " " : "Escape";
+    const evt = new KeyboardEvent(type, {
+      key: k,
+      code,
+      repeat: opts.repeat ?? false,
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(evt, "timeStamp", { value: at });
+    act(() => {
+      (opts.target ?? window).dispatchEvent(evt);
+    });
+    return evt;
+  }
+
+  function panProps() {
+    const onSpaceDown = vi.fn();
+    const onSpaceUp = vi.fn();
+    mount(baseProps({ onSpaceDown, onSpaceUp }));
+    return { onSpaceDown, onSpaceUp };
+  }
+
+  it("holding H pans while it is down and stops when it comes up", () => {
+    const { onSpaceDown, onSpaceUp } = panProps();
+    key("keydown", "KeyH", 0);
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+    expect(onSpaceUp).not.toHaveBeenCalled();
+    key("keyup", "KeyH", 800);
+    expect(onSpaceUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("key-repeat while H is held does not re-fire pan on", () => {
+    const { onSpaceDown } = panProps();
+    key("keydown", "KeyH", 0);
+    key("keydown", "KeyH", 30, { repeat: true });
+    key("keydown", "KeyH", 60, { repeat: true });
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("tapping H leaves pan on, and a second tap turns it off", () => {
+    const { onSpaceDown, onSpaceUp } = panProps();
+    key("keydown", "KeyH", 0);
+    key("keyup", "KeyH", 40);
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+    expect(onSpaceUp).not.toHaveBeenCalled();
+
+    key("keydown", "KeyH", 1000);
+    expect(onSpaceUp).toHaveBeenCalledTimes(1);
+    // The second tap's keyup must not be read as a fresh tap that re-latches.
+    key("keyup", "KeyH", 1040);
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("Esc lets go of a tapped H, and does not swallow Esc for anything else", () => {
+    const { onSpaceUp } = panProps();
+    key("keydown", "KeyH", 0);
+    key("keyup", "KeyH", 40);
+    const esc = key("keydown", "Escape", 500);
+    expect(onSpaceUp).toHaveBeenCalledTimes(1);
+    expect(esc.defaultPrevented).toBe(false);
+  });
+
+  it("releasing Space does not end a pan that H latched", () => {
+    const { onSpaceDown, onSpaceUp } = panProps();
+    key("keydown", "KeyH", 0);
+    key("keyup", "KeyH", 40);
+    key("keydown", "Space", 100);
+    key("keyup", "Space", 900);
+    expect(onSpaceUp).not.toHaveBeenCalled();
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("Space alone still pans while held (unchanged)", () => {
+    const { onSpaceDown, onSpaceUp } = panProps();
+    key("keydown", "Space", 0);
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+    key("keyup", "Space", 800);
+    expect(onSpaceUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("losing window focus mid-hold ends the pan instead of leaving it stuck", () => {
+    const { onSpaceUp } = panProps();
+    key("keydown", "KeyH", 0);
+    act(() => {
+      window.dispatchEvent(new Event("blur"));
+    });
+    expect(onSpaceUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("typing h in a <textarea> (the Text tool's editor) does not pan", () => {
+    const { onSpaceDown } = panProps();
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    const evt = key("keydown", "KeyH", 0, { target: ta });
+    expect(onSpaceDown).not.toHaveBeenCalled();
+    expect(evt.defaultPrevented).toBe(false);
+    ta.remove();
+  });
+
+  it("H is not taken from a keyboard-focused button the way Space is", () => {
+    // The reason H exists: a Tab-focused button gets Space (it activates the
+    // button, by design) — but H is not an activation key, so it still pans.
+    const { onSpaceDown } = panProps();
+    const btn = document.createElement("button");
+    document.body.appendChild(btn);
+    btn.focus();
+    key("keydown", "KeyH", 0, { target: btn });
+    expect(onSpaceDown).toHaveBeenCalledTimes(1);
+    btn.remove();
+  });
+});

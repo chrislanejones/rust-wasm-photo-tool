@@ -21,7 +21,7 @@
 // localStorage when signed out, the Convex `user_colors` table when signed in
 // — so it shows up on every swatch grid in the app.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Plus, Check, X, Circle as CircleIcon, Square as SquareIcon } from "lucide-react";
+import { Plus, Check, Circle as CircleIcon, Square as SquareIcon } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FieldLabel } from "@/components/ui/field-label";
+import { NumberField } from "@/components/ui/number-field";
+import { Swatch } from "@/components/ui/swatch";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { CONFIRM_AFFIRMATIVE, FIELD_NUMERIC } from "@/lib/styles";
 import { useUserColors } from "@/hooks/useUserColors";
@@ -245,10 +247,10 @@ export function ColorPickerDialog({
             }} />
 
             <FieldGroup label="RGBA" readout={css}>
-              <NumberField label="R" value={rgb.r} max={255} onChange={(n) => setRgbChannel("r", n)} />
-              <NumberField label="G" value={rgb.g} max={255} onChange={(n) => setRgbChannel("g", n)} />
-              <NumberField label="B" value={rgb.b} max={255} onChange={(n) => setRgbChannel("b", n)} />
-              <NumberField
+              <ChannelField label="R" value={rgb.r} max={255} onChange={(n) => setRgbChannel("r", n)} />
+              <ChannelField label="G" value={rgb.g} max={255} onChange={(n) => setRgbChannel("g", n)} />
+              <ChannelField label="B" value={rgb.b} max={255} onChange={(n) => setRgbChannel("b", n)} />
+              <ChannelField
                 label="A"
                 value={Number(alpha.toFixed(2))}
                 max={1}
@@ -258,9 +260,9 @@ export function ColorPickerDialog({
             </FieldGroup>
 
             <FieldGroup label="HSL" readout={formatHsl(hsl, alpha)}>
-              <NumberField label="H" value={Math.round(hsl.h)} max={360} onChange={(n) => setHslChannel("h", n)} />
-              <NumberField label="S" value={Math.round(hsl.s)} max={100} onChange={(n) => setHslChannel("s", n)} />
-              <NumberField label="L" value={Math.round(hsl.l)} max={100} onChange={(n) => setHslChannel("l", n)} />
+              <ChannelField label="H" value={Math.round(hsl.h)} max={360} onChange={(n) => setHslChannel("h", n)} />
+              <ChannelField label="S" value={Math.round(hsl.s)} max={100} onChange={(n) => setHslChannel("s", n)} />
+              <ChannelField label="L" value={Math.round(hsl.l)} max={100} onChange={(n) => setHslChannel("l", n)} />
             </FieldGroup>
 
             {/* ── Global palette ─────────────────────────────────────── */}
@@ -271,9 +273,12 @@ export function ColorPickerDialog({
               />
               <div className="flex flex-wrap gap-2">
                 {userColors.map((c) => (
-                  <PaletteSwatch
+                  <Swatch
                     key={c}
                     color={c}
+                    label={`Use ${c}`}
+                    removeLabel={`Remove ${c} from palette`}
+                    title={c}
                     active={c.toLowerCase() === hex}
                     onClick={() => {
                       const parsed = hexToRgba(c);
@@ -660,9 +665,8 @@ function FieldGroup({
   );
 }
 
-/** One channel — the DimensionFields width/height box, narrower. A real
- *  `<label htmlFor>` so the letter is attached to the spin button it names. */
-function NumberField({
+/** One channel — the shared NumberField, narrower and centered. */
+function ChannelField({
   label,
   value,
   max,
@@ -675,65 +679,17 @@ function NumberField({
   step?: number;
   onChange: (n: number) => void;
 }) {
-  const id = useId();
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <label htmlFor={id} className="text-xs text-text-secondary">
-        {label}
-      </label>
-      <input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        min={0}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(e.target.valueAsNumber)}
-        className={cn(FIELD_NUMERIC, "px-1 text-center")}
-      />
-    </div>
-  );
-}
-
-function PaletteSwatch({
-  color,
-  active,
-  onClick,
-  onRemove,
-}: {
-  color: string;
-  active: boolean;
-  onClick: () => void;
-  onRemove: () => void;
-}) {
-  return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          "checkerboard h-7 w-7 overflow-hidden rounded-full border-2 border-transparent transition-all",
-          active
-            ? "scale-110 ring-2 ring-theme-ring ring-offset-2 ring-offset-bg-secondary"
-            : "hover:scale-105",
-        )}
-        aria-label={`Use ${color}`}
-        title={color}
-      >
-        <span className="block h-full w-full" style={{ backgroundColor: color }} />
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full border border-theme-border bg-theme-sidebar text-theme-muted-foreground group-hover:flex hover:text-theme-foreground"
-        aria-label={`Remove ${color} from palette`}
-      >
-        <X className="h-2 w-2" />
-      </button>
-    </span>
+    <NumberField
+      label={label}
+      className="min-w-0"
+      inputClassName="px-1 text-center"
+      inputMode="decimal"
+      min={0}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(e.target.valueAsNumber)}
+    />
   );
 }

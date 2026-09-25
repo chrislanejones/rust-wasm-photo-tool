@@ -4,6 +4,195 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+Found during the Select morning run (live tolerance). `pnpm run build` prints
+"Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
+{ z-index: var(--z-*); }`. Tailwind scans text, and three comments spell the
+rule out literally: `app/src/styles.css:42`, `app/src/lib/styles.ts:251`,
+`app/src/components/ui/panel-close-button.tsx:38`. The generated rule is
+invalid and applies to nothing, so it is noise, not a bug — but it is the one
+warning in an otherwise clean build, and a real CSS warning would hide behind it.
+
+**Fix:** reword the three comments (e.g. "`z-[var(--z-…)]`" or "a `--z-*`
+token in a `z-[var(…)]` class") so no complete class string appears, then
+confirm the build prints no CSS warning. Same shape as the guardrails
+comment-counted-as-code trap in CLAUDE.md.
+## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+Found while ADR-067 was drafted, left out of the release on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The cubes' dynamic `import()` has no `.catch` | `marketing/src/components/CubeLetters.tsx` | If the chunk fails to load, the label says "Starting…" forever instead of "No GPU context". Fix: catch and set the `none` backend. |
+| A comment names three 0.165's `Color.setStyle` | `marketing/src/posts/engine-in-a-worker.figures.tsx:35` | three is 0.170 now. Check whether 0.170 parses `oklch()`; update or drop the comment. |
+
+Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
+Chromium draws WebGPU canvases blank white even for a bare three.js control, so
+only the WebGL 2 path is verified.
+
+## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
+post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and
+the whole `createScene()` render loop that `engine-in-a-worker.scenes.ts`
+already has — ~350 lines, copied rather than shared, matching that file's own
+stated convention (each post's scene runtime is self-contained so its chunk
+loads only on that page). Same story for the `.scene`/`.scene__*` CSS block in
+`offline-by-construction.figures.css`, copied byte-for-byte from
+`engine-in-a-worker.figures.css`.
+
+**Left alone deliberately.** With one prior post there was no established
+sharing pattern to follow, and extracting one now would mean editing the
+already-shipped post's files inside a session whose target was the new post —
+exactly what hard rule 4 says not to do.
+
+**Do it when** a third post needs a WebGL scene. Two identical copies is the
+established (if regrettable) convention here; a third copy is the signal to
+lift `SceneKit`/`stream`/`fade`/`createScene` into one shared module both
+posts' `figures.tsx` import, and the `.scene`/`.scene__*` CSS into one file
+both posts' bodies import instead of duplicating.
+
+## OPEN — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
+
+Found while adding the Sync switch on `feat/sync-settings-pane`. The group's
+buttons carry no `aria-pressed`, so a screen reader hears "Sync on, button" and
+"Sync off, button" with nothing to say which one is lit. The lit state is
+visual only (the filled pill). Same for every caller of the component: the
+Security pane's online-features switch, EXIF keep/strip, Appearance's theme and
+motion, General's reopen-last-session.
+
+Measured in the browser: `aria-pressed` is `null` on both Sync buttons, lit or
+not. `ToolButtonOption.active` already solved this for `ToolButtonGroup`
+(ADR-056: emit `aria-pressed` only for tiles that opt in), so the fix is
+probably the same one-line pattern here. It touches every pane, so it wants its
+own PR and a screen-reader check, not a ride-along.
+
+## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
+against the master build and the branch build, same machine and hour:
+
+| Build | Spec runs | Tests failed | Replays of the raw flow (paste → 1 s → Alt+E) |
+|---|---|---|---|
+| master `6b59460e` | 4 | **1 of 12** | 1 miss of 10 |
+| branch | 4 | **1 of 12** | 1 miss of 10; cold starts 8/8 on both |
+
+The failing test is whichever one hits it: `waitForEvent("download")` times out
+after Alt+E. Every miss in the replays coincided with the harness's "Failed to
+load Clerk" page error, but some runs had that error and still downloaded.
+
+Unverified suspect: `useCanvasActions.handleExport` calls `a.click()` and then
+`URL.revokeObjectURL(url)` on the very next line. Chrome starts a download
+asynchronously, so revoking synchronously can race it. The usual fix is to
+revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
+after a short delay). Reproduce the miss rate first, then change one line and
+re-measure. Isolate the fix before explaining it.
+
+## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+
+Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
+`StampSettings`' `handleModeChange` clears the highlighted preset
+(`setSelectedStampId(null)`) because "sub-mode teardown clears the armed stamp
+(useStampTeardown), so the panel's own selection highlight must not survive the
+switch either". But it only runs from `ToolModeToggle`'s `onModeChange`, which
+fires only from the in-panel icon row behind `showModeRow` — and nothing has
+passed `showModeRow` since the row moved to `SubtoolRow` (the new-ui-toolbar arc). The panel is
+not keyed on the mode, so nothing remounts it either. Expected symptom: pick a
+red stamp, switch Stamps › Clone › Stamps in the header, and the tile is still
+lit while clicks no longer place it.
+
+Paint and Shapes route through the same dead prop; their handlers only mirror
+state the store already holds, so they are harmless. Reproduce first; the fix
+is probably an effect on `activeMode` in StampSettings, after which the whole
+`onModeChange`/`showModeRow`/`columns`/`disabled` surface of ToolModeToggle can
+be deleted (the shim note there asks for exactly that).
+
+## OPEN — app SSOT leftovers that change pixels or need a call (09-22-2026)
+
+From the fallow + style/UI survey on `refactor/ssot-ui-cleanup`. That branch did
+the pixel-identical consolidations (see its three commits); these either change
+how something looks or need a decision:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| ~~`--primary` = `--accent` and `--ring` = `--border-active` in both themes~~ | styles.css | **DECIDED 09-22-2026 (Chris): keep them separate.** An accent picker may need them to differ |
+| `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
+| Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
+| Plain inputs with NO focus ring (`inputCls`) | BatchSettings:785, AIRenamePanel:213, SuperUserPane:90/100 | Adopting FIELD_NUMERIC fixes a WCAG focus-visible gap but restyles them |
+| Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
+| ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
+| **Only 2 of 43 segmented-control call sites expose selection state; 38 are silent and should not be** (3 more are action rows, where silence is right). `ToggleButtonGroup` emits no `aria-pressed`/`aria-checked` ever (14 sites); `ToolButtonGroup` emits it only for tiles carrying their own `active` — deliberately, so a plain action is never announced "not pressed" — which leaves its SELECT mode silent (24 of its 29 sites). `ToolModeToggle` passes `value=`, so it inherits the silence. The tree holds 12 real `aria-pressed` attributes. Measured 09-23-2026 | ui/toggle-button-group.tsx, ui/tool-button-group.tsx:108; Sync switch (v8.85) and privacy switch (v8.89) both on the first | WCAG 2.1 AA, not tidiness. Coupled to the `value`/`onChange` API change above; upstream of both sits "should the settings pairs be `ui/switch` at all?". `radio-cards` and `segmented-tabs` already do it right and are the two least-used primitives. See docs/UI_INVENTORY.md Findings 1–2 |
+| **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
+| **`scripts/inert-class-audit.mjs` prints "colour-utility candidates"** — British spelling in tool output, against the house rule. Found 09-23-2026 while writing docs/UI_INVENTORY.md, which quotes that line verbatim | scripts/inert-class-audit.mjs | One word. Deferred off the Night 1 docs branch because it is a script change, not a docs one — and fixing it desyncs the verbatim quote in UI_INVENTORY §1, so the two move together |
+| **Three of the six `raw-colors` file exclusions in `guardrails.sh` hide zero violations** (CanvasArea, PenOverlay, colors.ts). All three files exist; the arithmetic closes (22 + 7 + 2 + 1 = 32 measured with no exclusions) | scripts/guardrails.sh:90-93 | Two-line deletion that does not move the count, but it is the blocking CI gate and a docs branch should not touch it. Also: `rust-panics` is at 46 vs baseline 47, `librs-lines` 4763 vs 4808 — two free tightenings. See docs/UI_EXCEPTIONS.md |
+| Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
+| RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
+| GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
+| The rename form (Start # / Pad / preview) is copied | AIRenamePanel:280 vs BatchSettings:845 | Its own component; the two copies have drifted slightly |
+| Label/value row x3, progress bar x4 | ImageMetaPanel, SuperUserPane, StoragePane / ResourceMonitor, AIUsagePane, ResizeSettings | New primitives, small visual unification |
+| PenOverlay hardcodes `#fcdfc2` (the DARK accent) — wrong in light theme; `#5af` vs Lasso `#4d9bff` are two selection blues | PenOverlay:694, LassoOverlay | Visible fix; needs a selection-color token |
+| The orange "grid selection" color is written 4x with no token; a `bg-black/40` scrim skips DIALOG_OVERLAY | AppShell:2684/3269/3359, GridThumbnails:128/146, CanvasArea | Token + scrim change |
+| ~8 uppercase mono labels with 3 different trackings | various | `.label-caps` was the fix once and is deleted now (unused); a new one restyles them |
+| 16 inline numeric `zIndex` values off the z ladder (guardrails only counts classes) | CanvasArea 40-52, overlays 20-29 | Mapping to `var(--z-*)` may reorder stacking |
+| Stale `var()` fallbacks that no longer match the tokens | `var(--accent, #6366f1)` x4, `var(--color-theme-accent, #b6764e)` x3 | Harmless today, misleading |
+| `--shadow-sm/md/lg` in `:root` share Tailwind's theme namespace, apparently unread | styles.css:28-30 | Could not prove them dead overnight |
+| Duplicate exports in the Dexie layer | originalsAdapter vs originalsStore (`getOriginal`, `deleteOriginal`), db.ts vs adapter (`putOriginal`) | IndexedDB — dexie-migration skill territory |
+
+## OPEN — ~14 KB of the wasm is ttf-parser variable-font code (09-22-2026)
+
+Twiggy on a name-keeping build of master `6b59460e` (same code, `wasm-opt -O -g`):
+ttf_parser is 87,213 B, and the variable-font half of it — `gvar` outlines,
+`parse_variation_data`, `ItemVariationStore` — is roughly 14 KB. `ab_glyph = "0.2"`
+pulls it in through its default `variable-fonts` feature. If every face the
+engine loads is static (no `fvar` table), `ab_glyph = { version = "0.2",
+default-features = false, features = ["std"] }` should drop it. Check the fonts
+first, then the rust-wasm-loop gates and a text pixel diff. The same run found
+only 240 B of genuinely unreachable wasm, so this is the one real lead.
+
+## OPEN — the home page's mobile LCP is bimodal: a ~2 s element render delay in some runs (09-21-2026)
+
+Observation from the speed work on `feat/marketing-speed-contact`. No cause
+found. Lighthouse 12, mobile preset, `/`, three sets of runs:
+
+| Build | Runs | Runs with element render delay ≥ 1.2 s | Their LCP | The other runs' LCP |
+|---|---|---|---|---|
+| Baseline (master) | 6 | **5** | 5.5–6.7 s (all six) | — |
+| Speed branch | 5 | **2** | 4.9 s and 5.3 s | 2.1–2.3 s (render delay 29–64 ms) |
+| Live imagehorse.app | 3 | **1** | 6.8 s | 3.2–3.3 s |
+
+The delay is the last LCP phase: the image has finished loading and the paint
+waits. The branch made the fast mode the common one (3 of 5) and made the slow
+mode faster than the baseline's normal, but did not remove it.
+
+Not tested, and only a guess at where to look: the image and the entry script
+are requested together, so whichever finishes first may decide whether hydration
+runs before the hero paints. One cheap experiment is to start hydration after
+the first `requestAnimationFrame` and compare a dozen runs each way. It defers
+interactivity by a frame or two, which is why it was not folded into the speed
+PR unasked.
+
+## OPEN — marketing design-audit leftovers (09-21-2026)
+
+From the token/consistency audit run on `feat/marketing-speed-contact`. That
+branch fixed the safe items (one tier filter, one `.coda`, one "latest" pill,
+radius/type/motion tokens, focus-ring radius, the mobile sheet's CTA, Pricing's
+phone header, two dead selectors). These change how something looks, or need
+a decision, so they wait:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| "Selected" is drawn three ways: inset bar (`.seg`), accent border (Trail month tiles), border + tint + ring (home tool tiles) | styles.css `.seg[aria-pressed]`, `.month`, `.buttonset__btn` | Picking one changes two of the three |
+| The small uppercase label is written ~10 times with 0.08 / 0.1 / 0.12em tracking and mono or Geist | `.spec thead th`, `.stack__label`, `.cmdk__group`, `.foot-stmt__head`, … | One `.label` class + `--tracking-label` token; visible where the tracking differs |
+| Text links are styled 7 ways (underline vs bottom border, 3px / 0.14em / 0.2em offsets) | `.person__links a`, `.foot-stmt__links a`, `.notfound__links a`, `.postcard__title a`, … | One link style is a visible change |
+| Features and Trail Log end with no closing block (`.close` or `.coda`) | pages/Features.tsx, pages/Trail.tsx | Needs copy |
+| Blog shows date then version; Trail shows version then date, in the same meta column | `.postcard__meta`, `.release__meta` | Pick an order |
+| Top-level `.tbl` and stack `.node` cards use `--radius-sm`, other top-level cards `--radius-md` | styles.css | Visible |
+| `theme-color` is `#1b1210`; `--color-paper` is `#0d0504` (converted, verified) | marketing/index.html | May be deliberate: it tints the phone's address bar to match the hero's glow |
+| WebGPU cubes and the Canvas 2D fallback paint different oranges: the shader's "linear sRGB" accent is the sRGB value, not the linear one | components/CubeLetters.tsx WGSL `fs` | Changes the effect's color; the 2D path also hardcodes three oklch values |
+| Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
+| Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
+| The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
 ## OPEN — a ratchet that IMPROVED and was never locked in is silent drift (09-20-2026)
 
 Found while lowering `rust-panics` 47 → 46 and `librs-lines` 4808 → 4732. Both
@@ -959,7 +1148,7 @@ mapped corners are exact and lines/arrows/polylines/pen paths are just their
 control points — but a circle becomes a conic needing polygon approximation,
 and the shape render path has no tile cache to warp the way text does.
 
-## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
+## ✅ FIXED 2026-09-20 (ADR-060) — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
 
 Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,
 and that is measured rather than assumed.**
@@ -991,6 +1180,42 @@ session should instrument which branch fires before fixing either.
 master-written database looked like a migration fixture and was not one — with
 no op log in that origin, only the archive path was exercised. **An absent
 fixture reads exactly like a passing one.**
+
+### Closed 2026-09-20 — and the "likely mechanism" above was only half of it
+
+ADR-060. The unconfirmed guess was right about the archive path and **wrong that
+it was the only loss**. There were two, either of which loses the box on its own:
+
+| # | Where | What it did |
+|---|---|---|
+| a | `Op::TextEdit` apply (src/ops.rs) | REPLACED the annotation. `wrap_width`, `box_height`, `perspective` and `font_id` are `#[serde(skip)]`, so the payload cannot carry them and they decoded as defaults. Replaying a captured PRODUCTION log: cursor 3 = serif/299, cursor 4 (`TextEdit`) = `""`/0. `Op::ShapeEdit` had the same latent defect. |
+| b | `stripLiveAnnotations` + `restore_text_annotation` | The archive stripper was an allowlist without the three axes on it, so they had never reached disk at all — and the restore signature had nowhere to put them if they had. |
+
+So "fix the archive path" alone would still have lost the box on any origin that
+DID have an op log, and the merge alone would still have lost it on any origin
+that did not. Both halves shipped together.
+
+**No op-log version was taken** — the wire layout is unchanged, so `v9` stays
+free for #187, and every v7/v8 log already on disk replays better with no
+migration step. Measured on the v7 fixture: `wrap_width` 0 → 338.
+
+Fixed by: `TextParams::carry_skipped_from` / `ShapeParams::carry_skipped_from`,
+`stripLiveAnnotations` becoming a denylist, and three new arguments on
+`restore_text_annotation`. Pinned by `tests/oplog_v8_text_settings_replay.rs`,
+`tests/oplog_v7_v8_fixture_resume.rs` and
+`app/src/lib/textBoxSurvivesReload.test.ts`.
+
+### Still open, carried out of the same session
+
+- **A box drag before the first save stops the op log from EVER being
+  persisted.** Observed 2026-09-20, three runs: with the drag, no manifest row
+  and no chunk row for the whole session; the identical run without it persisted
+  `TextAdd + TextFont` within the debounce. One variable, contrast measured,
+  mechanism NOT isolated. It no longer loses the box (the archive path carries it
+  now), but it costs cross-reload undo depth, so it is worth chasing.
+- **The text corner quad is carried and restored now, but nothing exercises a
+  warped text through a real reload** — `perspective` rides the same three new
+  arguments on faith from a unit test, not from a browser.
 
 ## The v8.34 brush fix was never applied to the other brushes (2026-08-14) — clone stamp AND blur NOW FIXED
 
@@ -1956,11 +2181,11 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   run while `document.hasFocus()` was `true` — same conditions as Night Job IV.)
 - **DEFERRED (Chris, 2026-08-04: "Edit shape is fine for now"): history labels
   don't say WHAT changed.** `update_shape_annotation` snaps a fixed
-  `"Edit Shape"`, so a recolour, a move and a resize all write the same row.
-  Recolour a square then drag it and History shows two identical `Edit Shape`
+  `"Edit Shape"`, so a recolor, a move and a resize all write the same row.
+  Recolor a square then drag it and History shows two identical `Edit Shape`
   entries with nothing to tell them apart — in the one place you'd look for
   "the step where I changed the color". Fix is to pass the label in from the
-  call site (`Recolour Shape` / `Move Shape` / `Resize Shape`); small, but it
+  call site (`Recolor Shape` / `Move Shape` / `Resize Shape`); small, but it
   touches the Rust crate so it needs a wasm rebuild and a size note. Same
   applies to text annotations if it's done.
 - **CLOSED by a human, 2026-08-04: the start-screen "Paste (Ctrl+V)" BUTTON
@@ -3188,3 +3413,52 @@ exactly the "clean up while I'm here" edit the rules forbid.
 
 **Do it when** a modal primitive consolidation happens anyway — the three-modal
 convergence onto `ui/dialog` already tracked above is the natural moment.
+
+---
+
+## `ToggleButtonGroup` never says which button is on
+
+Every Settings pane states its choices with `ToggleButtonGroup`, and the active
+button is marked **visually only** — a raised `bg-bg-elevated` pill with
+`shadow-md`. The component sets `aria-label` on icon-only buttons and nothing
+else: no `aria-pressed`, no `role="radiogroup"`, no `aria-checked`. A screen
+reader hears two buttons and cannot tell Keep EXIF from Strip EXIF, or "In your
+browser" from "Online features".
+
+Found while adding the online-features control to Settings → Security, where
+the whole point of the control is which of the two is currently true.
+
+**Left alone deliberately.** This is a shared primitive with callers across the
+top bar, the tool rail and six panes; `aria-pressed` on a button whose group is
+really a radio set is the wrong fix, and choosing between `aria-pressed` and a
+real radiogroup is a change to every caller's semantics at once. That is a
+pass of its own, not a rider on a feature.
+
+**Do it when** the WCAG sweep happens, or the next time a pane is built around
+"which one is on" — the second occurrence is the signal. The fix belongs in
+`app/src/components/ui/toggle-button-group.tsx`, one place.
+
+## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+The v2 port moved every marketing page onto its own stylesheet
+(`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
+`legal.css`, `contact.css`, `architecture.css`, `blog-post.css`, `footer.css`,
+`shot-annotations.css`). Each page's old rules are still sitting in
+`styles.css`, unreferenced — roughly: `.fx*` (Features' old rail and list),
+`.person*` / `.people` (About), `.foot-stmt*` (the old footer, ~22 lines),
+`.tool-head*` / `.tool-badge*` / `.tool-does` / `.tool-related*` (the first
+tool-page pass), and Trail's `.ach*`, `.month__*`, `.graph*`, `.year*`,
+`.release*`, plus Architecture's `.map*`, `.plane__*`, `.stack*`, `.tbl*`,
+`.rels*`, `.coda*`, `.seg*`.
+
+**Why it is parked, not done:** the redesign was already one large diff, and a
+CSS delete that removes one selector too many fails silently — the page still
+renders, just wrong, and no gate catches it. `styles.css` is also still shared
+by the pages that were NOT reskinned, so "unused by the page I ported" is not
+the same as "unused".
+
+**Do it when** there is a session for it. Method: build, then for each candidate
+class grep all of `marketing/src` (tsx AND the other css files, since one
+stylesheet can reference another's class), delete only the ones with zero hits
+outside `styles.css`, and pixel-diff every route before and after with the
+harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.

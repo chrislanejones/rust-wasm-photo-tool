@@ -15,8 +15,14 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    // No `baseUrl`, and the path is RELATIVE. TypeScript 7 removed `baseUrl`
+    // (TS5102) and rejects a non-relative path target (TS5090), and this file
+    // was the only tsconfig in the repo still using either — app/tsconfig.json
+    // already writes "./src/*". Without `baseUrl`, paths resolve against this
+    // file's own directory, which is where "." pointed anyway, so the mapping
+    // is unchanged for TypeScript 5. Runtime resolution never read this block:
+    // `@` is aliased in marketing/vite.config.ts.
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

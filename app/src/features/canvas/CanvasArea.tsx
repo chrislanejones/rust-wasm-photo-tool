@@ -45,7 +45,7 @@ import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind, RulerUnit } from "@/lib/preferences";
-import { selectionCombineMode } from "@/lib/selectionBool";
+import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
 import type { ShapeName } from "@/lib/types";
@@ -56,6 +56,18 @@ import {
   sloppyPolylinePoints,
   starVertices,
 } from "@/lib/shapeSloppiness";
+
+/* On-canvas ink. Neutral black/white on purpose, not theme tokens: these sit on
+   arbitrary photo pixels, so they contrast by pairing a light line with a dark
+   one rather than by hue. Named because each was a literal repeated 2–7 times. */
+/** The dim outside a marquee, and the dark underlay beneath its dashed edge. */
+const MARQUEE_SHADE = "rgba(0,0,0,0.55)";
+/** The dashed box around a shape or text being edited. */
+const EDIT_BOX_STROKE = "rgba(255,255,255,0.85)";
+/** The dark rim on every white drag handle. */
+const HANDLE_OUTLINE = "rgba(0,0,0,0.5)";
+/** The soft shadow that lifts a handle cluster off the image. */
+const HANDLE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -438,7 +450,8 @@ function getCursorForSubTool(
   isPanning?: boolean,
   colorPickerActive?: boolean,
   moveActive?: boolean,
-  combineIntent?: 0 | 1 | 2,
+  combineIntent?: SelectionCombineMode,
+  maskEditing?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";
 
@@ -459,8 +472,11 @@ function getCursorForSubTool(
   }
 
   // Resize Layer only drags while its Move toggle is on; idle otherwise, so the
-  // cursor must not promise a drag the canvas won't honour.
+  // cursor must not promise a drag the canvas won't honour. Mask editing wins
+  // over Move — same precedence as useEffectiveTool's dispatch — and returns
+  // undefined so the brush-size ring below is the cursor, as it is for Paint.
   if (group === "edit" && def?.id === "resize-layer") {
+    if (maskEditing) return undefined;
     return moveActive ? "move" : undefined;
   }
 
@@ -585,6 +601,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // both CanvasArea call sites for one gate would be drilling for its own
     // sake.
     const eraserMode = useToolStore((s) => s.eraserMode);
+    // Layers-panel mask painting: gates the ring and the cursor exactly like
+    // `eraserMode` above, and is read from the store for the same reason.
+    const maskEditing = useToolStore((s) => s.maskEditing);
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -754,12 +773,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Live Shift/Alt intent while the Select tool hovers — drives the +/−
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
-    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    const [combineIntent, setCombineIntent] = useState<SelectionCombineMode>(0);
     // Ref mirror so the rAF preview closure (below) and the keyboard effect
     // read the LIVE intent, not a stale render's. `setIntent` keeps both in
     // step — the state drives the cursor re-render, the ref the async reads.
-    const combineIntentRef = useRef<0 | 1 | 2>(0);
-    const setIntent = useCallback((next: 0 | 1 | 2) => {
+    const combineIntentRef = useRef<SelectionCombineMode>(0);
+    const setIntent = useCallback((next: SelectionCombineMode) => {
       combineIntentRef.current = next;
       setCombineIntent((cur) => (cur === next ? cur : next));
     }, []);
@@ -1300,6 +1319,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       colorPickerActive,
       layerMoveActive,
       selectionActive ? combineIntent : 0,
+      maskEditing,
     );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
@@ -1718,10 +1738,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               }}
             >
               {/* Dark overlay — 4 rects framing the crop selection */}
-              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill="rgba(0,0,0,0.55)" />
-              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill="rgba(0,0,0,0.55)" />
-              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill="rgba(0,0,0,0.55)" />
-              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill="rgba(0,0,0,0.55)" />
+              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill={MARQUEE_SHADE} />
+              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill={MARQUEE_SHADE} />
+              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill={MARQUEE_SHADE} />
+              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill={MARQUEE_SHADE} />
 
               {/* Dashed selection border */}
               <rect x={vx} y={vy} width={vw} height={vh}
@@ -1782,14 +1802,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               {marqueeShape === "ellipse" ? (
                 <>
                   <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
-                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                    fill="none" stroke={MARQUEE_SHADE} strokeWidth={2.5} strokeDasharray="5 5" />
                   <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
                     fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
                 </>
               ) : (
                 <>
                   <rect x={vx} y={vy} width={vw} height={vh}
-                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                    fill="none" stroke={MARQUEE_SHADE} strokeWidth={2.5} strokeDasharray="5 5" />
                   <rect x={vx} y={vy} width={vw} height={vh}
                     fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
                 </>
@@ -2161,7 +2181,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               <rect
                 x={vx} y={vy} width={vw} height={vh}
                 fill="none"
-                stroke="rgba(255,255,255,0.85)"
+                stroke={EDIT_BOX_STROKE}
                 strokeWidth={1.5}
                 strokeDasharray="5 4"
               />
@@ -2176,7 +2196,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 const stemTop = vy - STEM_GAP;
                 const stemBot = stemTop - STEM_LEN;
                 const dotCy = stemBot - DOT_OFFSET;
-                const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                const filter = HANDLE_SHADOW;
                 return (
                   <g
                     style={{ cursor: "move", pointerEvents: "all", filter }}
@@ -2191,7 +2211,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       fill="transparent"
                     />
                     <line x1={cx} y1={stemTop} x2={cx} y2={stemBot} stroke="white" strokeWidth={2} />
-                    <circle cx={cx} cy={dotCy} r={DOT_R} fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+                    <circle cx={cx} cy={dotCy} r={DOT_R} fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1} />
                   </g>
                 );
               })()}
@@ -2217,13 +2237,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 <>
                   <circle
                     cx={toSX(start.x)} cy={toSY(start.y)} r={EP_R}
-                    fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1.5}
+                    fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1.5}
                     style={{ cursor: "crosshair", pointerEvents: "all" }}
                     onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "start")}
                   />
                   <circle
                     cx={toSX(end.x)} cy={toSY(end.y)} r={EP_R}
-                    fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1.5}
+                    fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1.5}
                     style={{ cursor: "crosshair", pointerEvents: "all" }}
                     onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "end")}
                   />
@@ -2253,9 +2273,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             The `ai` clause STAYS: those two modes are the Create-side eraser
             painting a real mask onto the canvas, sharing the `ai` tool id with
             the Enhance › AI tile that only clicks. `eraserMode` is what tells
-            them apart. */}
+            them apart.
+
+            `maskEditing` joins them (09-24): the Layers panel's mask brush
+            paints from the `arrow` tool, so the ring must show there too —
+            sized by AppShell's `effectiveBrushSize` from `maskBrushSize`. */}
         {cursorVisible &&
           (activeTool === "brush" ||
+            maskEditing ||
             (activeTool === "ai" &&
               (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&
@@ -2834,7 +2859,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     x={ctr.left + sx} y={ctr.top + sy}
                     width={boxW} height={boxH}
                     fill="none"
-                    stroke="rgba(255,255,255,0.85)"
+                    stroke={EDIT_BOX_STROKE}
                     strokeWidth={1.5}
                     strokeDasharray="5 4"
                   />
@@ -2845,7 +2870,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemTop = topEdge - STEM_GAP;
                     const stemBot = stemTop - STEM_LEN;
                     const dotCy = stemBot - DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     return (
                       <g
                         style={{ cursor: "move", pointerEvents: "all", filter }}
@@ -2872,7 +2897,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           cy={dotCy}
                           r={DOT_R}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                         />
                       </g>
@@ -2889,7 +2914,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemTop = arcBottomY;
                     const stemBot = stemTop + STEM_LEN - ARC_R;
                     const dotCy = stemBot + DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     const arcD = `M ${cx - ARC_R} ${arcTop} A ${ARC_R} ${ARC_R} 0 1 0 ${cx + ARC_R} ${arcTop}`;
                     return (
                       <g
@@ -2923,7 +2948,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           cy={dotCy}
                           r={DOT_R}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                         />
                       </g>
@@ -2950,7 +2975,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       width={HS}
                       height={HS}
                       fill="white"
-                      stroke="rgba(0,0,0,0.5)"
+                      stroke={HANDLE_OUTLINE}
                       strokeWidth={1}
                       rx={1}
                       style={{ cursor: h.cursor, pointerEvents: "all" }}
@@ -2967,7 +2992,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemRight = leftEdge - STEM_GAP;
                     const stemLeft = stemRight - STEM_LEN;
                     const sqCx = stemLeft - DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     return (
                       <g
                         style={{ cursor: "ew-resize", pointerEvents: "all", filter }}
@@ -2995,7 +3020,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           width={HS}
                           height={HS}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                           rx={1}
                         />

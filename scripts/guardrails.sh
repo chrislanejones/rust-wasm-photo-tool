@@ -89,7 +89,7 @@ check() {
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
     -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
-    -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' -g '!**/toolConfig.ts' \
+    -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' \
   | rg -v 'allow: raw-color' | wc -l)
 check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
 
@@ -229,8 +229,12 @@ check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 # This is the ordinary case the header describes — lower it when an extraction
 # lands — arriving three commits late. It is a LOWERING, not the raise the
 # 4798 -> 4808 note above had to defend.
+# 4732 was never merged: this branch sat open while master grew lib.rs back up
+# legitimately — v8.93-v8.98 added engine state (the live-Tolerance retune
+# record, ADR-066; the Refine preview copy, ADR-069). Chris set it at master's
+# real count on merge (09-24-2026): 4808 -> 4771, still a lowering.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4732 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4771 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler

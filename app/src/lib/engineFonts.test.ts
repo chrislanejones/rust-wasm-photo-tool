@@ -14,6 +14,7 @@ import {
   ensureEngineFonts,
   availableFaces,
   resolveFacesWhenReady,
+  ensureEngineFontsForRestore,
   __resetEngineFontsForTest,
 } from "./engineFonts";
 
@@ -243,3 +244,49 @@ describe("resolveFacesWhenReady — a ref is not a dependency", () => {
 });
 
 type EngineFaceIds = string[];
+
+describe("ensureEngineFontsForRestore — a resume never hangs on a font", () => {
+  it("returns as soon as the faces are registered, not after the full wait", async () => {
+    const tool = fakeTool();
+    const t0 = Date.now();
+    await ensureEngineFontsForRestore(tool as never, 5_000);
+    expect(Date.now() - t0, "did not sit out the timeout").toBeLessThan(1_000);
+    expect(tool.calls.some((c) => c.startsWith("register:liberation-mono")), "Mono was registered").toBe(
+      true,
+    );
+  });
+
+  it("gives up after the wait when registration stalls, instead of blocking the resume", async () => {
+    // A stalled fetch or a wedged worker. The document must still come back —
+    // in the embedded face, which is what it did before this existed.
+    const stalled = {
+      register_font: () => new Promise<void>(() => {}),
+      has_font: () => false,
+    };
+    const t0 = Date.now();
+    await ensureEngineFontsForRestore(stalled as never, 60);
+    const waited = Date.now() - t0;
+    expect(waited, "waited for the faces").toBeGreaterThanOrEqual(50);
+    expect(waited, "then went ahead without them").toBeLessThan(1_000);
+  });
+});
+
+describe("a face that failed to fetch is retried, not cached as gone", () => {
+  // The resume paths call this at boot, when the network is busiest. A
+  // transient miss must not remove Mono for the rest of the session.
+  it("registers Mono on the next call after its first fetch failed", async () => {
+    let monoFails = true;
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      if (monoFails && /mono/i.test(String(url))) return { ok: false } as unknown as Response;
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(String(url).length) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const tool = fakeTool();
+
+    await ensureEngineFonts(tool as never);
+    expect(tool.calls.some((c) => c.startsWith("register:liberation-mono")), "not on the failed pass").toBe(false);
+
+    monoFails = false;
+    await ensureEngineFonts(tool as never);
+    expect(tool.calls.some((c) => c.startsWith("register:liberation-mono")), "registered on the retry").toBe(true);
+  });
+});
