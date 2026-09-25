@@ -92,3 +92,11 @@ coverage list, or a `mask_plane`/`box_pass` call whose result is compared
 against a threshold.
 
 *Corrected 09-24-2026, before release:* the PR and the first draft of this record said 824,328 B (+7,734). That was measured before the last engine edit (a refine that selects nothing returns a transparent overlay, removing a branch). The shipped build is **824,286 B (+7,692)**, reproduced from the merge commit in two trees with the same hash.
+
+*Corrected 09-24-2026 by [ADR-070](070-op-log-v9-is-one-bump-and-op-variants-are-append-only.md):*
+the "ops the eventual format bump must cover" line overclaims. Selection steps
+(Refine Selection, the retune step, Intersect and the other combine modes) go
+through `snap_selection` and are invisible to the op log by design — the log's
+`Document` holds pixels, texts, shapes and canvas, and has no selection to
+record them into. Add Mask from source is a full `snap()` with no mask plane in
+`Document` either; recording it needs a document-model ADR, not a v9 variant.
