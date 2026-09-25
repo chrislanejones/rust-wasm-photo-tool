@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { PLACEHOLDER_CONVEX_URL, assertPlaceholderConvexUrl, demoEnv } from "./e2e/guard/backend";
 
 // E2E harness (reintroduced 2026-07-14 for the oplog-canvas regression spec;
 // the original v7.12 harness was removed in the v7.14 repo cleanup — this
@@ -23,9 +24,14 @@ const BASE_URL = `http://localhost:${PORT}`;
 // unreachable-backend network noise is routed offline + filtered in the spec.
 // Convex fatally rejects a deployment name that isn't the reserved
 // `word-word-123` shape, so the placeholder host uses that format.
-const DEMO_ENV =
-  'VITE_CONVEX_URL="https://smoke-placeholder-123.convex.cloud" ' +
-  'VITE_CLERK_PUBLISHABLE_KEY="pk_test_Y2xlcmsuc21va2UuaW52YWxpZCQ="';
+//
+// The values themselves live in e2e/guard/backend.ts, shared with the SW
+// config, and are CHECKED here at load: a real Convex URL fails the run before
+// anything is built. The served build is checked again by the global setup,
+// and every request by the auto fixture in e2e/guard/test.ts.
+const E2E_CONVEX_URL = PLACEHOLDER_CONVEX_URL;
+assertPlaceholderConvexUrl(E2E_CONVEX_URL);
+const DEMO_ENV = demoEnv(E2E_CONVEX_URL);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -35,6 +41,9 @@ export default defineConfig({
   // gate — e2e/no-sw-default.spec.ts pins that a default build never
   // registers a service worker.
   testIgnore: ["**/sw/**"],
+  // Fails the run if the served build names a real Convex host, or if a spec
+  // bypasses the guarded `test` (e2e/guard/).
+  globalSetup: "./e2e/guard/global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
