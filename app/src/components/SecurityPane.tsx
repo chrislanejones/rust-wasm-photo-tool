@@ -111,6 +111,11 @@ export function SecurityPane({
               another device can pick it up. Off, the copy stays in this browser
               and nothing is uploaded.
             </li>
+            <li>
+              <strong>Share links</strong> — signed in, a flattened copy of
+              the photo is uploaded so anyone with the link can see it. Off,
+              the Share link button says why it can't make one.
+            </li>
             {NETWORK_SUB_TOOLS.map(({ group, subTool, key }) => (
               <li key={key}>
                 <strong>

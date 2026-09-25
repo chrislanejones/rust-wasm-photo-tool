@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as aiCaps from "../aiCaps.js";
 import type * as aiJobs from "../aiJobs.js";
 import type * as annotations from "../annotations.js";
 import type * as auth from "../auth.js";
@@ -38,6 +39,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  aiCaps: typeof aiCaps;
   aiJobs: typeof aiJobs;
   annotations: typeof annotations;
   auth: typeof auth;
