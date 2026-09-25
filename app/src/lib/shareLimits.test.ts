@@ -194,6 +194,13 @@ function createFakeConvex() {
     async get(id: string) {
       return tables.get(id.split("|")[0])?.get(id) ?? null;
     },
+    // The `_storage` system table: deleteStoredFile (convex/storedFiles.ts)
+    // reads a file's row before deleting it, for its size and existence.
+    system: {
+      async get(_table: "_storage", id: string) {
+        return blobs.has(id) ? { _id: id, _creationTime: 0, size: 1, sha256: "" } : null;
+      },
+    },
   };
 
   const storage = {

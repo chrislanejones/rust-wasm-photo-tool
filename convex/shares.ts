@@ -9,6 +9,8 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
+import { deleteStoredFiles } from "./storedFiles";
+import type { DeletedFiles } from "./testAccount";
 
 // ── Public, read-only share links ──────────────────────────────────────────
 // Mirrors the photoEdits storage pattern, but a share stores only the flattened
@@ -424,12 +426,21 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const share = await ownedShare(ctx, args.token);
     if (!share) return;
-    await ctx.storage.delete(share.storageId);
-    const views = await ctx.db
-      .query("share_views")
-      .withIndex("by_shareId", (q) => q.eq("shareId", share._id))
-      .collect();
-    for (const row of views) await ctx.db.delete(row._id);
-    await ctx.db.delete(share._id);
+    await deleteShareRecord(ctx, share);
   },
 });
+
+/** Delete one share: its snapshot file, its `share_views` rows and the row, in
+ *  the caller's transaction. THE delete path for `shares` — `remove` and the
+ *  test-account wipe (testAccountWipe.ts) both call this. No ownership check:
+ *  callers decide whose share it is before they get here. */
+export async function deleteShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<DeletedFiles> {
+  const freed = await deleteStoredFiles(ctx, [share.storageId]);
+  const views = await ctx.db
+    .query("share_views")
+    .withIndex("by_shareId", (q) => q.eq("shareId", share._id))
+    .collect();
+  for (const row of views) await ctx.db.delete(row._id);
+  await ctx.db.delete(share._id);
+  return freed;
+}

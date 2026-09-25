@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — two tables whose files the app never deletes (09-25-2026)
+
+Found while surveying file-owning tables for the test-account wipe
+(`feat/retention-phase0`). Not fixed there; the wipe handles both for the test
+account only.
+
+| Table | What happens | Effect |
+| --- | --- | --- |
+| `images` | `images.remove` deletes the ROW and never `storageId`'s file | Any file an `images` row owned becomes an orphan on Remove. The table looks unused by the editor today (`aiJobs.ts` calls it "the unused `images` table"), so this may be zero bytes; measure before fixing. |
+| `ai_jobs` | Nothing ever deletes a job, so its input, mask and output frames stay forever | Every AI run keeps up to 3 files. A retention rule for jobs is owed (Phase 1). |
+
 ## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
 
 Found during the Select morning run (live tolerance). `pnpm run build` prints

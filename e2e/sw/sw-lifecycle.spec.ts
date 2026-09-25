@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../guard/test";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service-worker lifecycle against a VITE_ENABLE_SW=1 build (Night B,
