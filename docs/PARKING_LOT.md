@@ -193,6 +193,57 @@ a decision, so they wait:
 | Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
 | Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
 | The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+## OPEN — a ratchet that IMPROVED and was never locked in is silent drift (09-20-2026)
+
+Found while lowering `rust-panics` 47 → 46 and `librs-lines` 4808 → 4732. Both
+counts came down in ONE commit, #131 (`2d188420`, "fonts arrive at runtime"),
+and ADR-058 records the lowering as part of that change — but the commit
+touches **zero lines of `scripts/guardrails.sh`**. The branch carried the new
+baselines; the merge did not. Measured in a clean clone:
+
+| Commit | `rust-panics` | `src/lib.rs` |
+| --- | --- | --- |
+| `6a3de6be` (before #131) | 47 | 4808 |
+| `2d188420` (#131) | **46** | **4732** |
+| `5bd73cce` (v8.80) | 46 | 4732 |
+
+For three releases the script printed `IMPROVED … lower the baseline` on every
+run and nothing acted on it, so 46 panics and 76 lines of `lib.rs` could have
+come back for free. **`IMPROVED` is an advisory line inside a blocking job** —
+the one output here that asks for work and cannot enforce it, which is the
+shape this script exists to argue against.
+
+Worth considering, NOT decided: make `IMPROVED` fail on a **pull request** that
+edits the counted files, so a lowering has to land with the change that earned
+it. Two reasons it is not obvious. Two branches can legitimately be below the
+baseline at once (the 4798 → 4808 note in the script is exactly that case), and
+a PR that merely merges master would go red through no fault of its own. Cheaper
+first step: make the release checklist read the last run's `IMPROVED` lines.
+
+Related but separate: this is the same family as the op-log version collision —
+two branches moving one counter independently, where only the merge order
+decides which value survives.
+
+## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+Noticed while checking whether any doc repeated the false "runs in CI" skip
+message. It does not — the three matched-pair checks are not documented at all
+— but the table that IS there is stale on almost every row:
+
+| Row | docs/CI.md says | `scripts/guardrails.sh` actually has |
+| --- | --- | --- |
+| Raw colors | 26 | 22 |
+| Off-scale type | 9 | 8 |
+| Rust panics / unsafe | 67 | 46 |
+| a11y `role="button"` | 5 | 4 |
+| How many checks | "six" / "only one of the six" | eleven — 8 counted + 3 matched pairs |
+
+Nothing here is wrong in a way that breaks a build; a reader just learns the
+wrong numbers, and the three co-change checks are invisible to anyone who has
+not read the script. Left out of this session's diff on purpose (hard rule 4) —
+and docs are Dara's, not a CI change. The right fix is probably to stop
+hand-copying baselines into prose at all and have the doc point at the script,
+since a number duplicated in two files drifts by default.
 
 ## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
 

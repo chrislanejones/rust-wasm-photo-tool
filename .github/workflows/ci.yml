@@ -361,7 +361,39 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
     steps:
+      # ⚠️ NOT the default checkout, and the reason is the whole point of this
+      # job. The three matched-pair checks in guardrails.sh diff HEAD against
+      # `git merge-base origin/master HEAD`. At the default fetch-depth of 1
+      # that ref does not exist on a runner, so all three printed
+      #   "skip … no origin/master to diff against (runs in CI)"
+      # — a message naming CI as where they run, on the one host where they did
+      # not. Measured on two real runs rather than reasoned about:
+      #   pull_request 35487378044 → skip, skip, skip
+      #   push master  35456540646 → ok (engine hunks: 0, oracle hunks: 0) ×3
+      # On master origin/master IS HEAD, so the "ok" was a pass over an empty
+      # diff. Between the two, a one-sided edit had never once been compared on
+      # a pull request, which is the only event where catching it still helps.
+      #
+      # `filter: blob:none` rather than a plain `fetch-depth: 0`, because full
+      # history is not free on this repo. Measured 2026-09-20 (662 commits, 41
+      # branches), cloning from GitHub:
+      #   depth 1 (what this job did)     1 s   .git   6 MB
+      #   blob:none + full history        2 s   .git   7 MB   ← this
+      #   full history                    5 s   .git  96 MB
+      # A blobless partial clone carries the entire commit graph, so merge-base
+      # cannot come back empty, and file contents arrive on demand — only for
+      # the five paths the pair checks actually diff. A plain fetch-depth: 0
+      # would pull 96 MB of historical blobs this job never opens, 89 MB of it
+      # to answer a question about five files.
+      #
+      # ⚠️ Do not "simplify" this back to a bare checkout. guardrails.sh now
+      # treats a missing origin/master as FATAL when GITHUB_ACTIONS is set, so
+      # dropping these two lines fails the job loudly instead of quietly
+      # skipping — which is the intended trade, but it is still a broken build.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: ./scripts/guardrails.sh
