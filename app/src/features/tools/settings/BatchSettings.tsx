@@ -1327,7 +1327,7 @@ function TextBatchPanel({
           ))}
         </SelectField>
         <ToolButtonGroup
-          className="mt-2"
+          className="mt-2" aria-label="Font weight"
           options={WEIGHT_OPTIONS}
           value={bold ? "bold" : "normal"}
           onChange={(id) => setBold(id === "bold")}

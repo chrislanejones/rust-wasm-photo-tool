@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { setHoldsTabClaim } from "@/lib/sync/leader";
+import { registerTabClaimer, setHoldsTabClaim } from "@/lib/sync/leader";
 
 /** Channel name is the storage identity, not the app name — every tab sharing
  *  these IndexedDB databases must agree on it. */
@@ -87,6 +87,10 @@ export function useTabClaim(): { isStale: boolean; claimHere: () => void } {
   useEffect(() => {
     setHoldsTabClaim(!isStale);
   }, [isStale]);
+
+  // The Sync pane's "Use here" takes the claim through leader.ts, so the
+  // one claim function is reachable without threading it through AppShell.
+  useEffect(() => registerTabClaimer(claimHere), [claimHere]);
 
   return { isStale, claimHere };
 }
