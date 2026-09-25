@@ -59,6 +59,8 @@ interface KeyboardShortcutOptions {
   onZoomOut: () => void;
   onZoomReset?: () => void;
   onGroupChange?: (group: ToolGroupId) => void;
+  /** Alt+C — toggle the A/B Compare overlay (TopBar's Compare button). */
+  onToggleCompare?: () => void;
   onFlipH?: () => void;
   onFlipV?: () => void;
   onRotateCw?: () => void;
@@ -141,6 +143,7 @@ export function useKeyboardShortcuts({
   onZoomOut,
   onZoomReset,
   onGroupChange,
+  onToggleCompare,
   onFlipH,
   onFlipV,
   onRotateCw,
@@ -407,6 +410,7 @@ export function useKeyboardShortcuts({
           case "KeyN": e.preventDefault(); setShowUpload((v) => !v); break;
           case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
+          case "KeyC": e.preventDefault(); onToggleCompare?.(); break;
           case "KeyR": e.preventDefault(); setShowHistory((v) => !v); break;
           case "Equal": e.preventDefault(); onZoomIn(); break;
           case "Minus": e.preventDefault(); onZoomOut(); break;
@@ -492,7 +496,7 @@ export function useKeyboardShortcuts({
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
-    onZoomOut, onZoomReset, onGroupChange, onFlipH, onFlipV, onRotateCw,
+    onZoomOut, onZoomReset, onGroupChange, onToggleCompare, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
     onLayerToFront, onLayerToBack,
   ]);
