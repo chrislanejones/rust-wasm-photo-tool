@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — three stale backend descriptions left after the dead-table removal (09-24-2026)
+
+Found while deleting `projects`/`images`/`layers`/`annotations`/`history`
+(branch `chore/delete-dead-backend`). Left out of that diff on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| "`crons.ts` — scheduled cleanup" | `convex/README.md` Functions list | `crons.ts` registers NO jobs. The line describes cleanup that does not exist (see the orphaned-storage finding). |
+| Tables list lacks `sync_docs` and `share_views` | `convex/README.md` Tables section | README lists 7 of the 9 tables in `convex/schema.ts`. |
+| Comment names a "Convex `images` row" as the future upload target | `app/src/components/StoragePane.tsx:6` | That table no longer exists. The pipeline it describes was never built; reword when it is designed. |
+
 ## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
 
 Found during the Select morning run (live tolerance). `pnpm run build` prints
