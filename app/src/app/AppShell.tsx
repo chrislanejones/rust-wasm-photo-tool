@@ -42,6 +42,7 @@ const MasterBar = lazy(() =>
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { OpenRasterControls } from "@/components/ExportPane";
+import { downloadOraWithToast } from "@/lib/openraster";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -170,6 +171,7 @@ import {
   FolderArchive,
   ImagePlus,
   Image as ImageIcon,
+  Package,
   Pipette,
 } from "lucide-react";
 
@@ -221,12 +223,16 @@ function capMessage(mode: UserMode, max: number): string {
 }
 
 // Format choices shown in the Download dialog — a second chance to pick a
-// format for anyone who missed the dropdown in the Compress panel.
-const DOWNLOAD_FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
+// format for anyone who missed the dropdown in the Compress panel. ORA is the
+// one non-raster choice — the full layered project, not a flattened encode —
+// so it never touches the persisted `exportFormat` preference below.
+type DownloadFormat = ExportFormat | "ora";
+const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; hint: string }[] = [
   { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
   { value: "png", label: "PNG", hint: "Lossless · transparency" },
   { value: "webp", label: "WebP", hint: "Small · transparency" },
   { value: "avif", label: "AVIF", hint: "Smallest · modern" },
+  { value: "ora", label: "ORA", hint: "Layered · full project" },
 ];
 
 /** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
@@ -916,6 +922,14 @@ export function AppShell() {
    *  cannot offer "Download AVIF" and then hand over a PNG. */
   const effectiveExportFormat: ExportFormat =
     exportFormat === "avif" && avifEncodable === false ? "png" : exportFormat;
+  // The dialog's own format pick, reseeded from the persisted preference each
+  // time it opens — kept separate so an "ora" pick never lands in that store.
+  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(exportFormat);
+  useEffect(() => {
+    if (exportDialogOpen) setDownloadFormat(exportFormat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportDialogOpen]);
+  const isOraDownload = downloadFormat === "ora";
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -1178,6 +1192,15 @@ export function AppShell() {
   );
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
+    if (isOraDownload) {
+      void downloadOraWithToast({
+        stampToolRef: stamp.toolRef,
+        flushToCanvas: stamp.flushToCanvas,
+        syncState: stamp.syncState,
+        imageName: activeEntry?.name,
+      });
+      return;
+    }
     void handleExportAs(exportName.stem());
   };
 
@@ -2650,6 +2673,10 @@ export function AppShell() {
       const group = groupById(g);
       if (group) activateGroup(group);
     },
+    // canCompare is declared below this call; read via closure.
+    onToggleCompare: () => {
+      if (canCompare) handleToggleCompare();
+    },
     onFlipH: stamp.flipHorizontal,
     onFlipV: stamp.flipVertical,
     onRotateCw: stamp.rotate90Cw,
@@ -2948,8 +2975,11 @@ export function AppShell() {
               <span className="text-xs font-semibold text-text-muted">Format</span>
               <RadioCards
                 name="download-format"
-                value={exportFormat}
-                onValueChange={setExportFormat}
+                value={downloadFormat}
+                onValueChange={(v) => {
+                  setDownloadFormat(v);
+                  if (v !== "ora") setExportFormat(v); // ORA stays local-only
+                }}
                 options={downloadFormats}
                 columns={2}
               />
@@ -2959,15 +2989,15 @@ export function AppShell() {
               value={exportName.value}
               defaultStem={exportName.defaultStem}
               onChange={exportName.onChange}
-              ext={EXT[effectiveExportFormat]}
+              ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
               onSubmit={downloadFromDialog}
             />
           </DialogBody>
 
           <DialogFooter className="flex-row gap-2">
             <ActionTile
-              icon={ImageIcon}
-              label={`Download ${effectiveExportFormat.toUpperCase()}`}
+              icon={isOraDownload ? Package : ImageIcon}
+              label={isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`}
               onClick={downloadFromDialog}
             />
             <ShareButton
