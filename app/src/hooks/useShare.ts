@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { cloudPhotosAllowed } from "@/hooks/useEditPersistence";
+import { useUIStore } from "@/stores/useUIStore";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 /** Build the public share URL for a token, anchored to wherever the app is
@@ -25,6 +27,7 @@ interface CreateShareInput {
  *  and the button tells a signed-in user to sign in. */
 export type ShareAvailability =
   | "ready"
+  | "online-off" // signed in, but "Everything in your browser" is on — nothing may leave the tab
   | "connecting" // Convex handshake still in flight — not an answer yet
   | "signed-out" // genuinely nobody signed in
   | "backend-rejected"; // signed in with Clerk, Convex would not accept it
@@ -40,14 +43,25 @@ function clerkSessionPresent(): boolean {
 
 /** Create-side of share links: upload a flattened PNG snapshot to Convex
  *  storage, mint a token, and hand back a ready-to-copy public URL.
- *  Requires a signed-in user (the upload URL is auth-gated). */
+ *  Requires a signed-in user (the upload URL is auth-gated) AND the online
+ *  switch on: a share link is the most deliberate upload in the app, and
+ *  Settings › Security promises that with the switch off nothing leaves the
+ *  tab. Until QC F2 (09-24-2026) this path checked sign-in alone — the one
+ *  photo upload #149's `cloudPhotosAllowed` never reached. */
 export function useShare() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
+  const allowed = cloudPhotosAllowed(isAuthenticated, onlineFeatures);
   const generateUploadUrl = useMutation(api.shares.generateUploadUrl);
   const createShareMutation = useMutation(api.shares.create);
 
   const createShare = useCallback(
     async (input: CreateShareInput): Promise<{ url: string; token: string }> => {
+      // Read at call time, not from the render: the switch may have changed
+      // since, and the refusal must come BEFORE an upload URL is requested.
+      if (!useUIStore.getState().onlineFeaturesEnabled) {
+        throw new Error("Online features are off, so nothing leaves this tab.");
+      }
       const uploadUrl = await generateUploadUrl();
       const resp = await fetch(uploadUrl, {
         method: "POST",
@@ -69,12 +83,14 @@ export function useShare() {
   );
 
   const availability: ShareAvailability = isAuthenticated
-    ? "ready"
+    ? onlineFeatures
+      ? "ready"
+      : "online-off"
     : isLoading
       ? "connecting"
       : clerkSessionPresent()
         ? "backend-rejected"
         : "signed-out";
 
-  return { createShare, canShare: isAuthenticated, availability };
+  return { createShare, canShare: allowed, availability };
 }
