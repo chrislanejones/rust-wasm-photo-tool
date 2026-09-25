@@ -383,9 +383,7 @@ export default function Architecture() {
             <p className="arch-schema__deck">
               Every table the app reads or writes, with its fields and indexes. Each row hangs
               straight off <code>users</code>, keyed by the editor&rsquo;s own <code>photoKey</code>.
-              Never a pixel: edited images stay in the browser that made them. Five tables from an
-              earlier design — projects, images, layers, annotations, history — are still declared
-              and the app calls none of them.
+              Never a pixel: edited images stay in the browser that made them.
             </p>
           </header>
 
