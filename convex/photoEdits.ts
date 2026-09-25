@@ -1,6 +1,19 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
+import { deleteStoredFiles } from "./storedFiles";
+import type { DeletedFiles } from "./testAccount";
+
+/** Delete one edit: its archive file and its row, in the caller's transaction.
+ *  THE delete path for `photo_edits` — `remove`, `clearAll` and the
+ *  test-account wipe (testAccountWipe.ts) all call this, so the file can never
+ *  be dropped without the row or the row without the file. */
+export async function deletePhotoEditRecord(ctx: MutationCtx, edit: Doc<"photo_edits">): Promise<DeletedFiles> {
+  const freed = await deleteStoredFiles(ctx, [edit.storageId]);
+  await ctx.db.delete(edit._id);
+  return freed;
+}
 
 /** Returns a short-lived upload URL for storing a canvas archive.
  *  Auth-gated: only signed-in users can mint upload URLs (prevents anonymous
@@ -143,10 +156,7 @@ export const remove = mutation({
         q.eq("userId", user._id).eq("photoKey", args.photoKey),
       )
       .unique();
-    if (edit) {
-      await ctx.storage.delete(edit.storageId);
-      await ctx.db.delete(edit._id);
-    }
+    if (edit) await deletePhotoEditRecord(ctx, edit);
   },
 });
 
@@ -159,9 +169,6 @@ export const clearAll = mutation({
       .query("photo_edits")
       .withIndex("by_userId_photoKey", (q) => q.eq("userId", user._id))
       .collect();
-    for (const edit of edits) {
-      await ctx.storage.delete(edit.storageId);
-      await ctx.db.delete(edit._id);
-    }
+    for (const edit of edits) await deletePhotoEditRecord(ctx, edit);
   },
 });
