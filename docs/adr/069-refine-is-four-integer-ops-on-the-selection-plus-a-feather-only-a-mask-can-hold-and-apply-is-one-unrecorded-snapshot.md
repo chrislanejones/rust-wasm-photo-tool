@@ -61,12 +61,12 @@ components did not exist (the wand's contiguous mode is a seeded flood,
   Selection (islands, holes, smooth, expand); Add Mask from source (0..3 +
   feather); and ADR-066's selection steps (`selection_retune`'s one-time step,
   Intersect combine).
-- wasm 816,594 → 824,328 B (+7,734; `pkg/stamp_tool_bg.wasm` measured at
-  824,328). Twiggy on a named wasm32 build (unoptimized): `box_pass` 1,198 +
+- wasm 816,594 → 824,286 B (+7,692; `pkg/stamp_tool_bg.wasm` measured at
+  824,286). Twiggy on a named wasm32 build (unoptimized): `box_pass` 1,198 +
   `dilate` 1,166, `add_layer_mask_from` 975, `drop_small_components` 859 +
   flood specialization 264, `refined_selection` 673, `selection_refine_apply`
   497, `erode` 434, four exports' glue ~1.5 KB. Headroom to `MAX_WASM` 860,000
-  (`scripts/deploy-sentinel.sh:87`): 35,672 B. `lib.rs` 4,771 of the 4,808 cap.
+  (`scripts/deploy-sentinel.sh:87`): 35,714 B. `lib.rs` 4,771 of the 4,808 cap.
 - Not done: mask view modes (Overlay / B&W), deferred to Night 4. Both can be
   DOM overlays like `SelectionOverlay` / `ObjectRemovalOverlay` with one new
   export (mask → RGBA), without touching compositing, so the parity-test stop
@@ -90,3 +90,5 @@ replayed document loses every refine. Early warning sign: a
 `snap_selection("…")` label in a diff with no matching line in the bump's
 coverage list, or a `mask_plane`/`box_pass` call whose result is compared
 against a threshold.
+
+*Corrected 09-24-2026, before release:* the PR and the first draft of this record said 824,328 B (+7,734). That was measured before the last engine edit (a refine that selects nothing returns a transparent overlay, removing a branch). The shipped build is **824,286 B (+7,692)**, reproduced from the merge commit in two trees with the same hash.

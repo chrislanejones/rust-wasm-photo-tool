@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.98",
+    date: "2026-09-24",
+    headline: "Refine a selection, then turn it into a mask.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Clean Up on the Select panel drops specks, fills pinholes, smooths the edge and pulls it in a pixel, in one step you can undo.",
+      },
+      {
+        tag: "feature",
+        text: "The Refine sliders do the same things one at a time. Move one and you see the result first, with the Selected readout showing what it cost. Apply is one undo step.",
+      },
+      {
+        tag: "feature",
+        text: "Add mask asks what to start from: show the layer, hide it, reveal the selection or hide it. Feather softens the edge, and the mask brush opens straight after.",
+      },
+      {
+        tag: "feature",
+        text: "Name the file in the export dialog before it downloads. The name is cleaned up for every operating system, and the extension always matches the format.",
+      },
+      {
+        tag: "rust",
+        text: "The refine operations are integer and run in the engine, so every machine selects exactly the same pixels.",
+      },
+      {
+        tag: "fix",
+        text: "The Combine button called New shared its name with the New image button for screen readers. It is New selection now.",
+      },
+    ],
+  },
+  {
     version: "v8.97",
     date: "2026-09-24",
     headline: "Open a .ora file in your browser, and see every layer.",

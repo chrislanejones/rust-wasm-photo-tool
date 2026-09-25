@@ -10974,3 +10974,22 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Select (#231)** | Live Tolerance: dragging the slider re-runs the last click from the same seed against the pre-click selection, so Add/Subtract/Intersect shrink as well as grow, and the whole drag is **one** undo step. 70 ms debounce, one run in flight, newest answer wins; above 8 MP (3.2 MP edge-aware) it waits for the drag to pause. A "Selected 18.4% · 2.1 MP" readout under the sliders and as a status-bar chip. **Intersect** is combine mode 3. Both sliders always shown, disabled with a one-line reason where unused. Engine: `selection_coverage()`, `selection_can_retune()`, `selection_retune()`. ADR-066. Pinned by `e2e/select-live-tolerance.spec.ts`; cargo test 372 / 557 with features. |
 | **Engine size** | **816,594 B** (was 814,432; +2,162 B for #231's retune record and coverage query). |
 | **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 24/24 routes prerendered, browser test: sample loads in 519 ms, layer toggle changes pixels, a deflated .ora opens, a non-.ora zip is refused with a reason, phone has no horizontal overflow. |
+
+## v8.98 Change Summary — 2026-09-24
+
+**Refine a selection, then turn it into a mask.** The day half of the Select work; the morning half (#231) shipped in v8.97.
+
+| Area | Change |
+| --- | --- |
+| **Refine** (#233) | A section on the Select panel. **Clean Up** = remove islands under 4 px, fill holes under 6 px, smooth 2 px, contract 1 px, in one step. Five sliders expose the same operations plus Feather. A slider previews on a copy (the ants and the "Selected" readout show the result; the selection and the history do not move); Apply commits one "Refine Selection" undo step. |
+| **Engine** | `src/selection_refine.rs`: integer and deterministic throughout. Connected components run on the shared flood core (`flood_barrier_into`), not a second flood. Smooth is open then close; expand and contract are dilate and erode; square element, separable running counts, O(pixels) at any radius. |
+| **Feather** | Lives in the mask, not the selection: the selection is on/off per pixel, so a soft edge cannot exist there. Two integer box-blur passes produce the mask plane. |
+| **Add mask** (#233) | Layer Settings' tile opens its choices inline: Show entire layer, Hide entire layer, Reveal selection, Hide selection (disabled, with the reason, until something is selected), and Select subject… (opens Background Removal). Each is one undo step; the mask brush opens after, as before. |
+| **Undo, decided** | Apply is one snapshot and is not recorded in the op log (ADR-069). `src/ops.rs` untouched, no format bump. Every selection step keeps a whole copy of the image, so on a large photo Apply spends one of few undo steps; the Refine note says so and the Undo readout shows it. |
+| **Export name** (#232) | The export dialog has a File name field, pre-filled with `<name>-revised`. Illegal characters are stripped, a typed `.jpg` is not doubled, and an empty field falls back to the default. The extension always follows the format. |
+| **Accessibility** | Combine's "New" is "New selection": it had the same accessible name as the top bar's "New" (a new image). |
+| **Not built** | Mask view modes (Overlay, black-and-white) move to the UI plan's Night 4; both can be overlays with no compositing change. |
+| **Engine size** | 816,594 → **824,286 B** (+7,692). Ceiling 860,000. |
+| **QC** | `imagehorse-qc` on the production build, all five sections PASS: boot and demo mode, file picker and drag-drop; wand, Intersect, Shift override, Refine preview/Apply, undo/redo, Compare, export; every new button and the existing Selection actions; reload → Resume keeps the photo; focus rings, 8.56:1 contrast on the new reason text, Add mask by keyboard. |
+| **Gates** | cargo 393 / 578 (features), vitest 1,195, e2e `Running 36 tests` 34 passed / 2 skipped, tsc 0, eslint 0 errors, guardrails OK, 0 inert classes. |
+

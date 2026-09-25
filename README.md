@@ -85,30 +85,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.97 — 2026-09-24
+### v8.98 — 2026-09-24
 
-**Open a .ora file in your browser, and see every layer.**
+**Refine a selection, then turn it into a mask.**
 
-There was no site that opens an OpenRaster file. There is one now:
-imagehorse.app/openraster. Drop a .ora on the page and every layer is unzipped
-and drawn in the tab. Nothing is uploaded, and it keeps working with the
-network off. Toggle layers, look at the file's own flattened copy, save any
-layer as a PNG.
+The Select panel has a Refine section now. Clean Up does the usual chores in
+one step: it drops specks under 4 pixels, fills pinholes under 6, smooths the
+edge and pulls it in by one. The sliders underneath are the same operations
+one at a time. Move one and you see the result before you commit it, with the
+"Selected" readout telling you what it cost. Apply is one undo step.
 
-It opens on a five-layer sample, so there is something to look at before you
-have a file. Under the viewer: what a .ora is, what is inside one, how to
-export one from Image Horse and import it back, and what survives the trip.
+Layer Settings' Add mask asks what the mask should start from: show the whole
+layer, hide it, reveal just the selection, or hide the selection. Feather from
+Refine softens that edge. The mask brush opens straight after, as it always
+has. Select subject… is there too, and takes you to Background Removal.
 
-The viewer uses the browser's own PNG decoder, every layer at once. 60 MB of
-layers in 0.4 seconds. The engine's decoder measured five times slower here
-and would have cost 354 KB to download, so the page ships without it.
+The export dialog lets you name the file before it downloads. The name you type
+is cleaned up so every operating system accepts it, and the extension always
+matches the format.
 
-In the editor, Select got its morning work (#231): drag Tolerance and the
-selection re-runs live from the same click, with one undo step for the whole
-drag instead of one per tick. A "Selected 18.4% · 2.1 MP" readout sits under
-the sliders and in the status bar, and Intersect joins New, Add and Subtract.
-
-Engine 816,594 bytes (was 814,432).
+Engine 824,286 bytes (was 816,594).
 
 ## License
 
