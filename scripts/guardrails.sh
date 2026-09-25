@@ -183,58 +183,10 @@ check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 
-# ── src/lib.rs SIZE RATCHET (the Rust twin of eslint's max-lines) ──
-#
-# The TS side got `max-lines` with per-file baselines on 2026-08-27; this is the
-# same idea for the one Rust file with the same problem. lib.rs is 5,213 lines
-# and holds the whole wasm_bindgen surface, so it cannot simply be split — but
-# it can be stopped from growing, and its stateless free functions and op-log
-# persistence surface are already coherent chunks ready for the
-# `annotations.rs` / `capture.rs` extraction treatment.
-#
-# Same rule as every other baseline here: this number only goes DOWN. When an
-# extraction lands, lower it in the same commit.
-#
-# Deliberately NOT rustc's `dead_code` lint, which was the obvious candidate
-# and does not work in this crate — an unused private fn added to lib.rs,
-# history.rs or edges.rs produces no diagnostic at all under
-# `cargo check --all-features` (verified 2026-08-27 with --message-format=json:
-# zero compiler-message entries), while the identical probe warns in a minimal
-# crate on the same pinned 1.97.1 toolchain. Cause not identified; do not
-# re-derive it as "pub items are exempt" — the probe was private, and cdylib
-# and wasm-bindgen were both ruled out by isolation.
-# 5213 -> 5183 (layer Color Overlay, 2026-08-28): `Layer::from_snapshot_pixels`
-# moved the two hand-built snapshot layers out to layer.rs, and the Color
-# Overlay engine tests were written into layer.rs's own test module rather than
-# here. Lowered in the same commit as the extraction, per the rule above.
-# 4912 -> 4798 (shape perspective, 2026-09-11): `oplog_sync_annotations`'
-# annotation diff — 110 lines of pure comparison over two lists and the log's
-# document — moved out to `ops::annotation_sync_ops`, beside the `Op` variants
-# it emits and the `#[serde(skip)]` fields whose hazards it has to remember.
-# Lowered in the same commit as the extraction, per the rule above.
-# 4798 -> 4808 (merging master into shape perspective, 2026-09-16). ⚠️ READ THIS
-# BEFORE CONCLUDING THE RATCHET WAS RAISED TO GO GREEN. It was not: measured
-# against MASTER this is a LOWERING of 4912 -> 4808, which is the ratchet doing
-# its job. The 4798 above was set on this branch while it was 30 commits behind,
-# against a lib.rs that contained neither Levels (#152) nor Presets (#153); both
-# add engine surface to lib.rs, and merging brought those lines in legitimately.
-# Two branches ratcheting the same counter independently is the only way this
-# number can move UP without new slop, and the check for it is the one below:
-# 4808 must be lower than the baseline on the branch you are merging INTO.
-# 4808 -> 4732 (2026-09-20), and for the same reason as `rust-panics` above:
-# #131 (`2d188420`) moved the font bindings into `src/fonts.rs`'s own
-# `#[wasm_bindgen] impl` and `commit_text`/`measure_text` into `src/text.rs`,
-# then landed without touching this file. Measured in a clean clone:
-#   6a3de6be  4808      2d188420  4732      5bd73cce (v8.80)  4732
-# This is the ordinary case the header describes — lower it when an extraction
-# lands — arriving three commits late. It is a LOWERING, not the raise the
-# 4798 -> 4808 note above had to defend.
-# 4732 was never merged: this branch sat open while master grew lib.rs back up
-# legitimately — v8.93-v8.98 added engine state (the live-Tolerance retune
-# record, ADR-066; the Refine preview copy, ADR-069). Chris set it at master's
-# real count on merge (09-24-2026): 4808 -> 4771, still a lowering.
-n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4771 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+# ── src/lib.rs line count: NOT ratcheted ──
+# `librs-lines` (5213 -> 4771 over Aug-Sep 2026) was retired by Chris on
+# 09-25-2026. lib.rs is refactored often enough that a blocking line count cost
+# more than it caught. Don't reintroduce it without asking.
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
