@@ -4,6 +4,33 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+Found during the Select morning run (live tolerance). `pnpm run build` prints
+"Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
+{ z-index: var(--z-*); }`. Tailwind scans text, and three comments spell the
+rule out literally: `app/src/styles.css:42`, `app/src/lib/styles.ts:251`,
+`app/src/components/ui/panel-close-button.tsx:38`. The generated rule is
+invalid and applies to nothing, so it is noise, not a bug — but it is the one
+warning in an otherwise clean build, and a real CSS warning would hide behind it.
+
+**Fix:** reword the three comments (e.g. "`z-[var(--z-…)]`" or "a `--z-*`
+token in a `z-[var(…)]` class") so no complete class string appears, then
+confirm the build prints no CSS warning. Same shape as the guardrails
+comment-counted-as-code trap in CLAUDE.md.
+## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+Found while ADR-067 was drafted, left out of the release on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The cubes' dynamic `import()` has no `.catch` | `marketing/src/components/CubeLetters.tsx` | If the chunk fails to load, the label says "Starting…" forever instead of "No GPU context". Fix: catch and set the `none` backend. |
+| A comment names three 0.165's `Color.setStyle` | `marketing/src/posts/engine-in-a-worker.figures.tsx:35` | three is 0.170 now. Check whether 0.170 parses `oklch()`; update or drop the comment. |
+
+Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
+Chromium draws WebGPU canvases blank white even for a bare three.js control, so
+only the WebGL 2 path is verified.
+
 ## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
 
 Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
@@ -169,6 +196,57 @@ a decision, so they wait:
 | Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
 | Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
 | The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+## OPEN — a ratchet that IMPROVED and was never locked in is silent drift (09-20-2026)
+
+Found while lowering `rust-panics` 47 → 46 and `librs-lines` 4808 → 4732. Both
+counts came down in ONE commit, #131 (`2d188420`, "fonts arrive at runtime"),
+and ADR-058 records the lowering as part of that change — but the commit
+touches **zero lines of `scripts/guardrails.sh`**. The branch carried the new
+baselines; the merge did not. Measured in a clean clone:
+
+| Commit | `rust-panics` | `src/lib.rs` |
+| --- | --- | --- |
+| `6a3de6be` (before #131) | 47 | 4808 |
+| `2d188420` (#131) | **46** | **4732** |
+| `5bd73cce` (v8.80) | 46 | 4732 |
+
+For three releases the script printed `IMPROVED … lower the baseline` on every
+run and nothing acted on it, so 46 panics and 76 lines of `lib.rs` could have
+come back for free. **`IMPROVED` is an advisory line inside a blocking job** —
+the one output here that asks for work and cannot enforce it, which is the
+shape this script exists to argue against.
+
+Worth considering, NOT decided: make `IMPROVED` fail on a **pull request** that
+edits the counted files, so a lowering has to land with the change that earned
+it. Two reasons it is not obvious. Two branches can legitimately be below the
+baseline at once (the 4798 → 4808 note in the script is exactly that case), and
+a PR that merely merges master would go red through no fault of its own. Cheaper
+first step: make the release checklist read the last run's `IMPROVED` lines.
+
+Related but separate: this is the same family as the op-log version collision —
+two branches moving one counter independently, where only the merge order
+decides which value survives.
+
+## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+Noticed while checking whether any doc repeated the false "runs in CI" skip
+message. It does not — the three matched-pair checks are not documented at all
+— but the table that IS there is stale on almost every row:
+
+| Row | docs/CI.md says | `scripts/guardrails.sh` actually has |
+| --- | --- | --- |
+| Raw colors | 26 | 22 |
+| Off-scale type | 9 | 8 |
+| Rust panics / unsafe | 67 | 46 |
+| a11y `role="button"` | 5 | 4 |
+| How many checks | "six" / "only one of the six" | eleven — 8 counted + 3 matched pairs |
+
+Nothing here is wrong in a way that breaks a build; a reader just learns the
+wrong numbers, and the three co-change checks are invisible to anyone who has
+not read the script. Left out of this session's diff on purpose (hard rule 4) —
+and docs are Dara's, not a CI change. The right fix is probably to stop
+hand-copying baselines into prose at all and have the doc point at the script,
+since a number duplicated in two files drifts by default.
 
 ## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
 
@@ -3341,6 +3419,73 @@ convergence onto `ui/dialog` already tracked above is the natural moment.
 
 ---
 
+## Gates that report "skip" where they were built to run (found 2026-09-20)
+
+Found while building `scripts/gate-run.sh` (the shared gate-runner, #107) by
+reading the scripts and one real CI log rather than the job names. **None of
+these is fixed** — each needs a decision, and that session's target was the
+helper. Listed newest evidence first.
+
+| # | Where | What it actually does | Evidence |
+|---|---|---|---|
+| 1 | `guardrails.sh` matched pairs (×3) | **Never run in CI**, the one place their own message says they run | run 35487378044 |
+| 2 | `dead-exports-audit.mjs` wasm half | **Never runs in CI** — no `pkg/`, so the engine-export count is always 0 | same log |
+| 3 | `ci.yml` wasm sha step | an empty sha is green, and silently disarms the sentinel's tier 2 | read, not yet reproduced |
+| 4 | `docs/vacuous-checks.md` | referenced 5× in this file and in `ci.yml`; **the file does not exist** | `git ls-files` |
+
+**1 — the three matched-pair checks.** `blur-oracle-pair`,
+`rotated-anchor-pair` and `blur-shader-pair` all begin
+`git merge-base origin/master HEAD || true` and print
+`skip …: no origin/master to diff against (runs in CI)` when it fails.
+`actions/checkout@v4` defaults to `fetch-depth: 1` and fetches no
+remote-tracking `origin/master`, so in CI that merge-base always fails.
+Measured in the guardrails job of run 35487378044 (2026-09-20):
+
+```
+  skip blur-oracle-pair: no origin/master to diff against (runs in CI)
+  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)
+  skip blur-shader-pair: no origin/master to diff against (runs in CI)
+```
+
+The parenthetical is exactly backwards: they run LOCALLY, where a full clone
+has `origin/master`, and skip in CI. ADR-030's oracle/shader pairs and
+ADR-050's anchor pair have therefore never once been enforced by the blocking
+job. **Fix is two decisions, not one:** give the job the base ref
+(`fetch-depth: 0`, or an explicit `git fetch --depth=1 origin master`), and
+then decide whether an un-runnable co-change check should be fatal rather than
+a printed skip — `gate_run --forbid 'skip'` is now one flag away.
+
+**2 — the engine half of the dead-exports audit.** Same job: it prints
+`note: pkg/stamp_tool.d.ts absent — run 'pnpm run build:wasm' for the engine
+half.` and contributes 0 to TOTAL. The `dead-exports: 0` baseline is real for
+TS and vacuous for the wasm surface. That half is what found
+`oplog_keyframe_rgba`. Needs a wasm artifact in the guardrails job (cheap if
+the `rust` job uploads `pkg/`), or an honest split into two baselines.
+
+**3 — the sha that can go missing without going red.**
+`echo "sha256=$(sha256sum pkg/stamp_tool_bg.wasm | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"`
+— `cut` succeeds on empty input and `echo` succeeds on an empty value, so a
+missing or unreadable artifact writes `sha256=` and the step is GREEN. GitHub
+runs `bash -e {0}`: errexit, **no pipefail**, so nothing catches it. The
+downstream effect is worse than the blank: `EXPECTED_WASM_SHA256` arrives
+empty, `deploy-sentinel.sh` takes its `[ -n … ]` branch and prints
+`tier 2 : skipped — no CI expectation in the environment`, which reads like a
+scheduled run. Today `build-wasm.sh` exits non-zero first, so the artifact is
+there; the guard is a side effect of the previous step, not of this one.
+
+**4 — the doc that is cited but absent.** `docs/vacuous-checks.md` is named by
+`ci.yml`'s convex-deploy comment and four entries in this file ("vacuous check
+#15", "family 3"), and `git ls-files` has never had it. Either the numbering
+lives somewhere else or it was never written; the ADR on branch
+`docs/adr-vacuous-gates` is the natural place to settle it.
+
+**Do NOT "fix" push-all-remotes.sh's `| sed` pipes.** They look like the
+classic swallowed exit code and they are not: that script sets `pipefail`, so
+the pipeline reports the push. Measured 2026-09-20 against two local bare
+remotes, one deliberately broken — `pipefail` on → `CAUGHT by the if`,
+`pipefail` off → `MISSED — the if saw sed`. The hazard is real only where
+`pipefail` is absent, which is every `run:` block in `ci.yml` and every
+`$(cmd | filter)` assignment whose status nobody reads.
 ## `ToggleButtonGroup` never says which button is on
 
 Every Settings pane states its choices with `ToggleButtonGroup`, and the active
@@ -3362,3 +3507,28 @@ pass of its own, not a rider on a feature.
 **Do it when** the WCAG sweep happens, or the next time a pane is built around
 "which one is on" — the second occurrence is the signal. The fix belongs in
 `app/src/components/ui/toggle-button-group.tsx`, one place.
+
+## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+The v2 port moved every marketing page onto its own stylesheet
+(`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
+`legal.css`, `contact.css`, `architecture.css`, `blog-post.css`, `footer.css`,
+`shot-annotations.css`). Each page's old rules are still sitting in
+`styles.css`, unreferenced — roughly: `.fx*` (Features' old rail and list),
+`.person*` / `.people` (About), `.foot-stmt*` (the old footer, ~22 lines),
+`.tool-head*` / `.tool-badge*` / `.tool-does` / `.tool-related*` (the first
+tool-page pass), and Trail's `.ach*`, `.month__*`, `.graph*`, `.year*`,
+`.release*`, plus Architecture's `.map*`, `.plane__*`, `.stack*`, `.tbl*`,
+`.rels*`, `.coda*`, `.seg*`.
+
+**Why it is parked, not done:** the redesign was already one large diff, and a
+CSS delete that removes one selector too many fails silently — the page still
+renders, just wrong, and no gate catches it. `styles.css` is also still shared
+by the pages that were NOT reskinned, so "unused by the page I ported" is not
+the same as "unused".
+
+**Do it when** there is a session for it. Method: build, then for each candidate
+class grep all of `marketing/src` (tsx AND the other css files, since one
+stylesheet can reference another's class), delete only the ones with zero hits
+outside `styles.css`, and pixel-diff every route before and after with the
+harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.

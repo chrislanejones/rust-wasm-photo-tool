@@ -39,11 +39,13 @@ import { cn } from "@/lib/utils";
  *  ("Resize canvas → 1920×1080") and under `flex-1` it wrapped to three lines
  *  and dragged its sibling to the same height (measured: 54px → 70px for BOTH
  *  buttons the moment the target dimensions changed). */
-type PanelActionBarLayout = "full" | "split";
+type PanelActionBarLayout = "full" | "split" | "halves";
 
 interface PanelActionBarProps {
   /** `full` (default) — one action, full width. `split` — two actions pushed
-   *  to opposite edges, secondary first in source order. */
+   *  to opposite edges, secondary first in source order. `halves` — two
+   *  actions side by side, 50% each; only for SHORT fixed labels, since a
+   *  label wider than its half overflows instead of wrapping. */
   layout?: PanelActionBarLayout;
   children: React.ReactNode;
   className?: string;
@@ -63,7 +65,11 @@ export function PanelActionBar({
             // action itself having to carry `w-full` (which would then have to
             // be un-set for the split layout).
             "grid"
-          : [
+          : layout === "halves"
+            ? // Two equal tracks; each action stretches to fill its own half.
+              // Canvas Size (Chris, 09-24-2026: "50% and 50% width").
+              "grid grid-cols-2 gap-2"
+            : [
               // `justify-between` is the two-on-one-line case. `flex-wrap` plus
               // the last child's `ml-auto` is the OVERFLOW case: a pair too wide
               // for a 226px sidebar column drops the primary onto its own row

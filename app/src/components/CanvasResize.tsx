@@ -109,8 +109,10 @@ export function CanvasResize({
           target, so the visible labels are the verbs; the accessible names
           keep the object ("Remove canvas" contains "Remove", WCAG 2.5.3).
           Destructive first, primary on the right edge — source order is the
-          layout. */}
-      <PanelActionBar layout="split">
+          layout. Equal halves since 09-24-2026 (Chris: "50% and 50% width"):
+          the verb-only labels are short and fixed, so the old reason against
+          `flex-1` halves — a dynamic label wrapping to three lines — is gone. */}
+      <PanelActionBar layout="halves">
         <PanelAction
           tone="destructive"
           disabled={disabled || !canRemove}

@@ -85,17 +85,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.92 — 2026-09-23
+### v8.98 — 2026-09-24
 
-**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
+**Refine a selection, then turn it into a mask.**
 
-`scripts/compare-clean-view.js`. Paste it into Chrome DevTools › Sources ›
-Snippets and run it with a photo loaded. It turns Compare on, puts the
-divider three quarters of the way across, and hides the rest of the page.
-Zoom with Alt + = and Alt + -, and press Esc to get everything back.
+The Select panel has a Refine section now. Clean Up does the usual chores in
+one step: it drops specks under 4 pixels, fills pinholes under 6, smooths the
+edge and pulls it in by one. The sliders underneath are the same operations
+one at a time. Move one and you see the result before you commit it, with the
+"Selected" readout telling you what it cost. Apply is one undo step.
 
-It adds one style tag and takes it away again. Nothing in the app changed,
-and the engine is the same 814,432 bytes as v8.91.
+Layer Settings' Add mask asks what the mask should start from: show the whole
+layer, hide it, reveal just the selection, or hide the selection. Feather from
+Refine softens that edge. The mask brush opens straight after, as it always
+has. Select subject… is there too, and takes you to Background Removal.
+
+The export dialog lets you name the file before it downloads. The name you type
+is cleaned up so every operating system accepts it, and the extension always
+matches the format.
+
+Engine 824,286 bytes (was 816,594).
 
 ## License
 

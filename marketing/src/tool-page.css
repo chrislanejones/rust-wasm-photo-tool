@@ -1,0 +1,316 @@
+/* The ten tool landing pages (/photo-editor, /blur-image, …) — ToolPage v2.
+ *
+ * Its own file rather than a block in styles.css: the tool pages are one
+ * component with one layout, and keeping their rules together means the whole
+ * template can be read, or removed, in one place.
+ *
+ * Sizes are the design file's own values. Where a value has a token it uses
+ * it (--text-4xl for the h1, --text-panel for "What it does" and "Next",
+ * --text-ui for anything you act on). The four below have no rung in the scale
+ * yet and are only used here, so they live here.
+ */
+
+:root {
+  /* The lede beside the h1: between --text-deck and --text-lg. */
+  --text-tp-lede: 1.1875rem;
+  /* A reasoning section's heading on the cream board. */
+  --text-tp-split: clamp(1.5rem, 2vw, 1.875rem);
+  /* A related-tool card's blurb. */
+  --text-tp-blurb: 0.875rem;
+  /* The closing line above the last button. */
+  --text-tp-close: clamp(1.375rem, 2vw, 1.75rem);
+}
+
+/* ── head ───────────────────────────────────────────────────────────── */
+
+.tp-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 32px 64px;
+  align-items: end;
+  /* The nav floats, so the first heading buys its own room under it. */
+  padding: calc(var(--banner-height) + 72px) var(--page-gutter) 56px;
+}
+.tp-head__lead { display: grid; gap: 22px; min-width: 0; }
+.tp-head__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.tp-head__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 15ch;
+  font-weight: 700;
+  font-size: var(--text-4xl);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.tp-head__side { display: grid; gap: 28px; padding-bottom: 6px; }
+.tp-head__lede {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--text-tp-lede);
+  line-height: 1.5;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+/* ── buttons ────────────────────────────────────────────────────────── */
+
+.tp-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.tp-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 14px 22px;
+  border: var(--rule-hair) solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-ui);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-micro) var(--ease-out),
+              border-color var(--dur-micro) var(--ease-out);
+}
+.tp-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.tp-btn--fill {
+  font-weight: 600;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+.tp-btn--fill:hover { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.tp-btn--line {
+  font-weight: 500;
+  border-color: var(--color-rule);
+  color: var(--color-ink);
+}
+.tp-btn--line:hover { border-color: var(--color-accent); color: var(--color-ink); }
+
+/* ── where it runs ──────────────────────────────────────────────────── */
+
+.tp-runs-wrap { padding: 0 var(--page-gutter) 56px; }
+.tp-runs {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 24px;
+  align-items: center;
+  padding: 22px 26px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 16px;
+  background: var(--color-paper-2);
+}
+/* A tool that uploads gets the accent border and a warm wash. */
+.tp-runs--server,
+.tp-runs--both {
+  border-color: var(--color-accent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--color-accent) 14%, var(--color-paper-2)),
+    var(--color-paper-2) 70%
+  );
+}
+.tp-runs__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-accent);
+}
+.tp-runs__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+.tp-runs__note {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+/* On a phone the unwrappable label takes most of the row and squeezes the note
+   into a column four words wide. Stack them instead. The design file has the
+   same two-column grid at every width. */
+@media (max-width: 34rem) {
+  .tp-runs { grid-template-columns: minmax(0, 1fr); padding: 18px 20px; }
+}
+
+/* ── the cream board ─────────────────────────────────────────────────
+   Its ink is local, not token-derived: every site ink token is tuned for
+   light text on the dark page, and every one of them is illegible on cream.
+   Same values as the home page's .board--cream. */
+
+.tp-board {
+  --tp-ink: oklch(20% 0.020 40);
+  --tp-ink-2: oklch(30% 0.020 40);
+  --tp-ink-3: oklch(32% 0.020 40);
+  --tp-rule: oklch(84% 0.020 80);
+  --tp-card-rule: oklch(86% 0.020 80);
+  --tp-card: oklch(97.5% 0.012 80);
+  --tp-mark: oklch(44% 0.170 45);
+
+  display: grid;
+  gap: clamp(48px, 6vw, 72px);
+  margin: 0 var(--page-gutter);
+  padding: clamp(32px, 5vw, 64px);
+  border-radius: 20px;
+  background: oklch(94% 0.020 80);
+  color: var(--tp-ink);
+}
+.tp-board__h2 {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-panel);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: var(--tp-ink);
+}
+
+.tp-does { display: grid; gap: 24px; }
+.tp-does__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tp-does__item {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 18px 20px;
+  border: var(--rule-hair) solid var(--tp-card-rule);
+  border-radius: 14px;
+  background: var(--tp-card);
+  font-size: var(--text-ui);
+  line-height: 1.5;
+  color: var(--tp-ink-2);
+  text-wrap: pretty;
+}
+.tp-does__check { display: block; margin-top: 2px; color: var(--tp-mark); }
+
+.tp-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 16px 64px;
+  align-items: start;
+  padding-top: clamp(40px, 5vw, 56px);
+  border-top: var(--rule-hair) solid var(--tp-rule);
+}
+.tp-split__h2 {
+  margin: 0;
+  max-width: 18ch;
+  font-weight: 700;
+  font-size: var(--text-tp-split);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  color: var(--tp-ink);
+}
+.tp-split__p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--text-md);
+  line-height: 1.65;
+  color: var(--tp-ink-3);
+  text-wrap: pretty;
+}
+.tp-split__p a {
+  color: var(--tp-mark);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.tp-split__p a:focus-visible { outline: 2px solid var(--tp-mark); outline-offset: 2px; }
+
+/* ── next ───────────────────────────────────────────────────────────── */
+
+.tp-next { display: grid; gap: 24px; padding: 88px var(--page-gutter) 0; }
+.tp-next__h2 {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-panel);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.tp-next__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tp-next__li { display: grid; }
+.tp-next__card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  min-height: 11rem;
+  padding: 22px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 16px;
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  text-decoration: none;
+  transition: border-color 160ms var(--ease-out);
+}
+.tp-next__card:hover { border-color: var(--color-accent); color: var(--color-ink); }
+.tp-next__card:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.tp-next__group {
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.tp-next__label {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.tp-next__blurb {
+  font-size: var(--text-tp-blurb);
+  line-height: 1.5;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+.tp-next__slug {
+  align-self: end;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* ── close ──────────────────────────────────────────────────────────── */
+
+.tp-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 40px;
+  padding: 96px var(--page-gutter) 112px;
+}
+.tp-close__text { display: grid; gap: 6px; }
+.tp-close__line {
+  margin: 0;
+  font-size: var(--text-tp-close);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.tp-close__sub { margin: 0; font-size: var(--text-md); color: var(--color-ink-2); }

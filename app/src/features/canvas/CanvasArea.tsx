@@ -45,7 +45,7 @@ import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind, RulerUnit } from "@/lib/preferences";
-import { selectionCombineMode } from "@/lib/selectionBool";
+import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
 import type { ShapeName } from "@/lib/types";
@@ -450,7 +450,8 @@ function getCursorForSubTool(
   isPanning?: boolean,
   colorPickerActive?: boolean,
   moveActive?: boolean,
-  combineIntent?: 0 | 1 | 2,
+  combineIntent?: SelectionCombineMode,
+  maskEditing?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";
 
@@ -471,8 +472,11 @@ function getCursorForSubTool(
   }
 
   // Resize Layer only drags while its Move toggle is on; idle otherwise, so the
-  // cursor must not promise a drag the canvas won't honour.
+  // cursor must not promise a drag the canvas won't honour. Mask editing wins
+  // over Move — same precedence as useEffectiveTool's dispatch — and returns
+  // undefined so the brush-size ring below is the cursor, as it is for Paint.
   if (group === "edit" && def?.id === "resize-layer") {
+    if (maskEditing) return undefined;
     return moveActive ? "move" : undefined;
   }
 
@@ -597,6 +601,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // both CanvasArea call sites for one gate would be drilling for its own
     // sake.
     const eraserMode = useToolStore((s) => s.eraserMode);
+    // Layers-panel mask painting: gates the ring and the cursor exactly like
+    // `eraserMode` above, and is read from the store for the same reason.
+    const maskEditing = useToolStore((s) => s.maskEditing);
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -766,12 +773,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Live Shift/Alt intent while the Select tool hovers — drives the +/−
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
-    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    const [combineIntent, setCombineIntent] = useState<SelectionCombineMode>(0);
     // Ref mirror so the rAF preview closure (below) and the keyboard effect
     // read the LIVE intent, not a stale render's. `setIntent` keeps both in
     // step — the state drives the cursor re-render, the ref the async reads.
-    const combineIntentRef = useRef<0 | 1 | 2>(0);
-    const setIntent = useCallback((next: 0 | 1 | 2) => {
+    const combineIntentRef = useRef<SelectionCombineMode>(0);
+    const setIntent = useCallback((next: SelectionCombineMode) => {
       combineIntentRef.current = next;
       setCombineIntent((cur) => (cur === next ? cur : next));
     }, []);
@@ -1312,6 +1319,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       colorPickerActive,
       layerMoveActive,
       selectionActive ? combineIntent : 0,
+      maskEditing,
     );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
@@ -2265,9 +2273,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             The `ai` clause STAYS: those two modes are the Create-side eraser
             painting a real mask onto the canvas, sharing the `ai` tool id with
             the Enhance › AI tile that only clicks. `eraserMode` is what tells
-            them apart. */}
+            them apart.
+
+            `maskEditing` joins them (09-24): the Layers panel's mask brush
+            paints from the `arrow` tool, so the ring must show there too —
+            sized by AppShell's `effectiveBrushSize` from `maskBrushSize`. */}
         {cursorVisible &&
           (activeTool === "brush" ||
+            maskEditing ||
             (activeTool === "ai" &&
               (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&

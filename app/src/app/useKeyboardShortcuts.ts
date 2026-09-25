@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
@@ -428,6 +429,22 @@ export function useKeyboardShortcuts({
             break;
         }
         return;
+      }
+
+      // ─── Bare X → swap the mask brush between black and white ──────
+      // Photoshop's X (swap foreground/background colors, which on a mask is
+      // hide↔reveal). Claimed ONLY while mask editing is on, so it takes
+      // nothing from any future binding; typing contexts never reach here
+      // (the input/textarea/contentEditable guard at the top). Read via
+      // getState(), the command-palette precedent — a mode swap is global
+      // chrome, not an AppShell prop.
+      if (e.code === "KeyX") {
+        const t = useToolStore.getState();
+        if (t.maskEditing) {
+          e.preventDefault();
+          t.setMaskPaintValue(t.maskPaintValue < 128 ? 255 : 0);
+          return;
+        }
       }
 
       // ─── Bare digits 1-5 → tool GROUP switching ────────────────────

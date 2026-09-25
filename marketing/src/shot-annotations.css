@@ -1,0 +1,166 @@
+/* shot-annotations — numbered callouts on the home timeline screenshots.
+ * Owned by the annotations port; other ports must not edit this file.
+ *
+ * Positions are percentages computed in ShotTimeline from each capture's own
+ * pixels (data/shots.ts), inside `.shot-stack`, which is the fixed-ratio frame
+ * box. Everything here is presentation only. */
+
+:root {
+  /* The pin number and the bold lead-in sit on a rose fill or a near-black
+     label, and read a step brighter than --color-ink in the design (98% vs
+     95%). One use, so it lives here rather than in tokens.css. */
+  --shot-pin-ink: oklch(98% 0.005 70);
+}
+
+.shot-callouts {
+  /* The design's marker color is its "rose", which is the site's second accent. */
+  --pin: var(--color-accent-2);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── the highlight shape ─────────────────────────────────────────────── */
+
+.shot-callout__mark {
+  position: absolute;
+  border: 2px solid var(--pin);
+  border-radius: 6px;
+  /* A dark halo so a rose outline still reads over a busy or pale photo. */
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-paper) 55%, transparent);
+}
+.shot-callout__mark--ellipse { border-radius: 50%; }
+/* A rule rather than a box: the Original ⟷ Edited divider is a line. */
+.shot-callout__mark--line {
+  border: 0;
+  border-left: 2px dashed var(--pin);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ── the pin + label ─────────────────────────────────────────────────── */
+
+.shot-callout__label {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: min(26ch, 30%);
+}
+.shot-callout__label--up { transform: translateY(-100%); }
+
+.shot-callout__pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--color-accent-2);
+  color: var(--shot-pin-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+.shot-callouts .shot-callout__pin {
+  animation: shot-pin-pulse 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.shot-callout__text {
+  padding: 6px 10px;
+  border: 1px solid var(--pin);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--color-paper) 90%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--color-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.shot-callout__text strong,
+.shot-notes__item strong {
+  font-weight: 700;
+  color: var(--shot-pin-ink);
+}
+
+@keyframes shot-pin-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-accent-2) 55%, transparent); }
+  70%      { box-shadow: 0 0 0 10px transparent; }
+}
+@keyframes shot-callouts-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.shot-callouts { animation: shot-callouts-in var(--dur-short) var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-callouts,
+  .shot-callouts .shot-callout__pin { animation: none; }
+}
+
+/* ── the same callouts as a list ─────────────────────────────────────── */
+
+/* Wide screens: the words are already on the picture, so the list is for
+   screen readers only. Same recipe as `.visually-hidden`. */
+.shot-notes {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.shot-notes__list {
+  grid-area: 1 / 1;
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  visibility: hidden;
+}
+.shot-notes__list[data-current] { visibility: visible; }
+
+.shot-notes__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+.shot-notes__item .shot-callout__pin {
+  width: 22px;
+  height: 22px;
+  font-size: var(--text-xs);
+}
+
+/* Narrow screens: a 12px label inside a box capped at 30% of a ~350px-wide
+   screenshot is about 100px of text, which nobody can read. The picture keeps
+   its numbered pins and highlight shapes, and the list becomes the visible key
+   under the frame. */
+@media (max-width: 48rem) {
+  .shot-callout__text { display: none; }
+  .shot-callouts .shot-callout__pin {
+    width: 22px;
+    height: 22px;
+    font-size: var(--text-xs);
+  }
+
+  .shot-notes {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    display: grid;
+  }
+}

@@ -117,6 +117,8 @@ import {
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
+import { useExportFileName } from "@/hooks/useExportFileName";
+import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
@@ -934,10 +936,13 @@ export function AppShell() {
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
-        if (maskEditing) return toolSettings.brushSize / 2;
         if (brushMode === "blur") return toolSettings.blurSize / 2;
         if (brushMode === "erase") return toolSettings.eraserSize / 2;
         return toolSettings.brushSize / 2;
+      case "arrow":
+        // The Layers panel's mask brush — its own size, not the Paint brush's.
+        if (maskEditing) return toolSettings.maskBrushSize / 2;
+        return 0;
       case "crop":
         return 0;
       case "ai":
@@ -1141,6 +1146,7 @@ export function AppShell() {
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
+    handleExportAs,
   } = useCanvasActions({
     stamp,
     exportFormat,
@@ -1164,6 +1170,16 @@ export function AppShell() {
       canvasBgTransparent,
     }),
   });
+
+  const exportName = useExportFileName(
+    exportDialogOpen,
+    activePhotoId,
+    photos.find((p) => p.id === activePhotoId)?.name,
+  );
+  const downloadFromDialog = () => {
+    setExportDialogOpen(false);
+    void handleExportAs(exportName.stem());
+  };
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -1478,14 +1494,19 @@ export function AppShell() {
   });
 
   // Mask edit-mode handlers (wired into the Layers panel). Entering mask edit
-  // selects the layer + switches to the Paint brush so strokes hit the mask.
+  // selects the layer and turns on the panel's own mask brush — the user
+  // stays on the Layers panel; no tool switch.
   const { handleAddMask, handleToggleMaskEdit } = useMaskActions(stamp);
 
-  // Mask editing is a brush activity — drop it when leaving the Paint tool so
-  // the panel highlight and canvas routing don't get stuck on.
+  // Mask editing lives on the Layers panel — drop it when the lit sub-tool
+  // is anything else, so the panel toggle and canvas routing don't get stuck
+  // on. Sub-tool, not tool: Canvas Size and Guides share the `arrow` tool id
+  // but have no mask section, and a stale flag there would leave strokes
+  // silently scrubbing a mask under a panel that never says so.
+  const activeSubToolId = activeSubTool?.subTool.id;
   useEffect(() => {
-    if (activeTool !== "brush") setMaskEditing(false);
-  }, [activeTool]);
+    if (activeSubToolId !== "resize-layer") setMaskEditing(false);
+  }, [activeSubToolId]);
 
   // Move tool (the repurposed "arrow" slot): drag the active layer's content.
   const moveLayerTool = useMoveLayerTool({
@@ -2526,7 +2547,12 @@ export function AppShell() {
       const step = 5 * direction;
       const clamp = (v: number, lo: number, hi: number) =>
         Math.max(lo, Math.min(hi, v));
-      if (activeTool === "brush") {
+      if (maskEditing) {
+        // The Layers panel's mask brush — checked first because mask editing
+        // is a modal activity: while it is on, the brackets must size the
+        // brush that is actually painting. Range matches the panel's slider.
+        setToolSettings((p) => ({ ...p, maskBrushSize: clamp(p.maskBrushSize + step, 4, 200) }));
+      } else if (activeTool === "brush") {
         if (brushMode === "paint") {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
@@ -2555,7 +2581,7 @@ export function AppShell() {
         }
       }
     },
-    [activeTool, brushMode, stampSubMode, eraserMode, setToolSettings, setStampSettings, stamp],
+    [activeTool, brushMode, stampSubMode, eraserMode, maskEditing, setToolSettings, setStampSettings, stamp],
   );
 
   // Ctrl/Cmd+Shift+] / [ — send the active layer to the top / bottom of the
@@ -2928,16 +2954,21 @@ export function AppShell() {
                 columns={2}
               />
             </div>
+
+            <ExportFileNameField
+              value={exportName.value}
+              defaultStem={exportName.defaultStem}
+              onChange={exportName.onChange}
+              ext={EXT[effectiveExportFormat]}
+              onSubmit={downloadFromDialog}
+            />
           </DialogBody>
 
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
               label={`Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleExport();
-              }}
+              onClick={downloadFromDialog}
             />
             <ShareButton
               exportPng={async () => {

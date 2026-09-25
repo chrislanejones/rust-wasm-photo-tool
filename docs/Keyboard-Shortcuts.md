@@ -90,6 +90,11 @@ The same four live on each shape row in Review → Reselect as ▲ / ▼
 | `Ctrl + Shift + J`     | New layer via cut (clears the source) |
 | `Ctrl + Shift + ]`     | Send the active layer to the front |
 | `Ctrl + Shift + [`     | Send the active layer to the back |
+| `X`                    | While painting a layer mask: swap black and white (Hide ↔ Reveal) — Photoshop's X |
+| `Ctrl + [` / `]`       | While painting a layer mask: resize the mask brush (the same chord every other brush uses) |
+
+`X` is claimed only while mask painting is on; the rest of the time the key
+does nothing, so nothing else can collide with it.
 
 The two reorder chords match Photoshop. "Back" means as far down as the stack
 allows — the engine keeps every layer above the canvas layer, and refuses to
