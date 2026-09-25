@@ -3416,6 +3416,73 @@ convergence onto `ui/dialog` already tracked above is the natural moment.
 
 ---
 
+## Gates that report "skip" where they were built to run (found 2026-09-20)
+
+Found while building `scripts/gate-run.sh` (the shared gate-runner, #107) by
+reading the scripts and one real CI log rather than the job names. **None of
+these is fixed** — each needs a decision, and that session's target was the
+helper. Listed newest evidence first.
+
+| # | Where | What it actually does | Evidence |
+|---|---|---|---|
+| 1 | `guardrails.sh` matched pairs (×3) | **Never run in CI**, the one place their own message says they run | run 35487378044 |
+| 2 | `dead-exports-audit.mjs` wasm half | **Never runs in CI** — no `pkg/`, so the engine-export count is always 0 | same log |
+| 3 | `ci.yml` wasm sha step | an empty sha is green, and silently disarms the sentinel's tier 2 | read, not yet reproduced |
+| 4 | `docs/vacuous-checks.md` | referenced 5× in this file and in `ci.yml`; **the file does not exist** | `git ls-files` |
+
+**1 — the three matched-pair checks.** `blur-oracle-pair`,
+`rotated-anchor-pair` and `blur-shader-pair` all begin
+`git merge-base origin/master HEAD || true` and print
+`skip …: no origin/master to diff against (runs in CI)` when it fails.
+`actions/checkout@v4` defaults to `fetch-depth: 1` and fetches no
+remote-tracking `origin/master`, so in CI that merge-base always fails.
+Measured in the guardrails job of run 35487378044 (2026-09-20):
+
+```
+  skip blur-oracle-pair: no origin/master to diff against (runs in CI)
+  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)
+  skip blur-shader-pair: no origin/master to diff against (runs in CI)
+```
+
+The parenthetical is exactly backwards: they run LOCALLY, where a full clone
+has `origin/master`, and skip in CI. ADR-030's oracle/shader pairs and
+ADR-050's anchor pair have therefore never once been enforced by the blocking
+job. **Fix is two decisions, not one:** give the job the base ref
+(`fetch-depth: 0`, or an explicit `git fetch --depth=1 origin master`), and
+then decide whether an un-runnable co-change check should be fatal rather than
+a printed skip — `gate_run --forbid 'skip'` is now one flag away.
+
+**2 — the engine half of the dead-exports audit.** Same job: it prints
+`note: pkg/stamp_tool.d.ts absent — run 'pnpm run build:wasm' for the engine
+half.` and contributes 0 to TOTAL. The `dead-exports: 0` baseline is real for
+TS and vacuous for the wasm surface. That half is what found
+`oplog_keyframe_rgba`. Needs a wasm artifact in the guardrails job (cheap if
+the `rust` job uploads `pkg/`), or an honest split into two baselines.
+
+**3 — the sha that can go missing without going red.**
+`echo "sha256=$(sha256sum pkg/stamp_tool_bg.wasm | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"`
+— `cut` succeeds on empty input and `echo` succeeds on an empty value, so a
+missing or unreadable artifact writes `sha256=` and the step is GREEN. GitHub
+runs `bash -e {0}`: errexit, **no pipefail**, so nothing catches it. The
+downstream effect is worse than the blank: `EXPECTED_WASM_SHA256` arrives
+empty, `deploy-sentinel.sh` takes its `[ -n … ]` branch and prints
+`tier 2 : skipped — no CI expectation in the environment`, which reads like a
+scheduled run. Today `build-wasm.sh` exits non-zero first, so the artifact is
+there; the guard is a side effect of the previous step, not of this one.
+
+**4 — the doc that is cited but absent.** `docs/vacuous-checks.md` is named by
+`ci.yml`'s convex-deploy comment and four entries in this file ("vacuous check
+#15", "family 3"), and `git ls-files` has never had it. Either the numbering
+lives somewhere else or it was never written; the ADR on branch
+`docs/adr-vacuous-gates` is the natural place to settle it.
+
+**Do NOT "fix" push-all-remotes.sh's `| sed` pipes.** They look like the
+classic swallowed exit code and they are not: that script sets `pipefail`, so
+the pipeline reports the push. Measured 2026-09-20 against two local bare
+remotes, one deliberately broken — `pipefail` on → `CAUGHT by the if`,
+`pipefail` off → `MISSED — the if saw sed`. The hazard is real only where
+`pipefail` is absent, which is every `run:` block in `ci.yml` and every
+`$(cmd | filter)` assignment whose status nobody reads.
 ## `ToggleButtonGroup` never says which button is on
 
 Every Settings pane states its choices with `ToggleButtonGroup`, and the active
