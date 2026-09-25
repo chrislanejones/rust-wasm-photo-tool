@@ -26,6 +26,7 @@ mod describe;
 mod drawing;
 mod edges;
 mod effects;
+pub mod exif;
 mod fonts;
 mod history;
 mod layer;
