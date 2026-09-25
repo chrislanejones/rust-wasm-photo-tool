@@ -138,8 +138,13 @@ function createFakeConvex() {
     ["users", new Map()],
     ["shares", new Map()],
     ["share_views", new Map()],
+    // Read by the storage quota (convex/storageQuota.ts), which sums an
+    // account's photo edits and share snapshots.
+    ["photo_edits", new Map()],
   ]);
-  const blobs = new Set<string>();
+  /** Stored files and their sizes in bytes — `_storage`, as far as the quota
+   *  check reads it. */
+  const blobs = new Map<string, number>();
   let seq = 0;
   let identity: { subject: string } | null = null;
 
@@ -171,6 +176,7 @@ function createFakeConvex() {
               return rows[0] ?? null;
             },
             collect: async () => rows,
+            take: async (n: number) => rows.slice(0, n),
           };
         },
       };
@@ -193,6 +199,12 @@ function createFakeConvex() {
     },
     async get(id: string) {
       return tables.get(id.split("|")[0])?.get(id) ?? null;
+    },
+    system: {
+      async get(id: string) {
+        const size = blobs.get(id);
+        return size === undefined ? null : { _id: id, _creationTime: 0, sha256: "", size };
+      },
     },
   };
 
@@ -234,8 +246,8 @@ function createFakeConvex() {
       identity = null;
     },
     /** Upload a blob and mint a link for it, as the signed-in user. */
-    async share(title = "sky", blob = `blob-${seq + 1}`): Promise<string> {
-      blobs.add(blob);
+    async share(title = "sky", blob = `blob-${seq + 1}`, size = 1_000_000): Promise<string> {
+      blobs.set(blob, size);
       const r = await call<{ token: string }>(create, {
         storageId: blob,
         canvasW: 1920,
@@ -541,5 +553,34 @@ describe("shares:setLimits — an end date needs a write at that instant", () =>
     await server.setLimits({ token, maxViews: null, expiresAt: NOON - 1 });
     expect(server.scheduled).toEqual([]);
     expect(await server.get(token)).toMatchObject({ reason: "expired" });
+  });
+});
+
+// ── The storage quota, enforced where the pointer is committed ──────────────
+// `shares.create` is where a snapshot's size is known (it has landed in
+// storage), so that is where the quota is exact. The boundary itself is pinned
+// in storageQuota.test.ts; this proves the handler actually asks.
+
+describe("shares:create — the cloud storage quota", () => {
+  const FREE_CAP = 100 * 1024 * 1024;
+
+  it("allows a snapshot that brings a free account exactly to 100 MB, refuses one byte more", async () => {
+    // beforeEach already stored blob-1 at 1,000,000 bytes.
+    await server.share("fills it", "blob-fill", FREE_CAP - 1_000_000);
+    await expect(server.share("one byte over", "blob-over", 1)).rejects.toThrow(
+      /cloud storage is full/,
+    );
+    // No row was written for the refused snapshot: still the two from before.
+    expect((await server.listMine()).map((r) => r.title)).toEqual(
+      expect.arrayContaining(["sky", "fills it"]),
+    );
+    expect(await server.listMine()).toHaveLength(2);
+  });
+
+  it("deleting a link is always allowed, and frees the room it held", async () => {
+    await server.share("fills it", "blob-fill", FREE_CAP - 1_000_000);
+    await expect(server.share("refused", "blob-a", 500_000)).rejects.toThrow(/cloud storage is full/);
+    await server.remove(token); // frees blob-1's 1,000,000 bytes
+    await expect(server.share("fits now", "blob-b", 500_000)).resolves.toEqual(expect.any(String));
   });
 });
