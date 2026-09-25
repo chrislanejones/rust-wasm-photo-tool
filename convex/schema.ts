@@ -217,6 +217,14 @@ export default defineSchema({
   // an unguessable `token`. The `get` query is PUBLIC (no auth) so anyone with
   // the link can view/download the snapshot; ownership (userId) only gates
   // listing/revoking. This is the "share link" the Pro paywall advertises.
+  //
+  // The four optional fields below are the Settings › Shared limits. ALL
+  // OPTIONAL, and that is load-bearing: Convex validates the whole table on
+  // push, so a required field would fail the deploy for every link that
+  // already exists. Absent reads as "no limit" — see `availability` in
+  // shares.ts. `pausedAt` is the ONLY one the owner's Pause writes; the two
+  // auto-limits are never written as a pause, they are re-derived on every
+  // read so that raising a limit un-stops a link with no extra write.
   shares: defineTable({
     token: v.string(),
     userId: v.id("users"),
@@ -226,9 +234,86 @@ export default defineSchema({
     title: v.optional(v.string()),
     views: v.number(),
     createdAt: v.number(),
+    /** Stop serving after this many views. Reaching it PAUSES, never deletes. */
+    maxViews: v.optional(v.number()),
+    /** ms epoch. Stop serving at or after this instant. */
+    expiresAt: v.optional(v.number()),
+    /** Set by the owner's Pause, cleared by Resume. */
+    pausedAt: v.optional(v.number()),
+    /** Written by the scheduled `shares.expire` AT `expiresAt`. Not read to
+     *  decide anything — `availability` compares the clock. Its job is the
+     *  WRITE: a Convex query is cached and is not re-run as time passes, so
+     *  without a write at that instant a cached `get` would go on serving the
+     *  image past its end date until something else touched the row. */
+    expiredAt: v.optional(v.number()),
+    lastViewedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
     .index("by_userId", ["userId"]),
+
+  // ── Share views (one row per counted view) ────────────────────────────────
+  // TIMESTAMP ONLY. No IP, no user agent, no viewer id, nothing that could
+  // identify who opened a link — the privacy policy says so, and this table is
+  // what keeps that true. It exists so the owner's pane can draw a 30-day
+  // view sparkline per link; the running total lives on `shares.views`.
+  // Rows are deleted with their share (shares.remove), so the table is bounded
+  // by the views of links that still exist.
+  share_views: defineTable({
+    shareId: v.id("shares"),
+    at: v.number(),
+  })
+    // (shareId, at): every read is one share's rows from a start time onward,
+    // which this index serves as a range with no scan.
+    .index("by_shareId", ["shareId", "at"]),
+
+  // ── Synced client documents (cross-device / cross-tab state) ───────────
+  // ONE ROW PER (user, key). `value` is a canonical JSON blob written by
+  // app/src/lib/sync — `prefs`, `ui` and `tools` today. The client compares
+  // `value` strings directly rather than a hash: these blobs are under a
+  // couple of kilobytes, and an exact comparison cannot collide the way a
+  // short hash can (which would look like "my change didn't sync").
+  //
+  // `key` is an OPEN string, not a union, on purpose: a new synced document
+  // must be a code change in convex/sync.ts (which validates against
+  // SYNC_KEYS) and not a schema migration. Convex validates the whole table
+  // on push, so a union here would make every new document type a deploy
+  // risk for rows that already exist.
+  //
+  // `rev` is server-assigned and strictly increasing per row, and it is what
+  // a write is CHECKED against: `sync:push` carries the rev the client's
+  // change was based on and is refused when the row has moved since. That is
+  // what stops a mutation Convex queued while a laptop was offline from
+  // landing, on reconnect, over a day of changes made on the phone.
+  //
+  // `value: null` is a FORGOTTEN document ("Forget the synced copy"). The row
+  // stays, with its settings removed, so that its rev keeps counting and every
+  // device can tell "the user deleted this" from "this account never had one"
+  // — the second seeds from a device's pending change, the first must not be
+  // re-seeded by whichever device happens to be online. So nothing ever
+  // DELETES a row of this table: a row that vanished would restart at rev 1,
+  // under devices that remember a higher one.
+  //
+  // `format` is the document's schema version as the WRITING build knew it.
+  // A build never writes over a row from a newer format — it cannot see the
+  // fields that build added, and its write would erase them.
+  //
+  // There is deliberately no device or tab id here. Nothing needs to know
+  // which device wrote a row, so no per-browser identifier is uploaded.
+  //
+  // NOT the photo archive. Replicating edited pixels across devices is a
+  // separate, larger thing and is blocked on the op-log breakage tracked in
+  // docs/PARKING_LOT.md; see docs/adr/061.
+  sync_docs: defineTable({
+    userId: v.id("users"),
+    key: v.string(),
+    value: v.union(v.string(), v.null()),
+    rev: v.number(),
+    updatedAt: v.number(),
+    format: v.number(),
+  })
+    // The only index. Every read is one (user, key) lookup — the key set is a
+    // closed list of three — and a user-wide scan can use its `userId` prefix.
+    .index("by_userId_key", ["userId", "key"]),
 
   // ── AI Jobs ─────────────────────────────────────────────
   // Keyed by photoKey (the editor's string id, same as photo_edits) rather
@@ -244,7 +329,7 @@ export default defineSchema({
       v.literal("ocr"),
       // REGISTERED BUT DELIBERATELY UNIMPLEMENTED — do not wire this up.
       // "alt" is the hosted caption model that ADR-028 considered and REJECTED
-      // in favour of running image description locally in the Rust engine. It
+      // in favor of running image description locally in the Rust engine. It
       // survives in this union only because removing a literal from a schema
       // union is a migration, not an edit. Without this note the next person
       // reads an unhandled case as an oversight and implements it, quietly

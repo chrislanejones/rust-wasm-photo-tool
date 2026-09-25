@@ -81,13 +81,34 @@ export interface Post {
 
 export const POSTS: readonly Post[] = [
   {
+    slug: "offline-by-construction",
+    headline: "The hotel Wi-Fi died. The editor kept running.",
+    title: "Image Horse works offline by construction",
+    deck: "Why an image editor whose engine runs in a Web Worker and whose truth lives in IndexedDB keeps working when the Wi-Fi doesn't — and what that buys a ward, an operating room, or anyone whose work can't wait for a signal.",
+    description:
+      "The engine runs in a Web Worker and the truth lives in IndexedDB, so Image Horse keeps editing when the network drops — measured, not assumed, and built for the hardest network in the building.",
+    published: "2026-09-22",
+    version: "v8.85",
+    tag: "engineering",
+    // WebP, not the generator's PNG: this card was drawn by hand. It ships as
+    // exported, uncompressed, at 49,800 bytes.
+    ogImage: "/og/blog/offline-by-construction.webp",
+    sources: [
+      "marketing/src/posts/offline-by-construction.tsx",
+      "docs/Architecture.md",
+      "app/src/lib/oplogPersistence.ts",
+      "docs/adr/019-opt-in-precache-service-worker.md",
+      "docs/adr/049-the-service-worker-is-blocked-on-eviction-reach-not-the-precache.md",
+    ],
+  },
+  {
     slug: "engine-in-a-worker",
     headline: "We moved the engine off the main thread. The pixels stayed put.",
     title: "Moving a Rust engine into a Web Worker",
     deck: "How Image Horse moved its Rust engine into a worker without ever sending a frame across a thread boundary — and why the obvious way to do it is impossible.",
     description:
       "The Rust engine behind Image Horse now runs in a Web Worker. Heavy operations blocked the UI for 129–137 ms; they block it for none. Here is what it took.",
-    published: "2026-08-13",
+    published: "2026-09-18",
     version: "v8.32",
     tag: "engineering",
     ogImage: "/og/blog/engine-in-a-worker.png",
@@ -108,17 +129,16 @@ export const postFor = (slug: string): Post | undefined => POSTS.find((p) => p.s
 /** `/blog/<slug>` — the one place the URL shape is written down. */
 export const postPath = (post: Post) => `/blog/${post.slug}`;
 
-/** Display form: "13 August 2026".
+/** Display form: "September 18th, 2026".
  *
  *  Parsed off the string rather than through `new Date(iso)`, which reads a
  *  bare ISO date as UTC midnight and renders it in the reader's local zone —
  *  so anyone west of Greenwich sees a post published a day early.
  *
- *  This is deliberately the same shape and the same technique as `fmtDate` in
- *  pages/Trail.tsx, so a date on /blog and a date on /trail-log cannot read
- *  differently. It is duplicated rather than extracted because there are two
- *  of them; if a third appears, that is the moment to lift all three into one
- *  module rather than now. */
+ *  Chris asked for this exact shape (month, ordinal day, year) on 2026-09-22,
+ *  which is deliberately NOT the shape `fmtDate` in pages/Trail.tsx uses
+ *  ("13 August 2026") — the two used to match on purpose; they no longer do,
+ *  and that is a decision, not drift. */
 const MONTHS_FULL = [
   "January",
   "February",
@@ -134,7 +154,24 @@ const MONTHS_FULL = [
   "December",
 ];
 
+/** "18" → "18th". English ordinal suffix: everything in 11–13 is "th"
+ *  regardless of its last digit (the rule the mod-10 switch alone gets
+ *  wrong — 11 is not "11st"). */
+const ordinal = (n: number) => {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+};
+
 export const fmtPostDate = (iso: string) => {
   const [y, m, d] = iso.split("-");
-  return `${parseInt(d, 10)} ${MONTHS_FULL[parseInt(m, 10) - 1]} ${y}`;
+  return `${MONTHS_FULL[parseInt(m, 10) - 1]} ${ordinal(parseInt(d, 10))}, ${y}`;
 };

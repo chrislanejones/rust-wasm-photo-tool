@@ -21,6 +21,9 @@ export const defaultToolSettings: ToolSettings = {
   eraserSize: 24,
   eraserOpacity: 100,
   eraserHardness: 70,
+  maskBrushSize: 48,
+  maskFeather: 30, // engine hardness 0.7 — a soft skirt by default, like PS
+
   fontSize: 24,
   // The embedded face, and its CSS twin. `""` is what every text annotation
   // written before v8.76 means, so this default is also the migration.

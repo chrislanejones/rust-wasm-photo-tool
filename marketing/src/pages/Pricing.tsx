@@ -1,26 +1,27 @@
 import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
-import { CrownIcon, LayersIcon, UserCheckIcon, UserXIcon } from "../components/Icons";
 import { EDITOR_URL, external } from "../config";
 
-type Tier = "all" | "demo" | "free" | "pro";
+/* /pricing — ported from the Pricing v2 design.
+ *
+ * The tier limits below are the ones app/src/lib/tiers.ts enforces. The design
+ * file was written from this page and that file, so a number that changes there
+ * has to change here too; nothing reads it automatically.
+ */
 
-const FILTERS = [
-  { key: "all", label: "All", Icon: LayersIcon },
-  { key: "demo", label: "Logged out", Icon: UserXIcon },
-  { key: "free", label: "Logged in", Icon: UserCheckIcon },
-  { key: "pro", label: "Pro", Icon: CrownIcon },
-] as const;
+type TierKey = "demo" | "free" | "pro";
+type Tier = "all" | TierKey;
 
 interface Card {
-  key: Exclude<Tier, "all">;
+  key: TierKey;
   name: string;
   tag: string;
-  tagKind: "local" | "server";
+  /** The tag says whether this tier costs us a server. */
+  server: boolean;
   price: string;
   unit: string;
-  perks: React.ReactNode[];
+  perks: string[];
   cta: string;
   lead?: boolean;
 }
@@ -29,24 +30,30 @@ const CARDS: Card[] = [
   {
     key: "demo",
     name: "Demo",
-    tag: "anonymous",
-    tagKind: "local",
+    tag: "no account",
+    server: false,
     price: "$0",
     unit: "forever",
-    perks: ["All WASM tools", "8 layers per image", "12 image gallery", "Session-only", "No signup"],
+    perks: [
+      "Every editing tool",
+      "8 layers per image",
+      "12-photo gallery",
+      "Edits kept in this browser",
+      "No signup",
+    ],
     cta: "Try it now",
   },
   {
     key: "free",
     name: "Free",
-    tag: "logged in",
-    tagKind: "local",
+    tag: "signed in",
+    server: false,
     price: "$0",
     unit: "per month",
     perks: [
-      "Edit sync to the cloud",
-      "Originals stay on-device",
-      "24 images",
+      "A copy of your edits in the cloud",
+      "Originals stay on your device",
+      "24-photo gallery",
       "100 MB of cloud storage",
       "8 layers per image",
     ],
@@ -56,172 +63,171 @@ const CARDS: Card[] = [
     key: "pro",
     name: "Pro",
     tag: "$10 / month",
-    tagKind: "server",
+    server: true,
     price: "$10",
     unit: "per month",
     perks: [
-      <>Cloud originals — 5&nbsp;GB</>,
+      "5 GB of cloud storage",
       "16 layers per image",
       "Background and object removal",
       "Read text out of an image",
-      "50 AI passes a day",
-      "100 photos",
+      "50 AI passes a day, 300 a month",
+      "100-photo gallery",
     ],
     cta: "Start Pro",
     lead: true,
   },
 ];
 
-type Cell = { kind: "yes" } | { kind: "no" } | { kind: "num"; text: React.ReactNode };
-const yes: Cell = { kind: "yes" };
-const no: Cell = { kind: "no" };
-const num = (text: React.ReactNode): Cell => ({ kind: "num", text });
+const Y = "yes";
+const N = "—";
 
 interface Row {
-  feature: React.ReactNode;
-  cells: [Cell, Cell, Cell];
+  feature: string;
+  sub?: string;
+  cells: [string, string, string];
 }
 
-interface Group {
-  name: string;
-  rows: Row[];
-}
+const row = (feature: string, cells: [string, string, string], sub?: string): Row => ({
+  feature,
+  cells,
+  sub,
+});
 
-const sub = (label: string, note: string) => (
-  <>
-    {label} <span className="spec__sub">{note}</span>
-  </>
-);
-
-const MATRIX: Group[] = [
+const MATRIX: { name: string; rows: Row[] }[] = [
   {
-    name: "Editing tools — WASM, zero server cost",
+    name: "Editing tools — on your machine, free on every tier",
     rows: [
-      { feature: "Clone stamp", cells: [yes, yes, yes] },
-      { feature: "Paint / brush", cells: [yes, yes, yes] },
-      { feature: sub("Stroke stabilizer", "paint, eraser, blur, redact"), cells: [yes, yes, yes] },
-      { feature: "Arrows, shapes, text, emoji", cells: [yes, yes, yes] },
-      { feature: sub("Bézier pen", "re-editable paths"), cells: [yes, yes, yes] },
-      { feature: sub("Selection", "wand, lasso, color range, edge-aware"), cells: [yes, yes, yes] },
-      { feature: sub("Perspective, distort, skew", "shapes, text and paths"), cells: [yes, yes, yes] },
-      { feature: "Blur, pixelate and black-box redaction", cells: [yes, yes, yes] },
-      { feature: sub("Magic eraser", "PatchMatch, on your machine"), cells: [yes, yes, yes] },
-      { feature: "Brightness / contrast", cells: [yes, yes, yes] },
-      { feature: sub("Levels", "against a live histogram"), cells: [yes, yes, yes] },
-      { feature: sub("Color presets", "one click, one undo step"), cells: [yes, yes, yes] },
-      { feature: "Crop / resize", cells: [yes, yes, yes] },
-      {
-        feature: sub("Layers", "client-side stack"),
-        cells: [num("8 per image"), num("8 per image"), num("16 per image")],
-      },
-      { feature: "Undo / redo", cells: [yes, yes, yes] },
-      { feature: "Export PNG · JPEG · WebP · AVIF", cells: [yes, yes, yes] },
-      { feature: sub("OpenRaster export and import", "layers intact, opens in Krita"), cells: [yes, yes, yes] },
-      { feature: sub("Batch", "logo, text, rename, AI rename — all local"), cells: [yes, yes, yes] },
+      row("Clone stamp", [Y, Y, Y]),
+      row("Paint / brush", [Y, Y, Y]),
+      row("Stroke stabilizer", [Y, Y, Y], "paint, eraser, blur, redact"),
+      row("Arrows, shapes, text, emoji", [Y, Y, Y]),
+      row("Bézier pen", [Y, Y, Y], "re-editable paths"),
+      row("Selection", [Y, Y, Y], "wand, lasso, color range, edge-aware"),
+      row("Perspective, distort, skew", [Y, Y, Y], "shapes, text and paths"),
+      row("Blur, pixelate and black-box redaction", [Y, Y, Y]),
+      row("Magic eraser", [Y, Y, Y], "PatchMatch, on your machine"),
+      row("Brightness / contrast", [Y, Y, Y]),
+      row("Levels", [Y, Y, Y], "against a live histogram"),
+      row("Color presets", [Y, Y, Y], "one click, one undo step"),
+      row("Crop / resize", [Y, Y, Y]),
+      row("Layers", ["8 per image", "8 per image", "16 per image"], "client-side stack"),
+      row("Undo / redo", [Y, Y, Y]),
+      row("Export PNG · JPEG · WebP · AVIF", [Y, Y, Y]),
+      row("OpenRaster export and import", [Y, Y, Y], "layers intact, opens in Krita"),
+      row("Batch", [Y, Y, Y], "logo, text, rename, AI rename — all local"),
     ],
   },
   {
     name: "Gallery and storage",
     rows: [
-      { feature: "Gallery", cells: [num("12 images"), num("24 images"), num("100 images")] },
-      { feature: "Auto compress all", cells: [yes, yes, yes] },
-      { feature: sub("Edit persistence", "saved across sessions"), cells: [no, yes, yes] },
-      {
-        feature: "Original files",
-        cells: [num("local"), num("on your device"), num("cloud")],
-      },
-      { feature: "Cloud storage quota", cells: [no, num("100 MB"), num("5 GB")] },
+      row("Gallery", ["12 images", "24 images", "100 images"]),
+      row("Auto compress all", [Y, Y, Y]),
+      row("Edit persistence", [Y, Y, Y], "kept in this browser between visits"),
+      row("Off-device copy of your edits", [N, Y, Y], "once you sign in"),
+      row("Original files", ["on your device", "on your device", "on your device"]),
+      row("Cloud storage quota", [N, "100 MB", "5 GB"]),
     ],
   },
   {
-    name: "Projects and data — Convex",
+    name: "Your data in the cloud",
     rows: [
-      { feature: "Projects", cells: [no, yes, yes] },
-      { feature: "Persistent history", cells: [no, yes, yes] },
-      { feature: "Annotations sync", cells: [no, yes, yes] },
-      { feature: "Share links", cells: [no, yes, yes] },
+      row("Persistent history", [N, Y, Y]),
+      row("Annotations sync", [N, Y, Y]),
+      row("Share links", [N, Y, Y]),
     ],
   },
   {
-    name: "AI features — Replicate, billed to us",
+    name: "AI features — run on a server, billed to us",
     rows: [
-      { feature: sub("Background removal", "rembg"), cells: [no, no, yes] },
-      { feature: sub("Object removal", "SD Inpaint"), cells: [no, no, yes] },
-      { feature: sub("Read text out of an image", "OCR"), cells: [no, no, yes] },
-      { feature: sub("Daily AI passes", "resets every 24 hours"), cells: [no, no, num("50 a day")] },
+      row("Background removal", [N, N, Y], "rembg"),
+      row("Object removal", [N, N, Y], "LaMa"),
+      row("Read text out of an image", [N, N, Y], "OCR"),
+      row("Daily AI passes", [N, N, "50 a day"], "resets every 24 hours"),
+      row("Monthly AI passes", [N, N, "300 a month"], "resets every 30 days"),
     ],
   },
 ];
 
-/** Column index per tier; column 0 is the feature name, which never dims. */
-const COL: Record<Exclude<Tier, "all">, number> = { demo: 1, free: 2, pro: 3 };
+const TILES: { key: Tier; label: string; count: string }[] = [
+  { key: "all", label: "All", count: "3 tiers" },
+  { key: "demo", label: "Logged out", count: "Demo" },
+  { key: "free", label: "Logged in", count: "Free" },
+  { key: "pro", label: "Pro", count: "$10 / month" },
+];
+
+const HEADS: { key: TierKey; label: string }[] = [
+  { key: "demo", label: "Demo" },
+  { key: "free", label: "Free" },
+  { key: "pro", label: "Pro" },
+];
+
+const cellKind = (t: string) => (t === Y ? "yes" : t === N ? "no" : "val");
 
 export default function Pricing() {
-  // Dims rather than hides. The matrix's whole job is comparison — hiding the
-  // other two columns would leave you reading a single column and calling it a
-  // comparison. Dimming keeps them there to be compared against.
+  // Dims rather than hides. The matrix is a comparison, and hiding the other
+  // two columns would leave one column to compare against nothing.
   const [tier, setTier] = useState<Tier>("all");
-  const dim = (col: number) => (tier !== "all" && col !== 0 && col !== COL[tier] ? " is-dim" : "");
-
-  const cell = (c: Cell, col: number) => {
-    const cls = `${c.kind}${dim(col)}`;
-    if (c.kind === "yes") return <td className={cls}>yes</td>;
-    if (c.kind === "no") return <td className={cls}>—</td>;
-    return <td className={cls}>{c.text}</td>;
-  };
+  const dimCol = (k: TierKey) => (tier !== "all" && tier !== k ? " is-dim" : "");
 
   return (
     <>
-      <main id="main">
-        {/* The figure is the argument, paired with a worded headline — a bare
-            number as the only hero text says nothing on its own. */}
-        <header className="stat-hero">
-          <p className="stat-hero__figure tnum">$0</p>
-          <h1 className="stat-hero__headline">Every editing tool. Every tier. Forever.</h1>
-          <p className="lede">
-            Not a trial and not a loss-leader. The editor is Rust compiled to WebAssembly, so it runs
-            on your CPU and costs us nothing per user. There is no version of this where we charge
-            you for a crop.
-          </p>
-          <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-            Open the beta
-          </a>
+      <main id="main" className="pricing">
+        <header className="pr-hero">
+          <div className="pr-hero__lead">
+            <p className="pr-hero__eyebrow">Pricing · three tiers, one price</p>
+            <p className="pr-hero__figure">$0</p>
+            <h1 className="pr-hero__title">Every editing tool. Every tier. Forever.</h1>
+          </div>
+          <div className="pr-hero__aside">
+            <p className="pr-hero__deck">
+              Not a trial and not a loss-leader. The editor runs on your own computer, so it costs us
+              nothing per person. There is no version of this where we charge you for a crop.
+            </p>
+            <div className="pr-hero__actions">
+              <a className="cta cta--fill pr-btn" href={EDITOR_URL} {...external}>
+                Open the editor
+              </a>
+              <a className="cta cta--outline pr-btn" href="#matrix">
+                Compare the tiers
+              </a>
+            </div>
+          </div>
         </header>
 
-        <hr className="rule-thick" />
-
-        <section className="tiers">
-          <header className="head-hang">
-            <h2 className="section__title">Three tiers</h2>
-            <p className="lede">
-              The gates are not on the tools. They sit where our own bill lands: Convex writes, cloud
-              storage, and Replicate inference.
-            </p>
-          </header>
-
-          <div className="tier-grid">
+        <section className="pr-tiers" aria-label="Tiers">
+          <p className="pr-tiers__intro">
+            The gates are not on the tools. They sit where our own bill lands: keeping a copy of your
+            edits, cloud storage, and the AI jobs we pay a server to run.
+          </p>
+          <div className="pr-tiers__grid">
             {CARDS.map((c) => (
               <article
                 key={c.key}
-                className={`tier${c.lead ? " tier--lead" : ""}${
+                className={`pr-card${c.lead ? " pr-card--lead" : ""}${
                   tier !== "all" && tier !== c.key ? " is-dim" : ""
                 }`}
               >
-                <div className="tier__head">
-                  <h3 className="tier__name">{c.name}</h3>
-                  <span className={`tag tag--${c.tagKind}`}>{c.tag}</span>
+                <div className="pr-card__head">
+                  <h2 className="pr-card__name">{c.name}</h2>
+                  <span className={`pr-card__tag${c.server ? " pr-card__tag--server" : ""}`}>
+                    {c.tag}
+                  </span>
                 </div>
-                <p className="tier__price tnum">
-                  {c.price}
-                  <span className="tier__unit">{c.unit}</span>
+                <p className="pr-card__price">
+                  <span className="pr-card__amount">{c.price}</span>
+                  <span className="pr-card__unit">{c.unit}</span>
                 </p>
-                <ul className="tier__list">
-                  {c.perks.map((p, i) => (
-                    <li key={i}>{p}</li>
+                <ul className="pr-card__perks">
+                  {c.perks.map((p) => (
+                    <li key={p}>
+                      <span className="pr-card__dot" aria-hidden="true" />
+                      <span>{p}</span>
+                    </li>
                   ))}
                 </ul>
                 <a
-                  className={`cta ${c.lead ? "cta--fill" : "cta--outline"} tier__cta`}
+                  className={`cta ${c.lead ? "cta--fill" : "cta--outline"} pr-btn pr-card__cta`}
                   href={EDITOR_URL}
                   {...external}
                 >
@@ -232,63 +238,65 @@ export default function Pricing() {
           </div>
         </section>
 
-        <section className="matrix">
-          <header className="head-hang">
-            <h2 className="section__title section__title--sm">What each tier actually gets</h2>
-          </header>
-
-          {/* The same segmented group and the same icons as the Architecture
-              tier filter, so the tier vocabulary means one thing site-wide. */}
-          <div className="graph__scroll spec__filter">
-            <div className="graph__group" role="group" aria-label="Focus one tier in the matrix">
-              {FILTERS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  className="seg seg--where"
-                  type="button"
-                  aria-pressed={tier === key}
-                  onClick={() => setTier(key)}
-                >
-                  <Icon className="seg__icon" />
-                  <span className="seg__label">{label}</span>
-                </button>
-              ))}
-            </div>
+        <section id="matrix" className="pr-matrix" aria-label="What each tier gets">
+          <div className="pr-matrix__head">
+            <h2 className="pr-matrix__title">What each tier actually gets</h2>
+            <p className="pr-matrix__deck">
+              Editing runs on your machine on every tier. Only the server-backed rows differ. Pick a
+              tier to bring its column forward.
+            </p>
           </div>
 
-          <div className="matrix__scroll">
-            <table className="spec spec--matrix">
-              <caption className="spec__caption">
-                Editing runs locally on every tier. Only the server-backed rows differ.
-              </caption>
+          <div role="group" aria-label="Focus one tier" className="pr-matrix__tiles">
+            {TILES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={tier === t.key}
+                className={`pr-tile${tier === t.key ? " is-on" : ""}`}
+                onClick={() => setTier(t.key)}
+              >
+                <span className="pr-tile__label">{t.label}</span>
+                <span className="pr-tile__count">{t.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="pr-matrix__scroll">
+            <table className="pr-table">
               <thead>
                 <tr>
-                  <th scope="col">Feature</th>
-                  <th scope="col" className={dim(1).trim()}>
-                    Demo
+                  <th scope="col" className="pr-table__feature-head">
+                    Feature
                   </th>
-                  <th scope="col" className={dim(2).trim()}>
-                    Free
-                  </th>
-                  <th scope="col" className={dim(3).trim()}>
-                    Pro
-                  </th>
+                  {HEADS.map((h) => (
+                    <th key={h.key} scope="col" className={`pr-table__tier${dimCol(h.key)}`}>
+                      {h.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {MATRIX.map((g) => (
                   <Fragment key={g.name}>
-                    {/* a group header spans all four columns — it has no tier to dim */}
-                    <tr className="spec__group">
-                      <th scope="rowgroup" colSpan={4}>
+                    <tr>
+                      <th scope="rowgroup" colSpan={4} className="pr-table__group">
                         {g.name}
                       </th>
                     </tr>
-                    {g.rows.map((r, i) => (
-                      <tr key={i}>
-                        <th scope="row">{r.feature}</th>
-                        {r.cells.map((c, ci) => (
-                          <Fragment key={ci}>{cell(c, ci + 1)}</Fragment>
+                    {g.rows.map((r) => (
+                      <tr key={r.feature} className="pr-table__row">
+                        <th scope="row" className="pr-table__feature">
+                          {r.feature}
+                          {r.sub && <span className="pr-table__sub">{r.sub}</span>}
+                        </th>
+                        {r.cells.map((c, i) => (
+                          <td
+                            key={HEADS[i].key}
+                            className={`pr-table__cell pr-table__cell--${cellKind(c)}${dimCol(HEADS[i].key)}`}
+                          >
+                            {c}
+                          </td>
                         ))}
                       </tr>
                     ))}
@@ -299,21 +307,24 @@ export default function Pricing() {
           </div>
         </section>
 
-        <section className="principle">
-          <h2 className="section__title section__title--sm">The principle</h2>
-          <p className="principle__body">
-            Demo mode costs us nothing, because WASM runs on your device. So there are no artificial
-            “sign in to use blur” gates on tools that never touch our servers. The gallery limit is
-            the honest nudge: edit a dozen photos, want to keep them, and that's the moment an
-            account is worth it. Our bill scales with paying users, not with drive-by traffic.
-          </p>
-          <Link className="cta cta--outline cta--lg" to="/architecture">
-            See where the boundary is
-          </Link>
+        <section className="pr-why">
+          <h2 className="pr-why__title">Why the free tier is really free</h2>
+          <div className="pr-why__body">
+            <p className="pr-why__text">
+              The editor runs on your device, so a signed-out visitor costs us nothing. That is why
+              there are no &ldquo;sign in to use blur&rdquo; gates on tools that never touch a server.
+              The gallery limit is the honest nudge: edit a dozen photos, want to keep them, and that
+              is the moment an account is worth having. Our bill scales with paying users, not with
+              drive-by traffic.
+            </p>
+            <Link className="cta cta--outline pr-btn pr-why__link" to="/architecture">
+              See where the boundary is
+            </Link>
+          </div>
         </section>
       </main>
 
-      <Footer line="We charge for our bills, not for your CPU." />
+      <Footer line="Free where it runs on your machine. Paid where it runs on ours." />
     </>
   );
 }

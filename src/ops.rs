@@ -165,6 +165,28 @@ use serde::{Deserialize, Serialize};
 /// `""` is defined by `fonts::DEFAULT_FONT_ID`'s contract to mean the embedded
 /// face. That is why this step needs no promoting function — but it is a
 /// property to check, not to assume, the next time a field is added.
+///
+/// ## v8.81 fixed a text-settings loss and DELIBERATELY DID NOT BUMP THIS
+///
+/// ADR-060. `Op::TextEdit` / `Op::ShapeEdit` used to REPLACE the annotation
+/// they name, which reset the four `#[serde(skip)]` axes to their decode
+/// defaults — so the typeface and the box a user set were erased by the next
+/// edit, and only on reload, because only replay runs `apply`. Applying those
+/// two ops now MERGES (see `TextParams::carry_skipped_from`).
+///
+/// **No version number was taken, and that is the decision, not an oversight.**
+/// A bump is for a change in what the BYTES are; this is a change in what the
+/// engine does with bytes it was already reading, and the wire layout is
+/// untouched — a v8 writer and this reader still agree frame for frame. Taking
+/// a number here would have cost every existing log (`decode_op` accepts
+/// `2..=OP_FORMAT_VERSION`, so v9 bytes are unreadable by every shipped build,
+/// and PR #187 needs v9 for a change that genuinely IS new bytes).
+///
+/// The honest cost is that v8 bytes now replay differently than they did under
+/// v8.80. That is intended and it is the repair: the old replay lost data the
+/// log demonstrably contained, so every existing log comes back MORE like what
+/// its user saw, never less. Pinned on real captured production bytes by
+/// `tests/oplog_v8_text_settings_replay.rs` and `tests/oplog_v7_v8_fixture_resume.rs`.
 pub const OP_FORMAT_VERSION: u8 = 8;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
@@ -405,6 +427,41 @@ impl TextParams {
             font_id: a.font_id.clone(),
         }
     }
+
+    /// Carry the four `#[serde(skip)]` fields over from the annotation this
+    /// payload is about to replace — ADR-060.
+    ///
+    /// ⚠️ THIS IS WHAT MAKES `Op::TextEdit` NON-DESTRUCTIVE, and it is not a
+    /// nicety. `wrap_width`, `box_height`, `perspective` and `font_id` are
+    /// `#[serde(skip)]` (see the fields' comments — they have to be, or every
+    /// `TextAdd`/`TextEdit` payload already on a user's disk mis-decodes), so
+    /// an encoded `TextEdit` **physically cannot carry them**. What comes back
+    /// out of `postcard` is therefore not "the user chose the default" — it is
+    /// *no information at all*, and a replace that honored it silently reset
+    /// the typeface and the box on every text edit.
+    ///
+    /// Measured on a captured production log (`tests/fixtures/oplog/`): a
+    /// `TextFont` then a `TextWrap` established `liberation-serif` / 299 px,
+    /// and the next `TextEdit` put them back to `""` / 0. That is the reload
+    /// bug this method fixes, and the same bytes replay correctly with it.
+    ///
+    /// Resetting a setting to its default is still representable — that is the
+    /// property that makes the absent value safe to ignore here.
+    /// `annotation_sync_ops` emits `TextFont { font_id: "" }` /
+    /// `TextWrap { wrap_width: 0 }` whenever the live value differs from the
+    /// log's, *including* when the new value is the default. So every genuine
+    /// reset rides its own op and nothing depends on `TextEdit` clearing
+    /// anything.
+    /// `prev` is `&mut` and `font_id` is MOVED out of it rather than cloned:
+    /// the only caller overwrites `prev` with `self` on the next line, so the
+    /// emptied string is never observable, and replaying a long log stops
+    /// allocating one `String` per `TextEdit`.
+    fn carry_skipped_from(&mut self, prev: &mut TextParams) {
+        self.wrap_width = prev.wrap_width;
+        self.box_height = prev.box_height;
+        self.perspective = prev.perspective;
+        self.font_id = std::mem::take(&mut prev.font_id);
+    }
 }
 
 impl ShapeParams {
@@ -473,6 +530,24 @@ impl ShapeParams {
             fill_block: self.fill_block,
             perspective: crate::perspective::NormQuad(self.perspective),
         }
+    }
+
+    /// The shape twin of [`TextParams::carry_skipped_from`] — ADR-060. Read
+    /// that doc comment; it applies word for word, with `sloppiness` and
+    /// `perspective` as the two `#[serde(skip)]` fields an encoded
+    /// `Op::ShapeEdit` physically cannot carry.
+    ///
+    /// It is fixed here at the same time as the text one deliberately. The
+    /// comment on `annotation_sync_ops` says the four skipped axes are
+    /// "handled identically below; keep them that way, because one of them
+    /// being forgotten is the failure this comment exists to prevent" — and a
+    /// merge rule that held for text and not for shapes would be exactly that
+    /// failure, waiting for the first log that edits a sketchy shape after
+    /// drawing it. No such log has shipped yet only because `ShapeSloppiness`
+    /// is new; the defect is the same age as `ShapeEdit`.
+    fn carry_skipped_from(&mut self, prev: &ShapeParams) {
+        self.sloppiness = prev.sloppiness;
+        self.perspective = prev.perspective;
     }
 }
 
@@ -1568,7 +1643,13 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         Op::TextEdit(p) => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == p.id) {
-                *t = p.clone();
+                // MERGE, not replace — ADR-060. The payload cannot carry the
+                // four `#[serde(skip)]` axes, so the annotation keeps its own;
+                // `TextParams::carry_skipped_from` is where the whole argument
+                // lives.
+                let mut next = p.clone();
+                next.carry_skipped_from(t);
+                *t = next;
             }
         }
         Op::TextRemove { id } => {
@@ -1628,7 +1709,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         Op::ShapeEdit(p) => {
             if let Some(s) = doc.shapes.iter_mut().find(|s| s.id == p.id) {
-                *s = p.clone();
+                // MERGE, not replace — ADR-060, same rule as `TextEdit` above
+                // and for the same reason. See `ShapeParams::carry_skipped_from`.
+                let mut next = p.clone();
+                next.carry_skipped_from(s);
+                *s = next;
             }
         }
         Op::ShapeRemove { id } => {

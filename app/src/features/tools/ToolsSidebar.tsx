@@ -42,6 +42,7 @@ import { AISettings } from "./settings/AISettings";
 import type { AIResultPixels } from "@/hooks/useAIJob";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
+import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
 interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
@@ -119,10 +120,6 @@ interface ToolsSidebarProps {
   quality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
-  onToggleCompare: () => void;
-  /** An immutable upload baseline exists for the active photo, so A/B compare
-   *  has something to show. See ResizeSettings' `compareDisabled`. */
-  hasCompareBaseline: boolean;
   compressProgress: { completed: number; total: number };
   onApplyCrop?: () => void;
   /** Allows the Crop tool ratio buttons to drop a centered crop selection
@@ -215,8 +212,6 @@ export function ToolsSidebar({
   quality,
   onQualityChange,
   onQualityCommit,
-  onToggleCompare,
-  hasCompareBaseline,
   compressProgress,
   onApplyCrop,
   onSetCropSelection,
@@ -295,10 +290,9 @@ export function ToolsSidebar({
         embedded
           ? // Compact master-bar content box: flush below the chrome (top 56 =
             // top-2 + 48px chrome), filling to the status bar.
-            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
-          : "group fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col"
+            MASTER_BAR_CONTENT_BOX
+          : "group fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col shadow-panel"
       }
-      style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
       {/* Hover the panel and a close appears in its top-left; the top bar's
           Tools toggle brings it back. Not in the docked master bar, whose
@@ -332,7 +326,7 @@ export function ToolsSidebar({
       <motion.div
         layout
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
-        // (Apply Compression & Resize, Show A/B Compare) sits the same 6px off
+        // (Apply Compression & Resize) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
         // the two chrome edges agree instead of each picking a number
         // (Chris, 2026-09-11 — "follow the reference of top bar, button to
@@ -358,8 +352,6 @@ export function ToolsSidebar({
             onResizeOnly={onResizeOnly}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
-            onToggleCompare={onToggleCompare}
-            hasCompareBaseline={hasCompareBaseline}
             compressProgress={compressProgress}
           />
         )}

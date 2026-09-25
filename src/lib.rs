@@ -40,6 +40,7 @@ mod presets;
 // bytes are identical either way.
 pub mod perspective;
 mod selection;
+mod selection_refine;
 mod settings;
 mod stabilizer;
 mod stamp;
@@ -464,11 +465,16 @@ pub struct ImageHorseTool {
     selection: Option<Vec<bool>>,
     /// How the NEXT tool-produced selection mask combines with the current
     /// selection: 0 = replace (default / historical behavior), 1 = add
-    /// (union), 2 = subtract. Set by JS from the Shift/Alt modifier when the
-    /// `ih_selection_bool` flag is on; the producers (wand/edge/color-range and
-    /// the lasso at close) route through `apply_produced_selection`. Stays 0
-    /// when the flag is off, so nothing about the shipped behavior changes.
+    /// (union), 2 = subtract, 3 = intersect. Set by JS from the panel's
+    /// Combine group or the Shift/Alt modifier; the producers (wand/edge/
+    /// color-range and the lasso at close) route through
+    /// `apply_produced_selection`.
     selection_combine: u8,
+    /// The last click-once selection, kept so a tolerance change can re-run
+    /// it in place (`selection_retune`). See `selection::SelectionRetune`.
+    selection_retune: Option<crate::selection::SelectionRetune>,
+    /// The Refine sliders' preview copy — only feeds the readout.
+    refine_preview: Option<Vec<bool>>,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
     /// RNG seeded and deterministic (never reads system time/entropy) while
@@ -895,6 +901,8 @@ impl ImageHorseTool {
             editing_text_id: None,
             selection: None,
             selection_combine: 0,
+            selection_retune: None,
+            refine_preview: None,
             #[cfg(feature = "patchmatch")]
             patchmatch_seed_counter: 0,
             lasso: None,
@@ -4581,9 +4589,40 @@ mod layer_persistence_tests {
             1.0,
         );
         t.restore_text_annotation(
-            "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi",
+            16.0,
+            0,
+            0,
+            0,
+            false,
+            2,
+            2,
+            0.0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
             // shadow params (box, text, r, g, b, a, dx, dy, blur)
-            false, false, 0, 0, 0, 0, 0, 0, 0, "",
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            // font_id, then the box axes and the quad (ADR-060). An empty
+            // slice is the "no quad recorded" case every pre-v8.81 archive
+            // hits.
+            0,
+            0,
+            &[],
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

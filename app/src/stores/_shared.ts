@@ -76,3 +76,26 @@ export function validatedRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+/** One validator per persisted field: given whatever came back from storage
+ *  (or from another device) and the value to fall back to, return a value
+ *  this build can hold. */
+export type FieldValidators<T> = { [K in keyof T]: (raw: unknown, fallback: T[K]) => T[K] };
+
+/** Run a validator table over a blob. Every field in the table is produced —
+ *  from the blob when it passes, from `current` when it does not — and nothing
+ *  outside the table is read. This is the one place a persisted slice is
+ *  checked, shared by a store's `merge` (rehydrate from IndexedDB) and the
+ *  sync layer's document for that store (lib/sync/docs.ts), so a field's rule
+ *  is written once rather than once per reader. */
+export function validateFields<T extends object>(
+  validators: FieldValidators<T>,
+  raw: Record<string, unknown>,
+  current: T,
+): T {
+  const out = {} as T;
+  for (const key of Object.keys(validators) as (keyof T)[]) {
+    out[key] = validators[key](raw[key as string], current[key]);
+  }
+  return out;
+}

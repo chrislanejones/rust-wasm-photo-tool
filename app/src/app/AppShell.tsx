@@ -46,7 +46,7 @@ import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
-import { ADMIN_EMAIL } from "@/lib/superuser";
+import { useSession, effectiveMode } from "@/hooks/useEntitlement";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
@@ -55,7 +55,7 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { MultiTabScreen } from "@/components/MultiTabScreen";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
-import { CONFIRM_DESTRUCTIVE } from "@/lib/styles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useTabClaim } from "@/hooks/useTabClaim";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
@@ -117,6 +117,8 @@ import {
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
+import { useExportFileName } from "@/hooks/useExportFileName";
+import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
@@ -150,9 +152,7 @@ import {
   DialogDescription,
   DialogBody,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ShareButton } from "@/components/ShareButton";
 import {
@@ -424,25 +424,32 @@ export function AppShell() {
     setAuthResolved(true);
   }, [setUserMode, setAuthResolved]);
 
-  // Tier override (set from the Super User settings tab). When set, it wins over
-  // the Clerk-derived mode so the No Login / Logged In / Paid versions can be
-  // tested without real auth. Only the admin can reach the tab that sets it.
+  // ── Who you are, and what you may see (ADR: role, not a fourth tier) ──────
+  //
+  // `session` comes from the SERVER (`users.me` → convex/entitlement.ts): the
+  // role from ADMIN_EMAILS, and the entitlement, in which an admin is entitled
+  // to paid WITHOUT a tier grant. The browser no longer decides either; it used
+  // to compare the signed-in email to a hardcoded address.
+  //
+  // The Super User preview may only TAKE AWAY (`effectiveMode` → `previewOf`),
+  // so the UI can never offer what the server would refuse — the mismatch that
+  // used to happen when the override raised a free account to "paid".
+  const session = useSession();
   const devTierOverride = useUIStore((s) => s.devTierOverride);
   const setDevTierOverride = useUIStore((s) => s.setDevTierOverride);
-  const effectiveUserMode = devTierOverride ?? userMode;
+  // While Convex is still answering, fall back to the Clerk-derived mode so the
+  // first paint is not "signed out" for someone who is signed in.
+  const effectiveUserMode = session.ready
+    ? effectiveMode(session, devTierOverride)
+    : (devTierOverride ?? userMode);
 
-  // Super User settings tab — only the admin account sees it. The tier override
-  // is client-side UI gating only (the real tier stays enforced server-side by
-  // Convex), so this is a convenience gate, not a security boundary.
-  const { user } = useUser();
-  const isSuperUser =
-    user?.primaryEmailAddress?.emailAddress?.toLowerCase() === ADMIN_EMAIL;
-  const superUser: SuperUserControls | null = isSuperUser
+  const superUser: SuperUserControls | null = session.role === "admin"
     ? {
         mode: effectiveUserMode,
         overridden: devTierOverride !== null,
         onSelect: (m) => setDevTierOverride(m),
         onReset: () => setDevTierOverride(null),
+        entitlement: session.entitlement,
       }
     : null;
 
@@ -929,10 +936,13 @@ export function AppShell() {
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
-        if (maskEditing) return toolSettings.brushSize / 2;
         if (brushMode === "blur") return toolSettings.blurSize / 2;
         if (brushMode === "erase") return toolSettings.eraserSize / 2;
         return toolSettings.brushSize / 2;
+      case "arrow":
+        // The Layers panel's mask brush — its own size, not the Paint brush's.
+        if (maskEditing) return toolSettings.maskBrushSize / 2;
+        return 0;
       case "crop":
         return 0;
       case "ai":
@@ -1136,6 +1146,7 @@ export function AppShell() {
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
+    handleExportAs,
   } = useCanvasActions({
     stamp,
     exportFormat,
@@ -1159,6 +1170,16 @@ export function AppShell() {
       canvasBgTransparent,
     }),
   });
+
+  const exportName = useExportFileName(
+    exportDialogOpen,
+    activePhotoId,
+    photos.find((p) => p.id === activePhotoId)?.name,
+  );
+  const downloadFromDialog = () => {
+    setExportDialogOpen(false);
+    void handleExportAs(exportName.stem());
+  };
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -1473,14 +1494,19 @@ export function AppShell() {
   });
 
   // Mask edit-mode handlers (wired into the Layers panel). Entering mask edit
-  // selects the layer + switches to the Paint brush so strokes hit the mask.
+  // selects the layer and turns on the panel's own mask brush — the user
+  // stays on the Layers panel; no tool switch.
   const { handleAddMask, handleToggleMaskEdit } = useMaskActions(stamp);
 
-  // Mask editing is a brush activity — drop it when leaving the Paint tool so
-  // the panel highlight and canvas routing don't get stuck on.
+  // Mask editing lives on the Layers panel — drop it when the lit sub-tool
+  // is anything else, so the panel toggle and canvas routing don't get stuck
+  // on. Sub-tool, not tool: Canvas Size and Guides share the `arrow` tool id
+  // but have no mask section, and a stale flag there would leave strokes
+  // silently scrubbing a mask under a panel that never says so.
+  const activeSubToolId = activeSubTool?.subTool.id;
   useEffect(() => {
-    if (activeTool !== "brush") setMaskEditing(false);
-  }, [activeTool]);
+    if (activeSubToolId !== "resize-layer") setMaskEditing(false);
+  }, [activeSubToolId]);
 
   // Move tool (the repurposed "arrow" slot): drag the active layer's content.
   const moveLayerTool = useMoveLayerTool({
@@ -2521,7 +2547,12 @@ export function AppShell() {
       const step = 5 * direction;
       const clamp = (v: number, lo: number, hi: number) =>
         Math.max(lo, Math.min(hi, v));
-      if (activeTool === "brush") {
+      if (maskEditing) {
+        // The Layers panel's mask brush — checked first because mask editing
+        // is a modal activity: while it is on, the brackets must size the
+        // brush that is actually painting. Range matches the panel's slider.
+        setToolSettings((p) => ({ ...p, maskBrushSize: clamp(p.maskBrushSize + step, 4, 200) }));
+      } else if (activeTool === "brush") {
         if (brushMode === "paint") {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
@@ -2550,7 +2581,7 @@ export function AppShell() {
         }
       }
     },
-    [activeTool, brushMode, stampSubMode, eraserMode, setToolSettings, setStampSettings, stamp],
+    [activeTool, brushMode, stampSubMode, eraserMode, maskEditing, setToolSettings, setStampSettings, stamp],
   );
 
   // Ctrl/Cmd+Shift+] / [ — send the active layer to the top / bottom of the
@@ -2631,6 +2662,11 @@ export function AppShell() {
   });
 
   const hasImage = stamp.state.ready;
+  // The top bar's Compare toggle: needs a loaded photo and its stored upload
+  // baseline, and is off in the Batch editor (`emoji`), where edits hit every
+  // photo at once and there is no single before/after. CompareSlider closes an
+  // open overlay when Batch opens.
+  const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
   const canUndo = stamp.state.undoCount > 0;
   const canRedo = stamp.state.redoCount > 0;
 
@@ -2826,96 +2862,55 @@ export function AppShell() {
           in components/UpdatePrompt.tsx. */}
       <UpdatePrompt />
 
-      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete all images?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={confirmDeleteAll}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete all
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteAllOpen}
+        onOpenChange={setDeleteAllOpen}
+        title="Delete all images?"
+        cancelLabel="Cancel"
+        confirmLabel="Delete all"
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={confirmDeleteAll}
+      >
+        This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
+      </ConfirmDialog>
 
       {/* Single-image delete confirm — per-image trashcan + right-click "Delete image". */}
-      <Dialog
+      <ConfirmDialog
         open={deletePhotoId !== null}
         onOpenChange={(o) => !o && setDeletePhotoId(null)}
+        title="Delete this image?"
+        cancelLabel="Cancel"
+        confirmLabel="Delete image"
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={() => {
+          const id = deletePhotoId;
+          setDeletePhotoId(null);
+          if (id) handleRemovePhoto(id);
+        }}
       >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this image?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              This removes the image and its edit history. This cannot be undone.
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={() => {
-                const id = deletePhotoId;
-                setDeletePhotoId(null);
-                if (id) handleRemovePhoto(id);
-              }}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete image
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        This removes the image and its edit history. This cannot be undone.
+      </ConfirmDialog>
 
       {/* Delete-selected confirm. */}
-      <Dialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
-            </DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              {selectedIds.size === 1
-                ? "This removes the selected image and its edit history. This cannot be undone."
-                : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
-            </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button size="large" className="flex-1">Cancel</Button>
-            </DialogClose>
-            <Button size="large"
-              onClick={() => {
-                setDeleteSelectedOpen(false);
-                handleDeleteSelected();
-              }}
-              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              {selectedIds.size === 1 ? "Delete image" : "Delete selected"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteSelectedOpen}
+        onOpenChange={setDeleteSelectedOpen}
+        title={selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
+        cancelLabel="Cancel"
+        confirmLabel={selectedIds.size === 1 ? "Delete image" : "Delete selected"}
+        confirmIcon={Trash2}
+        tone="destructive"
+        onConfirm={() => {
+          setDeleteSelectedOpen(false);
+          handleDeleteSelected();
+        }}
+      >
+        {selectedIds.size === 1
+          ? "This removes the selected image and its edit history. This cannot be undone."
+          : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
+      </ConfirmDialog>
 
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -2959,16 +2954,21 @@ export function AppShell() {
                 columns={2}
               />
             </div>
+
+            <ExportFileNameField
+              value={exportName.value}
+              defaultStem={exportName.defaultStem}
+              onChange={exportName.onChange}
+              ext={EXT[effectiveExportFormat]}
+              onSubmit={downloadFromDialog}
+            />
           </DialogBody>
 
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
               label={`Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleExport();
-              }}
+              onClick={downloadFromDialog}
             />
             <ShareButton
               exportPng={async () => {
@@ -3060,6 +3060,9 @@ export function AppShell() {
             onToggleHistory={() => setShowHistory((v) => !v)}
             onExport={handleExportClick}
             canExport={hasImage}
+            compareActive={compareActive}
+            canCompare={canCompare}
+            onToggleCompare={handleToggleCompare}
             winWidth={bp.width}
             drawerMode={bp.narrow}
             reduceMotion={prefs.reduceMotion}
@@ -3115,8 +3118,6 @@ export function AppShell() {
             quality={quality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
-            onToggleCompare={handleToggleCompare}
-            hasCompareBaseline={!!activeOriginalKey}
             compressProgress={compressProgress}
             onApplyCrop={drawingTools.applyCrop}
             onSetCropSelection={drawingTools.setCropSelection}

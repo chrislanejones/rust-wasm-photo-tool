@@ -1,11 +1,9 @@
 // Hand-maintained — features.ts is regenerated from docs/Features.md, this
-// isn't. Add an entry here whenever a new feature lands; the sidebar falls
-// back to a plain dot for anything unmapped rather than erroring.
+// isn't. Add an entry here whenever a new feature lands; a card falls back
+// to a plain dot for anything unmapped rather than erroring.
 
 import type { ElementType } from "react";
-import { CpuIcon } from "../components/Icons";
 import {
-  AppWindow,
   BadgeCheck,
   Stamp,
   Move,
@@ -32,8 +30,6 @@ import {
   History,
   Save,
   Sparkles,
-  LayoutGrid,
-  SquareStack,
   Hand,
   GitCompare,
   GalleryHorizontalEnd,
@@ -41,8 +37,6 @@ import {
   Upload,
   FileDown,
   Command,
-  Wrench,
-  Brain,
   SunMoon,
   Ruler,
   Database,
@@ -55,24 +49,31 @@ import {
   Copy,
   Magnet,
   CircleSmall,
+  SquareDashedMousePointer,
+  Grid3x3,
+  Aperture,
+  SwatchBook,
+  Frame,
+  Layers,
+  FileArchive,
+  ScrollText,
+  Eraser,
 } from "lucide-react";
 
-export const GROUP_ICONS: Record<string, ElementType> = {
-  // Same glyph as Home's "Your machine" tab — one meaning, one icon, site-wide.
-  "Image Processing (Rust/WASM)": CpuIcon,
-  "UI (React)": AppWindow,
-};
-
-export const FEATURE_ICONS: Record<string, ElementType> = {
+const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
   "Red Stamps": BadgeCheck,
-  "Edit group (Crop · Transform · Color Picker · Resize Layer · Canvas Size · Guides)": Move,
+  "Edit group (Crop · Transform · Perspective · Color Picker · Layers · Canvas Size · Guides · Rulers and Grid)": Move,
+  "Select group": SquareDashedMousePointer,
+  "Placement grid": Grid3x3,
   "Text Shadow": Layers2,
   "Security tab": ShieldCheck,
   "Responsive / snapped windows": MonitorSmartphone,
   "Keyboard accessibility": Keyboard,
   "Resize & Compress": Maximize2,
-  Levels: SlidersHorizontal,
+  Adjustments: SlidersHorizontal,
+  Levels: Aperture,
+  Presets: SwatchBook,
   Histogram: BarChart3,
   "Fast integer compositing": Zap,
   "Color Picker": Pipette,
@@ -81,6 +82,7 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
   Shapes: Shapes,
   "Paint / Brush": Paintbrush,
   "Pen (Vector Paths)": PenTool,
+  "Perspective / Distort / Skew": Frame,
   Text: Type,
   "Emoji Stamp": SmilePlus,
   Export: Download,
@@ -89,19 +91,19 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
   "Copy/Paste Regions": ClipboardPaste,
   History: History,
   "Per-photo Edit Persistence": Save,
+  Layers: Layers,
+  "OpenRaster export and import": FileArchive,
 
   "Animated Panels": Sparkles,
-  "Tool Grid": LayoutGrid,
-  "Tab Switchers": SquareStack,
-  "Spacebar Pan": Hand,
+  "Pan (H or Space)": Hand,
   "A/B Compare Slider": GitCompare,
   "Multi-photo Gallery": GalleryHorizontalEnd,
   "Review Panel": PanelRight,
   Upload: Upload,
   "Export Dropdown": FileDown,
   "Keyboard Shortcut Modal": Command,
-  "Hidden Dev Tools": Wrench,
-  "Eraser Panel": Brain,
+  "Diagnostics Log": ScrollText,
+  "Erasers and AI removal": Eraser,
   "Light / Dark / System theme": SunMoon,
   "Rulers & Grids": Ruler,
   "State management (Zustand)": Database,
@@ -127,10 +129,6 @@ const FALLBACK_ICON = CircleSmall;
 
 export function getFeatureIcon(name: string): ElementType {
   return FEATURE_ICONS[name] ?? FALLBACK_ICON;
-}
-
-export function getGroupIcon(name: string): ElementType {
-  return GROUP_ICONS[name] ?? AppWindow;
 }
 
 /** The anchor id a feature renders under on /features.

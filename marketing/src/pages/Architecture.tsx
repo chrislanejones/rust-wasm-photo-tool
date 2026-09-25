@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import Footer from "../components/Footer";
 import { CrownIcon, DownloadIcon, LayersIcon, UserCheckIcon, UserXIcon } from "../components/Icons";
 import { GITHUB_URL, external } from "../config";
@@ -7,477 +7,518 @@ import { KEY_LABEL, TABLES } from "../data/schema";
 type Tier = "all" | "demo" | "free" | "pro";
 
 const FILTERS = [
-  { key: "all", label: "Full architecture", Icon: LayersIcon },
-  { key: "demo", label: "Logged out", Icon: UserXIcon },
-  { key: "free", label: "Logged in", Icon: UserCheckIcon },
-  { key: "pro", label: "Paid users", Icon: CrownIcon },
+  { key: "all", label: "Full architecture", count: "every plane", Icon: LayersIcon },
+  { key: "demo", label: "Logged out", count: "browser only", Icon: UserXIcon },
+  { key: "free", label: "Logged in", count: "+ sync & shares", Icon: UserCheckIcon },
+  { key: "pro", label: "Paid", count: "+ AI passes", Icon: CrownIcon },
 ] as const;
 
 /* ⚠️ THE DEMO NOTE IS A FACTUAL CLAIM. Measure it before changing it.
  *
- * It said "No account, no network" for months while it was false, twice over
- * and for two different reasons:
- *
- *   1. `app/index.html` <link>ed fonts.googleapis.com on every load, so every
- *      demo visitor's IP reached Google before touching anything. FIXED — the
- *      two UI faces are self-hosted now (v8.72).
- *   2. Clerk's SDK initializes on load even signed out. STILL TRUE. Measured
- *      on production, logged out, 2026-09-11: 7 requests to
- *      `<instance>.clerk.accounts.dev` and 2 to `clerk-telemetry.com` before
- *      any interaction.
- *
- * Fixing (1) and leaving the sentence alone is how a claim stays wrong through
- * the release that was supposed to make it true. What IS true, and is the
- * thing worth claiming, is that no PHOTO leaves the browser — so that is what
- * it says now.
+ * It said "No account, no network" for months while it was false, for two
+ * reasons: `app/index.html` linked fonts.googleapis.com (fixed in v8.72, faces
+ * are self-hosted now), and Clerk's SDK initializes on load even signed out
+ * (still true — measured on production 2026-09-11: 7 requests to the Clerk
+ * instance and 2 to clerk-telemetry.com before any interaction). What IS true,
+ * and worth claiming, is that no PHOTO leaves the browser.
  *
  * To re-measure: load the app logged out and read
- * `performance.getEntriesByType("resource")` for origins that are not our own. */
+ * `performance.getEntriesByType("resource")` for origins that are not ours. */
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
-  demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the demo everyone gets, and it is the whole editor.",
-  free: "Signing in adds sync, history and one share link. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
-  pro: "Everything that ships today. Pro is the only tier where a photo of yours reaches an inference server.",
+  demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the editor everyone gets, and it is the whole editor.",
+  free: "Signing in adds sync, history and share links. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
+  pro: "Everything that ships today. Paid is the only entitlement where a photo of yours reaches an inference server. An admin is entitled to all of this by role, not by purchase.",
 };
+
+/** [title, sub, tiers] — tiers is a space-separated list of who ever touches it. */
+type Node = [string, string, string];
+
+const EDGE: Node[] = [
+  ["Clerk", "identity", "free pro"],
+  ["Convex", "settings across devices · entitlements · gallery", "free pro"],
+  ["AI proxy → Replicate", "the server holds the provider key", "pro"],
+  ["Share delivery", "ShareViewer · view counts, timestamps only", "free pro"],
+];
+
+interface Group {
+  label: string;
+  muted: string;
+  /** narrowest a card may get before the grid wraps */
+  min: string;
+  /** card surface: `ui` = paper-3, `wasm` = paper-4, `net` = paper-2 */
+  surface: "ui" | "wasm" | "net";
+  mono?: boolean;
+  items: (Node | [string, string, string, "soon"])[];
+}
+
+const GROUPS: Group[] = [
+  {
+    label: "Client layer",
+    muted: "— runs entirely in the browser",
+    min: "16rem",
+    surface: "ui",
+    items: [
+      ["React App", "Vite + React 19 · Vercel static SPA", "demo free pro"],
+      ["Canvas Engine", "Engine worker · zero-copy blit to an OffscreenCanvas", "demo free pro"],
+      ["Zustand State", "7 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
+    ],
+  },
+  {
+    label: "WASM processing layer",
+    muted: "— client-side Rust, one binary",
+    min: "14rem",
+    surface: "wasm",
+    items: [
+      ["core · layer", "ImageBuffer · layer stack · composite / mask", "demo free pro"],
+      ["paint · effects", "Brush / eraser / mask · blur / pixelate / redact", "demo free pro"],
+      ["annotations · selection", "Live text & shape overlays · magic-wand, edge-aware and lasso selection", "demo free pro"],
+      ["stamp · transform", "Clone brush · flip / rotate / resize / crop", "demo free pro"],
+      ["filters", "Brightness · contrast · saturation · shadows / highlights · sharpen · gaussian blur", "demo free pro"],
+      ["levels · presets", "Black / white / midtones · a preset is a stack of filters · one shared preview slot", "demo free pro"],
+      ["perspective", "Four-corner warp for shapes, text and pixels · homography solved in Rust", "demo free pro"],
+      ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust", "demo free pro"],
+      ["describe", "Local image description — names a photo from its content, no account", "demo free pro"],
+      // The design said "format v6". OP_FORMAT_VERSION in src/ops.rs is 8.
+      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v8", "demo free pro"],
+      ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill", "demo free pro"],
+      ["simd", "v128/f32x4 kernels · scalar fallback", "demo free pro"],
+    ],
+  },
+  {
+    label: "Identity & entitlement",
+    muted: "— Clerk decides who; the server decides what",
+    min: "12rem",
+    surface: "net",
+    items: [
+      ["Clerk Auth", "identity provider", "free pro"],
+      ["Logged out", "entitlement: none · anonymous · 12 photos", "demo"],
+      ["Logged in", "entitlement: free · 24 photos", "free"],
+      ["Paid", "entitlement: paid · pro or team tier · Stripe", "pro"],
+      ["Admin", "a role, not a tier — entitled to paid, from ADMIN_EMAILS on the server", "pro"],
+    ],
+  },
+  {
+    label: "Convex functions",
+    muted: "— signed-in only",
+    min: "12rem",
+    surface: "net",
+    mono: true,
+    items: [
+      ["users.ts", "account row · me() with tier, role and entitlement", "free pro"],
+      ["entitlement.ts", "the one ladder: none → free → paid · a preview may only take away", "free pro"],
+      ["photoEdits.ts", "save / getEdit", "free pro"],
+      ["ai.ts", "dispatch to Replicate · 3 models wired", "pro"],
+      ["aiJobs.ts", "job status (useQuery) · daily and monthly caps", "pro"],
+      ["shares.ts", "public share links · pause, view cap, expiry", "free pro"],
+      ["textHistory.ts", "recent texts", "free pro"],
+      ["sync.ts", "settings across devices · compare-and-set on rev", "free pro"],
+      ["userColors.ts", "saved color palette · 32 per user", "free pro"],
+      ["stripe.ts · subscriptions.ts", "checkout / portal · plan status", "free pro"],
+      ["http.ts", "webhook router · Replicate + Stripe, HMAC-verified", "pro"],
+    ],
+  },
+  {
+    label: "Storage",
+    muted: "",
+    min: "16rem",
+    surface: "wasm",
+    items: [
+      ["IndexedDB (Dexie)", "Originals · SHA-256 content-addressed · your machine", "demo free pro"],
+      ["Convex File Storage", "Edit archives · shares · AI frames · a server", "free pro"],
+    ],
+  },
+  {
+    label: "AI",
+    muted: "— Replicate, paid only",
+    min: "12rem",
+    surface: "net",
+    mono: true,
+    items: [
+      ["cjwbw/rembg", "background removal", "pro"],
+      ["text-extract-ocr", "text extract", "pro"],
+      ["remove-object", "object removal (masked, LaMa)", "pro"],
+      ["Real-ESRGAN", "4× upscale", "planned", "soon"],
+    ],
+  },
+  {
+    label: "Event handlers",
+    muted: "— webhooks",
+    min: "16rem",
+    surface: "net",
+    items: [
+      ["Stripe webhook", "subscription changes → subscriptions", "pro"],
+      ["Replicate webhook", "AI complete → ai_jobs.status", "pro"],
+    ],
+  },
+];
+
+/* Presentation only — which outside system a table belongs to. The fields,
+ * types and indexes all come from data/schema.ts. */
+const TABLE_BADGE: Record<string, string> = {
+  users: "Clerk-synced",
+  subscriptions: "Stripe",
+  shares: "public read",
+  share_views: "new · timestamps only",
+  ai_jobs: "Replicate",
+};
+
+const RELS: [string, string, string][] = [
+  ["users", "1 ─ 1", "subscriptions"],
+  ["users", "1 ─ ∞", "photo_edits"],
+  ["users", "1 ─ ∞", "recent_texts"],
+  ["users", "1 ─ ∞", "sync_docs"],
+  ["users", "1 ─ ∞", "user_colors"],
+  ["users", "1 ─ ∞", "shares"],
+  ["shares", "1 ─ ∞", "share_views"],
+  ["users", "1 ─ ∞", "ai_jobs"],
+];
+
+// A relationship is only drawn when both ends are tables the schema actually
+// documents, so the list can never point at a table the grid above lacks.
+const KNOWN = new Set(TABLES.map((t) => t.name));
+const SHOWN_RELS = RELS.filter(([a, , b]) => KNOWN.has(a) && KNOWN.has(b));
 
 export default function Architecture() {
   // Dims every node a given kind of user never touches — the page's argument,
   // made pressable.
   const [tier, setTier] = useState<Tier>("all");
 
-  /** `tiers` is the space-separated list of tiers a node belongs to. */
   const dim = (tiers: string) =>
     tier !== "all" && !tiers.split(/\s+/).includes(tier) ? " is-dim" : "";
 
-  const node = (tiers: string, extra = "") => `node${extra}${dim(tiers)}`;
-
   return (
     <>
-      <main id="main">
-        {/* The map IS the page: an orientation phrase, then the map. */}
-        <header className="page-head">
-          <h1 className="page-head__title">One plane is the editor. The other is optional.</h1>
-          <p className="lede">
-            Everything inside the solid boundary runs in your tab. Cut the dashed plane off entirely
-            and what's left is still a complete, working image editor — that isn't a fallback mode,
-            it's the demo everyone gets.
+      <main id="main" className="architecture">
+        <header className="arch-head">
+          <div className="arch-head__lead">
+            <p className="arch-head__eyebrow">Architecture · as of v8.90, 09-22-2026</p>
+            <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
+          </div>
+          <p className="arch-head__deck">
+            Everything inside the solid box runs in your tab. Cut the dashed box off entirely and
+            what&rsquo;s left is still a complete image editor &mdash; that isn&rsquo;t a fallback
+            mode, it&rsquo;s the free editor everyone gets.
           </p>
         </header>
 
-        <section className="tiers-filter" aria-labelledby="tf-h">
+        <section className="arch-filter" aria-labelledby="tf-h">
           <h2 className="visually-hidden" id="tf-h">
             Show the architecture for one kind of user
           </h2>
-          <div className="graph__scroll">
-            <div
-              className="graph__group"
-              role="group"
-              aria-label="Show the architecture for one kind of user"
-            >
-              {FILTERS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  className="seg seg--tier"
-                  type="button"
-                  aria-pressed={tier === key}
-                  onClick={() => setTier(key)}
-                >
-                  <Icon size={22} className="seg__icon" />
-                  <span className="seg__label">{label}</span>
-                </button>
-              ))}
-            </div>
+          <div
+            className="arch-filter__grid"
+            role="group"
+            aria-label="Show the architecture for one kind of user"
+          >
+            {FILTERS.map(({ key, label, count, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className="arch-tile"
+                aria-pressed={tier === key}
+                onClick={() => setTier(key)}
+              >
+                <span className="arch-tile__icon">
+                  <Icon size={22} />
+                </span>
+                <span className="arch-tile__label">{label}</span>
+                <span className="arch-tile__count">{count}</span>
+              </button>
+            ))}
           </div>
-          <p className="tiers-filter__note" role="status">
+          <p className="arch-filter__note" role="status">
             {NOTES[tier]}
           </p>
         </section>
 
-        <section className="map" aria-labelledby="map-h">
+        <section className="arch-map" aria-labelledby="map-h">
           <h2 className="visually-hidden" id="map-h">
             System map
           </h2>
 
-          <div className={`map__plane map__plane--client${dim("demo free pro")}`}>
-            {/* NOT "fully functional offline", which is what this said until
-                2026-08-06. There is no service worker in a shipped build —
-                VITE_ENABLE_SW is set nowhere, so the registration code is
-                constant-folded out and a cold load with no network fails. What
-                is true, and what distinguishes this plane from the Convex one,
-                is that nothing here needs a round trip once the tab is open.
-                Restore the offline claim only when the SW actually ships. */}
-            <div className="plane__head">
-              <span className="plane__name">Browser</span>
-              <span className="plane__note">no server in the edit path</span>
+          {/* NOT "fully functional offline". A precache service worker is
+              written and ships dark (ADR-049), so a cold load with no network
+              still fails. Restore an offline claim only when the SW ships. */}
+          <div className="arch-plane arch-plane--browser">
+            <div className="arch-plane__head">
+              <span className="arch-plane__name">Browser</span>
+              <span className="arch-plane__note">
+                no server in the edit path · one 814 KB engine
+              </span>
             </div>
 
-            <div className="map__row">
-              <article className="node">
-                <h3 className="node__title">UI plane</h3>
-                <p className="node__sub">React 19 · TypeScript · Vite</p>
-                <ul className="node__list">
+            <div className="arch-plane__row">
+              <article className="arch-node arch-node--ui">
+                <h3 className="arch-node__title">UI plane</h3>
+                <p className="arch-node__sub">React 19 · TypeScript · Vite · Tailwind v4</p>
+                <ul className="arch-node__list">
                   <li>AppShell — composition and layout only</li>
-                  <li>Tool registry — 5 modules registered, routing still in AppShell</li>
+                  <li>Tool registry — 5 modules registered; routing still hand-wired in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask</li>
-                  <li>Zustand stores — UI · tool · gallery · annotation · guides · perspective · text box</li>
+                  <li>
+                    7 Zustand stores — UI · tool · gallery · annotation · guides · perspective ·
+                    text box
+                  </li>
                 </ul>
               </article>
 
-              <article className={node("demo free pro", " node--accent")}>
-                <h3 className="node__title">Compute plane</h3>
-                <p className="node__sub">where the pixels are touched</p>
-                <ul className="node__list">
+              <article className={`arch-node arch-node--compute${dim("demo free pro")}`}>
+                <h3 className="arch-node__title">Compute plane</h3>
+                <p className="arch-node__sub">where the pixels are touched</p>
+                <ul className="arch-node__list">
                   <li>
                     <strong>Engine worker</strong> — the engine and the canvas both live here, off
-                    the main thread
+                    the main thread. Main-thread blocking per heavy op: 129–137 ms → 0.
                   </li>
                   <li>
-                    <strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog
+                    <strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog,
+                    PatchMatch
+                  </li>
+                  <li>
+                    <strong>Local describer</strong> — names a photo from what&rsquo;s in it,
+                    inside the engine. No account, no per-image cost.
                   </li>
                   <li>Codec worker — WebP/JPEG encode · gallery thumbnails</li>
-                  <li className={`node__planned${dim("planned")}`}>
+                  <li>
+                    Fonts — three families served as static files, registered with the engine at
+                    runtime
+                  </li>
+                  <li className={`arch-node__planned${dim("planned")}`}>
                     rayon worker pool — tried and dropped: 8–31× slower than the single-threaded
                     kernel
                   </li>
-                  <li className={`node__planned${dim("planned")}`}>
-                    WebGPU backend — one blur kernel and a self-test, nothing on the pixel path
+                  <li className={`arch-node__planned${dim("planned")}`}>
+                    WebGPU backend — one blur kernel and a self-test; nothing on the pixel path
                   </li>
                 </ul>
               </article>
 
-              <article className="node">
-                <h3 className="node__title">Persistence plane</h3>
-                <p className="node__sub">IndexedDB · Dexie</p>
-                <ul className="node__list">
-                  <li>originals — content-addressed, immutable</li>
-                  <li>opLogs + keyframes</li>
+              <article className="arch-node arch-node--ui">
+                <h3 className="arch-node__title">Persistence plane</h3>
+                <p className="arch-node__sub">IndexedDB · Dexie</p>
+                <ul className="arch-node__list">
+                  <li>originals — content-addressed (SHA-256), immutable</li>
+                  <li>opLogs + keyframes — the op format is at v8</li>
                   <li>gallery manifest</li>
                   <li>renderCache — disposable</li>
                 </ul>
               </article>
             </div>
 
-            <p className="plane__foot">
-              Plus <code>localStorage</code> for lightweight prefs. A service worker that precaches
-              the shell and the WASM binary is written and tested, and switched off — it has never
-              been on in a build that shipped.
+            <p className="arch-plane__foot">
+              Plus <code>localStorage</code> for lightweight prefs, and a sync layer over both: a{" "}
+              <code>BroadcastChannel</code> keeps every tab on this device in step, and — only when
+              signed in — Convex carries the same three documents to your other devices. Your
+              photos are not in it. A precache-only service worker is written and tested and still
+              ships dark: it is blocked on eviction reach, not on the precache (ADR-049).
             </p>
           </div>
 
-          <div className="map__seam" aria-hidden="true">
-            <span className="map__seam-label">sever here — the editor still works</span>
+          <div className="arch-seam" aria-hidden="true">
+            <span className="arch-seam__rule" />
+            <span className="arch-seam__label">sever here — the editor still works</span>
+            <span className="arch-seam__rule" />
           </div>
 
-          <div className={`map__plane map__plane--edge${dim("free pro")}`}>
-            <div className="plane__head">
-              <span className="plane__name">Network</span>
-              <span className="plane__note">optional, additive only</span>
+          <div className={`arch-plane arch-plane--edge${dim("free pro")}`}>
+            <div className="arch-plane__head">
+              <span className="arch-plane__name">Network</span>
+              <span className="arch-plane__note">
+                optional, additive only · the only place a photo of yours can travel
+              </span>
             </div>
-
-            <div className="map__row map__row--4">
-              <article className={node("free pro", " node--quiet")}>
-                <h3 className="node__title">Clerk</h3>
-                <p className="node__sub">identity</p>
-              </article>
-              <article className={node("free pro", " node--quiet")}>
-                <h3 className="node__title">Convex</h3>
-                <p className="node__sub">prefs sync · entitlements · gallery</p>
-              </article>
-              <article className={node("pro", " node--quiet")}>
-                <h3 className="node__title">AI proxy → Replicate</h3>
-                <p className="node__sub">the server holds the provider key</p>
-              </article>
-              <article className={node("free pro", " node--quiet")}>
-                <h3 className="node__title">Share delivery</h3>
-                <p className="node__sub">ShareViewer</p>
-              </article>
+            <div className="arch-plane__row arch-plane__row--edge">
+              {EDGE.map(([title, sub, tiers]) => (
+                <article key={title} className={`arch-node arch-node--net${dim(tiers)}`}>
+                  <h3 className="arch-node__title">{title}</h3>
+                  <p className="arch-node__sub">{sub}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="stack">
-          <header className="head-hang">
-            <h2 className="section__title section__title--sm">What's in each plane</h2>
+        <section className="arch-stack">
+          <header className="arch-stack__head">
+            <h2 className="arch-section-title">What&rsquo;s in each plane</h2>
+            <p className="arch-stack__deck">
+              Three words, kept apart since v8.90: a <strong>tier</strong> is what an account paid
+              for, a <strong>role</strong> is what a person is trusted to do, and an{" "}
+              <strong>entitlement</strong> is what this session may use. The server decides all
+              three.
+            </p>
           </header>
 
-          <h3 className="stack__label">
-            Client layer <span className="muted">— runs entirely in the browser</span>
-          </h3>
-          <div className="stack__grid">
-            <article className={node("demo free pro")}>
-              <h4 className="node__title">React App</h4>
-              <p className="node__sub">Vite + React 19 · Vercel static SPA</p>
-            </article>
-            <article className={node("demo free pro")}>
-              <h4 className="node__title">Canvas Engine</h4>
-              <p className="node__sub">Engine worker · zero-copy blit to an OffscreenCanvas</p>
-            </article>
-            <article className={node("demo free pro")}>
-              <h4 className="node__title">Zustand State</h4>
-              <p className="node__sub">7 stores · atomic selectors</p>
-            </article>
-          </div>
+          {GROUPS.map((g) => (
+            <div key={g.label}>
+              <h3 className="arch-stack__label">
+                {g.label} {g.muted && <span className="arch-stack__muted">{g.muted}</span>}
+              </h3>
+              <div className="arch-stack__grid" style={{ "--min": g.min } as CSSProperties}>
+                {g.items.map(([title, sub, tiers, soon]) => (
+                  <article key={title} className={`arch-node arch-node--${g.surface}${dim(tiers)}`}>
+                    <h4 className={`arch-node__title${g.mono ? " arch-node__title--mono" : ""}`}>
+                      {title}
+                    </h4>
+                    <p className="arch-node__sub">{sub}</p>
+                    {soon && <span className="arch-node__soon">soon</span>}
+                  </article>
+                ))}
+              </div>
+            </div>
+          ))}
 
-          <h3 className="stack__label">
-            WASM processing layer <span className="muted">— client-side Rust, one binary</span>
-          </h3>
-          <div className="stack__grid stack__grid--3">
-            {[
-              ["core · layer", "ImageBuffer · layer stack · composite / mask"],
-              ["paint · effects", "Brush / eraser / mask · blur / pixelate / redact"],
-              ["annotations · selection", "Live text & shape overlays · magic-wand"],
-              ["stamp · transform", "Clone brush · flip / rotate / resize / crop"],
-              ["filters", "Brightness · contrast · gaussian blur"],
-              ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, rasterised in Rust"],
-              ["codec · history", "PNG encode (Rust) · undo snapshots"],
-              ["simd", "v128/f32x4 kernels · scalar fallback"],
-              ["utils", "json · point math · shared helpers"],
-            ].map(([title, sub]) => (
-              <article key={title} className={node("demo free pro", " node--accent")}>
-                <h4 className="node__title">{title}</h4>
-                <p className="node__sub">{sub}</p>
-              </article>
-            ))}
-          </div>
-
-          <h3 className="stack__label">
-            Identity <span className="muted">— Clerk</span>
-          </h3>
-          <div className="stack__grid stack__grid--4">
-            <article className={node("free pro", " node--quiet")}>
-              <h4 className="node__title">Clerk Auth</h4>
-              <p className="node__sub">identity provider</p>
-            </article>
-            <article className={node("demo", " node--quiet")}>
-              <h4 className="node__title">Demo</h4>
-              <p className="node__sub">anonymous · 12 photos</p>
-            </article>
-            <article className={node("free", " node--quiet")}>
-              <h4 className="node__title">Free</h4>
-              <p className="node__sub">signed in · 24 photos</p>
-            </article>
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title">Pro</h4>
-              <p className="node__sub">100 photos · coming soon</p>
-            </article>
-          </div>
-
-          <h3 className="stack__label">
-            Convex functions <span className="muted">— signed-in only</span>
-          </h3>
-          <div className="stack__grid stack__grid--3">
-            {[
-              ["photoEdits.ts", "save / getEdit", "free pro"],
-              ["ai.ts", "dispatch to Replicate", "pro"],
-              ["aiJobs.ts", "job status (useQuery)", "pro"],
-              ["shares.ts", "public share links", "free pro"],
-              ["textHistory.ts", "recent texts", "free pro"],
-              ["stripe.ts", "checkout / portal", "free pro"],
-            ].map(([title, sub, tiers]) => (
-              <article key={title} className={node(tiers, " node--quiet")}>
-                <h4 className="node__title mono">{title}</h4>
-                <p className="node__sub">{sub}</p>
-              </article>
-            ))}
-          </div>
-
-          <h3 className="stack__label">Storage</h3>
-          <div className="stack__grid">
-            <article className={node("demo free pro", " node--accent")}>
-              <h4 className="node__title">IndexedDB (Dexie)</h4>
-              <p className="node__sub">Originals · SHA-256 content-addressed · your machine</p>
-            </article>
-            <article className={node("free pro", " node--quiet")}>
-              <h4 className="node__title">Convex File Storage</h4>
-              <p className="node__sub">Edit archives · shares · AI frames · a server</p>
-            </article>
-          </div>
-
-          <h3 className="stack__label">
-            AI <span className="muted">— Replicate, Pro only</span>
-          </h3>
-          <div className="stack__grid stack__grid--4">
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title mono">cjwbw/rembg</h4>
-              <p className="node__sub">background removal</p>
-            </article>
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title mono">abiruyt/text-extract-ocr</h4>
-              <p className="node__sub">text extract</p>
-            </article>
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title mono">zylim0702/remove-object</h4>
-              <p className="node__sub">object removal (masked)</p>
-            </article>
-            <article className={node("planned", " node--quiet")}>
-              <h4 className="node__title mono">Real-ESRGAN</h4>
-              <p className="node__sub">4× upscale</p>
-              <span className="tag tag--local">soon</span>
-            </article>
-          </div>
-
-          <h3 className="stack__label">
-            Event handlers <span className="muted">— webhooks</span>
-          </h3>
-          <div className="stack__grid">
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title">Stripe webhook</h4>
-              <p className="node__sub">
-                subscription changes → <span className="mono">subscriptions</span>
-              </p>
-            </article>
-            <article className={node("pro", " node--quiet")}>
-              <h4 className="node__title">Replicate webhook</h4>
-              <p className="node__sub">
-                AI complete → <span className="mono">ai_jobs.status</span>
-              </p>
-            </article>
-          </div>
-          <p className="stack__note muted">
-            Clerk sign-in isn't a webhook here — the client calls <code>users.upsert</code> once
-            Convex's own auth bridge comes up, and that is what actually creates the{" "}
-            <code>users</code> row.
+          <p className="arch-stack__note">
+            Clerk sign-in isn&rsquo;t a webhook here — the client calls <code>users.upsert</code>{" "}
+            once Convex&rsquo;s own auth bridge comes up, and that is what actually creates the{" "}
+            <code>users</code> row. Who is an admin is read from <code>ADMIN_EMAILS</code> on the
+            deployment — never from the browser.
           </p>
         </section>
 
-        <section className="schema" id="schema">
-          <header className="head-hang">
-            <h2 className="section__title section__title--sm">Convex database schema</h2>
-            <p className="lede">
-              Every table, its fields and its indexes. Flatter than a typical projects → images tree:
-              each row hangs straight off <code>users</code>, keyed by the client's own{" "}
-              <code>photoKey</code> string rather than a server-side image id.
+        <section className="arch-schema" id="schema">
+          <header className="arch-schema__head">
+            <h2 className="arch-big-title">What the server keeps, table by table.</h2>
+            <p className="arch-schema__deck">
+              Every table the app reads or writes, with its fields and indexes. Each row hangs
+              straight off <code>users</code>, keyed by the editor&rsquo;s own <code>photoKey</code>.
+              Never a pixel: edited images stay in the browser that made them. Five tables from an
+              earlier design — projects, images, layers, annotations, history — are still declared
+              and the app calls none of them.
             </p>
           </header>
 
-          <div className="schema__grid">
+          <div className="arch-schema__grid">
             {TABLES.map((t) => (
-              <article key={t.name} className={`tbl${dim(t.tiers)}`}>
-                <h3 className="tbl__name mono">{t.name}</h3>
-                <dl className="tbl__fields">
+              <article key={t.name} className={`arch-tbl${dim(t.tiers)}`}>
+                <h3 className="arch-tbl__name">
+                  <span>{t.name}</span>
+                  {TABLE_BADGE[t.name] && (
+                    <span className="arch-tbl__badge">{TABLE_BADGE[t.name]}</span>
+                  )}
+                </h3>
+                <dl className="arch-tbl__fields">
                   {t.fields.map((f) => (
                     <Fragment key={f.name}>
-                      <dt className="tbl__field">
-                        {f.key && <span className="tbl__key">{KEY_LABEL[f.key]}</span>}
-                        <span className="tbl__fname">{f.name}</span>
-                        {f.indexed && <span className="tbl__idx">idx</span>}
+                      <dt className="arch-tbl__field">
+                        {f.key && <span className="arch-tbl__key">{KEY_LABEL[f.key]}</span>}
+                        <span className="arch-tbl__fname">{f.name}</span>
+                        {f.indexed && <span className="arch-tbl__idx">idx</span>}
                       </dt>
-                      <dd className="tbl__type">
+                      <dd className="arch-tbl__type">
                         {f.type}
-                        {f.comment && <span className="tbl__comment">{f.comment}</span>}
+                        {f.comment && <span className="arch-tbl__comment">{f.comment}</span>}
                       </dd>
                     </Fragment>
                   ))}
                 </dl>
                 {t.indexes.length > 0 && (
-                  <p className="tbl__indexes">
+                  <p className="arch-tbl__indexes">
                     {t.indexes.map((i) => (
-                      <span key={i} className="tbl__idxname">
+                      <span key={i} className="arch-tbl__idxname">
                         {i}
                       </span>
                     ))}
                   </p>
                 )}
-                {t.note && <p className="tbl__note">{t.note}</p>}
+                {t.note && <p className="arch-tbl__note">{t.note}</p>}
               </article>
             ))}
           </div>
 
-          <div className="rels">
-            <h3 className="stack__label">Entity relationships</h3>
-            <ul className="rels__list">
-              {[
-                ["users", "1 ─ 1", "subscriptions"],
-                ["users", "1 ─ ∞", "photo_edits"],
-                ["users", "1 ─ ∞", "recent_texts"],
-                ["users", "1 ─ ∞", "shares"],
-                ["users", "1 ─ ∞", "ai_jobs"],
-              ].map(([a, card, b]) => (
-                <li key={b}>
-                  <span className="mono">{a}</span> <span className="rels__card">{card}</span>{" "}
-                  <span className="mono">{b}</span>
+          <div className="arch-rels">
+            <h3 className="arch-rels__label">Entity relationships</h3>
+            <ul className="arch-rels__list">
+              {SHOWN_RELS.map(([a, card, b]) => (
+                <li key={`${a}-${b}`}>
+                  <span className="arch-rels__name">{a}</span>{" "}
+                  <span className="arch-rels__card">{card}</span>{" "}
+                  <span className="arch-rels__name">{b}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="stack__grid stack__grid--4 schema__notes">
-            <article className="node node--quiet">
-              <h4 className="node__title">Real-time</h4>
-              <p className="node__sub">
-                <span className="mono">useQuery</span> hooks auto-update when data changes. No
-                polling.
+          <div className="arch-schema__notes">
+            <article className="arch-note">
+              <h4 className="arch-note__title">Real-time</h4>
+              <p className="arch-note__body">
+                <span className="arch-mono">useQuery</span> hooks update when data changes. No
+                polling — it is what carries a setting from a phone to a laptop.
               </p>
             </article>
-            <article className="node node--quiet">
-              <h4 className="node__title">Row-level auth</h4>
-              <p className="node__sub">
-                <span className="mono">ctx.auth</span> in mutations, plus query filters for
-                user-scoped data.
+            <article className="arch-note">
+              <h4 className="arch-note__title">Row-level auth</h4>
+              <p className="arch-note__body">
+                <span className="arch-mono">ctx.auth</span> in mutations, plus query filters for
+                user-scoped data. Entitlement is computed server-side from tier + role.
               </p>
             </article>
-            <article className="node node--quiet">
-              <h4 className="node__title">File storage</h4>
-              <p className="node__sub">
-                Integrated blob storage for images via <span className="mono">storage.getUrl()</span>
-                .
+            <article className="arch-note">
+              <h4 className="arch-note__title">File storage</h4>
+              <p className="arch-note__body">
+                Blob storage for edit archives, share snapshots and AI frames via{" "}
+                <span className="arch-mono">storage.getUrl()</span>.
               </p>
             </article>
-            <article className="node node--quiet">
-              <h4 className="node__title">Webhooks</h4>
-              <p className="node__sub">
-                Replicate + Stripe post back to <span className="mono">convex/http.ts</span>,
-                HMAC-verified.
+            <article className="arch-note">
+              <h4 className="arch-note__title">Webhooks</h4>
+              <p className="arch-note__body">
+                Replicate and Stripe post back to <span className="arch-mono">convex/http.ts</span>,
+                HMAC-verified. A scheduled <span className="arch-mono">shares.expire</span> stops a
+                link at its end date.
               </p>
             </article>
           </div>
         </section>
 
         {/* The argument, then the source that backs it, then both ways out. */}
-        <section className="why">
-          <h2 className="section__title section__title--sm">Why draw it this way</h2>
-          <p className="lede">
-            Because the boundary is the product. An editor that needs a server is an editor that can
-            be switched off, rate-limited, or quietly trained on. The dashed plane buys you sync,
-            sharing, and the AI passes — and it is the only place a photo of yours can travel. Demo
-            mode never crosses it.
-          </p>
-          <p className="lede">
-            The map above is drawn by hand from <code>system-architecture.mermaid</code>, the
-            flowchart the repo ships. Take the original and render it wherever you like — Mermaid
-            Live, a VS&nbsp;Code preview, your own docs.
-          </p>
-          <div className="why__actions">
+        <section className="arch-coda">
+          <div className="arch-coda__text">
+            <h2 className="arch-big-title arch-big-title--wide">Why draw it this way</h2>
+            <p className="arch-coda__lede">
+              Because the boundary is the product. An editor that needs a server is an editor that
+              can be switched off, rate-limited, or quietly trained on. The dashed box buys you
+              sync, sharing and the AI passes — and it is the only place a photo of yours can
+              travel. Signed out, you never cross it.
+            </p>
+            <p className="arch-coda__source">
+              The map above is drawn by hand from{" "}
+              <span className="arch-mono arch-coda__file">system-architecture.mermaid</span>, the
+              flowchart the repo ships. Render the original wherever you like.
+            </p>
+          </div>
+          <div className="arch-coda__actions">
             {/* A download rather than a live render: mermaid's color parser
                 rejects OKLCH outright, so theming it from these tokens would
                 mean a second hex palette plus ~1MB of CDN to draw what the
                 hand-built map above already says. */}
             <a
-              className="cta cta--outline cta--lg"
+              className="arch-btn"
               href="/system-architecture.mermaid"
               download="system-architecture.mermaid"
               type="text/vnd.mermaid"
             >
               <DownloadIcon />
-              Download the source
+              Download the .mermaid source
             </a>
             <a
-              className="cta cta--outline cta--lg"
+              className="arch-btn"
               href={`${GITHUB_URL}/blob/master/docs/Architecture.md`}
               {...external}
             >
               Read the full architecture doc
             </a>
+            <p className="arch-coda__foot">
+              flowchart TB · <span className="arch-coda__num">121</span> lines · the dashed
+              subgraph is the plane you can cut
+            </p>
           </div>
-          <p className="diagram__foot muted">
-            <span className="mono">system-architecture.mermaid</span> · Mermaid{" "}
-            <span className="mono">flowchart TB</span> · <span className="fig">113</span> lines · the
-            dashed subgraph is the plane you can cut.
-          </p>
         </section>
       </main>
 
-      <Footer line="Sever the network plane. It still works." />
+      <Footer line="One plane is the editor. The other is optional." />
     </>
   );
 }
