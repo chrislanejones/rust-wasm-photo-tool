@@ -7,3 +7,4 @@ export { exportOra, type ExportOraResult } from "./export";
 // breaks .ora import.
 export { importOraAsNewPhoto } from "./import";
 export type { OraLayerMeta, OraStack } from "./types";
+export { downloadOraProject, downloadOraWithToast, baseFileName } from "./download";
