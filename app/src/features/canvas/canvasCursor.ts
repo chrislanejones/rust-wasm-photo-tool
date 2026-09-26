@@ -2,6 +2,10 @@
 // the one function that picks a cursor for the lit sub-tool. Moved out of
 // CanvasArea.tsx unchanged so that file holds the component.
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
+// The real union, not a hand-written copy. The extraction inlined `0 | 1 | 2`,
+// which silently dropped Intersect (mode 3, added by #231) and made this stop
+// compiling the moment it met master.
+import type { SelectionCombineMode } from "@/lib/selectionBool";
 
 // Data-URI SVG cursor for the rotate handle — there's no standard CSS
 // rotation cursor, so we draw a small curved-arrow glyph. Falls back to
@@ -68,7 +72,7 @@ export function getCursorForSubTool(
   isPanning?: boolean,
   colorPickerActive?: boolean,
   moveActive?: boolean,
-  combineIntent?: 0 | 1 | 2,
+  combineIntent?: SelectionCombineMode,
   maskEditing?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";

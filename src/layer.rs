@@ -1594,6 +1594,18 @@ impl ImageHorseTool {
     }
 
     /// Discard layer `id`'s mask (reveal everything again). False if it had none.
+    /// Whether layer `id` currently has a mask.
+    ///
+    /// Restored 09-26-2026. It was deleted as an export "nothing calls", which
+    /// was true on the day that branch was cut — `tests/selection_refine.rs`
+    /// arrived on master afterwards (#233, v8.98) and calls it twice. The
+    /// deletion only surfaced when the two met, and only under
+    /// `cargo clippy --all-targets` with NO features, which is what the
+    /// pre-push hook runs; `cargo test --features tiles` compiled fine.
+    pub fn has_layer_mask(&self, id: u32) -> bool {
+        self.layers.iter().any(|l| l.id == id && l.mask.is_some())
+    }
+
     pub fn remove_layer_mask(&mut self, id: u32) -> bool {
         let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
             return false;
