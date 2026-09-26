@@ -88,9 +88,10 @@ async function render(): Promise<void> {
   });
 }
 
+/** By visible text, or by the accessible name the icon-only row actions carry. */
 function button(label: string): HTMLButtonElement {
   const btn = [...document.body.querySelectorAll("button")].find(
-    (b) => b.textContent?.trim() === label,
+    (b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label,
   );
   if (!btn) throw new Error(`"${label}" button not rendered`);
   return btn as HTMLButtonElement;
@@ -130,22 +131,32 @@ describe("Settings › Shared", () => {
     ];
     await render();
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Links3");
-    expect(text).toContain("Views40");
-    expect(text).toContain("Most opened25");
+    expect(text).toContain("3 links · 40 views in all · most opened: capped.png");
     expect(text).toContain("Live");
     expect(text).toContain("Paused");
     expect(text).toContain("Hit its view limit");
-    expect(text).toContain("25 views of 25");
+    expect(text).toContain("25 of 25 views");
     expect(text).toContain("last opened 3m ago");
     // A paused link offers Resume; a live one offers Pause.
-    expect([...document.body.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Resume")).toHaveLength(1);
-    expect([...document.body.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Pause")).toHaveLength(2);
+    const named = (prefix: string) =>
+      [...document.body.querySelectorAll("button")].filter((b) => b.getAttribute("aria-label")?.startsWith(prefix));
+    expect(named("Resume ")).toHaveLength(1);
+    expect(named("Pause ")).toHaveLength(2);
+  });
+
+  it("keeps the limits folded away until asked for", async () => {
+    h.links = [link()];
+    await render();
+    expect(document.body.querySelector('input[type="number"]'), "folded by default").toBeNull();
+    act(() => button("Limits for sunset.jpg").click());
+    expect(button("Limits for sunset.jpg").getAttribute("aria-pressed")).toBe("true");
+    expect(document.body.querySelector('input[type="number"]')).not.toBeNull();
   });
 
   it("keeps the limits as a draft until Save, then sends both fields", async () => {
     h.links = [link()];
     await render();
+    act(() => button("Limits for sunset.jpg").click());
     expect(button("Save limits").disabled, "nothing changed yet").toBe(true);
 
     const num = document.body.querySelector<HTMLInputElement>('input[type="number"]')!;
@@ -175,6 +186,7 @@ describe("Settings › Shared", () => {
   it("refuses a view limit that is not a whole number of at least 1", async () => {
     h.links = [link()];
     await render();
+    act(() => button("Limits for sunset.jpg").click());
     const num = document.body.querySelector<HTMLInputElement>('input[type="number"]')!;
     const proto = Object.getPrototypeOf(num) as object;
     Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(num, "0");
@@ -186,14 +198,14 @@ describe("Settings › Shared", () => {
   });
 
   it("Pause and Resume call the right mutation for the link's state", async () => {
-    h.links = [link(), link({ token: "tok-b", pausedAt: T0, status: "paused" })];
+    h.links = [link(), link({ token: "tok-b", title: "b.png", pausedAt: T0, status: "paused" })];
     await render();
     await act(async () => {
-      button("Pause").click();
+      button("Pause sunset.jpg").click();
     });
     expect(h.pause).toHaveBeenCalledWith({ token: "tok-a" });
     await act(async () => {
-      button("Resume").click();
+      button("Resume b.png").click();
     });
     expect(h.resume).toHaveBeenCalledWith({ token: "tok-b" });
   });
@@ -202,9 +214,9 @@ describe("Settings › Shared", () => {
     h.links = [link()];
     await render();
     await act(async () => {
-      button("Delete").click();
+      button("Delete sunset.jpg").click();
     });
-    expect(h.remove, "the card's Delete only asks").not.toHaveBeenCalled();
+    expect(h.remove, "the row's Delete only asks").not.toHaveBeenCalled();
 
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
     expect(dialog?.textContent).toContain("Delete this share link?");
@@ -225,5 +237,14 @@ describe("Settings › Shared", () => {
     await render();
     expect(document.body.querySelector('[role="img"]')).toBeNull();
     expect(document.body.textContent).toContain("3 views");
+  });
+
+  it("marks a missing image with an icon, not an empty box", async () => {
+    h.links = [link({ imageUrl: null })];
+    await render();
+    const thumb = document.body.querySelector('[title="Preview unavailable"]');
+    expect(thumb, "the placeholder says what it is").not.toBeNull();
+    expect(thumb!.querySelector("svg")).not.toBeNull();
+    expect(document.body.querySelector("img")).toBeNull();
   });
 });

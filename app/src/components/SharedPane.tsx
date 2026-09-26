@@ -19,18 +19,26 @@
 //     confirm is `overModal`: Settings is a modal, and a plain dialog opens
 //     underneath it, so Delete looked dead.
 //
+// ONE LIST, LIKE THE OTHER PANES. It was a stack of bordered cards, each with
+// its fields always open, under three stat tiles: nothing else in Settings
+// looks like that. Now it is a summary line and one list, a row per link with
+// the dense-row actions every other list uses (RowAction); the limits fold
+// open under their row. Chris, 09-25-2026: "doesn't match any UI".
+//
 // NO CHART. There was a thirty-day bar row here; with views on one or two
 // days it drew a lone block at the right edge that read as a stray box, not a
 // chart. The view count and "last opened" beside the thumbnail say it.
 import { useEffect, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { Link2, Pause, Play, Trash2 } from "lucide-react";
+import { ImageOff, Link2, Pause, Play, Timer, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NumberField } from "@/components/ui/number-field";
 import { PaneHeading } from "@/components/ui/pane-heading";
+import { RowAction } from "@/components/ui/row-actions";
+import { ErrorNote } from "@/components/ui/status-note";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/sonner";
 import { shareUrlFor } from "@/hooks/useShare";
@@ -107,6 +115,10 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
 
   const [busy, setBusy] = useState<"limits" | "pause" | "delete" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Limits are the rarely-used control, so they fold away under the row like
+  // any other list's detail, and the pane reads as a list of links.
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const run = async (what: NonNullable<typeof busy>, fn: () => Promise<unknown>, done?: string) => {
     setBusy(what);
@@ -132,111 +144,116 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
 
   const title = link.title ?? "Untitled";
   const paused = link.pausedAt !== null;
+  const hasImage = link.imageUrl !== null && !imageFailed;
 
   return (
-    <li className="space-y-3 rounded-lg border border-border bg-bg-elevated p-3">
-      <div className="flex gap-3">
+    <li className="px-3 py-2.5">
+      <div className="flex items-center gap-3">
         {/* The owner's own image, through the same signed URL the viewer
-            gets. `aspect-ratio` from the stored size, so the card does not
-            jump when the bytes arrive. */}
+            gets. When there is none (the file is gone, or the URL failed) the
+            box says so with an icon; an empty box read as a stray square. */}
         <div
-          className="w-20 shrink-0 overflow-hidden rounded-md border border-border bg-bg-primary"
-          style={{ aspectRatio: `${link.canvasW} / ${link.canvasH}` }}
+          className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-bg-primary"
+          title={hasImage ? undefined : "Preview unavailable"}
         >
-          {link.imageUrl && (
-            <img src={link.imageUrl} alt="" className="size-full object-cover" loading="lazy" />
+          {hasImage ? (
+            <img
+              src={link.imageUrl!}
+              alt=""
+              className="size-full object-cover"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <ImageOff aria-hidden className="size-4 text-text-muted" />
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
             <p className="min-w-0 truncate text-xs font-semibold text-text-primary">{title}</p>
             <StatusBadge status={link.status} />
           </div>
-          <p className="text-2xs text-text-muted">
-            {link.canvasW}×{link.canvasH} · made {formatDate(link.createdAt)}
+          <p className="truncate text-2xs text-text-muted">
+            <span className="font-semibold tabular-nums text-text-secondary">
+              {link.views.toLocaleString("en-US")}
+            </span>
+            {link.maxViews !== null && ` of ${link.maxViews.toLocaleString("en-US")}`}{" "}
+            {link.views === 1 && link.maxViews === null ? "view" : "views"}
+            {link.lastViewedAt !== null && ` · last opened ${agoText(link.lastViewedAt, now)}`}
+            {link.expiresAt !== null &&
+              ` · ${link.status === "expired" ? "expired" : "stops"} ${formatDate(link.expiresAt)}`}
+            {` · made ${formatDate(link.createdAt)}`}
           </p>
-          <p className="text-xs text-text-primary">
-            <span className="font-semibold tabular-nums">{link.views.toLocaleString("en-US")}</span>{" "}
-            {link.views === 1 ? "view" : "views"}
-            {link.maxViews !== null && (
-              <span className="text-text-muted"> of {link.maxViews.toLocaleString("en-US")}</span>
-            )}
-            {link.lastViewedAt !== null && (
-              <span className="text-text-muted"> · last opened {agoText(link.lastViewedAt, now)}</span>
-            )}
-            {link.expiresAt !== null && (
-              <span className="text-text-muted">
-                {" "}· {link.status === "expired" ? "expired" : "stops"} {formatDate(link.expiresAt)}
-              </span>
-            )}
-          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <RowAction icon={Link2} label={`Copy link to ${title}`} onClick={() => void copy()} />
+          <RowAction
+            icon={paused ? Play : Pause}
+            label={paused ? `Resume ${title}` : `Pause ${title}`}
+            disabled={busy !== null}
+            onClick={() =>
+              void run(
+                "pause",
+                () => (paused ? resume({ token: link.token }) : pause({ token: link.token })),
+                paused ? "Link is live again" : "Link paused",
+              )
+            }
+          />
+          <RowAction
+            icon={Timer}
+            label={`Limits for ${title}`}
+            pressed={limitsOpen}
+            onClick={() => setLimitsOpen((o) => !o)}
+          />
+          <RowAction
+            icon={Trash2}
+            label={`Delete ${title}`}
+            disabled={busy !== null}
+            onClick={() => setConfirmDelete(true)}
+          />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <NumberField
-          label="Stop after views"
-          min={1}
-          step={1}
-          placeholder="No limit"
-          value={maxViews}
-          onChange={(e) => setMaxViews(e.target.value)}
-          className="max-w-[9rem]"
-        />
-        <label className="flex flex-1 flex-col gap-0.5">
-          <span className="text-xs text-text-secondary">Stop on</span>
-          <input
-            type="date"
-            className={FIELD_NUMERIC}
-            value={expires}
-            onChange={(e) => setExpires(e.target.value)}
-          />
-        </label>
-        <Button
-          size="large"
-          disabled={!limitsDirty || !draftValid || busy !== null}
-          onClick={() =>
-            void run(
-              "limits",
-              () => setLimits({ token: link.token, maxViews: draftMax, expiresAt: draftExpires }),
-              "Limits saved",
-            )
-          }
-        >
-          {busy === "limits" ? "Saving…" : "Save limits"}
-        </Button>
-      </div>
-      {!draftValid && (
-        <p className="text-2xs text-destructive">The view limit has to be a whole number, 1 or more.</p>
+      {limitsOpen && (
+        <div className="mt-2.5 space-y-1.5 border-t border-border pt-2.5">
+          <div className="flex flex-wrap items-end gap-2">
+            <NumberField
+              label="Stop after views"
+              min={1}
+              step={1}
+              placeholder="No limit"
+              value={maxViews}
+              onChange={(e) => setMaxViews(e.target.value)}
+              className="max-w-[9rem]"
+            />
+            <label className="flex flex-1 flex-col gap-0.5">
+              <span className="text-xs text-text-secondary">Stop on</span>
+              <input
+                type="date"
+                className={FIELD_NUMERIC}
+                value={expires}
+                onChange={(e) => setExpires(e.target.value)}
+              />
+            </label>
+            <Button
+              disabled={!limitsDirty || !draftValid || busy !== null}
+              onClick={() =>
+                void run(
+                  "limits",
+                  () => setLimits({ token: link.token, maxViews: draftMax, expiresAt: draftExpires }),
+                  "Limits saved",
+                )
+              }
+            >
+              {busy === "limits" ? "Saving…" : "Save limits"}
+            </Button>
+          </div>
+          {!draftValid && <ErrorNote>The view limit has to be a whole number, 1 or more.</ErrorNote>}
+          <p className="text-2xs text-text-muted">
+            Reaching either limit pauses the link. Raise it and the link works again.
+          </p>
+        </div>
       )}
-
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void copy()}>
-          <Link2 aria-hidden />
-          Copy link
-        </Button>
-        <Button
-          disabled={busy !== null}
-          onClick={() =>
-            void run(
-              "pause",
-              () => (paused ? resume({ token: link.token }) : pause({ token: link.token })),
-              paused ? "Link is live again" : "Link paused",
-            )
-          }
-        >
-          {paused ? <Play aria-hidden /> : <Pause aria-hidden />}
-          {busy === "pause" ? "…" : paused ? "Resume" : "Pause"}
-        </Button>
-        <Button
-          className="text-destructive-strong"
-          disabled={busy !== null}
-          onClick={() => setConfirmDelete(true)}
-        >
-          <Trash2 aria-hidden />
-          Delete
-        </Button>
-      </div>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -299,19 +316,14 @@ export function SharedPane() {
         </p>
       ) : (
         <>
-          <dl className="grid grid-cols-3 gap-2 text-center">
-            {[
-              ["Links", links.length.toLocaleString("en-US")],
-              ["Views", totalViews.toLocaleString("en-US")],
-              ["Most opened", mostViewed ? `${mostViewed.views.toLocaleString("en-US")}` : "—"],
-            ].map(([k, v]) => (
-              <div key={k} className="rounded-lg border border-border bg-bg-elevated px-2 py-2">
-                <dt className="text-2xs text-text-muted">{k}</dt>
-                <dd className="text-sm font-semibold tabular-nums text-text-primary">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <ul className="space-y-3">
+          <p className="text-xs text-text-muted">
+            {links.length.toLocaleString("en-US")} {links.length === 1 ? "link" : "links"} ·{" "}
+            {totalViews.toLocaleString("en-US")} {totalViews === 1 ? "view" : "views"} in all
+            {mostViewed && mostViewed.views > 0 && links.length > 1 && (
+              <> · most opened: {mostViewed.title ?? "Untitled"}</>
+            )}
+          </p>
+          <ul className="divide-y divide-border rounded-lg border border-border bg-bg-elevated">
             {links.map((l) => (
               <LinkCard key={l.token} link={l} now={now} />
             ))}
