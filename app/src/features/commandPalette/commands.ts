@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Share2,
   Beaker,
+  Puzzle,
   Sun,
   Undo2,
 } from "lucide-react";
@@ -217,6 +218,15 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
         "webgpu", "gpu"],
       icon: Beaker,
       run: () => openSettingsTab("beta"),
+    },
+    {
+      id: "settings.plugins",
+      label: "Plugins",
+      group: "settings",
+      keywords: ["plugins", "plugin", "extensions", "add-ons", "psd", "photoshop",
+        "formats", "import", "export"],
+      icon: Puzzle,
+      run: () => openSettingsTab("plugins"),
     },
     {
       id: "settings.toggle-rulers",

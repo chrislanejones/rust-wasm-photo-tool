@@ -36,6 +36,7 @@
 - **Per-photo Edit Persistence** — Switching photos saves the full WASM canvas + undo/redo stack to IndexedDB (PNG-encoded per snapshot). Switching back restores the exact edit session — same canvas state, same undo history, all redo steps intact
 - **Layers** — a real layer stack per photo: 8 layers per image, 16 on Pro. Add, rename, hide, reorder, set opacity, delete and flatten from **Review → Layers**; **Edit → Layers** moves, resizes and masks the picked layer (paint the mask, invert it, apply it or remove it) and adds a color overlay. The stack lives in the Rust engine and is saved with the edit, so it survives a reload
 - **OpenRaster export and import** — **Settings → Import / Export** writes the full project, every layer, to an `.ora` file that opens in Krita, GIMP and other editors, and opens an `.ora` as a new photo with its layer stack restored
+- **Plugins** — features that ship inside the app but stay off until turned on in **Settings → Plugins** (a master switch, then one per plugin; kept on this device, nothing downloaded). The first is **Photoshop PSD**: export the full project as a layered `.psd` from the Download dialog or Settings → Import / Export, and open a `.psd` as a new photo with its layers — names, order, visibility and opacity survive; blend modes, groups, masks and adjustment layers are dropped and the import says which. See [Plugins](Plugins.md)
 
 ### UI (React)
 

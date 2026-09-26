@@ -173,6 +173,8 @@ app/src/
 │   │                                 pane-heading, status-note, segmented-tabs, swatch, tooltip
 │   │                                 (+ HintTooltip). Repeated class strings live in lib/styles.ts
 │   ├── ParkedScreen.tsx              "This tab is parked" card behind IdleScreen + MultiTabScreen
+│   ├── PluginsPane.tsx               Settings → Plugins: the master "Allow plugins" switch and a row per
+│   │                                 plugin in lib/plugins/registry.ts; commits as pressed (ADR-072)
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
@@ -303,6 +305,13 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
+    ├── plugins/                      Plugins (ADR-072, docs/Plugins.md): code that ships in the bundle,
+    │                                 off until switched on per device. registry.ts is the catalogue,
+    │                                 state.ts the two switches (localStorage), document.ts the
+    │                                 LayeredDocument a format plugin speaks, bridge.ts the ONE place
+    │                                 that moves one in/out of the engine, download.ts +
+    │                                 importAsNewPhoto.ts the shared funnels. psd/ is the first
+    │                                 plugin: a pure .psd codec (read.ts / write.ts / packbits.ts)
     ├── preferences.ts                App-wide prefs (Settings → General / Appearance / Rulers &
     │                                 Grids / Security / Layers and Canvas): the shape, the defaults,
     │                                 the clamps, and the canonical serializer that is ALSO the sync

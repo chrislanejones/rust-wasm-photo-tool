@@ -112,9 +112,12 @@ import {
   compositeSavedEdit,
   encodeRgba,
   EXT,
+  EXPORT_FORMATS,
   extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
+import { activeFormatById, downloadPluginFormatWithToast } from "@/lib/plugins";
+import { useActivePluginFormats } from "@/hooks/usePlugins";
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
@@ -224,9 +227,14 @@ function capMessage(mode: UserMode, max: number): string {
 
 // Format choices shown in the Download dialog — a second chance to pick a
 // format for anyone who missed the dropdown in the Compress panel. ORA is the
-// one non-raster choice — the full layered project, not a flattened encode —
-// so it never touches the persisted `exportFormat` preference below.
-type DownloadFormat = ExportFormat | "ora";
+// built-in non-raster choice — the full layered project, not a flattened
+// encode — so it never touches the persisted `exportFormat` preference below.
+// A format PLUGIN (Settings → Plugins; lib/plugins) adds its own layered
+// choice after these, keyed by the plugin format's id, and is treated the same
+// way: local to the dialog, never persisted.
+type DownloadFormat = ExportFormat | "ora" | (string & {});
+const isExportFormat = (v: string): v is ExportFormat =>
+  (EXPORT_FORMATS as readonly string[]).includes(v);
 const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; hint: string }[] = [
   { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
   { value: "png", label: "PNG", hint: "Lossless · transparency" },
@@ -909,14 +917,21 @@ export function AppShell() {
       live = false;
     };
   }, []);
+  const pluginFormats = useActivePluginFormats();
   const downloadFormats = useMemo(
-    () =>
-      DOWNLOAD_FORMATS.map((o) =>
+    () => [
+      ...DOWNLOAD_FORMATS.map((o) =>
         o.value === "avif" && avifEncodable === false
           ? { ...o, hint: "Not supported here · saves as PNG" }
           : o,
       ),
-    [avifEncodable],
+      ...pluginFormats.map(({ format }) => ({
+        value: format.id as DownloadFormat,
+        label: format.label,
+        hint: format.hint,
+      })),
+    ],
+    [avifEncodable, pluginFormats],
   );
   /** What will actually be written — drives the dialog's button label so it
    *  cannot offer "Download AVIF" and then hand over a PNG. */
@@ -930,6 +945,18 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportDialogOpen]);
   const isOraDownload = downloadFormat === "ora";
+  // A plugin pick resolves against the ACTIVE formats each render: switching
+  // the plugin off while the dialog is open drops the pick back to a raster
+  // format rather than downloading through a plugin that is no longer on.
+  const pluginDownload =
+    !isOraDownload && !isExportFormat(downloadFormat)
+      ? activeFormatById(downloadFormat)
+      : undefined;
+  const layeredDownloadExt = isOraDownload
+    ? ".ora"
+    : pluginDownload
+      ? pluginDownload.format.extension
+      : null;
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -1198,6 +1225,16 @@ export function AppShell() {
         flushToCanvas: stamp.flushToCanvas,
         syncState: stamp.syncState,
         imageName: activeEntry?.name,
+      });
+      return;
+    }
+    if (pluginDownload) {
+      void downloadPluginFormatWithToast({
+        format: pluginDownload.format,
+        stampToolRef: stamp.toolRef,
+        flushToCanvas: stamp.flushToCanvas,
+        syncState: stamp.syncState,
+        fileStem: exportName.stem(),
       });
       return;
     }
@@ -2978,7 +3015,8 @@ export function AppShell() {
                 value={downloadFormat}
                 onValueChange={(v) => {
                   setDownloadFormat(v);
-                  if (v !== "ora") setExportFormat(v); // ORA stays local-only
+                  // ORA and plugin formats stay local to the dialog.
+                  if (isExportFormat(v)) setExportFormat(v);
                 }}
                 options={downloadFormats}
                 columns={2}
@@ -2989,15 +3027,21 @@ export function AppShell() {
               value={exportName.value}
               defaultStem={exportName.defaultStem}
               onChange={exportName.onChange}
-              ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
+              ext={layeredDownloadExt ?? EXT[effectiveExportFormat]}
               onSubmit={downloadFromDialog}
             />
           </DialogBody>
 
           <DialogFooter className="flex-row gap-2">
             <ActionTile
-              icon={isOraDownload ? Package : ImageIcon}
-              label={isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`}
+              icon={layeredDownloadExt ? Package : ImageIcon}
+              label={
+                isOraDownload
+                  ? "Download ORA"
+                  : pluginDownload
+                    ? `Download ${pluginDownload.format.label}`
+                    : `Download ${effectiveExportFormat.toUpperCase()}`
+              }
               onClick={downloadFromDialog}
             />
             <ShareButton
