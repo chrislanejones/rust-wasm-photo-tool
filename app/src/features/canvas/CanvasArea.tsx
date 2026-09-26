@@ -36,6 +36,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
+import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
@@ -604,6 +605,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Layers-panel mask painting: gates the ring and the cursor exactly like
     // `eraserMode` above, and is read from the store for the same reason.
     const maskEditing = useToolStore((s) => s.maskEditing);
+    // 0 = black = hides, 255 = white = reveals. The ring is painted this
+    // colour while mask editing, so the cursor itself answers "what will this
+    // stroke do" — the third of the three places that read `maskEditing`, and
+    // like the other two it computes nothing of its own.
+    const maskPaintValue = useToolStore((s) => s.maskPaintValue);
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -2286,12 +2292,18 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           !cursor &&
           !isPanning && (
           <div
-            className="brush-cursor"
+            className={`brush-cursor${maskEditing ? " brush-cursor--mask" : ""}`}
             style={{
               left: cursorPos.x,
               top: cursorPos.y,
               width: brushDiameter,
               height: brushDiameter,
+              ...(maskEditing
+                ? ({
+                    "--mask-cursor-ink": maskCursorInk(maskPaintValue),
+                    "--mask-cursor-halo": maskCursorHalo(maskPaintValue),
+                  } as React.CSSProperties)
+                : null),
             }}
           />
         )}

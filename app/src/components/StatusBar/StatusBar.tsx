@@ -109,6 +109,10 @@ export function StatusBar({
   const uploadDims = useUploadDimensions();
   // Read from the tool store, like uploadDims above, so AppShell gains no prop.
   const coverage = useToolStore((s) => s.selectionCoverage);
+  // The ONE publisher of "what will the next brush stroke change" — the same
+  // value the canvas cursor reads. Neither computes its own answer; that drift
+  // is what this pass exists to stop.
+  const maskEditing = useToolStore((s) => s.maskEditing);
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -206,6 +210,19 @@ export function StatusBar({
         {/* Same slot rules as Undo NN% beside it: here while something is
             selected, gone when nothing is, and neutral at every value — a
             0.02% selection is information, not an error. */}
+        {/* Same slot rules as Undo NN% and the selection readout: present
+            while true, absent when not, never alarming. Before this, the tile
+            label in Layer Settings ("Paint mask" / "Painting mask") was the
+            ONLY place in the app that said a stroke would change the mask
+            instead of the pixels, and you had to go looking at it. */}
+        {maskEditing && (
+          <>
+            <span className="status-zoom" data-testid="status-mask-editing">
+              Editing mask &middot; black hides, white reveals
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {coverage && (
           <>
             <span className="status-zoom" data-testid="status-selection">
