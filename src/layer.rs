@@ -835,26 +835,7 @@ impl ImageHorseTool {
     /// having to special-case an empty layer.
     pub(crate) fn layer_content_bbox(&self, idx: usize) -> (u32, u32, u32, u32) {
         let (ow, oh) = (self.width, self.height);
-        let data = &self.layers[idx].buf.data;
-        let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
-        let mut found = false;
-        for y in 0..oh {
-            let row = (y * ow) as usize * 4;
-            for x in 0..ow {
-                if data[row + x as usize * 4 + 3] != 0 {
-                    found = true;
-                    minx = minx.min(x);
-                    miny = miny.min(y);
-                    maxx = maxx.max(x);
-                    maxy = maxy.max(y);
-                }
-            }
-        }
-        if found {
-            (minx, miny, maxx - minx + 1, maxy - miny + 1)
-        } else {
-            (0, 0, ow, oh)
-        }
+        crate::tight_bbox(&self.layers[idx].buf.data, ow, oh).unwrap_or((0, 0, ow, oh))
     }
 }
 
@@ -1112,12 +1093,6 @@ impl ImageHorseTool {
         } else {
             Some((dx, dy))
         };
-    }
-
-    /// Move tool — discard any in-progress move preview without committing
-    /// (drag abort / Escape). No history.
-    pub fn cancel_move_preview(&mut self) {
-        self.move_preview = None;
     }
 
     /// Move tool — commit a move of the ACTIVE layer's content by (dx, dy):
@@ -1669,11 +1644,6 @@ impl ImageHorseTool {
         }
         self.recomposite();
         true
-    }
-
-    /// Whether layer `id` currently has a mask.
-    pub fn has_layer_mask(&self, id: u32) -> bool {
-        self.layers.iter().any(|l| l.id == id && l.mask.is_some())
     }
 
     // ── Layer color overlay (non-destructive style) ──────────────────────

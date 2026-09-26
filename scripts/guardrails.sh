@@ -91,7 +91,7 @@ n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-
     -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
     -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
+check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
@@ -151,7 +151,10 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # ops_engine_parity that is 7 lines a naive pass misfiles as production code.
 # Match `cfg(all(test` too, and check the `mod` declaration, not just the file.
 #
-# What 47 now means: 45 genuine production sites — 35 of them SIMD `unsafe`,
+# 47 -> 46 on 2026-09-26: measured, not annotated — a production site left.
+# The breakdown below is now 44 production + the same 2 test panics.
+#
+# What 47 meant: 45 genuine production sites — 35 of them SIMD `unsafe`,
 # which is expected and unchanged since v7.72 — plus exactly 2 test panics that
 # CANNOT carry a same-line annotation:
 #   src/ops_engine_parity.rs  the multi-line `panic!(` in assert_flat_identical
@@ -166,7 +169,7 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # followed by a standalone `//` comment makes rustfmt align that comment to the
 # annotation column, shoving unrelated prose out to column ~70. A blank line
 # between them prevents it.
-check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
+check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
@@ -209,8 +212,13 @@ check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 # Two branches ratcheting the same counter independently is the only way this
 # number can move UP without new slop, and the check for it is the one below:
 # 4808 must be lower than the baseline on the branch you are merging INTO.
+# 4808 -> 4662 (2026-09-26): 45 of those were slack (the file had shrunk and
+# the number had not followed); the other 101 are the crop-preview trio,
+# `stamp_red` and `get_brush_size`, wasm exports with no caller anywhere. The
+# next lowerings are in docs/AppShell-Refactor-Plan.md (§ Rust): the two test
+# modules (1,188 lines) and the op-log block (~820) leave lib.rs.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4808 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4662 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
