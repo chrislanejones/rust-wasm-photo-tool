@@ -753,11 +753,6 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
 #[wasm_bindgen]
 impl ImageHorseTool {
     // ── Drawing: Arrows ─────────────────────────────────────────
-    /// Save undo snapshot before drawing an arrow/shape.
-    /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
-    pub fn begin_draw_stroke(&mut self, label: &str) {
-        self.snap(label);
-    }
 
     /// Draw an arrow onto the image buffer.
     /// style: 0 = single-headed, 1 = double-headed
@@ -1026,42 +1021,6 @@ impl ImageHorseTool {
         id
     }
 
-    /// Add a freehand/polyline pen stroke (kind 6). `points` is a flat
-    /// [x0,y0,x1,y1,…] array of vertices; the bbox is derived from it.
-    /// Pushes "Add Pen".
-    pub fn add_polyline_annotation(
-        &mut self,
-        points: &[f64],
-        color_hex: &str,
-        stroke_width: f64,
-    ) -> u32 {
-        self.snap("Add Pen");
-        let c = drawing::parse_hex_color(color_hex);
-        let pts = flat_to_points(points);
-        let (x0, y0, x1, y1) = points_bbox(&pts);
-        let id = self.next_shape_id;
-        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active]
-            .shape_annotations
-            .push(ShapeAnnotation {
-                id,
-                kind: 6,
-                x0,
-                y0,
-                x1,
-                y1,
-                r: c[0],
-                g: c[1],
-                b: c[2],
-                stroke_width,
-                arrow_style: 0,
-                number: 0,
-                points: pts,
-                ..Default::default()
-            });
-        id
-    }
-
     /// Restore a persisted polyline WITHOUT pushing history. Color is raw r,g,b.
     pub fn restore_polyline_annotation(
         &mut self,
@@ -1181,25 +1140,6 @@ impl ImageHorseTool {
                 ..Default::default()
             });
         id
-    }
-
-    /// Replace just the control points of an existing annotation (no history).
-    /// Used for live drag-editing of a Bézier path's anchors/handles; the
-    /// caller pushes one snapshot when the drag gesture ends.
-    pub fn set_annotation_points(&mut self, id: u32, points: &[f64]) {
-        let pts = flat_to_points(points);
-        let (x0, y0, x1, y1) = points_bbox(&pts);
-        if let Some(s) = self.layers[self.active]
-            .shape_annotations
-            .iter_mut()
-            .find(|s| s.id == id)
-        {
-            s.points = pts;
-            s.x0 = x0;
-            s.y0 = y0;
-            s.x1 = x1;
-            s.y1 = y1;
-        }
     }
 
     /// Commit a reshape of an existing Bézier path: pushes one "Edit Pen Path"

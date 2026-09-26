@@ -484,7 +484,7 @@ function formatAuditBytes(n: number): string {
 }
 
 /** Markdown rendering of a report — what gets pasted into
- *  docs/content-addressed-gc-audit.md. Kept next to the audit so the document's
+ *  docs/content-addressed-gc-audit.md (git history; moved out of the repo 2026-09-17). Kept next to the audit so the document's
  *  shape and the analysis can't drift apart. */
 export function formatAuditMarkdown(r: ContentAuditReport): string {
   const L: string[] = [];

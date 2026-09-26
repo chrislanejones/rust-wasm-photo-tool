@@ -510,7 +510,7 @@ export function BatchSettings({
             // what the user sees.
             // Throwaway engine (the one-port allowlist), so these two cannot tear —
             // nothing else can mutate it between them. Ordinary awaits, not a capture;
-            // see docs/engine-worker-capture-sweep.md.
+            // see docs/engine-worker-capture-sweep.md (git history; moved out of the repo 2026-09-17).
             const workW = await tool.width();
             const workH = await tool.height();
             const targetLogoW = Math.max(

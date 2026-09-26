@@ -263,7 +263,7 @@ jobs:
       # secret was not set, all three steps above were skipped, and the job
       # reported SUCCESS while deploying nothing. Prod stayed three modules
       # short and master's CI said everything was fine. Green because it could
-      # not fail is the exact shape docs/vacuous-checks.md exists to name.
+      # not fail is the exact shape docs/vacuous-checks.md (git history; moved out of the repo 2026-09-17) exists to name.
       - name: Fail if the deploy key is missing
         if: env.CONVEX_DEPLOY_KEY == ''
         run: |
@@ -344,7 +344,7 @@ jobs:
           language: javascript-typescript
       - uses: github/codeql-action/analyze@v4.38.0
 
-  # ---------- Static guardrails (from docs/ci-guardrails.md) ----------
+  # ---------- Static guardrails (from docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17)) ----------
   # BLOCKING as of the night-repair pass. These ran under `continue-on-error`
   # on the job AND every step, which meant they reported violations and failed
   # nothing — advisory theater. Flipping them straight to blocking was not an

@@ -19,6 +19,7 @@ What is in this folder, and what deliberately is not.
 | [Deploying.md](Deploying.md) | how a release reaches production |
 | [Change-summary.md](Change-summary.md) | full release history |
 | [PARKING_LOT.md](PARKING_LOT.md) | problems noticed but deliberately not fixed yet |
+| [AppShell-Refactor-Plan.md](AppShell-Refactor-Plan.md) | how the big files get smaller, and what the 2026-09-26 audit found |
 | [adr/](adr/INDEX.md) | decision records — why, not what |
 | [archive/](archive/README.md) | superseded documents, kept for their reasoning |
 

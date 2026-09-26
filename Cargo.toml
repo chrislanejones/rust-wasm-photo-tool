@@ -130,9 +130,10 @@ name = "oplog_v3_resume"
 required-features = ["tiles"]
 
 # Same registration rule, same reason — it replays a captured v8 log through
-# `oplog_restore_png`. EXPECTED RED: it pins the TextEdit setting loss, which
-# is a format-semantics decision left for an attended session (see the file
-# header and FINDINGS-oplog-and-text-0919.md).
+# `oplog_restore_png`. Its rows were RED when the file was written (the
+# TextEdit setting loss — see the file header and FINDINGS-oplog-and-text-0919.md);
+# the repair in `ops.rs` (`decode_op`'s v8 ladder) turned them green, and the
+# test now pins that repair.
 [[test]]
 name = "oplog_v8_text_settings_replay"
 required-features = ["tiles"]

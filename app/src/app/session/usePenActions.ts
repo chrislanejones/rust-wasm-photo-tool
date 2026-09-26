@@ -30,7 +30,7 @@ export function usePenActions(
 ) {
   const clearPenEditRequest = useAnnotationStore((s) => s.clearPenEditRequest);
 
-  // ADR-024 Stage 3.5, the PenOverlay redesign (`docs/pen-overlay-async-design.md`).
+  // ADR-024 Stage 3.5, the PenOverlay redesign (`docs/pen-overlay-async-design.md (git history; moved out of the repo 2026-09-17)`).
   // This is the site whose RETURN VALUE is the contract, which is why it outlived
   // every other conversion: `PenOverlay.finish()` uses the new id to keep the
   // path selected, so an un-awaited version hands it a Promise and the path you

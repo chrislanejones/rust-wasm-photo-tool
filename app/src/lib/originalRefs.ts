@@ -3,7 +3,7 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // THE BUG THIS EXISTS TO STOP (found 2026-07-28 by the GC reachability audit,
-// docs/content-addressed-gc-audit.md § "Not asked for, and more serious")
+// docs/content-addressed-gc-audit.md (git history; moved out of the repo 2026-09-17) § "Not asked for, and more serious")
 //
 // Originals are content-addressed, so identical bytes are ONE blob with many
 // referrers — and `handleDuplicateSelected` leans on that deliberately: a

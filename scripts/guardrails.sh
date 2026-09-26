@@ -91,7 +91,7 @@ n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-
     -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
     -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
+check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
@@ -151,7 +151,10 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # ops_engine_parity that is 7 lines a naive pass misfiles as production code.
 # Match `cfg(all(test` too, and check the `mod` declaration, not just the file.
 #
-# What 47 now means: 45 genuine production sites — 35 of them SIMD `unsafe`,
+# 47 -> 46 on 2026-09-26: measured, not annotated — a production site left.
+# The breakdown below is now 44 production + the same 2 test panics.
+#
+# What 47 meant: 45 genuine production sites — 35 of them SIMD `unsafe`,
 # which is expected and unchanged since v7.72 — plus exactly 2 test panics that
 # CANNOT carry a same-line annotation:
 #   src/ops_engine_parity.rs  the multi-line `panic!(` in assert_flat_identical

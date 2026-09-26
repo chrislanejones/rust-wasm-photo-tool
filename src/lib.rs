@@ -854,7 +854,7 @@ impl ImageHorseTool {
 /// Tight bounding box `(x, y, w, h)` of every pixel with non-zero alpha in an
 /// RGBA `w×h` buffer. `None` if every pixel is fully transparent (nothing to
 /// crop to).
-fn tight_bbox(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+pub(crate) fn tight_bbox(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
     let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
     let mut found = false;
     for y in 0..h {
@@ -2072,10 +2072,6 @@ impl ImageHorseTool {
         self.stamp.set_brush_size(size);
     }
 
-    pub fn get_brush_size(&self) -> u32 {
-        self.stamp.brush_size
-    }
-
     pub fn set_hardness(&mut self, h: f64) {
         self.stamp.set_hardness(h);
     }
@@ -2394,47 +2390,6 @@ impl ImageHorseTool {
                 h,
             },
         });
-    }
-
-    /// Preview crop overlay in WASM.
-    /// Saves a snapshot, applies darkening overlay + dashed border.
-    /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
-    pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.snap("Crop Preview");
-        transform::apply_crop_overlay(
-            &mut self.layers[self.active].buf.data,
-            self.width,
-            self.height,
-            x,
-            y,
-            w,
-            h,
-            0.5,
-        );
-        transform::draw_crop_border(
-            &mut self.layers[self.active].buf.data,
-            self.width,
-            self.height,
-            x,
-            y,
-            w,
-            h,
-            [255, 255, 255, 200],
-            5,
-            5,
-        );
-    }
-
-    /// Remove the crop preview (undo the snapshot pushed by preview_crop).
-    pub fn cancel_crop_preview(&mut self) -> bool {
-        self.undo()
-    }
-
-    /// Apply crop after preview: undo preview first, then crop for real.
-    pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        // Drop the preview snapshot/overlay, then crop the real pixels.
-        self.undo();
-        self.crop(x, y, w, h);
     }
 
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
@@ -3054,63 +3009,7 @@ impl ImageHorseTool {
             dest_y,
         );
     }
-    /// Like stamp_pixels but scales the source to `target_size × target_size`
-    /// first (bilinear), then composites it centered on (dest_x, dest_y).
-    /// Pushes "Red Stamp" to history (not "Emoji").
-    pub fn stamp_red(
-        &mut self,
-        pixels: &[u8],
-        src_w: u32,
-        src_h: u32,
-        dest_x: i32,
-        dest_y: i32,
-        target_size: u32,
-    ) {
-        self.snap("Red Stamp");
-        // Scale stamp to target_size preserving aspect ratio
-        let scale = target_size as f64 / src_w.max(src_h) as f64;
-        let new_w = ((src_w as f64 * scale).round() as u32).max(1);
-        let new_h = ((src_h as f64 * scale).round() as u32).max(1);
-        let scaled = transform::resize_bilinear(pixels, src_w, src_h, new_w, new_h);
-        // Center on dest
-        let cx = dest_x - (new_w as i32 / 2);
-        let cy = dest_y - (new_h as i32 / 2);
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            &scaled,
-            new_w,
-            new_h,
-            cx,
-            cy,
-        );
-    }
 
-    /// DEPRECATED: prefer `add_text_annotation` + `flatten_text_annotations`
-    /// for the re-editable overlay flow. Kept as a one-shot direct-to-pixels
-    /// fallback for callers (currently: Batch Text) that don't need re-edit —
-    /// Batch runs each photo through a disposable `ImageHorseTool` that's
-    /// `.free()`'d right after export, so there's no live annotation state
-    /// to speak of, just bake-and-export.
-    ///
-    /// Render text entirely in Rust (Liberation Sans, embedded font) and
-    /// composite it onto the image buffer at (dest_x, dest_y).
-    /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
-    /// `dest_x/dest_y` is the top-left corner of the unrotated TEXT block —
-    /// when `background_kind` adds a background box, it grows outward from
-    /// the text by `bg_padding` on every side, so the text itself never
-    /// shifts and callers don't need to re-derive their placement math when
-    /// background is toggled on.
-    /// `angle_deg` rotates the rendered tile clockwise (positive) around its center.
-    ///
-    /// `background_kind`: 0 = none, 1 = solid rect. NOT 2 (speech bubble) —
-    /// batch text is a one-shot flatten with no live overlay to hang a
-    /// tail-direction control off, so the bubble path is intentionally
-    /// unreachable from here. Shares `build_annotation_tile` with
-    /// `add_text_annotation`/`update_text_annotation` (shadow off, no tail)
-    /// so the rect-fill/padding/corner-radius rendering can't drift between
-    /// the live-overlay and batch entry points.
     /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
     /// `target_size`, and composite it centered on (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_red pipeline for red stamps.

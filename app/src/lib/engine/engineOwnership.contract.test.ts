@@ -13,38 +13,11 @@
 // `toolSurfaces.contract.test.ts`, which caught the toolbar drift's cause
 // rather than its symptom.
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { SRC, FILES, rel, code } from "./contractScan";
 
-// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
-// guard that resolves relative to the launch directory reads ZERO files when
-// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
-// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
-// passes VACUOUSLY. Verified by planting a real violation: from the repo root
-// the guard stayed green; from `app/` it caught it.
-const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
-const SRC = join(APP_ROOT, "src");
-
-/** Every .ts/.tsx under app/src, excluding specs. */
-function walk(dir: string, out: string[] = []): string[] {
-  for (const e of readdirSync(dir)) {
-    const p = join(dir, e);
-    if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(e) && !/\.test\.tsx?$/.test(e) && !e.endsWith(".d.ts")) out.push(p);
-  }
-  return out;
-}
-
-const rel = (f: string) => f.split("/src/")[1] ?? f;
-
-/** Comments are stripped before every check below. An earlier guard in this
- *  repo passed against deleted code because it matched the identifier inside
- *  the comment explaining the code — a test satisfied by its own docs. */
-const code = (f: string) =>
-  readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-
-const FILES = walk(SRC);
+// The walker, `rel` and `code` live in ./contractScan (one copy for every
+// source-walking contract test); comments are stripped before every check.
 
 describe("only useEngineCore owns the live engine handle", () => {
   it("is the only module that assigns toolRef.current", () => {

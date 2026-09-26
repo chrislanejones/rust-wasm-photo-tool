@@ -150,25 +150,6 @@ export const saveSettings = mutation({
   },
 });
 
-/** Increment daily usage counter (resets after 24h). */
-export const incrementUsage = mutation({
-  args: { amount: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const now = Date.now();
-    const oneDayMs = 86_400_000;
-    const shouldReset = now - user.usageResetAt > oneDayMs;
-
-    await ctx.db.patch(user._id, {
-      dailyUsage: shouldReset
-        ? (args.amount ?? 1)
-        : user.dailyUsage + (args.amount ?? 1),
-      usageResetAt: shouldReset ? now : user.usageResetAt,
-      updatedAt: now,
-    });
-  },
-});
-
 /** DEV/ADMIN: set a user's tier by email. internalMutation -> NOT callable
  *  from the client; only via `npx convex run users:devGrantTier`. */
 export const devGrantTier = internalMutation({

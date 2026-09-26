@@ -18,16 +18,12 @@
 // if the number goes DOWN without the budget being lowered (so a batch cannot
 // land without someone deliberately recording the progress). 168 -> 0 is the
 // gate, one edit to `BUDGET` per batch.
-//
-// WHY IT SHELLS OUT. The classification lives in `scripts/engine-call-audit.mjs`
-// and only there. Reimplementing "is this awaited" here would create two
-// definitions of converted that drift apart, and the audit is the artifact the
-// contract names as the measure. One implementation, this test consumes it.
+// (Why the count is a shell-out, not a regex here: see ./engineCallGate.ts.)
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { SRC, FILES, rel, code } from "./contractScan";
+import { gate } from "./engineCallGate";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 /** Lower this by exactly the batch size as each of a3–a10 lands. Gate is 0.
  *
@@ -325,34 +321,6 @@ import { fileURLToPath } from "node:url";
  *  `DISSOLVES_AT_STAGE_4` and the floor test below before trying. */
 const BUDGET = 5;
 
-// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
-// guard that resolves relative to the launch directory reads ZERO files when
-// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
-// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
-// passes VACUOUSLY. Verified by planting a real violation: from the repo root
-// the guard stayed green; from `app/` it caught it.
-const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
-const REPO = join(APP_ROOT, "..");
-const SRC = join(APP_ROOT, "src");
-
-interface Gate {
-  total: number;
-  valueConsumed: number;
-  awaited: number;
-  unawaited: number;
-  restructure: number;
-  truthy: number;
-  remaining: number;
-  remainingByFile: Record<string, number>;
-  truthySites: string[];
-  remainingHandlers: string[];
-  hotHandlers: string[];
-  /** a10 — the hot-path bucket, measured for the first time in v8.21. */
-  hotConsumed: number;
-  hotRemaining: number;
-  hotRemainingHandlers: string[];
-}
-
 /** ADR-024 a10 — the SECOND gate, and the one whose absence nearly shipped a
  *  broken flag.
  *
@@ -373,31 +341,6 @@ interface Gate {
  *  15  v8.20 — measured for the first time (2 truthy-trap, 13 needs-restructure)
  */
 const BUDGET_HOT = 0;
-
-const gate: Gate = JSON.parse(
-  execFileSync("node", [join(REPO, "scripts/engine-call-audit.mjs"), "--json", REPO], {
-    encoding: "utf8",
-  }),
-);
-
-function walk(dir: string, out: string[] = []): string[] {
-  for (const e of readdirSync(dir)) {
-    const p = join(dir, e);
-    if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(e) && !/\.test\.tsx?$/.test(e) && !e.endsWith(".d.ts")) out.push(p);
-  }
-  return out;
-}
-
-const rel = (f: string) => f.split("/src/")[1] ?? f;
-
-/** Comments stripped — same reasoning as the ownership contract: a guard that
- *  matches the identifier inside the comment explaining it is satisfied by its
- *  own documentation. */
-const code = (f: string) =>
-  readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-
-const FILES = walk(SRC);
 
 describe("Stage 3.5 — value-consuming engine calls become async", () => {
   it("the audit still finds the call sites at all", () => {
@@ -1035,7 +978,6 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     ).toBe(BUDGET - EXEMPT_TOTAL);
   });
 
-
   it("every allowlist entry still matches something", () => {
     // Guards the allowlist itself. An entry that stops matching — because the
     // handler was renamed or the file moved — would silently grant a blanket
@@ -1081,68 +1023,5 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // quietly park finished work in a10 and flatter the gate.
     const dragged = gate.hotHandlers.filter((r) => handlerOf(r) === "moveLayer");
     expect(dragged, "moveLayer is a discrete reorder, not a frame path").toEqual([]);
-  });
-});
-
-// The flag belongs in `port.ts`. A caller that branches on it has re-exposed
-// the choice Stage 3.5 exists to hide, and every such branch is a place the two
-// implementations can quietly diverge.
-//
-// `featureFlags.ts` is allowlisted and is NOT a call site: it is the registry
-// that lists all 11 flags for the dev flag panel, and it consumes
-// `engineWorkerEnabled` as the `isOn` reader exactly like every other flag.
-// The contract said "nothing consumes its return value"; the repo disagreed,
-// and per the contract's own rule the repo wins.
-const FLAG_READERS: Record<string, string> = {
-  "lib/engine/port.ts": "owns the flag — this is where the local/worker choice belongs",
-  "lib/featureFlags.ts": "the flag registry; surfaces ih_engine_worker in the dev panel like all 11",
-};
-
-describe("worker selection stays behind the port", () => {
-  it("no call site branches on ih_engine_worker", () => {
-    const readers = FILES.filter((f) =>
-      /ih_engine_worker|engineWorkerEnabled/.test(code(f)),
-    ).map(rel);
-    const unexpected = readers.filter((f) => !(f in FLAG_READERS));
-    expect(
-      unexpected,
-      "a module outside the port reads the engine-worker flag.\n" +
-        "Stage 3.5's invariant is that callers use the async contract REGARDLESS of what is behind\n" +
-        "the seam. If a caller has to know, the seam is not doing its job — fix the seam, not the caller.",
-    ).toEqual([]);
-  });
-
-  it("every allowlisted flag reader still reads it", () => {
-    // A stale allowlist silently permits a path that moved elsewhere.
-    for (const [f, why] of Object.entries(FLAG_READERS)) {
-      expect(why.length, `${f} needs a reason`).toBeGreaterThan(20);
-      const full = FILES.find((x) => rel(x) === f);
-      expect(full, `allowlisted ${f} no longer exists — drop it`).toBeTruthy();
-      expect(
-        /ih_engine_worker|engineWorkerEnabled/.test(code(full!)),
-        `allowlisted ${f} no longer reads the flag — drop it from FLAG_READERS`,
-      ).toBe(true);
-    }
-  });
-});
-
-// Deliberately overlaps `engineOwnership.contract.test.ts`. The contract lists
-// this as one of the three properties Stage 3.5's guard must hold, and a test
-// file should stand alone for the property it names — duplicated assertions are
-// cheap, whereas a property nobody owns is how ONE PORT PER DOCUMENT erodes.
-describe("throwaway engines stay off the live port", () => {
-  const THROWAWAY = ["lib/exportImage.ts", "features/tools/settings/BatchSettings.tsx"];
-
-  it("no throwaway document routes through attachLivePort", () => {
-    for (const f of THROWAWAY) {
-      const full = FILES.find((x) => rel(x) === f);
-      expect(full, `${f} moved — update this list and engineOwnership.contract.test.ts together`)
-        .toBeTruthy();
-      expect(
-        code(full!),
-        `${f} calls attachLivePort — its ops would land in the LIVE document's op log, ` +
-          "so undo would replay edits to a photo nobody opened",
-      ).not.toContain("attachLivePort");
-    }
   });
 });

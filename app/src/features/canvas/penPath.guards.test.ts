@@ -1,7 +1,7 @@
 // ===== FILE: app/src/features/canvas/penPath.guards.test.ts =====
 //
 // The two guards the PenOverlay redesign added — ADR-024 Stage 3.5, the last
-// step (`docs/pen-overlay-async-design.md`).
+// step (`docs/pen-overlay-async-design.md (git history; moved out of the repo 2026-09-17)`).
 //
 // `handlePenCommit` and `handlePenHitTest` were the final two convertible sites
 // in the migration, and they outlived the other ~89 because neither is an

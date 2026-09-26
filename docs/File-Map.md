@@ -177,7 +177,6 @@ app/src/
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
 │   │                                 log + tier selector) in production builds
-│   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
 │   ├── ColorSwatchGrid.tsx           Preset swatches + the user's saved palette + a "+" that opens
 │   │                                 the ColorPickerDialog; translucent picks sit on a checkerboard
 │   ├── ColorPickerDialog.tsx         The color dialog behind every "+": wheel / rectangle picker
@@ -236,7 +235,6 @@ app/src/
 │   │   │                             Duplicate button (content-addressed copy) beside Export /
 │   │   │                             Delete Selected; header count reads "N of N — cap max" /
 │   │   │                             "Selected: n of N" with an (i) tier-limit tooltip from TIERS
-│   │   └── PhotoThumb.tsx            Individual thumbnail component
 │   ├── tools/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
 │   │   ├── ToolGrid.tsx              Gradient icon buttons
@@ -250,12 +248,11 @@ app/src/
 │   │       │                         auto-compress, and ONE Apply button named for what is pending
 │   │       ├── EffectsSettings.tsx   Tab-switched: Levels (brightness/contrast sliders) +
 │   │       │                         Color Picker (eyedropper, activates magnifier overlay)
-│   │       ├── ArrowSettings.tsx     Coming-soon panel (FileText icon); content moved to
-│   │       │                         ShapeSettings Arrows tab
 │   │       ├── ShapeSettings.tsx     2-tab: Shapes (4 buttons styled like Transform panel,
 │   │       │                         lucide icons, stroke/color) + Arrows (stroke, style, color);
 │   │       │                         shapesMode lifted to AppShell for correct canvas routing
-│   │       ├── BatchSettings.tsx     Coming-soon panel for Images toolbar tool (batch icon stamp)
+│   │       ├── BatchSettings.tsx     Batch tool: text, logo, resize/compress across the gallery
+│   │       │                         (throwaway engine per photo; pinned by the max-lines ratchet)
 │   │       ├── PaintSettings.tsx     Tab-switched: Paint (size/color/opacity) +
 │   │       │                         Blur Brush (radius, intensity) + Pen (Bézier vector paths:
 │   │       │                         stroke width/color + optional solid background fill)
@@ -332,8 +329,5 @@ app/src/
     │   │                             signed out for sync; on again = first contact
     │   ├── identity.ts               Tab id (echo suppression). No device id — nothing uploads one
     │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
-    ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,
-    │                                 SVG rejection (staged; wire before decode)
-    ├── security/sanitizeFilename.ts  Path-traversal-safe basename for ZIP / download names (staged)
     └── utils.ts                      cn() utility
 ```
