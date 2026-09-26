@@ -1,12 +1,20 @@
 import { useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
-import { Package, Upload } from "lucide-react";
+import { Package, Puzzle, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { downloadOraWithToast, importOraAsNewPhoto } from "@/lib/openraster";
 import { PaneHeading } from "@/components/ui/pane-heading";
+import { baseFileName } from "@/lib/openraster/download";
+import {
+  downloadPluginFormatWithToast,
+  importPluginFormatAsNewPhoto,
+  type ActiveFormat,
+} from "@/lib/plugins";
+import { useActivePluginFormats } from "@/hooks/usePlugins";
+import { navigateTo } from "@/features/routing";
 
 export interface OpenRasterControls {
   stampToolRef: MutableRefObject<ImageHorseTool | null>;
@@ -43,6 +51,53 @@ export function ExportPane({
 }: OpenRasterControls) {
   const [busy, setBusy] = useState<"export" | "import" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Formats the active plugins add (Settings → Plugins). Empty while the
+  // master switch is off, so this pane is exactly the .ora pane it was.
+  const pluginFormats = useActivePluginFormats();
+  const [pluginBusy, setPluginBusy] = useState<string | null>(null);
+  const pluginInputRef = useRef<HTMLInputElement>(null);
+  // One hidden input serves every plugin format: the button that opens it
+  // sets `accept` and remembers which format asked, synchronously, inside the
+  // click — a file picker only opens from a user gesture.
+  const pendingImportRef = useRef<ActiveFormat | null>(null);
+
+  const handlePluginExport = async ({ format }: ActiveFormat) => {
+    setPluginBusy(`export:${format.id}`);
+    await downloadPluginFormatWithToast({
+      format,
+      stampToolRef,
+      flushToCanvas,
+      syncState,
+      fileStem: baseFileName(imageName),
+    });
+    setPluginBusy(null);
+  };
+
+  const handlePluginImportFile = async (file: File, { format }: ActiveFormat) => {
+    setPluginBusy(`import:${format.id}`);
+    try {
+      const { layers, notes } = await importPluginFormatAsNewPhoto(
+        format,
+        file,
+        stampToolRef,
+        onAddPhotos,
+      );
+      flushToCanvas();
+      syncState();
+      toast.success(`Imported ${format.extension} as a new photo`, {
+        description: [`Restored ${layers} layer${layers === 1 ? "" : "s"}.`, ...notes].join(" "),
+        duration: notes.length ? 10000 : undefined,
+      });
+    } catch (err) {
+      console.error(`Import ${format.extension} failed:`, err);
+      toast.error(
+        err instanceof Error ? err.message : `Couldn't import that ${format.extension} file.`,
+      );
+    } finally {
+      setPluginBusy(null);
+    }
+  };
+  const anyBusy = busy !== null || pluginBusy !== null;
 
   const handleExport = async () => {
     setBusy("export");
@@ -80,7 +135,7 @@ export function ExportPane({
         </PaneHeading>
         <Button
           size="large"
-          disabled={busy !== null}
+          disabled={anyBusy}
           onClick={() => fileInputRef.current?.click()}
           className="w-full"
         >
@@ -108,7 +163,7 @@ export function ExportPane({
         </PaneHeading>
         <Button
           size="large"
-          disabled={busy !== null}
+          disabled={anyBusy}
           onClick={() => void handleExport()}
           className="w-full"
         >
@@ -116,6 +171,75 @@ export function ExportPane({
           {busy === "export" ? "Exporting…" : "Export as .ora"}
         </Button>
       </div>
+
+      {/* Plugin formats — one Import / Export pair per active format plugin. */}
+      {pluginFormats.length === 0 ? (
+        <div className="space-y-2 pt-4 border-t border-theme-sidebar-border">
+          <PaneHeading title="More formats">
+            Photoshop PSD and other layered formats are plugins. Turn them on in
+            Settings → Plugins and their Import and Export buttons appear here.
+          </PaneHeading>
+          <Button onClick={() => navigateTo({ kind: "settings", tab: "plugins" })}>
+            <Puzzle />
+            Open Plugins
+          </Button>
+        </div>
+      ) : (
+        <>
+          {pluginFormats.map((active) => {
+            const { format, plugin } = active;
+            const importing = pluginBusy === `import:${format.id}`;
+            const exporting = pluginBusy === `export:${format.id}`;
+            return (
+              <div
+                key={format.id}
+                className="space-y-3 pt-4 border-t border-theme-sidebar-border"
+              >
+                <PaneHeading title={`${format.label} (${plugin.name} plugin)`}>
+                  {format.describe} Open one as a new photo with its layers, or
+                  export the full project — every layer — as {format.extension}.
+                </PaneHeading>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="large"
+                    disabled={anyBusy}
+                    onClick={() => {
+                      const input = pluginInputRef.current;
+                      if (!input) return;
+                      pendingImportRef.current = active;
+                      input.accept = format.accept;
+                      input.click();
+                    }}
+                  >
+                    {importing ? <Spinner size={16} /> : <Upload />}
+                    {importing ? "Importing…" : `Import ${format.extension}`}
+                  </Button>
+                  <Button
+                    size="large"
+                    disabled={anyBusy}
+                    onClick={() => void handlePluginExport(active)}
+                  >
+                    {exporting ? <Spinner size={16} /> : <Package />}
+                    {exporting ? "Exporting…" : `Export as ${format.extension}`}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          <input
+            ref={pluginInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = ""; // allow re-selecting the same file next time
+              const target = pendingImportRef.current;
+              pendingImportRef.current = null;
+              if (file && target) void handlePluginImportFile(file, target);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

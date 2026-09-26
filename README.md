@@ -35,6 +35,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Features](docs/Features.md)** — what it can actually do, end to end.
 - **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
 - **[OpenRaster (.ora)](docs/OpenRaster-Export-Import.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
+- **[Plugins](docs/Plugins.md)** — features that ship off until you turn them on in Settings → Plugins; the Photoshop PSD plugin, what survives a round trip, and how to write a plugin.
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and the in-progress move of the editor off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.

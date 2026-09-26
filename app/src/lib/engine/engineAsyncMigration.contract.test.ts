@@ -821,7 +821,13 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Gate
     // buckets unchanged.
-    expect(gate.awaited, "cumulative converted sites").toBe(158);
+    // Plugins + the PSD format plugin — 158 -> 161: three awaited sites born
+    // with the feature, all in `lib/plugins/bridge.ts`, the ONE file that moves
+    // a plugin's LayeredDocument in and out of the engine (`capture_layer_stack`
+    // for the stack, `get_layer_png` per layer, `export_png` for the merged
+    // image). A format plugin itself never calls the engine, so a second
+    // format adds zero sites here. Gate buckets unchanged.
+    expect(gate.awaited, "cumulative converted sites").toBe(161);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
