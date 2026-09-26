@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/format";
 import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import type { UserMode } from "@/lib/tiers";
 
 export interface ShortcutHint {
   keys: string;
@@ -69,9 +70,10 @@ const MARKETING_URL = "https://imagehorse.app";
  *  session. */
 const BRAND_COLLAPSE_MS = 5 * 60 * 1000;
 
-/** Tier of the current user. Lives here historically; consumed by
- *  `photoLimits` and AppShell even though the status bar no longer shows it. */
-export type UserMode = "demo" | "loggedIn" | "paid";
+/** Tier of the current user. Lived here historically; now defined beside the
+ *  tier table in `lib/tiers.ts` (which imported it from here — a component
+ *  under a lib module) and re-exported so importers keep working. */
+export type { UserMode };
 
 interface Props {
   state: CloneStampState;

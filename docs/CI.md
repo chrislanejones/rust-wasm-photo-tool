@@ -8,7 +8,9 @@ Everything runs from one workflow, [`.github/workflows/ci.yml`](../.github/workf
 
 Deploys are **not** driven by Actions — the hosts build on push themselves. CI mirrors those builds so a break fails here first.
 
-> **Before adding or trusting a gate, read [`vacuous-checks.md`](vacuous-checks.md).**
+> **Before adding or trusting a gate, read `vacuous-checks.md`** — moved out of the
+> repo on 2026-09-17 with the other finished working documents (see
+> [README.md](README.md)); `git log --all -- docs/vacuous-checks.md` finds it.
 > This repo has produced fourteen checks that were green because they could not
 > fail — including one in this file's own deploy sentinel, which passed on a
 > real featureless build for its entire life.

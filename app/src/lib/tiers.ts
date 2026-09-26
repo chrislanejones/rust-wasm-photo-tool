@@ -8,7 +8,10 @@
 // (marketing/src/sections/Pricing.tsx). The gallery photo cap ALSO lives in
 // Rust (`photo_limit` in src/lib.rs) for the WASM layer — keep the two in sync;
 // `galleryLimit` here must equal what `photo_limit` returns.
-import type { UserMode } from "@/components/StatusBar";
+/** Tier of the current user. Defined here — the tier table is the thing that
+ *  gives the three values their meaning — and re-exported from
+ *  `components/StatusBar` where it used to live, so no importer changed. */
+export type UserMode = "demo" | "loggedIn" | "paid";
 
 interface TierConfig {
   /** Switcher / UI label, e.g. "No Login". */

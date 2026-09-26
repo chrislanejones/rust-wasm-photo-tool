@@ -30,7 +30,7 @@
 // `arrow` with no mode, because those two tools are single-mode tools whose
 // panels hold several features apiece. Derive identity and those six tiles
 // light up three-at-a-time. So each sub-tool carries its own stable id and the
-// store tracks the active one. See docs/toolbar-migration-map.md § Design note.
+// store tracks the active one. See docs/archive/toolbar-migration-map.md § Design note.
 import type { ToolType } from "@/lib/types";
 import {
   Aperture,

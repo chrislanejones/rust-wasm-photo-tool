@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import { useCanvasCoords } from "@/hooks/useCanvasCoords";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
 import {
@@ -55,16 +56,9 @@ export function useSelectionActions(
   // nothing renders off it yet.
   const [combineHint, setCombineHint] = useState<SelectionCombineMode>(0);
 
-  const getCoords = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
-    const c = canvasRef.current;
-    if (!c) return { x: 0, y: 0 };
-    const r = c.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) * c.width) / r.width,
-      y: ((e.clientY - r.top) * c.height) / r.height,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The same mapping every canvas tool uses; one implementation, stable for a
+  // stable ref, so nothing downstream re-memoizes.
+  const getCoords = useCanvasCoords(canvasRef);
 
   // Which engine call a canvas click makes is the ONLY difference between the
   // three click-once selection kinds — all three return the same canvas-sized

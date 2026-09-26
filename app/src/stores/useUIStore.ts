@@ -346,7 +346,7 @@ export const useUIStore = create<UIState>()(
       // effects in AppShell), so persisting them would contradict that intent.
       // Transient dialog / celebration / diagnostics / upload flags are excluded
       // for the obvious reason (they'd re-open on reload). See
-      // docs/State-Management.md §6.
+      // docs/archive/State-Management.md §6.
       partialize: (s): UIPersisted => ({
         masterTab: s.masterTab,
         // Palette recents + usage counts are a pure "remember my habits" pref,

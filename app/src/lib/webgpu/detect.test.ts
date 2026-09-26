@@ -6,7 +6,7 @@
 // `ok: true`". So every test below drives the REAL `probeWebGpu` against a
 // stubbed `navigator.gpu` and asserts on `GpuStatus`, not on the matcher.
 // Testing `softwareAdapterMarker` alone would pass forever if someone deleted
-// the call site — the exact shape `docs/vacuous-checks.md` collects.
+// the call site — the exact shape `docs/vacuous-checks.md (git history; moved out of the repo 2026-09-17)` collects.
 //
 // `probeWebGpu` memoises its answer for the tab's lifetime, so each case gets a
 // fresh module via `vi.resetModules()` + a dynamic import. Sharing one import

@@ -497,7 +497,7 @@ export const useToolStore = create<ToolState>()(
       // stampSettings / toolSettings (these DO push into the engine via
       // stamp.setBrushSize/… so persisting them would need a one-time WASM sync
       // on rehydrate — deferred to the AppShell wiring; see
-      // docs/State-Management.md §6).
+      // docs/archive/State-Management.md §6).
       partialize: (s): ToolPersisted => ({
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,
