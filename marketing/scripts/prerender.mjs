@@ -195,6 +195,19 @@ const shallowBoundary = new Set(
   })(),
 );
 
+// …which is exactly what Vercel's shallow checkout hits for most files: the live
+// sitemap had `lastmod` on 2 of 24 URLs. The fallback is src/data/source-dates.json,
+// written from a full clone by scripts/gen-sitemap-dates.mjs during the release
+// routine and committed. Git still wins whenever it gives a real answer, so a
+// deep enough clone can only make a date newer, never older.
+const committedDates = (() => {
+  try {
+    return JSON.parse(readFileSync(join(marketing, "src", "data", "source-dates.json"), "utf8")).dates ?? {};
+  } catch {
+    return {};
+  }
+})();
+
 function lastCommitDate(paths) {
   const dates = paths
     .map((p) => {
@@ -206,10 +219,10 @@ function lastCommitDate(paths) {
         }).trim();
         const [sha, date] = line.split(" ");
         // The boundary commit did not "change" this file, it is just where the
-        // history stops. No date is better than that one.
-        return sha && !shallowBoundary.has(sha) ? date : "";
+        // history stops. The committed date is better than that one.
+        return sha && !shallowBoundary.has(sha) ? date : (committedDates[p] ?? "");
       } catch {
-        return "";
+        return committedDates[p] ?? "";
       }
     })
     .filter(Boolean);

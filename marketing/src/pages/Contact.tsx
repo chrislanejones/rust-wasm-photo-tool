@@ -84,7 +84,7 @@ const TOPICS: Topic[] = [
     placeholder: "I had forty photos and needed to …",
     cta: "Suggest it",
     note: "Ideas that fit the no-upload principle get the most attention.",
-    links: [{ label: "See what's already coming", href: "/coming-soon" }],
+    links: [{ label: "See what's already coming", href: "/in-the-works" }],
   },
   {
     key: "security",

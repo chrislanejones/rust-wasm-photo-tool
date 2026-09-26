@@ -89,7 +89,7 @@ export const PAGE_ROUTES: { path: string; page: LazyPage; source: string }[] = [
   { path: "/trail-log", page: Trail, source: "src/pages/Trail.tsx" },
   { path: "/privacy-policy", page: PrivacyPolicy, source: "src/pages/PrivacyPolicy.tsx" },
   { path: "/terms-of-service", page: TermsOfService, source: "src/pages/TermsOfService.tsx" },
-  { path: "/coming-soon", page: ComingSoon, source: "src/pages/ComingSoon.tsx" },
+  { path: "/in-the-works", page: ComingSoon, source: "src/pages/ComingSoon.tsx" },
   { path: "/openraster", page: OpenRaster, source: "src/pages/OpenRaster.tsx" },
   { path: "/photo-editor", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
   { path: "/image-compressor", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },

@@ -196,8 +196,8 @@ export const ROUTES: readonly Route[] = [
     footerOnly: true,
   },
   {
-    to: "/coming-soon",
-    ogImage: "/og/coming-soon.png",
+    to: "/in-the-works",
+    ogImage: "/og/in-the-works.png",
     label: "What's coming",
     title: "What's coming to Image Horse — building, decided, ideas",
     description:
