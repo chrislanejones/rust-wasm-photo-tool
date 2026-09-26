@@ -721,6 +721,23 @@ html.reduce-motion .canvas-spinner {
   mix-blend-mode: difference;
 }
 
+/* Mask editing: the ring wears the value the stroke will paint — black hides,
+   white reveals — so the cursor answers "what will this stroke change" without
+   anyone reading a panel. It is the third of the three places driven by
+   `maskEditing`, and it computes nothing itself.
+
+   `difference` is dropped on purpose: differencing black against a photo is a
+   no-op, so the black ring would simply vanish over dark pixels. The paired
+   light/dark outline used by the selection cursors carries it over any photo
+   instead — the halo is always the opposite of the ink. */
+.brush-cursor--mask {
+  mix-blend-mode: normal;
+  border-color: var(--mask-cursor-ink);
+  box-shadow:
+    0 0 0 1.5px var(--mask-cursor-halo),
+    inset 0 0 0 1.5px var(--mask-cursor-halo);
+}
+
 /* Source marker crosshair */
 .source-marker {
   position: fixed;
