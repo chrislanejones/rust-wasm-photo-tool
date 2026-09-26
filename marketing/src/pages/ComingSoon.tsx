@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { EDITOR_URL, external } from "../config";
 import { GROUPS } from "../data/comingSoon";
 
@@ -125,6 +127,7 @@ export default function ComingSoon() {
             ))}
           </ul>
         </section>
+        <NextCards cards={pickNextCards("/in-the-works")} />
       </main>
 
       <Footer line="Nothing here is a promise about a date. All of it is a promise about direction." />

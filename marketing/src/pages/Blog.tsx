@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { POSTS, fmtPostDate, postPath } from "../data/posts";
 import { EDITOR_URL, external } from "../config";
 
@@ -84,6 +86,7 @@ export default function Blog() {
             </Link>
           </div>
         </section>
+        <NextCards cards={pickNextCards("/blog")} />
       </main>
 
       <Footer line="The changelog says what. This says why." />

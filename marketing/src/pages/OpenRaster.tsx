@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 import OraFaq from "../components/OraFaq";
 import OraViewer from "../components/OraViewer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { EDITOR_URL, external } from "../config";
 import { OPENRASTER_FAQ } from "../data/openraster";
 
@@ -17,12 +19,10 @@ import { OPENRASTER_FAQ } from "../data/openraster";
  * "Import / Export" (SETTINGS_TAB_LABELS in the app), not "Export".
  */
 
-const NEXT = [
-  { to: "/ora-to-png", group: "Convert", label: ".ora to PNG", blurb: "Flatten a .ora to a single PNG, or unpack every layer." },
-  { to: "/ora-to-psd", group: "Convert", label: ".ora to PSD", blurb: "A layered PSD for Photoshop, with names, opacity and blend modes." },
-  { to: "/what-is-ora", group: "Learn", label: "What is a .ora file?", blurb: "The two-minute version, with a file you can open." },
-  { to: "/photo-editor", group: "Enhance", label: "Photo editor", blurb: "Layers and masks — 8 per image, 16 on Pro — saved with the edit." },
-];
+/* The other three .ora pages are pinned for this path in data/nextCards.ts,
+ * so they are always the first three cards; only the fourth is the seeded
+ * pick. This is the guide the other three point back to, and a guide whose
+ * own links move around is one you cannot give directions with. */
 
 /** ✓ with a note, or just a note. One row per thing that can go wrong between apps. */
 type Cell = { ok?: boolean; note?: string };
@@ -268,21 +268,7 @@ export default function OpenRaster() {
           </section>
         </article>
 
-        <nav className="tp-next" aria-label="Related pages">
-          <h2 className="tp-next__h2">Next</h2>
-          <ul className="tp-next__list">
-            {NEXT.map((r) => (
-              <li className="tp-next__li" key={r.to}>
-                <Link className="tp-next__card" to={r.to}>
-                  <span className="tp-next__group">{r.group}</span>
-                  <span className="tp-next__label">{r.label}</span>
-                  <span className="tp-next__blurb">{r.blurb}</span>
-                  <span className="tp-next__slug">{r.to} &rarr;</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <NextCards cards={pickNextCards("/openraster")} />
 
         <section className="tp-close">
           <div className="tp-close__text">

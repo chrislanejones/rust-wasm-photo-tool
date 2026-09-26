@@ -3,19 +3,21 @@ import { Link } from "react-router-dom";
 import Footer from "./Footer";
 import OraFaq from "./OraFaq";
 import OraViewer, { type OraViewerMode } from "./OraViewer";
+import NextCards from "./NextCards";
+import { pickNextCards } from "../data/nextCards";
 import type { Faq } from "../data/openraster";
 
 /* The shape the three small OpenRaster pages share — /what-is-ora,
  * /ora-to-png, /ora-to-psd: a head, the viewer, a cream board with one
- * section and the questions, then links to the other three pages. Each page
- * passes its own words; the order and the classes live here so the three
- * cannot drift apart. /openraster is the long page and has its own file. */
-
-const LINKS = [
-  { to: "/ora-to-png", label: "Convert .ora to PNG" },
-  { to: "/ora-to-psd", label: "Convert .ora to PSD" },
-  { to: "/what-is-ora", label: "What is a .ora file?" },
-];
+ * section and the questions, then the Next cards. Each page passes its own
+ * words; the order and the classes live here so the three cannot drift apart.
+ * /openraster is the long page and has its own file.
+ *
+ * The foot used to be a three-button row to the sibling .ora pages. It is now
+ * the same seeded four-card grid every other page ends with — the buttons only
+ * ever offered the .ora corner of the site, and a reader who finished one of
+ * these had no way on to anything else. The filled link back to /openraster
+ * survives as the one fixed way up to the guide. */
 
 export default function OraSubPage(props: {
   /** This page's path, left out of the links at the foot. */
@@ -62,16 +64,13 @@ export default function OraSubPage(props: {
           </section>
         </article>
 
-        <nav className="ora-links" aria-label="Related pages">
+        <nav className="ora-links" aria-label="OpenRaster guide">
           <Link className="tp-btn tp-btn--fill" to="/openraster">
             {props.guide}
           </Link>
-          {LINKS.filter((l) => l.to !== props.path).map((l) => (
-            <Link key={l.to} className="tp-btn tp-btn--line" to={l.to}>
-              {l.label}
-            </Link>
-          ))}
         </nav>
+
+        <NextCards cards={pickNextCards(props.path)} />
       </main>
 
       <Footer line={props.footer} />

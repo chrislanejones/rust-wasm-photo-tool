@@ -8,6 +8,7 @@ import "./styles.css";
 import "./tool-page.css";
 import "./openraster.css";
 import "./trail.css";
+import "./pager.css";
 import "./features.css";
 // One stylesheet per v2 page, so the parallel ports never share a file.
 import "./about.css";

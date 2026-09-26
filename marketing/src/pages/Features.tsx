@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { EDITOR_URL, external } from "../config";
 import { CARD_SECTIONS, CARD_TOTAL, type CardGroupKey } from "../data/featureCards";
 import { featureSlug, getFeatureIcon } from "../data/featureIcons";
@@ -106,6 +108,7 @@ export default function Features() {
             </Link>
           </div>
         </section>
+        <NextCards cards={pickNextCards("/features")} />
       </main>
 
       <Footer line={`${CARD_TOTAL} of them, and the editing ones are all free.`} />
