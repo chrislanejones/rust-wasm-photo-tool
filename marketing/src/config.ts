@@ -26,7 +26,7 @@ export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo
  *  have their own column in the footer and their own panel in the nav, so
  *  letting them into this list would bury the seven actual places on the
  *  site. */
-export const PAGES = ROUTES.filter((r) => !r.footerOnly && !r.toolPage).map(({ to, label }) => ({
+export const PAGES = ROUTES.filter((r) => !r.footerOnly && !r.toolPage && !r.under).map(({ to, label }) => ({
   to,
   label,
 }));

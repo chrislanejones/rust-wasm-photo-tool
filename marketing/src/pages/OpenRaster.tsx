@@ -1,24 +1,42 @@
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import OraFaq from "../components/OraFaq";
 import OraViewer from "../components/OraViewer";
 import { EDITOR_URL, external } from "../config";
 import { OPENRASTER_FAQ } from "../data/openraster";
 
 /* /openraster — Learn · File formats.
  *
- * Two jobs on one page. The viewer at the top opens any .ora in the tab, which
- * no other site does; the article under it says what a .ora is and what
- * survives a trip through Image Horse. The layout is the tool page's (tp-*),
- * because it is the same shape: head, a cream board of reasoning, next, close.
+ * Two jobs on one page. The viewer at the top opens any .ora in the tab and
+ * saves it back out as PNG, a layered PSD or a fresh .ora, which no other site
+ * does; the article under it says what a .ora is, who reads what, and where
+ * the format came from. The layout is the tool page's (tp-*), because it is
+ * the same shape: head, a cream board of reasoning, next, close.
  *
  * Copy is the design's, with one correction: the editor's tab is labeled
  * "Import / Export" (SETTINGS_TAB_LABELS in the app), not "Export".
  */
 
 const NEXT = [
+  { to: "/ora-to-png", group: "Convert", label: ".ora to PNG", blurb: "Flatten a .ora to a single PNG, or unpack every layer." },
+  { to: "/ora-to-psd", group: "Convert", label: ".ora to PSD", blurb: "A layered PSD for Photoshop, with names, opacity and blend modes." },
+  { to: "/what-is-ora", group: "Learn", label: "What is a .ora file?", blurb: "The two-minute version, with a file you can open." },
   { to: "/photo-editor", group: "Enhance", label: "Photo editor", blurb: "Layers and masks — 8 per image, 16 on Pro — saved with the edit." },
-  { to: "/features", group: "Learn", label: "Features", blurb: "Every export format, and the other 55 features, grouped by task." },
-  { to: "/architecture", group: "Learn", label: "Architecture", blurb: "Why the layer engine is Rust in your tab, and what the server never sees." },
+];
+
+/** ✓ with a note, or just a note. One row per thing that can go wrong between apps. */
+type Cell = { ok?: boolean; note?: string };
+const APPS = ["Krita", "GIMP", "MyPaint", "Image Horse"] as const;
+const COMPAT: { row: string; cells: [Cell, Cell, Cell, Cell] }[] = [
+  { row: "Opens .ora", cells: [{ ok: true }, { ok: true, note: "since 2.8" }, { ok: true, note: "native format" }, { ok: true, note: "as a new photo" }] },
+  { row: "Saves .ora", cells: [{ ok: true }, { ok: true }, { ok: true }, { ok: true }] },
+  { row: "Layer names, order, opacity, hidden layers", cells: [{ ok: true }, { ok: true }, { ok: true }, { ok: true }] },
+  { row: "Layer groups", cells: [{ ok: true }, { ok: true }, { ok: true }, { note: "Flattened to one stack" }] },
+  { row: "Blend modes", cells: [{ ok: true }, { ok: true, note: "its own modes use a gimp: prefix" }, { ok: true }, { note: "Read as normal" }] },
+  {
+    row: "Layers offset or smaller than the canvas",
+    cells: [{ ok: true }, { ok: true }, { ok: true, note: "writes them by default" }, { note: "Placed at 0,0 — may import blank" }],
+  },
 ];
 
 export default function OpenRaster() {
@@ -33,15 +51,15 @@ export default function OpenRaster() {
           <div className="tp-head__side">
             <p className="tp-head__lede">
               OpenRaster is the open layered format Krita, GIMP and MyPaint share. Drop a .ora below to see
-              every layer &mdash; it&rsquo;s read in this tab, not uploaded &mdash; or export one from Image
-              Horse and take your layers with you.
+              every layer, hide or reorder them, and save the result as PNG, a layered PSD or a fresh .ora
+              &mdash; all in this tab, nothing uploaded.
             </p>
             <div className="tp-actions">
               <a className="tp-btn tp-btn--fill" href="#viewer">
                 Open a .ora
               </a>
-              <a className="tp-btn tp-btn--line" href="#round-trip">
-                What survives a round trip
+              <a className="tp-btn tp-btn--line" href="#compatibility">
+                Which apps open it
               </a>
             </div>
           </div>
@@ -99,6 +117,56 @@ export default function OpenRaster() {
             </div>
           </section>
 
+          <section id="compatibility" className="ora-trip">
+            <div className="ora-trip__head">
+              <h2 className="tp-board__h2">Who reads and writes what</h2>
+              <p className="tp-split__p">
+                The format is simple; the apps aren&rsquo;t identical. This is what to expect when a file moves
+                between them.
+              </p>
+            </div>
+            <div className="ora-table-wrap">
+              <table className="ora-table">
+                <thead>
+                  <tr>
+                    <td />
+                    {APPS.map((a) => (
+                      <th scope="col" key={a} className={a === "Image Horse" ? "is-us" : undefined}>
+                        {a}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPAT.map(({ row, cells }) => (
+                    <tr key={row}>
+                      <th scope="row">{row}</th>
+                      {cells.map((c, i) => (
+                        <td key={APPS[i]}>
+                          {c.ok && <span className="ora-mark">✓</span>}
+                          {c.ok && c.note && " "}
+                          {c.note}
+                          {c.ok && !c.note && <span className="visually-hidden">Yes</span>}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr>
+                    <th scope="row">Text, shapes, masks</th>
+                    <td colSpan={4}>
+                      Not in the baseline format. Every app writes them as pixels, so none of them survive a round
+                      trip as editable objects.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="ora-source">
+              Based on the OpenRaster baseline spec and each app&rsquo;s current release. Found a cell that&rsquo;s
+              wrong? <Link to="/contact">Tell us</Link>.
+            </p>
+          </section>
+
           <section className="tp-split">
             <div className="ora-col">
               <h2 className="tp-split__h2">Export a .ora from Image Horse</h2>
@@ -136,86 +204,67 @@ export default function OpenRaster() {
               </p>
               <p className="tp-split__p">
                 Like everything else in the editor, both directions run on your machine. The viewer at the
-                top of this page does the same thing, without the editing.
+                top of this page does the same thing, without the editing. If a file came from another app, its{" "}
+                <em>Before you import</em> notes tell you what to fix first.
               </p>
             </div>
           </section>
 
-          <section id="round-trip" className="ora-trip">
-            <h2 className="tp-board__h2">What survives a round trip</h2>
-            <div className="ora-table-wrap">
-              <table className="ora-table">
-                <thead>
-                  <tr>
-                    <th scope="col">In your project</th>
-                    <th scope="col">Out and back</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row">Layer order, names, opacity, visibility</th>
-                    <td>
-                      <span className="ora-mark">✓</span> Kept, both ways
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">The layer you had selected</th>
-                    <td>
-                      <span className="ora-mark">✓</span> Restored on import; otherwise the top layer
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Text and shapes</th>
-                    <td>Painted into their layer on export. They come back as pixels, not editable objects.</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Layer masks</th>
-                    <td>Not written yet. It&rsquo;s on the list.</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Layers from another app that are offset or smaller than the canvas</th>
-                    <td>
-                      Import places every layer at the top-left, full size, so these may come in blank. The
-                      viewer above shows where they should sit.
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Layer groups and blend modes from another app</th>
-                    <td>Image Horse has no layer groups yet, and imports every layer as normal blending.</td>
-                  </tr>
-                </tbody>
-              </table>
+          <section className="tp-split">
+            <div className="ora-col">
+              <h2 className="tp-board__h2">Twenty years of .ora</h2>
+              <p className="tp-split__p">
+                The format exists because the alternative was licensed. It has stayed small on purpose.
+              </p>
             </div>
-          </section>
-
-          <section className="ora-trip">
-            <h2 className="tp-split__h2">Where else a .ora opens</h2>
-            <ul className="ora-apps">
+            <ol className="ora-years">
               <li>
-                <strong>Krita</strong>
-                <span>Opens and saves .ora directly. The usual next stop for painting.</span>
+                <span className="ora-years__y">2006</span>
+                <span>
+                  Adobe narrows the license on the PSD specification. At the first Libre Graphics Meeting in
+                  Lyon, Krita developers Boudewijn Rempt and Cyrille Berger propose an open layered format,
+                  modeled on OpenDocument: a ZIP of PNGs described by one XML file.
+                </span>
               </li>
               <li>
-                <strong>GIMP</strong>
-                <span>Opens .ora and exports it back. Also the easy way to turn one into a PSD.</span>
+                <span className="ora-years__y">2009</span>
+                <span>
+                  MyPaint adopts .ora as its native save format &mdash; the first app to live in it day to day,
+                  and the reason layer offsets became part of the spec.
+                </span>
               </li>
               <li>
-                <strong>MyPaint</strong>
-                <span>Uses .ora as its own save format.</span>
+                <span className="ora-years__y">2010</span>
+                <span>Pinta 0.4 ships support. By now Krita reads and writes it too.</span>
               </li>
-            </ul>
+              <li>
+                <span className="ora-years__y">2012</span>
+                <span>
+                  GIMP 2.8 includes an OpenRaster plug-in out of the box. With Krita 2.4 the same year, all three
+                  major free editors speak the format.
+                </span>
+              </li>
+              <li>
+                <span className="ora-years__y">2013 &rarr;</span>
+                <span>
+                  The baseline spec is versioned, 0.0.1 through today&rsquo;s 0.0.5, picking up the flattened{" "}
+                  <code>mergedimage.png</code>, blend modes via <code>composite-op</code>, per-layer x/y and the{" "}
+                  <code>selected</code> flag. Drawpile and others join.
+                </span>
+              </li>
+              <li>
+                <span className="ora-years__y">2026</span>
+                <span>
+                  Image Horse reads and writes .ora entirely in the browser, with a Rust engine in a worker.
+                  This page is the first place you can open one without installing anything.
+                </span>
+              </li>
+            </ol>
           </section>
 
           <section className="tp-split">
             <h2 className="tp-board__h2">Questions</h2>
-            <div className="ora-faq">
-              {OPENRASTER_FAQ.map((f) => (
-                <div className="ora-faq__item" key={f.q}>
-                  <h3>{f.q}</h3>
-                  <p>{f.a}</p>
-                </div>
-              ))}
-            </div>
+            <OraFaq faq={OPENRASTER_FAQ} />
           </section>
         </article>
 

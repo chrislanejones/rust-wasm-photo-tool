@@ -168,6 +168,9 @@ function readZip(buf: ArrayBuffer) {
 /* ── the document ─────────────────────────────────────────────────────── */
 
 export interface OraLayer {
+  /** Its place in stack.xml, fixed at read time: a stable key through
+   *  reorders and renames. */
+  id: number;
   name: string;
   src: string;
   x: number;
@@ -183,6 +186,9 @@ export interface OraLayer {
   /** Object URL of the layer's own PNG bytes — the thumbnail and the download. */
   url?: string;
   bytes?: number;
+  /** The layer's PNG exactly as it sat in the archive. A saved .ora and the
+   *  layers zip reuse these bytes rather than re-encoding the pixels. */
+  png?: Bytes;
 }
 
 export interface OraCheck {
@@ -242,6 +248,7 @@ export async function parseOra(buf: ArrayBuffer, fileName: string, size: number)
         walk(c, alpha * num(c.getAttribute("opacity"), 1), vis && c.getAttribute("visibility") !== "hidden", depth + 1);
       } else if (c.localName === "layer") {
         layers.push({
+          id: layers.length,
           name: c.getAttribute("name") || "Untitled",
           src: c.getAttribute("src") || "",
           x: num(c.getAttribute("x"), 0),
@@ -272,6 +279,7 @@ export async function parseOra(buf: ArrayBuffer, fileName: string, size: number)
       l.bmp = await createImageBitmap(blob);
       l.url = URL.createObjectURL(blob);
       l.bytes = bytes.length;
+      l.png = bytes;
     }),
   );
   const offset = layers.filter((l) => l.bmp && (l.x || l.y)).map((l) => l.name);
@@ -294,15 +302,15 @@ export async function parseOra(buf: ArrayBuffer, fileName: string, size: number)
   const warnings: string[] = [];
   if (offset.length) {
     warnings.push(
-      `${offset.length === 1 ? "One layer is" : `${offset.length} layers are`} placed at an offset (${list(offset)}). Image Horse's importer puts every layer at the top-left today, so these may come in blank.`,
+      `${offset.length === 1 ? "One layer is" : `${offset.length} layers are`} placed at an offset (${list(offset)}). Image Horse's importer puts every layer at the top-left today, so these may come in blank. The PSD export keeps the offsets.`,
     );
   }
   if (odd.length) {
     warnings.push(`${list(odd)} ${odd.length === 1 ? "isn't" : "aren't"} the size of the canvas. Import expects full-size layers.`);
   }
-  if (nested) warnings.push("This file has layer groups. They're shown flattened here, and Image Horse imports them as a flat stack.");
+  if (nested) warnings.push("This file has layer groups. They're shown flattened here, saved back as a flat stack, and Image Horse imports them the same way.");
   if (layers.some((l) => l.op !== "svg:src-over")) {
-    warnings.push("Some layers use a blend mode. It's drawn here, but Image Horse imports every layer as normal.");
+    warnings.push("Some layers use a blend mode. It's drawn here and written into the PSD, but Image Horse imports every layer as normal.");
   }
   if (missing.length) warnings.push(`stack.xml names ${list(missing)}, but the PNG isn't in the archive.`);
 
@@ -344,15 +352,344 @@ export function drawOra(c: HTMLCanvasElement, d: OraDoc, view: "composite" | "me
     g.drawImage(d.merged.bmp, 0, 0, d.w, d.h);
     return;
   }
+  paint(g, d);
+}
+
+/** The layer stack, bottom first. The canvas on screen and every export draw
+ *  through this one loop, so what you see is what you save. */
+function paint(g: CanvasRenderingContext2D, d: OraDoc) {
   for (let i = d.layers.length - 1; i >= 0; i--) {
     const l = d.layers[i];
     if (!l.visible || !l.bmp) continue;
-    g.globalAlpha = l.opacity * l.group;
+    g.globalAlpha = Math.min(1, l.opacity * l.group);
     g.globalCompositeOperation = OPS[l.op] ?? "source-over";
     g.drawImage(l.bmp, l.x, l.y);
   }
   g.globalAlpha = 1;
   g.globalCompositeOperation = "source-over";
+}
+
+/** The visible stack flattened into a new canvas, transparent or on white. */
+export function composite(d: OraDoc, onWhite = false): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = d.w;
+  c.height = d.h;
+  const g = c.getContext("2d")!;
+  if (onWhite) {
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, d.w, d.h);
+  }
+  paint(g, d);
+  return c;
+}
+
+/* ── export ───────────────────────────────────────────────────────────
+ * Everything below writes a file from the document as it stands: layers
+ * hidden, reordered or renamed in the viewer are written that way. All of it
+ * runs in the tab, same as the reading.
+ */
+
+/** Give the event loop a turn between heavy steps so the busy label paints
+ *  and the page still scrolls while a big PSD is being packed. */
+export const tick = () =>
+  new Promise<void>((resolve) => {
+    const s = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+    if (s?.yield) {
+      s.yield().then(resolve, resolve);
+      return;
+    }
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => {
+      ch.port1.close();
+      resolve();
+    };
+    ch.port2.postMessage(0);
+  });
+
+/** A layer name made safe for a file name. */
+export const safeName = (s: string) => (s || "layer").replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "layer";
+
+const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+/** Hand a blob to the browser as a download. The URL outlives the click
+ *  because some browsers read it after `click()` returns. */
+export function download(blob: Blob, name: string) {
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = u;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 20000);
+}
+
+/** The flattened picture as a PNG, transparency kept. */
+export const makePng = (d: OraDoc) =>
+  new Promise<Blob>((resolve, reject) =>
+    composite(d).toBlob((b) => (b ? resolve(b) : reject(new Error("The browser couldn't encode the PNG."))), "image/png"),
+  );
+
+/** One PNG per layer in a zip, numbered top to bottom. The bytes are the
+ *  archive's own, not re-encoded. */
+export function makeLayersZip(d: OraDoc): Blob {
+  const ls = d.layers.filter((l) => l.png);
+  return writeZip(
+    ls.map((l, i) => ({ name: `${String(i + 1).padStart(2, "0")}-${safeName(l.name)}.png`, data: l.png! })),
+    "application/zip",
+  );
+}
+
+/** A fresh .ora of the document as it stands. Groups were flattened on the
+ *  way in, so each layer's opacity carries its group's. */
+export async function makeOra(d: OraDoc): Promise<Blob> {
+  const layers = d.layers.filter((l) => l.png);
+  const n = layers.length;
+  const xml =
+    `<?xml version='1.0' encoding='UTF-8'?>\n<image w="${d.w}" h="${d.h}" version="0.0.3">\n  <stack>\n` +
+    layers
+      .map(
+        (l, i) =>
+          `    <layer name="${esc(l.name)}" src="data/layer${n - 1 - i}.png" x="${l.x}" y="${l.y}" opacity="${+Math.min(1, l.opacity * l.group).toFixed(3)}" visibility="${l.visible ? "visible" : "hidden"}" composite-op="${esc(l.op)}"${l.selected ? ' selected="true"' : ""}/>`,
+      )
+      .join("\n") +
+    `\n  </stack>\n</image>\n`;
+  const merged = composite(d);
+  const s = Math.min(1, 256 / Math.max(d.w, d.h));
+  const t = document.createElement("canvas");
+  t.width = Math.max(1, Math.round(d.w * s));
+  t.height = Math.max(1, Math.round(d.h * s));
+  t.getContext("2d")!.drawImage(merged, 0, 0, t.width, t.height);
+  const enc = new TextEncoder();
+  const files = [
+    { name: "mimetype", data: enc.encode("image/openraster") },
+    { name: "stack.xml", data: enc.encode(xml) },
+  ];
+  layers.forEach((l, i) => files.push({ name: `data/layer${n - 1 - i}.png`, data: l.png! }));
+  files.push({ name: "mergedimage.png", data: await toPng(merged) });
+  files.push({ name: "Thumbnails/thumbnail.png", data: await toPng(t) });
+  return writeZip(files, "image/openraster");
+}
+
+/* ── PSD ──────────────────────────────────────────────────────────────
+ * An 8-bit RGB PSD with one layer record per .ora layer and RLE (PackBits)
+ * channels — the shape Photoshop writes itself. Big-endian throughout. The
+ * layer's rectangle is its offset and its own size, so layers smaller than the
+ * canvas or placed off the origin land where they sat in the .ora.
+ */
+
+/** OpenRaster composite-op → PSD blend key. Unlisted ops are written Normal. */
+const PSD_BLEND: Record<string, string> = {
+  "svg:src-over": "norm",
+  "svg:multiply": "mul ",
+  "svg:screen": "scrn",
+  "svg:overlay": "over",
+  "svg:darken": "dark",
+  "svg:lighten": "lite",
+  "svg:color-dodge": "div ",
+  "svg:color-burn": "idiv",
+  "svg:hard-light": "hLit",
+  "svg:soft-light": "sLit",
+  "svg:difference": "diff",
+  "svg:exclusion": "smud",
+  "svg:hue": "hue ",
+  "svg:saturation": "sat ",
+  "svg:color": "colr",
+  "svg:luminosity": "lum ",
+  "svg:plus": "lddg",
+};
+
+/** A growable big-endian byte writer. */
+class BW {
+  b: Bytes;
+  n = 0;
+  constructor(size = 1 << 16) {
+    this.b = new Uint8Array(size);
+  }
+  ensure(k: number) {
+    if (this.n + k <= this.b.length) return;
+    let m = this.b.length * 2;
+    while (m < this.n + k) m *= 2;
+    const nb = new Uint8Array(m);
+    nb.set(this.b.subarray(0, this.n));
+    this.b = nb;
+  }
+  u8(v: number) {
+    this.ensure(1);
+    this.b[this.n++] = v & 255;
+  }
+  u16(v: number) {
+    this.ensure(2);
+    this.b[this.n++] = (v >> 8) & 255;
+    this.b[this.n++] = v & 255;
+  }
+  u32(v: number) {
+    this.ensure(4);
+    this.b[this.n++] = (v >>> 24) & 255;
+    this.b[this.n++] = (v >> 16) & 255;
+    this.b[this.n++] = (v >> 8) & 255;
+    this.b[this.n++] = v & 255;
+  }
+  bytes(a: Uint8Array) {
+    this.ensure(a.length);
+    this.b.set(a, this.n);
+    this.n += a.length;
+  }
+  str(s: string) {
+    for (let i = 0; i < s.length; i++) this.u8(s.charCodeAt(i));
+  }
+  out(): Bytes {
+    return this.b.subarray(0, this.n);
+  }
+}
+
+/** PackBits one row: runs of 2–128 equal bytes, literals of 1–128. */
+function packBits(src: Uint8Array, out: BW) {
+  const n = src.length;
+  let i = 0;
+  while (i < n) {
+    let run = 1;
+    while (i + run < n && run < 128 && src[i + run] === src[i]) run++;
+    if (run >= 2) {
+      out.u8(257 - run);
+      out.u8(src[i]);
+      i += run;
+      continue;
+    }
+    let j = i + 1;
+    while (j < n && j - i < 128 && !(j + 1 < n && src[j] === src[j + 1])) j++;
+    out.u8(j - i - 1);
+    out.bytes(src.subarray(i, j));
+    i = j;
+  }
+}
+
+function packRows(plane: Uint8Array, w: number, h: number, rows: BW, lens: Uint16Array, off: number) {
+  for (let y = 0; y < h; y++) {
+    const s = rows.n;
+    packBits(plane.subarray(y * w, (y + 1) * w), rows);
+    lens[off + y] = rows.n - s;
+  }
+}
+
+/** One layer channel: compression = 1 (RLE), the row byte counts, the rows. */
+function packChannel(plane: Uint8Array, w: number, h: number): Bytes {
+  const rows = new BW((w * h >> 1) + h * 2 + 64);
+  const lens = new Uint16Array(h);
+  packRows(plane, w, h, rows, lens, 0);
+  const out = new BW(rows.n + 2 + h * 2);
+  out.u16(1);
+  for (const l of lens) out.u16(l);
+  out.bytes(rows.out());
+  return out.out();
+}
+
+export async function makePsd(d: OraDoc): Promise<Blob> {
+  const W = d.w;
+  const H = d.h;
+  // PSD lists layers bottom first; the document holds them top first.
+  const layers = d.layers.filter((l) => l.bmp).slice().reverse();
+  const recs: { l: OraLayer; w: number; h: number; chans: { id: number; data: Bytes }[] }[] = [];
+  for (const l of layers) {
+    const w = l.bmp!.width;
+    const h = l.bmp!.height;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(l.bmp!, 0, 0);
+    const px = g.getImageData(0, 0, w, h).data;
+    // Channel -1 is transparency, then R, G, B.
+    const pl = [0, 1, 2, 3].map(() => new Uint8Array(w * h));
+    for (let i = 0, p = 0; i < px.length; i += 4, p++) {
+      pl[0][p] = px[i + 3];
+      pl[1][p] = px[i];
+      pl[2][p] = px[i + 1];
+      pl[3][p] = px[i + 2];
+    }
+    const chans = [];
+    for (let k = 0; k < 4; k++) {
+      chans.push({ id: k - 1, data: packChannel(pl[k], w, h) });
+      await tick();
+    }
+    recs.push({ l, w, h, chans });
+  }
+
+  const li = new BW(1 << 20);
+  li.u16(recs.length);
+  for (const { l, w, h, chans } of recs) {
+    li.u32(l.y);
+    li.u32(l.x);
+    li.u32(l.y + h);
+    li.u32(l.x + w);
+    li.u16(4);
+    for (const ch of chans) {
+      li.u16(ch.id & 0xffff);
+      li.u32(ch.data.length);
+    }
+    li.str("8BIM");
+    li.str(PSD_BLEND[l.op] ?? "norm");
+    li.u8(Math.round(255 * Math.min(1, l.opacity * l.group)));
+    li.u8(0); // clipping: base
+    li.u8(l.visible ? 0 : 2); // flags: bit 1 = hidden
+    li.u8(0); // filler
+    // The legacy Pascal name (Latin-1, padded to 4) and the real one, `luni`.
+    const name = l.name || "Layer";
+    const pas = new Uint8Array(Math.min(255, name.length));
+    for (let i = 0; i < pas.length; i++) pas[i] = name.charCodeAt(i) & 255;
+    const pasLen = 1 + pas.length;
+    const pasPad = (4 - (pasLen % 4)) % 4;
+    const uni = new BW(8 + name.length * 2);
+    uni.u32(name.length);
+    for (let i = 0; i < name.length; i++) uni.u16(name.charCodeAt(i));
+    const uniPad = (4 - (uni.n % 4)) % 4;
+    li.u32(8 + pasLen + pasPad + 12 + uni.n + uniPad); // extra data length
+    li.u32(0); // no layer mask
+    li.u32(0); // no blending ranges
+    li.u8(pas.length);
+    li.bytes(pas);
+    for (let i = 0; i < pasPad; i++) li.u8(0);
+    li.str("8BIM");
+    li.str("luni");
+    li.u32(uni.n + uniPad);
+    li.bytes(uni.out());
+    for (let i = 0; i < uniPad; i++) li.u8(0);
+  }
+  for (const r of recs) for (const ch of r.chans) li.bytes(ch.data);
+  if (li.n % 2) li.u8(0);
+  const info = li.out();
+  await tick();
+
+  // The flattened image, on white: a reader that ignores layers shows this.
+  const px = composite(d, true).getContext("2d")!.getImageData(0, 0, W, H).data;
+  const rows = new BW(W * H + H * 6 + 64);
+  const lens = new Uint16Array(H * 3);
+  const plane = new Uint8Array(W * H);
+  for (let ch = 0; ch < 3; ch++) {
+    for (let i = ch, p = 0; i < px.length; i += 4, p++) plane[p] = px[i];
+    packRows(plane, W, H, rows, lens, ch * H);
+    await tick();
+  }
+
+  const out = new BW(info.length + rows.n + H * 6 + 128);
+  out.str("8BPS");
+  out.u16(1); // version
+  for (let i = 0; i < 6; i++) out.u8(0);
+  out.u16(3); // channels
+  out.u32(H);
+  out.u32(W);
+  out.u16(8); // depth
+  out.u16(3); // RGB
+  out.u32(0); // color mode data
+  out.u32(0); // image resources
+  out.u32(info.length + 8); // layer and mask info
+  out.u32(info.length);
+  out.bytes(info);
+  out.u32(0); // global layer mask
+  out.u16(1); // image data: RLE
+  for (const l of lens) out.u16(l);
+  out.bytes(rows.out());
+  return new Blob([out.out()], { type: "image/vnd.adobe.photoshop" });
 }
 
 /* ── the sample ───────────────────────────────────────────────────────── */

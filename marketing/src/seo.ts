@@ -13,7 +13,7 @@
  */
 
 import { POSTS, postPath, type Post } from "./data/posts";
-import { OPENRASTER_FAQ } from "./data/openraster";
+import { OPENRASTER_FAQ, ORA_TO_PNG_FAQ, ORA_TO_PSD_FAQ, WHAT_IS_ORA_FAQ } from "./data/openraster";
 import { FEATURES } from "./data/features";
 
 /** Counted, not typed: the feature list is generated from docs/Features.md, so a
@@ -74,6 +74,10 @@ export interface Route {
    *  than a list of jobs the editor does. `toolPages.ts` carries their content;
    *  this table carries only what a crawler reads. */
   toolPage?: boolean;
+  /** A page that hangs off another: in the sitemap and the prerender, out of
+   *  the nav, the footer and the palette. The three small OpenRaster pages are
+   *  reached from /openraster and from search, not from the site's menu. */
+  under?: string;
   /** Questions answered ON the page. Read by the page for its FAQ section and
    *  by `jsonLdFor` for a FAQPage node — the same list, so the markup can never
    *  name a question the visitor cannot see. */
@@ -125,9 +129,9 @@ export const ROUTES: readonly Route[] = [
   {
     to: "/openraster",
     label: "OpenRaster (.ora)",
-    title: "Open .ora files in your browser — OpenRaster viewer",
+    title: "Open .ora files online — OpenRaster viewer and converter",
     description:
-      "See every layer of an OpenRaster (.ora) file in your browser, nothing uploaded. What a .ora holds, how Image Horse exports and imports one, and what survives.",
+      "View, edit and convert any OpenRaster (.ora) file in your browser — to PNG, layered PSD or back to .ora. Nothing uploaded. What's inside, and which apps open it.",
     ogImage: "/og/openraster.png",
     sources: [
       "marketing/src/pages/OpenRaster.tsx",
@@ -136,6 +140,57 @@ export const ROUTES: readonly Route[] = [
       "marketing/src/data/openraster.ts",
     ],
     faq: OPENRASTER_FAQ,
+  },
+  {
+    to: "/what-is-ora",
+    label: "What is a .ora file?",
+    title: "What is a .ora file? OpenRaster, explained",
+    description:
+      "A .ora file is an OpenRaster image: a ZIP of PNG layers and an XML layer list, shared by Krita, GIMP and MyPaint. Open one in your browser and see inside.",
+    ogImage: "/og/what-is-ora.png",
+    sources: [
+      "marketing/src/pages/WhatIsOra.tsx",
+      "marketing/src/components/OraSubPage.tsx",
+      "marketing/src/components/OraViewer.tsx",
+      "marketing/src/lib/ora.ts",
+      "marketing/src/data/openraster.ts",
+    ],
+    under: "/openraster",
+    faq: WHAT_IS_ORA_FAQ,
+  },
+  {
+    to: "/ora-to-png",
+    label: "Convert .ora to PNG",
+    title: "Convert .ora to PNG online, free — no upload",
+    description:
+      "Turn an OpenRaster (.ora) file into a PNG in your browser. Flatten it, or unpack every layer as its own PNG. Nothing leaves your machine.",
+    ogImage: "/og/ora-to-png.png",
+    sources: [
+      "marketing/src/pages/OraToPng.tsx",
+      "marketing/src/components/OraSubPage.tsx",
+      "marketing/src/components/OraViewer.tsx",
+      "marketing/src/lib/ora.ts",
+      "marketing/src/data/openraster.ts",
+    ],
+    under: "/openraster",
+    faq: ORA_TO_PNG_FAQ,
+  },
+  {
+    to: "/ora-to-psd",
+    label: "Convert .ora to PSD",
+    title: "Convert .ora to PSD online, layers kept — no upload",
+    description:
+      "Turn an OpenRaster (.ora) file into a layered Photoshop PSD in your browser. Names, order, opacity, blend modes and offsets carry across. Nothing uploaded.",
+    ogImage: "/og/ora-to-psd.png",
+    sources: [
+      "marketing/src/pages/OraToPsd.tsx",
+      "marketing/src/components/OraSubPage.tsx",
+      "marketing/src/components/OraViewer.tsx",
+      "marketing/src/lib/ora.ts",
+      "marketing/src/data/openraster.ts",
+    ],
+    under: "/openraster",
+    faq: ORA_TO_PSD_FAQ,
   },
   {
     to: "/pricing",
@@ -448,9 +503,13 @@ const breadcrumbs = (route: Route) =>
     : {
         "@type": "BreadcrumbList",
         itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: route.label, item: abs(route.to) },
-        ],
+          { name: "Home", item: SITE_URL },
+          // A page `under` another sits one rung lower: Home › OpenRaster › PNG.
+          ...(route.under
+            ? [{ name: ROUTES.find((r) => r.to === route.under)?.label ?? route.under, item: abs(route.under) }]
+            : []),
+          { name: route.label, item: abs(route.to) },
+        ].map((crumb, i) => ({ "@type": "ListItem", position: i + 1, ...crumb })),
       };
 
 /** The page itself, tied to the site and the brand. */

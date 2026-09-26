@@ -47,3 +47,9 @@
   chunk boundaries importing from `three/webgpu` (three 0.170.0). A design that
   uses `<gpu-letters>` or `<horse-trot>` maps to `CubeLetters` and
   `<Footer horse />`, not to a custom element.
+- **09-25-2026: the sync was started a second time, then PAUSED again before any
+  project was created.** Chris redirected to porting the OpenRaster pages from
+  design project `ffa0b2cf-a798-4307-85ce-b314b627eb35` (`/openraster` v2 plus
+  the new `/what-is-ora`, `/ora-to-png` and `/ora-to-psd`, branch
+  `feat/ora-page-v2`). Still no `projectId` pinned; the next run is still a
+  first-time import. Wait until that branch has merged.
