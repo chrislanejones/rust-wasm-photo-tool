@@ -243,6 +243,11 @@
 /* ── the log ────────────────────────────────────────────────────────── */
 
 .trail-log { padding: var(--space-xl) var(--page-gutter) var(--space-3xl); }
+/* The Next grid carries its own 88px of top padding. Stacked under the log's
+   6rem bottom padding that is 184px of empty page between the pager and the
+   first card — which is what it looked like. The log keeps its own padding
+   when nothing follows it; when the grid does, the grid's spacing is enough. */
+.trail-log:has(+ .tp-next) { padding-bottom: 0; }
 .trail-log__count {
   margin: 0;
   padding-bottom: var(--space-sm);
