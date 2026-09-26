@@ -52,7 +52,7 @@ const LEARN_ITEMS: LearnItem[] = [
   { key: "trail",        href: "/trail-log",    title: "Trail Log",    desc: "Every release, newest first, and the commits behind them.", paths: P.commit, detail: "Every release, newest first, with the commits behind it. Press a month to narrow the log; the year pill brings it all back. Each month opens with what it amounted to." },
   { key: "features",     href: "/features",     title: "Features",     desc: "The whole list — engine and interface.", paths: P.checks,    detail: "All the features from the repo's own list, regrouped by what you're trying to do — annotate, select, enhance, export. Each has a plain line and the engineering line underneath." },
   { key: "openraster",   href: "/openraster",   title: "OpenRaster (.ora)", desc: "Open a layered .ora here. Take it to Krita or GIMP.", paths: P.layers, detail: "OpenRaster is the open layered format Krita, GIMP and MyPaint share. Drop a .ora on the page to see every layer — read in the tab, never uploaded — and learn what survives a round trip through Image Horse." },
-  { key: "coming",       href: "/coming-soon",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
+  { key: "coming",       href: "/in-the-works",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
   { key: "about",        href: "/about",        title: "About",        desc: "Who builds it, and the horse.",          paths: P.info,      detail: "Image Horse is one person's project, and it is named after a horse. Chris builds it. Naji, an Arabian who survived his herd and later worked as a therapy horse, lent the name." },
 ];
 
@@ -338,7 +338,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                       </Link>
                     ))}
                     {g.pages.length < 2 && (
-                      <Link to="/coming-soon" className="nav-mega__page nav-mega__page--more">
+                      <Link to="/in-the-works" className="nav-mega__page nav-mega__page--more">
                         <span className="nav-more__eye"><Paths d={P.telescope} size={12} />Coming</span>
                         <span className="nav-mega__page-title">More on the way</span>
                         <span className="nav-mega__page-desc">What&rsquo;s being built, and how sure we are <span aria-hidden="true">&rarr;</span></span>
@@ -427,7 +427,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                 </Link>
               ))
             )}
-            <Link to="/coming-soon" className="nav-sheet__card nav-sheet__card--more">
+            <Link to="/in-the-works" className="nav-sheet__card nav-sheet__card--more">
               <span className="nav-more__eye"><Paths d={P.telescope} size={12} />Coming</span>
               <span className="nav-sheet__card-title">More on the way</span>
               <span className="nav-sheet__card-desc">What&rsquo;s being built, and how sure we are <span aria-hidden="true">&rarr;</span></span>

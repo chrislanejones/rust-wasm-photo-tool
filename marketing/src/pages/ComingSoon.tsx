@@ -4,7 +4,7 @@ import Footer from "../components/Footer";
 import { EDITOR_URL, external } from "../config";
 import { GROUPS } from "../data/comingSoon";
 
-/* /coming-soon — what's coming, and how sure we are.
+/* /in-the-works — what's coming, and how sure we are.
  *
  * Three states and no dates. A date is a promise about a week; a state is a
  * promise about direction, and only one of those is worth making on a project

@@ -5,7 +5,7 @@
  */
 
 :root {
-  /* The v2 page-title rung: /contact and /coming-soon set their h1 here. It
+  /* The v2 page-title rung: /contact and /in-the-works set their h1 here. It
      tops out a quarter-rem above --text-4xl, which is why it is its own token. */
   --text-page-title: clamp(2.5rem, 4vw + 1rem, 4.75rem);
   /* Pill links and the sent-state button. */

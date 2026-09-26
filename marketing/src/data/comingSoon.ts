@@ -1,4 +1,4 @@
-/* The /coming-soon register, shared with the home page's "Being built now"
+/* The /in-the-works register, shared with the home page's "Being built now"
  * band so the two can never disagree. Rules for entries live in
  * pages/ComingSoon.tsx. */
 

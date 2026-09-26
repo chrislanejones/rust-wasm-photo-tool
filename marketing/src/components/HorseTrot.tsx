@@ -8,24 +8,47 @@ import type { HorseTrotScene } from "./horse-trot.three";
  * 178 KB model plus three.js for a picture that sits under the fold, so the
  * query decides before anything is requested, not after.
  *
- * SSR renders nothing. `desktop` starts false on both server and client, so
- * hydration matches; the effect flips it and only then mounts the canvas. */
+ * Reduced motion gets a still picture of the same horse, `horse-still.webp`,
+ * instead of the canvas. The scene used to handle it by drawing one frame and
+ * stopping, which still cost the reader 155 KB of gzipped three.js plus the
+ * 178 KB model for a picture that never moves. The still is a snapshot of that
+ * scene, so the two look the same.
+ *
+ * SSR renders nothing. Both queries start false on server and client, so
+ * hydration matches; the effect flips them and only then mounts anything. */
 
 const DESKTOP = "(min-width: 64rem) and (hover: hover) and (pointer: fine)";
+const REDUCED = "(prefers-reduced-motion: reduce)";
 const SRC = "/horse.glb";
+const STILL = "/horse-still.webp";
 
-export default function HorseTrot() {
-  const [desktop, setDesktop] = useState(false);
+function useMedia(query: string) {
+  const [match, setMatch] = useState(false);
 
   useEffect(() => {
-    const mq = matchMedia(DESKTOP);
-    setDesktop(mq.matches);
-    const on = (e: MediaQueryListEvent) => setDesktop(e.matches);
+    const mq = matchMedia(query);
+    setMatch(mq.matches);
+    const on = (e: MediaQueryListEvent) => setMatch(e.matches);
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
-  }, []);
+  }, [query]);
 
-  return desktop ? <HorseCanvas /> : null;
+  return match;
+}
+
+export default function HorseTrot() {
+  const desktop = useMedia(DESKTOP);
+  const reduced = useMedia(REDUCED);
+  if (!desktop) return null;
+  return reduced ? <HorseStill /> : <HorseCanvas />;
+}
+
+function HorseStill() {
+  return (
+    <div className="sfoot__horse" aria-hidden="true">
+      <img className="sfoot__horse-canvas" src={STILL} alt="" width={420} height={240} decoding="async" />
+    </div>
+  );
 }
 
 function HorseCanvas() {
