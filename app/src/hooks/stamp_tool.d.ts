@@ -1425,6 +1425,37 @@ declare module "stamp_tool" {
     /** Current selection as an RGBA overlay (empty if nothing selected). */
     selection_overlay(): Uint8Array;
     has_selection(): boolean;
+    /** `[selected, total]` pixels — the "Selected 18.4% · 2.1 MP" readout.
+     *  One count over the selection plane; `[0, w*h]` with nothing selected. */
+    selection_coverage(): Uint32Array;
+    /** Whether `selection_retune` would re-run anything: the last selection
+     *  was a wand / edge-aware / color-range click and nothing has touched the
+     *  history since. */
+    selection_can_retune(): boolean;
+    /** Re-run the last click-once selection from the same seed with a new
+     *  tolerance (and edge threshold, for edge-aware) — the live Tolerance
+     *  slider. Replaces that click's result in place: combines with the
+     *  selection from BEFORE the click and pushes no undo step of its own.
+     *  Returns the overlay RGBA; empty when the result selects nothing OR
+     *  there was nothing to re-run — re-read `selection_overlay` to tell. */
+    selection_retune(tolerance: number, edge_threshold: number): Uint8Array;
+    /** Refine preview on a COPY (islands, holes, smooth radius, signed
+     *  expand): the overlay the refined selection would draw. The selection
+     *  and history are untouched. Empty when the result selects nothing. */
+    selection_refine_preview(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** `[selected, total]` of the last refine preview — the readout while a
+     *  Refine slider moves. */
+    selection_refine_preview_coverage(): Uint32Array;
+    /** Drop the refine preview copy. */
+    selection_refine_cancel(): void;
+    /** Apply the refine ops: ONE undo step ("Refine Selection"), recomputed
+     *  from the parameters. Returns the overlay. */
+    selection_refine_apply(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** Add a mask to layer `id` from `source`: 0 reveal all, 1 hide all,
+     *  2 reveal the selection, 3 hide the selection. `feather` softens the
+     *  selection's edge (2 and 3). One undo step. False if the layer is
+     *  missing or already masked, or 2/3 with nothing selected. */
+    add_layer_mask_from(id: number, source: number, feather: number): boolean;
     /** Deselect (no history). */
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
@@ -1444,7 +1475,7 @@ declare module "stamp_tool" {
     selection_union(mask: Uint8Array): boolean;
     selection_subtract(mask: Uint8Array): boolean;
     /** Combine mode for the NEXT producer call: 0 = replace, 1 = union,
-     *  2 = subtract (clamped). The producers (wand / edge / color-range /
+     *  2 = subtract, 3 = intersect (clamped). The producers (wand / edge / color-range /
      *  lasso-close) route their mask through this so Shift/Alt-drag adds or
      *  subtracts instead of replacing. Reset to 0 after each use is the
      *  caller's job. */

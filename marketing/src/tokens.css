@@ -84,6 +84,22 @@
    * than gravity. The hero line is 60, so it caps here. */
   --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
   --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
+  /* The v2 redesign's rungs, from the design file's own values. --text-hero is
+   * deliberately smaller than --text-display: the v2 hero is four short
+   * sentences capped at 12ch, and at the display size it broke one phrase per
+   * line and split "Shrink it." across two. */
+  --text-deck:    1.125rem;
+  --text-card:    1.75rem;
+  --text-section: clamp(2rem, 2vw + 1rem, 2.75rem);
+  --text-hero:    clamp(2.75rem, 5vw + 1rem, 5.75rem);
+  /* Pricing v2. --text-ui is the button, table and list size the v2 designs
+   * use for anything you act on; --text-price is the $0 figure, which v2 sets
+   * smaller than --text-figure so the headline under it can lead. */
+  --text-ui:       0.9375rem;
+  --text-headline: clamp(2rem, 3vw + 1rem, 3.75rem);
+  --text-price:    clamp(4rem, 9vw + 1rem, 9rem);
+  --text-panel:    clamp(1.75rem, 2.5vw, 2.25rem);
+  --text-coda:     clamp(1.75rem, 2.5vw, 2.5rem);
   /* The closing line above every footer. */
   --text-statement: clamp(1.75rem, 4.5vw, 3rem);
   /* A single number set larger than any headline: the $0 on /pricing. */

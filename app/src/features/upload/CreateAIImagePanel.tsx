@@ -293,6 +293,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
           placeholder — now rendered by the same ToolButtonGroup the
           Crop ratios use rather than a private copy of it. */}
       <ToolButtonGroup<string>
+        aria-label="Aspect ratio"
         columns={5}
         label={
           <>

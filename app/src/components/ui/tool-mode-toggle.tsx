@@ -95,6 +95,7 @@ export function ToolModeToggle<T extends string>({
     <div className={cn("space-y-2.5", showModeRow && "-mt-2", className)}>
       {showModeRow && (
         <ToolButtonGroup
+          aria-label="Mode"
           stacked
           columns={columns}
           options={modes}

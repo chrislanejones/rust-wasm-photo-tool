@@ -1,0 +1,228 @@
+/* about — v2 port. Owned by the about port; other ports must not edit this file.
+ *
+ * /about: a split head, then both people on one cream board, then a one-line
+ * close. Sizes are the About v2 design's own values; where the site's scale has
+ * no matching rung the rung is defined here rather than borrowed from a class
+ * that sets its own size.
+ */
+
+:root {
+  /* The About v2 title. Same clamp as /coming-soon's, one rung under
+     --text-hero: this headline is eight words, not four short sentences. */
+  --text-about-title: clamp(2.5rem, 4vw + 1rem, 4.75rem);
+  /* A person's name on the board. */
+  --text-about-name: clamp(1.75rem, 2.5vw, 2.25rem);
+  /* The link pills under a bio. */
+  --text-about-pill: 0.875rem;
+  /* The closing line. */
+  --text-about-close: clamp(1.375rem, 2vw, 1.75rem);
+}
+
+/* ── head ─────────────────────────────────────────────────────────────── */
+
+.about-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  /* Same clearance as .page-head and .hero: the nav floats, so the first
+     heading buys its own room under it. */
+  padding: calc(var(--banner-height) + var(--space-2xl)) var(--page-gutter) var(--space-xl);
+}
+.about-head__lead { display: grid; gap: 20px; min-width: 0; }
+.about-head__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.about-head__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 14ch;
+  font-size: var(--text-about-title);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.about-head__deck {
+  margin: 0;
+  padding-bottom: 6px;
+  max-width: 36ch;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+/* ── the board ─────────────────────────────────────────────────────────
+   Its ink is local, not token-derived: every site ink token is tuned for
+   light text on the dark page, and all of them are wrong on cream. */
+
+.about-board {
+  --about-ink: oklch(20% 0.020 40);
+  --about-ink-2: oklch(30% 0.020 40);
+  --about-mark: oklch(44% 0.170 45);
+  --about-rule: oklch(84% 0.020 80);
+  --about-frame: oklch(86% 0.020 80);
+  --about-card: oklch(97.5% 0.012 80);
+  --about-pill-rule: oklch(76% 0.020 70);
+
+  display: grid;
+  gap: clamp(40px, 6vw, 72px);
+  margin: var(--space-xl) var(--page-gutter) 0;
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: 20px;
+  background: oklch(94% 0.020 80);
+  color: var(--about-ink);
+}
+
+.about-person {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 28px var(--space-2xl);
+  align-items: start;
+}
+.about-person--flip {
+  padding-top: clamp(32px, 5vw, 56px);
+  border-top: 1px solid var(--about-rule);
+}
+
+.about-person__shot {
+  margin: 0;
+  max-width: 26rem;
+  overflow: hidden;
+  border: 1px solid var(--about-frame);
+  border-radius: 14px;
+  background: var(--about-card);
+}
+.about-person__shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* The horse's row mirrors: text first, portrait pushed to the far edge. */
+.about-person--flip .about-person__shot {
+  order: 2;
+  max-width: 22rem;
+  justify-self: end;
+}
+.about-person--flip .about-person__text { order: 1; }
+
+.about-person__text {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.about-person__role {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--about-mark);
+}
+.about-person__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: var(--text-about-name);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: var(--about-ink);
+}
+.about-person__native {
+  display: inline-flex;
+  letter-spacing: 0;
+  color: var(--about-mark);
+}
+.about-person__bio {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--about-ink-2);
+  text-wrap: pretty;
+}
+.about-person__bio a {
+  color: var(--about-mark);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.about-person__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+}
+.about-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--about-pill-rule);
+  border-radius: var(--radius-pill);
+  background: var(--about-card);
+  color: var(--about-ink);
+  font-size: var(--text-about-pill);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+.about-pill:hover { border-color: var(--about-mark); }
+.about-pill:focus-visible { outline: 2px solid var(--about-mark); outline-offset: 2px; }
+
+/* ── close ─────────────────────────────────────────────────────────────── */
+
+.about-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px var(--space-xl);
+  padding: var(--space-2xl) var(--page-gutter) var(--space-3xl);
+}
+.about-close__text { display: grid; gap: 6px; }
+.about-close__line {
+  margin: 0;
+  font-size: var(--text-about-close);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.about-close__sub {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-ink-2);
+}
+.about-close__cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.about-close__cta:hover { background: var(--color-accent-soft); }
+.about-close__cta:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }

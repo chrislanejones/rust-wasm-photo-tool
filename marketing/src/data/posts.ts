@@ -90,6 +90,9 @@ export const POSTS: readonly Post[] = [
     published: "2026-09-22",
     version: "v8.85",
     tag: "engineering",
+    // WebP, not the generator's PNG: this card was drawn by hand. It ships as
+    // exported, uncompressed, at 49,800 bytes.
+    ogImage: "/og/blog/offline-by-construction.webp",
     sources: [
       "marketing/src/posts/offline-by-construction.tsx",
       "docs/Architecture.md",

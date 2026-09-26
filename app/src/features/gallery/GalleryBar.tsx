@@ -702,7 +702,8 @@ export function GalleryBar({
                 : "grid grid-cols-[auto_1fr_auto] gap-2 items-center"
             }
           >
-            <button
+            <Button
+              size="tiny"
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -711,7 +712,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollLeft}
-              className="btn-icon flex-shrink-0"
+              className="flex-shrink-0"
               aria-label={vertical ? "Scroll up" : "Scroll left"}
             >
               {vertical ? (
@@ -719,7 +720,7 @@ export function GalleryBar({
               ) : (
                 <ChevronLeft className="h-4 w-4" />
               )}
-            </button>
+            </Button>
 
             <div
               ref={stripRef}
@@ -810,7 +811,8 @@ export function GalleryBar({
               ))}
             </div>
 
-            <button
+            <Button
+              size="tiny"
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -819,7 +821,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollRight}
-              className="btn-icon flex-shrink-0"
+              className="flex-shrink-0"
               aria-label={vertical ? "Scroll down" : "Scroll right"}
             >
               {vertical ? (
@@ -827,7 +829,7 @@ export function GalleryBar({
               ) : (
                 <ChevronRight className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </div>
 
           {/* Vertical (master bar): the count readout is pinned to the bottom. */}

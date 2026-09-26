@@ -13,7 +13,7 @@ import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { useTabClaim } from "./useTabClaim";
-import { holdsTabClaim, setHoldsTabClaim } from "@/lib/sync/leader";
+import { claimTabHere, holdsTabClaim, setHoldsTabClaim } from "@/lib/sync/leader";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -60,6 +60,21 @@ describe("useTabClaim → the sync pusher", () => {
 
     await act(async () => {
       claim.claimHere();
+      await settle();
+    });
+    expect(claim.isStale).toBe(false);
+    expect(holdsTabClaim()).toBe(true);
+  });
+
+  it("Settings › Sync's Use here (claimTabHere) reaches this hook's claim", async () => {
+    await act(async () => {
+      other.postMessage({ type: "claim", id: "someone-else" });
+      await settle();
+    });
+    expect(claim.isStale).toBe(true);
+
+    await act(async () => {
+      claimTabHere();
       await settle();
     });
     expect(claim.isStale).toBe(false);

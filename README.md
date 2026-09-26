@@ -85,29 +85,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.88 — 2026-09-22
+### v8.98 — 2026-09-24
 
-**Settings › Beta lets you switch on unfinished features for your own browser, and hand someone else a link that does the same for theirs.**
+**Refine a selection, then turn it into a mask.**
 
-Some things here are finished but not trusted yet. The Smart Brush, where a
-stroke stops at an edge instead of running over it, has been tested every
-way except the one that matters: whether it feels right to paint with.
-Blur on the graphics card is the same story. Until now the only way to try
-either was to type a key into the browser's developer tools, which means
-the only people who could were people who already knew the key.
+The Select panel has a Refine section now. Clean Up does the usual chores in
+one step: it drops specks under 4 pixels, fills pinholes under 6, smooths the
+edge and pulls it in by one. The sliders underneath are the same operations
+one at a time. Move one and you see the result before you commit it, with the
+"Selected" readout telling you what it cost. Apply is one undo step.
 
-Settings › Beta lists them. Each is off until you turn it on, and turning
-one on changes nothing for anybody else. **Copy invite link** gives you a
-link that turns one feature on for whoever opens it, on the device they
-open it with, so trying an experiment is one message instead of a
-paragraph of instructions. Anyone can switch it back off in the same
-place, or open the app with `?beta=none` to clear them all.
+Layer Settings' Add mask asks what the mask should start from: show the whole
+layer, hide it, reveal just the selection, or hide the selection. Feather from
+Refine softens that edge. The mask brush opens straight after, as it always
+has. Select subject… is there too, and takes you to Background Removal.
 
-These choices live in your browser. Nothing about them is sent anywhere,
-and there is no way for me to know who is in a beta — which is the point,
-and also why feedback has to be asked for.
+The export dialog lets you name the file before it downloads. The name you type
+is cleaned up so every operating system accepts it, and the extension always
+matches the format.
 
-The engine did not change. It is the same 814,432 bytes as v8.87.
+Engine 824,286 bytes (was 816,594).
 
 ## License
 

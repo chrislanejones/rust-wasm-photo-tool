@@ -6,6 +6,9 @@
 // existing functional-updater call sites (e.g. `setMoveActive((m) => !m)`,
 // `setToolSettings((p) => ({ ...p, brushSize }))`) migrate untouched.
 import { create } from "zustand";
+import type { SelectionCombineMode } from "@/lib/selectionBool";
+import type { SelectionCoverage } from "@/lib/selectionCoverage";
+import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
@@ -204,6 +207,28 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
+  /** How the next selection combines with the current one — the Select
+   *  panel's Combine group (New / Add / Subtract / Intersect). Shift and Alt
+   *  still override it for one gesture. NOT PERSISTED (outside `partialize`):
+   *  a session-scoped choice, and a reload that came back in Subtract would
+   *  make the first click look broken. No IndexedDB change. */
+  selectionCombine: SelectionCombineMode;
+  /** `[selected, total]` pixels of the live selection, from the engine's
+   *  `selection_coverage` — the "Selected 18.4% · 2.1 MP" readout in the
+   *  panel and the status bar. `null` until the engine has answered, and
+   *  whenever nothing is selected. NOT PERSISTED. */
+  selectionCoverage: SelectionCoverage | null;
+  /** The Refine section's sliders. Start at the Clean Up values. NOT
+   *  PERSISTED (outside `partialize`): no IndexedDB change. */
+  selectionRefine: RefineSettings;
+  /** A Refine preview is on screen: the overlay and the readout show the
+   *  refined copy, not the selection. Cleared by Apply, Clean Up, and any
+   *  other change to the selection. */
+  refinePreviewing: boolean;
+  /** Panel → session hook: "apply now". The panel has no engine handle (it
+   *  would mean threading props through AppShell), so it asks through the
+   *  store and `useSelectionActions` answers. `n` makes each request new. */
+  refineRequest: { kind: "apply" | "cleanUp"; n: number } | null;
   /** AI › Object Removal is painting its mask ON the canvas right now.
    *
    *  This replaced a portal-mounted popup that painted on its own private
@@ -265,6 +290,11 @@ export interface ToolState {
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  setSelectionCombine: (v: SetArg<SelectionCombineMode>) => void;
+  setSelectionCoverage: (v: SelectionCoverage | null) => void;
+  setSelectionRefine: (v: SetArg<RefineSettings>) => void;
+  setRefinePreviewing: (v: boolean) => void;
+  requestRefine: (kind: "apply" | "cleanUp") => void;
   /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
    *  the mask describes one object on one image, so carrying it into the next
    *  visit to the panel could only ever remove the wrong thing. */
@@ -356,6 +386,11 @@ export const useToolStore = create<ToolState>()(
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
+      selectionCombine: 0,
+      selectionCoverage: null,
+      selectionRefine: CLEAN_UP,
+      refinePreviewing: false,
+      refineRequest: null,
       objectRemovalMasking: false,
       cropSelectionActive: false,
       objectRemovalStrokes: [],
@@ -436,6 +471,14 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setSelectionCombine: (v) =>
+        set((s) => ({ selectionCombine: resolveSet(v, s.selectionCombine) })),
+      setSelectionCoverage: (v) => set({ selectionCoverage: v }),
+      setSelectionRefine: (v) =>
+        set((s) => ({ selectionRefine: resolveSet(v, s.selectionRefine) })),
+      setRefinePreviewing: (v) => set({ refinePreviewing: v }),
+      requestRefine: (kind) =>
+        set((s) => ({ refineRequest: { kind, n: (s.refineRequest?.n ?? 0) + 1 } })),
       setObjectRemovalMasking: (v) =>
         set((s) => {
           const next = resolveSet(v, s.objectRemovalMasking);

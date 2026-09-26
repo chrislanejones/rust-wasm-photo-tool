@@ -10817,3 +10817,179 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust or Convex change. |
 | **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1099 across 96 files** (19 new: 14 `beta.test.ts`, 5 `BetaPane.test.ts`), production build + `inert-class-audit` 0, marketing build clean. Mutations: **6 of 6 killed** — a kill switch entering the ring, the parameter left in the URL, `?beta=none` disabled, an unknown id not skipped, storage read instead of the module's predicate, and a beta id that is not URL-safe. PR CI: #221 **16/16** Actions green. |
 | **QC** | Browser, production build: `?beta=smart-brush` set `ih_smart_edge=1` and left the URL at `/`; the pane read On; toggling GPU blur wrote `ih_webgpu=1`; `?beta=none` cleared both. Features.md gains a Beta line (features.ts 55 → 56). |
+
+## v8.89 Change Summary — 2026-09-22
+
+**"Everything in your browser" now stops photo uploads too, which is what that page always said it did.**
+
+| Area | Change |
+| --- | --- |
+| **The bug** | `useEditPersistence` uploaded a flattened archive of every edited photo on `isAuthenticated` **alone**. The switch gated the AI tools, which carry `requiresNetwork` (v8.84, #198); this path is not a tool, so it went straight through the net. Settings › Security said "your photos never leave this tab" with the switch off, and for a signed-in person that was false. |
+| **Measured** | On the live deployment the same day, all of it from this path: **207 files, 6.9 GB**, median **31.7 MB**, largest **123 MB** — against an advertised quota of 100 MB signed in and 5 GB paid, which nothing enforces. |
+| **The gate** | New `cloudPhotosAllowed(isAuthenticated, onlineFeaturesEnabled)`. Both cloud legs go through it: the upload in `savePhotoEdit`, and the cloud fallback in `loadPhotoEdit`. |
+| **Deletes stay open** | `removeEdit` and `clearAll` keep the bare auth check, deliberately. Taking a copy back sends no pixels, and refusing it while the switch is off would strand data on a server the person has just asked to stop using. |
+| **⚠️ Behavior change** | Signed in with the switch off — its shipped default — an edit is no longer copied to the account, and a photo with no local archive no longer falls back to the cloud. Turning the switch on restores both. |
+| **Says so** | Settings › Security lists the edit backup in "what on turns on" and notes that deleting still works with the switch off. The privacy policy says the switch governs the backup exactly as it governs the AI tools. |
+| **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust or Convex change. |
+| **Tests** | 5 new in `cloudPhotosAllowed.test.ts`: the rule, a fresh signed-in profile at the shipped default, that exactly the two cloud legs are gated, that both delete legs are not, and that the file still names the promise it keeps. Mutations: ignoring the switch, and putting the upload back on auth alone, each turn **2 tests red**. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1104 across 97 files**, production build + `inert-class-audit` 0, marketing build clean. PR CI: #223 **17/17** Actions green. |
+| **Next** | This is stage 0 of a synced gallery (Chris, 09-22): the switch had to mean what it says before more photo data moves. Stage 1 is the gallery list and thumbnails, paid-gated, with an entitlement model where admin is a role rather than a fourth tier. |
+
+## v8.90 Change Summary — 2026-09-22
+
+**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | Chris, 09-22: "the levels should be — not logged in \| logged in free \| paid \| Superuser … default superusers to paid … but they can drop down status. what do you recommend?" The recommendation, taken: keep superuser OFF the pricing ladder. Folding it in turns every gate into "paid OR superuser", and that trailing clause is what rots — miss it once and a paid feature is free, or the person debugging cannot see what they are debugging. A second admin would also be a new rung in a *pricing* ladder. |
+| **Three words, kept apart** | `convex/entitlement.ts`: **tier** is what the account paid for (free / pro / team), **role** is what the person is trusted to do (user / admin), **entitlement** is what this session may use (none / free / paid). One pure module, imported by the server and the client, so a gate cannot drift from the rule. |
+| **Admin ⇒ paid** | An admin is entitled to paid, server included, with no tier grant. Testing paid needs no fake `pro` on the row — which matters here, because one person had accumulated **three** `users` rows, two of them already pro, and `devGrantTier` picks the first by email. |
+| **The server decides** | `users.me` returns `role` and `entitlement`, computed from `ADMIN_EMAILS` (plural, comma separated; the older `ADMIN_EMAIL` still works). `app/src/lib/superuser.ts` — which compared the signed-in email to an address hardcoded **in the browser** — is deleted. |
+| **A preview may only take away** | `previewOf`. Super User is now "look at the app as another kind of account": rungs above your entitlement are shown but disabled. The old override could raise a free account to "paid", so the UI offered what the server refused; that mismatch is impossible by construction now. |
+| **Fails closed** | A missing `ADMIN_EMAILS` makes **nobody** an admin. A deployment that forgot the variable must not hand the role to whoever signs in first. Set on `brave-ant-608` before this shipped. |
+| **Deploy order** | Functions pushed to the live deployment **before** the merge: 77 functions, `users.me` present, sync and shares intact. `me` only gains fields, so an older client is unaffected. |
+| **Engine size** | Unchanged at **814,432 B**, sha256 `d8afbefbdbacf868…`. No Rust changed. |
+| **Tests** | 21 new in `entitlement.test.ts`: the ladder and its `UserMode` round trip, an unknown or junk tier never opening a paid door, admin entitled to paid without a grant, the preview never raising anyone (every combination of rung and preview), and the admin list tolerating spaces and case while refusing substrings, lookalikes, and an empty list. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings (baseline), guardrails OK, vitest **1125 across 98 files**. PR CI: #224 **16/16** Actions green. |
+| **Next** | Stage 1 of the synced gallery — the photo list and thumbnails, gated on this entitlement, with the server enforcing the real one. |
+
+## v8.91 Change Summary — 2026-09-23
+
+**A/B Compare lives in the top bar now, between New and Export, and works over every tool.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | The only Compare control was a button at the bottom of Enhance › Compress. Leave that group and the button vanished, so `CompareSlider` closed the overlay on any group change to avoid a comparison pinned with no off switch. Compare was really a Compress-only feature. |
+| **Top bar** | `TopBar.tsx`: a Compare `IconButton` between New and Export. A real toggle — `active` plus `aria-pressed`, tooltip flips between "A/B Compare" and "Hide A/B Compare". New `CompareIcon` drawn in lucide's 24-unit, 2px-stroke style. |
+| **When it's available** | `canCompare` in AppShell: a photo is loaded, it has a stored upload baseline (`activeOriginalKey`), and the active tool is not Batch (`emoji`). Disabled otherwise, never hidden. |
+| **Auto-close** | `CompareSlider.tsx` closes the overlay only on entering Batch, whose edits go to every loaded photo and have no single before/after. It used to close on leaving `enhance/*`. |
+| **Compress panel** | `ResizeSettings` loses `hasCompareBaseline`, `onToggleCompare` and the button + tooltip. |
+| **Tests** | `e2e/compare-photo-rect.spec.ts` drives the top-bar button instead of the Compress one. |
+| **Also since v8.90** | #225 — the deploy check no longer counts a pure rule module (`convex/entitlement.ts`) as a missing function, which had turned master CI red on v8.90. #226/#227 — the offline blog post gets its own share card, shipped uncompressed, and reads in US English. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | PR #229 CI: **17** Actions checks green incl. Static guardrails, Frontend typecheck + build, SW e2e; Convex prod deploy skipped (no function change). The 4 Netlify rows are the lapsed free plan. |
+
+## v8.92 Change Summary — 2026-09-23
+
+**A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom.**
+
+| Area | Change |
+| --- | --- |
+| **Why** | Chris wanted before/after screenshots at several zoom levels with nothing else on the page. |
+| **The snippet** | `scripts/compare-clean-view.js`, a DevTools snippet like `webgpu-blur-bench.js`, never bundled. It clicks the top-bar Compare button if it's off, sets the divider with one synthetic pointer click on the overlay (the position lives in `useUIStore`, which has no handle on `window`), and adds a `<style>` that hides `body *` except the canvas and overlay, both marked with `data-ih-keep`. A MutationObserver re-marks them if zoom re-renders the overlay. |
+| **Settings** | `POSITION` (default **0.75**), `KEEP_LABELS`, `BACKDROP` at the top of the file. |
+| **Controls** | Alt + = / Alt + - / Alt + 0 and Alt + scroll zoom as usual; Esc or a second run turns it off. |
+| **Verified live** | On edit.imagehorse.app: divider at **75%**, only the canvas and overlay visible, zoom 552 → 668 px wide stayed clean, Esc restored the page, route unchanged, **0** page errors. |
+| **"Different photo" — not a bug** | In the first test the Edited side looked like another picture. Retested with the divider at each end: it is the **same photo**, with a strong contrast edit and a leftover rectangle from an earlier session. At 75% the Edited side is just the photo's right-hand quarter, which is all shop signs. |
+| **Engine size** | Unchanged at **814,432 B**. No app code changed. |
+| **Gates** | tsc 0, eslint 0 errors / 57 warnings, guardrails OK. |
+
+## v8.93 Change Summary — 2026-09-24
+
+**Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.**
+
+| Area | Change |
+| --- | --- |
+| **Layer mask brush** | Mask painting is now self-contained on the Layers panel. Pressing the mask toggle no longer switches to the Paint brush group. A brush section appears inside the mask row with size, feather and hide/reveal (black/white) controls. |
+| **X key** | While painting a mask, X swaps black and white — the same binding Photoshop uses. The key is dormant outside mask-paint mode so nothing else can collide with it. |
+| **Morphing button** | The "Edit mask" toggle morphs to read "Painting mask" once mask editing is on, making the active state clear without adding a second button below it. |
+| **Toggle bug fix** | `handleToggleMaskEdit` previously compared a Promise to a number (the engine runs in a worker), so it could only ever turn on. Awaiting `active_layer_id()` fixed the toggle. |
+| **Marketing nav** | Nav replaced with a mega-menu. "Tools" and "Learn" open dropdown panels with feature cards that preview descriptions on hover. All tool-specific landing pages and learn pages are linked for SEO. |
+| **Mobile sheet** | The mobile sheet is now a full-screen overlay with a principle card, a 2-column tools grid, a 2-column learn grid, a Pricing/Contact pair and a CTA. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0, eslint 0 errors, guardrails OK (two improvements: rust-panics 46 < 47, librs-lines 4763 < 4808). |
+
+## v8.94 Change Summary — 2026-09-24
+
+**The ten tools in the new menu have pages now. Every one of those links was a dead end, and a dead end on this host is a blank white page.**
+
+| Area | Change |
+| --- | --- |
+| **The bug** | v8.93's mega-menu linked to ten tool paths — `/photo-editor`, `/image-compressor`, `/background-remover`, `/remove-object-from-photo`, `/annotate-image`, `/clone-stamp`, `/pixelate-image`, `/blur-image`, `/batch-image-editor`, `/image-editor-no-upload`. None had a route or a page. All ten returned a hard **404** from Vercel, whose 404 page is white. |
+| **Why the catch-all didn't save it** | `routes.ts` has a `*` → NotFound route, so a client-side click would have rendered the site's own 404. The menu used plain `<a href>` for internal links, which is a **full page load** — it reaches the host, not the router, so the catch-all never ran. Both faults had to be fixed. |
+| **Ten tool pages** | One `ToolLanding.tsx` driven by `data/toolPages.ts`: H1, lede, a runs-on badge (your machine / a server / mostly local), what it does, two body sections, and three related-tool links. 860–970 words of real prerendered content each. |
+| **What's coming** | New `/coming-soon`: sixteen entries in three states — being built, decided, thinking about it — with filter tiles and per-state counts. No dates. Ported from the `Coming Soon v2` design, including its light board on the dark page. |
+| **Menu panel height** | The panel had no floor, so it resized as you moved between Tools and Learn and again when a group held one tool rather than two. `min-height: 23rem` on the panel and `height: 20rem` on every column, with tool cards on `flex: 1 1 0` so they fill the column. This is the design's spacing, which the first port dropped. |
+| **Learn panel** | Gained its sixth item, "What's coming", which the first port left out. The feature card's footer counts the list rather than hard-coding five. |
+| **One list** | The menu read its own copy of every tool title and blurb. It now reads `toolPages.ts`, the same file the pages render, so the two cannot drift. |
+| **Sitemap** | 12 → **23 URLs** (21 pages, 2 posts). Tool routes carry a `toolPage` flag so they stay in the sitemap and the prerender but out of the footer's main column. |
+| **Trail Log** | Untouched and verified: **152 versions**, v8.93 → v0.1, all release text intact in the prerendered HTML. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, 23/23 routes prerendered. |
+
+## v8.95 Change Summary — 2026-09-24
+
+**The whole marketing site is redrawn — every page, in the new design, with the cream boards and the numbered callouts on the screenshots.**
+
+| Area | Change |
+| --- | --- |
+| **Every page** | Home, Pricing, Features, Trail Log, Blog, blog posts, About, Contact, Architecture, Privacy, Terms, the footer and the ten tool pages, all rebuilt to the v2 designs. Ported in parallel, one agent per page, each owning its own files. |
+| **Cream boards** | The v2 signature: a light, near-black-on-cream board on the dark page for blocks that are a register rather than prose — the feature grid, the pricing matrix, what-runs-where, and /coming-soon. Each carries local `--b-ink*` vars, because every site ink token is tuned for light-on-dark and all of them are wrong on cream. |
+| **Screenshot callouts** | The home timeline's numbered pins, highlight shapes and callout boxes, at the design's own pixel coordinates, on four shots: Presets / Original↔Edited / Compress All (Sep), magic wand (Aug), Stroke Stabilizer (Jul 27), History (Jul 17). Real text for screen readers and in the prerendered HTML. Below 48rem the pins stay on the image and the notes render as a numbered list. |
+| **Menu card width** | The Learn panel's tall card was 256px against Tools' 183px — a flex basis with a 16rem cap versus a grid track. Learn now uses the same track definition, so the card is one column on both panels and matches at every width (183/183 at 1280, 184/184 at 1024). |
+| **Type scale** | Nine rungs added to `tokens.css` from the designs' own values (`--text-hero`, `--text-section`, `--text-card`, `--text-deck`, `--text-ui`, `--text-headline`, and three on Pricing). Every ported page was measured against its mockup at 1280px and every text size matches within 0.5px. The first Home pass had shipped a 119px hero against an 80px design by reusing `.hero__display`, which carries its own size. |
+| **Share cards** | 21 route cards, up from 5. Each uses the real horse logo instead of a plain orange square, is set in Geist (they used to fall back to `system-ui`, which is a different font on every machine that ran the generator), and carries a short share headline rather than the long SEO title. `text-wrap: balance` so a headline cannot widow its last word. |
+| **Schema truth** | `/architecture` documented 8 of the 14 deployed Convex tables and said the op log was format v6 when `src/ops.rs` has `OP_FORMAT_VERSION = 8`. Now 14/14, every field name verified against `convex/schema.ts` by script, with `projects`, `images`, `layers`, `annotations` and `history` marked as what they are: deployed, and called by nothing since the engine moved into the browser. `share_views` and five newer `shares` fields added. |
+| **Copy** | The designs' verbiage throughout, with four refusals: Terms' "your pictures never reach us" (the body names the cloud and AI exceptions, so it overclaims), a contact form that would POST to a site with no backend (it opens your mail app instead), "~12 min read" pills (posts carry no reading time), and British spellings. Pricing's footer line is now "Free where it runs on your machine. Paid where it runs on ours." |
+| **Legal text** | Unchanged and verified: all **99** sentences (56 Privacy, 43 Terms) present word for word, **0** added. Layout only. |
+| **SEO** | New titles and descriptions for /features, /trail-log and /blog; the rest unchanged. The features description counts `features.ts` rather than hard-coding a number that goes stale on the next feature. |
+| **One stylesheet per page** | `about/blog/blog-post/contact/architecture/features/legal/footer/tool-page/trail/shot-annotations.css`, so parallel work cannot collide — and a change to one page cannot reach another. Dead rules left behind in `styles.css` are parked in PARKING_LOT.md, deliberately not deleted in the same diff. |
+| **Trail Log** | All **153** versions and **1196** headline/entry strings verbatim in the prerendered HTML. `releases.ts` was never edited by a port. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |
+
+## v8.96 Change Summary — 2026-09-24
+
+**Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.**
+
+| Area | Change |
+| --- | --- |
+| **WEBGPU cubes** | The word on Home is **103** lit 3D cubes through three.js's WebGPU renderer, ported from the design's `gpu-letters.js`. Hover ripples, drag scatters, any key knocks them loose, and they spring back. The label reports what the machine actually gave it: WebGPU, WebGL 2, or no GPU context. It never claims a device it did not get. |
+| **Trotting horse** | The design's `horse-trot.js`: a low-poly horse (`horse.glb`, 181,792 B, 15 morph targets) beside "Your pictures, your computer." in the Home footer. Decoration only, `aria-hidden`. Desktop pointers only, decided before anything is requested, so a phone never downloads the model or three.js. |
+| **Page weight** | Both graphics are chunk boundaries (`gpu-letters.three.ts`, `horse-trot.three.ts`), loaded when their section comes within 300px of the viewport. Home's HTML preloads neither. |
+| **three.js** | 0.165 → **0.170**, which has the `three/webgpu` entry the design's graphics were built on (added in 0.167). ADR-067 amends ADR-057. Both blog-post scenes checked on it: they render, with no console errors. |
+| **Being built now** | A cream band between the cubes and the blog: the five "building" entries from /coming-soon, the two already behind a flag first, each with a **Beta** badge and a link to try it. It reads the same list as /coming-soon (`data/comingSoon.ts`), so the two cannot disagree. It also splits what used to be two dark rows meeting at a hairline. |
+| **Menu bar** | **Home** added: Home · Tools · Learn · Pricing · Contact. The ⌘K button lost a white ring that was the browser's default button border drawn on a pill. |
+| **Phone menu** | Opens with a **MAIN 3** group (Home, Contact, Pricing) built from the same card as Tools and Learn. It replaces the tall "The principle" card and the Pricing/Contact pair at the bottom, where Contact sat below the fold at 1,356px on an 844px screen. |
+| **More coming** | The dashed card in the Tools menu was faint mono text in an empty box. It is a real card now (icon, title, one line) in both menus; the phone version was at 60% opacity. |
+| **Contact form** | Can send straight to the inbox through Web3Forms once `VITE_WEB3FORMS_KEY` is set on the marketing project. With no key it opens your mail app, exactly as before. The Privacy Policy names the relay only while it is switched on. `api.web3forms.com` added to `connect-src`. |
+| **Known, not new** | A React #418 hydration warning on /contact, /pricing, /coming-soon and /privacy-policy when served by `vite preview`. The v8.95 release built the same way shows it on the same four pages; live production shows it on none. |
+| **Engine size** | Unchanged at **814,432 B**. No Rust changed. |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 23/23 routes prerendered. |
+
+## v8.97 Change Summary — 2026-09-24
+
+**Open a .ora file in your browser, and see every layer.**
+
+| Area | Change |
+| --- | --- |
+| **/openraster** | A new Learn page, from the design's `Learn - OpenRaster.dc.html`. Drop any .ora on it and every layer is unzipped and drawn in the tab: a composite from the layer PNGs, the file's own `mergedimage.png` beside it, a layer list with eyes, a thumbnail and a save-as-PNG per layer. Nothing is uploaded; it works with the network off. |
+| **The sample** | The page opens on a five-layer sunset (`makeSample` in `lib/ora.ts`) with a blend mode, an offset layer and a hidden one, so every column of the viewer has something to show. Generated on the client in the tab, not fetched: no extra request on first paint. "Download sample.ora" hands you that file. |
+| **Speed** | The viewer decodes with `createImageBitmap`, all layers in parallel. Measured on 8 layers of 3000×2000 (60.4 MB of PNG): **377 ms**; one layer at a time 1,477 ms; the engine's wasm `decode_png_to_rgba` 1,977 ms plus 354 KB gzipped to download first. So the page ships no wasm and no three.js; its own chunk is **8.5 KB** gzipped. The editor's importer keeps the wasm decoder on purpose, so import and export share one codec. ADR-068. |
+| **Archive check** | Each file gets a five-line report: mimetype is `image/openraster`, it is first and stored, `stack.xml` and its version, `mergedimage.png`, thumbnail. Deflated entries (Krita, GIMP) are read through `DecompressionStream`; the ZIP reader is 60 lines rather than a jszip dependency on the marketing site. |
+| **Before you import** | Warnings when a layer is at an offset, smaller than the canvas, inside a group, uses a blend mode, or names a PNG the archive lacks. Each says what the editor's importer does about it today (`app/src/lib/openraster/import.ts`): top-left placement, full-size expected, flat stack, normal blending. |
+| **The guide** | What a .ora is, the file list and a `stack.xml` sample, export from Image Horse in three steps, import back, a "what survives a round trip" table, where else it opens (Krita, GIMP, MyPaint), and five questions. One copy fix against the design: the editor's tab is **Import / Export**, not "Export". |
+| **SEO** | Title 51 characters, description 158, canonical, its own share card, in the sitemap. The five questions are on the page and in a `FAQPage` JSON-LD node built from the same list (`data/openraster.ts`), so the markup can never name a question a visitor cannot see. The empty drop state and the whole article are in the prerendered HTML. |
+| **Found the page** | OpenRaster (.ora) is in the Learn menu (desktop and phone), ⌘K, the footer's Pages column, and the Learn hover card. |
+| **Select (#231)** | Live Tolerance: dragging the slider re-runs the last click from the same seed against the pre-click selection, so Add/Subtract/Intersect shrink as well as grow, and the whole drag is **one** undo step. 70 ms debounce, one run in flight, newest answer wins; above 8 MP (3.2 MP edge-aware) it waits for the drag to pause. A "Selected 18.4% · 2.1 MP" readout under the sliders and as a status-bar chip. **Intersect** is combine mode 3. Both sliders always shown, disabled with a one-line reason where unused. Engine: `selection_coverage()`, `selection_can_retune()`, `selection_retune()`. ADR-066. Pinned by `e2e/select-live-tolerance.spec.ts`; cargo test 372 / 557 with features. |
+| **Engine size** | **816,594 B** (was 814,432; +2,162 B for #231's retune record and coverage query). |
+| **Gates** | tsc 0 (marketing + app), eslint 0 errors / 57 warnings, guardrails OK, build 24/24 routes prerendered, browser test: sample loads in 519 ms, layer toggle changes pixels, a deflated .ora opens, a non-.ora zip is refused with a reason, phone has no horizontal overflow. |
+
+## v8.98 Change Summary — 2026-09-24
+
+**Refine a selection, then turn it into a mask.** The day half of the Select work; the morning half (#231) shipped in v8.97.
+
+| Area | Change |
+| --- | --- |
+| **Refine** (#233) | A section on the Select panel. **Clean Up** = remove islands under 4 px, fill holes under 6 px, smooth 2 px, contract 1 px, in one step. Five sliders expose the same operations plus Feather. A slider previews on a copy (the ants and the "Selected" readout show the result; the selection and the history do not move); Apply commits one "Refine Selection" undo step. |
+| **Engine** | `src/selection_refine.rs`: integer and deterministic throughout. Connected components run on the shared flood core (`flood_barrier_into`), not a second flood. Smooth is open then close; expand and contract are dilate and erode; square element, separable running counts, O(pixels) at any radius. |
+| **Feather** | Lives in the mask, not the selection: the selection is on/off per pixel, so a soft edge cannot exist there. Two integer box-blur passes produce the mask plane. |
+| **Add mask** (#233) | Layer Settings' tile opens its choices inline: Show entire layer, Hide entire layer, Reveal selection, Hide selection (disabled, with the reason, until something is selected), and Select subject… (opens Background Removal). Each is one undo step; the mask brush opens after, as before. |
+| **Undo, decided** | Apply is one snapshot and is not recorded in the op log (ADR-069). `src/ops.rs` untouched, no format bump. Every selection step keeps a whole copy of the image, so on a large photo Apply spends one of few undo steps; the Refine note says so and the Undo readout shows it. |
+| **Export name** (#232) | The export dialog has a File name field, pre-filled with `<name>-revised`. Illegal characters are stripped, a typed `.jpg` is not doubled, and an empty field falls back to the default. The extension always follows the format. |
+| **Accessibility** | Combine's "New" is "New selection": it had the same accessible name as the top bar's "New" (a new image). |
+| **Not built** | Mask view modes (Overlay, black-and-white) move to the UI plan's Night 4; both can be overlays with no compositing change. |
+| **Engine size** | 816,594 → **824,286 B** (+7,692). Ceiling 860,000. |
+| **QC** | `imagehorse-qc` on the production build, all five sections PASS: boot and demo mode, file picker and drag-drop; wand, Intersect, Shift override, Refine preview/Apply, undo/redo, Compare, export; every new button and the existing Selection actions; reload → Resume keeps the photo; focus rings, 8.56:1 contrast on the new reason text, Add mask by keyboard. |
+| **Gates** | cargo 393 / 578 (features), vitest 1,195, e2e `Running 36 tests` 34 passed / 2 skipped, tsc 0, eslint 0 errors, guardrails OK, 0 inert classes. |
+

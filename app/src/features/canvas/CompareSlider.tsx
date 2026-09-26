@@ -41,7 +41,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
   // move the handle back to the middle mid-comparison.
   const position = useUIStore((s) => s.comparePosition);
   const setPosition = useUIStore((s) => s.setComparePosition);
-  const activeSubTool = useToolStore((s) => s.activeSubTool);
+  const activeTool = useToolStore((s) => s.activeTool);
   // Asked only while compare is open — a closed slider must not add an engine
   // round trip to every stroke. Same revision AppShell's status bar reads.
   const layerRevision = useGalleryStore((s) => s.layerRevision);
@@ -113,13 +113,16 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
     };
   }, [active, canvasEl]);
 
-  // The ONLY control for this overlay is the "Hide A/B Compare" button in
-  // Enhance › Compress. Walk to any other group and that button is gone while
-  // the overlay stays pinned over the canvas — a stuck comparison with nothing
-  // left to switch it off. Leaving the group closes it.
+  // The toggle is the top bar's Compare button, so the overlay works over
+  // every tool — except the Batch editor, whose edits go to every loaded photo
+  // at once and have no single before/after to show. The button disables
+  // there, so opening Batch closes the overlay rather than leaving it pinned
+  // with nothing to switch it off.
+  // (`activeTool === "emoji"` is the Batch group — its legacy id, shared by
+  // all four of its sub-tools.)
   useEffect(() => {
-    if (active && !activeSubTool.startsWith("enhance/")) setCompareActive(false);
-  }, [active, activeSubTool, setCompareActive]);
+    if (active && activeTool === "emoji") setCompareActive(false);
+  }, [active, activeTool, setCompareActive]);
 
   const getPosition = useCallback((clientX: number) => {
     const el = overlayRef.current;

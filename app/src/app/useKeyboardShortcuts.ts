@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
@@ -58,6 +59,8 @@ interface KeyboardShortcutOptions {
   onZoomOut: () => void;
   onZoomReset?: () => void;
   onGroupChange?: (group: ToolGroupId) => void;
+  /** Alt+C — toggle the A/B Compare overlay (TopBar's Compare button). */
+  onToggleCompare?: () => void;
   onFlipH?: () => void;
   onFlipV?: () => void;
   onRotateCw?: () => void;
@@ -140,6 +143,7 @@ export function useKeyboardShortcuts({
   onZoomOut,
   onZoomReset,
   onGroupChange,
+  onToggleCompare,
   onFlipH,
   onFlipV,
   onRotateCw,
@@ -406,6 +410,7 @@ export function useKeyboardShortcuts({
           case "KeyN": e.preventDefault(); setShowUpload((v) => !v); break;
           case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
+          case "KeyC": e.preventDefault(); onToggleCompare?.(); break;
           case "KeyR": e.preventDefault(); setShowHistory((v) => !v); break;
           case "Equal": e.preventDefault(); onZoomIn(); break;
           case "Minus": e.preventDefault(); onZoomOut(); break;
@@ -428,6 +433,22 @@ export function useKeyboardShortcuts({
             break;
         }
         return;
+      }
+
+      // ─── Bare X → swap the mask brush between black and white ──────
+      // Photoshop's X (swap foreground/background colors, which on a mask is
+      // hide↔reveal). Claimed ONLY while mask editing is on, so it takes
+      // nothing from any future binding; typing contexts never reach here
+      // (the input/textarea/contentEditable guard at the top). Read via
+      // getState(), the command-palette precedent — a mode swap is global
+      // chrome, not an AppShell prop.
+      if (e.code === "KeyX") {
+        const t = useToolStore.getState();
+        if (t.maskEditing) {
+          e.preventDefault();
+          t.setMaskPaintValue(t.maskPaintValue < 128 ? 255 : 0);
+          return;
+        }
       }
 
       // ─── Bare digits 1-5 → tool GROUP switching ────────────────────
@@ -475,7 +496,7 @@ export function useKeyboardShortcuts({
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
-    onZoomOut, onZoomReset, onGroupChange, onFlipH, onFlipV, onRotateCw,
+    onZoomOut, onZoomReset, onGroupChange, onToggleCompare, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
     onLayerToFront, onLayerToBack,
   ]);

@@ -1,159 +1,114 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
-import { FEATURES } from "../data/features";
-import { getFeatureIcon, getGroupIcon, featureSlug } from "../data/featureIcons";
-import { useMediaQuery } from "../useMediaQuery";
+import { EDITOR_URL, external } from "../config";
+import { CARD_SECTIONS, CARD_TOTAL, type CardGroupKey } from "../data/featureCards";
+import { featureSlug, getFeatureIcon } from "../data/featureIcons";
 
-// Same breakpoint Nav.tsx uses for its own desktop/mobile split.
-const DESKTOP_QUERY = "(min-width: 60.0625rem)";
+/* /features — everything the editor does, in plain words.
+ *
+ * Every card is one entry in features.ts, which is generated from
+ * docs/Features.md, so the count on this page is the repo's own count and
+ * cannot drift. featureCards.ts adds what the docs don't carry: the group a
+ * feature belongs to by what you're trying to do, a plain line first, and the
+ * engineering line trimmed to fit underneath.
+ *
+ * The cards sit on a light panel, the same register-of-things surface as
+ * /coming-soon. Each keeps the anchor id the ⌘K palette deep-links to.
+ */
 
-const slug = featureSlug;
-
-const TOTAL = FEATURES.reduce((n, g) => n + g.items.length, 0);
+type Filter = "all" | CardGroupKey;
 
 export default function Features() {
-  // Which feature the reader is actually on — the rail marks it.
-  const [current, setCurrent] = useState<string | null>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const railRef = useRef<HTMLElement>(null);
+  const [active, setActive] = useState<Filter>("all");
+  const shown = CARD_SECTIONS.filter((g) => active === "all" || g.key === active);
 
-  // 40 items open-by-default reads fine as a desktop rail; as an accordion
-  // stacked above the content on a 375px phone it's a wall the reader has to
-  // scroll past before reaching a single word of the page. Closed on mobile,
-  // open on desktop — and re-decided on every resize across the breakpoint,
-  // same as Nav's sheet giving up its open state when the window grows back.
-  //
-  // The server value is `false` (closed), and it is the narrow case on purpose.
-  // This page is prerendered, so some answer has to exist before any browser
-  // has been asked — and the one that survives being wrong is the one that
-  // matches what a crawler on a phone user-agent should get. Being wrong here
-  // costs a collapsed rail for the frame before hydration, and nothing else:
-  // `desktop` only drives the `open` attribute on the rail's <details>, never
-  // `fx__body` below, so every word of the feature text is in the prerendered
-  // HTML at either setting.
-  const desktop = useMediaQuery(DESKTOP_QUERY, false);
-
-  // The rail follows the reader. IntersectionObserver, never a scroll listener.
-  // The top margin clears the fixed nav, so a feature counts as current when
-  // it's actually readable rather than while it's still behind the bar.
-  //
-  // Marking "whatever last fired isIntersecting" is the obvious version and
-  // it's wrong: scrolling down, the NEXT item's top edge enters the band while
-  // the item you're reading still fills the screen, so the highlight sits one
-  // ahead of you the whole way down the page. Track the whole intersecting set
-  // instead and mark the TOPMOST member — the one you're actually in.
-  useEffect(() => {
-    const items = [...(bodyRef.current?.querySelectorAll<HTMLElement>(".fx__item") ?? [])];
-    const order = items.map((el) => el.id);
-    const visible = new Set<string>();
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) visible.add(e.target.id);
-          else visible.delete(e.target.id);
-        }
-        const top = order.find((id) => visible.has(id));
-        // Between two sections nothing is in the band. Keep the last mark
-        // rather than blanking the rail in the gap.
-        if (top) setCurrent(top);
-      },
-      { rootMargin: "-96px 0px -70% 0px" },
-    );
-    items.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-
-  // Keep the marked link visible without yanking the whole page: scroll the
-  // rail's own box only. (`block: "nearest"` on the link would scroll the
-  // window too if the rail weren't its own scroll container.)
-  useEffect(() => {
-    if (!current) return;
-    railRef.current
-      ?.querySelector<HTMLElement>(`a[href="#${current}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [current]);
+  const tiles: { key: Filter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: CARD_TOTAL },
+    ...CARD_SECTIONS.map((g) => ({ key: g.key, label: g.short, count: g.items.length })),
+  ];
 
   return (
     <>
       <main id="main">
-        {/* A sticky rail beside the scrolling list — the page's own index,
-            which never leaves while you read. */}
-        <header className="page-head">
-          <h1 className="page-head__title">Features</h1>
-          <p className="lede">
-            The whole list, straight from the repo's own docs — <span className="fig">{TOTAL}</span>{" "}
-            of them. The engine ones run on your machine; the interface ones are what you touch. Pick
-            a group, or just scroll.
+        <header className="fxv-head">
+          <div className="fxv-head__lead">
+            <p className="fxv-head__eyebrow">
+              Features &middot; {CARD_TOTAL} of them, from the repo&rsquo;s own list
+            </p>
+            <h1 className="fxv-head__title">Everything the editor does, in plain words.</h1>
+          </div>
+          <p className="fxv-head__deck">
+            Annotate, select, enhance, export &mdash; all of it runs on your own machine, and the
+            editing tools are free. Pick a group, or just scroll. Each card has a plain line first
+            and the engineering line underneath.
           </p>
         </header>
 
-        <div className="fx">
-          <aside className="fx__rail" aria-label="Feature groups">
-            <nav className="fx__panel" ref={railRef}>
-              {FEATURES.map((g) => {
-                const GroupIcon = getGroupIcon(g.name);
-                return (
-                  // <details>/<summary> rather than a JS accordion: it opens
-                  // and closes, is keyboard-operable and announced correctly
-                  // with no script at all.
-                  <details className="fx__group" key={g.name} open={desktop}>
-                    <summary className="fx__summary">
-                      <GroupIcon className="fx__summary-icon" size={16} />
-                      <span className="fx__summary-label" title={g.name}>
-                        {g.name}
-                      </span>
-                      <span className="fx__n">{g.items.length}</span>
-                    </summary>
-                    <ul className="fx__list">
-                      {g.items.map((item) => {
-                        const id = slug(item.name);
-                        const ItemIcon = getFeatureIcon(item.name);
-                        return (
-                          <li key={id}>
-                            <a
-                              className={`fx__link${current === id ? " is-current" : ""}`}
-                              href={`#${id}`}
-                              title={item.name}
-                            >
-                              <ItemIcon className="fx__link-icon" size={16} />
-                              <span className="fx__link-label">{item.name}</span>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </details>
-                );
-              })}
-            </nav>
-          </aside>
-
-          <div className="fx__body" ref={bodyRef}>
-            {FEATURES.map((g) => (
-              <section className="fx__section" key={g.name}>
-                <h2 className="fx__grouphead" id={slug(g.name)}>
-                  {g.name}
-                </h2>
-                {g.items.map((item) => {
-                  const ItemIcon = getFeatureIcon(item.name);
-                  return (
-                    <article className="fx__item" id={slug(item.name)} key={item.name}>
-                      <h3 className="fx__title">
-                        <ItemIcon className="fx__title-icon" size={18} />
-                        {item.name}
-                      </h3>
-                      <p className="fx__text">{item.body}</p>
-                    </article>
-                  );
-                })}
-              </section>
+        <section className="fxv-filter" aria-label="Filter features by group">
+          <div role="group" className="fxv-filter__grid">
+            {tiles.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={active === t.key}
+                className={`fxv-tile${active === t.key ? " is-on" : ""}`}
+                onClick={() => setActive((a) => (a === t.key ? "all" : t.key))}
+              >
+                <span className="fxv-tile__label">{t.label}</span>
+                <span className="fxv-tile__count">{t.count}</span>
+              </button>
             ))}
           </div>
-        </div>
+        </section>
+
+        <section className="fxv-board" aria-label="Feature list">
+          {shown.map((g) => (
+            <div className="fxv-group" key={g.key}>
+              <div className="fxv-group__head">
+                <h2 className="fxv-group__name">
+                  {g.name}
+                  <span className="fxv-group__count">{g.items.length}</span>
+                </h2>
+                <p className="fxv-group__blurb">{g.blurb}</p>
+              </div>
+              <ul className="fxv-cards">
+                {g.items.map((f) => {
+                  const Icon = getFeatureIcon(f.name);
+                  return (
+                    <li className="fxv-card" id={featureSlug(f.name)} key={f.name}>
+                      <h3 className="fxv-card__name">
+                        <span className="fxv-card__chip" aria-hidden="true">
+                          <Icon size={18} />
+                        </span>
+                        {f.title}
+                      </h3>
+                      <p className="fxv-card__plain">{f.plain}</p>
+                      {f.detail && <p className="fxv-card__detail">{f.detail}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </section>
+
+        <section className="fxv-close">
+          <p className="fxv-close__line">
+            {CARD_TOTAL} of them, and the editing ones are all free.
+          </p>
+          <div className="fxv-close__actions">
+            <a className="fxv-btn fxv-btn--fill" href={EDITOR_URL} {...external}>
+              Open the editor
+            </a>
+            <Link className="fxv-btn fxv-btn--line" to="/trail-log">
+              See what shipped this month
+            </Link>
+          </div>
+        </section>
       </main>
 
-      <Footer line={`${TOTAL} of them, and the editing ones are all free.`} />
+      <Footer line={`${CARD_TOTAL} of them, and the editing ones are all free.`} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Slider from "./Slider";
-import type { Shot } from "../data/shots";
+import type { Shot, ShotAnnotation } from "../data/shots";
 import { external } from "../config";
 
 /* The hero shot, with a handle on its own history.
@@ -36,6 +36,60 @@ const monthYear = (iso: string) => {
   return `${MONTHS[parseInt(m, 10) - 1]} ${y}`;
 };
 
+/* ── callouts ────────────────────────────────────────────────────────────
+ * A capture is drawn with `object-fit: contain` inside a box of this fixed
+ * ratio, so a capture of any other shape is letterboxed: bars top and bottom
+ * for a wider one, left and right for a taller one. The callouts are stored in
+ * the capture's own pixels, and this maps them onto that box, which makes
+ * them land on the same UI element at every width, with no JS measurement
+ * and no resize listener. Same math as the design file's `fit()`. */
+const FRAME_RATIO = 2048 / 1219;
+
+const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+
+function fitTo(width: number, height: number) {
+  const r = width / height;
+  if (r < FRAME_RATIO) {
+    const f = r / FRAME_RATIO;
+    return (x: number, y: number) => [(1 - f) / 2 + (x / width) * f, y / height] as const;
+  }
+  const f = FRAME_RATIO / r;
+  return (x: number, y: number) => [x / width, (1 - f) / 2 + (y / height) * f] as const;
+}
+
+function Callouts({ shot, notes }: { shot: Shot; notes: ShotAnnotation[] }) {
+  const map = fitTo(shot.width, shot.height);
+  return (
+    /* aria-hidden: the words here are for eyes. The same callouts are read as
+       a real list below the frame (`.shot-notes`), so a screen reader gets them
+       once, in order, instead of as scattered positioned fragments. */
+    <div className="shot-callouts" aria-hidden="true">
+      {notes.map((a) => {
+        const [l, t] = map(a.x, a.y);
+        const [r, b] = map(a.x + a.w, a.y + a.h);
+        const [lx, ly] = map(a.lx, a.ly);
+        return (
+          <div key={a.n}>
+            <span
+              className={`shot-callout__mark shot-callout__mark--${a.shape}`}
+              style={{ left: pct(l), top: pct(t), width: pct(r - l), height: pct(b - t) }}
+            />
+            <span
+              className={`shot-callout__label${a.up ? " shot-callout__label--up" : ""}`}
+              style={{ left: pct(lx), top: pct(ly) }}
+            >
+              <span className="shot-callout__pin">{a.n}</span>
+              <span className="shot-callout__text">
+                <strong>{a.title}</strong> {a.text}
+              </span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface ShotTimelineProps {
   shots: Shot[];
 }
@@ -49,6 +103,7 @@ export default function ShotTimeline({ shots }: ShotTimelineProps) {
   const idle = useRef<number | null>(null);
 
   const shot = shots[i];
+  const notes = shot.annotations ?? [];
 
   const goTo = (next: number) => {
     setI(next);
@@ -111,8 +166,49 @@ export default function ShotTimeline({ shots }: ShotTimelineProps) {
               />
             );
           })}
+          {/* Keyed by frame so each stop remounts the overlay and replays its
+              short fade-in, instead of the boxes jumping to their new spots. */}
+          {notes.length > 0 && <Callouts key={shot.src} shot={shot} notes={notes} />}
         </div>
       </figure>
+
+      {/* The callouts as text. On a wide screen this list is visually hidden
+          and exists for screen readers, because the words are already on the
+          picture. Below 48rem the labels on the picture are too small to read
+          (a 12px label in a 30%-wide box, on a 350px-wide screenshot), so the
+          picture keeps only its numbered pins and highlight shapes, and this
+          list becomes the visible key under the frame.
+
+          Like the captions below, every annotated frame's list sits in the
+          SAME grid cell with the inactive ones `visibility: hidden`, so the
+          block is always as tall as the longest list and scrubbing between
+          frames never moves the page. */}
+      {shots.some((s) => s.annotations?.length) && (
+        <div className="shot-notes">
+          {shots.map((s, n) =>
+            s.annotations?.length ? (
+              <ol
+                key={s.src}
+                className="shot-notes__list"
+                data-current={n === i || undefined}
+                aria-hidden={n !== i || undefined}
+                aria-label={`What the ${s.dateLabel} screenshot points out`}
+              >
+                {s.annotations.map((a) => (
+                  <li key={a.n} className="shot-notes__item">
+                    <span className="shot-callout__pin" aria-hidden="true">
+                      {a.n}
+                    </span>
+                    <span>
+                      <strong>{a.title}</strong> {a.text}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : null,
+          )}
+        </div>
+      )}
 
       <div className="timeline">
         <div className="timeline__scrub">

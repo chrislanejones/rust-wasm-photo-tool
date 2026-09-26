@@ -1,0 +1,32 @@
+- heading "Everything in your browser" [level=3]
+- paragraph: Off — the default — your photos never leave this tab. Opening, editing, compressing and exporting all run on your own machine in WebAssembly, and your images, edits and gallery are stored in this browser. On adds the features whose job is to send something out. The same switch sits in the New dialog; changing it in either place changes it in both.
+- radiogroup "Everything in your browser":
+  - radio "In your browser" [checked]
+  - radio "Online features"
+- heading "What \"on\" turns on" [level=4]
+- list:
+  - listitem:
+    - strong: Create AI Image
+    - text: in the New dialog — your prompt and any images you attach go to a generation server.
+  - listitem:
+    - strong: Your edits, backed up to your account
+    - text: — signed in, a flattened copy of each edited photo is kept on the server so another device can pick it up. Off, the copy stays in this browser and nothing is uploaded.
+  - listitem:
+    - strong: Enhance › AI
+    - text: — background removal and object removal, run on a model; the image goes to a server.
+  - listitem:
+    - strong: Create › OCR
+    - text: — read the text out of the image; the image goes to a server.
+- paragraph: Off, those are grayed out and nothing is uploaded. Tools that run on your machine, like Magic Eraser, stay available either way. Deleting a copy you already uploaded still works with the switch off — it sends nothing and it is how you take something back.
+- heading "What it does not cover" [level=4]
+- paragraph: Anonymous usage analytics — page views and feature counts — load on every visit either way, and set cookies. Your images, edits and filenames are never part of that.
+- heading "Export metadata (EXIF)" [level=3]
+- paragraph: Keep your camera metadata — GPS, capture time, lens — embedded in exported JPEG / WebP files, or strip it for privacy before an image ever leaves the tab. Applies to Export, Export All, and Export Selected.
+- radiogroup "Export metadata (EXIF)":
+  - radio "Keep EXIF"
+  - radio "Strip EXIF" [checked]
+- heading "Strip scope" [level=4]
+- paragraph: "\"All\" removes EXIF, GPS, maker notes, and XMP/IPTC. \"Location only\" removes just GPS — camera, lens, and timestamp survive."
+- radiogroup "Strip scope":
+  - radio "Location only"
+  - radio "All metadata" [checked]
