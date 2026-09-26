@@ -11016,3 +11016,17 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Gates run** | tsc 0, eslint 0 errors / 57 warnings, `guardrails.sh` OK with no count above baseline, marketing build 27 URLs prerendered, skip links 29/29. |
 | **Verified in a browser** | Pagination stepped 1 → 2 → 17 (last page holds the final 6, Next disabled) → 16; picking September from page 17 reset to "1–15 of 37 releases · September 2026". Card rules checked against the prerendered HTML on 14 pages: 4 cards each, no page links to itself, /openraster leads with its three .ora siblings, each blog post leads with the other. |
 | **Not a bug** | React #418 fires on every page under `vite preview`, on master, including pages this release never touched; live throws none. Proven with a control worktree at `origin/master` served the same way. |
+
+## v9.0 Change Summary — 2026-09-26
+
+**The cards at the foot of every page sit right.** One commit, following the grid that shipped hours earlier in v8.99.
+
+| Area | Change |
+| --- | --- |
+| **Cards cleared the footer** | `.tp-next` carried 88px of padding on top and none underneath. On the pages where the grid is the last thing in `<main>` — the Trail Log, /blog, the three .ora sub-pages and the Learn pages — the measured gap from the last card to the footer was **0**. `.tp-next:last-child` now adds `--space-3xl` (96px), which is the same number `.tp-close` already uses as its top padding. |
+| **No double gap** | `/openraster`, the .ora sub-pages' guide link aside, and the ten tool pages have `.tp-close` between the grid and the footer, so `:last-child` does not match and their spacing is untouched. Verified: `/openraster` still reports `padding-bottom: 0px` with 96px coming from `.tp-close`. |
+| **Four lines, never more** | The blog cards used the post's `description`, which is written to 140–160 characters for the line under a search result. Beside blurbs of 38 to 65 it ran six lines where its neighbours ran two. Blog cards use the post's `headline` now — **46 and 63 characters**, already shipped copy, and already the best short line either post has. No new prose was written for them. |
+| **The floor under it** | `.tp-next__blurb` is clamped to 4 lines (`-webkit-line-clamp` plus the standard property), so a future card cannot break the rule by carrying a long blurb. |
+| **Measurement** | Line counts came from `Range.getClientRects()` over the text node, counting distinct `top` values. The obvious method — element height ÷ line-height — reported **six or seven lines for every card, including a 38-character one**, because the blurb span is stretched by the card's equal-height grid. That false reading is why the first pass looked fine. |
+| **Verified** | 1280 and 390. Every blurb ≤ 4 lines at both, nothing clipped (`scrollHeight` vs `clientHeight`), cards equal height, last card to footer **96px**, no horizontal scroll. The marketing site has no `prefers-color-scheme` and no `data-theme` — it is dark-only — so "both themes" does not apply here. |
+| **Gates** | tsc 0, build 27 URLs prerendered, eslint 0 errors, guardrails OK. |

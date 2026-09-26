@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.0",
+    date: "2026-09-26",
+    headline: "The cards at the foot of every page sit right.",
+    entries: [
+      {
+        tag: "ui",
+        text: "The four cards that close every page no longer touch the footer. They sat flush against it on the Trail Log, the blog, the .ora pages and the Learn pages \u2014 a gap of zero. It is 96px now, the same figure the rest of the site uses.",
+      },
+      {
+        tag: "ui",
+        text: "No card runs past four lines. The blog cards were falling back to the post\u2019s search-result description and running six lines beside neighbours running two; they use the post\u2019s headline instead, which is shorter and was already written.",
+      },
+    ],
+  },
+  {
     version: "v8.99",
     date: "2026-09-26",
     headline: "Every page says where to go next, and the .ora viewer saves.",
