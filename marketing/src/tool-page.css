@@ -237,12 +237,26 @@
 
 /* ── next ───────────────────────────────────────────────────────────── */
 
-.tp-next { display: grid; gap: 24px; padding: 88px var(--page-gutter) 0; }
-/* On a page that ends with .tp-close, that section's 96px of top padding is
-   the gap. On a page where the grid IS the last thing — the Trail Log, /blog,
-   the .ora sub-pages, the Learn pages — there was nothing, and the cards sat
-   flush against the footer with a measured gap of 0. Same 96px either way. */
-.tp-next:last-child { padding-bottom: var(--space-3xl); }
+/* The block owns the air on BOTH sides, unconditionally: --space-3xl above
+   the "Next" heading and the same below the last card, on every page that
+   renders it.
+
+   It used to own only the top, and hang its bottom padding off :last-child.
+   That read as "the grid is last, so the footer needs clearing" — but it is
+   the wrong question to ask. On the eleven pages where a .tp-close follows
+   (/openraster and the ten tool landings) the selector does not match, so the
+   grid's bottom padding is 0 and the cards butt straight into that section's
+   box; and on the Learn, blog and .ora pages, where the grid IS last today,
+   the spacing survives only until someone renders one more thing after it —
+   at which point the cards go flush against the footer again with no rule
+   changed. Symmetric padding cannot break that way, and it is the same
+   measure on every page, which is the point. */
+.tp-next { display: grid; gap: 24px; padding: var(--space-3xl) var(--page-gutter); }
+/* The one place the two would stack. .tp-close's 96px of top padding was the
+   gap under the cards back when the grid had none; now the grid brings its
+   own, and the section starts straight after it. Its 112px bottom is
+   untouched — that is the footer's clearance, not the grid's. */
+.tp-next + .tp-close { padding-top: 0; }
 .tp-next__h2 {
   margin: 0;
   font-weight: 700;
