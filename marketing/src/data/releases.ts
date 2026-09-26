@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.1",
+    date: "2026-09-26",
+    headline: "The app tells you when a stroke will change a mask.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Painting a mask says so in three places now \u2014 the tile you pressed, a line in the status bar, and the brush ring itself, which turns the colour it is about to paint. Black hides, white reveals.",
+      },
+      {
+        tag: "ui",
+        text: "Every tool panel is laid out the same way: the same header, the same rows, and the settings most strokes never need folded into one Advanced section at the foot.",
+      },
+      {
+        tag: "infra",
+        text: "Eleven engine exports nothing called are gone, and the drawing, cursor and preview code came out of two very large files into their own. The engine is 5,255 bytes smaller and nothing on screen changed.",
+      },
+    ],
+  },
+  {
     version: "v9.0",
     date: "2026-09-26",
     headline: "The cards at the foot of every page sit right.",

@@ -85,19 +85,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.0 — 2026-09-26
+### v9.1 — 2026-09-26
 
-**The cards at the foot of every page sit right.**
+**The app tells you when a stroke will change a mask.**
 
-The four cards that close every page were touching the footer — a gap of zero
-on the Trail Log, the blog, the .ora pages and the Learn pages. It is 96px now,
-the figure the rest of the site already used.
+Until now one tile label was the only thing that said a brush stroke would
+change the mask instead of the pixels. Three things say it now, all reading the
+same value: the tile, a line in the status bar, and the brush ring itself,
+which turns the colour it is about to paint. Black hides, white reveals.
 
-No card runs past four lines. The blog cards were falling back to the post's
-search-result description and running six lines beside neighbours running two.
-They use the post's headline instead: shorter, and already written.
+Every tool panel is laid out the same way — one header, one kind of row, and
+the settings most strokes never need folded into an Advanced section at the
+foot.
 
-Engine 824,286 bytes (unchanged).
+Under that, a large clean-up: eleven engine exports nothing called are gone,
+and the drawing, cursor and preview code moved out of two very large files into
+modules of their own. Nothing on screen changed.
+
+Engine 819,031 bytes (was 824,286 — 5,255 smaller).
 
 ## License
 
