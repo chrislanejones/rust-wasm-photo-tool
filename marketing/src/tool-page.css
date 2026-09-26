@@ -238,6 +238,11 @@
 /* ── next ───────────────────────────────────────────────────────────── */
 
 .tp-next { display: grid; gap: 24px; padding: 88px var(--page-gutter) 0; }
+/* On a page that ends with .tp-close, that section's 96px of top padding is
+   the gap. On a page where the grid IS the last thing — the Trail Log, /blog,
+   the .ora sub-pages, the Learn pages — there was nothing, and the cards sat
+   flush against the footer with a measured gap of 0. Same 96px either way. */
+.tp-next:last-child { padding-bottom: var(--space-3xl); }
 .tp-next__h2 {
   margin: 0;
   font-weight: 700;
@@ -287,6 +292,16 @@
   line-height: 1.5;
   color: var(--color-ink-2);
   text-wrap: pretty;
+  /* Four lines, never more. A card is a signpost, not a paragraph. The blog
+     cards fell back to the post's 160-character meta description and ran six
+     lines while their neighbours ran two. The content fix is upstream — they
+     use the post's headline now — and this is the floor under it, so a future
+     card cannot break the rule by writing a long blurb. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
 }
 .tp-next__slug {
   align-self: end;

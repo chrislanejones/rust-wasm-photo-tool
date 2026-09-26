@@ -112,15 +112,23 @@ const SITE_CARDS: NextCard[] = [
   },
 ];
 
-/** Every blog post, newest first. The label is the post's short `title`, not
- *  its `headline` — a headline is two display-set sentences and would run
- *  four lines in a card. */
+/** Every blog post, newest first.
+ *
+ *  The label is the post's short `title`, not its `headline` — a headline is
+ *  set as two display sentences and would run four lines as a card title.
+ *
+ *  The blurb is that `headline`, NOT the `description`. A description is
+ *  written to 140–160 characters for the blue link under a search result; in
+ *  a card beside blurbs of 38 to 65 it ran six lines where its neighbours ran
+ *  two, and Chris drew a circle around it. The headlines are 46 and 63
+ *  characters, already written, and already the best short line either post
+ *  has. Nothing new was composed for these cards. */
 const postCards = (): NextCard[] =>
   POSTS.map((p) => ({
     to: postPath(p),
     group: "Blog",
     label: p.title,
-    blurb: p.description,
+    blurb: p.headline,
   }));
 
 /** The whole pool, in a stable order. Order matters only as the input to the
