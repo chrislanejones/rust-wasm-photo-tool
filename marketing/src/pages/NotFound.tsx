@@ -36,7 +36,7 @@ export default function NotFound() {
         </nav>
       </main>
 
-      <Footer line="Everything else is still where you left it." />
+      <Footer line="Everything else is still where you left it." horse />
     </>
   );
 }

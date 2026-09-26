@@ -1,4 +1,6 @@
+import * as React from "react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 import { cn } from "@/lib/utils";
 
 export interface ToolButtonOption<T extends string> {
@@ -26,7 +28,8 @@ export interface ToolButtonOption<T extends string> {
    *
    *  Setting it also makes the tile a real toggle button to assistive tech —
    *  `aria-pressed` is emitted for tiles that carry this and for no others, so
-   *  a plain action is never announced as "not pressed". */
+   *  a plain action is never announced as "not pressed". Ignored for the
+   *  announcement in a SELECT group, where the tile is a radio instead. */
   active?: boolean;
 }
 
@@ -35,7 +38,12 @@ interface Props<T extends string> {
   /** The selected id. OMIT IT for an ACTION group — buttons that do something
    *  rather than pick something, so no tile is ever lit (the gallery's
    *  Auto Compress scope). `undefined === opt.id` is false for every option,
-   *  which is exactly the wanted behavior. */
+   *  which is exactly the wanted behavior.
+   *
+   *  PASSING THE PROP AT ALL is what makes this a SELECT group — a radio group
+   *  to assistive tech, one Tab stop, arrow keys. Presence, not value: a
+   *  select whose state has not loaded yet (`value={undefined}`) is still a
+   *  select, with nothing checked. docs/UI_CONSISTENCY.md §7. */
   value?: T;
   onChange: (id: T) => void;
   /** Column count for the grid. Defaults to 2. */
@@ -50,6 +58,14 @@ interface Props<T extends string> {
   /** Disable every tile (e.g. no image loaded). Default false. */
   disabled?: boolean;
   className?: string;
+  /** The radio group's accessible name, for a SELECT group with no `label`
+   *  of its own, or whose `label` holds more than words. Repeat the visible
+   *  heading's words. A plain-text `label` is already the name. */
+  "aria-label"?: string;
+  /** Point at a heading rendered elsewhere. Wins over `label`. */
+  "aria-labelledby"?: string;
+  /** A sentence that explains the group, e.g. why some options are off. */
+  "aria-describedby"?: string;
 }
 
 const COL_CLASS: Record<2 | 3 | 4 | 5, string> = {
@@ -62,6 +78,8 @@ const COL_CLASS: Record<2 | 3 | 4 | 5, string> = {
 /**
  * A grid of ToolButtons. Three modes, all the same grid:
  *  - SELECT — pass `value`; one tile is lit (Shapes, Crop ratios, Effects).
+ *    A named radio group: `role="radio"` + `aria-checked`, one Tab stop,
+ *    arrows move and select (use-radio-group.ts).
  *  - ACTION — omit `value`; nothing ever lights (Wand → Selection).
  *  - TOGGLE — give an option its own `active`; that tile lights from its own
  *    state and gets `aria-pressed` (Guides → Lock, Rulers & Grid).
@@ -69,17 +87,38 @@ const COL_CLASS: Record<2 | 3 | 4 | 5, string> = {
  * Shares the border/active styling across all three so every "row of tiles"
  * control in the app looks the same.
  */
-export function ToolButtonGroup<T extends string>({
-  options,
-  value,
-  onChange,
-  columns = 2,
-  label,
-  labelAlign = "start",
-  stacked = false,
-  disabled = false,
-  className,
-}: Props<T>) {
+export function ToolButtonGroup<T extends string>(props: Props<T>) {
+  const {
+    options,
+    value,
+    onChange,
+    columns = 2,
+    label,
+    labelAlign = "start",
+    stacked = false,
+    disabled = false,
+    className,
+  } = props;
+  // The mode comes from props the caller already passes, so no call site
+  // had to change to become correct: `value` present = SELECT.
+  const isSelect = "value" in props;
+  const labelId = React.useId();
+  const radio = useRadioGroup({
+    ids: options.map((o) => o.id),
+    selected: value,
+    isDisabled: (i) => disabled || !!options[i].disabled,
+    onSelect: onChange,
+  });
+  // Explicit beats derived. `label` can hold more than words (a lightbulb
+  // button, whose own name would be read into the group's), so a caller that
+  // passes aria-label gets exactly that.
+  const name = props["aria-labelledby"]
+    ? { "aria-labelledby": props["aria-labelledby"] }
+    : props["aria-label"]
+      ? { "aria-label": props["aria-label"] }
+      : label
+        ? { "aria-labelledby": labelId }
+        : {};
   return (
     <div className={cn("space-y-2", className)}>
       {/* A div, not a <label>: it was never associated with a control (no
@@ -87,6 +126,7 @@ export function ToolButtonGroup<T extends string>({
           lightbulb, which must not be nested inside a label element. */}
       {label && (
         <div
+          id={labelId}
           className={cn(
             "flex items-center gap-1.5 text-2xs text-theme-muted-foreground",
             labelAlign === "center" && "justify-center",
@@ -98,14 +138,21 @@ export function ToolButtonGroup<T extends string>({
       {/* grid-auto-rows:1fr equalizes every row to the tallest, so a longer
           label (e.g. "Hand-drawn") makes all buttons that size — not just its
           own row. Buttons stretch to fill via the default align-self. */}
-      <div className={cn("grid gap-2 [grid-auto-rows:1fr]", COL_CLASS[columns])}>
-        {options.map((opt) => {
+      <div
+        className={cn("grid gap-2 [grid-auto-rows:1fr]", COL_CLASS[columns])}
+        {...(isSelect
+          ? { ...radio.groupProps, ...name, "aria-describedby": props["aria-describedby"] }
+          : {})}
+      >
+        {options.map((opt, i) => {
           const Icon = opt.icon;
           return (
             <ToolButton
               key={opt.id}
               active={opt.active ?? value === opt.id}
-              aria-pressed={opt.active}
+              // SELECT: a radio. Otherwise TOGGLE tiles (own `active`) get
+              // aria-pressed and ACTION tiles get nothing at all.
+              {...(isSelect ? radio.itemProps(i) : { "aria-pressed": opt.active })}
               stacked={stacked}
               disabled={disabled || opt.disabled}
               pro={opt.pro}

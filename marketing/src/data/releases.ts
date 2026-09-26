@@ -24,6 +24,287 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.0",
+    date: "2026-09-26",
+    headline: "The cards at the foot of every page sit right.",
+    entries: [
+      {
+        tag: "ui",
+        text: "The four cards that close every page no longer touch the footer. They sat flush against it on the Trail Log, the blog, the .ora pages and the Learn pages \u2014 a gap of zero. It is 96px now, the same figure the rest of the site uses.",
+      },
+      {
+        tag: "ui",
+        text: "No card runs past four lines. The blog cards were falling back to the post\u2019s search-result description and running six lines beside neighbours running two; they use the post\u2019s headline instead, which is shorter and was already written.",
+      },
+    ],
+  },
+  {
+    version: "v8.99",
+    date: "2026-09-26",
+    headline: "Every page says where to go next, and the .ora viewer saves.",
+    entries: [
+      {
+        tag: "feature",
+        text: "The .ora viewer on the OpenRaster page saves what you opened: a flat PNG, a layered PSD, or a fresh .ora. Hide and reorder layers first. It all happens in the tab \u2014 nothing is uploaded.",
+      },
+      {
+        tag: "feature",
+        text: "Three new pages answer what people actually type: what a .ora file is, how to turn one into a PNG, and how to turn one into a PSD.",
+      },
+      {
+        tag: "feature",
+        text: "Every learn page, every .ora page and every blog post now ends with four cards pointing somewhere useful. Which four depends on the page, and they stay the same between visits.",
+      },
+      {
+        tag: "ui",
+        text: "The Trail Log shows fifteen releases a page instead of all 246 at once. Picking a month starts you back at page one.",
+      },
+      {
+        tag: "ui",
+        text: "Every either/or control is a named radio group now: one Tab stop, arrow keys between the options, and the choice is read out.",
+      },
+      {
+        tag: "fix",
+        text: "Settings \u203a Shared looks like the rest of Settings, and its delete confirmation opens above the panel instead of behind it.",
+      },
+      {
+        tag: "feature",
+        text: "The Download dialog offers ORA. Alt+C toggles A/B Compare.",
+      },
+      {
+        tag: "feature",
+        text: "Every page in the sitemap carries a date, /coming-soon is now /in-the-works, and there is a horse on the 404 page.",
+      },
+      {
+        tag: "infra",
+        text: "Gates run one way and are tested against a failure they have to catch. The wasm size ceiling and the lib.rs line ratchet are gone \u2014 they measured the wrong thing.",
+      },
+    ],
+  },
+  {
+    version: "v8.98",
+    date: "2026-09-24",
+    headline: "Refine a selection, then turn it into a mask.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Clean Up on the Select panel drops specks, fills pinholes, smooths the edge and pulls it in a pixel, in one step you can undo.",
+      },
+      {
+        tag: "feature",
+        text: "The Refine sliders do the same things one at a time. Move one and you see the result first, with the Selected readout showing what it cost. Apply is one undo step.",
+      },
+      {
+        tag: "feature",
+        text: "Add mask asks what to start from: show the layer, hide it, reveal the selection or hide it. Feather softens the edge, and the mask brush opens straight after.",
+      },
+      {
+        tag: "feature",
+        text: "Name the file in the export dialog before it downloads. The name is cleaned up for every operating system, and the extension always matches the format.",
+      },
+      {
+        tag: "rust",
+        text: "The refine operations are integer and run in the engine, so every machine selects exactly the same pixels.",
+      },
+      {
+        tag: "fix",
+        text: "The Combine button called New shared its name with the New image button for screen readers. It is New selection now.",
+      },
+    ],
+  },
+  {
+    version: "v8.97",
+    date: "2026-09-24",
+    headline: "Open a .ora file in your browser, and see every layer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "/openraster: drop any .ora on the page and every layer is unzipped and drawn in the tab. Nothing is uploaded, and it keeps working with the network off. Toggle layers, look at the file's own flattened copy, save any layer as a PNG.",
+      },
+      {
+        tag: "feature",
+        text: "The page opens on a five-layer sample, so there is something to look at before you have a file. Download it and open it in Krita or GIMP.",
+      },
+      {
+        tag: "perf",
+        text: "The viewer uses the browser's own PNG decoder, every layer at once: 60 MB of layers in 0.4 seconds. The engine's decoder measured five times slower and would have cost 354 KB to download, so the page ships without it. Its own code is 8.5 KB.",
+      },
+      {
+        tag: "ui",
+        text: "Every file gets an archive check, and a note before you import when a layer is offset, undersized, grouped or blended, because the editor's importer handles none of those yet.",
+      },
+      {
+        tag: "ui",
+        text: "The guide under the viewer: what a .ora is, what is inside, how to export one from Image Horse and import it back, what survives the round trip, and where else it opens.",
+      },
+      {
+        tag: "infra",
+        text: "OpenRaster (.ora) is in the Learn menu, the phone menu, ⌘K, the footer and the sitemap, with its own share card. Five questions are on the page and in its structured data, from one list.",
+      },
+      {
+        tag: "feature",
+        text: "Select: drag Tolerance and the selection re-runs live from the same click, one undo step for the whole drag. A \"Selected 18.4% · 2.1 MP\" readout under the sliders and in the status bar. Intersect joins New, Add and Subtract.",
+      },
+      {
+        tag: "rust",
+        text: "Engine 816,594 bytes, up 2,162 for the selection retune record and the coverage query.",
+      },
+    ],
+  },
+  {
+    version: "v8.96",
+    date: "2026-09-24",
+    headline:
+      "Home is in the menu, the WEBGPU cubes are real 3D, and a horse trots in the footer.",
+    entries: [
+      {
+        tag: "feature",
+        text: "The WEBGPU word on the home page is 103 lit cubes now. Hover to ripple them, drag to scatter them, press any key to knock them loose. The line under it says what your machine actually drew them with: WebGPU, WebGL 2, or nothing.",
+      },
+      {
+        tag: "feature",
+        text: "A low-poly horse trots beside \"Your pictures, your computer.\" at the foot of the home page, on computers with a mouse. A phone never downloads it.",
+      },
+      {
+        tag: "perf",
+        text: "Neither graphic costs the first page load. three.js arrives only when the cubes or the horse come near the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"Being built now\" sits between the cubes and the blog: the five things in progress, with a Beta badge on the two you can already switch on.",
+      },
+      {
+        tag: "ui",
+        text: "Home is in the menu bar. On a phone the menu opens with Home, Contact and Pricing as a group of their own, instead of a tall card that pushed Contact off the screen.",
+      },
+      {
+        tag: "ui",
+        text: "\"More coming\" in the Tools menu is a real card instead of faint text in an empty box, and the ⌘K button lost its stray white ring.",
+      },
+      {
+        tag: "infra",
+        text: "The contact form can send straight to the inbox once a form key is set. Until then it opens your mail app, as it always has.",
+      },
+    ],
+  },
+  {
+    version: "v8.95",
+    date: "2026-09-24",
+    headline:
+      "The whole marketing site is redrawn — every page, in the new design, with the cream boards and the numbered callouts on the screenshots.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Every page is rebuilt to the new design: Home, Pricing, Features, Trail Log, Blog and its posts, About, Contact, Architecture, Privacy, Terms, the footer, and the ten tool pages.",
+      },
+      {
+        tag: "ui",
+        text: "The light boards arrive — the register-like blocks that sit on the dark page: the feature grid, the pricing matrix, what runs where, and what's coming.",
+      },
+      {
+        tag: "feature",
+        text: "The screenshots on the home page carry their callouts again: numbered pins on Presets, the Original/Edited split, Compress All, the magic wand, the Stroke Stabilizer and History. On a phone the pins stay on the picture and the notes read as a list underneath.",
+      },
+      {
+        tag: "ui",
+        text: "The Tools and Learn menus now draw their tall card at exactly the same size, so the menu stops resizing as you move between them.",
+      },
+      {
+        tag: "feature",
+        text: "Every page has its own share card now — 21 of them, the horse on each, set in the same typeface as the site. Before, only five pages had one.",
+      },
+      {
+        tag: "fix",
+        text: "The architecture page was describing 8 of the 14 tables that actually exist, and had the op-log format a version behind. It now lists all 14, field for field, and says plainly which five nothing uses any more.",
+      },
+      {
+        tag: "fix",
+        text: "Dates read as US formats throughout, and the machine-readable ones stay in the markup for crawlers.",
+      },
+      {
+        tag: "infra",
+        text: "Each page owns its own stylesheet instead of one shared file, so a change to one page cannot reach another.",
+      },
+    ],
+  },
+  {
+    version: "v8.94",
+    date: "2026-09-24",
+    headline:
+      "The ten tools in the new menu have pages now. Every one of those links was a dead end, and a dead end on this host is a blank white page.",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Tools menu linked to ten paths that had no page behind them — /photo-editor, /blur-image and eight more all returned a hard 404. They are real pages now.",
+      },
+      {
+        tag: "fix",
+        text: "Menu links were plain anchors, so every click was a full page load that went to the host instead of the router. They are router links now, which is also why the site's own 404 never got a chance to show.",
+      },
+      {
+        tag: "feature",
+        text: "Ten tool pages: what each one does, whether it runs on your machine or needs a server, and where to go next.",
+      },
+      {
+        tag: "feature",
+        text: "What's coming — sixteen entries in three states, being built, decided, or thinking about it. No dates.",
+      },
+      {
+        tag: "ui",
+        text: "The menu panel keeps its height whether a column holds one tool or two, so it stops resizing as you move across it.",
+      },
+      {
+        tag: "infra",
+        text: "The menu and the tool pages read one list, so a blurb cannot say one thing in the menu and another on the page.",
+      },
+    ],
+  },
+  {
+    version: "v8.93",
+    date: "2026-09-24",
+    headline: "Layer mask brush stays on the Layers panel — Photoshop X key, adjustable size and feather. Marketing nav becomes a mega-menu.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Layer mask painting now happens on the Layers panel itself, not on the Paint brush. A brush section appears inside the mask row with size, feather and hide/reveal controls. Hit X to swap black and white while painting, same as Photoshop. The Layers panel stays mounted the whole time.",
+      },
+      {
+        tag: "fix",
+        text: "The Toggle Mask Edit button morphs to read 'Painting mask' once you're in edit mode, making the active state obvious without a second button. The async toggle no longer got stuck in an always-on state by comparing a Promise to a number.",
+      },
+      {
+        tag: "ui",
+        text: "Marketing site nav replaced with a mega-menu: Tools and Learn dropdowns, feature cards that preview descriptions on hover, and a full-screen mobile sheet with card grids. All tool and learn pages are linked for crawlability.",
+      },
+    ],
+  },
+  {
+    version: "v8.92",
+    date: "2026-09-23",
+    headline: "A console snippet that hides everything but the photo and the A/B Compare divider, for screenshots at any zoom",
+    entries: [
+      {
+        tag: "infra",
+        text: "scripts/compare-clean-view.js: paste it into Chrome DevTools, run it, and the page is just the photo with the Compare divider three quarters across. Alt + = and Alt + - zoom, Esc puts everything back. Nothing in the app changed.",
+      },
+    ],
+  },
+  {
+    version: "v8.91",
+    date: "2026-09-23",
+    headline: "A/B Compare lives in the top bar now, between New and Export, and works over every tool",
+    entries: [
+      {
+        tag: "ui",
+        text: "Compare used to be a button at the bottom of Enhance › Compress and nowhere else. It sits with New and Export now and stays put, so you can paint, crop or adjust and then drag the divider to see what changed against the photo you uploaded.",
+      },
+      {
+        tag: "fix",
+        text: "It grays out when there is nothing to compare: no photo, no stored upload to compare against, or the Batch editor, where one edit goes to every photo. Opening Batch closes the overlay instead of leaving it stuck on screen.",
+      },
+    ],
+  },
+  {
     version: "v8.90",
     date: "2026-09-22",
     headline: "Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less",

@@ -1,3 +1,5 @@
+import { AdvancedSection } from "@/components/ui/advanced-section";
+import { ControlRow } from "@/components/ui/control-row";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolSettings } from "@/lib/types";
 
@@ -15,6 +17,12 @@ const STABILIZER_LEVELS = [
 ] as const;
 
 type Level = ToolSettings["paintStabilizer"];
+
+/** "Off" / "Low" / "Med" / "High" for a level — the closed Advanced
+ *  section's summary reads the same word the lit tile shows. */
+function stabilizerLabel(value: Level | undefined): string {
+  return STABILIZER_LEVELS.find((l) => l.id === (value ?? "off"))?.label ?? "Off";
+}
 
 interface Props {
   /** Current level. `undefined` is tolerated and reads as "off" — the setting
@@ -37,13 +45,31 @@ interface Props {
  */
 export function StabilizerRow({ value, onChange, label = "Stroke Stabilizer" }: Props) {
   return (
-    <div className="space-y-2">
-      <label className="text-2xs text-theme-muted-foreground">{label}</label>
-      <ToolButtonGroup
-        options={STABILIZER_LEVELS}
-        value={value ?? "off"}
-        onChange={(id) => onChange(id as Level)}
-      />
-    </div>
+    // A ControlRow with no value slot: the lit tile already says the level.
+    // The radio group is named by the label on screen, not a repeat of it.
+    <ControlRow label={label}>
+      {({ labelId }) => (
+        <ToolButtonGroup
+          aria-labelledby={labelId}
+          options={STABILIZER_LEVELS}
+          value={value ?? "off"}
+          onChange={(id) => onChange(id as Level)}
+        />
+      )}
+    </ControlRow>
+  );
+}
+
+/**
+ * The stabilizer as a panel's Advanced section — how Paint, Blur and both
+ * Eraser modes carry it (Night 3). A set-once preference rather than a
+ * per-stroke dial, so it is collapsed by default; the closed summary still
+ * names the level, so a stabilizer that is ON is never hidden.
+ */
+export function AdvancedStabilizer({ value, onChange }: Pick<Props, "value" | "onChange">) {
+  return (
+    <AdvancedSection summary={`Stabilizer: ${stabilizerLabel(value)}`}>
+      <StabilizerRow value={value} onChange={onChange} />
+    </AdvancedSection>
   );
 }

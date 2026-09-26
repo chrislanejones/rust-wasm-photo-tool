@@ -85,27 +85,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.90 — 2026-09-22
+### v9.0 — 2026-09-26
 
-**Being an admin is a role now, not a higher price tier, and previewing another kind of account can only ever show you less.**
+**The cards at the foot of every page sit right.**
 
-Image Horse has three kinds of account: not signed in, signed in, and paid.
-Being the person who runs it was quietly becoming a fourth, which is the
-wrong shape — a tier is something you bought, and running the place is not.
+The four cards that close every page were touching the footer — a gap of zero
+on the Trail Log, the blog, the .ora pages and the Learn pages. It is 96px now,
+the figure the rest of the site already used.
 
-So it is a role. An admin is entitled to everything a paid account gets,
-the server included, without anyone granting themselves a paid plan or
-paying for one. The app used to decide who the admin was by comparing your
-email address inside the browser, with the address written into the code;
-now the server decides, from a list kept with the deployment.
+No card runs past four lines. The blog cards were falling back to the post's
+search-result description and running six lines beside neighbours running two.
+They use the post's headline instead: shorter, and already written.
 
-Super User becomes a way to look at the app as another kind of account —
-signed out, or signed in and free — to check those views. It can only ever
-show you **less** than you are entitled to. Before, it could put the
-interface into "paid" for an account that wasn't, so the buttons appeared
-and then the server turned them down. That can no longer happen.
-
-The engine did not change. It is the same 814,432 bytes as v8.89.
+Engine 824,286 bytes (unchanged).
 
 ## License
 

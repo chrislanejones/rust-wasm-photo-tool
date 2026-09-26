@@ -69,6 +69,7 @@ export function getCursorForSubTool(
   colorPickerActive?: boolean,
   moveActive?: boolean,
   combineIntent?: 0 | 1 | 2,
+  maskEditing?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";
 
@@ -89,8 +90,16 @@ export function getCursorForSubTool(
   }
 
   // Resize Layer only drags while its Move toggle is on; idle otherwise, so the
-  // cursor must not promise a drag the canvas won't honour.
+  // cursor must not promise a drag the canvas won't honour. Mask editing wins
+  // over Move — same precedence as useEffectiveTool's dispatch — and returns
+  // undefined so the brush-size ring below is the cursor, as it is for Paint.
+  //
+  // This branch is NOT part of the extraction: it arrived on master in Night 4
+  // after this refactor was branched, and taking the extracted file as-is at
+  // merge time would have dropped it silently — the mask brush would have gone
+  // back to showing the Move cursor.
   if (group === "edit" && def?.id === "resize-layer") {
+    if (maskEditing) return undefined;
     return moveActive ? "move" : undefined;
   }
 

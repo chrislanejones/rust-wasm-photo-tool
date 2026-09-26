@@ -27,6 +27,7 @@ import {
   Redo2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
+import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { SuperUserControls } from "@/components/SuperUserPane";
@@ -60,6 +61,13 @@ interface TopBarProps {
    *  cluster's icon pair rather than in the labeled center group. */
   onExport: () => void;
   canExport: boolean;
+  /** A/B compare — a TOGGLE between New and Export. It used to be a button at
+   *  the bottom of Enhance › Compress only; here it works over every tool.
+   *  `canCompare` is false with no photo, no stored upload baseline, or in the
+   *  Batch editor, where there is no single before/after. */
+  compareActive: boolean;
+  canCompare: boolean;
+  onToggleCompare: () => void;
   /** Shared window width (from useBreakpoint) — drives the compact / narrow
    *  collapse; TopBar no longer owns a resize listener. */
   winWidth: number;
@@ -90,6 +98,9 @@ export function TopBar({
   showHistory,
   onExport,
   canExport,
+  compareActive,
+  canCompare,
+  onToggleCompare,
   onToggleUpload,
   onToggleTools,
   onToggleGallery,
@@ -276,10 +287,11 @@ export function TopBar({
                 Zoom, and `grouped` turns off their standalone fill so the
                 container's own shows through. */}
             <div className={compact ? "contents" : "flex items-center justify-end gap-3 min-w-0"}>
-              {/* New / Export — two ACTIONS, no labels, in the Undo/Redo box.
-                  New mirrors a panel so it can report `active`; Export fires a
-                  download and never does, and disables instead when there is
-                  nothing loaded. */}
+              {/* New / Compare / Export, no labels, in the Undo/Redo box.
+                  New mirrors a panel so it can report `active`; Compare is a
+                  real toggle (the A/B overlay); Export fires a download and
+                  never does, and disables instead when there is nothing
+                  loaded. */}
               <div className={compact ? "contents" : GROUP_PILL}>
                 <IconButton
                   icon={ArrowUpFromLine}
@@ -288,6 +300,19 @@ export function TopBar({
                   active={showUpload}
                   standalone={compact}
                   tooltip={{ shortcut: "Alt + N" }}
+                />
+                <IconButton
+                  icon={CompareIcon}
+                  label="Compare"
+                  onClick={onToggleCompare}
+                  active={compareActive}
+                  aria-pressed={compareActive}
+                  disabled={!canCompare}
+                  standalone={compact}
+                  tooltip={{
+                    label: compareActive ? "Hide A/B Compare" : "A/B Compare",
+                    shortcut: "Alt + C",
+                  }}
                 />
                 <IconButton
                   icon={ArrowDownFromLine}

@@ -208,7 +208,9 @@ pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u
     // end into wasm memory, and a zero dimension would hit `clamp(0, -1)`
     // and panic. Refuse both here, once, with a transparent output of the
     // requested size so every caller's size invariant still holds.
-    let need = (old_w as usize).saturating_mul(old_h as usize).saturating_mul(4);
+    let need = (old_w as usize)
+        .saturating_mul(old_h as usize)
+        .saturating_mul(4);
     if old_w == 0 || old_h == 0 || data.len() < need {
         return vec![0u8; (new_w.max(1) as usize) * (new_h.max(1) as usize) * 4];
     }

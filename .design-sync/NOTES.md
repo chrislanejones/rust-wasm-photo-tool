@@ -1,0 +1,55 @@
+# design-sync notes
+
+- **Scope (Chris, 09-24-2026): sync the MARKETING site's design system, not the
+  editor app's.** The goal is for Claude Design mockups of marketing pages to
+  come out already written in our tokens and class names, so porting a mockup
+  into `marketing/src/` is close to a copy instead of a full translation.
+  The editor's 30 primitives in `app/src/components/ui` are out of scope for
+  now. They would be a separate project if wanted later.
+- **The marketing system is mostly tokens + CSS classes, not a component
+  library.** Sources of truth: `marketing/src/tokens.css` (color, type scale
+  incl. the v2 rungs `--text-hero`, `--text-section`, `--text-card`,
+  `--text-deck`, `--text-ui`, `--text-headline`), `marketing/src/styles.css`,
+  plus the per-page files added by the v2 ports (`tool-page.css`,
+  `features.css`, `trail.css`). React components live in
+  `marketing/src/components/` (Nav, Footer, ButtonSet, CubeLetters,
+  ShotTimeline, CommandPalette, Slider, Icons, NajiArabic). No Storybook, no
+  `*.stories.*`, no `dist/`, so it's the package shape, and it will likely need
+  an off-script layout per the skill's "upload format is the contract" rule.
+- **Timing: run only after the v2 ports land and are committed** (Pricing,
+  Features, 10 tool pages, Trail Log). Each port was still editing
+  tokens.css/styles.css on 09-24; syncing mid-port would upload a moving
+  vocabulary.
+- **The cream panel is a first-class pattern, not a one-off.** Every v2 page
+  uses it (`.board--cream` with local `--b-ink` vars on Home, `.soon-board` on
+  /coming-soon). Document it in the conventions header with its local ink
+  variables, because the site's own ink tokens are tuned for light-on-dark and
+  every one is wrong on cream.
+- **Known trap to put in the conventions header:** don't reuse `.hero__display`,
+  `.section__title--sm` or `.page-head__title` for v2 headings. Each carries its
+  own font-size that doesn't match the v2 scale; that's how Home shipped a 119px
+  hero against an 80px mockup.
+- Design project the mockups live in (not the sync target): `c4c7a8aa-9fac-4728-a0ff-65b35eb0f0d1`
+  ("Image horse marketing mockup", PROJECT_TYPE_PROJECT). The sync goes into a
+  NEW design-system project, per the skill.
+- **Copy overrides that must not be re-imported from the mockup project:**
+  Pricing's footer line was "We charge for our bills, not for your CPU." Chris
+  called it a bad tagline on 09-24, and it's now "Free where it runs on your
+  machine. Paid where it runs on ours." The mockup still has the old line.
+  Fix it there too, or a re-port will bring it back.
+- **09-24-2026: the first sync was started, then PAUSED before any project was
+  created.** Chris redirected to implementing `Home bottom section.dc.html` from
+  design project `054e87bd-f08f-4efa-88cf-0682bc08af31` (three.js WEBGPU cubes +
+  trotting horse in the footer). Re-run the sync only after that work is
+  committed, because it changes `CubeLetters`, `Footer`, `footer.css` and the nav.
+  No `projectId` is pinned yet, so the next run is still a first-time import.
+- **Three.js now lives on the home page, lazily.** `components/*.three.ts` are
+  chunk boundaries importing from `three/webgpu` (three 0.170.0). A design that
+  uses `<gpu-letters>` or `<horse-trot>` maps to `CubeLetters` and
+  `<Footer horse />`, not to a custom element.
+- **09-25-2026: the sync was started a second time, then PAUSED again before any
+  project was created.** Chris redirected to porting the OpenRaster pages from
+  design project `ffa0b2cf-a798-4307-85ce-b314b627eb35` (`/openraster` v2 plus
+  the new `/what-is-ora`, `/ora-to-png` and `/ora-to-psd`, branch
+  `feat/ora-page-v2`). Still no `projectId` pinned; the next run is still a
+  first-time import. Wait until that branch has merged.

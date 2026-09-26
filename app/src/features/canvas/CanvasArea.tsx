@@ -36,6 +36,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
+import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
@@ -44,7 +45,7 @@ import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind, RulerUnit } from "@/lib/preferences";
-import { selectionCombineMode } from "@/lib/selectionBool";
+import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
 import type { ShapeName } from "@/lib/types";
@@ -374,6 +375,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // both CanvasArea call sites for one gate would be drilling for its own
     // sake.
     const eraserMode = useToolStore((s) => s.eraserMode);
+    // Layers-panel mask painting: gates the ring and the cursor exactly like
+    // `eraserMode` above, and is read from the store for the same reason.
+    const maskEditing = useToolStore((s) => s.maskEditing);
+    // 0 = black = hides, 255 = white = reveals. The ring is painted this
+    // colour while mask editing, so the cursor itself answers "what will this
+    // stroke do" — the third of the three places that read `maskEditing`, and
+    // like the other two it computes nothing of its own.
+    const maskPaintValue = useToolStore((s) => s.maskPaintValue);
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -543,12 +552,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Live Shift/Alt intent while the Select tool hovers — drives the +/−
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
-    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    const [combineIntent, setCombineIntent] = useState<SelectionCombineMode>(0);
     // Ref mirror so the rAF preview closure (below) and the keyboard effect
     // read the LIVE intent, not a stale render's. `setIntent` keeps both in
     // step — the state drives the cursor re-render, the ref the async reads.
-    const combineIntentRef = useRef<0 | 1 | 2>(0);
-    const setIntent = useCallback((next: 0 | 1 | 2) => {
+    const combineIntentRef = useRef<SelectionCombineMode>(0);
+    const setIntent = useCallback((next: SelectionCombineMode) => {
       combineIntentRef.current = next;
       setCombineIntent((cur) => (cur === next ? cur : next));
     }, []);
@@ -1089,6 +1098,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       colorPickerActive,
       layerMoveActive,
       selectionActive ? combineIntent : 0,
+      maskEditing,
     );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
@@ -2042,20 +2052,31 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             The `ai` clause STAYS: those two modes are the Create-side eraser
             painting a real mask onto the canvas, sharing the `ai` tool id with
             the Enhance › AI tile that only clicks. `eraserMode` is what tells
-            them apart. */}
+            them apart.
+
+            `maskEditing` joins them (09-24): the Layers panel's mask brush
+            paints from the `arrow` tool, so the ring must show there too —
+            sized by AppShell's `effectiveBrushSize` from `maskBrushSize`. */}
         {cursorVisible &&
           (activeTool === "brush" ||
+            maskEditing ||
             (activeTool === "ai" &&
               (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&
           !isPanning && (
           <div
-            className="brush-cursor"
+            className={`brush-cursor${maskEditing ? " brush-cursor--mask" : ""}`}
             style={{
               left: cursorPos.x,
               top: cursorPos.y,
               width: brushDiameter,
               height: brushDiameter,
+              ...(maskEditing
+                ? ({
+                    "--mask-cursor-ink": maskCursorInk(maskPaintValue),
+                    "--mask-cursor-halo": maskCursorHalo(maskPaintValue),
+                  } as React.CSSProperties)
+                : null),
             }}
           />
         )}

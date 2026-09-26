@@ -56,7 +56,7 @@ export const FEATURES: FeatureGroup[] = [
     items: [
       { name: "Animated Panels", body: "Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)" },
       { name: "Pan (H or Space)", body: "H is the hand key: hold it and the pan ends on release, tap it and the pan stays on until the next tap or Esc. Holding Space still pans. All tool handlers are bypassed during a pan, and typing h in a text field does nothing" },
-      { name: "A/B Compare Slider", body: "Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned" },
+      { name: "A/B Compare Slider", body: "Squoosh-style draggable divider, toggled from the top bar over every tool except Batch; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned" },
       { name: "Multi-photo Gallery", body: "Bottom strip with thumbnails, add/remove/switch/duplicate (content-addressed, zero-copy; carries edits); PgUp/PgDn cycling; multi-select with Export / Delete / Duplicate / Unselect; header count + per-tier limit (i) tooltip; originals preserved in IndexedDB at full resolution regardless of working-copy downscale" },
       { name: "Review Panel", body: "Right-side panel (Alt+R) with a header toggle group that opens up to three stacked sections sharing the body height (1 full / 2 halves / 3 thirds, each scrollable):" },
       { name: "Upload", body: "Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)" },

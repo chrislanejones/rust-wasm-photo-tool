@@ -35,5 +35,6 @@
 export { SyncProvider } from "./SyncProvider";
 export { useSyncEnabled, setSyncEnabled } from "./enabled";
 export { sendThisDevice } from "./useCloudSync";
+export { claimTabHere } from "./leader";
 export { useSyncStatus, type SyncStatus, type SyncState } from "./status";
 export { SYNC_KEYS, type SyncKey } from "./keys";

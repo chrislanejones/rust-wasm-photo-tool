@@ -60,6 +60,15 @@ const Contact = lazyPage(() => import("./pages/Contact"));
 const Trail = lazyPage(() => import("./pages/Trail"));
 const PrivacyPolicy = lazyPage(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyPage(() => import("./pages/TermsOfService"));
+const ComingSoon = lazyPage(() => import("./pages/ComingSoon"));
+const OpenRaster = lazyPage(() => import("./pages/OpenRaster"));
+const WhatIsOra = lazyPage(() => import("./pages/WhatIsOra"));
+const OraToPng = lazyPage(() => import("./pages/OraToPng"));
+const OraToPsd = lazyPage(() => import("./pages/OraToPsd"));
+// All ten tool landing pages are ONE component that reads its content out of
+// toolPages.ts by pathname. They still get a route, a sitemap entry and a
+// prerendered <head> each, which is the part a crawler cares about.
+const ToolLanding = lazyPage(() => import("./pages/ToolLanding"));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 
 /** The route table App.tsx renders, in match order.
@@ -83,6 +92,21 @@ export const PAGE_ROUTES: { path: string; page: LazyPage; source: string }[] = [
   { path: "/trail-log", page: Trail, source: "src/pages/Trail.tsx" },
   { path: "/privacy-policy", page: PrivacyPolicy, source: "src/pages/PrivacyPolicy.tsx" },
   { path: "/terms-of-service", page: TermsOfService, source: "src/pages/TermsOfService.tsx" },
+  { path: "/in-the-works", page: ComingSoon, source: "src/pages/ComingSoon.tsx" },
+  { path: "/openraster", page: OpenRaster, source: "src/pages/OpenRaster.tsx" },
+  { path: "/what-is-ora", page: WhatIsOra, source: "src/pages/WhatIsOra.tsx" },
+  { path: "/ora-to-png", page: OraToPng, source: "src/pages/OraToPng.tsx" },
+  { path: "/ora-to-psd", page: OraToPsd, source: "src/pages/OraToPsd.tsx" },
+  { path: "/photo-editor", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/image-compressor", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/background-remover", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/remove-object-from-photo", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/annotate-image", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/clone-stamp", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/pixelate-image", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/blur-image", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/batch-image-editor", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
+  { path: "/image-editor-no-upload", page: ToolLanding, source: "src/pages/ToolLanding.tsx" },
   // A catch-all, so an unknown URL gets a page that says so instead of a bare
   // nav over empty space. Paired with a real 404 status from the host (see
   // scripts/prerender.mjs).

@@ -1,65 +1,67 @@
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { POSTS, fmtPostDate, postPath } from "../data/posts";
 import { EDITOR_URL, external } from "../config";
 
-/* /blog — the list.
+/* /blog — the list, v2.
  *
  * Laid out on the Trail Log's grid rather than as a card deck: a dated meta
- * column on the left, the writing on the right. That is not a style choice
- * being reused for its own sake — the two pages answer the same question in two
- * registers ("what changed" and "why"), and a reader who has scrolled one
- * should not have to learn a second layout to scan the other.
+ * column on the left, the writing on the right. The two pages answer the same
+ * question in two registers ("what changed" and "why"), so a reader who has
+ * scrolled one should not have to learn a second layout to scan the other.
  *
- * Deliberately no tag filter yet. The site has a segmented filter on three
- * pages and it would drop straight in, but a control that narrows one post to
- * one post is furniture. It goes in when the list is long enough to need it.
+ * Own `blog-*` classes rather than the shared `.postcard`: Home's "From the
+ * blog" uses `.postcard` and is deliberately text-only, and this page's v2 row
+ * sets its headline much larger. Two sizes of one object, two class sets.
+ *
+ * The design also showed "3 figures · 12 min" under each post. A Post has no
+ * figure count or reading time, so that pill is left out rather than guessed.
  */
 export default function Blog() {
   const [latest, ...rest] = POSTS;
+  const count = POSTS.length === 1 ? "1 post" : `${POSTS.length} posts`;
 
   return (
     <>
       <main id="main">
-        <header className="page-head">
-          <h1 className="page-head__title">Blog</h1>
-          <p className="lede">
+        <header className="blog-head">
+          <div className="blog-head__lead">
+            <p className="blog-head__eyebrow">Blog &middot; {count}, newest first</p>
+            <h1 className="blog-head__title">The changelog says what. This says why.</h1>
+          </div>
+          <p className="blog-head__deck">
             Notes on how this thing is built. Each post takes one decision, says what it cost, and
-            shows the measurements behind it. The changelog is on the{" "}
-            <Link to="/trail-log">Trail Log</Link> — this is the part that needed more than a line.
+            shows the measurements behind it. The line-by-line version is on the{" "}
+            <Link to="/trail-log">Trail Log</Link> &mdash; this is the part that needed more than a
+            line.
           </p>
         </header>
 
-        <section className="postlist" aria-label="All posts">
-          <p className="postlist__count">
-            {POSTS.length === 1 ? "1 post" : `${POSTS.length} posts`}, newest first.
-          </p>
-
-          <ol className="postlist__list">
+        <section className="blog-list" aria-label="All posts">
+          <ol className="blog-list__items">
             {POSTS.map((post) => (
-              <li className="postcard" key={post.slug}>
-                <div className="postcard__meta">
-                  {/* ISO in the attribute, prose in the text — the machine form
-                      and the human form of one date, never two dates. */}
-                  <time className="postcard__date" dateTime={post.published}>
+              <li className="blog-row" key={post.slug}>
+                <div className="blog-row__meta">
+                  {/* ISO in the attribute, prose in the text — one date, two forms. */}
+                  <time className="blog-row__date" dateTime={post.published}>
                     {fmtPostDate(post.published)}
                   </time>
-                  {post.version && <span className="postcard__version">{post.version}</span>}
+                  {post.version && <span className="blog-row__version">{post.version}</span>}
                   {post === latest && rest.length > 0 && (
-                    <span className="tag--latest">Latest</span>
+                    <span className="blog-row__latest">Latest</span>
                   )}
                 </div>
 
-                <div className="postcard__body">
-                  <h2 className="postcard__title">
-                    {/* The whole heading is the link. A "Read more" beneath a
-                        title that is also a link gives one destination two
-                        targets and makes a screen reader announce it twice. */}
+                <div className="blog-row__body">
+                  <h2 className="blog-row__title">
+                    {/* The whole heading is the link — no separate "Read more". */}
                     <Link to={postPath(post)}>{post.headline}</Link>
                   </h2>
-                  <p className="postcard__deck">{post.deck}</p>
-                  <p className="postcard__tags">
-                    <span className="tag">{post.tag}</span>
+                  <p className="blog-row__deck">{post.deck}</p>
+                  <p className="blog-row__tags">
+                    <span className="blog-pill">{post.tag}</span>
                   </p>
                 </div>
               </li>
@@ -67,23 +69,24 @@ export default function Blog() {
           </ol>
         </section>
 
-        <section className="close">
-          <div className="close__body">
-            <p className="close__line">The software these are about is free to try.</p>
-            <p className="close__sub">
+        <section className="blog-close">
+          <div className="blog-close__copy">
+            <p className="blog-close__line">The software these are about is free to try.</p>
+            <p className="blog-close__sub">
               Everything described here runs in your own tab. There is no account to make and nothing
-              is uploaded — open an image and the engine is already on your machine.
+              is uploaded &mdash; open an image and the engine is already on your machine.
             </p>
-            <div className="close__actions">
-              <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the beta
-              </a>
-              <Link className="cta cta--outline cta--lg" to="/architecture">
-                See how it fits together
-              </Link>
-            </div>
+          </div>
+          <div className="blog-close__actions">
+            <a className="blog-btn blog-btn--fill" href={EDITOR_URL} {...external}>
+              Open the editor &mdash; free
+            </a>
+            <Link className="blog-btn blog-btn--line" to="/architecture">
+              See how it fits together
+            </Link>
           </div>
         </section>
+        <NextCards cards={pickNextCards("/blog")} />
       </main>
 
       <Footer line="The changelog says what. This says why." />

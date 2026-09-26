@@ -49,6 +49,7 @@
   --z-mobile-viewer: 49; /* mobile single-photo viewer — above the mobile grid, still under dialogs */
   --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
   --z-modal: 60; /* modals layered above dialogs */
+  --z-over-modal: 70; /* a confirm opened from inside a modal (Settings › Shared › Delete) */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
@@ -718,6 +719,23 @@ html.reduce-motion .canvas-spinner {
   transform: translate(-50%, -50%);
   z-index: var(--z-cursor);
   mix-blend-mode: difference;
+}
+
+/* Mask editing: the ring wears the value the stroke will paint — black hides,
+   white reveals — so the cursor answers "what will this stroke change" without
+   anyone reading a panel. It is the third of the three places driven by
+   `maskEditing`, and it computes nothing itself.
+
+   `difference` is dropped on purpose: differencing black against a photo is a
+   no-op, so the black ring would simply vanish over dark pixels. The paired
+   light/dark outline used by the selection cursors carries it over any photo
+   instead — the halo is always the opposite of the ink. */
+.brush-cursor--mask {
+  mix-blend-mode: normal;
+  border-color: var(--mask-cursor-ink);
+  box-shadow:
+    0 0 0 1.5px var(--mask-cursor-halo),
+    inset 0 0 0 1.5px var(--mask-cursor-halo);
 }
 
 /* Source marker crosshair */
@@ -1595,6 +1613,9 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
+/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
+   chip in token classes on the house radius. This bare rule stays only for
+   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
 kbd {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -2232,6 +2253,18 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 
 input[type="range"]:focus {
   outline: none;
+}
+
+/* The house focus ring, on keyboard focus only (Night 3, 09-25-2026). The
+   base `input[type="range"] { outline: none }` above sits later in the file
+   than the global `input:focus-visible` rule at equal specificity, and the
+   `:focus` rule outranks it, so a keyboard user on a slider got only the
+   thumb halo below: `--accent-dim` is 15% alpha, measured 1.14:1 against the
+   light panel and 1.47:1 against the dark one. Invisible, for practical
+   purposes. The halo stays; the dashed ink ring (14.3:1) now leads. */
+input[type="range"]:focus-visible {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: 2px;
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {

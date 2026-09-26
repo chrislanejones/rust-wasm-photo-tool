@@ -11,6 +11,7 @@ import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
 import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { compareBaselineKey } from "@/lib/compareBaseline";
+import { defaultExportStem } from "@/lib/exportFileName";
 
 export function useCanvasActions({
   stamp,
@@ -182,9 +183,11 @@ export function useCanvasActions({
     }
   }, [stamp, exportCanvasBackground, canvasBgTransparent]);
 
-  const handleExport = useCallback(async () => {
+  /** Download the active image. `stem` is the export dialog's file-name field
+   *  (already sanitized); omitted everywhere else, which keeps the
+   *  `<name>-revised` default. */
+  const handleExportAs = useCallback(async (stem?: string) => {
     const entry = photos.find((p) => p.id === activePhotoId) ?? null;
-    const activeName = entry?.name ?? "image";
     const tool = stamp.toolRef.current;
     // Excluding the canvas background crops the export to the photo's own
     // (smaller) bounding box — track the dimensions that were ACTUALLY
@@ -238,7 +241,6 @@ export function useCanvasActions({
       exportH,
     );
 
-    const stem = activeName.replace(/\.[^.]+$/, "");
     const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
     const a = document.createElement("a");
     a.href = url;
@@ -248,7 +250,7 @@ export function useCanvasActions({
     // from landing as a `.avif` file full of PNG. EXT stays as the fallback for
     // the rare blob with no type at all.
     const ext = extFromMime(blob.type) || EXT[exportFormat];
-    a.download = `${stem}-revised${ext}`;
+    a.download = `${stem ?? defaultExportStem(entry?.name)}${ext}`;
     a.click();
     URL.revokeObjectURL(url);
     // `exportCanvasBackground` is read at the top of this callback and was
@@ -262,6 +264,10 @@ export function useCanvasActions({
     // had it; only this path did not.
   }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground, canvasBgTransparent]);
 
+  // Zero-arg wrapper: this is handed straight to `onClick` (context menu) and
+  // the keyboard shortcut, and must not mistake a click event for a name.
+  const handleExport = useCallback(() => handleExportAs(), [handleExportAs]);
+
   return {
     getHistogram,
     handleZoomIn,
@@ -269,5 +275,6 @@ export function useCanvasActions({
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
+    handleExportAs,
   };
 }

@@ -1,5 +1,6 @@
+import { useId } from "react";
 import { Frame, Image as ImageIcon } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { Preferences } from "@/lib/preferences";
@@ -50,10 +51,12 @@ export function LayersCanvasPane({
   value,
   onChange,
 }: LayersCanvasPaneProps) {
+  const importId = useId();
+  const exportId = useId();
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <PaneHeading title="Importing: Canvas on every new image or background">
+        <PaneHeading id={importId} title="Importing: Canvas on every new image or background">
           How a freshly-opened photo lands. “Canvas + photo” places the image
           on a slightly larger backing canvas as two layers (a Background and
           the Photo on top), Photoshop-style. “Photo only” keeps the classic
@@ -62,6 +65,8 @@ export function LayersCanvasPane({
         </PaneHeading>
         <ToggleButtonGroup
           fill
+          mode="select"
+          aria-labelledby={importId}
           items={[
             {
               key: "artboard",
@@ -106,7 +111,7 @@ export function LayersCanvasPane({
       </section>
 
       <section className="space-y-3">
-        <PaneHeading title="Exporting: Export Canvas as a background (copy canvas to clipboard)">
+        <PaneHeading id={exportId} title="Exporting: Export Canvas as a background (copy canvas to clipboard)">
           The backing canvas above (“Canvas + photo”) is a compositional
           guide. “Photo only” — the default — leaves it out of downloads,
           shares, and copies, so an export is the photo at the photo’s own
@@ -117,6 +122,8 @@ export function LayersCanvasPane({
         </PaneHeading>
         <ToggleButtonGroup
           fill
+          mode="select"
+          aria-labelledby={exportId}
           items={[
             {
               key: "photo-only",

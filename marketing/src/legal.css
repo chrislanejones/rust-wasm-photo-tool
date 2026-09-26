@@ -1,0 +1,222 @@
+/* legal — v2 port. Owned by the legal port; other ports must not edit this file.
+ *
+ * One layout for /privacy-policy and /terms-of-service: a split head, two
+ * summary cards on the dark page, the document itself on a cream board, and a
+ * closing band. The document is set on cream because it is the one block a
+ * reader is meant to read end to end, and the light surface says "this is the
+ * text" before a word is read.
+ *
+ * Sizes are the mockup's own (Privacy v2 / Terms v2). The tokens below are
+ * prefixed so they cannot collide with the other v2 pages' `:root` blocks. */
+
+:root {
+  --text-legal-title: clamp(2.5rem, 4vw + 1rem, 4.75rem);
+  --text-legal-section: clamp(1.5rem, 2vw, 1.875rem);
+  --text-legal-close: clamp(1.375rem, 2vw, 1.75rem);
+  /* A summary card's text: brighter than --color-ink-2 so the two cards read
+     as the headline facts, dimmer than --color-ink so they don't compete with
+     the h1. */
+  --color-legal-card-ink: oklch(84% 0.012 65);
+  /* Between --color-paper-2 and --color-paper-3: a card lifted just off the page. */
+  --color-legal-card: oklch(18% 0.020 35);
+}
+
+/* ── head ─────────────────────────────────────────────────────────────── */
+
+.legal-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  /* The nav floats, so the first heading buys its own room under it. 3.5rem
+     is the mockup's 56px, not --space-2xl. */
+  padding: calc(var(--banner-height) + 3.5rem) var(--page-gutter) 40px;
+}
+.legal-head__lead { display: grid; gap: 20px; min-width: 0; }
+.legal-head__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.legal-head__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 16ch;
+  font-weight: 700;
+  font-size: var(--text-legal-title);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.legal-head__deck {
+  margin: 0;
+  max-width: 36ch;
+  padding-bottom: 6px;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+/* ── the two facts, on the dark page ─────────────────────────────────── */
+
+.legal-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 12px;
+  padding: 8px var(--page-gutter) 32px;
+}
+.legal-summary__card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 18px 20px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 14px;
+  background: var(--color-legal-card);
+}
+/* "It is beta" is the one fact the Terms lead with, so it is lit. */
+.legal-summary__card--lit {
+  border-color: var(--color-accent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--color-accent) 18%, var(--color-legal-card)),
+    var(--color-paper-2) 70%
+  );
+}
+.legal-summary__label {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.legal-summary__text {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--color-legal-card-ink);
+  text-wrap: pretty;
+}
+
+/* ── the document, on cream ──────────────────────────────────────────── */
+
+/* Local ink: every site ink token is tuned for light text on the dark page,
+   and all of them are wrong here. */
+.legal-board {
+  --l-ink: oklch(20% 0.020 40);
+  --l-ink-2: oklch(32% 0.020 40);
+  --l-accent: oklch(44% 0.170 45);
+  --l-rule: oklch(86% 0.020 80);
+  --l-card: oklch(97.5% 0.012 80);
+
+  display: grid;
+  gap: 40px;
+  margin: 0 var(--page-gutter);
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: 20px;
+  background: oklch(94% 0.020 80);
+  color: var(--l-ink);
+}
+.legal-board__section { display: grid; gap: 14px; }
+.legal-board__section + .legal-board__section,
+.legal-board__section + .legal-board__minor {
+  padding-top: 32px;
+  border-top: var(--rule-hair) solid var(--l-rule);
+}
+.legal-board__section--list { gap: 18px; }
+.legal-board h2 {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-legal-section);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--l-ink);
+}
+.legal-board p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--l-ink-2);
+  text-wrap: pretty;
+}
+.legal-board strong { font-weight: 700; color: var(--l-ink); }
+.legal-board a {
+  color: var(--l-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.legal-board a:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.legal-board__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legal-board__card {
+  padding: 18px;
+  border: var(--rule-hair) solid var(--l-rule);
+  border-radius: 14px;
+  background: var(--l-card);
+  font-size: var(--text-ui);
+  line-height: 1.5;
+  color: var(--l-ink-2);
+}
+.legal-board__card strong { font-weight: 600; }
+
+/* The short closing clauses sit side by side at a smaller size. */
+.legal-board__minor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 32px 48px;
+}
+.legal-board__minor--wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.legal-board__minor > div { display: grid; gap: 10px; align-content: start; }
+.legal-board__minor h2 {
+  font-size: var(--text-lg);
+  line-height: 1.15;
+}
+.legal-board__minor p {
+  font-size: var(--text-ui);
+  line-height: 1.55;
+}
+
+/* ── closing band ────────────────────────────────────────────────────── */
+
+.legal-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 40px;
+  padding: 64px var(--page-gutter) 96px;
+}
+.legal-close__text { display: grid; gap: 6px; }
+.legal-close__line {
+  margin: 0;
+  font-size: var(--text-legal-close);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.legal-close__sub { margin: 0; color: var(--color-ink-2); }
+/* The mockup's button is a notch smaller and heavier than .cta--lg. */
+.legal-close__cta.cta {
+  min-height: 48px;
+  padding: 14px 22px;
+  font-size: var(--text-ui);
+  font-weight: 600;
+}

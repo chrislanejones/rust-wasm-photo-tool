@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { ReasonNote } from "@/components/ui/status-note";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,22 +40,37 @@ import { cn } from "@/lib/utils";
  *  ("Resize canvas → 1920×1080") and under `flex-1` it wrapped to three lines
  *  and dragged its sibling to the same height (measured: 54px → 70px for BOTH
  *  buttons the moment the target dimensions changed). */
-type PanelActionBarLayout = "full" | "split";
+type PanelActionBarLayout = "full" | "split" | "halves";
+
+/** The id of the bar's reason line, while one renders. A `PanelAction` that
+ *  is disabled picks it up as `aria-describedby`, so the sentence under the
+ *  bar is also what a screen reader hears on the dead button. */
+const ReasonIdContext = React.createContext<string | undefined>(undefined);
 
 interface PanelActionBarProps {
   /** `full` (default) — one action, full width. `split` — two actions pushed
-   *  to opposite edges, secondary first in source order. */
+   *  to opposite edges, secondary first in source order. `halves` — two
+   *  actions side by side, 50% each; only for SHORT fixed labels, since a
+   *  label wider than its half overflows instead of wrapping. */
   layout?: PanelActionBarLayout;
+  /** Why the action(s) cannot run right now — "Drag a crop box on the
+   *  canvas first." Visible text under the bar (a tooltip would not show on
+   *  touch, and a disabled button gets no hover anyway). Pass it only while
+   *  the action is disabled; a reason under a live button is noise. */
+  reason?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }
 
 export function PanelActionBar({
   layout = "full",
+  reason,
   children,
   className,
 }: PanelActionBarProps) {
-  return (
+  const baseId = React.useId();
+  const reasonId = reason ? `${baseId}-reason` : undefined;
+  const bar = (
     <div
       className={cn(
         layout === "full"
@@ -63,7 +79,11 @@ export function PanelActionBar({
             // action itself having to carry `w-full` (which would then have to
             // be un-set for the split layout).
             "grid"
-          : [
+          : layout === "halves"
+            ? // Two equal tracks; each action stretches to fill its own half.
+              // Canvas Size (Chris, 09-24-2026: "50% and 50% width").
+              "grid grid-cols-2 gap-2"
+            : [
               // `justify-between` is the two-on-one-line case. `flex-wrap` plus
               // the last child's `ml-auto` is the OVERFLOW case: a pair too wide
               // for a 226px sidebar column drops the primary onto its own row
@@ -79,6 +99,15 @@ export function PanelActionBar({
     >
       {children}
     </div>
+  );
+  if (!reason) return bar;
+  return (
+    <ReasonIdContext.Provider value={reasonId}>
+      <div className="space-y-2">
+        {bar}
+        <ReasonNote id={reasonId}>{reason}</ReasonNote>
+      </div>
+    </ReasonIdContext.Provider>
   );
 }
 
@@ -116,12 +145,15 @@ export interface PanelActionProps
 export const PanelAction = React.forwardRef<
   HTMLButtonElement,
   PanelActionProps
->(({ className, tone = "default", pressed, ...props }, ref) => (
+>(({ className, tone = "default", pressed, ...props }, ref) => {
+  const reasonId = React.useContext(ReasonIdContext);
+  return (
   <Button
     ref={ref}
     size="large"
     type="button"
     aria-pressed={pressed}
+    aria-describedby={props.disabled ? reasonId : undefined}
     className={cn(
       // `whitespace-nowrap` + `shrink-0` is what makes the split layout wrap
       // the BUTTON rather than the button's text: without it both actions
@@ -134,5 +166,6 @@ export const PanelAction = React.forwardRef<
     )}
     {...props}
   />
-));
+  );
+});
 PanelAction.displayName = "PanelAction";

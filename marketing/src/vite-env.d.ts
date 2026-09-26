@@ -12,3 +12,8 @@
 
 /** The year of the build, from `define` in vite.config.ts. */
 declare const __BUILD_YEAR__: number;
+
+interface ImportMetaEnv {
+  /** Public Web3Forms key for /contact — see WEB3FORMS_KEY in config.ts. */
+  readonly VITE_WEB3FORMS_KEY?: string;
+}

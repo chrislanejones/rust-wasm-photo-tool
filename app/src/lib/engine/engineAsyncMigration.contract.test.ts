@@ -752,7 +752,19 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // real id for the life of the page. `set_text_font` is awaited for the same
     // reason its siblings `set_text_wrap_width` and `set_text_box_height` are:
     // it must land before the commit's flush reads the tile.
-    expect(gate.awaited, "cumulative converted sites").toBe(149);
+    // Live Tolerance + selection readout — 149 -> 153: four awaited sites born
+    // with the feature, all in `useSelectionActions.ts`. `selection_coverage`
+    // feeds the readout; `selection_can_retune` is a guard (un-awaited, the
+    // Promise is truthy and every slider tick would re-run a stale click);
+    // `selection_retune` and the `selection_overlay` re-read behind it return
+    // the mask the overlay draws. Gate buckets unchanged.
+    // Refine + Add mask from selection — 153 -> 158: five awaited
+    // value-consuming sites born with the feature, in `useSelectionActions.ts`
+    // (the refine preview, its readout and Apply) and `useMaskActions.ts`
+    // (`add_layer_mask_from`, whose boolean decides whether to flush and open
+    // the mask brush — un-awaited, a refused add would still do both). Gate
+    // buckets unchanged.
+    expect(gate.awaited, "cumulative converted sites").toBe(158);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

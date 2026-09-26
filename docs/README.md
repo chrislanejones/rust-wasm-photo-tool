@@ -13,6 +13,9 @@ What is in this folder, and what deliberately is not.
 | [Keyboard-Shortcuts.md](Keyboard-Shortcuts.md) | every chord |
 | [OpenRaster-Export-Import.md](OpenRaster-Export-Import.md) | the .ora format contract |
 | [CI.md](CI.md) | the gates, and which ones block |
+| [UI_CONSISTENCY.md](UI_CONSISTENCY.md) | the ten UI rules, and the canonical scale |
+| [UI_INVENTORY.md](UI_INVENTORY.md) | what the UI vocabulary actually is, counted |
+| [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) | every registered exception to a UI gate |
 | [Deploying.md](Deploying.md) | how a release reaches production |
 | [Change-summary.md](Change-summary.md) | full release history |
 | [PARKING_LOT.md](PARKING_LOT.md) | problems noticed but deliberately not fixed yet |

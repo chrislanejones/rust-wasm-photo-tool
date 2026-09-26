@@ -26,6 +26,33 @@
  * frame is worth a stop and what actually changed between two of them.
  */
 
+/** One numbered callout drawn over a capture.
+ *
+ *  Every coordinate is in the capture's OWN pixels — the same `width` × `height`
+ *  as its Shot — so a box can be checked or nudged by opening the image in any
+ *  editor and reading the cursor position. ShotTimeline maps them onto the
+ *  letterboxed frame at render time; nothing here knows how big the frame is. */
+export interface ShotAnnotation {
+  /** The number on the pin. */
+  n: number;
+  /** A rounded highlight box, an ellipse, or a dashed vertical rule (w: 0). */
+  shape: "box" | "ellipse" | "line";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Where the pin and its label sit — the label's top-left corner. */
+  lx: number;
+  ly: number;
+  /** Hang the label ABOVE (lx, ly) instead of below it, for a callout near the
+   *  bottom edge that would otherwise run off the frame. */
+  up?: boolean;
+  /** Bold lead-in. */
+  title: string;
+  /** The rest of the sentence, read straight after the title. */
+  text: string;
+}
+
 export interface Shot {
   /** Served from /public/shots. */
   src: string;
@@ -50,6 +77,8 @@ export interface Shot {
    *  older frames load only when someone drags the rail, so they stay one
    *  file each. `src` remains the largest size and the fallback. */
   srcSet?: string;
+  /** Numbered callouts for this frame, if it has any. */
+  annotations?: ShotAnnotation[];
 }
 
 const REPO = "https://github.com/chrislanejones/rust-wasm-photo-tool/commit";
@@ -119,6 +148,9 @@ export const SHOTS: Shot[] = [
     note: "The server-side work gets a panel of its own — background removal, text extraction, object removal — and it is the only panel that reaches a server.",
     href: `${REPO}/035db9e7875e01d3dc3ed6adfd7e395c2af353c0`,
     sourceLabel: "v7.36",
+    annotations: [
+      { n: 1, shape: "box", x: 1352, y: 142, w: 240, h: 262, lx: 880, ly: 148, title: "History", text: "— every step you took, newest last. Click one to jump back to that moment; it survives a reload." },
+    ],
     alt: "The editor with an AI Tools panel on the left — Remove Background, Extract Text, Remove Object, and a grayed-out 4× Upscale marked Coming Soon — a white Fiat 500 ringed in red and labeled “Window Repair” on the canvas, with History and Layers on the right.",
   },
   {
@@ -130,6 +162,9 @@ export const SHOTS: Shot[] = [
     note: "The toolbar settles into five groups and stops being a color chart. Paint gains the Stroke Stabilizer; the whole interface goes quiet so the photo can be loud.",
     href: `${REPO}/767d42af15d9f3d7a5517af54fcea04adf0f435c`,
     sourceLabel: "v7.54",
+    annotations: [
+      { n: 1, shape: "box", x: 16, y: 578, w: 202, h: 86, lx: 232, ly: 580, title: "Stroke Stabilizer", text: "smooths a shaky hand or trackpad while you draw — the line follows a steadied cursor. Off, Low, Med or High." },
+    ],
     alt: "The editor in its quiet dark palette: a monochrome tool rail, a Paint panel with brush size, opacity, hardness, a color row and Stroke Stabilizer set to Off, a Tokyo crossing on the canvas, and twelve photos in the gallery strip.",
   },
   {
@@ -141,6 +176,9 @@ export const SHOTS: Shot[] = [
     note: "Today: magic-wand select, real layer stacks, undo to a thousand steps — and a 310 KB engine doing all of it inside the tab.",
     href: `${REPO}/4cd90e1bc9fe95375625580af0ff386954a75c2a`,
     sourceLabel: "4cd90e1",
+    annotations: [
+      { n: 1, shape: "box", x: 926, y: 588, w: 566, h: 124, lx: 926, ly: 578, up: true, title: "Magic wand → mask.", text: "One click on the bonnet and the marching ants hug its edge. Everything you do next — blur, recolor, cut, copy — stays inside it." },
+    ],
     alt: "The Image Horse editor open on a photo of a white Mercedes SUV, a magic-wand selection marching around the bonnet, with the Wand and Selection panels on the left and History and Layers on the right — five photos in the gallery strip below, all held in the browser.",
   },
   {
@@ -154,6 +192,11 @@ export const SHOTS: Shot[] = [
     note: "Today: presets you preview on the photo before you keep them, an Original / Edited split to see what changed, and a Viper shrunk 92% without leaving the tab.",
     href: `${REPO}/cb614652ff77ab3e7a49d51b13455709540da7d3`,
     sourceLabel: "v8.79",
+    annotations: [
+      { n: 1, shape: "box", x: 22, y: 283, w: 284, h: 250, lx: 322, ly: 290, title: "Presets", text: "— preview before you keep." },
+      { n: 2, shape: "line", x: 1061, y: 280, w: 0, h: 610, lx: 1160, ly: 196, title: "Original ⟷ Edited", text: "side by side." },
+      { n: 3, shape: "ellipse", x: 1004, y: 936, w: 188, h: 56, lx: 1204, ly: 944, title: "Compress All", text: "— every photo to your target size or smaller, one pass." },
+    ],
     alt: "The Image Horse editor open on a photo of a red Viper parked by the ocean, split down the middle between Original and Edited, with the Presets panel on the left previewing Enhance and History, Layers and a histogram on the right — eight cars in the gallery strip below, the Viper tagged −92%.",
   },
 ];

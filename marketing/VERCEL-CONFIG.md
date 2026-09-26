@@ -46,6 +46,13 @@ what gets cached and indexed. The apex is canonical because that is what
 `src/seo.ts` writes into every `<link rel=canonical>` and every sitemap entry;
 changing one without the other splits the site in two.
 
+### `/coming-soon` → `/in-the-works`
+
+The page was renamed on 2026-09-25. The old URL was already in Google's index
+and in the submitted sitemap, so it redirects permanently rather than 404ing:
+that carries whatever the old address had earned over to the new one. Keep it
+until Search Console stops listing `/coming-soon`.
+
 ## `headers` — `/(.*)`
 
 ### `Strict-Transport-Security`

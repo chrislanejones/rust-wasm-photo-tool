@@ -1,18 +1,18 @@
 import { useState } from "react";
-import { Brush, Droplets, PenTool, Blend, Check, Eye, EyeOff } from "lucide-react";
+import { Brush, Droplets, PenTool, Blend } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import type { BrushMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { StabilizerRow } from "./StabilizerRow";
+import { AdvancedStabilizer } from "./StabilizerRow";
+import { ControlRow } from "@/components/ui/control-row";
+import { Kbd } from "@/components/ui/kbd";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
-import { ActionTile } from "@/components/ui/action-tile";
-import { SectionHeader } from "@/components/ui/section-header";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { PANEL_SECTION } from "@/lib/styles";
 
@@ -32,13 +32,6 @@ const BLUR_MODES = [
 
 const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
 
-/** Mask brush value as an exclusive choice — 0 = hide (black), 255 = reveal
- *  (white). Module-level so the group isn't handed a fresh array each render. */
-const MASK_BRUSH_OPTIONS = [
-  { id: "hide", label: "Hide", icon: EyeOff },
-  { id: "reveal", label: "Reveal", icon: Eye },
-] as const;
-
 /** Paint's sub-mode union — the store (`useToolStore.BrushMode`) is the
  *  canonical definition; this alias keeps the panel's public prop names. */
 export type PaintMode = BrushMode;
@@ -54,7 +47,7 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
     info: (
       <>
         Freehand-paints the active layer in the selected color.{" "}
-        <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+        <Kbd>Ctrl+]</Kbd>/<Kbd>Ctrl+[</Kbd> grows/shrinks the brush.
         Stroke Stabilizer smooths shaky drags.
       </>
     ),
@@ -67,7 +60,7 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
       <>
         Softens (Blur), mosaics (Pixelate), or fully redacts
         (Solid) whatever you drag over on the active layer.{" "}
-        <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+        <Kbd>Ctrl+]</Kbd>/<Kbd>Ctrl+[</Kbd> grows/shrinks the brush.
       </>
     ),
   },
@@ -80,9 +73,9 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
         Click to drop points, drag to pull Bézier handles. The ring on your
         first point shows the join: dashed while the path is open, solid blue
         when a click there would connect the ends — or once they are.{" "}
-        <kbd>Enter</kbd> closes the path and keeps it selected, so Stroke and
-        Background restyle it. <kbd>Esc</kbd> finishes it open and deselects,{" "}
-        <kbd>Backspace</kbd> undoes a point.
+        <Kbd>Enter</Kbd> closes the path and keeps it selected, so Stroke and
+        Background restyle it. <Kbd>Esc</Kbd> finishes it open and deselects,{" "}
+        <Kbd>Backspace</Kbd> undoes a point.
       </>
     ),
   },
@@ -113,13 +106,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   const setSmartBrush = useToolStore((s) => s.setSmartBrush);
   const smartBrushStrength = useToolStore((s) => s.smartBrushStrength);
   const setSmartBrushStrength = useToolStore((s) => s.setSmartBrushStrength);
-  // Mask painting — read straight from the store for the same reason Smart
-  // Brush is: it is a MODE the app is in, not a brush dimension, and routing
-  // it through props would mean threading it from AppShell for one section.
-  const maskEditing = useToolStore((s) => s.maskEditing);
-  const setMaskEditing = useToolStore((s) => s.setMaskEditing);
-  const maskPaintValue = useToolStore((s) => s.maskPaintValue);
-  const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
 
   const handleModeChange = (m: PaintMode) => {
     setInternalMode(m);
@@ -177,14 +163,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   onChange={(color) => onChange({ ...settings, brushColor: color })}
                 />
 
-                {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off by
-                    default; Low/Med/High set the leash (smoothing strength).
-                    The level table lives in StabilizerRow, the single copy. */}
-                <StabilizerRow
-                  value={settings.paintStabilizer}
-                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
-                />
-
                 {/* ── Smart Brush (behind ih_smart_edge; see lib/smartEdge.ts) ──
                     The second consumer of the edge core that already powers the
                     edge-aware wand: the stroke is walled in by strong edges, so
@@ -196,6 +174,9 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   <div className={PANEL_SECTION}>
                     <ToolButton
                       active={smartBrush}
+                      // An independent on/off, so a TOGGLE (UI_CONSISTENCY §7):
+                      // the lit tile was never announced as on.
+                      aria-pressed={smartBrush}
                       onClick={() => setSmartBrush(!smartBrush)}
                       className="w-full"
                       title="Stop the brush bleeding across object edges"
@@ -219,50 +200,22 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   </div>
                 )}
 
-                {/* ── Painting a layer mask ──────────────────────────────
-                    Mask editing is a BRUSH activity, so its live controls
-                    belong on the brush's panel — this is where the strokes
-                    are actually made, and it is the only panel that can
-                    show them at all: `maskEditing` is force-cleared
-                    whenever the active tool stops being the brush
-                    (AppShell), so the Layers tool's own panel can never
-                    render them. v8.38 moved the mask buttons off the layer
-                    ROWS into the Layers tool; this is the half of that move
-                    that has to live here instead, and without it Hide/
-                    Reveal would be unreachable UI. */}
-                {maskEditing && (
-                  <div className={PANEL_SECTION}>
-                    <SectionHeader
-                      title="Painting Layer Mask"
-                      info={
-                        <>
-                          Strokes hit the active layer&rsquo;s mask, not its
-                          pixels. <strong className="font-semibold text-theme-foreground">Hide</strong>{" "}
-                          paints black (the layer disappears there),{" "}
-                          <strong className="font-semibold text-theme-foreground">Reveal</strong>{" "}
-                          paints white. Invert, Apply and Remove live in the
-                          Layers tool.
-                        </>
-                      }
-                    />
-                    <ToolButtonGroup
-                      label="Brush paints"
-                      columns={2}
-                      stacked
-                      value={maskPaintValue < 128 ? "hide" : "reveal"}
-                      onChange={(v) => setMaskPaintValue(v === "hide" ? 0 : 255)}
-                      options={MASK_BRUSH_OPTIONS}
-                    />
-                    <div className="grid gap-2 [grid-auto-rows:1fr]">
-                      <ActionTile
-                        icon={Check}
-                        label="Done painting mask"
-                        onClick={() => setMaskEditing(false)}
-                        title="Stop painting the mask (strokes go back to pixels)"
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Layer-mask painting used to render its Hide/Reveal
+                    controls here, because entering mask edit switched the
+                    app to this panel. Since 09-24-2026 the mask brush lives
+                    entirely in the Layers panel's Layer Mask section —
+                    strokes, value, size and feather — and `maskEditing`
+                    can no longer be on while the Paint brush is. */}
+
+                {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off
+                    by default, a set-once preference rather than a per-stroke
+                    dial, so it is the Advanced section. The closed summary
+                    still says the level, so ON is never hidden. The level
+                    table lives in StabilizerRow, the single copy. */}
+                <AdvancedStabilizer
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
               </>
             );
 
@@ -271,6 +224,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               <>
                 {/* Mode: Gaussian blur / Pixelate / Solid redaction */}
                 <ToolButtonGroup
+                  aria-label="Blur mode"
                   columns={3}
                   options={BLUR_MODES}
                   value={settings.blurMode ?? "gaussian"}
@@ -313,15 +267,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   />
                 )}
 
-                {/* Applies to all three blur modes — it leashes the STROKE,
-                    not the effect, so blur, pixelate and redact all steady
-                    the same way. Same field the Paint brush and Eraser read:
-                    one dial, on everywhere. */}
-                <StabilizerRow
-                  value={settings.paintStabilizer}
-                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
-                />
-
                 {settings.blurMode === "solid" && (
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
@@ -329,6 +274,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     onChange={(color) => onChange({ ...settings, redactColor: color })}
                   />
                 )}
+
+                {/* Applies to all three blur modes — it leashes the STROKE,
+                    not the effect, so blur, pixelate and redact all steady
+                    the same way. Same field the Paint brush and Eraser read:
+                    one dial, on everywhere. Last, in Advanced, as in Paint. */}
+                <AdvancedStabilizer
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
               </>
             );
 
@@ -351,28 +305,30 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 />
 
                 {/* Background — fills the closed path's interior (under the stroke). */}
-                <div className="space-y-2">
-                  <label className="text-2xs text-theme-muted-foreground">
-                    Background
-                  </label>
-                  <ToolButtonGroup
-                    options={[
-                      { id: "none", label: "None" },
-                      { id: "solid", label: "Solid" },
-                    ]}
-                    value={settings.fillMode === "none" ? "none" : "solid"}
-                    onChange={(id) =>
-                      onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-                    }
-                  />
-                  {settings.fillMode !== "none" && (
-                    <ColorSwatchGrid
-                      colors={TEXT_COLORS}
-                      value={settings.fillColor}
-                      onChange={(color) => onChange({ ...settings, fillColor: color })}
-                    />
+                <ControlRow label="Background">
+                  {({ labelId }) => (
+                    <div className="space-y-2">
+                      <ToolButtonGroup
+                        aria-labelledby={labelId}
+                        options={[
+                          { id: "none", label: "None" },
+                          { id: "solid", label: "Solid" },
+                        ]}
+                        value={settings.fillMode === "none" ? "none" : "solid"}
+                        onChange={(id) =>
+                          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+                        }
+                      />
+                      {settings.fillMode !== "none" && (
+                        <ColorSwatchGrid
+                          colors={TEXT_COLORS}
+                          value={settings.fillColor}
+                          onChange={(color) => onChange({ ...settings, fillColor: color })}
+                        />
+                      )}
+                    </div>
                   )}
-                </div>
+                </ControlRow>
               </>
             );
 

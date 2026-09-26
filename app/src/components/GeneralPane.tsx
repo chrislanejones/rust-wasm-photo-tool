@@ -1,5 +1,6 @@
+import { useId } from "react";
 import { Clock, History } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
   MAX_HISTORY_MIN,
@@ -65,6 +66,8 @@ const IDLE_OPTIONS: { min: number; label: string }[] = [
 ];
 
 export function GeneralPane({ value, onChange }: GeneralPaneProps) {
+  const idleId = useId();
+  const returnId = useId();
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -85,13 +88,15 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
       </section>
 
       <section className="space-y-3">
-        <PaneHeading title="Idle screen">
+        <PaneHeading id={idleId} title="Idle screen">
           After this long with no activity, Image Horse dims to a “Continue”
           screen and pauses background work to save CPU. Your edits are kept.
         </PaneHeading>
         <ToggleButtonGroup
           fill
           noIcons
+          mode="select"
+          aria-labelledby={idleId}
           items={IDLE_OPTIONS.map(({ min, label }) => ({
             key: String(min),
             icon: Clock,
@@ -103,7 +108,7 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
       </section>
 
       <section className="space-y-3">
-        <PaneHeading title="When you return">
+        <PaneHeading id={returnId} title="When you return">
           After you close the tab and come back, reopen your last gallery right
           where you left off — or start with a clean upload. Either way your
           edits stay saved.
@@ -111,6 +116,8 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
         <ToggleButtonGroup
           fill
           noIcons
+          mode="select"
+          aria-labelledby={returnId}
           items={[
             {
               key: "reopen",

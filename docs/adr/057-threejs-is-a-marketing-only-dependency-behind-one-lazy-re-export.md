@@ -132,3 +132,11 @@ quietly takes on everything the 19-class whitelist was excluding. The warning
 sign is `from "three"` appearing anywhere under `marketing/src` other than
 `engine-in-a-worker.three.ts` — nothing else will notice, because the build
 still succeeds and the only symptom is a bigger number in `dist/assets`.
+
+*Amended 09-24-2026 by ADR-067, in v8.96:* the "one re-export module" rule had
+already drifted when #219 added `posts/offline-by-construction.three.ts`, and
+v8.96 moves three to 0.170.0 and puts two `three/webgpu` chunks on the home
+page. The rule that holds now: every runtime `three` import lives in a
+`*.three.ts` module reached only by dynamic `import()`, the pin stays exact,
+and `three` and `three/webgpu` never share a scene. The 0.165 sizes above are
+historical.

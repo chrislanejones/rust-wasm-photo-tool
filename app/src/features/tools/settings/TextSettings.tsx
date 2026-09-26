@@ -4,7 +4,7 @@ import { Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";

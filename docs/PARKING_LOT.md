@@ -4,6 +4,51 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — UI Night 3 leftovers: what the three tool panels surfaced outside themselves (09-25-2026)
+
+Night 3 normalized Paint, Eraser and Crop and stopped at three. These are the
+things it measured and did not touch, because each one reaches past those
+panels or changes a color. Counts are JSX elements by TypeScript AST, not grep
+lines.
+
+| Item | Where | Why it waits |
+|---|---|---|
+| **Light-theme lit tiles fail AA text contrast: 2.24:1.** `ToolButton`'s active state is `text-theme-primary` on `bg-theme-primary/20`; on the light panel that is `#c98f3f` on its own 20% tint. Dark is 8.05:1. Every SELECT tile in the app (Crop's "Free", Stabilizer "Off", Shapes…) | ui/tool-button.tsx `activeCls` | A color change on every tile in both panels and dialogs, which Night 3's stop conditions forbid. The same `--accent` shortfall styles.css already calls "NOT fixed here". Night 5 (color), or a token decision |
+| **20 bare `<kbd>` in 6 files still ride the legacy element rule** (3px radius): ShortcutModal ×3, StatusBar ×1, ToolGrid ×1, LayerSettings ×6, PerspectiveSettings ×1, SelectSettings ×8 | those files; styles.css `kbd {}` | Mechanical move to `ui/kbd`, 1px radius change each. Delete the CSS rule with the last one |
+| **`ToolButtonGroup`'s own `label` prop is a second spelling of `ControlRow`'s label slot**, 12 call sites in 7 files (RulersGridsPane, BatchSettings ×2, LayerSettings, ShapeSettings, TextSettings ×4, CreateAIImagePanel, NewActions ×2) | ui/tool-button-group.tsx | Same look (text-2xs muted, 8px gap), so moving them is pixel-safe; but it is 7 files outside tonight's three. Then the prop can go |
+| **`FieldLabel` is `ControlRow` without the control**, info on the right instead of beside the label; 5 uses in 3 files | ui/field-label.tsx | Folding it changes where the lightbulb sits. A look decision |
+| **The color picker dialog's saved-palette swatches are still silent** — `Swatch` takes a `radio` prop now, and only `ColorSwatchGrid` passes it | ColorPickerDialog.tsx:277 | Same fix as the grid; the dialog is not a tool panel |
+| **`aria-valuetext` on sliders could not be verified by probe.** It is in the DOM (`aria-valuetext="20"` on a track at 75), but Chromium 153's CDP `valuetext` ignores `aria-valuetext` even on a pure `role="slider"` div (control case: reports `""`), so the probe cannot see it either way | ui/size-slider.tsx | One real screen-reader pass (NVDA or VoiceOver) settles it |
+| **Paint's `erase` mode is still an orphan** (no tile, ORPHAN O-1) and was left on the old grammar on purpose | PaintSettings.tsx `case "erase"` | Reviving or deleting it is a product call, not a layout one |
+| **Stroke Stabilizer now sits in a collapsed Advanced section** in Paint, Blur and both Eraser modes. Its closed summary says the level ("Stabilizer: Med"), so ON is never hidden | StabilizerRow.tsx `AdvancedStabilizer` | Chris to confirm this is where it belongs. If not, `defaultOpen` on `AdvancedSection` is the one-word revert |
+
+## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+Found during the Select morning run (live tolerance). `pnpm run build` prints
+"Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
+{ z-index: var(--z-*); }`. Tailwind scans text, and three comments spell the
+rule out literally: `app/src/styles.css:42`, `app/src/lib/styles.ts:251`,
+`app/src/components/ui/panel-close-button.tsx:38`. The generated rule is
+invalid and applies to nothing, so it is noise, not a bug — but it is the one
+warning in an otherwise clean build, and a real CSS warning would hide behind it.
+
+**Fix:** reword the three comments (e.g. "`z-[var(--z-…)]`" or "a `--z-*`
+token in a `z-[var(…)]` class") so no complete class string appears, then
+confirm the build prints no CSS warning. Same shape as the guardrails
+comment-counted-as-code trap in CLAUDE.md.
+## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+Found while ADR-067 was drafted, left out of the release on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The cubes' dynamic `import()` has no `.catch` | `marketing/src/components/CubeLetters.tsx` | If the chunk fails to load, the label says "Starting…" forever instead of "No GPU context". Fix: catch and set the `none` backend. |
+| A comment names three 0.165's `Color.setStyle` | `marketing/src/posts/engine-in-a-worker.figures.tsx:35` | three is 0.170 now. Check whether 0.170 parses `oklch()`; update or drop the comment. |
+
+Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
+Chromium draws WebGPU canvases blank white even for a bare three.js control, so
+only the WebGL 2 path is verified.
+
 ## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
 
 Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
@@ -92,9 +137,16 @@ how something looks or need a decision:
 | ~~`--primary` = `--accent` and `--ring` = `--border-active` in both themes~~ | styles.css | **DECIDED 09-22-2026 (Chris): keep them separate.** An accent picker may need them to differ |
 | `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
 | Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
-| Plain inputs with NO focus ring (`inputCls`) | BatchSettings:785, AIRenamePanel:213, SuperUserPane:90/100 | Adopting FIELD_NUMERIC fixes a WCAG focus-visible gap but restyles them |
+| ~~Plain inputs with NO focus ring (`inputCls`)~~ | BatchSettings:788, AIRenamePanel:213, SuperUserPane:110/119 | **MEASURED FALSE 09-24-2026 (UI Night 2).** They have the house ring: keyboard focus on Batch › Rename paints `outline: dashed 2px` in `--focus-ring`, from the unlayered global `input:focus-visible` rule in styles.css, and no scoped rule removes it (only `input[type=range]` opts out). AI Rename's `inputCls` is the same string byte for byte. Pinned by `e2e/ui-night2-controls.spec.ts`. Adopting FIELD_NUMERIC is now purely a look decision (Night 5), not an a11y fix |
 | Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
 | ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
+| ~~**Only 2 of 43 segmented-control call sites expose selection state; 38 are silent and should not be**~~ **RESOLVED 09-24-2026 (UI Night 2):** 36 SELECT sites are named radio groups, 4 TOGGLE sites carry `aria-pressed` (2 already did; TopBar and ReviewPanel are new), 3 ACTION rows stay silent, see docs/UI_CONSISTENCY.md §7. The `value`/`onChange` API row above still stands. (3 more are action rows, where silence is right). `ToggleButtonGroup` emits no `aria-pressed`/`aria-checked` ever (14 sites); `ToolButtonGroup` emits it only for tiles carrying their own `active` — deliberately, so a plain action is never announced "not pressed" — which leaves its SELECT mode silent (24 of its 29 sites). `ToolModeToggle` passes `value=`, so it inherits the silence. The tree holds 12 real `aria-pressed` attributes. Measured 09-23-2026 | ui/toggle-button-group.tsx, ui/tool-button-group.tsx:108; Sync switch (v8.85) and privacy switch (v8.89) both on the first | WCAG 2.1 AA, not tidiness. Coupled to the `value`/`onChange` API change above; upstream of both sits "should the settings pairs be `ui/switch` at all?". `radio-cards` and `segmented-tabs` already do it right and are the two least-used primitives. See docs/UI_INVENTORY.md Findings 1–2 |
+| **Raw `<button>` baseline for Night 7's ratchet: 35 outside `components/ui/`, in 27 files** (**34 in 26 after Night 3**: `SizeSlider:97`'s preset buttons moved into `ui/preset-row`) (JSX elements counted by AST, not grep lines; was 37 in 27 files before Night 2 converted GalleryBar's two strip-scroll arrows to `Button size="tiny"`, the only two that matched a variant with zero visual change). Measured 09-24-2026 | app/src | **The primitives cannot absorb the rest without new `Button` variants**, and Night 2 added none (a variant is a design decision, not a one-off prop). By what each one needs: **ghost** small text action, 6 (DiagnosticLogOverlay:90, FeatureFlagsPanel:65, ResourceMonitor:198, PerspectiveActionBar:135, TextSettings:449, BatchSettings:656) · **link**, 2 (OnlineFeaturesOffNotice:17, TransformCropSettings:306) · **accent CTA**, 1 (ResumeContent:54) · **brand CTA on raw palette colors**, 3 (SubscriptionButton:414 `bg-zinc-800`, :428 and TextSettings:424 `bg-purple-600`; R4 violations guardrails cannot see, it counts hex) · **secondary large** (text-sm / font-medium / text-secondary), 3 (ResumeContent:61, DevTestsPane:22, StoragePane:103) · **small ghost icon**, 3 (ImageMetaPanel:66/121, CreateAIImagePanel:242) · **pill toggle** with a solid-primary on state, 3 (DimensionFields:71, NewActions:478, BatchSettings:819) · **small bordered**, 1 (ResourceMonitor:129). Bespoke and correctly not a `Button`, 13: swatch "+" circles (ColorPickerDialog:293, ColorSwatchGrid:72), SizeSlider:97 presets, info triggers that want `ui/info-tooltip` (AIUsagePane:111, GalleryCount:47), canvas/thumbnail overlays (DuplicatePadOverlay:112, GridThumbnails:130, MobileShell:67, GalleryBar:268/278), the Settings category rail (SubscriptionButton:296), HistogramView:271, StampSettings:189 |
+| **Two more silent exclusive choices, outside Night 1's 43**: HistogramView's RGB / Luma pair (raw buttons, inline styles, `mode === m`, no state exposed) and the Settings category rail (the current tab has no `aria-current` or `aria-selected`). Found 09-24-2026 during the raw-button census | features/canvas/HistogramView.tsx:271, components/SubscriptionButton.tsx:296 | HistogramView is a canvas panel (Night 3). The rail is a tab list or a nav with `aria-current`, a decision about the Settings dialog's structure |
+| **`ToggleButtonGroup`'s pill buttons compute `outline: dashed 3px`, offset 0, on keyboard focus**, where the global `button:focus-visible` rule says 2px, offset 2px. Same before and after Night 2 (measured on both builds); no matched stylesheet rule sets 3px, so it comes from somewhere the CSS-rule inspector does not show (framer-motion `motion.button` is the suspect) | ui/toggle-button-group.tsx | Harmless (still visible, still the focus color) but it is two focus-ring geometries in one app. Find the source before Night 5 touches focus |
+| **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
+| **`scripts/inert-class-audit.mjs` prints "colour-utility candidates"** — British spelling in tool output, against the house rule. Found 09-23-2026 while writing docs/UI_INVENTORY.md, which quotes that line verbatim | scripts/inert-class-audit.mjs | One word. Deferred off the Night 1 docs branch because it is a script change, not a docs one — and fixing it desyncs the verbatim quote in UI_INVENTORY §1, so the two move together |
+| **Three of the six `raw-colors` file exclusions in `guardrails.sh` hide zero violations** (CanvasArea, PenOverlay, colors.ts). All three files exist; the arithmetic closes (22 + 7 + 2 + 1 = 32 measured with no exclusions) | scripts/guardrails.sh:90-93 | Two-line deletion that does not move the count, but it is the blocking CI gate and a docs branch should not touch it. Also: `rust-panics` is at 46 vs baseline 47, `librs-lines` 4763 vs 4808 — two free tightenings. See docs/UI_EXCEPTIONS.md |
 | Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
 | RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
 | GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
@@ -162,6 +214,57 @@ a decision, so they wait:
 | Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
 | Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
 | The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+## OPEN — a ratchet that IMPROVED and was never locked in is silent drift (09-20-2026)
+
+Found while lowering `rust-panics` 47 → 46 and `librs-lines` 4808 → 4732. Both
+counts came down in ONE commit, #131 (`2d188420`, "fonts arrive at runtime"),
+and ADR-058 records the lowering as part of that change — but the commit
+touches **zero lines of `scripts/guardrails.sh`**. The branch carried the new
+baselines; the merge did not. Measured in a clean clone:
+
+| Commit | `rust-panics` | `src/lib.rs` |
+| --- | --- | --- |
+| `6a3de6be` (before #131) | 47 | 4808 |
+| `2d188420` (#131) | **46** | **4732** |
+| `5bd73cce` (v8.80) | 46 | 4732 |
+
+For three releases the script printed `IMPROVED … lower the baseline` on every
+run and nothing acted on it, so 46 panics and 76 lines of `lib.rs` could have
+come back for free. **`IMPROVED` is an advisory line inside a blocking job** —
+the one output here that asks for work and cannot enforce it, which is the
+shape this script exists to argue against.
+
+Worth considering, NOT decided: make `IMPROVED` fail on a **pull request** that
+edits the counted files, so a lowering has to land with the change that earned
+it. Two reasons it is not obvious. Two branches can legitimately be below the
+baseline at once (the 4798 → 4808 note in the script is exactly that case), and
+a PR that merely merges master would go red through no fault of its own. Cheaper
+first step: make the release checklist read the last run's `IMPROVED` lines.
+
+Related but separate: this is the same family as the op-log version collision —
+two branches moving one counter independently, where only the merge order
+decides which value survives.
+
+## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+Noticed while checking whether any doc repeated the false "runs in CI" skip
+message. It does not — the three matched-pair checks are not documented at all
+— but the table that IS there is stale on almost every row:
+
+| Row | docs/CI.md says | `scripts/guardrails.sh` actually has |
+| --- | --- | --- |
+| Raw colors | 26 | 22 |
+| Off-scale type | 9 | 8 |
+| Rust panics / unsafe | 67 | 46 |
+| a11y `role="button"` | 5 | 4 |
+| How many checks | "six" / "only one of the six" | eleven — 8 counted + 3 matched pairs |
+
+Nothing here is wrong in a way that breaks a build; a reader just learns the
+wrong numbers, and the three co-change checks are invisible to anyone who has
+not read the script. Left out of this session's diff on purpose (hard rule 4) —
+and docs are Dara's, not a CI change. The right fix is probably to stop
+hand-copying baselines into prose at all and have the doc point at the script,
+since a number duplicated in two files drifts by default.
 
 ## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
 
@@ -2099,11 +2202,11 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   run while `document.hasFocus()` was `true` — same conditions as Night Job IV.)
 - **DEFERRED (Chris, 2026-08-04: "Edit shape is fine for now"): history labels
   don't say WHAT changed.** `update_shape_annotation` snaps a fixed
-  `"Edit Shape"`, so a recolour, a move and a resize all write the same row.
-  Recolour a square then drag it and History shows two identical `Edit Shape`
+  `"Edit Shape"`, so a recolor, a move and a resize all write the same row.
+  Recolor a square then drag it and History shows two identical `Edit Shape`
   entries with nothing to tell them apart — in the one place you'd look for
   "the step where I changed the color". Fix is to pass the label in from the
-  call site (`Recolour Shape` / `Move Shape` / `Resize Shape`); small, but it
+  call site (`Recolor Shape` / `Move Shape` / `Resize Shape`); small, but it
   touches the Rust crate so it needs a wasm rebuild and a size note. Same
   applies to text annotations if it's done.
 - **CLOSED by a human, 2026-08-04: the start-screen "Paste (Ctrl+V)" BUTTON
@@ -3334,6 +3437,73 @@ convergence onto `ui/dialog` already tracked above is the natural moment.
 
 ---
 
+## Gates that report "skip" where they were built to run (found 2026-09-20)
+
+Found while building `scripts/gate-run.sh` (the shared gate-runner, #107) by
+reading the scripts and one real CI log rather than the job names. **None of
+these is fixed** — each needs a decision, and that session's target was the
+helper. Listed newest evidence first.
+
+| # | Where | What it actually does | Evidence |
+|---|---|---|---|
+| 1 | `guardrails.sh` matched pairs (×3) | **Never run in CI**, the one place their own message says they run | run 35487378044 |
+| 2 | `dead-exports-audit.mjs` wasm half | **Never runs in CI** — no `pkg/`, so the engine-export count is always 0 | same log |
+| 3 | `ci.yml` wasm sha step | an empty sha is green, and silently disarms the sentinel's tier 2 | read, not yet reproduced |
+| 4 | `docs/vacuous-checks.md` | referenced 5× in this file and in `ci.yml`; **the file does not exist** | `git ls-files` |
+
+**1 — the three matched-pair checks.** `blur-oracle-pair`,
+`rotated-anchor-pair` and `blur-shader-pair` all begin
+`git merge-base origin/master HEAD || true` and print
+`skip …: no origin/master to diff against (runs in CI)` when it fails.
+`actions/checkout@v4` defaults to `fetch-depth: 1` and fetches no
+remote-tracking `origin/master`, so in CI that merge-base always fails.
+Measured in the guardrails job of run 35487378044 (2026-09-20):
+
+```
+  skip blur-oracle-pair: no origin/master to diff against (runs in CI)
+  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)
+  skip blur-shader-pair: no origin/master to diff against (runs in CI)
+```
+
+The parenthetical is exactly backwards: they run LOCALLY, where a full clone
+has `origin/master`, and skip in CI. ADR-030's oracle/shader pairs and
+ADR-050's anchor pair have therefore never once been enforced by the blocking
+job. **Fix is two decisions, not one:** give the job the base ref
+(`fetch-depth: 0`, or an explicit `git fetch --depth=1 origin master`), and
+then decide whether an un-runnable co-change check should be fatal rather than
+a printed skip — `gate_run --forbid 'skip'` is now one flag away.
+
+**2 — the engine half of the dead-exports audit.** Same job: it prints
+`note: pkg/stamp_tool.d.ts absent — run 'pnpm run build:wasm' for the engine
+half.` and contributes 0 to TOTAL. The `dead-exports: 0` baseline is real for
+TS and vacuous for the wasm surface. That half is what found
+`oplog_keyframe_rgba`. Needs a wasm artifact in the guardrails job (cheap if
+the `rust` job uploads `pkg/`), or an honest split into two baselines.
+
+**3 — the sha that can go missing without going red.**
+`echo "sha256=$(sha256sum pkg/stamp_tool_bg.wasm | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"`
+— `cut` succeeds on empty input and `echo` succeeds on an empty value, so a
+missing or unreadable artifact writes `sha256=` and the step is GREEN. GitHub
+runs `bash -e {0}`: errexit, **no pipefail**, so nothing catches it. The
+downstream effect is worse than the blank: `EXPECTED_WASM_SHA256` arrives
+empty, `deploy-sentinel.sh` takes its `[ -n … ]` branch and prints
+`tier 2 : skipped — no CI expectation in the environment`, which reads like a
+scheduled run. Today `build-wasm.sh` exits non-zero first, so the artifact is
+there; the guard is a side effect of the previous step, not of this one.
+
+**4 — the doc that is cited but absent.** `docs/vacuous-checks.md` is named by
+`ci.yml`'s convex-deploy comment and four entries in this file ("vacuous check
+#15", "family 3"), and `git ls-files` has never had it. Either the numbering
+lives somewhere else or it was never written; the ADR on branch
+`docs/adr-vacuous-gates` is the natural place to settle it.
+
+**Do NOT "fix" push-all-remotes.sh's `| sed` pipes.** They look like the
+classic swallowed exit code and they are not: that script sets `pipefail`, so
+the pipeline reports the push. Measured 2026-09-20 against two local bare
+remotes, one deliberately broken — `pipefail` on → `CAUGHT by the if`,
+`pipefail` off → `MISSED — the if saw sed`. The hazard is real only where
+`pipefail` is absent, which is every `run:` block in `ci.yml` and every
+`$(cmd | filter)` assignment whose status nobody reads.
 ## `ToggleButtonGroup` never says which button is on
 
 Every Settings pane states its choices with `ToggleButtonGroup`, and the active
@@ -3355,3 +3525,38 @@ pass of its own, not a rider on a feature.
 **Do it when** the WCAG sweep happens, or the next time a pane is built around
 "which one is on" — the second occurrence is the signal. The fix belongs in
 `app/src/components/ui/toggle-button-group.tsx`, one place.
+
+## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+The v2 port moved every marketing page onto its own stylesheet
+(`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
+`legal.css`, `contact.css`, `architecture.css`, `blog-post.css`, `footer.css`,
+`shot-annotations.css`). Each page's old rules are still sitting in
+`styles.css`, unreferenced — roughly: `.fx*` (Features' old rail and list),
+`.person*` / `.people` (About), `.foot-stmt*` (the old footer, ~22 lines),
+`.tool-head*` / `.tool-badge*` / `.tool-does` / `.tool-related*` (the first
+tool-page pass), and Trail's `.ach*`, `.month__*`, `.graph*`, `.year*`,
+`.release*`, plus Architecture's `.map*`, `.plane__*`, `.stack*`, `.tbl*`,
+`.rels*`, `.coda*`, `.seg*`.
+
+**Why it is parked, not done:** the redesign was already one large diff, and a
+CSS delete that removes one selector too many fails silently — the page still
+renders, just wrong, and no gate catches it. `styles.css` is also still shared
+by the pages that were NOT reskinned, so "unused by the page I ported" is not
+the same as "unused".
+
+**Do it when** there is a session for it. Method: build, then for each candidate
+class grep all of `marketing/src` (tsx AND the other css files, since one
+stylesheet can reference another's class), delete only the ones with zero hits
+outside `styles.css`, and pixel-diff every route before and after with the
+harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.
+
+---
+
+### Source comments still cite the retired `librs-lines` ratchet (09-25-2026)
+
+`src/stabilizer.rs:46`, `src/fonts.rs:208`, `src/text.rs:519` and
+`app/src/lib/engine/textMetricsCache.contract.test.ts:58` explain code placement
+by pointing at `librs-lines`, which Chris retired on 09-25-2026. The placements
+are still fine; only the stated reason is stale. Reword them the next time each
+file is touched. Not worth an engine-gate run on its own.

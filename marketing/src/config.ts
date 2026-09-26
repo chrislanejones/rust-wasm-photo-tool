@@ -4,6 +4,13 @@ import { APP_URL, ROUTES } from "./seo";
  *  and a sign-in cookie both read as Image Horse rather than as some build host. */
 export const EDITOR_URL = APP_URL;
 
+/** Web3Forms access key for the contact form. PUBLIC by design — it only lets
+ *  a form deliver to the inbox it was created for, and it ships in the page
+ *  either way. Empty means the form falls back to opening the reader's mail app
+ *  (the pre-Web3Forms behavior). Set it on the Vercel marketing project as
+ *  VITE_WEB3FORMS_KEY; it is read at build time. */
+export const WEB3FORMS_KEY: string = import.meta.env.VITE_WEB3FORMS_KEY ?? "";
+
 export const GITHUB_URL = "https://github.com/chrislanejones/rust-wasm-photo-tool";
 export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo-tool";
 
@@ -14,8 +21,22 @@ export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo
  *
  *  `footerOnly` routes are filtered out here rather than being kept out of
  *  ROUTES: the legal pages still need a sitemap entry and a prerendered head,
- *  they just do not belong in a nav of places to go. */
-export const PAGES = ROUTES.filter((r) => !r.footerOnly).map(({ to, label }) => ({ to, label }));
+ *  they just do not belong in a nav of places to go. `toolPage` routes are
+ *  filtered out for the mirror-image reason — there are ten of them and they
+ *  have their own column in the footer and their own panel in the nav, so
+ *  letting them into this list would bury the seven actual places on the
+ *  site. */
+export const PAGES = ROUTES.filter((r) => !r.footerOnly && !r.toolPage && !r.under).map(({ to, label }) => ({
+  to,
+  label,
+}));
+
+/** The tool landing pages, for the footer's own column. Same projection again:
+ *  a route with `toolPage: true` lands here and nowhere else. */
+export const TOOL_NAV_PAGES = ROUTES.filter((r) => r.toolPage).map(({ to, label }) => ({
+  to,
+  label,
+}));
 
 /** The legal documents, for the footer's second row. Same projection, opposite
  *  filter, so a new `footerOnly: true` route lands here and nowhere else. */

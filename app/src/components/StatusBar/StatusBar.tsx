@@ -10,6 +10,8 @@ import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import type { UserMode } from "@/lib/tiers";
+import { useToolStore } from "@/stores/useToolStore";
+import { describeCoverage } from "@/lib/selectionCoverage";
 
 export interface ShortcutHint {
   keys: string;
@@ -107,6 +109,12 @@ export function StatusBar({
   // Read from the gallery store rather than two more props out of AppShell —
   // see the hook for why `entry.origWidth` is NOT the upload size.
   const uploadDims = useUploadDimensions();
+  // Read from the tool store, like uploadDims above, so AppShell gains no prop.
+  const coverage = useToolStore((s) => s.selectionCoverage);
+  // The ONE publisher of "what will the next brush stroke change" — the same
+  // value the canvas cursor reads. Neither computes its own answer; that drift
+  // is what this pass exists to stop.
+  const maskEditing = useToolStore((s) => s.maskEditing);
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -201,6 +209,30 @@ export function StatusBar({
             side by side. Neutral on purpose at every value: this replaced a
             toast that read as a warning, and a readout that turns red at 4%
             would just be the toast again. */}
+        {/* Same slot rules as Undo NN% beside it: here while something is
+            selected, gone when nothing is, and neutral at every value — a
+            0.02% selection is information, not an error. */}
+        {/* Same slot rules as Undo NN% and the selection readout: present
+            while true, absent when not, never alarming. Before this, the tile
+            label in Layer Settings ("Paint mask" / "Painting mask") was the
+            ONLY place in the app that said a stroke would change the mask
+            instead of the pixels, and you had to go looking at it. */}
+        {maskEditing && (
+          <>
+            <span className="status-zoom" data-testid="status-mask-editing">
+              Editing mask &middot; black hides, white reveals
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {coverage && (
+          <>
+            <span className="status-zoom" data-testid="status-selection">
+              {describeCoverage(coverage)}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {undoDepth && (
           <>
             <span className="status-zoom" title={describeUndoDepth(undoDepth)}>

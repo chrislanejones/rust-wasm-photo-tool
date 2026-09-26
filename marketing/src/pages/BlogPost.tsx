@@ -1,10 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
 import NotFound from "./NotFound";
-import { POSTS, fmtPostDate, postFor, postPath } from "../data/posts";
+import { pickNextCardsForPost } from "../data/nextCards";
+import { fmtPostDate, postFor, postPath } from "../data/posts";
 import { POST_BODIES, POST_TOPPERS } from "../posts/registry";
 import { AUTHOR } from "../seo";
-import { EDITOR_URL, external } from "../config";
 
 /* /blog/:slug — the article shell.
  *
@@ -14,7 +15,21 @@ import { EDITOR_URL, external } from "../config";
  * headline itself. That split is what keeps a post file to prose and figures
  * with no page furniture in it, and it means a change to the dateline is one
  * edit rather than one per post.
+ *
+ * Layout is the v2 post design ("Blog - Offline by Construction" / "Blog -
+ * Engine in a Worker"): a tall topper with the headline set at its foot, then
+ * one centered reading column with wider figures. Its CSS is blog-post.css,
+ * scoped under `.post-head--article` and `.post--article`, because `.post` is
+ * also the prose block for Contact and the legal pages.
  */
+
+/* The line above the footer, per post, from each post's design. A post without
+   one gets the generic line. */
+const FOOTER_LINE: Record<string, string> = {
+  "offline-by-construction": "Offline isn't a feature. It's what's left when nothing was on the wire.",
+  "engine-in-a-worker": "The engine left the main thread. The pixels stayed put.",
+};
+const DEFAULT_FOOTER_LINE = "Written down so the next decision has something to argue with.";
 
 const Sep = () => (
   <span className="post-head__sep" aria-hidden="true">
@@ -35,15 +50,18 @@ export default function BlogPost() {
   const Body = POST_BODIES[post.slug];
   const Topper = POST_TOPPERS[post.slug];
 
-  // POSTS is newest first, so the entry before this one is the newer post.
-  const i = POSTS.indexOf(post);
-  const newer = i > 0 ? POSTS[i - 1] : undefined;
-  const older = i < POSTS.length - 1 ? POSTS[i + 1] : undefined;
+  // The foot was an Older/Newer pair walking POSTS in order. With two posts
+  // that is one link and a dead end, and it could only ever offer more blog —
+  // never the tool the post is about. It is now the site's four-card grid,
+  // led by another post so the writing still comes first.
+  const cards = pickNextCardsForPost(postPath(post));
 
   return (
     <>
       <main id="main">
-        <header className={Topper ? "post-head post-head--topper" : "post-head"}>
+        <header
+          className={`post-head post-head--article${Topper ? " post-head--topper" : ""}`}
+        >
           {Topper ? (
             <>
               {/* The post's own scene, then a scrim that darkens the top for
@@ -68,12 +86,6 @@ export default function BlogPost() {
             <span>{post.tag}</span>
             <Sep />
             <time dateTime={post.published}>{fmtPostDate(post.published)}</time>
-            {post.version && (
-              <>
-                <Sep />
-                <span className="post-head__version">{post.version}</span>
-              </>
-            )}
             <Sep />
             <span>{AUTHOR.name}</span>
             {post.updated && (
@@ -91,47 +103,15 @@ export default function BlogPost() {
           <p className="post-head__deck">{post.deck}</p>
         </header>
 
-        <article className="post">
+        <article className="post post--article">
           <Body />
         </article>
 
-        {(newer || older) && (
-          <nav className="post-next" aria-label="More posts">
-            {older && (
-              <Link className="post-next__link" to={postPath(older)}>
-                <span className="post-next__label">Older</span>
-                <span className="post-next__title">{older.headline}</span>
-              </Link>
-            )}
-            {newer && (
-              <Link className="post-next__link post-next__link--newer" to={postPath(newer)}>
-                <span className="post-next__label">Newer</span>
-                <span className="post-next__title">{newer.headline}</span>
-              </Link>
-            )}
-          </nav>
-        )}
+        <NextCards cards={cards} heading="Read next" label="More to read" />
 
-        <section className="close">
-          <div className="close__body">
-            <p className="close__line">All of this is running in the demo right now.</p>
-            <p className="close__sub">
-              No account, no upload. Open an image and the engine described above is already on your
-              own machine — including the worker this post is about.
-            </p>
-            <div className="close__actions">
-              <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-                Open the beta
-              </a>
-              <Link className="cta cta--outline cta--lg" to="/blog">
-                Read the rest
-              </Link>
-            </div>
-          </div>
-        </section>
       </main>
 
-      <Footer line="Written down so the next decision has something to argue with." />
+      <Footer line={FOOTER_LINE[post.slug] ?? DEFAULT_FOOTER_LINE} />
     </>
   );
 }
