@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Frame, Image as ImageIcon } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { Preferences } from "@/lib/preferences";

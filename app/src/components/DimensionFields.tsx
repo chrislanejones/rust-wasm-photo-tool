@@ -1,5 +1,5 @@
 import { Lock, Unlock } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { NumberField } from "@/components/ui/number-field";
 
 interface Props {

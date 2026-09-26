@@ -16,6 +16,8 @@ import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ReselectBar } from "@/components/ui/reselect-bar";
+import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 import { useToolStore } from "@/stores/useToolStore";
 import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
@@ -153,8 +155,12 @@ export function TransformCropSettings({
   return (
     <div className="space-y-6">
       {/* ── Crop (first; no verbiage — just the ratio + apply) ───────────── */}
+      {/* ToolPanel, not `space-y-3 -mt-2`: the negative margin tucked the
+          header under the old in-panel icon row, which moved to the sidebar
+          header long ago. Paint and Eraser dropped it then; Crop kept it, and
+          sat 8px higher at 12px spacing where they sit at 16px. */}
       {show("crop") && onApplyCrop && (
-        <div className="space-y-3 -mt-2">
+        <ToolPanel>
           <SectionHeader
             title="Crop"
             info={
@@ -166,14 +172,18 @@ export function TransformCropSettings({
             }
           />
 
-          <ToolButtonGroup
-            stacked
-            label="Ratio"
-            options={RATIO_OPTIONS}
-            value={ratio}
-            onChange={(id) => void handleRatioChange(id)}
-            columns={3}
-          />
+          <ControlRow label="Ratio">
+            {({ labelId }) => (
+              <ToolButtonGroup
+                stacked
+                aria-labelledby={labelId}
+                options={RATIO_OPTIONS}
+                value={ratio}
+                onChange={(id) => void handleRatioChange(id)}
+                columns={3}
+              />
+            )}
+          </ControlRow>
 
           {ratio !== "free" && (
             <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs full-width-badge type-current">
@@ -186,12 +196,22 @@ export function TransformCropSettings({
           {/* The reference footer action. It used to carry a <Crop/> glyph,
               which was the only icon in any of the six panel action bars —
               and "Apply Crop" was already saying it. */}
-          <PanelActionBar>
+          {/* Disabled says why, under the button and as its description —
+              a greyed "Apply Crop" with nothing else was a dead end. */}
+          <PanelActionBar
+            reason={
+              disabled
+                ? "Open an image to crop it."
+                : !hasCropSelection
+                  ? "Drag a crop box on the canvas, or pick a ratio."
+                  : undefined
+            }
+          >
             <PanelAction disabled={disabled || !hasCropSelection} onClick={onApplyCrop}>
               Apply Crop
             </PanelAction>
           </PanelActionBar>
-        </div>
+        </ToolPanel>
       )}
 
       {/* ── Transform ───────────────────────────────────────────────────── */}

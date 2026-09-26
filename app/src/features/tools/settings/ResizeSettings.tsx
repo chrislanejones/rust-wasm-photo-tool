@@ -4,7 +4,7 @@ import { Scaling, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 import {
   Tooltip,

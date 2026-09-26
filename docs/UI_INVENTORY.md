@@ -401,6 +401,11 @@ in `styles.css`. Neither is a bug and neither is urgent, but any rule phrased
 as "use the primitive in `ui/`" is false as written until this is settled.
 Night 3, alongside the `repo-boundaries` work.
 
+> **Resolved 09-25-2026 (Night 3).** `SizeSlider` is `components/ui/size-slider.tsx`
+> (15 importers; import paths only outside the three panels). `<kbd>` is
+> `components/ui/kbd.tsx`; the bare rule stays, marked legacy, for the six
+> files not yet moved. See UI_CONSISTENCY §8.
+
 ## 9. What Night 1 did not do
 
 No component changed. No class changed. No baseline moved. The script is an

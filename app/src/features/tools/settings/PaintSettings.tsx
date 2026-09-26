@@ -5,11 +5,13 @@ import type { BrushMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { StabilizerRow } from "./StabilizerRow";
+import { AdvancedStabilizer } from "./StabilizerRow";
+import { ControlRow } from "@/components/ui/control-row";
+import { Kbd } from "@/components/ui/kbd";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { PANEL_SECTION } from "@/lib/styles";
@@ -45,7 +47,7 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
     info: (
       <>
         Freehand-paints the active layer in the selected color.{" "}
-        <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+        <Kbd>Ctrl+]</Kbd>/<Kbd>Ctrl+[</Kbd> grows/shrinks the brush.
         Stroke Stabilizer smooths shaky drags.
       </>
     ),
@@ -58,7 +60,7 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
       <>
         Softens (Blur), mosaics (Pixelate), or fully redacts
         (Solid) whatever you drag over on the active layer.{" "}
-        <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+        <Kbd>Ctrl+]</Kbd>/<Kbd>Ctrl+[</Kbd> grows/shrinks the brush.
       </>
     ),
   },
@@ -71,9 +73,9 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
         Click to drop points, drag to pull Bézier handles. The ring on your
         first point shows the join: dashed while the path is open, solid blue
         when a click there would connect the ends — or once they are.{" "}
-        <kbd>Enter</kbd> closes the path and keeps it selected, so Stroke and
-        Background restyle it. <kbd>Esc</kbd> finishes it open and deselects,{" "}
-        <kbd>Backspace</kbd> undoes a point.
+        <Kbd>Enter</Kbd> closes the path and keeps it selected, so Stroke and
+        Background restyle it. <Kbd>Esc</Kbd> finishes it open and deselects,{" "}
+        <Kbd>Backspace</Kbd> undoes a point.
       </>
     ),
   },
@@ -161,14 +163,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   onChange={(color) => onChange({ ...settings, brushColor: color })}
                 />
 
-                {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off by
-                    default; Low/Med/High set the leash (smoothing strength).
-                    The level table lives in StabilizerRow, the single copy. */}
-                <StabilizerRow
-                  value={settings.paintStabilizer}
-                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
-                />
-
                 {/* ── Smart Brush (behind ih_smart_edge; see lib/smartEdge.ts) ──
                     The second consumer of the edge core that already powers the
                     edge-aware wand: the stroke is walled in by strong edges, so
@@ -180,6 +174,9 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   <div className={PANEL_SECTION}>
                     <ToolButton
                       active={smartBrush}
+                      // An independent on/off, so a TOGGLE (UI_CONSISTENCY §7):
+                      // the lit tile was never announced as on.
+                      aria-pressed={smartBrush}
                       onClick={() => setSmartBrush(!smartBrush)}
                       className="w-full"
                       title="Stop the brush bleeding across object edges"
@@ -209,6 +206,16 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     entirely in the Layers panel's Layer Mask section —
                     strokes, value, size and feather — and `maskEditing`
                     can no longer be on while the Paint brush is. */}
+
+                {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off
+                    by default, a set-once preference rather than a per-stroke
+                    dial, so it is the Advanced section. The closed summary
+                    still says the level, so ON is never hidden. The level
+                    table lives in StabilizerRow, the single copy. */}
+                <AdvancedStabilizer
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
               </>
             );
 
@@ -260,15 +267,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   />
                 )}
 
-                {/* Applies to all three blur modes — it leashes the STROKE,
-                    not the effect, so blur, pixelate and redact all steady
-                    the same way. Same field the Paint brush and Eraser read:
-                    one dial, on everywhere. */}
-                <StabilizerRow
-                  value={settings.paintStabilizer}
-                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
-                />
-
                 {settings.blurMode === "solid" && (
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
@@ -276,6 +274,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     onChange={(color) => onChange({ ...settings, redactColor: color })}
                   />
                 )}
+
+                {/* Applies to all three blur modes — it leashes the STROKE,
+                    not the effect, so blur, pixelate and redact all steady
+                    the same way. Same field the Paint brush and Eraser read:
+                    one dial, on everywhere. Last, in Advanced, as in Paint. */}
+                <AdvancedStabilizer
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
               </>
             );
 
@@ -298,29 +305,30 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 />
 
                 {/* Background — fills the closed path's interior (under the stroke). */}
-                <div className="space-y-2">
-                  <label className="text-2xs text-theme-muted-foreground">
-                    Background
-                  </label>
-                  <ToolButtonGroup
-                    aria-label="Background"
-                    options={[
-                      { id: "none", label: "None" },
-                      { id: "solid", label: "Solid" },
-                    ]}
-                    value={settings.fillMode === "none" ? "none" : "solid"}
-                    onChange={(id) =>
-                      onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-                    }
-                  />
-                  {settings.fillMode !== "none" && (
-                    <ColorSwatchGrid
-                      colors={TEXT_COLORS}
-                      value={settings.fillColor}
-                      onChange={(color) => onChange({ ...settings, fillColor: color })}
-                    />
+                <ControlRow label="Background">
+                  {({ labelId }) => (
+                    <div className="space-y-2">
+                      <ToolButtonGroup
+                        aria-labelledby={labelId}
+                        options={[
+                          { id: "none", label: "None" },
+                          { id: "solid", label: "Solid" },
+                        ]}
+                        value={settings.fillMode === "none" ? "none" : "solid"}
+                        onChange={(id) =>
+                          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+                        }
+                      />
+                      {settings.fillMode !== "none" && (
+                        <ColorSwatchGrid
+                          colors={TEXT_COLORS}
+                          value={settings.fillColor}
+                          onChange={(color) => onChange({ ...settings, fillColor: color })}
+                        />
+                      )}
+                    </div>
                   )}
-                </div>
+                </ControlRow>
               </>
             );
 
