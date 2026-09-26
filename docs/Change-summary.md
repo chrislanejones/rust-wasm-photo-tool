@@ -10993,3 +10993,26 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **QC** | `imagehorse-qc` on the production build, all five sections PASS: boot and demo mode, file picker and drag-drop; wand, Intersect, Shift override, Refine preview/Apply, undo/redo, Compare, export; every new button and the existing Selection actions; reload → Resume keeps the photo; focus rings, 8.56:1 contrast on the new reason text, Add mask by keyboard. |
 | **Gates** | cargo 393 / 578 (features), vitest 1,195, e2e `Running 36 tests` 34 passed / 2 skipped, tsc 0, eslint 0 errors, guardrails OK, 0 inert classes. |
 
+
+## v8.99 Change Summary — 2026-09-26
+
+**Every page says where to go next, and the .ora viewer saves.** Eleven commits since v8.98, most of them the marketing site.
+
+| Area | Change |
+| --- | --- |
+| **.ora viewer saves** (`4e00c5b7`) | The viewer on /openraster writes as well as reads: a flat PNG, a layered PSD, or a fresh .ora, with layers hidden, reordered and renamed first. Still no wasm on the page — the browser decoder measured 377 ms against the engine's 1,977 ms plus a 354 KB download. |
+| **Three .ora pages** (`4e00c5b7`) | /what-is-ora, /ora-to-png and /ora-to-psd, sharing one `OraSubPage` shell so the three cannot drift. Each has its own `<head>`, share card and prerendered file. |
+| **Next cards** (`b7d15d7d`) | The four-card grid that closed /openraster now closes every learn page, every .ora page, every blog post and the Trail Log — 25 pages that previously just ended. `data/nextCards.ts` holds one pool; the tool cards come from `toolPages.ts` and the site cards reuse the nav's own `desc` lines, so a page is described once. |
+| **Which four** | Seeded off the page's own path, **not** `Math.random`. The site is prerendered and then hydrated, so a fresh roll in the browser renders different cards than Node wrote — a hydration mismatch, and a crawler would read a set no visitor sees. /openraster pins the other three .ora pages and rolls only the fourth; a blog post leads with another post; a tool page keeps its three hand-picked siblings and gains a fourth from the pool. |
+| **Older / Newer, gone** | A blog post's foot was a two-link walk through `POSTS`. With two posts that is one link and a dead end, and it could never offer the tool the post was about. |
+| **Trail Log pagination** (`b7d15d7d`) | 15 releases a page, 17 pages. All 246 in one document was **522,970 bytes** of prerendered HTML; it is **83,377** now, −84%. Picking a month resets to page one, so a two-release month cannot strand you on page nine. Client state, not a URL parameter — the month filter is component state and a link carrying only the page number would restore a page without the filter it belongs to. |
+| **Trail Log spacing** (`aa3c4d37`) | The log's 6rem bottom padding stacked on the card grid's own 88px top padding: 184px of empty page between the pager and the first card. Now 88px, the same as every other page. |
+| **Night 2 controls** (`f7fd3283`, #230) | Every exclusive choice is a named radio group: one Tab stop, arrow keys between options, the selection announced. Sync's Send stays visible. |
+| **Settings › Shared** (`067d29f6`, #222) | Matches the other panes, and the delete confirmation opens above Settings instead of behind it. |
+| **Download + shortcut** (`8deae25a`, #243) | ORA in the Download dialog's format picker; Alt+C for A/B Compare. |
+| **Sitemap + 404** (`a344d924`, #244) | Every sitemap URL carries a `lastmod` — 27 of 27, where the live sitemap had 2 of 24, because Vercel builds from a shallow clone and the prerender correctly refuses boundary dates. `source-dates.json` is the committed fallback; git still wins when it has a real answer. /coming-soon is now /in-the-works behind a 308, and the 404 page has a horse on it. |
+| **Gates** (`900cfa4c`, `17bc67bc`, `be804070`) | One way to run a gate, and a test that watches it fail. The matched-pair guardrails run where they claimed to run. The wasm size ceiling and the lib.rs line ratchet are retired — both measured the wrong thing. ADR-071. |
+| **Engine size** | **824,286 B**, unchanged — nothing this release touches the crate. |
+| **Gates run** | tsc 0, eslint 0 errors / 57 warnings, `guardrails.sh` OK with no count above baseline, marketing build 27 URLs prerendered, skip links 29/29. |
+| **Verified in a browser** | Pagination stepped 1 → 2 → 17 (last page holds the final 6, Next disabled) → 16; picking September from page 17 reset to "1–15 of 37 releases · September 2026". Card rules checked against the prerendered HTML on 14 pages: 4 cards each, no page links to itself, /openraster leads with its three .ora siblings, each blog post leads with the other. |
+| **Not a bug** | React #418 fires on every page under `vite preview`, on master, including pages this release never touched; live throws none. Proven with a control worktree at `origin/master` served the same way. |

@@ -85,26 +85,30 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.98 — 2026-09-24
+### v8.99 — 2026-09-26
 
-**Refine a selection, then turn it into a mask.**
+**Every page says where to go next, and the .ora viewer saves.**
 
-The Select panel has a Refine section now. Clean Up does the usual chores in
-one step: it drops specks under 4 pixels, fills pinholes under 6, smooths the
-edge and pulls it in by one. The sliders underneath are the same operations
-one at a time. Move one and you see the result before you commit it, with the
-"Selected" readout telling you what it cost. Apply is one undo step.
+The OpenRaster page opens a layered .ora and now saves it back out — a flat
+PNG, a layered PSD, or a fresh .ora. Hide and reorder layers first. It runs in
+the tab with no wasm and nothing uploaded. Three new pages sit under it: what a
+.ora file is, .ora to PNG, and .ora to PSD.
 
-Layer Settings' Add mask asks what the mask should start from: show the whole
-layer, hide it, reveal just the selection, or hide the selection. Feather from
-Refine softens that edge. The mask brush opens straight after, as it always
-has. Select subject… is there too, and takes you to Background Removal.
+Every learn page, every .ora page and every blog post ends with four cards
+pointing somewhere useful. Which four depends on the page and does not change
+between visits. The Trail Log pages at fifteen releases instead of listing all
+246, and picking a month starts you back at page one.
 
-The export dialog lets you name the file before it downloads. The name you type
-is cleaned up so every operating system accepts it, and the extension always
-matches the format.
+Every either/or control in the editor is a named radio group: one Tab stop,
+arrow keys between the options, and the choice read out. Settings › Shared
+matches the other panes, and its delete confirmation opens above the panel
+rather than behind it. The Download dialog offers ORA, and Alt+C toggles A/B
+Compare.
 
-Engine 824,286 bytes (was 816,594).
+Gates run one way now and are tested against a failure they have to catch. The
+wasm size ceiling and the lib.rs line ratchet are retired.
+
+Engine 824,286 bytes (unchanged).
 
 ## License
 

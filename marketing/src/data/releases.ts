@@ -24,6 +24,49 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.99",
+    date: "2026-09-26",
+    headline: "Every page says where to go next, and the .ora viewer saves.",
+    entries: [
+      {
+        tag: "feature",
+        text: "The .ora viewer on the OpenRaster page saves what you opened: a flat PNG, a layered PSD, or a fresh .ora. Hide and reorder layers first. It all happens in the tab \u2014 nothing is uploaded.",
+      },
+      {
+        tag: "feature",
+        text: "Three new pages answer what people actually type: what a .ora file is, how to turn one into a PNG, and how to turn one into a PSD.",
+      },
+      {
+        tag: "feature",
+        text: "Every learn page, every .ora page and every blog post now ends with four cards pointing somewhere useful. Which four depends on the page, and they stay the same between visits.",
+      },
+      {
+        tag: "ui",
+        text: "The Trail Log shows fifteen releases a page instead of all 246 at once. Picking a month starts you back at page one.",
+      },
+      {
+        tag: "ui",
+        text: "Every either/or control is a named radio group now: one Tab stop, arrow keys between the options, and the choice is read out.",
+      },
+      {
+        tag: "fix",
+        text: "Settings \u203a Shared looks like the rest of Settings, and its delete confirmation opens above the panel instead of behind it.",
+      },
+      {
+        tag: "feature",
+        text: "The Download dialog offers ORA. Alt+C toggles A/B Compare.",
+      },
+      {
+        tag: "feature",
+        text: "Every page in the sitemap carries a date, /coming-soon is now /in-the-works, and there is a horse on the 404 page.",
+      },
+      {
+        tag: "infra",
+        text: "Gates run one way and are tested against a failure they have to catch. The wasm size ceiling and the lib.rs line ratchet are gone \u2014 they measured the wrong thing.",
+      },
+    ],
+  },
+  {
     version: "v8.98",
     date: "2026-09-24",
     headline: "Refine a selection, then turn it into a mask.",
