@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Clock, History } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
   MAX_HISTORY_MIN,

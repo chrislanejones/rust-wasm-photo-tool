@@ -85,28 +85,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.99 — 2026-09-26
+### v9.0 — 2026-09-26
 
-**Every page says where to go next, and the .ora viewer saves.**
+**The cards at the foot of every page sit right.**
 
-The OpenRaster page opens a layered .ora and now saves it back out — a flat
-PNG, a layered PSD, or a fresh .ora. Hide and reorder layers first. It runs in
-the tab with no wasm and nothing uploaded. Three new pages sit under it: what a
-.ora file is, .ora to PNG, and .ora to PSD.
+The four cards that close every page were touching the footer — a gap of zero
+on the Trail Log, the blog, the .ora pages and the Learn pages. It is 96px now,
+the figure the rest of the site already used.
 
-Every learn page, every .ora page and every blog post ends with four cards
-pointing somewhere useful. Which four depends on the page and does not change
-between visits. The Trail Log pages at fifteen releases instead of listing all
-246, and picking a month starts you back at page one.
-
-Every either/or control in the editor is a named radio group: one Tab stop,
-arrow keys between the options, and the choice read out. Settings › Shared
-matches the other panes, and its delete confirmation opens above the panel
-rather than behind it. The Download dialog offers ORA, and Alt+C toggles A/B
-Compare.
-
-Gates run one way now and are tested against a failure they have to catch. The
-wasm size ceiling and the lib.rs line ratchet are retired.
+No card runs past four lines. The blog cards were falling back to the post's
+search-result description and running six lines beside neighbours running two.
+They use the post's headline instead: shorter, and already written.
 
 Engine 824,286 bytes (unchanged).
 

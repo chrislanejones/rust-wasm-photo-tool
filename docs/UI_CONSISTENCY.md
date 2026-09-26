@@ -158,8 +158,13 @@ Import these. Do not re-implement them.
 | Pane heading | `ui/pane-heading` · section: `ui/section-header` |
 | Panel footer actions | `ui/panel-action-bar` |
 | Numeric field | `ui/number-field` |
-| Slider | `components/SizeSlider` — **not in `ui/`**, see Inventory Finding 5 |
-| Keyboard chip | the global `kbd` rule — **no component**, see Inventory §7 |
+| Slider | `ui/size-slider` (moved into `ui/` on Night 3, 15 importers) |
+| Preset row (25 / 50 / 75 / 100) | `ui/preset-row` — a named radio group; `SizeSlider` renders it |
+| One control: label, value, control, reason | `ui/control-row` |
+| A tool panel's body rhythm | `ui/tool-panel` |
+| Settings most strokes do not need | `ui/advanced-section` |
+| "Why is this off" line | `ReasonNote` in `ui/status-note` (both `reason` slots use it) |
+| Keyboard chip | `ui/kbd`. The bare `kbd` CSS rule is legacy, kept for 6 unmoved files |
 
 `ui/dialog` is the modal survivor; `Modal` and `SmallDialog` are being
 retired, which was already decided and is tracked in `PARKING_LOT.md`.
@@ -251,3 +256,51 @@ where the heading is a `SectionHeader` or a bare `<label>`).
 **What SELECT does not change.** How it looks. The lit tile, the pill and the
 spacing are the same classes as before. The only visible difference is that
 the focus ring moves with the arrow keys.
+
+## 8. The tool-panel grammar (Night 3, 09-25-2026)
+
+One panel = these parts, top to bottom. Every name was checked against the
+Night 1 inventory first; where a part already existed it was reused, not
+renamed.
+
+| Part | Primitive | New? | Notes |
+| --- | --- | --- | --- |
+| Frame | `ToolPanel` | new | `space-y-4`, nothing else. Needed: Crop was at 12px with a `-mt-2` while Paint and Eraser were at 16px |
+| Header | `SectionHeader` | reused | No `ToolHeader`; that would have been a second name for this |
+| Primary control | whatever the tool's main choice is | — | Crop's Ratio grid, Blur's mode row |
+| Control rows | `ControlRow` (and `SizeSlider` on it) | new | `data-slot` label / value / control / reason. Header to control is 8px everywhere |
+| Presets | `PresetRow` | new | Radio group named "<label> presets" |
+| Advanced | `AdvancedSection` | new | Collapsed by default, last before the actions; closed summary names the state inside |
+| Actions | `PanelActionBar` | reused | Gained `reason` |
+
+**Measured (1280px, DOM probe, same fixture):**
+
+| Panel | Header offset | Row gap | Label to control |
+| --- | --- | --- | --- |
+| Paint | 0 → 0 | 16 → 16 | 6 (sliders), 4 (Color, Stabilizer) → **8** |
+| Eraser | 0 → 0 | 16 → 16 | 6 / 4 → **8** |
+| Crop | **−8 → 0** | **12 → 16** | 8 → 8 |
+
+**Where Paint and Crop disagreed, and what changed in the primitive:**
+
+| Disagreement | Paint | Crop | Resolution |
+| --- | --- | --- | --- |
+| Panel rhythm | 16px via ToolModeToggle | 12px + `-mt-2` | `ToolPanel` owns the number; ToolModeToggle renders it too |
+| Label → control | 6px (`SizeSlider`) | 8px (`ToolButtonGroup` label) | `ControlRow` is 8px; the slider moved, not the 15 tile-group importers |
+| How a group is named | `StabilizerRow`: bare `<label>` + `aria-label` repeating it | `ToolButtonGroup label="Ratio"` | `ControlRow` hands the control its label id: `aria-labelledby` the words on screen |
+| Disabled with no reason | none disabled | Apply Crop greyed, silent | `reason` slot on both `ControlRow` and `PanelActionBar`, one `ReasonNote` |
+| Value slot | sliders show one | tile grids do not | `value` is optional; a lit tile already says its state |
+
+**Semantics added on the way (R6):** preset rows and the color swatches were
+exclusive choices that announced nothing. Both are named radio groups now,
+one Tab stop each. The swatch group sits on a `display: contents` element so
+the swatches and the "+" still wrap as one row; Chromium keeps the role
+(checked in the accessibility tree, and pinned by `e2e/ui-night3-panels.spec.ts`).
+
+**Focus (R8):** a range input's only keyboard focus cue was a 15%-alpha thumb
+halo, 1.14:1 on the light panel and 1.47:1 on the dark. Ranges now get the
+house dashed ring on `:focus-visible` (styles.css).
+
+**390px has no tool panels.** Phone width is the "Mobile version" (upload and
+download only). The panel's small-window surface is 960px dock mode, which the
+Night 3 screenshots add.

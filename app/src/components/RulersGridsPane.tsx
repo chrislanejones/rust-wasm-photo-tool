@@ -1,5 +1,5 @@
 import { Frame, Grid3x3, LayoutGrid, Ruler } from "lucide-react";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";

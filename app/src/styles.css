@@ -1613,6 +1613,9 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
+/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
+   chip in token classes on the house radius. This bare rule stays only for
+   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
 kbd {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -2250,6 +2253,18 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 
 input[type="range"]:focus {
   outline: none;
+}
+
+/* The house focus ring, on keyboard focus only (Night 3, 09-25-2026). The
+   base `input[type="range"] { outline: none }` above sits later in the file
+   than the global `input:focus-visible` rule at equal specificity, and the
+   `:focus` rule outranks it, so a keyboard user on a slider got only the
+   thumb halo below: `--accent-dim` is 15% alpha, measured 1.14:1 against the
+   light panel and 1.47:1 against the dark one. Invisible, for practical
+   purposes. The halo stays; the dashed ink ring (14.3:1) now leads. */
+input[type="range"]:focus-visible {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: 2px;
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {

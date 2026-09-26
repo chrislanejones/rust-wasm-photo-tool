@@ -4,6 +4,8 @@ import { useUserColors } from "@/hooks/useUserColors";
 import { warmColorParser } from "@/lib/colorParser";
 import { ColorPickerDialog } from "@/components/ColorPickerDialog";
 import { Swatch } from "@/components/ui/swatch";
+import { ControlRow } from "@/components/ui/control-row";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 interface Props {
   colors: readonly string[];
@@ -44,52 +46,77 @@ export function ColorSwatchGrid({
     warmColorParser();
   }, []);
 
+  // Every swatch, presets then the user's own, is ONE radio group: picking a
+  // color is exactly one of N (UI_CONSISTENCY §7). One Tab stop, arrows move
+  // and pick. The "+" is an action, not a color, so it stays outside the
+  // group. A color may appear twice (a preset the user also saved); the
+  // FIRST is the one checked, and both still light, as before.
+  const shown = allowCustom ? [...colors, ...userColors] : [...colors];
+  const radioIds = shown.map((c, i) => `${i}:${c}`);
+  const firstIndex = shown.indexOf(value);
+  const radio = useRadioGroup({
+    ids: radioIds,
+    selected: firstIndex >= 0 ? radioIds[firstIndex] : undefined,
+    isDisabled: () => disabled,
+    onSelect: (id) => onChange(shown[radioIds.indexOf(id)]),
+  });
+
   return (
-    <div className="space-y-2">
-      <label className="text-2xs text-theme-muted-foreground">{label}</label>
-      <div className="flex flex-wrap gap-2 py-1">
-        {colors.map((color) => (
-          <Swatch
-            key={color}
-            color={color}
-            active={value === color}
-            onClick={() => onChange(color)}
-            disabled={disabled}
-          />
-        ))}
-        {allowCustom &&
-          userColors.map((color) => (
-            <Swatch
-              key={`user:${color}`}
-              color={color}
-              active={value === color}
-              onClick={() => onChange(color)}
-              onRemove={() => removeColor(color)}
-              disabled={disabled}
-            />
-          ))}
-        {allowCustom && (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            disabled={disabled}
-            aria-label="Pick a custom color"
-            aria-haspopup="dialog"
-            aria-expanded={pickerOpen}
-            className={[
-              "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
-              pickerOpen
-                ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
-                : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
-              disabled && "opacity-40 pointer-events-none",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+    <>
+      <ControlRow label={label}>
+        {({ labelId }) => (
+          <div className="flex flex-wrap gap-2 py-1">
+            {/* `contents`: the group has no box of its own, so the swatches
+                and the "+" keep wrapping as ONE row of circles. The role
+                survives (checked in Chromium's accessibility tree, Night 3). */}
+            <div {...radio.groupProps} aria-labelledby={labelId} className="contents">
+              {colors.map((color, i) => (
+                <Swatch
+                  key={color}
+                  color={color}
+                  active={value === color}
+                  onClick={() => onChange(color)}
+                  disabled={disabled}
+                  radio={radio.itemProps(i)}
+                />
+              ))}
+              {allowCustom &&
+                userColors.map((color, i) => (
+                  <Swatch
+                    key={`user:${color}`}
+                    color={color}
+                    active={value === color}
+                    onClick={() => onChange(color)}
+                    onRemove={() => removeColor(color)}
+                    disabled={disabled}
+                    radio={radio.itemProps(colors.length + i)}
+                  />
+                ))}
+            </div>
+            {allowCustom && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                disabled={disabled}
+                aria-label="Pick a custom color"
+                aria-haspopup="dialog"
+                aria-expanded={pickerOpen}
+                className={[
+                  "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
+                  pickerOpen
+                    ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
+                    : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
+                  disabled && "opacity-40 pointer-events-none",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         )}
-      </div>
+      </ControlRow>
 
       {allowCustom && (
         <ColorPickerDialog
@@ -100,6 +127,6 @@ export function ColorSwatchGrid({
           title={label === "Color" ? "Pick a color" : `${label} color`}
         />
       )}
-    </div>
+    </>
   );
 }

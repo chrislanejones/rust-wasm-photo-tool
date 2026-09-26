@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolSettings } from "@/lib/types";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 
 interface EffectsSettingsProps {

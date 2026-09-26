@@ -61,7 +61,7 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
 import { isMarqueeKind, useToolStore } from "@/stores/useToolStore";
