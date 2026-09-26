@@ -3831,7 +3831,7 @@ a { color: inherit; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Tool landing pages (/photo-editor, /blur-image, …) and /coming-soon.
+   Tool landing pages (/photo-editor, /blur-image, …) and /in-the-works.
 
    Ten pages share one component, so they share one block of CSS. Most of the
    body reuses `.post`, the site's prose block — what is here is the head
@@ -3956,7 +3956,7 @@ a { color: inherit; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   /coming-soon — what's coming, and how sure we are.
+   /in-the-works — what's coming, and how sure we are.
 
    The entry board sits on a light panel on an otherwise dark page. That is
    deliberate: it is the only block on the site that is a register of things
@@ -4322,8 +4322,8 @@ a { color: inherit; }
   text-wrap: pretty;
 }
 
-/* ── "Being built now" — the /coming-soon cards on the home page's cream ──
-   .soon-card reads --board-*, which .soon-board sets on /coming-soon; here the
+/* ── "Being built now" — the /in-the-works cards on the home page's cream ──
+   .soon-card reads --board-*, which .soon-board sets on /in-the-works; here the
    cream band sets them from its own --b-* so the card is the same object. */
 .building {
   --board-ink: var(--b-ink);
@@ -4335,7 +4335,7 @@ a { color: inherit; }
   gap: var(--space-xl);
 }
 .building .soon-card { background: var(--b-card); }
-/* Five entries: narrower minimum than /coming-soon's 17rem so they sit on one
+/* Five entries: narrower minimum than /in-the-works's 17rem so they sit on one
    row on a desktop instead of leaving an orphan under four. */
 .building .soon-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
 /* The badge is a label, the pill beside it is the link — two jobs, two shapes. */
@@ -4783,7 +4783,7 @@ a { color: inherit; }
 }
 .pr-card__cta { margin-top: 4px; justify-content: center; }
 
-/* The matrix panel — an inset cream board, like /coming-soon's, with its own
+/* The matrix panel — an inset cream board, like /in-the-works's, with its own
    ink because every site ink token is tuned for light text on dark. */
 .pr-matrix {
   --m-ink: oklch(20% 0.020 40);

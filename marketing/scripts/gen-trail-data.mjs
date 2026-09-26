@@ -3,6 +3,7 @@
 //
 //   src/data/commits.ts   ← `git log master`             (the Trail Log squares)
 //   src/data/features.ts  ← docs/Features.md             (the /features list)
+//   src/data/source-dates.json ← git log, per page source (the sitemap lastmod)
 //
 // Run it as part of the release routine, from anywhere:
 //
@@ -272,3 +273,9 @@ console.log(
   `celebrationStats.ts  ${monthName} ${monthEntries} entries · ${monthRels.length} releases · ` +
     `${allTime} all-time · feature ${monthTags.feature ?? 0} · fix ${monthTags.fix ?? 0} · latest ${latest.version}`,
 );
+
+// ── src/data/source-dates.json ──────────────────────────────────────────
+// The sitemap's `lastmod` dates. Its own script, run from here so the routine's
+// one "regenerate the derived data" step covers it too. See gen-sitemap-dates.mjs
+// for why the dates are committed instead of read from git at build time.
+execFileSync(process.execPath, [resolve(here, "gen-sitemap-dates.mjs")], { stdio: "inherit" });

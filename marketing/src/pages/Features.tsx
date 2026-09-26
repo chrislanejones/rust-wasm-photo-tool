@@ -14,7 +14,7 @@ import { featureSlug, getFeatureIcon } from "../data/featureIcons";
  * engineering line trimmed to fit underneath.
  *
  * The cards sit on a light panel, the same register-of-things surface as
- * /coming-soon. Each keeps the anchor id the ⌘K palette deep-links to.
+ * /in-the-works. Each keeps the anchor id the ⌘K palette deep-links to.
  */
 
 type Filter = "all" | CardGroupKey;

@@ -6,7 +6,7 @@ import HorseTrot from "./HorseTrot";
 interface FooterProps {
   /** The closing statement. Each page ends on its own sentence. */
   line: string;
-  /** The trotting horse beside the line. Home only, per the design. */
+  /** The trotting horse beside the line. Home and the 404. */
   horse?: boolean;
 }
 

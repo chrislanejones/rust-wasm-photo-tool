@@ -12,7 +12,7 @@ import { EDITOR_URL, GITHUB_URL, external } from "../config";
 
 type Where = "all" | "local" | "server";
 
-/* "Being built now", straight from the /coming-soon register. Beta entries
+/* "Being built now", straight from the /in-the-works register. Beta entries
  * first: they are the ones you can switch on today, and the GPU blur — the
  * row directly above — is one of them. */
 const BUILDING = [...(GROUPS.find((g) => g.key === "building")?.items ?? [])].sort(
@@ -338,7 +338,7 @@ export default function Home() {
             </ul>
 
             <p className="building__more">
-              <Link to="/coming-soon">
+              <Link to="/in-the-works">
                 Everything that&rsquo;s coming, and how sure we are <span aria-hidden="true">&rarr;</span>
               </Link>
             </p>

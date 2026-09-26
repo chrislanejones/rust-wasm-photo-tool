@@ -14,6 +14,11 @@
       "has": [{ "type": "host", "value": "www.imagehorse.app" }],
       "destination": "https://imagehorse.app/:path*",
       "permanent": true
+    },
+    {
+      "source": "/coming-soon",
+      "destination": "/in-the-works",
+      "permanent": true
     }
   ],
 
