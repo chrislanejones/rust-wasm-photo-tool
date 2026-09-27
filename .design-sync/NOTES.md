@@ -123,3 +123,41 @@ root to serve it from. The components are fine; only the card cannot reach it.
 **`conventions.md` is the README header** and is the point of the whole sync.
 Every class, token and prop in it was checked against the built artifacts
 (38 tokens, 17 classes, 6 components — all present). Re-check after editing it.
+
+## 09-27-2026 (re-sync) — `resync.mjs` REBUILDS, so it wipes styles.css too
+
+The first re-sync verdict was clean: `ok: true`, anchor ok, all six components
+`unchanged`, `upload.any: false`. Correct — and it still left the local bundle
+broken, because **the driver runs `package-build.mjs` internally**, which
+rewrites `styles.css` back to the converter's single `@import`. The 14 per-page
+sheets and tokens.css dropped straight back out of the closure.
+
+Measured, before and after re-running `post-build.mjs`:
+
+| | after the driver | after post-build |
+|---|---|---|
+| `styles.css` @imports | **1** | **16** |
+| tokens defined | 0 (79 referenced, undefined) | **215** |
+| validator verdict | `✓ bundle is complete` (2 warnings) | `✓ bundle is complete` |
+| render check | **6/6 clean** | 6/6 clean |
+
+Read those last two rows twice. Every component rendered as an **unstyled
+bulleted list in Times New Roman**, and the render check ticked five of six
+green anyway — it measures emptiness and height, not legibility. The contact
+sheet is the only thing that showed it.
+
+Two things follow, and the second is the dangerous one:
+
+1. **`post-build.mjs` runs after `resync.mjs` as well**, not just after a bare
+   `package-build.mjs`. Treat "any build" as "any build, including the one
+   inside the driver".
+2. **The anchor does not cover the styles.css manifest.** `styleSha` is
+   computed over `_ds_bundle.css`, which the rebuild does not touch — so the
+   diff sees "styling unchanged" and reports nothing to upload while the
+   closure is gutted. On the atomic path, which re-uploads the whole bundle,
+   that is how a gutted manifest would reach the project with a green verdict
+   in front of it.
+
+The remote was verified intact after this run (16 imports, read back with
+`get_file`), so nothing shipped broken. But the only reason is that this
+re-sync had nothing to upload.
