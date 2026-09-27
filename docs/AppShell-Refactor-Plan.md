@@ -1,364 +1,321 @@
-# AppShell refactor plan — and the rest of the entropy ledger
+# AppShell refactor plan
 
-Written 2026-09-26. Supersedes the deleted `Entropy-Refactor-Plan.md` for the
-part of it that was still open (AppShell, CanvasArea, `lib.rs`), and records
-what the 2026-09-26 audit found elsewhere. ADR-042 is the decision this plan
-executes; this file is the *how*, with numbers.
+Written 2026-09-27. Replaces the 2026-09-26 version of this file, which was
+sound and never ran: the PR that shipped it (#247) executed the pure-function
+moves in `CanvasArea` and `useDrawingTools` and nothing in AppShell. ADR-042
+is the decision; this file is the *how*, with today's numbers and one
+addition (B0) that makes the first real step safe.
 
-## Where things stood on 2026-09-26, before this plan
+## Where things stand on 2026-09-27
 
-The `max-lines` ratchet was pinned on 2026-08-27 as a warning. A month later:
+| File | Lines | eslint cap | Headroom |
+| --- | ---: | ---: | ---: |
+| `app/src/app/AppShell.tsx` | 3,716 | 3,716 | 0 |
+| `app/src/features/canvas/CanvasArea.tsx` | 2,823 | 2,823 | 0 |
+| `app/src/features/tools/settings/BatchSettings.tsx` | 1,428 | 1,428 | 0 |
+| `app/src/hooks/useDrawingTools.ts` | 991 | 991 | 0 |
+| `app/src/hooks/useEngineCore.ts` | 900 | (warn line) | 0 |
 
-| File | Cap (08-27) | Size (09-26) | |
-| --- | ---: | ---: | --- |
-| `app/src/app/AppShell.tsx` | 3,718 | 3,649 | cap never lowered to match |
-| `app/src/features/canvas/CanvasArea.tsx` | 2,909 | 3,025 | **over by 116** |
-| `app/src/hooks/useDrawingTools.ts` | 1,173 | 1,360 | **over by 187** |
-| `app/src/lib/engine/engineAsyncMigration.contract.test.ts` | 1,015 | 1,136 | **over by 121** |
-| `app/src/features/tools/settings/BatchSettings.tsx` | 1,428 | 1,428 | at the cap |
-| `src/lib.rs` (guardrails) | 4,808 | 4,763 | cap never lowered |
+Every capped file sits at exactly zero headroom, and the caps are `error`.
+That is the ratchet doing its job. It also means the next feature that
+touches AppShell fails lint on its first line, and the only ways out are to
+move something unrelated or raise the number. This plan exists so that the
+next feature does not touch AppShell at all.
 
-Three of five over, nothing red, because the rule was `warn` and `pnpm lint`
-gates on errors. That is the "early warning sign" ADR-042's pre-mortem named
-(the AppShell cap going a month without being lowered), and it fired.
+Rust, code vs test (measured, first `#[cfg(test)]` module to its close):
 
-**Done in the same change as this document** (so the plan starts from a green
-board, not a promise):
+| File | Total | Tests | Real code |
+| --- | ---: | ---: | ---: |
+| `src/lib.rs` | 4,671 | 1,214 | 3,457 |
+| `src/ops.rs` | 3,654 | 1,651 | 2,003 |
+| `src/annotations.rs` | 2,659 | 170 | 2,489 |
+| `src/layer.rs` | 2,342 | 346 | 1,996 |
 
-- The pinned caps are now `error` (`eslint.config.mjs`). A push that grows a
-  pinned file past its cap fails lint; the fix is to move something out, never
-  to raise the number. The general 900-line rule stays `warn`, on purpose.
-- The three over-cap files are back under, by pure-function moves:
-  `useDrawingTools` 1,360 → 991 (`lib/drawEditState.ts`, `lib/drawPreview.ts`),
-  `CanvasArea` 3,025 → 2,802 (`canvasCursor.ts`, `shapeOverlayPath.ts`),
-  the contract test 1,136 → 1,015 (`contractScan.ts` — one file walker instead
-  of three copies — `engineCallGate.ts`, `enginePortSeam.contract.test.ts`).
-- `lib.rs` 4,763 → 4,662 by deleting wasm exports with no caller anywhere
-  (below), and its guardrail lowered to match. `rust-panics` 47 → 46, measured.
+## The diagnosis, unchanged
 
-## AppShell: why it grows, and why more handler extraction will not fix it
+AppShell is the composition root, and it reads the stores on its children's
+behalf. Measured in the file today:
 
-ADR-042 (2026-09-02) inventoried the file: 247 named blocks, 34 of them ≥15
-lines, totalling 1,255 lines; the best single extraction was 103 lines, 2.7%
-of the file; the JSX return is another 993 lines that moving handlers never
-touches. Twenty more extraction PRs end near 2,500 lines. That arithmetic has
-not changed.
+- 123 store subscriptions in one component: `useUIStore` ×52,
+  `useToolStore` ×37, `useGalleryStore` ×21, `useAnnotationStore` ×9,
+  `useGuidesStore` ×4.
+- Those values go back down as props: `<ToolsSidebar>` 77, `<CanvasArea>`
+  46 (a 60-field `Props`), `<ReviewPanel>` 32, `<TopBar>` 23 — each with a
+  `handleXChange` wrapper (ADR-042 counted ~213).
+- The JSX return is 1,008 lines that handler extraction never touches.
+- There is no `createContext` and no `React.memo` anywhere in `app/src`.
 
-What the file actually is: the composition root, and everything reaches its
-children **as props**.
+So a new feature has nowhere to go except another prop, another handler and
+another line in the return. That is the accretion mechanism, and it is why the
+file grew while being dismantled. ADR-042's arithmetic still holds: the best
+single handler extraction is 103 lines (2.7%), and twenty more of them end
+near 2,500. Extraction is not the fix. Changing who reads the stores is.
 
-- `<ToolsSidebar>` takes **77** props. `<CanvasArea>` **46** (a 60-field
-  `Props`). `<ReviewPanel>` 32. `<TopBar>` 23.
-- AppShell reads `useUIStore` 52 times and `useToolStore` 37 times, then
-  re-threads those values down as props, each with a `handleXChange` wrapper.
-  ADR-042 counted ~213 such glue handlers.
-- Engine actions are drilled one callback at a time:
-  `onBrightness={stamp.adjustBrightness}` goes AppShell → ToolsSidebar →
-  EffectsSettings, and every new adjustment adds a prop at each hop.
-- There is **no React context anywhere in `app/src`**. So a new feature has
-  nowhere to put shared state except a prop, a handler and a line in the
-  1,008-line return. That is the accretion mechanism, and it is why the file
-  grew 94 lines *while being dismantled* (entropy report, 2026-07-30).
+## Libraries: what was considered, and the decision
 
-Zustand is already here (`useUIStore` 74 keys, `useToolStore`, `useGalleryStore`,
-`useGuidesStore`, `usePerspectiveStore`, `useTextBoxStore`, `useAnnotationStore`).
-The problem is not a missing store; it is that AppShell reads the stores on
-the children's behalf.
+The question "would TanStack help" was asked and answered on 2026-09-27.
+Recording it here so it is not re-asked every quarter.
+
+**Not adopted, and not for size reasons.** TanStack is incremental by design,
+so "too late" never applies; it is that its problems are not this repo's:
+
+| Library | Solves | Already here |
+| --- | --- | --- |
+| TanStack Query | server-state cache + refetch | Convex `useQuery`/`useMutation` in 10 files is already a reactive cache; a second one on top is two caches for one dataset |
+| TanStack Router | route tree, loaders | `features/routing/` — a hash router that appears in no pain table |
+| TanStack Virtual | long lists | possibly `GalleryBar.tsx` (850 lines) if it mounts every thumbnail; small, and separate from this plan |
+| Jotai / Valtio / Redux | a different store | seven working Zustand stores. The stores are fine; the *reader* is wrong |
+| XState | interaction state machines | the right *shape* for tool sessions, the wrong weight. Done as a discriminated union in `useToolStore` instead (B4) |
+| Immer | nested updates | optional; add only if B2 makes a setter ugly |
+| Zod / Valibot | rehydration guards | could replace `stores/_shared.ts` `validated`/range helpers with `schema.catch(default)`; do it on a store's next version bump, not now |
+
+**Adopted, in this order:**
+
+1. **React Compiler** (`babel-plugin-react-compiler`, via the
+   `@vitejs/plugin-react` babel option). React 19 is already here and
+   `eslint.config.compiler.mjs` already probes its rule set. Zero `memo` in
+   the app means every AppShell render re-renders every child, and it is
+   exactly the risk B1 carries (a context value whose identity changes per
+   stroke). The compiler removes that risk before the context exists.
+2. **`eslint-plugin-boundaries`** (or `import/no-restricted-paths`). The
+   2026-09-26 audit found `lib/tiers.ts` importing from a component and
+   `useUIStore` importing `SettingsTab` from `SubscriptionButton.tsx`. Fixed
+   by hand, they come back. `lib/` imports nothing above it; `stores/`
+   imports `lib/` only; `features/x/` does not import `features/y/`. A lint
+   error, in the style of the ratchet.
+3. **`knip`** in place of `scripts/dead-exports-audit.mjs`, which counts a
+   test file as a "user" and so misses `rgbToHsl`, `liveEnginePort` and the
+   like; knip also reports unused files and dependencies.
+4. **`useShallow` from `zustand/shallow`** — no new dependency. It is the
+   idiom for a child reading three or four keys in B2, replacing three or
+   four single-key selectors or one prop from AppShell.
 
 ## The plan
 
-Each phase is its own PR, with the AppShell cap lowered in the same commit.
-Sizes after each phase are estimates; the committed caps are measured.
+Four tracks. A and D are mechanical and independent. B is the point. C is
+where the new features go, and it is sequenced *after* B1 on purpose.
 
-### Phase 0 — scoreboard (done in this change)
+### Track A — mechanical, no design decision, first
 
-Caps to `error`, caps at today's sizes. Add one more counter to
-`scripts/guardrails.sh` when Phase 1 starts: the number of props on
-`<ToolsSidebar` and `<CanvasArea` inside AppShell (77 and 46 today), so the
-thing this plan reduces has its own ratchet and not just a line count.
+- `lib.rs` `layer_tests` + `layer_persistence_tests` → `src/lib_tests.rs`
+  (`#[cfg(test)] mod lib_tests;`). `ops.rs` `mod tests` +
+  `mod v2_migration_tests` → `src/ops_tests.rs` / `src/ops_migration_tests.rs`.
+  ~2,900 lines, zero production risk. The eleven `fn solid(w, h, rgba)` test
+  helpers collapse into one `#[cfg(test)] mod test_util` on the way.
+- Hook re-homing. `app/src/hooks` is 38 hooks. Engine core stays
+  (`useEngineCore`, `useCloneStamp`, `useLayers`, `useExport`, `useHistory`,
+  `useTransforms`, `useCanvasCoords`, `useEffectiveTool`). Tool-specific
+  hooks go to `features/tools/<tool>/`: drawing (`useDrawingTools`,
+  `useShapeZOrderMenu`), text (`useTextTool`, `useRecentTexts`,
+  `useEngineFaces`), paint (`usePaintTool`, `useBrushPreview`), stamp
+  (`useRedStampTool`, `useEmojiTool`), `usePerspectiveTool`,
+  `useMagicEraserTool`, `useMoveLayerTool`, `usePastePlacementTool`, color
+  (`useColorPicker`, `useUserColors`). Diagnostics → `features/diagnostics/`.
+  `hooks/stamp_tool.d.ts` is the wasm API declaration, not a hook →
+  `lib/engine/` (update `engine-call-audit.mjs`, `engine-rmw-audit.mjs`,
+  `snapshot-parameter-audit.mjs` and the contract test).
+- `knip` + boundaries lint added; the two known inversions (`UserMode` is
+  already fixed; `SettingsTab` is not) fixed under the new rule.
 
-### Phase 1 — session context (context, not Zustand)
+### Track B — AppShell, one PR per step, cap lowered in the same commit
 
-`app/session/SessionContext.tsx` provides the **hook instances AppShell
-already owns**: `stamp` (the engine handle from `useCloneStamp`),
-`drawingTools`, `pastePlacement`, `canvasRef`. Children call `useSession()`
-instead of receiving `onBrightness`, `onFlipH`, `onApplyCrop`, `onSelectLayer`,
-… as props.
+**B0 — React Compiler, annotation mode.** Install the plugin, enable with
+`compilationMode: "annotation"`, and annotate `ToolsSidebar`, `CanvasArea`,
+`ReviewPanel`, `TopBar` with `"use memo"`. Run
+`npx eslint app/src --config eslint.config.compiler.mjs` and fix what it
+names in those four files only. Flip to `infer` once the probe config is
+clean repo-wide — that is a later commit, not this one. Also in B0: add the
+props-count guardrail to `scripts/guardrails.sh` — the number of props on
+`<ToolsSidebar` and `<CanvasArea` inside AppShell (77 and 46 today) — so the
+thing this plan reduces has its own ratchet, not just a line count.
+
+Half a day. No behaviour change. Its only job is to make B1 safe.
+
+**B1 — SessionContext.** `app/session/SessionContext.tsx` provides the hook
+instances AppShell already owns: `stamp` (the engine facade from
+`useCloneStamp`), `drawingTools`, `pastePlacement`, `canvasRef`. Children
+call `useSession()` instead of receiving `onBrightness`, `onFlipH`,
+`onApplyCrop`, `onSelectLayer`, … as props.
 
 Context rather than a store because these are functions bound to a hook
-instance with refs inside — not serialisable state, and not something a
-persisted store should own (ADR-026's "wrong ownership" argument).
+instance with refs inside — not serialisable state and not something a
+persisted store should own (ADR-026).
 
-Removes: ~30 callback props from ToolsSidebar/CanvasArea and every pass-through
-line between AppShell and the leaf that calls them.
+Split the value: a stable *actions* object in one context; engine *state*
+(`layers`, `undoCount`, `levels`, `presets`) through the
+`useSyncExternalStore` path ADR-026 already established. B0 makes the
+"identity changes per stroke" failure a compiler concern rather than a
+hand-memoization one, but the split is still the right shape.
 
-Risk to measure first: if the context value changes identity whenever `stamp`'s
-*state* changes, every consumer re-renders on every stroke. Mitigation is to
-split the value — a stable actions object in one context, and engine **state**
-(`layers`, `undoCount`, `levels`, `presets`) read through the
-`useSyncExternalStore` path ADR-026 already established. Check `useCloneStamp`'s
-callback stability before choosing.
+Removes ~30 callback props from ToolsSidebar/CanvasArea and every
+pass-through line between AppShell and the leaf that calls them.
 
-### Phase 2 — consumers read the stores (the Zustand part)
+**B2 — children read the stores.** `activeTool`, `toolSettings`,
+`cropRatio`, `exportFormat`, `quality`, `prefs`, `photos`, `stampSettings`,
+`shapesMode`, `brushMode`, … already live in a store. The panel that needs
+one reads it with a selector (or `useShallow` for several); the
+`handleXChange` wrapper in AppShell that only calls `set` is **deleted, not
+moved**. This is where the line count falls, and it improves render
+granularity: a selector subscribes to one key where a prop from AppShell
+re-rendered on any AppShell render.
 
-`activeTool`, `toolSettings`, `cropRatio`, `exportFormat`, `quality`, `prefs`,
-`photos`/`setPhotos`, `stampSettings`, `shapesMode`, `brushMode`, … already live
-in a store. The panel that needs one reads it with a selector; the
-`handleXChange` wrapper in AppShell that only calls `set` is deleted, not moved.
+Rules: each deleted handler is read, not pattern-replaced. A handler that
+does two things (sets a key *and* flushes the canvas, or resets another key)
+stays, or becomes a session hook with its reasoning intact. The
+exhaustive-deps override in `eslint.config.mjs` explains why store setters
+pulled with `useStore(s => s.setX)` look like missing deps and are not.
 
-This *improves* render granularity — a selector subscribes to one key where a
-prop from AppShell re-rendered on any AppShell render.
+Removes the bulk of the ~213 glue handlers and ~40 more props.
 
-Rules: each deleted handler is **read**, not pattern-replaced. A handler that
-does two things (sets a store key *and* flushes the canvas, or resets another
-key) stays in AppShell or moves to a session hook with its reasoning intact.
-The exhaustive-deps override in `eslint.config.mjs` explains why store setters
-pulled out with `useStore(s => s.setX)` look like missing deps and are not.
-
-Removes: the bulk of the ~213 glue handlers and ~40 more props.
-
-### Phase 3 — split the JSX return
-
-Only viable after 1–2, otherwise the new components need the same 77 props.
+**B3 — split the JSX return.** Only viable after B1–B2; before them the new
+components need the same 77 props.
 
 - `<CanvasContextMenu>` — the 12 `ContextMenuItem`s and their shortcuts.
-- `<ShellDialogs>` — the three `ConfirmDialog`s, `UploadDialog`,
-  `ShortcutModal`, `UpdatePrompt`, `ResumeContent`, `Toaster`.
-- `<SidebarDock>` — `ToolsSidebar` + `MasterBar` wiring and the
-  narrow-window drawer bookkeeping.
+- `<ShellDialogs>` — three `ConfirmDialog`s, `UploadDialog`, `ShortcutModal`,
+  `UpdatePrompt`, `ResumeContent`, `Toaster`.
+- `<SidebarDock>` — `ToolsSidebar` + `MasterBar` wiring and the narrow-window
+  drawer bookkeeping.
 - `<Workspace>` — the two `CanvasArea` arms. **Keep the ternary's shape**:
   ADR-024 a11.1 needs the canvas element identity owned by AppShell precisely
-  because those arms mount and unmount; the counter must not move into what
-  they mount.
+  because those arms mount and unmount.
 
-Removes: ~700 of the 1,008 JSX lines.
+Removes ~700 of the 1,008 JSX lines.
 
-### Expected end state
+**B4 — the tool session as a state machine, then CanvasArea.** `useToolStore`
+(568 lines) plus CanvasArea's drag state is a state machine written as
+independent booleans. Model it as one discriminated union in the store:
 
-Roughly **1,500–1,800 lines** — about half. Beyond that, ADR-002 (tools as
-registry modules) is the next structural step, and it is blocked on this.
+```ts
+type ToolSession =
+  | { kind: "idle" }
+  | { kind: "crop"; rect: Rect; dragging: Handle | null }
+  | { kind: "shape-edit"; id: AnnotationId; drag: ShapeDrag | null }
+  | { kind: "paste"; placement: Placement }
+  | …
+```
 
-## CanvasArea
+Illegal combinations stop being representable, and each arm is the state
+one overlay owns. That is what lets the three big CanvasArea cuts happen
+cleanly, in this order: `ShapeEditLayer.tsx` (~750 lines with its overlay,
+the biggest single cut), `CropLayer.tsx`, `PastePlacementLayer.tsx`.
+`PerspectiveLayer.tsx` is the precedent, already shipped.
 
-Same disease, 46 props. Phases 1–2 apply to it unchanged. After them, the
-remaining large moves are the ones the earlier plan named and that are still
-valid:
+**Expected end state:** AppShell ~1,500–1,800, CanvasArea ~1,800. Beyond
+that, ADR-002 (tools as registry modules) is the next structural step and it
+is blocked on this.
 
-- `ShapeEditLayer.tsx` — the shape/arrow edit drag state + its overlay JSX
-  (~750 lines together). Biggest single cut.
-- `CropLayer.tsx` — crop handle drag + crop overlay.
-- `PastePlacementLayer.tsx` — paste-placement drag + overlay.
+### Track C — the new features
 
-`PerspectiveLayer.tsx` is the precedent: same shape, already shipped.
+Sequence them after B1. Today a feature costs a prop, a handler and lines in
+the return, in a file with zero headroom. After B1+B2 a feature is a store
+slice plus a panel that calls `useSession()` and reads its own keys, and
+AppShell's diff is near zero.
 
-## Rust — `src/lib.rs` and `src/ops.rs`
+The test that the refactor worked: **the first new feature after B2 should
+not change AppShell.** If it needs a prop through AppShell, the refactor
+missed and B2 is not done.
 
-The audit (2026-09-26) mapped `lib.rs` by topic. Two facts decide the order:
+If a feature cannot wait for B1: build it as `features/<name>/` with its own
+store from day one and wire only a mount point into AppShell. It then
+becomes the first consumer to move onto the context, not another debt.
 
-| `lib.rs` block | Lines | Note |
-| --- | ---: | --- |
-| `layer_tests` + `layer_persistence_tests` | **~1,188 (25%)** | tests, inside the production file |
-| `tiles_*` + the whole op-log surface (recorder, sync, replay, restore, persistence) | **~820** | one feature gate, one topic |
-| `resize` / `resize_canvas` / `set_artboard_border` + `crop_in_place` / `shrink_to_content` | ~430 | document geometry; two 65-line loops are identical |
-| history (undo/redo/labels/jump/delete/clear) | ~160 | `history.rs` already has an impl block |
-| `parse_color` / `parse_hex` / component parsers | ~140 | stateless |
-| `web_perf_metrics` / `lighthouse_score` / `erf` | ~110 | nothing to do with the engine |
-| `constrain_crop_to_ratio` / `compute_aspect_crop` | ~110 | stateless |
+### Track D — Rust structure, after Track A
 
-Moves, best first, each lowering `librs-lines` in the same commit:
+Moves, best first, each lowering the file in the same commit:
 
-1. **Tests out** → `src/lib_tests.rs` (`#[cfg(test)] mod lib_tests;`). ~1,188
-   lines, zero production risk. Do this first.
-2. **Op-log block** → `src/oplog_engine.rs` as another
-   `#[wasm_bindgen] impl ImageHorseTool` block (the pattern `annotations.rs`,
-   `history.rs`, `fonts.rs` already use). ~820 lines.
-3. **Geometry** → `src/geometry.rs`, and while moving it extract the
-   duplicated per-layer relayout loop (`resize_canvas` / `set_artboard_border`)
-   into one `relayout_layers(new_w, new_h, off_x, off_y, bg)`.
-4. Stateless free functions → `color_parse.rs`, `crop_math.rs`, `webperf.rs`.
-5. History block → into `history.rs`.
+1. Op-log block (`tiles_*`, recorder, sync, replay, restore, persistence;
+   ~820 lines, one feature gate) → `src/oplog_engine.rs` as another
+   `#[wasm_bindgen] impl ImageHorseTool` block, the pattern `annotations.rs`,
+   `history.rs`, `fonts.rs` already use.
+2. Geometry (`resize` / `resize_canvas` / `set_artboard_border` /
+   `crop_in_place` / `shrink_to_content`, ~430 lines) → `src/geometry.rs`,
+   extracting the duplicated per-layer relayout loop into one
+   `relayout_layers(new_w, new_h, off_x, off_y, bg)`.
+3. Stateless free functions → `color_parse.rs`, `crop_math.rs`, `webperf.rs`.
+4. History block → into `history.rs`.
+5. `ops.rs` → `ops/{types,codec,apply,log}.rs` if still worth it after its
+   tests leave.
 
-`ops.rs` (3,652) is 45% tests: `mod tests` and `mod v2_migration_tests`
-(~1,650 lines). Move those to `src/ops_tests.rs` / `src/ops_migration_tests.rs`
-first, then `ops/{types,codec,apply,log}.rs` if it is still worth it.
+Duplication worth removing, with the caveat that matters:
 
-### Duplication worth removing (verified, with the caveat that matters)
-
-- The "shift every annotation by (dx, dy)" block is verbatim in four places
-  (`lib.rs` crop_in_place, resize_canvas, set_artboard_border; `layer.rs`
-  translate) → `Layer::shift_annotations(dx, dy)`.
-- Straight-alpha source-over blending exists in six places. **Only merge
-  within a family**: the float versions (`stamp.rs`, `transform.rs` paste,
-  `paint.rs`, `text.rs`) with each other, the integer versions
-  (`drawing::blend_pixel`, `layer::blend_over`) with each other. Crossing the
-  families changes output by ±1 and breaks the replay-parity hashes.
+- "Shift every annotation by (dx, dy)" is verbatim in four places →
+  `Layer::shift_annotations(dx, dy)`.
+- Straight-alpha source-over exists in six places. **Merge only within a
+  family**: the float versions (`stamp.rs`, `transform.rs` paste, `paint.rs`,
+  `text.rs`) together, the integer versions (`drawing::blend_pixel`,
+  `layer::blend_over`) together. Crossing families changes output by ±1 and
+  breaks the replay-parity hashes.
 - Two hex parsers disagree: `drawing::parse_hex_color` returns **black** for
-  `#fff`, `lib::parse_hex` returns white. Pointing the first at the second
-  fixes a real bug for 3/4-digit input to every shape export; it is a
-  behaviour change, so it gets its own commit and its own test.
-- `layer_content_bbox` was a copy of `tight_bbox` — folded (this change).
-- `fn solid(w, h, rgba)` is defined 11 times across test modules; a shared
-  `#[cfg(test)] mod test_util` removes them when the tests move out (step 1).
+  `#fff`, `lib::parse_hex` returns white. Pointing the first at the second is
+  a real bug fix for 3/4-digit input to every shape export; it gets its own
+  commit and its own test. It also removes the non-ASCII `&hex[0..2]` panic.
 
-### Soundness items the panic guardrail cannot see
-
-Fixed in this change: `transform::resize_bilinear` trusted caller-supplied
-`old_w × old_h` against a JS-supplied buffer; the SIMD path reads through raw
-pointers, so a short buffer read past its end, and a zero dimension panicked
-in `clamp(0, -1)`. It now refuses both.
-
-Still open, low likelihood, for the next Rust sitting:
+Soundness items the panic guardrail cannot see, still open:
 
 - `transform::copy_region` computes `w*h*4` in `u32`; a huge region wraps in
-  release and the next write panics. Reachable from `copy_region` /
-  `copy_region_composited`.
+  release and the next write panics.
 - `get_pixel_region` with a huge `radius` overflows `side*side*4`. Clamp it.
-- `drawing::parse_hex_color` slices `&hex[0..2]` on a `&str`; non-ASCII input
-  panics at a char boundary. Goes away with the parser merge above.
 
-### Deleted in this change (no caller in app, tests, benches or fixtures)
+## The rest of the ledger (2026-09-26 audit, still open)
 
-`preview_crop`, `cancel_crop_preview`, `apply_crop_from_preview` and the two
-`transform` helpers only they used; `stamp_red` (the app uses
-`commit_red_stamp`); `get_brush_size`; `begin_draw_stroke`;
-`add_polyline_annotation`; `set_annotation_points`; `cancel_move_preview`;
-`has_layer_mask`. Each removed from the hand-kept `stamp_tool.d.ts` as well.
+Cheapest first. Each is a mechanical move or a deletion.
 
-Called by tests only, left in place (they need to stay `pub` for `tests/`):
-`load_image_artboard` (its doc claiming to be the default import path is stale
-— the app calls `load_image` then `set_artboard_border`),
-`shape_annotation_count`, `render_with_annotations`, `tonal_preview_active`,
-`has_layer_color_overlay`.
-
-Exported to wasm but only ever called from Rust — candidates to demote to a
-`pub(crate)` impl to shrink the surface: the five `effects.rs` stroke starters
-and region helpers dispatched through `effect_down`/`effect_move`; the four
-`paint_dab` / `paint_stab_*`; `get_zoom`.
-
-## The rest of the app — what the 2026-09-26 audit found
-
-Verified by grep, ordered by value. Items marked **done** shipped with this
-document; the rest are the queue, cheapest first.
-
-### Fixed in this change
-
-- **`convex/users.ts` `incrementUsage`** was a public `mutation` nothing
-  called, taking `amount: v.optional(v.number())` with no sign check — a
-  signed-in user could call it with a negative amount and reset their own
-  `dailyUsage`, the counter `aiJobs.ts` checks against `TIER_DAILY_CAP`.
-  Deleted. **done**
-- `useSelectionActions` carried its own copy of `useCanvasCoords` behind an
-  `eslint-disable`; it now uses the hook. **done**
-- `UserMode` was defined in `components/StatusBar` and imported by
-  `lib/tiers.ts`, `lib/photoLimits.ts` and `useUIStore` — a lib module
-  depending on a component. Now defined in `lib/tiers.ts`, re-exported from
-  StatusBar. **done**
-- Live code and docs pointed at documents moved out of the repo on
-  2026-09-17 (`vacuous-checks`, `ci-guardrails`, `pen-overlay-async-design`,
-  `engine-worker-capture-sweep`, `content-addressed-gc-audit`,
-  `share-links-auth-mismatch`) or at `docs/X.md` for files now in
-  `docs/archive/`. Fixed in 17 files; the moved-out ones now say so.
-  **done**
-- `docs/Architecture.md` described `lib/security/imageFirewall.ts`, which
-  does not exist, and `lib/exif.ts`, which is now a directory.
-  `docs/File-Map.md` listed five deleted files and called the 1,428-line
-  `BatchSettings` a "coming-soon panel". Corrected. **done**
-- Root `public/` held byte-identical copies of the marketing hero and logo;
-  only the September hero is referenced (README). Two files deleted. **done**
-
-### Next, cheap
-
-- **Dormant Convex data model, ~480 lines of public endpoints with no
-  caller:** `projects.ts`, `images.ts`, `layers.ts`, `annotations.ts`,
-  `history.ts`, plus `auth.loggedInUser`, `users.saveSettings`,
-  `aiJobs.listForPhoto`. `schema.ts` itself calls `images` "the unused
-  `images` table". Public functions are attack surface; remove the functions
-  first, the tables in a later deploy (a deploy step, so not done here).
-- **`lib/annotationHitTest.ts` is a "temporary" TS port of the engine's
-  hit-test, "expiring at v8.56".** The repo is at v8.90 and it is still
-  imported by `useTextTool` and `useDrawingTools`. Either build the engine
-  call it was waiting for or rewrite the note; today it is a stale promise.
+- **Dormant Convex endpoints, ~480 lines with no caller:** `projects.ts`,
+  `images.ts`, `layers.ts`, `annotations.ts`, `history.ts`, plus
+  `auth.loggedInUser`, `users.saveSettings`, `aiJobs.listForPhoto`. Public
+  functions are attack surface; remove the functions first, tables in a later
+  deploy.
+- **`lib/annotationHitTest.ts`** is a "temporary" port "expiring at v8.56";
+  the repo is at v9.1 and `useTextTool` and `useDrawingTools` still import it.
+  Build the engine call or rewrite the note.
 - **`capMessage`** is byte-identical in `AppShell.tsx` and
-  `useImageSession.ts`, hardcodes "24", and says "Pro (100) is coming soon"
-  while the paid tier exists. One copy in `lib/`, numbers from `TIERS`, copy
-  updated — the wording is a product decision, so it was not changed here.
+  `useImageSession.ts`, hardcodes "24" and says Pro "is coming soon" while the
+  tier exists. One copy in `lib/`, numbers from `TIERS`; the wording is a
+  product decision.
 - **e2e helpers copied per spec:** `blockExternalNetwork` ×12,
-  `importFixture` ×7, `watchConsole` ×5, `pickTool` ×5, `waitForCanvas` ×4
-  → `e2e/helpers.ts`. Also: 11 of the 12 specs never run in CI (`ci.yml`
-  runs `no-sw-default` and `e2e/sw/` only); `pr-sweep-0831` and `qc-v841`
-  read as one-off release sweeps and belong in an archive.
-- Small duplicates with a canonical home already: hex→rgb ×4
-  (`lib/colorConvert.hexToRgba`), rgb→hex ×4 (`useTextTool`'s equals
-  `lib/drawEditState.rgbToHex`), byte formatting ×3 (`lib/format.formatBytes`),
-  anchor-click download ×7 (write `lib/downloadBlob`), filename-stem regex ×7
-  (`ExportPane.baseFileName`), `sha256Hex` ×3, `agoText` ×2, inline `clamp`
-  in AppShell beside `lib/colorConvert.clamp`. The ~10 remaining
-  client→image coordinate copies are tracked in `PARKING_LOT.md` already.
-- `lib/colorConvert.rgbToHsl` / `hslToRgb` and `lib/engine/port.liveEnginePort`
-  are production exports only tests use (the dead-exports audit counts test
-  files as users). Delete or tag as test-only.
-- `contractScan.ts` / `engineCallGate.ts` (new here) import `node:fs` /
-  `node:child_process` and are used only by tests. Rename to `*.testkit.ts`
-  (precedent: `lib/sync/fakeConvex.testkit.ts`) once there is a second
-  consumer to justify the convention.
-- `scripts/engine-rmw-audit.mjs` reports 0 and is cited only by a closed
-  PARKING_LOT item; archive it. `snapshot-parameter-audit.mjs` and
-  `inert-class-audit.mjs` run nowhere — add to guardrails or list as manual
-  in `docs/CI.md`. `preview-nocache.py` and `push-all-remotes.sh` are
-  referenced nowhere.
-
-### Next, organisation (each a mechanical move, no behaviour)
-
-- **`app/src/hooks` is 38 hooks.** The engine core belongs there
-  (`useEngineCore`, `useCloneStamp` — misnamed, its header says it is the
-  engine facade with 17 importers — `useLayers`, `useExport`, `useHistory`,
-  `useTransforms`, `useCanvasCoords`, `useEffectiveTool`). The tool-specific
-  ones belong under `features/tools/<tool>/`: drawing/shapes (`useDrawingTools`,
-  `useShapeZOrderMenu`), text (`useTextTool`, `useRecentTexts`,
-  `useEngineFaces`), `usePerspectiveTool` (one importer, `PerspectiveLayer`),
-  paint (`usePaintTool`, `useBrushPreview`), `useMagicEraserTool`, stamp
-  (`useRedStampTool`, `useEmojiTool`), `useMoveLayerTool`,
-  `usePastePlacementTool`, color (`useColorPicker`, `useUserColors`),
-  `useAIJob`, `useAutoCompress`. Diagnostics (`useDiagnostics`,
-  `useDiagnosticsSampler`, the four diagnostics components,
-  `subsystemColors.ts`) → `features/diagnostics/`.
-- `hooks/stamp_tool.d.ts` is the hand-kept wasm API declaration, not a hook
-  → `lib/engine/`. Update the path in `scripts/engine-call-audit.mjs`,
-  `engine-rmw-audit.mjs`, `snapshot-parameter-audit.mjs` and the contract test.
+  `importFixture` ×7, `watchConsole` ×5, `pickTool` ×5, `waitForCanvas` ×4 →
+  `e2e/helpers.ts`. 11 of 12 specs never run in CI.
+- Small duplicates with a canonical home: hex→rgb ×4, rgb→hex ×4, byte
+  formatting ×3, anchor-click download ×7 (write `lib/downloadBlob`),
+  filename-stem regex ×7, `sha256Hex` ×3, `agoText` ×2, inline `clamp` in
+  AppShell beside `lib/colorConvert.clamp`.
 - 13 `components/*Pane.tsx` are the Settings modal's panes and
-  `SubscriptionButton.tsx` is really that modal → `features/settings/`.
-- `SettingsTab` lives in `SubscriptionButton.tsx` and `useUIStore` imports it —
-  same inversion as `UserMode`, same fix.
+  `SubscriptionButton.tsx` is that modal → `features/settings/`. `SettingsTab`
+  moves out of `SubscriptionButton.tsx` so `useUIStore` stops importing a
+  component (the boundaries rule will insist).
 - Tests far from subjects: `lib/entitlement.test.ts`, `lib/shareLimits.test.ts`
   test `convex/`; `lib/autosaveDelay.test.ts`, `lib/dirtyRule.test.ts` test
   `useImageSession`; `hooks/cloudPhotosAllowed.test.ts` tests
-  `useEditPersistence`; `lib/exif.test.ts` belongs in `lib/exif/`.
-- `FINDINGS-oplog-and-text-0919.md` sits at the repo root → `docs/archive/`
-  (update the citation in `lib/textBoxSurvivesReload.test.ts`).
-- `docs/File-Map.md` covers 75 of 332 non-test files (none of `app/session/`,
-  `lib/engine`, `lib/sync`, four of six stores). Regenerate it from the tree
-  or shrink it to directory level; a hand-kept file map of 332 files will
-  always be wrong.
-
-### Checked and fine
-
-Every store key is both read and set; every store action has an external
-caller; every runtime `ih_*` flag read is registered in `lib/featureFlags.ts`;
-no `@ts-ignore`, no `.skip`/`.only`; the disabled UI (S3/R2 connect, AI
-Generate) is deliberate and says so; `dead-exports-audit` reports 0.
+  `useEditPersistence`; `lib/exif.test.ts` → `lib/exif/`.
+- `FINDINGS-oplog-and-text-0919.md` at the repo root → `docs/archive/`.
+- `contractScan.ts` / `engineCallGate.ts` import `node:fs` and are used only
+  by tests → `*.testkit.ts` once a second consumer justifies the convention.
+- `scripts/engine-rmw-audit.mjs` reports 0 and is cited by a closed item;
+  archive. `snapshot-parameter-audit.mjs`, `inert-class-audit.mjs` run
+  nowhere; `preview-nocache.py`, `push-all-remotes.sh` are referenced nowhere.
+- `docs/File-Map.md` covers 75 of 332 non-test files. Regenerate from the
+  tree or shrink to directory level.
 
 ## What this plan deliberately does not do
 
+- Rewrite AppShell. Rejected in ADR-042 and still rejected: no reviewable diff.
+- Start with B3. Splitting the return before B1–B2 produces four components
+  that each need the 77 props.
 - Turn the general 900-line rule into an error. A new 901-line file should
   show up in the count, not block the push that created it.
-- Add `max-lines` caps to Rust files other than `lib.rs`. `ops.rs`,
-  `annotations.rs` and `layer.rs` are large; a cap is a separate decision.
+- Add `max-lines` caps to Rust files other than the retired `lib.rs` one.
 - Touch `BatchSettings.tsx`. At its cap, not growing.
-- Rewrite AppShell. Rejected in ADR-042 and still rejected: no reviewable diff.
+- Replace Zustand, the router, or Convex's query layer.
 
 ## How to tell it is working
 
-The pinned caps in `eslint.config.mjs` only ever go down, and the date next to
-each one is recent. If a cap goes a month without moving, this plan has
-stalled — that is ADR-042's warning sign, and it is the one that fired once
-already.
+Three numbers, all of which only go down, all dated in their config:
+
+- The pinned `max-lines` caps in `eslint.config.mjs`.
+- The props count on `<ToolsSidebar` and `<CanvasArea` in
+  `scripts/guardrails.sh` (from B0).
+- AppShell's diff on the first feature PR after B2. Near zero means done.
+
+If a cap goes a month without moving, this plan has stalled. That is
+ADR-042's warning sign, it fired once on 2026-09-26, and the answer was this
+rewrite rather than a bigger cap.
