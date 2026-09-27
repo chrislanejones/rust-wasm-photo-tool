@@ -91,7 +91,8 @@ a { color: inherit; }
 
 .nav-pill {
   position: fixed;
-  inset: var(--space-md) auto auto 50%;
+  /* Below the announcement bar: its height, then the same --space-md gap. */
+  inset: calc(var(--space-md) + var(--announce-height)) auto auto 50%;
   transform: translateX(-50%);
   /* Column so the mega panel sits below the pill row without escaping the nav.
      The panel is position:absolute so it doesn't stretch the nav's height. */
@@ -4954,3 +4955,43 @@ a { color: inherit; }
   text-wrap: pretty;
 }
 .pr-why__link { justify-self: start; }
+
+/* ── Naji announcement bar ───────────────────────────────────────────────
+   Pinned above the nav pill. Its height is --announce-height, which the nav
+   and --banner-height both read, so nothing can overlap it. Fixed height and a
+   single line on purpose: a bar that wrapped would be taller than the number
+   the rest of the layout reserves for it. The long line is for wide screens;
+   below 640px the short one shows instead. The whole bar is one link. */
+.naji-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: var(--z-sticky);
+  height: var(--announce-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 0 var(--page-gutter);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.naji-bar:hover .naji-bar__cta { text-decoration: underline; text-underline-offset: 3px; }
+.naji-bar:focus-visible { outline: 2px solid var(--color-accent-ink); outline-offset: -4px; }
+.naji-bar__cta { font-weight: 700; }
+.naji-bar__short { display: none; }
+@media (max-width: 639.98px) {
+  .naji-bar__long { display: none; }
+  .naji-bar__short { display: inline; }
+}
+/* At 320px the short line plus "Meet Naji →" measured wider than the bar and
+   was cut off; at 390 it fits. Drop the words only below 380, so the common
+   phone widths (390, 393, 414) keep them. The arrow and the link remain. */
+@media (max-width: 379.98px) {
+  .naji-bar__cta-word { display: none; }
+}

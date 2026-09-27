@@ -69,7 +69,7 @@ export const PEOPLE: Person[] = [
        sentence: the name is the Arabic, and the heading is where a name goes. */
     bio: [
       'Naji — Arabic for "survivor" — is an Arabian horse. He is the only horse of his herd who survived, which is what the name means.',
-      "He can be ridden, though he does not make it easy. He lives in Louisa, Virginia, and we are hoping to bring him down to Florida.",
+      "He can be ridden, though he does not make it easy. He still lives in Louisa, Virginia. Becky wants him with us in Jacksonville, so we are working on bringing him down.",
       "He has also worked as a therapy horse: my wife Becky counseled people with him through Heaven's Rays Ministries. A horse notices what a person is carrying before they say it out loud, which turns out to be the whole point.",
       "He is why the editor is named after a horse. A workhorse is a tool that does the job and does not fuss. Image Horse.",
     ],
