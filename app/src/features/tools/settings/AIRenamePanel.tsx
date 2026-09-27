@@ -156,8 +156,8 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
       setDescribed(next);
     } catch (err) {
       console.error("[ai-rename] fatal", err);
-      setErrorMsg("Couldn't read the images. Check the console.");
-      toast.error("Couldn't scan the images. Check the console.");
+      setErrorMsg("Couldn't read the images.");
+      toast.error("Couldn't scan the images.");
     } finally {
       if (aliveRef.current) setScanning(false);
     }

@@ -12,6 +12,9 @@ import { useBreakpoint } from "@/lib/useBreakpoint";
 import type { UserMode } from "@/lib/tiers";
 import { useToolStore } from "@/stores/useToolStore";
 import { describeCoverage } from "@/lib/selectionCoverage";
+import { useSaveStatus } from "@/lib/saveStatus";
+import { useSyncStatus } from "@/lib/sync/status";
+import { StatusMark } from "@/components/ui/status-mark";
 
 export interface ShortcutHint {
   keys: string;
@@ -115,6 +118,10 @@ export function StatusBar({
   // value the canvas cursor reads. Neither computes its own answer; that drift
   // is what this pass exists to stop.
   const maskEditing = useToolStore((s) => s.maskEditing);
+  // Night 5 feedback hierarchy: two errors that used to live ONLY in a toast.
+  // Each reads its single publisher; neither computes its own answer.
+  const saveFailed = useSaveStatus().failed;
+  const syncFailed = useSyncStatus().state === "error";
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -217,6 +224,27 @@ export function StatusBar({
             label in Layer Settings ("Paint mask" / "Painting mask") was the
             ONLY place in the app that said a stroke would change the mask
             instead of the pixels, and you had to go looking at it. */}
+        {/* Errors that need action, held here until they clear. A toast is
+            gone before you look; these are what is still TRUE after it has
+            gone. Leftmost, because a failure outranks a readout. */}
+        {saveFailed && (
+          <>
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-save-failed" role="status">
+              <StatusMark kind="failed" />
+              Couldn&rsquo;t save changes
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {syncFailed && (
+          <>
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-sync-failed" role="status">
+              <StatusMark kind="attention" />
+              Settings sync isn&rsquo;t working
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {maskEditing && (
           <>
             <span className="status-zoom" data-testid="status-mask-editing">
