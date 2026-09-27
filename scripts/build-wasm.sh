@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# The ONE way to build the engine. package.json, netlify.toml and CI all call
+# The ONE way to build the engine. package.json, vercel.json and CI all call
 # this, so the optimizer that rewrites the binary is checked in one place.
 #
 # WHY THIS EXISTS. rustc is pinned (rust-toolchain.toml, ADR-038) and wasm-pack
-# is pinned (0.15.0, netlify.toml + ci.yml). The tool that is NOT pinned is
+# is pinned (0.15.0, vercel.json + ci.yml). The tool that is NOT pinned is
 # `wasm-opt` — binaryen — which wasm-pack runs LAST and which rewrites every
 # byte of the output. wasm-pack 0.15.0 fetches binaryen 117 into its cache and
 # uses it… unless a `wasm-opt` is already on PATH, in which case PATH WINS,
@@ -20,7 +20,7 @@
 #     function of its own version)
 #   • if a `wasm-opt` is on PATH it must report exactly $WASM_OPT_VERSION;
 #     if none is on PATH, wasm-pack fetches $WASM_OPT_VERSION itself — which
-#     is what CI and Netlify do, and what every shipped binary was built with
+#     is what CI and Vercel do, and what every shipped binary was built with
 #   • after the build, the artifact's mtime must have MOVED. A build that
 #     exits non-zero can leave the previous pkg/ in place, and a stale
 #     artifact reads as a passing result (it did, 2026-09-05).
@@ -49,7 +49,7 @@ note "wasm-pack $wp"
 # ── 2. the optimizer wasm-pack will actually use ────────────────────────────
 # Self-heal first: if wasm-pack has ALREADY fetched binaryen $WASM_OPT_VERSION
 # into its cache, put that exact binary first on PATH. It is byte-for-byte the
-# one CI and Netlify run, so a foreign wasm-opt elsewhere on PATH is shadowed
+# one CI and Vercel run, so a foreign wasm-opt elsewhere on PATH is shadowed
 # rather than rejected — loudly, below, so nobody is surprised. The cache
 # layout is a wasm-pack internal; it is stable because wasm-pack is pinned.
 # Version-checked after the swap, so a wrong cache entry still fails.
@@ -81,7 +81,7 @@ if wo_path="$(command -v wasm-opt 2>/dev/null)"; then
     • or delete it and let wasm-pack fetch its own ($WASM_OPT_VERSION)"
   note "wasm-opt $wo on PATH ($wo_path) — matches pin"
 else
-  note "no wasm-opt on PATH — wasm-pack will fetch binaryen $WASM_OPT_VERSION (this is what CI and Netlify do)"
+  note "no wasm-opt on PATH — wasm-pack will fetch binaryen $WASM_OPT_VERSION (this is what CI and Vercel do)"
 fi
 
 # ── 3. no RUSTFLAGS in the environment ──────────────────────────────────────
