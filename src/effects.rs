@@ -338,13 +338,7 @@ impl ImageHorseTool {
 mod gpu_handoff_tests {
     use crate::ImageHorseTool;
 
-    fn solid(w: u32, h: u32, v: [u8; 4]) -> Vec<u8> {
-        let mut out = Vec::with_capacity((w * h * 4) as usize);
-        for _ in 0..(w * h) {
-            out.extend_from_slice(&v);
-        }
-        out
-    }
+    use crate::test_util::solid;
 
     fn tool() -> ImageHorseTool {
         let mut t = ImageHorseTool::new(8, 8);

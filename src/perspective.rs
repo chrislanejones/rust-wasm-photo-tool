@@ -462,13 +462,7 @@ pub fn quad_from_pairs(q: &[(f32, f32); 4]) -> Quad {
 mod tests {
     use super::*;
 
-    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
-        let mut v = Vec::with_capacity((w * h * 4) as usize);
-        for _ in 0..(w * h) {
-            v.extend_from_slice(&c);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     #[test]
     fn identity_correspondence_is_the_identity_map() {

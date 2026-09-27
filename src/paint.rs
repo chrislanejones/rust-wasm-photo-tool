@@ -1088,13 +1088,7 @@ mod smart_brush_tests {
 mod magic_eraser_brush_tests {
     use crate::ImageHorseTool;
 
-    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
-        let mut v = vec![0u8; (w * h * 4) as usize];
-        for px in v.chunks_exact_mut(4) {
-            px.copy_from_slice(&c);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     #[test]
     fn a_stroke_marks_selection_and_touches_no_pixels() {
