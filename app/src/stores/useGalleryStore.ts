@@ -52,6 +52,13 @@ interface GalleryState {
   setPhotos: (v: SetArg<PhotoEntry[]>) => void;
   setActivePhotoId: (v: SetArg<string | null>) => void;
   setSelectedIds: (v: SetArg<Set<string>>) => void;
+  /** Gallery multi-select. Moved out of AppShell in B2 — three set-only
+   *  wrappers over `setSelectedIds` that GalleryBar can call directly. */
+  toggleSelected: (id: string) => void;
+  /** Shift+click range: additive — the whole run joins the selection
+   *  (file-manager semantics), never deselects. */
+  selectRange: (ids: string[]) => void;
+  clearSelection: () => void;
   setImageSavings: (
     v: SetArg<Record<string, { savingsPercent: number }>>,
   ) => void;
@@ -80,6 +87,20 @@ export const useGalleryStore = create<GalleryState>()(
   setActivePhotoId: (v) =>
     set((s) => ({ activePhotoId: resolveSet(v, s.activePhotoId) })),
   setSelectedIds: (v) => set((s) => ({ selectedIds: resolveSet(v, s.selectedIds) })),
+  toggleSelected: (id) =>
+    set((s) => {
+      const next = new Set(s.selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { selectedIds: next };
+    }),
+  selectRange: (ids) =>
+    set((s) => {
+      const next = new Set(s.selectedIds);
+      ids.forEach((id) => next.add(id));
+      return { selectedIds: next };
+    }),
+  clearSelection: () => set({ selectedIds: new Set() }),
   setImageSavings: (v) =>
     set((s) => ({ imageSavings: resolveSet(v, s.imageSavings) })),
   setModifiedPhotos: (v) =>

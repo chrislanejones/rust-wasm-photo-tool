@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Aperture,
@@ -36,6 +36,9 @@ import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
 import { useEngine, useEngineState, useSession } from "@/app/session/SessionContext";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { pinLabelText } from "@/lib/pinLabel";
 import { zMoveFor, zTargetIndex } from "@/lib/shapeZOrder";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -57,9 +60,6 @@ export interface ReselectObject {
 type SectionKey = "history" | "reselect" | "layers" | "histogram";
 
 interface Props {
-  onClose: () => void;
-  /** Live placed objects (text + shapes) for the Reselect list. */
-  objects: ReselectObject[];
   /** Click an object → load it into the canvas edit overlay to move/resize. */
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
@@ -75,11 +75,6 @@ interface Props {
   // ── Histogram ──
   /** Pulls the per-channel histogram from Rust (no canvas sampling). */
   getHistogram: () => Promise<Uint32Array | null>;
-  /** Changes when the active image content changes → triggers a resample. */
-  histogramSignature: string;
-  /** Active photo id — when it changes the histogram bars fall down, then rise
-   *  back up once the newly-selected photo has composited. */
-  histogramPhotoKey: string;
   /** Embedded mode: render as a plain flex column (no fixed `.review-panel`
    *  chrome / slide animation) so it can fill the compact master bar. */
   embedded?: boolean;
@@ -88,6 +83,20 @@ interface Props {
    *  compact top bar are in play, where the chrome owns open/close instead. */
   closable?: boolean;
 }
+
+/** Reselect-list names for each shape kind (the engine's kind codes). */
+const KIND_LABEL: Record<number, string> = {
+  0: "Square",
+  1: "Circle",
+  2: "Line",
+  3: "Hand-drawn",
+  4: "Arrow",
+  5: "Pin",
+  6: "Pen",
+  7: "Pen Path",
+  8: "Diamond",
+  9: "Star",
+};
 
 const TOGGLES: {
   key: SectionKey;
@@ -107,8 +116,6 @@ const TOGGLES: {
 ];
 
 export function ReviewPanel({
-  onClose,
-  objects,
   onSelectObject,
   onDeleteObject,
   onDuplicateObject,
@@ -116,8 +123,6 @@ export function ReviewPanel({
   duplicatePadId,
   userMode,
   getHistogram,
-  histogramSignature,
-  histogramPhotoKey,
   embedded = false,
   closable = false,
 }: Props) {
@@ -147,7 +152,39 @@ export function ReviewPanel({
   const { history, layers, undoCount, redoCount } = useEngineState();
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
-  const { moveShape: onMoveShape } = useSession().drawingTools;
+  const { drawingTools, textTool } = useSession();
+  const { moveShape: onMoveShape } = drawingTools;
+  // B2: store-backed values read here, not passed. The Reselect list is
+  // derived from the live overlays (was AppShell's `reselectObjects`).
+  const setShowHistory = useUIStore((s) => s.setShowHistory);
+  const onClose = () => setShowHistory(false);
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const isImageLoading = useUIStore((s) => s.isImageLoading);
+  const { width, height } = useEngineState();
+  // Changes when the active image content changes → triggers a resample.
+  const histogramSignature = `${activePhotoId ?? ""}:${undoCount}:${redoCount}:${width}x${height}:${isImageLoading ? "loading" : "ready"}`;
+  // When the photo changes the histogram bars fall, then rise on the new one.
+  const histogramPhotoKey = activePhotoId ?? "";
+  // Names are per-kind ordinals computed in list order: Text #1, Square #1,
+  // Line #2, etc. The id is stable within its own (text vs shape) id-space.
+  const objects = useMemo<ReselectObject[]>(() => {
+    const items: ReselectObject[] = [];
+    textTool.annotations.forEach((a, i) => {
+      items.push({ key: `t${a.id}`, type: "text", id: a.id, label: `Text #${i + 1}` });
+    });
+    const counters: Record<number, number> = {};
+    drawingTools.shapes.forEach((s) => {
+      counters[s.kind] = (counters[s.kind] ?? 0) + 1;
+      // Pins show their own callout label (number or letter); everything else
+      // gets an ordinal.
+      const label =
+        s.kind === 5
+          ? `Pin ${pinLabelText(s.number, s.label_kind)}`
+          : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
+      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
+    });
+    return items;
+  }, [textTool.annotations, drawingTools.shapes]);
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
   // and scroll area. All three start open.

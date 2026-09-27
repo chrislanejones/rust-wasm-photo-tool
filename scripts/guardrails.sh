@@ -202,6 +202,7 @@ check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 # plan's "77 / 46" counted by hand; 46 was the Batch-grid arm, and the wide
 # arm is the one that matters).
 # 76 -> 53 and 61 -> 38 (2026-09-27, B1): SessionContext.
+# 53 -> 23 and 38 -> 21 (2026-09-27, B2): consumers read the stores.
 count_jsx_props() {
   # $1 = element name, $2 = file. Prints the max attribute count over every
   # `<Name` … `/>` block.
@@ -214,9 +215,9 @@ count_jsx_props() {
   ' "$2"
 }
 n_sidebar_props=$(count_jsx_props ToolsSidebar app/src/app/AppShell.tsx)
-check "appshell-sidebar-props" 53 "props on <ToolsSidebar> in AppShell — read the store in the panel instead" "$n_sidebar_props"
+check "appshell-sidebar-props" 23 "props on <ToolsSidebar> in AppShell — read the store in the panel instead" "$n_sidebar_props"
 n_canvas_props=$(count_jsx_props CanvasArea app/src/app/AppShell.tsx)
-check "appshell-canvas-props" 38 "props on <CanvasArea> in AppShell — read the store / session context instead" "$n_canvas_props"
+check "appshell-canvas-props" 21 "props on <CanvasArea> in AppShell — read the store / session context instead" "$n_canvas_props"
 
 # ── src/lib.rs line count: NOT ratcheted ──
 # `librs-lines` (5213 -> 4771 over Aug-Sep 2026) was retired by Chris on

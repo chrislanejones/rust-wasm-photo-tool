@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { formatBytes } from "@/lib/format";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useUIStore } from "@/stores/useUIStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -33,46 +35,22 @@ export interface PhotoEntry {
 }
 
 interface Props {
-  photos: PhotoEntry[];
-  activeId: string | null;
   onSelect: (entry: PhotoEntry) => void;
-  onRemove: (id: string) => void;
-  onClose: () => void;
   /** Show the hover-reveal close in the top-left corner. Wide desktop layout
    *  only — AppShell passes false whenever the dock, the narrow drawers or the
    *  compact top bar are in play, where the chrome owns open/close instead. */
   closable?: boolean;
-  showTools: boolean;
-  showHistory: boolean;
   /** Reduce Motion preference — when on, skip the margin-slide animation. */
   reduceMotion?: boolean;
   /** Narrow window — side panels overlay, so the gallery bar stays full-bleed. */
   narrow?: boolean;
   compressionProgress: Record<string, number>;
-  compressionSavings?: Record<string, { savingsPercent: number }>;
-  modifiedPhotos?: Set<string>;
-  /** Per-tier gallery cap, shown next to the count (e.g. "3 / 12"). */
-  maxPhotos?: number;
-  /** Remove every photo from the gallery. */
-  onDeleteAll?: () => void;
-  /** Remove the currently-selected photos. */
-  onDeleteSelected?: () => void;
-  /** Export the currently-selected photos as a ZIP. */
-  onExportSelected?: () => void;
   /** Auto Compress & Resize — the same handler the Resize panel calls, so the
    *  two surfaces cannot drift. "selected" means the active photo when nothing
    *  is selected. */
   onAutoCompress?: (scope: "selected" | "all") => void;
   /** Duplicate the currently-selected photos. */
   onDuplicateSelected?: () => void;
-  /** Currently-selected photo ids (lifted to the parent). */
-  selectedIds: Set<string>;
-  /** Toggle a photo's selection. */
-  onToggleSelect: (id: string) => void;
-  /** Add a contiguous run of photo ids to the selection (shift+click range). */
-  onSelectRange?: (ids: string[]) => void;
-  /** Clear the entire selection (the "Unselect" action). */
-  onClearSelection?: () => void;
   /** Vertical mode: the same gallery inverted for the compact master bar —
    *  self-positions as the master-bar content box, stacks thumbs in a column,
    *  and scrolls with up/down arrows (no scrollbar). */
@@ -347,13 +325,13 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
  */
 function GalleryActions({
   selectedCount,
-  totalCount,
-  vertical,
-  onAutoCompress,
   onClearSelection,
   onDeleteAll,
   onDeleteSelected,
   onExportSelected,
+  totalCount,
+  vertical,
+  onAutoCompress,
   only,
 }: {
   selectedCount: number;
@@ -521,30 +499,40 @@ function GalleryActions({
 }
 
 export function GalleryBar({
-  onClose,
-  photos,
-  activeId,
   onSelect,
-  onRemove,
-  showTools,
-  showHistory,
   reduceMotion,
   narrow,
   closable = false,
   compressionProgress,
-  compressionSavings,
-  modifiedPhotos,
-  maxPhotos,
-  onDeleteAll,
-  onDeleteSelected,
-  onExportSelected,
   onAutoCompress,
-  selectedIds,
-  onToggleSelect,
-  onSelectRange,
-  onClearSelection,
   vertical = false,
 }: Props) {
+  // B2 (docs/AppShell-Refactor-Plan.md): gallery + panel state is read from
+  // the stores it lives in. The 16 props this replaces were AppShell reading
+  // the same stores and forwarding; the set-only wrappers are gone.
+  const photos = useGalleryStore((s) => s.photos);
+  const activeId = useGalleryStore((s) => s.activePhotoId);
+  const compressionSavings = useGalleryStore((s) => s.imageSavings);
+  const modifiedPhotos = useGalleryStore((s) => s.modifiedPhotos);
+  // Per-tier gallery cap, shown next to the count (e.g. "3 / 12").
+  const maxPhotos = useGalleryStore((s) => s.maxPhotos);
+  const selectedIds = useGalleryStore((s) => s.selectedIds);
+  const onToggleSelect = useGalleryStore((s) => s.toggleSelected);
+  const onSelectRange = useGalleryStore((s) => s.selectRange);
+  const onClearSelection = useGalleryStore((s) => s.clearSelection);
+  const showTools = useUIStore((s) => s.showTools);
+  const showHistory = useUIStore((s) => s.showHistory);
+  const setShowGallery = useUIStore((s) => s.setShowGallery);
+  const onClose = () => setShowGallery(false);
+  // Per-image trashcan → the shared delete confirm (AppShell mounts it).
+  const onRemove = useUIStore((s) => s.setDeletePhotoId);
+  const setDeleteAllOpen = useUIStore((s) => s.setDeleteAllOpen);
+  const onDeleteAll = () => setDeleteAllOpen(true);
+  const setDeleteSelectedOpen = useUIStore((s) => s.setDeleteSelectedOpen);
+  const onDeleteSelected = () => setDeleteSelectedOpen(true);
+  // Export the selection: the Download chooser dialog.
+  const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
+  const onExportSelected = () => setExportDialogOpen(true);
   const stripRef = useRef<HTMLDivElement>(null);
   const selectionActive = selectedIds.size > 0;
   // Shift+click range anchor: the index of the last checkbox the user

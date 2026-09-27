@@ -41,7 +41,8 @@ import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
@@ -77,39 +78,7 @@ interface Props {
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
-  activeTool?: string;
-  textSettings?: {
-    fontSize: number;
-    /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
-     *  for the recent-text chips only. */
-    fontFamily?: string;
-    /** Engine typeface id; `""` = the embedded Liberation Sans. */
-    textFontId?: string;
-    fontWeight: string;
-    textColor: string;
-    /** Background-preview fields. The open textarea renders a live preview
-     *  using these so the user can configure their BG before committing. */
-    bgKind?: "none" | "rect" | "bubble";
-    bgColor?: string;
-    bgOpacity?: number;
-    bgPadding?: number;
-    bgCornerRadius?: number;
-    /** Speech-bubble tail angle in degrees (0-359). */
-    bgTail?: number;
-  };
-  colorPickerActive?: boolean;
-  /** Select tool: canvas clicks fire the active selection kind. */
-  selectionActive?: boolean;
-  /** Layer Settings → Move toggle on — drives the canvas cursor. */
-  layerMoveActive?: boolean;
   onSelectionClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  /** Select tool, click-once kinds: a DRAG sweeps a marquee instead of
-   *  clicking — preview here, engine commit on release. Off for the lasso
-   *  kind (its clicks are session anchors; a drag must not fight it). */
-  marqueeActive?: boolean;
-  /** Rect, or the ellipse inscribed in the drag rect — mirrors
-   *  `useToolStore.selectionShape` for the preview outline. */
-  marqueeShape?: "rect" | "ellipse";
   /** Commit the marquee: canvas-space corners + the release modifiers
    *  (Shift add / Alt subtract, flag-gated in the handler). */
   onMarqueeCommit?: (
@@ -119,46 +88,18 @@ interface Props {
     y1: number,
     mods: { shiftKey: boolean; altKey: boolean },
   ) => void;
-  /** Magnetic lasso kind: a session may be open, so mouse-moves drive the
-   *  live wire and a double-click closes the loop. */
-  lassoActive?: boolean;
   onLassoMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   onLassoClose?: () => void;
   /** Flat [x,y,…] image-space polylines from Rust — the frozen path and the
    *  live wire. Drawn by LassoOverlay; no geometry happens here. */
   lassoCommitted?: Int32Array | null;
   lassoPreview?: Int32Array | null;
-  /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
-  selectionMask?: Uint8Array | null;
   /** Canvas resize-handle drags on an open text input. Stays a prop because
    *  it does two things — the tool's live setter AND the panel slider's
    *  store field — which is a session decision, not a tool one. */
   onTextFontSizeChange?: (size: number) => void;
   /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
   renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
-  /** Live stroke/shape settings — read at render so panel tweaks update the
-   *  pending shape immediately (same values commitEdit reads at commit). */
-  drawSettings?: {
-    strokeColor: string;
-    strokeWidth: number;
-    arrowStyle: "single" | "double";
-    shape: ShapeName;
-    /** Stroke sloppiness 0-100 (how hand-drawn the outline is), read live so
-     *  a panel tweak while the overlay is open immediately rewobbles it. */
-    sloppiness: number;
-    fillMode: "none" | "solid" | "gradient" | "pixelate";
-    fillColor: string;
-    fillColor2: string;
-    gradientAngle: number;
-  };
-  /** Bézier pen tool (Paint → Pen sub-mode). When active, an interactive
-   *  pen overlay captures the canvas; finished paths commit via onPenCommit. */
-  penActive?: boolean;
-  penColor?: string;
-  penStrokeWidth?: number;
-  /** Live Background fill for the pen preview (shares toolSettings fill). */
-  penFillMode?: "none" | "solid" | "gradient" | "pixelate";
-  penFillColor?: string;
   /** Returns the new annotation's id — `PenOverlay.finish()` needs it to keep
    *  the finished path selected.
    *
@@ -178,9 +119,6 @@ interface Props {
   onPenEditStart?: (id: number) => void;
   onPenEditCommit?: (id: number, flatPoints: number[]) => void;
   onPenEditCancel?: (id: number) => void;
-  /** Reselect from the Review list → open this committed path in the overlay. */
-  penEditRequest?: { id: number; points: number[] } | null;
-  onPenEditRequestHandled?: () => void;
   /** Canvas "Rulers & Grids" config (Settings → Rulers & Grids). Renders a
    *  non-destructive grid + pixel rulers overlay when enabled. */
   guides?: {
@@ -205,36 +143,19 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
-      activeTool,
-      textSettings,
       onTextFontSizeChange,
       renderOverlay,
-      colorPickerActive,
-      selectionActive,
-      layerMoveActive,
       onSelectionClick,
-      marqueeActive,
-      marqueeShape,
       onMarqueeCommit,
-      selectionMask,
-      lassoActive,
       onLassoMove,
       onLassoClose,
       lassoCommitted,
       lassoPreview,
-      drawSettings,
-      penActive,
-      penColor,
-      penStrokeWidth,
-      penFillMode,
-      penFillColor,
       onPenCommit,
       onPenHitTest,
       onPenEditStart,
       onPenEditCommit,
       onPenEditCancel,
-      penEditRequest,
-      onPenEditRequestHandled,
       guides,
     },
     ref,
@@ -343,6 +264,83 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // stroke do" — the third of the three places that read `maskEditing`, and
     // like the other two it computes nothing of its own.
     const maskPaintValue = useToolStore((s) => s.maskPaintValue);
+    // B2 (docs/AppShell-Refactor-Plan.md): everything below already lived in
+    // a store and arrived as 17 props that AppShell derived from the same
+    // stores. Read once here; the derivations are the ones AppShell did.
+    const activeTool = useToolStore((s) => s.activeTool);
+    const colorPickerActive = useToolStore((s) => s.colorPickerActive);
+    const moveActive = useToolStore((s) => s.moveActive);
+    const selectionKind = useToolStore((s) => s.selectionKind);
+    const storeSelectionMask = useToolStore((s) => s.selectionMask);
+    const brushMode = useToolStore((s) => s.brushMode);
+    const toolSettings = useToolStore((s) => s.toolSettings);
+    const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
+    const onPenEditRequestHandled = useAnnotationStore((s) => s.clearPenEditRequest);
+    // Select is its own tool: being on it IS the armed state — one gate, no
+    // sub-mode, no toggle. Move-layer stays on `arrow`.
+    const selectionActive = activeTool === "select";
+    const layerMoveActive = activeTool === "arrow" && moveActive;
+    // Gated to the tool(s) that can actually populate this mask: the Select
+    // tool, or the Magic Eraser sub-mode of the Eraser tool, whose brush paints
+    // the same store field (see useMagicEraserTool). Without the second clause
+    // the mask is still written during a Magic Eraser stroke, but this zeroes
+    // it back out before <SelectionOverlay> ever sees it.
+    const selectionMask =
+      activeTool === "select" || (activeTool === "ai" && eraserMode === "magic")
+        ? storeSelectionMask
+        : null;
+    // Drag = marquee for the two marquee modes ONLY. The click-once kinds and
+    // the lasso no longer sweep one: since v7.47 the mode picks the gesture,
+    // so a stray drag in Wand can't quietly produce a rectangle.
+    const marqueeActive = activeTool === "select" && isMarqueeKind(selectionKind);
+    const marqueeShape = isMarqueeKind(selectionKind) ? selectionKind : "rect";
+    // Magnetic lasso: a session-based kind, so it gets the kind-specific gate
+    // the click-once kinds don't need.
+    const lassoActive = activeTool === "select" && selectionKind === "lasso";
+    // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas.
+    const penActive = activeTool === "brush" && brushMode === "pen";
+    const penColor = toolSettings.strokeColor;
+    const penStrokeWidth = toolSettings.strokeWidth;
+    const penFillMode = toolSettings.fillMode;
+    const penFillColor = toolSettings.fillColor;
+    // The open textarea renders a live preview from these, so the user can
+    // configure the BG before committing. `fontFamily` is not read by the
+    // overlay — the face comes from `textFontId` — it feeds the recent-text
+    // chips only.
+    const textSettings = useMemo(
+      () => ({
+        fontSize: toolSettings.fontSize,
+        fontFamily: toolSettings.fontFamily,
+        textFontId: toolSettings.textFontId,
+        fontWeight: toolSettings.fontWeight,
+        textColor: toolSettings.textColor,
+        bgKind: toolSettings.bgKind,
+        bgColor: toolSettings.bgColor,
+        bgOpacity: toolSettings.bgOpacity,
+        bgPadding: toolSettings.bgPadding,
+        bgCornerRadius: toolSettings.bgCornerRadius,
+        bgTail: toolSettings.bgTail,
+      }),
+      [toolSettings],
+    );
+    // Live stroke/shape settings — read at render so panel tweaks update the
+    // pending shape immediately (same values commitEdit reads at commit).
+    const drawSettings = useMemo(
+      () => ({
+        strokeColor: toolSettings.strokeColor,
+        strokeWidth: toolSettings.strokeWidth,
+        arrowStyle: toolSettings.arrowStyle,
+        shape: (toolSettings.shape ?? "rect") as ShapeName,
+        // Stroke sloppiness 0-100, read live so a panel tweak while the
+        // overlay is open immediately rewobbles it.
+        sloppiness: toolSettings.sloppiness ?? 0,
+        fillMode: toolSettings.fillMode,
+        fillColor: toolSettings.fillColor,
+        fillColor2: toolSettings.fillColor2,
+        gradientAngle: toolSettings.gradientAngle,
+      }),
+      [toolSettings],
+    );
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -534,7 +532,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const previewRafRef = useRef<number | null>(null);
     const previewPixelRef = useRef<number>(-1);
     const lastHoverRef = useRef<{ x: number; y: number } | null>(null);
-    const selectionKind = useToolStore((s) => s.selectionKind);
     const selectionTolerance = useToolStore((s) => s.selectionTolerance);
     const edgeThreshold = useToolStore((s) => s.edgeThreshold);
     // Kind → engine code. Only the click-once kinds preview on hover; the

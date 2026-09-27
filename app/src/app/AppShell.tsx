@@ -126,12 +126,11 @@ import {
   applyExifToReencoded,
   applyExifToVerbatim,
 } from "@/lib/exif";
-import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
-import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -352,7 +351,6 @@ export function AppShell() {
   useEffect(() => {
     if (photos.length > 0) setFirstRun(false); // latches false for the session
   }, [photos.length]);
-  const imageSavings = useGalleryStore((s) => s.imageSavings);
   const setImageSavings = useGalleryStore((s) => s.setImageSavings);
   const modifiedPhotos = useGalleryStore((s) => s.modifiedPhotos);
   const setModifiedPhotos = useGalleryStore((s) => s.setModifiedPhotos);
@@ -386,13 +384,10 @@ export function AppShell() {
   const maskEditing = useToolStore((s) => s.maskEditing);
   const setMaskEditing = useToolStore((s) => s.setMaskEditing);
   const maskPaintValue = useToolStore((s) => s.maskPaintValue);
-  const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
   const colorPickerActive = useToolStore((s) => s.colorPickerActive);
   const setColorPickerActive = useToolStore((s) => s.setColorPickerActive);
   const stampSubMode = useToolStore((s) => s.stampSubMode);
-  const setStampSubMode = useToolStore((s) => s.setStampSubMode);
   const shapesMode = useToolStore((s) => s.shapesMode);
-  const setShapesMode = useToolStore((s) => s.setShapesMode);
   // Eraser tool (id "ai") sub-mode — read here so canvas routing
   // (useEffectiveTool) and the selection-overlay prop below can see it. The
   // panel itself (AISettings.tsx) reads/writes the same store field.
@@ -421,7 +416,6 @@ export function AppShell() {
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const cropRatio = useToolStore((s) => s.cropRatio);
-  const setCropRatio = useToolStore((s) => s.setCropRatio);
   const userMode = useUIStore((s) => s.userMode);
   const setUserMode = useUIStore((s) => s.setUserMode);
   const authResolved = useUIStore((s) => s.authResolved);
@@ -653,24 +647,8 @@ export function AppShell() {
   // ── Gallery multi-select (lifted here so Compress/Export can use it) ────────
   const selectedIds = useGalleryStore((s) => s.selectedIds);
   const setSelectedIds = useGalleryStore((s) => s.setSelectedIds);
-  const toggleSelectPhoto = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-  // Shift+click range from the gallery: additive — the whole run joins the
-  // selection (matching file-manager semantics), never deselects.
-  const selectRangePhotos = useCallback((ids: string[]) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-  }, []);
+  // toggle / range-select moved into the store (B2); GalleryBar calls them.
+  const clearSelection = useGalleryStore((s) => s.clearSelection);
 
   // Drop selections for photos that no longer exist.
   useEffect(() => {
@@ -868,13 +846,9 @@ export function AppShell() {
   const activeTool = useToolStore((s) => s.activeTool);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
-  // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
-  // commits finished paths as live kind-7 annotations.
-  const penActive = activeTool === "brush" && brushMode === "pen";
   // Reselecting a pen path from the Review list pushes its geometry into the
-  // overlay through this one-shot request (cleared as soon as it's consumed).
-  // State lives in useAnnotationStore, not here — AppShell gains nothing new.
-  const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
+  // PenOverlay through a one-shot request in useAnnotationStore; CanvasArea
+  // reads and clears it (B2).
   const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
   // Pen handlers live in their own session hook (#45) — one domain, one set
   // of dependencies, and AppShell is under a line cap it was already over.
@@ -884,7 +858,6 @@ export function AppShell() {
     handlePenEditStart,
     handlePenEditCommit,
     handlePenEditCancel,
-    handlePenEditRequestHandled,
   } = usePenActions(stamp, toolSettings);
 
   useEffect(() => {
@@ -1326,19 +1299,12 @@ export function AppShell() {
     lassoPreview,
   } = useSelectionActions(stamp, canvasRef);
 
-  // ── The Select tool's panel/canvas state ──────────────────────────────────
+  // ── The Select tool's mask ────────────────────────────────────────────────
   // All masking math is Rust; JS just stores the returned overlay + routes ops.
-  // (The click/marquee handlers live in useSelectionActions; these selectors
-  // remain because the panel + canvas JSX read them.)
-  const selectionTolerance = useToolStore((s) => s.selectionTolerance);
-  const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
+  // The panel's tolerance/kind/threshold and the canvas gates read the store
+  // themselves (B2); this one stays for the copy-region action and the
+  // keyboard shortcuts' `hasSelection`.
   const selectionMask = useToolStore((s) => s.selectionMask);
-  // Which engine call a canvas click makes (wand / edge-aware / color range /
-  // lasso / rect / ellipse) — one exclusive mode, gesture included.
-  const selectionKind = useToolStore((s) => s.selectionKind);
-  const setSelectionKind = useToolStore((s) => s.setSelectionKind);
-  const edgeThreshold = useToolStore((s) => s.edgeThreshold);
-  const setEdgeThreshold = useToolStore((s) => s.setEdgeThreshold);
 
   // Move lives on Layer Settings ("arrow") and clears when you leave that
   // tool. Selection needs no such reset since the split: being ON the Select
@@ -1613,40 +1579,6 @@ export function AppShell() {
     },
     [textTool],
   );
-
-  // ── Reselect list: live placed objects (text + shapes) ─────────────────
-  // Names are per-kind ordinals computed in list order: Text #1, Square #1,
-  // Line #2, etc. The id is stable within its own (text vs shape) id-space.
-  const reselectObjects = useMemo<ReselectObject[]>(() => {
-    const items: ReselectObject[] = [];
-    textTool.annotations.forEach((a, i) => {
-      items.push({ key: `t${a.id}`, type: "text", id: a.id, label: `Text #${i + 1}` });
-    });
-    const KIND_LABEL: Record<number, string> = {
-      0: "Square",
-      1: "Circle",
-      2: "Line",
-      3: "Hand-drawn",
-      4: "Arrow",
-      5: "Pin",
-      6: "Pen",
-      7: "Pen Path",
-      8: "Diamond",
-      9: "Star",
-    };
-    const counters: Record<number, number> = {};
-    drawingTools.shapes.forEach((s) => {
-      counters[s.kind] = (counters[s.kind] ?? 0) + 1;
-      // Pins show their own callout label (number or letter); everything else
-      // gets an ordinal.
-      const label =
-        s.kind === 5
-          ? `Pin ${pinLabelText(s.number, s.label_kind)}`
-          : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
-      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
-    });
-    return items;
-  }, [textTool.annotations, drawingTools.shapes]);
 
   // Right-click stacking. Reads the shape under the CURSOR rather than the
   // selected one, so it restacks what you aimed at -- the row buttons in
@@ -3071,19 +3003,6 @@ export function AppShell() {
           <TopBar
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
-            showUpload={showUpload}
-            showTools={showTools}
-            showGallery={showGallery}
-            showHistory={showHistory}
-            onToggleUpload={() => setShowUpload((v) => !v)}
-            onToggleTools={() => setShowTools((v) => !v)}
-            onToggleGallery={() => setShowGallery((v) => !v)}
-            onToggleHistory={() => setShowHistory((v) => !v)}
-            onExport={handleExportClick}
-            canExport={hasImage}
-            compareActive={compareActive}
-            canCompare={canCompare}
-            onToggleCompare={handleToggleCompare}
             winWidth={bp.width}
             drawerMode={bp.narrow}
             reduceMotion={prefs.reduceMotion}
@@ -3100,13 +3019,8 @@ export function AppShell() {
             rulersPrefs={prefs}
             onRulersChange={(p) => applyPreferences({ ...prefs, ...p })}
             embedded={bp.dock}
-            onClose={() => setShowTools(false)}
             closable={panelsClosable}
-            activeTool={activeTool}
-            stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
-            exportFormat={exportFormat}
-            onExportFormatChange={setExportFormat}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
@@ -3117,63 +3031,22 @@ export function AppShell() {
             // nothing flickers.
             imageWidth={photoBounds?.width ?? stamp.state.width}
             imageHeight={photoBounds?.height ?? stamp.state.height}
-            currentByteSize={activeEntry?.byteSize ?? 0}
-            currentMime={activeEntry?.mimeType}
-            originalByteSize={activeEntry?.originalByteSize ?? 0}
-            activePhotoId={activePhotoId}
-            quality={quality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
             compressProgress={compressProgress}
-            cropRatio={cropRatio}
-            onCropRatioChange={setCropRatio}
             onPlace={handlePlace}
-            selectedKind={selectedObject?.type ?? null}
             selection={{
-              tolerance: selectionTolerance,
-              onToleranceChange: setSelectionTolerance,
               onSelectAll: handleSelectAll,
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
               onNewLayerCopy: handleNewLayerCopy,
               onNewLayerCut: handleNewLayerCut,
               onRemoveObject: handleRemoveObject,
-              active: selectionMask !== null,
-              kind: selectionKind,
-              onKindChange: setSelectionKind,
-              edgeThreshold: edgeThreshold,
-              onEdgeThresholdChange: setEdgeThreshold,
             }}
-            moveActive={moveActive}
             onToggleMove={handleToggleMove}
-            layerMask={{
-              editing: maskEditing,
-              value: maskPaintValue,
-              onAdd: handleAddMask,
-              onRemove: stamp.removeLayerMask,
-              onApply: stamp.applyLayerMask,
-              onInvert: stamp.invertLayerMask,
-              onToggleEdit: handleToggleMaskEdit,
-              onSetValue: setMaskPaintValue,
-            }}
-            toolSettings={toolSettings}
+            layerMask={{ onAdd: handleAddMask, onToggleEdit: handleToggleMaskEdit }}
             onToolSettingsChange={handleToolSettingsChange}
-            shapesMode={shapesMode}
-            onShapesModeChange={setShapesMode}
-            brushMode={brushMode}
-            onBrushModeChange={setBrushMode}
-            colorPickerActive={colorPickerActive}
-            onSetColorPickerActive={setColorPickerActive}
-            pickedColor={toolSettings.brushColor}
             onPickColor={handlePickColor}
-            stampSubMode={stampSubMode}
-            onStampSubModeChange={setStampSubMode}
-            stampEmoji={toolSettings.emoji}
-            stampEmojiSize={toolSettings.emojiSize}
-            onStampEmojiChange={(e) => setToolSettings((prev) => ({ ...prev, emoji: e }))}
-            onStampEmojiSizeChange={(s) => setToolSettings((prev) => ({ ...prev, emojiSize: s }))}
-            photos={photos}
-            setPhotos={setPhotos}
             aiEnabled={hasReplicateAI(effectiveUserMode)}
             onAIResult={handleAIResult}
           />
@@ -3280,46 +3153,13 @@ export function AppShell() {
                           cursorVisible={visible}
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                          activeTool={activeTool}
-                          textSettings={{
-                            fontSize: toolSettings.fontSize,
-                            fontFamily: toolSettings.fontFamily,
-                            textFontId: toolSettings.textFontId,
-                            fontWeight: toolSettings.fontWeight,
-                            textColor: toolSettings.textColor,
-                            bgKind: toolSettings.bgKind,
-                            bgColor: toolSettings.bgColor,
-                            bgOpacity: toolSettings.bgOpacity,
-                            bgPadding: toolSettings.bgPadding,
-                            bgCornerRadius: toolSettings.bgCornerRadius,
-                            bgTail: toolSettings.bgTail,
-                          }}
                           onTextFontSizeChange={handleTextFontSizeChange}
                           renderOverlay={renderDuplicatePad}
-                          colorPickerActive={colorPickerActive}
-                          drawSettings={{
-                            strokeColor: toolSettings.strokeColor,
-                            strokeWidth: toolSettings.strokeWidth,
-                            arrowStyle: toolSettings.arrowStyle,
-                            shape: toolSettings.shape ?? "rect",
-                            sloppiness: toolSettings.sloppiness ?? 0,
-                            fillMode: toolSettings.fillMode,
-                            fillColor: toolSettings.fillColor,
-                            fillColor2: toolSettings.fillColor2,
-                            gradientAngle: toolSettings.gradientAngle,
-                          }}
-                          penActive={penActive}
-                          penColor={toolSettings.strokeColor}
-                          penStrokeWidth={toolSettings.strokeWidth}
-                          penFillMode={toolSettings.fillMode}
-                          penFillColor={toolSettings.fillColor}
                           onPenCommit={handlePenCommit}
                           onPenHitTest={handlePenHitTest}
                           onPenEditStart={handlePenEditStart}
                           onPenEditCommit={handlePenEditCommit}
                           onPenEditCancel={handlePenEditCancel}
-                          penEditRequest={penEditRequest}
-                          onPenEditRequestHandled={handlePenEditRequestHandled}
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
@@ -3353,87 +3193,20 @@ export function AppShell() {
                       cursorVisible={visible}
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                      activeTool={activeTool}
-                      // Select is its own tool: being on it IS the armed
-                      // state — one gate, no sub-mode, no toggle. Move-layer
-                      // stays on `arrow`.
-                      selectionActive={activeTool === "select"}
-                      layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      // Gated to the tool(s) that can actually populate this
-                      // mask: the Select tool (selection's home since the
-                      // v7.44 split — was Adjust & Select), or the Magic
-                      // Eraser sub-mode of the Eraser tool, whose brush
-                      // paints the same store field (see useMagicEraserTool).
-                      // Without the second clause the mask is still written
-                      // during a Magic Eraser stroke, but this prop zeroes
-                      // it back out before <SelectionOverlay> ever sees it.
-                      selectionMask={
-                        activeTool === "select" ||
-                        (activeTool === "ai" && eraserMode === "magic")
-                          ? selectionMask
-                          : null
-                      }
-                      // Drag = marquee for the two marquee modes ONLY. The
-                      // click-once kinds and the lasso no longer sweep one:
-                      // since v7.47 the mode picks the gesture, so a stray drag
-                      // in Wand can't quietly produce a rectangle.
-                      marqueeActive={
-                        activeTool === "select" && isMarqueeKind(selectionKind)
-                      }
-                      marqueeShape={
-                        isMarqueeKind(selectionKind) ? selectionKind : "rect"
-                      }
                       onMarqueeCommit={handleMarqueeCommit}
-                      // Magnetic lasso: a session-based kind, so it gets the
-                      // kind-specific gate the click-once kinds don't need.
-                      lassoActive={
-                        activeTool === "select" && selectionKind === "lasso"
-                      }
                       onLassoMove={handleLassoMove}
                       onLassoClose={handleLassoClose}
                       lassoCommitted={lassoCommitted}
                       lassoPreview={lassoPreview}
                       guides={guidesConfig}
-                      textSettings={{
-                        fontSize: toolSettings.fontSize,
-                        fontFamily: toolSettings.fontFamily,
-                        textFontId: toolSettings.textFontId,
-                        fontWeight: toolSettings.fontWeight,
-                        textColor: toolSettings.textColor,
-                        bgKind: toolSettings.bgKind,
-                        bgColor: toolSettings.bgColor,
-                        bgOpacity: toolSettings.bgOpacity,
-                        bgPadding: toolSettings.bgPadding,
-                        bgCornerRadius: toolSettings.bgCornerRadius,
-                        bgTail: toolSettings.bgTail,
-                      }}
                       onTextFontSizeChange={handleTextFontSizeChange}
                       renderOverlay={renderDuplicatePad}
-                      colorPickerActive={colorPickerActive}
-                      drawSettings={{
-                        strokeColor: toolSettings.strokeColor,
-                        strokeWidth: toolSettings.strokeWidth,
-                        arrowStyle: toolSettings.arrowStyle,
-                        shape: toolSettings.shape ?? "rect",
-                        sloppiness: toolSettings.sloppiness ?? 0,
-                        fillMode: toolSettings.fillMode,
-                        fillColor: toolSettings.fillColor,
-                        fillColor2: toolSettings.fillColor2,
-                        gradientAngle: toolSettings.gradientAngle,
-                      }}
-                      penActive={penActive}
-                      penColor={toolSettings.strokeColor}
-                      penStrokeWidth={toolSettings.strokeWidth}
-                      penFillMode={toolSettings.fillMode}
-                      penFillColor={toolSettings.fillColor}
                       onPenCommit={handlePenCommit}
                       onPenHitTest={handlePenHitTest}
                       onPenEditStart={handlePenEditStart}
                       onPenEditCommit={handlePenEditCommit}
                       onPenEditCancel={handlePenEditCancel}
-                      penEditRequest={penEditRequest}
-                      onPenEditRequestHandled={handlePenEditRequestHandled}
                     />
                   </div>
                 </div>
@@ -3523,29 +3296,13 @@ export function AppShell() {
         {(bp.dock ? masterTab === "gallery" && !startSurfaceOpen : showGallery) && (
           <GalleryBar
             vertical={bp.dock}
-            photos={photos}
-            activeId={activePhotoId}
             onSelect={handleSelectPhoto}
-            onRemove={(id) => setDeletePhotoId(id)}
-            onClose={() => setShowGallery(false)}
             closable={panelsClosable}
-            showTools={showTools}
-            showHistory={showHistory}
             reduceMotion={prefs.reduceMotion}
             narrow={bp.narrow}
             compressionProgress={compressProgress.items ?? {}}
-            compressionSavings={imageSavings}
-            modifiedPhotos={modifiedPhotos}
-            maxPhotos={maxPhotos}
-            onDeleteAll={handleDeleteAll}
-            onDeleteSelected={() => setDeleteSelectedOpen(true)}
             onDuplicateSelected={handleDuplicateSelected}
-            onExportSelected={handleExportClick}
             onAutoCompress={handleAutoCompress}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelectPhoto}
-            onSelectRange={selectRangePhotos}
-            onClearSelection={clearSelection}
           />
         )}
       </AnimatePresence>
@@ -3554,9 +3311,7 @@ export function AppShell() {
         {(bp.dock ? masterTab === "review" && !startSurfaceOpen : showHistory) && (
           <ReviewPanel
             embedded={bp.dock}
-            onClose={() => setShowHistory(false)}
             closable={panelsClosable}
-            objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
             onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
@@ -3564,8 +3319,6 @@ export function AppShell() {
             duplicatePadId={duplicatePad.padId}
             userMode={effectiveUserMode}
             getHistogram={getHistogram}
-            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
-            histogramPhotoKey={activePhotoId ?? ""}
           />
         )}
       </AnimatePresence>

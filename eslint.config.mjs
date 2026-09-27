@@ -211,8 +211,11 @@ export default tseslint.config(
     // drawing/paste/text hook instances reach ToolsSidebar, CanvasArea,
     // ReviewPanel and TopBar through app/session/SessionContext.tsx; 91 props
     // and their pass-through lines are gone from the return.
+    // 3618 -> 3371 (2026-09-27, B2): ToolsSidebar, CanvasArea, ReviewPanel,
+    // TopBar and GalleryBar read their store-backed values with selectors; the
+    // ~80 props and the set-only wrappers behind them were deleted, not moved.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3618 }] },
+    rules: { "max-lines": ["error", { max: 3371 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -224,8 +227,10 @@ export default tseslint.config(
     // 2823 -> 2815 (2026-09-27, B0): the on-canvas ink constants moved to
     // canvasInk.ts so the React Compiler `"use memo"` opt-in fit under the cap.
     // 2815 -> 2783 (2026-09-27, B1): 22 props became session-context reads.
+    // 2783 -> 2780 (2026-09-27, B2): 17 props became store reads; the
+    // derivations moved in with them, so the file barely moved.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2783 }] },
+    rules: { "max-lines": ["error", { max: 2780 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

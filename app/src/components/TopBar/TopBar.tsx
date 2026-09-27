@@ -28,6 +28,10 @@ import {
 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { useEngine, useEngineState } from "@/app/session/SessionContext";
+import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { compareBaselineKey } from "@/lib/compareBaseline";
 import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
@@ -42,28 +46,6 @@ const GROUP_PILL = `flex items-center shrink-0 ${BUTTON_PILL}`;
 interface TopBarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
-  showUpload: boolean;
-  showTools: boolean;
-  showGallery: boolean;
-  showHistory: boolean;
-  onToggleUpload: () => void;
-  onToggleTools: () => void;
-  onToggleGallery: () => void;
-  onToggleHistory: () => void;
-  /** Export — an ACTION, not a toggle: it fires the download rather than
-   *  opening a panel, so it never renders active. It replaced the Tools
-   *  panel's full-width "Download & Share {FORMAT}" footer, which took a whole
-   *  row of the sidebar for one button, and now sits beside New in the right
-   *  cluster's icon pair rather than in the labeled center group. */
-  onExport: () => void;
-  canExport: boolean;
-  /** A/B compare — a TOGGLE between New and Export. It used to be a button at
-   *  the bottom of Enhance › Compress only; here it works over every tool.
-   *  `canCompare` is false with no photo, no stored upload baseline, or in the
-   *  Batch editor, where there is no single before/after. */
-  compareActive: boolean;
-  canCompare: boolean;
-  onToggleCompare: () => void;
   /** Shared window width (from useBreakpoint) — drives the compact / narrow
    *  collapse; TopBar no longer owns a resize listener. */
   winWidth: number;
@@ -83,19 +65,6 @@ interface TopBarProps {
 export function TopBar({
   onZoomIn,
   onZoomOut,
-  showUpload,
-  showTools,
-  showGallery,
-  showHistory,
-  onExport,
-  canExport,
-  compareActive,
-  canCompare,
-  onToggleCompare,
-  onToggleUpload,
-  onToggleTools,
-  onToggleGallery,
-  onToggleHistory,
   winWidth,
   drawerMode,
   reduceMotion,
@@ -108,9 +77,38 @@ export function TopBar({
   // B1 (docs/AppShell-Refactor-Plan.md): undo/redo and the zoom readout come
   // from the session context. Same names as the props they replace.
   const { undo: onUndo, redo: onRedo } = useEngine();
-  const { zoom, undoCount, redoCount } = useEngineState();
+  const { zoom, undoCount, redoCount, ready } = useEngineState();
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
+  // B2: the panel toggles, Export and Compare are store state; read here.
+  const showUpload = useUIStore((s) => s.showUpload);
+  const setShowUpload = useUIStore((s) => s.setShowUpload);
+  const showTools = useUIStore((s) => s.showTools);
+  const setShowTools = useUIStore((s) => s.setShowTools);
+  const showGallery = useUIStore((s) => s.showGallery);
+  const setShowGallery = useUIStore((s) => s.setShowGallery);
+  const showHistory = useUIStore((s) => s.showHistory);
+  const setShowHistory = useUIStore((s) => s.setShowHistory);
+  const onToggleUpload = () => setShowUpload((v) => !v);
+  const onToggleTools = () => setShowTools((v) => !v);
+  const onToggleGallery = () => setShowGallery((v) => !v);
+  const onToggleHistory = () => setShowHistory((v) => !v);
+  // Export — an ACTION, not a toggle: it opens the Download chooser rather
+  // than a panel, so it never renders active. It replaced the Tools panel's
+  // full-width "Download & Share {FORMAT}" footer and sits beside New.
+  const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
+  const onExport = () => setExportDialogOpen(true);
+  const canExport = ready;
+  // A/B compare — a TOGGLE between New and Export, over every tool. Needs a
+  // loaded photo and its stored upload baseline, and is off in the Batch
+  // editor (`emoji`), where edits hit every photo at once and there is no
+  // single before/after.
+  const compareActive = useUIStore((s) => s.compareActive);
+  const setCompareActive = useUIStore((s) => s.setCompareActive);
+  const onToggleCompare = () => setCompareActive((v) => !v);
+  const activeTool = useToolStore((s) => s.activeTool);
+  const activeEntry = useGalleryStore((s) => s.photos.find((p) => p.id === s.activePhotoId) ?? null);
+  const canCompare = ready && !!compareBaselineKey(activeEntry) && activeTool !== "emoji";
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below
