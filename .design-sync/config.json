@@ -1,0 +1,63 @@
+{
+  "projectId": "d312dd68-978f-445f-81b3-765e65fbfabd",
+  "shape": "package",
+  "pkg": "photo-horse-marketing",
+  "globalName": "ImageHorseMarketing",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "src/styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "provider": {
+    "component": "MemoryRouter",
+    "props": {
+      "initialEntries": [
+        "/"
+      ]
+    }
+  },
+  "componentSrcMap": {
+    "ButtonSet": "src/components/ButtonSet.tsx",
+    "Slider": "src/components/Slider.tsx",
+    "Pager": "src/components/Pager.tsx",
+    "NextCards": "src/components/NextCards.tsx",
+    "Footer": "src/components/Footer.tsx",
+    "Nav": "src/components/Nav.tsx",
+    "MemoryRouter": null
+  },
+  "extraFonts": [
+    "public/fonts/geist-latin-v5.woff2",
+    "public/fonts/geist-latin-ext-v5.woff2",
+    "public/fonts/jetbrains-mono-latin-v24.woff2",
+    "public/fonts/jetbrains-mono-latin-ext-v24.woff2"
+  ],
+  "dtsPropsFor": {
+    "ButtonSet": "  // No props. Twelve tool tiles with their own selection state,\n  // starting on Paint. Render it as <ButtonSet />.",
+    "Slider": "  value: number;\n  onValueChange: (value: number) => void;\n  min?: number;\n  max: number;\n  step?: number;\n  /** Names the control for a screen reader — there is no visible <label>. */\n  label: string;\n  /** What this stop *is*, spoken instead of the bare number (\"v3.10, 21 June\"). */\n  valueText: string;\n  /** One tick per stop. Passed through so the ticks can not drift off the range. */\n  ticks?: boolean;",
+    "Pager": "  /** 1-indexed. */\n  page: number;\n  pageCount: number;\n  onPage: (page: number) => void;\n  /** aria-label on the <nav>. */\n  label?: string;",
+    "NextCards": "  /** Already chosen by the caller — this component picks nothing, which is\n   *  what makes it safe under prerender + hydration. Renders null when empty. */\n  cards: readonly {\n    /** Router path. Also the de-dupe key and what the card prints as its slug. */\n    to: string;\n    /** The small label over the title — the nav group for this page. */\n    group: string;\n    /** Short title. */\n    label: string;\n    /** One line. Sentence case, ends with a period. Clamped to 4 lines. */\n    blurb: string;\n  }[];\n  /** The visible <h2>. */\n  heading?: string;\n  /** aria-label on the <nav>, for a screen reader landmark list. */\n  label?: string;",
+    "Footer": "  /** The closing statement. Each page ends on its own sentence. */\n  line: string;\n  /** The trotting horse beside the line. Home and the 404. */\n  horse?: boolean;",
+    "Nav": "  onOpenSearch: () => void;\n  searchOpen: boolean;"
+  },
+  "overrides": {
+    "Nav": {
+      "cardMode": "single"
+    },
+    "Footer": {
+      "cardMode": "single"
+    },
+    "NextCards": {
+      "cardMode": "column",
+      "primaryStory": "Default"
+    },
+    "Pager": {
+      "cardMode": "column",
+      "primaryStory": "Middle"
+    }
+  },
+  "entry": "marketing/src/ds-entry.ts",
+  "storyImports": {
+    "loaders": {
+      ".css": "css"
+    }
+  }
+}

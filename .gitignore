@@ -96,3 +96,8 @@ install.log
 # recipe, not about secrets — no key material has ever been in these files.
 # Moving forward-only does NOT remove them from git history; see docs/PARKING_LOT.md.
 docs/internal/
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
