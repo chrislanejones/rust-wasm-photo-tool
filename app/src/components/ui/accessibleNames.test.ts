@@ -35,7 +35,6 @@ function elementWithTitle(src: string, title: string): string {
 describe("icon-only controls carry a real name", () => {
   const review = read("features/canvas/ReviewPanel.tsx");
   const gallery = read("features/gallery/GalleryBar.tsx");
-  const dims = read("components/DimensionFields.tsx");
 
   it.each([
     ["Undo", 'title="Undo"'],
