@@ -1668,6 +1668,32 @@ kbd {
   transition: all 0.15s;
 }
 
+/* Dialog controls at phone width — 44px targets (Night 5 §6).
+ *
+ * Every dialog's close is `Button size="tiny"`, which IS `.btn-icon`: 24×24,
+ * measured on a phone. The footer buttons measured 38px tall.
+ *
+ * ⚠️ Two traps shaped this rule, both measured rather than assumed:
+ *  1. `.btn-icon` is UN-LAYERED (brace depth 0 in this file), and Tailwind v4
+ *     puts utilities in `@layer utilities`. Un-layered CSS beats ANY layered
+ *     rule whatever its specificity, so a `max-sm:size-11` on the close would
+ *     have lost silently. This rule is un-layered too, and one attribute more
+ *     specific than `.btn-icon`.
+ *  2. It sets width and height ONLY — never `position`. UploadDialog pins its
+ *     close with the `absolute` utility; a position here would out-rank that
+ *     and pull the button out of its corner.
+ * Scoped by data-slot so the zoom controls and every other `.btn-icon` keep
+ * their dense desktop size. */
+@media (max-width: 639.98px) {
+  .btn-icon[data-slot="dialog-close"] {
+    width: 44px;
+    height: 44px;
+  }
+  [data-slot="dialog-footer"] button {
+    min-height: 44px;
+  }
+}
+
 .btn-icon:hover:not(:disabled) {
   background: var(--bg-tertiary);
   border-color: var(--border-active);

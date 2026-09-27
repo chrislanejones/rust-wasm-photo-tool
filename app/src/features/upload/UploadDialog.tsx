@@ -102,7 +102,7 @@ export function UploadDialog({
 
           {/* Close — the same named button the shared DialogHeader renders. */}
           <DialogClose asChild>
-            <Button size="tiny" className="absolute top-4 right-4" aria-label="Close">
+            <Button size="tiny" className="absolute top-4 right-4" aria-label="Close" data-slot="dialog-close">
               <X className="h-4 w-4" />
             </Button>
           </DialogClose>

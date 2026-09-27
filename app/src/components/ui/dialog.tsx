@@ -162,7 +162,7 @@ const DialogHeader = ({
   >
     <div className="flex min-w-0 flex-col gap-1 text-left">{children}</div>
     <DialogPrimitive.Close asChild>
-      <Button size="tiny" className="shrink-0" aria-label="Close">
+      <Button size="tiny" className="shrink-0" aria-label="Close" data-slot="dialog-close">
         <X className="h-4 w-4" />
       </Button>
     </DialogPrimitive.Close>
@@ -185,6 +185,7 @@ const DialogFooter = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
+    data-slot="dialog-footer"
     className={cn(
       "flex flex-col-reverse gap-2 border-t border-border px-5 py-3.5 sm:flex-row sm:justify-end",
       className
