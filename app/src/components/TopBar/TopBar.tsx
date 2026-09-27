@@ -27,6 +27,7 @@ import {
   Redo2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
+import { useEngine, useEngineState } from "@/app/session/SessionContext";
 import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
@@ -39,13 +40,8 @@ import { BUTTON_PILL } from "@/lib/styles";
 const GROUP_PILL = `flex items-center shrink-0 ${BUTTON_PILL}`;
 
 interface TopBarProps {
-  zoom: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   showUpload: boolean;
   showTools: boolean;
   showGallery: boolean;
@@ -85,13 +81,8 @@ interface TopBarProps {
 }
 
 export function TopBar({
-  zoom,
   onZoomIn,
   onZoomOut,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
   showUpload,
   showTools,
   showGallery,
@@ -112,8 +103,14 @@ export function TopBar({
   superUser,
   openRaster,
 }: TopBarProps) {
-  // React Compiler opt-in (vite.config.ts, annotation mode) — 23 props.
+  // React Compiler opt-in (vite.config.ts, annotation mode).
   "use memo";
+  // B1 (docs/AppShell-Refactor-Plan.md): undo/redo and the zoom readout come
+  // from the session context. Same names as the props they replace.
+  const { undo: onUndo, redo: onRedo } = useEngine();
+  const { zoom, undoCount, redoCount } = useEngineState();
+  const canUndo = undoCount > 0;
+  const canRedo = redoCount > 0;
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below

@@ -207,8 +207,12 @@ export default tseslint.config(
     // match the file. See docs/AppShell-Refactor-Plan.md for why the next
     // reductions are structural (context + stores + JSX split), not more
     // handler extractions.
+    // 3716 -> 3618 (2026-09-27, B1): SessionContext. The engine facade and the
+    // drawing/paste/text hook instances reach ToolsSidebar, CanvasArea,
+    // ReviewPanel and TopBar through app/session/SessionContext.tsx; 91 props
+    // and their pass-through lines are gone from the return.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3716 }] },
+    rules: { "max-lines": ["error", { max: 3618 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -219,8 +223,9 @@ export default tseslint.config(
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
     // 2823 -> 2815 (2026-09-27, B0): the on-canvas ink constants moved to
     // canvasInk.ts so the React Compiler `"use memo"` opt-in fit under the cap.
+    // 2815 -> 2783 (2026-09-27, B1): 22 props became session-context reads.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2815 }] },
+    rules: { "max-lines": ["error", { max: 2783 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

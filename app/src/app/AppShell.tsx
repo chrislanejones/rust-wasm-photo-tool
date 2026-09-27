@@ -100,6 +100,7 @@ import { useExportDimensions } from "./session/useExportDimensions";
 import { useCanvasIdentity } from "@/lib/engine/canvasIdentity";
 import { transferCanvasToPort, releaseCanvasFromPort } from "@/lib/engine/port";
 import { useImageSession } from "./session/useImageSession";
+import { SessionProvider } from "./session/SessionContext";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
@@ -1613,15 +1614,6 @@ export function AppShell() {
     [textTool],
   );
 
-  // Live-annotation bounding boxes for the CanvasArea hover highlight.
-  const annotationBoxes = textTool.annotations.map((a) => ({
-    id: a.id,
-    x: a.x + a.tile_offset_x,
-    y: a.y + a.tile_offset_y,
-    tile_w: a.tile_w,
-    tile_h: a.tile_h,
-  }));
-
   // ── Reselect list: live placed objects (text + shapes) ─────────────────
   // Names are per-kind ordinals computed in list order: Text #1, Square #1,
   // Line #2, etc. The id is stable within its own (text vs shape) id-space.
@@ -2698,6 +2690,10 @@ export function AppShell() {
   const canRedo = stamp.state.redoCount > 0;
 
   return (
+    <SessionProvider
+      stamp={stamp}
+      tools={{ drawingTools, pastePlacement, textTool, canvasRef, containerRef, drawPreviewRef, attachCanvas }}
+    >
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
     <div className="app-shell">
       {/* Keyboard a11y: jump straight to the canvas, past all the chrome.
@@ -3073,13 +3069,8 @@ export function AppShell() {
       <AnimatePresence>
         {!bp.dock && showTopBar && (
           <TopBar
-            zoom={stamp.state.zoom}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
-            onUndo={stamp.undo}
-            onRedo={stamp.redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
             showUpload={showUpload}
             showTools={showTools}
             showGallery={showGallery}
@@ -3116,20 +3107,6 @@ export function AppShell() {
             onStampSettingsChange={handleStampSettingsChange}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
-            onFlipH={stamp.flipHorizontal}
-            onFlipV={stamp.flipVertical}
-            onRotate90Cw={stamp.rotate90Cw}
-            onResizeLayer={pastePlacement.beginLayerResize}
-            onBrightness={stamp.adjustBrightness}
-            onContrast={stamp.adjustContrast}
-            onGlobalBlur={stamp.applyGlobalBlur}
-            onSaturation={stamp.adjustSaturation}
-            onShadows={stamp.adjustShadows}
-            onHighlights={stamp.adjustHighlights}
-            onSharpen={stamp.adjustSharpen}
-            levels={stamp.levels}
-            presets={stamp.presets}
-            imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
@@ -3144,13 +3121,10 @@ export function AppShell() {
             currentMime={activeEntry?.mimeType}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
             activePhotoId={activePhotoId}
-            undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
             compressProgress={compressProgress}
-            onApplyCrop={drawingTools.applyCrop}
-            onSetCropSelection={drawingTools.setCropSelection}
             cropRatio={cropRatio}
             onCropRatioChange={setCropRatio}
             onPlace={handlePlace}
@@ -3172,8 +3146,6 @@ export function AppShell() {
             }}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
-            layers={stamp.state.layers}
-            onSelectLayer={stamp.setActiveLayer}
             layerMask={{
               editing: maskEditing,
               value: maskPaintValue,
@@ -3183,11 +3155,6 @@ export function AppShell() {
               onInvert: stamp.invertLayerMask,
               onToggleEdit: handleToggleMaskEdit,
               onSetValue: setMaskPaintValue,
-            }}
-            layerOverlay={{
-              onSet: stamp.setLayerColorOverlay,
-              onRemove: stamp.removeLayerColorOverlay,
-              onApply: stamp.applyLayerColorOverlay,
             }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
@@ -3207,9 +3174,6 @@ export function AppShell() {
             onStampEmojiSizeChange={(s) => setToolSettings((prev) => ({ ...prev, emojiSize: s }))}
             photos={photos}
             setPhotos={setPhotos}
-            stampToolRef={stamp.toolRef}
-            flushToCanvas={stamp.flushToCanvas}
-            syncState={stamp.syncState}
             aiEnabled={hasReplicateAI(effectiveUserMode)}
             onAIResult={handleAIResult}
           />
@@ -3309,9 +3273,7 @@ export function AppShell() {
                     >
                       <div style={{ position: "absolute", inset: 0 }}>
                         <CanvasArea
-                      attachCanvas={attachCanvas}
                           ref={canvasRef}
-                          drawPreviewRef={drawPreviewRef}
                           hookResult={effectiveStamp}
                           brushDiameter={diameter}
                           cursorPos={pos}
@@ -3319,12 +3281,6 @@ export function AppShell() {
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
                           activeTool={activeTool}
-                          textInput={textTool.textInput}
-                          textareaRef={textTool.textareaRef}
-                          onCanvasClick={textTool.onCanvasClick}
-                          onTextKeyDown={textTool.onTextKeyDown}
-                          onTextChange={textTool.onTextChange}
-                          onTextBlur={textTool.onTextBlur}
                           textSettings={{
                             fontSize: toolSettings.fontSize,
                             fontFamily: toolSettings.fontFamily,
@@ -3338,22 +3294,9 @@ export function AppShell() {
                             bgCornerRadius: toolSettings.bgCornerRadius,
                             bgTail: toolSettings.bgTail,
                           }}
-                          containerRef={containerRef}
-                          onTextPositionChange={textTool.setTextPosition}
                           onTextFontSizeChange={handleTextFontSizeChange}
-                          onTextRotationChange={textTool.setTextRotation}
-                          annotations={annotationBoxes}
-                          shapes={drawingTools.shapes}
                           renderOverlay={renderDuplicatePad}
-                          hoveredAnnotationId={textTool.hoveredAnnotationId}
-                          onCanvasHover={textTool.onCanvasHover}
-                          cropSelection={drawingTools.cropSelection}
-                          onCropChange={(sel) => drawingTools.setCropSelection(sel)}
-                          pastePlacementRect={pastePlacement.rect}
-                          onPastePlacementChange={pastePlacement.update}
                           colorPickerActive={colorPickerActive}
-                          drawEditState={drawingTools.editState}
-                          onDrawEditChange={drawingTools.updateEditGeometry}
                           drawSettings={{
                             strokeColor: toolSettings.strokeColor,
                             strokeWidth: toolSettings.strokeWidth,
@@ -3403,9 +3346,7 @@ export function AppShell() {
                 <div className="canvas-fullsize-host">
                   <div className="canvas-fullsize-slot">
                     <CanvasArea
-                      attachCanvas={attachCanvas}
                       ref={canvasRef}
-                      drawPreviewRef={drawPreviewRef}
                       hookResult={effectiveStamp}
                       brushDiameter={diameter}
                       cursorPos={pos}
@@ -3413,9 +3354,6 @@ export function AppShell() {
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
                       activeTool={activeTool}
-                      textInput={textTool.textInput}
-                      textareaRef={textTool.textareaRef}
-                      onCanvasClick={textTool.onCanvasClick}
                       // Select is its own tool: being on it IS the armed
                       // state — one gate, no sub-mode, no toggle. Move-layer
                       // stays on `arrow`.
@@ -3436,8 +3374,6 @@ export function AppShell() {
                           ? selectionMask
                           : null
                       }
-                      selectionWidth={stamp.state.width}
-                      selectionHeight={stamp.state.height}
                       // Drag = marquee for the two marquee modes ONLY. The
                       // click-once kinds and the lasso no longer sweep one:
                       // since v7.47 the mode picks the gesture, so a stray drag
@@ -3458,9 +3394,6 @@ export function AppShell() {
                       onLassoClose={handleLassoClose}
                       lassoCommitted={lassoCommitted}
                       lassoPreview={lassoPreview}
-                      onTextKeyDown={textTool.onTextKeyDown}
-                      onTextChange={textTool.onTextChange}
-                      onTextBlur={textTool.onTextBlur}
                       guides={guidesConfig}
                       textSettings={{
                         fontSize: toolSettings.fontSize,
@@ -3475,22 +3408,9 @@ export function AppShell() {
                         bgCornerRadius: toolSettings.bgCornerRadius,
                         bgTail: toolSettings.bgTail,
                       }}
-                      containerRef={containerRef}
-                      onTextPositionChange={textTool.setTextPosition}
                       onTextFontSizeChange={handleTextFontSizeChange}
-                      onTextRotationChange={textTool.setTextRotation}
-                      annotations={annotationBoxes}
-                      shapes={drawingTools.shapes}
                       renderOverlay={renderDuplicatePad}
-                      hoveredAnnotationId={textTool.hoveredAnnotationId}
-                      onCanvasHover={textTool.onCanvasHover}
-                      cropSelection={drawingTools.cropSelection}
-                      onCropChange={(sel) => drawingTools.setCropSelection(sel)}
-                      pastePlacementRect={pastePlacement.rect}
-                      onPastePlacementChange={pastePlacement.update}
                       colorPickerActive={colorPickerActive}
-                      drawEditState={drawingTools.editState}
-                      onDrawEditChange={drawingTools.updateEditGeometry}
                       drawSettings={{
                         strokeColor: toolSettings.strokeColor,
                         strokeWidth: toolSettings.strokeWidth,
@@ -3634,34 +3554,15 @@ export function AppShell() {
         {(bp.dock ? masterTab === "review" && !startSurfaceOpen : showHistory) && (
           <ReviewPanel
             embedded={bp.dock}
-            history={stamp.state.history}
-            onJump={stamp.jumpToHistory}
-            onDelete={stamp.deleteHistoryEntry}
             onClose={() => setShowHistory(false)}
             closable={panelsClosable}
-            onUndo={stamp.undo}
-            canUndo={canUndo}
-            onRedo={stamp.redo}
-            canRedo={canRedo}
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
             onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
             onToggleDuplicatePad={duplicatePad.togglePad}
             duplicatePadId={duplicatePad.padId}
-            onMoveShape={drawingTools.moveShape}
             userMode={effectiveUserMode}
-            layers={stamp.state.layers}
-            onAddLayer={() => stamp.addLayer()}
-            onDuplicateLayer={stamp.duplicateLayer}
-            onDeleteLayer={stamp.removeLayer}
-            onSelectLayer={stamp.setActiveLayer}
-            onToggleLayerVisible={stamp.setLayerVisible}
-            onSetLayerOpacity={stamp.setLayerOpacity}
-            onRenameLayer={stamp.renameLayer}
-            onMoveLayer={stamp.moveLayer}
-            onMergeDown={stamp.mergeDown}
-            onFlattenAll={stamp.flattenAll}
             getHistogram={getHistogram}
             histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
             histogramPhotoKey={activePhotoId ?? ""}
@@ -3712,5 +3613,6 @@ export function AppShell() {
         )}
     </div>
     </MotionConfig>
+    </SessionProvider>
   );
 }

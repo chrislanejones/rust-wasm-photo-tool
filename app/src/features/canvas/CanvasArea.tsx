@@ -11,8 +11,9 @@ import React, {
   useState,
 } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import { useSession, useEngineState } from "@/app/session/SessionContext";
 import { pendingShapeType } from "@/hooks/useDrawingTools";
-import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
+import type { CropSelection } from "@/hooks/useDrawingTools";
 import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import {
@@ -61,18 +62,6 @@ import {
   MARQUEE_THRESHOLD_PX,
 } from "./canvasInk";
 
-interface TextInputState {
-  screenX: number;
-  screenY: number;
-  canvasX: number;
-  canvasY: number;
-  text: string;
-  rotation: number;
-  fontSize?: number;
-  fontWeight?: string;
-  textColor?: string;
-}
-
 interface AnnotationBox {
   id: number;
   x: number;            // canvas-space top-left of the *rotated* tile bbox
@@ -83,23 +72,12 @@ interface AnnotationBox {
 
 interface Props {
   hookResult: ReturnType<typeof useCloneStamp>;
-  /** Ref for the arrow/shapes/crop rubber-band surface. Owned by AppShell only
-   *  because `useDrawingTools` lives there too and needs the same element; the
-   *  canvas itself is mounted here, beside the main one, so it inherits the
-   *  fit-scale and pan/zoom transform for free. */
-  drawPreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   brushDiameter: number;
   cursorPos: { x: number; y: number };
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
   activeTool?: string;
-  textInput?: TextInputState | null;
-  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
-  onCanvasClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  onTextKeyDown?: (e: React.KeyboardEvent) => void;
-  onTextChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onTextBlur?: () => void;
   textSettings?: {
     fontSize: number;
     /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
@@ -141,10 +119,6 @@ interface Props {
     y1: number,
     mods: { shiftKey: boolean; altKey: boolean },
   ) => void;
-  /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
-  selectionMask?: Uint8Array | null;
-  selectionWidth?: number;
-  selectionHeight?: number;
   /** Magnetic lasso kind: a session may be open, so mouse-moves drive the
    *  live wire and a double-click closes the loop. */
   lassoActive?: boolean;
@@ -154,38 +128,14 @@ interface Props {
    *  live wire. Drawn by LassoOverlay; no geometry happens here. */
   lassoCommitted?: Int32Array | null;
   lassoPreview?: Int32Array | null;
-  containerRef?: React.RefObject<HTMLDivElement | null>;
-  /** ADR-024 a11.1 — the canvas ref callback, owned by AppShell so the
-   *  generation counter outlives this component's remounts. Optional: without
-   *  it the forwarded ref is used directly, exactly as before. */
-  attachCanvas?: (el: HTMLCanvasElement | null) => void;
-  onTextPositionChange?: (canvasX: number, canvasY: number) => void;
+  /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
+  selectionMask?: Uint8Array | null;
+  /** Canvas resize-handle drags on an open text input. Stays a prop because
+   *  it does two things — the tool's live setter AND the panel slider's
+   *  store field — which is a session decision, not a tool one. */
   onTextFontSizeChange?: (size: number) => void;
-  onTextRotationChange?: (angle: number) => void;
-  /** Live, non-destructive text annotations (bbox + id). The text-tool
-   *  hover highlight is drawn over the one whose id matches
-   *  `hoveredAnnotationId`. */
-  annotations?: AnnotationBox[];
-  /** Live shape annotations on the active layer (bbox + id + kind). Only the
-   *  Perspective tool reads them here — it can be pointed at a square or a
-   *  circle the same way it can be pointed at text. */
-  shapes?: { id: number; kind: number; x0: number; y0: number; x1: number; y1: number }[];
   /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
   renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
-  hoveredAnnotationId?: number | null;
-  /** Mousemove handler used to drive the hover highlight while the text
-   *  tool is active. */
-  onCanvasHover?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  cropSelection?: CropSelection | null;
-  onCropChange?: (sel: CropSelection) => void;
-  /** Pending paste-onto-layer placement (movable/resizable bounding box).
-   *  Floats independent of `activeTool` — same pattern as `drawEditState`. */
-  pastePlacementRect?: PastePlacementRect | null;
-  onPastePlacementChange?: (rect: PastePlacementRect) => void;
-  /** Pending shape/arrow being edited via the Figma-style overlay. */
-  drawEditState?: DrawEditState | null;
-  /** Overlay handle drags push new geometry (canvas coords) up through this. */
-  onDrawEditChange?: (start: Point, end: Point) => void;
   /** Live stroke/shape settings — read at render so panel tweaks update the
    *  pending shape immediately (same values commitEdit reads at commit). */
   drawSettings?: {
@@ -250,34 +200,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
       hookResult,
-      drawPreviewRef,
       brushDiameter,
       cursorPos,
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
       activeTool,
-      textInput,
-      textareaRef,
-      onCanvasClick,
-      onTextKeyDown,
-      onTextChange,
-      onTextBlur,
       textSettings,
-      containerRef: externalContainerRef,
-      attachCanvas: externalAttachCanvas,
-      onTextPositionChange,
       onTextFontSizeChange,
-      onTextRotationChange,
-      annotations,
-      shapes,
       renderOverlay,
-      hoveredAnnotationId,
-      onCanvasHover,
-      cropSelection,
-      onCropChange,
-      pastePlacementRect,
-      onPastePlacementChange,
       colorPickerActive,
       selectionActive,
       layerMoveActive,
@@ -286,15 +217,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       marqueeShape,
       onMarqueeCommit,
       selectionMask,
-      selectionWidth,
-      selectionHeight,
       lassoActive,
       onLassoMove,
       onLassoClose,
       lassoCommitted,
       lassoPreview,
-      drawEditState,
-      onDrawEditChange,
       drawSettings,
       penActive,
       penColor,
@@ -313,10 +240,53 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     ref,
   ) => {
     // React Compiler opt-in (vite.config.ts, annotation mode). Re-rendered on
-    // every AppShell render, at stroke rate, with 46 props.
+    // every AppShell render, at stroke rate.
     "use memo";
     const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+
+    // B1 (docs/AppShell-Refactor-Plan.md): the tool hook instances and the refs
+    // AppShell owns arrive through the session context instead of 23 props.
+    // The names below are the ones the props had, so nothing under this line
+    // changed in that commit.
+    const { drawingTools, pastePlacement, textTool, containerRef, drawPreviewRef, attachCanvas } =
+      useSession();
+    const {
+      textInput,
+      textareaRef,
+      onCanvasClick,
+      onTextKeyDown,
+      onTextChange,
+      onTextBlur,
+      onCanvasHover,
+      hoveredAnnotationId,
+      setTextPosition: onTextPositionChange,
+      setTextRotation: onTextRotationChange,
+    } = textTool;
+    const {
+      cropSelection,
+      setCropSelection: onCropChange,
+      editState: drawEditState,
+      updateEditGeometry: onDrawEditChange,
+      shapes,
+    } = drawingTools;
+    const { rect: pastePlacementRect, update: onPastePlacementChange } = pastePlacement;
+    // The selection overlay is canvas-sized; the engine state says how big.
+    const { width: selectionWidth, height: selectionHeight } = useEngineState();
+    // Live text-annotation bounding boxes for the text-tool hover highlight
+    // and the Perspective tool's pick list. Was computed in AppShell every
+    // render; memoized here on the list it derives from.
+    const annotations = useMemo<AnnotationBox[]>(
+      () =>
+        textTool.annotations.map((a) => ({
+          id: a.id,
+          x: a.x + a.tile_offset_x,
+          y: a.y + a.tile_offset_y,
+          tile_w: a.tile_w,
+          tile_h: a.tile_h,
+        })),
+      [textTool.annotations],
+    );
 
     // ADR-024 a11.1 — the canvas ref, via AppShell's identity tracker when it
     // supplies one.
@@ -333,8 +303,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // CanvasArea started a fresh counter from zero. Unit tests were green — the
     // bookkeeping was correct, its OWNER was not.
     //
-    // Falls back to the forwarded ref so the component still works standalone.
-    const attachCanvas = externalAttachCanvas ?? ref;
+    // Read from the session context above; there is no standalone fallback
+    // any more — mounting CanvasArea outside <SessionProvider> throws.
 
     // Stroke gate close half (v8.33): the pointer coming up ANYWHERE ends the
     // stroke — tools continue drags outside the canvas via window listeners, so
@@ -354,8 +324,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // it is on the other, which is the same one-state-two-reads shape Stage 3.5
     // spent the week removing.
     const surfaceKey = canvasSurfaceKey();
-    const internalContainerRef = useRef<HTMLDivElement>(null);
-    const containerRef = externalContainerRef ?? internalContainerRef;
 
     // Spacebar-pan now comes straight from the UI store — it was prop-drilled
     // from AppShell before stage 1. (Compare state is read inside CompareSlider.)
@@ -1448,8 +1416,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             flushToCanvas={hookResult.flushToCanvas}
             imgW={imgW}
             imgH={imgH}
-            annotations={annotations ?? []}
-            shapes={shapes ?? []}
+            annotations={annotations}
+            shapes={shapes}
             activeLayerId={hookResult.state.activeLayerId}
           />
         )}

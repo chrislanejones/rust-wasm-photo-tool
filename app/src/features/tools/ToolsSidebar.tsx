@@ -11,7 +11,7 @@ import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
-import type { LevelsControls, PresetControls } from "@/hooks/useTransforms";
+import { useEngine, useEngineState, useSession } from "@/app/session/SessionContext";
 import { LevelsSettings } from "./settings/LevelsSettings";
 import { PresetsSettings } from "./settings/PresetsSettings";
 import { ToolGrid } from "./ToolGrid";
@@ -25,7 +25,6 @@ import {
   type LayerMaskControls,
   type LayerOverlayControls,
 } from "./settings/LayerSettings";
-import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectSettings } from "./settings/SelectSettings";
 import { PerspectiveSettings } from "./settings/PerspectiveSettings";
 import type { SelectionControls } from "./settings/SelectSettings";
@@ -35,7 +34,6 @@ import { EffectsSettings } from "./settings/EffectsSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { BatchSettings } from "./settings/BatchSettings";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
-import type { ImageHorseTool } from "stamp_tool";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 import { AISettings } from "./settings/AISettings";
@@ -67,12 +65,7 @@ interface ToolsSidebarProps {
   onToggleMove?: () => void;
   /** Layer stack + selection + mask controls for the Layers panel (v8.38) —
    *  the same data/handlers ReviewPanel gets, one selection driving all. */
-  layers?: LayerInfo[];
-  onSelectLayer?: (id: number) => void;
   layerMask?: LayerMaskControls;
-  /** Color Overlay controls for the selected layer — same one-set-per-panel
-   *  shape as `layerMask`, acting on whatever the panel's dropdown selected. */
-  layerOverlay?: LayerOverlayControls;
   /** Embedded mode: render the inner content as a plain flex column (no fixed
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
@@ -85,21 +78,6 @@ interface ToolsSidebarProps {
    *  to pluralize the Download footer's label too; Export moved to the bar.) */
   exportFormat: ExportFormat;
   onExportFormatChange?: (f: ExportFormat) => void;
-  onFlipH: () => void;
-  onFlipV: () => void;
-  onRotate90Cw: () => void;
-  /** "Resize Layer" — see `TransformCropSettingsProps.onResizeLayer`. */
-  onResizeLayer?: () => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
-  onSaturation?: (factor: number) => void;
-  onShadows?: (amount: number) => void;
-  onHighlights?: (amount: number) => void;
-  onSharpen?: (amount: number) => void;
-  /** Enhance › Levels: live preview and commit (useTransforms). */
-  levels?: LevelsControls;
-  presets?: PresetControls;
-  imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
   /** "Apply Resize" — resample only, no re-compression. See AppShell. */
@@ -115,18 +93,10 @@ interface ToolsSidebarProps {
   currentMime?: string;
   originalByteSize: number;
   activePhotoId: string | null;
-  /** WASM undo count of the active photo (used to re-sync Effects sliders). */
-  undoCount: number;
   quality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   compressProgress: { completed: number; total: number };
-  onApplyCrop?: () => void;
-  /** Allows the Crop tool ratio buttons to drop a centered crop selection
-   *  computed in Rust. Optional — omit to disable ratio buttons. */
-  onSetCropSelection?: (
-    sel: { x: number; y: number; width: number; height: number } | null,
-  ) => void;
   /** Locked aspect ratio for crop drags. `null` = Free (no constraint). */
   cropRatio?: [number, number] | null;
   onCropRatioChange?: (lock: [number, number] | null) => void;
@@ -141,7 +111,6 @@ interface ToolsSidebarProps {
   pickedColor?: string;
   /** Re-apply a color from the Color Picker history. */
   onPickColor?: (hex: string) => void;
-  onGlobalBlur?: (intensity: number) => void;
   // Shapes sub-mode
   shapesMode?: ShapesMode;
   onShapesModeChange?: (mode: ShapesMode) => void;
@@ -155,9 +124,6 @@ interface ToolsSidebarProps {
   // Bulk-logo (Images / "emoji" tool)
   photos: PhotoEntry[];
   setPhotos: React.Dispatch<React.SetStateAction<PhotoEntry[]>>;
-  stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
-  flushToCanvas: () => void;
-  syncState: () => void;
   /** Whether the current tier may use Replicate AI (Paid only). */
   aiEnabled?: boolean;
   /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
@@ -176,27 +142,11 @@ export function ToolsSidebar({
   selection,
   moveActive,
   onToggleMove,
-  layers,
-  onSelectLayer,
   layerMask,
-  layerOverlay,
   embedded = false,
   closable = false,
   exportFormat,
   onExportFormatChange,
-  onFlipH,
-  onFlipV,
-  onRotate90Cw,
-  onResizeLayer,
-  onBrightness,
-  onContrast,
-  onSaturation,
-  onShadows,
-  onHighlights,
-  onSharpen,
-  levels,
-  presets,
-  imageReady,
   onResize,
   onResizeOnly,
   onResizeCanvas,
@@ -208,13 +158,10 @@ export function ToolsSidebar({
   currentMime,
   originalByteSize,
   activePhotoId,
-  undoCount,
   quality,
   onQualityChange,
   onQualityCommit,
   compressProgress,
-  onApplyCrop,
-  onSetCropSelection,
   cropRatio,
   onCropRatioChange,
   toolSettings,
@@ -225,7 +172,6 @@ export function ToolsSidebar({
   onSetColorPickerActive,
   pickedColor,
   onPickColor,
-  onGlobalBlur,
   shapesMode,
   onShapesModeChange,
   stampSubMode,
@@ -236,15 +182,47 @@ export function ToolsSidebar({
   onStampEmojiSizeChange,
   photos,
   setPhotos,
-  stampToolRef,
-  flushToCanvas,
-  syncState,
   aiEnabled = false,
   onAIResult,
 }: ToolsSidebarProps) {
-  // React Compiler opt-in (vite.config.ts, annotation mode). 77 props from
-  // AppShell, none memoized — this is where a parent render costs the most.
+  // React Compiler opt-in (vite.config.ts, annotation mode). The most props
+  // of any component, none memoized — a parent render costs the most here.
   "use memo";
+  // B1 (docs/AppShell-Refactor-Plan.md): the engine and the tool hook
+  // instances come from the session context, not 23 more props. Bound to the
+  // names the props had so the panel wiring below is untouched. The panels
+  // themselves still take these as props — their render tests mount them
+  // without a provider, and B2 is where they read stores directly.
+  const {
+    flipHorizontal: onFlipH,
+    flipVertical: onFlipV,
+    rotate90Cw: onRotate90Cw,
+    adjustBrightness: onBrightness,
+    adjustContrast: onContrast,
+    applyGlobalBlur: onGlobalBlur,
+    adjustSaturation: onSaturation,
+    adjustShadows: onShadows,
+    adjustHighlights: onHighlights,
+    adjustSharpen: onSharpen,
+    levels,
+    presets,
+    setActiveLayer: onSelectLayer,
+    setLayerColorOverlay,
+    removeLayerColorOverlay,
+    applyLayerColorOverlay,
+    toolRef: stampToolRef,
+    flushToCanvas,
+    syncState,
+  } = useEngine();
+  const layerOverlay: LayerOverlayControls = {
+    onSet: setLayerColorOverlay,
+    onRemove: removeLayerColorOverlay,
+    onApply: applyLayerColorOverlay,
+  };
+  const { layers, undoCount, ready: imageReady } = useEngineState();
+  const { drawingTools, pastePlacement } = useSession();
+  const { applyCrop: onApplyCrop, setCropSelection: onSetCropSelection } = drawingTools;
+  const onResizeLayer = pastePlacement.beginLayerResize;
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
   const effectsMode = useToolStore((s) => s.effectsMode);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
