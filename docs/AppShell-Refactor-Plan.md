@@ -6,7 +6,39 @@ moves in `CanvasArea` and `useDrawingTools` and nothing in AppShell. ADR-042
 is the decision; this file is the *how*, with today's numbers and one
 addition (B0) that makes the first real step safe.
 
-## Where things stand on 2026-09-27
+## Status (2026-09-27, end of day)
+
+All of Track B and Track A ran on `claude/zen-hawking-p6hkgt`, one commit per
+step, cap lowered in the same commit:
+
+| | Before | After |
+| --- | ---: | ---: |
+| `AppShell.tsx` | 3,716 | 2,389 |
+| `CanvasArea.tsx` | 2,823 | 1,954 |
+| `src/lib.rs` | 4,670 | 3,491 |
+| `src/ops.rs` | 3,653 | 2,006 |
+| props AppShell → ToolsSidebar / CanvasArea (guardrail) | 76 / 61 | 23 / 21 |
+
+Three things differed from the plan below, recorded so the next reader does
+not rediscover them:
+
+- **B0 overstated itself.** Of the four `"use memo"` components only TopBar
+  compiled; the compiler skips silently. ToolsSidebar and ReviewPanel were
+  fixed (the compiler cannot lower `= false` defaults in a props destructure);
+  CanvasArea stays uncompiled because of its `exhaustive-deps` suppressions,
+  and its directive was removed. `app/src/app/reactCompiler.contract.test.ts`
+  now fails if any opted-in component is skipped.
+- **B3 added `ExportDialog` and `session/useImageImport`** alongside the four
+  planned shell components — both moved whole domains, not just JSX.
+- **B4's state machine was not built.** The crop box, the paste placement and
+  the pending shape edit each already live in their own hook
+  (`useDrawingTools`, `usePastePlacementTool`), not in `useToolStore`, so the
+  three layers moved out without it. Folding that state into one store union
+  would be an ownership change across three hooks with real behaviour risk and
+  no line saving. Revisit only if a bug comes from two of those states being
+  live at once.
+
+## Where things stood on 2026-09-27, before any of it
 
 | File | Lines | eslint cap | Headroom |
 | --- | ---: | ---: | ---: |

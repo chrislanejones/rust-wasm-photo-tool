@@ -232,8 +232,11 @@ export default tseslint.config(
     // 2815 -> 2783 (2026-09-27, B1): 22 props became session-context reads.
     // 2783 -> 2780 (2026-09-27, B2): 17 props became store reads; the
     // derivations moved in with them, so the file barely moved.
+    // 2780 -> 1954 (2026-09-27, B4): CropLayer, PastePlacementLayer and
+    // ShapeEditLayer — each drag state + window listeners + overlay — moved
+    // out, the way PerspectiveLayer did.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2780 }] },
+    rules: { "max-lines": ["error", { max: 1954 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],
