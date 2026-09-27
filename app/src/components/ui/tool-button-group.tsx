@@ -48,6 +48,19 @@ interface Props<T extends string> {
   onChange: (id: T) => void;
   /** Column count for the grid. Defaults to 2. */
   columns?: 2 | 3 | 4 | 5;
+  /** One icon-only row in a recessed trough, the active segment raised — the
+   *  Select panel's Combine control (design: "Select Panel", 09-27-2026).
+   *
+   *  A VARIANT, not a second control. It is the same `useRadioGroup` as the
+   *  grid, so Night 2's contract comes with it unchanged: one Tab stop, arrow
+   *  keys between segments, `aria-checked` on each. A separate segmented
+   *  component would have been a second exclusive-choice implementation, which
+   *  is the thing the constitution exists to prevent.
+   *
+   *  Icon-only, so each segment's `label` becomes its `aria-label`: the name
+   *  must survive losing the visible text. The caller shows the active label
+   *  elsewhere (SectionHeader's `value`) so the choice is still legible. */
+  segmented?: boolean;
   /** Optional small label rendered above the grid. A ReactNode, not a string,
    *  so a caller can put an icon and a lightbulb beside the words. */
   label?: React.ReactNode;
@@ -93,6 +106,7 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
     value,
     onChange,
     columns = 2,
+    segmented = false,
     label,
     labelAlign = "start",
     stacked = false,
@@ -139,7 +153,12 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
           label (e.g. "Hand-drawn") makes all buttons that size — not just its
           own row. Buttons stretch to fill via the default align-self. */}
       <div
-        className={cn("grid gap-2 [grid-auto-rows:1fr]", COL_CLASS[columns])}
+        className={cn(
+          segmented
+            ? "flex gap-1 rounded-lg bg-bg-tertiary p-1"
+            : "grid gap-2 [grid-auto-rows:1fr]",
+          !segmented && COL_CLASS[columns],
+        )}
         {...(isSelect
           ? { ...radio.groupProps, ...name, "aria-describedby": props["aria-describedby"] }
           : {})}
@@ -158,9 +177,21 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
               pro={opt.pro}
               title={opt.title}
               onClick={() => onChange(opt.id)}
+              {...(segmented
+                ? {
+                    // The visible text is gone, so the label becomes the name.
+                    "aria-label": opt.label,
+                    className: cn(
+                      "flex-1 border-0 px-0 py-1.5",
+                      opt.active ?? value === opt.id
+                        ? "bg-bg-elevated text-theme-foreground shadow-md"
+                        : "bg-transparent text-theme-muted-foreground hover:bg-theme-muted/30",
+                    ),
+                  }
+                : {})}
             >
               {Icon && <Icon />}
-              {opt.label}
+              {!segmented && opt.label}
             </ToolButton>
           );
         })}
