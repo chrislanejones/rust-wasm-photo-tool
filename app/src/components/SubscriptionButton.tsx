@@ -3,10 +3,9 @@
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
-import { DIALOG_OVERLAY, WINDOW_TITLE } from "@/lib/styles";
+import { WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -48,6 +47,7 @@ import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -499,41 +499,33 @@ export function SubscriptionButton({
         </DialogContent>
       </Dialog>
 
-      {/* Restore confirmation — portaled above the Settings modal (z-modal). */}
-      {restoreConfirmOpen &&
-        createPortal(
-          <div
-            className={`${DIALOG_OVERLAY} z-[var(--z-idle)] flex items-center justify-center p-4`}
-            onClick={() => setRestoreConfirmOpen(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Restore settings"
-              className="w-full max-w-sm rounded-xl border border-border bg-bg-secondary p-5 text-text-primary shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold">Restore settings?</h3>
-              <p className="mt-2 text-sm text-text-muted leading-relaxed">
-                {tab === "superuser"
-                  ? "This clears the Super User tier override and returns to your real account tier."
-                  : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Button size="large"
-                  className="flex-1"
-                  onClick={() => setRestoreConfirmOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button size="large" className="flex-1" onClick={handleRestore}>
-                  Restore
-                </Button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {/* Restore confirmation, on ConfirmDialog.
+          It used to be hand-built — a portaled div with a dialog role — and
+          that one choice broke four things at once, all measured in a browser
+          (Night 5, 09-26-2026) with a real Escape keypress:
+            - Escape closed SETTINGS, not this: a raw div is not in Radix's
+              layer stack, so Settings was still the topmost layer, and the
+              confirm was left orphaned over the editor;
+            - no focus trap, so Settings' trap stayed armed and pulled focus
+              straight back out of the confirm;
+            - no Escape handler of its own;
+            - its description was text-muted, 3.65:1 on light.
+          ConfirmDialog is a Radix Dialog, so it joins the layer stack on top of
+          Settings and Escape reaches it first. `overModal` lifts it to
+          --z-over-modal (70) above Settings' --z-modal (60). */}
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        onOpenChange={setRestoreConfirmOpen}
+        title="Restore settings?"
+        cancelLabel="Cancel"
+        confirmLabel="Restore"
+        onConfirm={handleRestore}
+        overModal
+      >
+        {tab === "superuser"
+          ? "This clears the Super User tier override and returns to your real account tier."
+          : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
+      </ConfirmDialog>
     </>
   );
 }

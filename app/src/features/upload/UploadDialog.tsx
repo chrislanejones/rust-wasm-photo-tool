@@ -2,15 +2,32 @@
 // cold start the same actions render full-page via FirstRunScreen instead — both
 // share <NewActions/>. This wrapper owns the modal chrome: backdrop, logo/title
 // header, sign-in, close button, and the shake when close is blocked.
-import { useEffect, useCallback, useState } from "react";
-import { motion, AnimatePresence, useAnimation } from "framer-motion";
+//
+// On `ui/dialog` since Night 5 (09-26-2026). It was hand-built on framer-motion,
+// which cost it every piece of modal behaviour the primitive gives for free:
+//   - no dialog role and no aria-modal, so a screen reader did not know it
+//     was a dialog at all;
+//   - no focus trap, so Tab walked the page behind the backdrop;
+//   - Escape came from a WINDOW keydown listener, which fired on every Escape
+//     anywhere regardless of what was on top;
+//   - the ✕ had no accessible name;
+//   - the title was an <h1>, not the dialog's name.
+// Escape, the backdrop and the ✕ all reach `onOpenChange(false)` now, and all
+// three go through `handleTryClose`, so the blocked-close shake (canClose=false,
+// e.g. right after Delete All) behaves exactly as before.
+import { useCallback, useState } from "react";
+import { motion, useAnimation } from "framer-motion";
 import { X } from "lucide-react";
-import { dialogZoom, fadeIn } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { NewActions } from "@/features/upload/NewActions";
 
 const horseLogo = "/Image-Horse-Logo.svg";
-import { DIALOG_OVERLAY } from "@/lib/styles";
 
 interface Props {
   open: boolean;
@@ -43,70 +60,62 @@ export function UploadDialog({
     else onClose();
   }, [canClose, onClose, triggerShake]);
 
-  // Escape closes (shake when closing is blocked, same as the ✕ button).
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleTryClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, handleTryClose]);
-
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          variants={fadeIn}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          className={`${DIALOG_OVERLAY} z-[var(--z-dialog)] flex items-center justify-center`}
-          onClick={handleTryClose}
-        >
-          <motion.div
-            {...dialogZoom}
-            className="relative w-full max-w-lg mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <motion.div
-              animate={controls}
-              className="bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
-            >
-              {/* Logo + Title — top center. Hidden in New Canvas mode so the
-                  "New Document" setup gets the full panel. A short top pad keeps
-                  the sign-in / close buttons clear of the content. */}
-              {blankMode ? (
-                <div className="pt-6" />
-              ) : (
-                <div className="flex flex-col items-center pt-6 pb-2">
-                  <img
-                    src={horseLogo}
-                    alt="Image Horse"
-                    className="w-30 h-30 mb-2 drop-shadow-lg"
-                  />
-                  <h1 className="text-lg font-bold text-text-primary tracking-wide">
-                    Image Horse
-                  </h1>
-                </div>
-              )}
-
-              {/* Close */}
-              <Button size="tiny" className="absolute top-4 right-4" onClick={handleTryClose}>
-                <X className="h-4 w-4" />
-              </Button>
-
-              <NewActions
-                onFiles={onFiles}
-                onFilesAdded={onClose}
-                onInvalidFiles={triggerShake}
-                autoFocusFirst
-                onBlankModeChange={setBlankMode}
+    <Dialog
+      open={open}
+      // Every way out — Escape, the backdrop, the ✕ — arrives here. `open` is
+      // controlled, so when closing is blocked and onClose is never called the
+      // dialog simply stays open and shakes.
+      onOpenChange={(next) => {
+        if (!next) handleTryClose();
+      }}
+    >
+      <DialogContent
+        aria-describedby={undefined}
+        // The rounder corner is this dialog's own; keeping it holds the visual
+        // change of the port to the semantics, which is the point of it. The
+        // 1rem gutter keeps the panel off the screen edge on a phone.
+        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl"
+      >
+        <motion.div animate={controls}>
+          {/* Logo + Title — top center. Hidden in New Canvas mode so the
+              "New Document" setup gets the full panel. The title is ALWAYS in
+              the tree: it is the dialog's accessible name, and a dialog with
+              no name is announced as just "dialog". */}
+          {blankMode ? (
+            <>
+              <div className="pt-6" />
+              <DialogTitle className="sr-only">New image</DialogTitle>
+            </>
+          ) : (
+            <div className="flex flex-col items-center pt-6 pb-2">
+              <img
+                src={horseLogo}
+                alt=""
+                className="w-30 h-30 mb-2 drop-shadow-lg"
               />
-            </motion.div>
-          </motion.div>
+              <DialogTitle className="text-lg font-bold text-text-primary tracking-wide">
+                Image Horse
+              </DialogTitle>
+            </div>
+          )}
+
+          {/* Close — the same named button the shared DialogHeader renders. */}
+          <DialogClose asChild>
+            <Button size="tiny" className="absolute top-4 right-4" aria-label="Close">
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogClose>
+
+          <NewActions
+            onFiles={onFiles}
+            onFilesAdded={onClose}
+            onInvalidFiles={triggerShake}
+            autoFocusFirst
+            onBlankModeChange={setBlankMode}
+          />
         </motion.div>
-      )}
-    </AnimatePresence>
+      </DialogContent>
+    </Dialog>
   );
 }

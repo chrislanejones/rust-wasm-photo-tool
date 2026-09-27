@@ -128,7 +128,7 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               than in `ui/dialog` because that default is shared with every
               other dialog in the app and re-toning all of them is its own
               session — see the report. */}
-          <DialogDescription className="text-xs text-text-secondary">
+          <DialogDescription className="text-xs">
             Theme and motion, and whether this device syncs with your account.
           </DialogDescription>
         </DialogHeader>

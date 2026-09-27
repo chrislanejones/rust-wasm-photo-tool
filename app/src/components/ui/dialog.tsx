@@ -215,7 +215,14 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm leading-relaxed text-text-muted", className)}
+    // text-secondary, not text-muted. Measured from computed styles on a real
+    // build (Night 5, 09-26-2026): muted is 3.65:1 on the light theme's
+    // dialog surface, under WCAG AA's 4.5:1 for 14px text, and it sat under
+    // EVERY dialog in the app. secondary is 6.99:1 light and 8.56:1 dark.
+    // Two call sites had patched it locally (the mobile settings sheet and the
+    // parked screen); both overrides are gone, so this is the one place the
+    // colour is decided. A test fails if a call site sets it again.
+    className={cn("text-sm leading-relaxed text-text-secondary", className)}
     {...props}
   />
 ))
