@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as React from "react";
@@ -53,10 +53,6 @@ describe("saveStatus — the one publisher for a failed save", () => {
     container.remove();
   });
 
-  it("starts clear, so a fresh session never claims a failure", () => {
-    expect(seen.at(-1)).toBe(false);
-  });
-
   it("holds a failure until a later save clears it", async () => {
     await act(async () => setSaveFailed(true));
     expect(seen.at(-1)).toBe(true);
@@ -68,6 +64,30 @@ describe("saveStatus — the one publisher for a failed save", () => {
     const before = renders;
     await act(async () => setSaveFailed(false)); // already false
     expect(renders).toBe(before);
+  });
+});
+
+describe("saveStatus — its REAL initial value", () => {
+  it("starts clear, so a fresh session never claims a failure", async () => {
+    // A fresh module instance, read before anything writes to it. The first
+    // version of this test lived beside a beforeEach that called
+    // setSaveFailed(false) first, so it asserted the value the reset had just
+    // set — flipping the real initial value to `true` left it green. Same hole
+    // as Night 4's maskEditing default, found the same way: by mutating it.
+    vi.resetModules();
+    const fresh = await import("@/lib/saveStatus");
+    const values: boolean[] = [];
+    function Probe() {
+      values.push(fresh.useSaveStatus().failed);
+      return null;
+    }
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const r = createRoot(el);
+    await act(async () => r.render(React.createElement(Probe)));
+    expect(values[0]).toBe(false);
+    await act(async () => r.unmount());
+    el.remove();
   });
 });
 
