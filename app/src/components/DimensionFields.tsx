@@ -70,6 +70,11 @@ export function DimensionFields({
         />
         <button
           onClick={onToggleLock}
+          // A STABLE name, with aria-pressed carrying on/off (Night 2's toggle
+          // rule). The only name used to be this flipping title, so a screen
+          // reader heard "Unlock aspect ratio, pressed" — which contradicts
+          // itself. The title still flips, for the hover hint.
+          aria-label="Lock aspect ratio"
           title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
           aria-pressed={lockAspect}
           disabled={disabled}
