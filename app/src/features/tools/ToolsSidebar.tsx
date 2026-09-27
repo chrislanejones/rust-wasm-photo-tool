@@ -102,8 +102,8 @@ export function ToolsSidebar({
   selection,
   onToggleMove,
   layerMask,
-  embedded = false,
-  closable = false,
+  embedded,
+  closable,
   onResize,
   onResizeOnly,
   onResizeCanvas,
@@ -116,12 +116,16 @@ export function ToolsSidebar({
   compressProgress,
   onToolSettingsChange,
   onPickColor,
-  aiEnabled = false,
+  aiEnabled,
   onAIResult,
 }: ToolsSidebarProps) {
   // React Compiler opt-in (vite.config.ts, annotation mode). The most props
   // of any component, none memoized — a parent render costs the most here.
   "use memo";
+  // ⚠️ No `= false` defaults in the props destructure: babel-plugin-react-compiler
+  // 1.0 fails to lower them (AssignmentPattern) and silently skips the whole
+  // component. Every optional boolean here reads `undefined` as false anyway.
+  // reactCompiler.contract.test.ts fails if this stops compiling.
   // B1 (docs/AppShell-Refactor-Plan.md): the engine and the tool hook
   // instances come from the session context, not 23 more props. Bound to the
   // names the props had so the panel wiring below is untouched. The panels

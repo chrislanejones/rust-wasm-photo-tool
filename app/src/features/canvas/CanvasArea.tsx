@@ -160,9 +160,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     },
     ref,
   ) => {
-    // React Compiler opt-in (vite.config.ts, annotation mode). Re-rendered on
-    // every AppShell render, at stroke rate.
-    "use memo";
+    // Not a React Compiler opt-in: it skips components with hook-lint
+    // suppressions (this has several). The overlays read the live canvas rect
+    // at render, which is only correct while nothing memoizes this component.
     const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
 

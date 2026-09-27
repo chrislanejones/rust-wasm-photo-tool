@@ -123,11 +123,15 @@ export function ReviewPanel({
   duplicatePadId,
   userMode,
   getHistogram,
-  embedded = false,
-  closable = false,
+  embedded,
+  closable,
 }: Props) {
   // React Compiler opt-in (vite.config.ts, annotation mode).
   "use memo";
+  // ⚠️ No `= false` defaults in the props destructure: babel-plugin-react-compiler
+  // 1.0 fails to lower them (AssignmentPattern) and silently skips the whole
+  // component. Every optional boolean here reads `undefined` as false anyway.
+  // reactCompiler.contract.test.ts fails if this stops compiling.
   // B1 (docs/AppShell-Refactor-Plan.md): history, layers and their engine
   // actions come from the session context, not 19 props. Bound to the names
   // the props had so the sections below are untouched.
