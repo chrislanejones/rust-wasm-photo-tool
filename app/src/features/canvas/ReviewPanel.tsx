@@ -165,6 +165,8 @@ export function ReviewPanel({
   embedded = false,
   closable = false,
 }: Props) {
+  // React Compiler opt-in (vite.config.ts, annotation mode) — 32 props.
+  "use memo";
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
   // and scroll area. All three start open.

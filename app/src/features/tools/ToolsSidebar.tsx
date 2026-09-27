@@ -242,6 +242,9 @@ export function ToolsSidebar({
   aiEnabled = false,
   onAIResult,
 }: ToolsSidebarProps) {
+  // React Compiler opt-in (vite.config.ts, annotation mode). 77 props from
+  // AppShell, none memoized — this is where a parent render costs the most.
+  "use memo";
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
   const effectsMode = useToolStore((s) => s.effectsMode);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for

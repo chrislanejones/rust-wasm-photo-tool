@@ -217,8 +217,10 @@ export default tseslint.config(
     // 2909 -> 2802 (2026-09-26): the file had crept to 3025. The two cursor
     // glyphs + getCursorForSubTool moved to canvasCursor.ts, arrowGeometry +
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
+    // 2823 -> 2815 (2026-09-27, B0): the on-canvas ink constants moved to
+    // canvasInk.ts so the React Compiler `"use memo"` opt-in fit under the cap.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2823 }] },
+    rules: { "max-lines": ["error", { max: 2815 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

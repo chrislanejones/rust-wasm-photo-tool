@@ -112,6 +112,8 @@ export function TopBar({
   superUser,
   openRaster,
 }: TopBarProps) {
+  // React Compiler opt-in (vite.config.ts, annotation mode) — 23 props.
+  "use memo";
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below

@@ -186,6 +186,37 @@ check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 
+# ── PROP DRILLING OUT OF AppShell (docs/AppShell-Refactor-Plan.md, B0) ──
+#
+# The thing the AppShell plan reduces is not the line count, it is the number
+# of props AppShell threads into its two biggest children. `max-lines` is the
+# outer ratchet; this is the inner one, so a step that shrinks the file by
+# moving a handler while ADDING a prop (the 2026-07 accretion pattern) is
+# caught here even when the line count says "improved".
+#
+# Counts JSX attributes on each `<ToolsSidebar` / `<CanvasArea` element in
+# AppShell — one `name={…}` or bare `name` per line, which is how the file is
+# formatted — and reports the LARGEST instance (CanvasArea is mounted in both
+# arms of the Batch ternary; the wide-canvas arm carries more). A comment line
+# inside the element does not count. Measured 2026-09-27: 76 and 61 (the
+# plan's "77 / 46" counted by hand; 46 was the Batch-grid arm, and the wide
+# arm is the one that matters).
+count_jsx_props() {
+  # $1 = element name, $2 = file. Prints the max attribute count over every
+  # `<Name` … `/>` block.
+  awk -v el="$1" '
+    $0 ~ "<" el "$" || $0 ~ "<" el "[[:space:]]" { inside = 1; n = 0; next }
+    inside && /^[[:space:]]*\/>/ { if (n > max) max = n; inside = 0; next }
+    inside && /^[[:space:]]*(\/\/|\/\*|\*)/ { next }
+    inside && /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|$)/ { n++ }
+    END { print max + 0 }
+  ' "$2"
+}
+n_sidebar_props=$(count_jsx_props ToolsSidebar app/src/app/AppShell.tsx)
+check "appshell-sidebar-props" 76 "props on <ToolsSidebar> in AppShell — read the store in the panel instead" "$n_sidebar_props"
+n_canvas_props=$(count_jsx_props CanvasArea app/src/app/AppShell.tsx)
+check "appshell-canvas-props" 61 "props on <CanvasArea> in AppShell — read the store / session context instead" "$n_canvas_props"
+
 # ── src/lib.rs line count: NOT ratcheted ──
 # `librs-lines` (5213 -> 4771 over Aug-Sep 2026) was retired by Chris on
 # 09-25-2026. lib.rs is refactored often enough that a blocking line count cost
