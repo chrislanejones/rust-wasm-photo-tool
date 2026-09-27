@@ -148,20 +148,12 @@ export const panelSwap: Variants = {
    A variant used once is indirection, not a single source of truth.
    ────────────────────────────────────────────────────────────────────────── */
 
-// Modal / dialog entrance — the surface itself, not its backdrop.
-//
-// ⚠️ THIS EXISTED TWICE AND THE TWO HAD ALREADY DRIFTED: UploadDialog entered
-// from `scale: 0.95`, ObjectRemovalModal from `scale: 0.96`. Nobody chose
-// that difference and nobody could see it — which is the whole argument for a
-// named variant. `settingsPanelMotion` right below carries the same scar in
-// its own comment ("it had drifted into ~9 inline copies").
-//
-// Spread it — `{...dialogZoom}` — rather than copying the triple.
-export const dialogZoom = {
-  initial: { scale: 0.95, opacity: 0 },
-  animate: { scale: 1, opacity: 1, transition: springStandard },
-  exit: { scale: 0.95, opacity: 0, transition: { duration: 0.12 } },
-};
+// (`dialogZoom` lived here — the entrance for a hand-built modal surface. Its
+// last two consumers were UploadDialog and ObjectRemovalModal; the second was
+// deleted earlier and the first moved onto `ui/dialog` in Night 5, which
+// animates its own surface through Radix's data-state classes. A modal that
+// wants an entrance should be a `ui/dialog`, not a motion.div with this spread
+// on it — so it is gone rather than kept "in case".)
 
 // Settings sub-feature panel enter/exit (Paint / Text / Resize sub-panels and
 // ImageMetaPanel). Spread onto the `motion.div` — `{...settingsPanelMotion}` —

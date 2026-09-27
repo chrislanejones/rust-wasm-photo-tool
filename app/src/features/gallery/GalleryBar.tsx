@@ -267,8 +267,14 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           Shown on hover only. */}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        aria-label="Remove image"
         title="Remove"
-        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-all"
+        // focus-visible:opacity-100 — this button is opacity-0 until hover, so a
+        // keyboard user tabbing through the gallery landed on it completely
+        // INVISIBLE: opacity 0, and opacity hides an element's outline too, so
+        // the global button:focus-visible ring could not show (WCAG 2.4.7,
+        // measured in QC 09-27-2026). The Select toggle beside it gets the same.
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
       </button>
@@ -277,6 +283,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           visible for every thumb once a selection has started. */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
+        // A toggle: a stable name, with aria-pressed saying which way it is.
+        // The only name used to be this flipping title.
+        aria-label="Select image"
+        aria-pressed={selected}
         title={selected ? "Deselect" : "Select"}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
            `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
@@ -313,7 +323,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
             : "bg-black/55 border-white/80 text-white/45"
-        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>
@@ -384,7 +394,12 @@ function GalleryActions({
     : "flex items-center gap-1.5";
   const actionBtn = vertical ? "px-1.5 py-2 text-2xs" : btn;
   /** Compact stacks icon over label, so the label must not be hidden there. */
-  const label = vertical ? "inline" : "hidden sm:inline";
+  // sr-only, not hidden. `hidden` is display:none, which takes the text out of
+  // the ACCESSIBILITY tree as well as off the screen — so below 640px every one
+  // of these buttons was icon-only with a flaky `title` as its only name.
+  // sr-only looks identical (gone below sm, shown above) but a screen reader
+  // still reads the label. Seven buttons fixed by this one string.
+  const label = vertical ? "inline" : "sr-only sm:not-sr-only";
 
   const actions = (
     <>

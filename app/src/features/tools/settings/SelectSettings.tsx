@@ -279,6 +279,8 @@ export function SelectSettings({
       <div className={PANEL_SECTION}>
         <SectionHeader
           title="Combine"
+          // The strip is icon-only, so the chosen mode's name lives here.
+          value={COMBINE_OPTIONS[combine]?.label}
           info={
             <>
               How the next selection meets the one you have. Holding{" "}
@@ -288,7 +290,7 @@ export function SelectSettings({
           }
         />
         <ToolButtonGroup<CombineId>
-          columns={2}
+          segmented
           disabled={disabled}
           value={COMBINE_IDS[combine]}
           onChange={(id) => setCombine(COMBINE_IDS.indexOf(id) as SelectionCombineMode)}

@@ -277,10 +277,10 @@ export function ReviewPanel({
               <History className="h-3.5 w-3.5" />
               <span className="review-section-name">History</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <Button size="tiny" onClick={onUndo} disabled={!canUndo} title="Undo">
+                <Button size="tiny" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo">
                   <Undo2 className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="tiny" onClick={onRedo} disabled={!canRedo} title="Redo">
+                <Button size="tiny" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo">
                   <Redo2 className="h-3.5 w-3.5" />
                 </Button>
                 <TinyNumberBox>{history.length}</TinyNumberBox>
@@ -330,6 +330,7 @@ export function ReviewPanel({
                 <TinyNumberBox>{objects.length}</TinyNumberBox>
                 <Button size="tiny"
                   onClick={() => toggle("reselect")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
@@ -418,6 +419,7 @@ export function ReviewPanel({
                     const t = subToolByKey("edit/resize-layer");
                     if (t) activateSubTool(t);
                   }}
+                  aria-label="Open the Layers tool"
                   title="Open the Layers tool (move, resize, mask)"
                 >
                   <Settings className="h-3.5 w-3.5" />
@@ -425,6 +427,11 @@ export function ReviewPanel({
                 <Button size="tiny"
                   onClick={onAddLayer}
                   disabled={!canAddLayer}
+                  // The NAME says what it does; the title below says why it is
+                  // disabled. Before this, the only name was that title, so a
+                  // screen reader heard "Layer limit reached (8)" and never
+                  // learned the button adds a layer.
+                  aria-label="Add layer"
                   title={
                     !layersUnlocked
                       ? "Layers require a logged-in or paid account"
@@ -444,6 +451,7 @@ export function ReviewPanel({
                 </Button>
                 <Button size="tiny"
                   onClick={() => toggle("layers")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
@@ -656,6 +664,7 @@ export function ReviewPanel({
               <div className="ml-auto flex items-center gap-1.5">
                 <Button size="tiny"
                   onClick={() => toggle("histogram")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />

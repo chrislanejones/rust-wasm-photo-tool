@@ -557,8 +557,8 @@ export function BatchSettings({
       );
     } catch (err) {
       console.error("Bulk-logo: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the logo. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the logo.");
     } finally {
       setRunning(false);
     }
@@ -1254,8 +1254,8 @@ function TextBatchPanel({
       );
     } catch (err) {
       console.error("Bulk-text: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the text. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the text.");
     } finally {
       setRunning(false);
     }

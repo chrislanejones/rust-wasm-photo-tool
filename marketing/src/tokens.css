@@ -157,7 +157,14 @@
   );
   /* A secondary sticky must dock BELOW the fixed nav, not at top:0, or it
    * paints over the bar mid-scroll. 62px pill + 16px inset + air. */
-  --banner-height: 94px;
+  /* The Naji announcement bar pinned above the nav (components/NajiBanner.tsx).
+     ONE number moves everything: the nav pill drops by it and --banner-height
+     grows by it, so every page's top padding, every anchor's scroll margin, the
+     sticky panel and the mobile sheet — ~25 rules, all derived from
+     --banner-height — clear the bar without a single per-page edit. Set it to 0
+     to take the bar away and the layout goes back exactly as it was. */
+  --announce-height: 40px;
+  --banner-height: calc(94px + var(--announce-height));
   --measure:     65ch;
 
   /* === Rules =================================================== */

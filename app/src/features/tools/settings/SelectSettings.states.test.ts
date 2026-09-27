@@ -130,9 +130,14 @@ describe("the readout", () => {
 });
 
 describe("Combine", () => {
+  /** By ACCESSIBLE NAME, not visible text. The segments went icon-only with
+   *  the Select Panel design (09-27-2026), so the name moved to `aria-label`
+   *  and the chosen one is spelled out in the section header instead. Reading
+   *  the name is what a screen reader does, and it holds whichever way the
+   *  control is drawn — querying visible text was the thing that broke. */
   const radio = (name: string) => {
     const b = [...container.querySelectorAll("button")].find(
-      (x) => x.textContent?.trim() === name,
+      (x) => (x.getAttribute("aria-label") ?? x.textContent?.trim()) === name,
     );
     if (!b) throw new Error(`no ${name} button`);
     return b;

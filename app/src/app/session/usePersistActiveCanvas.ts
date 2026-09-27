@@ -10,6 +10,7 @@ import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
+import { setSaveFailed } from "@/lib/saveStatus";
 import { putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { makeThumbnailFromPixels } from "@/lib/workingCopy";
@@ -137,9 +138,14 @@ export function usePersistActiveCanvas({
         ...prev,
         [entry.id]: { savingsPercent: realSavings },
       }));
+      // A save landed, so any earlier failure is no longer true.
+      setSaveFailed(false);
     } catch (err) {
       console.error("Persist canvas failed:", err);
       toast.error("Couldn't save canvas changes");
+      // The toast is the moment; this is what stays true after it has gone —
+      // the status bar holds it until a later save succeeds.
+      setSaveFailed(true);
     }
     // `setPhotos` / `setImageSavings` are listed even though AppShell's array
     // omitted them. Zustand actions are stable references, so naming them
