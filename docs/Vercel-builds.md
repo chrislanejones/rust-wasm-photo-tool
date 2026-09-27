@@ -74,5 +74,9 @@ September 2026, from the team's usage API: 942 builds, 1,401 build minutes,
 09-17 against Hobby's 100-a-day cap. Replaying all 234 master commits since
 09-01 through the script: 468 builds become 317.
 
-Not settled: whether a build skipped this way still counts toward the
-100-a-day cap. Vercel's docs do not say.
+**A skip still creates a deployment record.** Measured on PR #252: the skipped
+build appears as a CANCELED deployment ("canceled because the Ignored Build
+Step command returned exit code 0"). The build minutes and the queue slot are
+saved; whether a CANCELED deployment counts toward the 100-a-day cap, Vercel's
+docs do not say — assume it may. Only `git.deploymentEnabled` stops a
+deployment from existing at all, and it works by branch, not by path.
