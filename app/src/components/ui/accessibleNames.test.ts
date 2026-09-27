@@ -86,3 +86,19 @@ describe("responsive labels stay in the accessibility tree", () => {
     expect(src).not.toMatch(/const label = [^;]*"hidden sm:inline"/);
   });
 });
+
+describe("hover-only controls still show on keyboard focus (WCAG 2.4.7)", () => {
+  // The gallery's Remove and Select buttons are opacity-0 until hover. A
+  // keyboard user tabbing through landed on them INVISIBLE — and opacity hides
+  // an element's outline too, so the global button:focus-visible ring could
+  // not show. Measured in QC with a real Tab: opacity 0 -> 1, ring visible.
+  const gallery = read("features/gallery/GalleryBar.tsx");
+
+  it("Remove reveals itself on keyboard focus", () => {
+    expect(gallery).toMatch(/opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"/);
+  });
+
+  it("Select reveals itself on keyboard focus", () => {
+    expect(gallery).toMatch(/"opacity-0 group-hover:opacity-100 focus-visible:opacity-100"/);
+  });
+});

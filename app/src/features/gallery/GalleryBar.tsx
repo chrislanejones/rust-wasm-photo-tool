@@ -269,7 +269,12 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
         aria-label="Remove image"
         title="Remove"
-        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-all"
+        // focus-visible:opacity-100 — this button is opacity-0 until hover, so a
+        // keyboard user tabbing through the gallery landed on it completely
+        // INVISIBLE: opacity 0, and opacity hides an element's outline too, so
+        // the global button:focus-visible ring could not show (WCAG 2.4.7,
+        // measured in QC 09-27-2026). The Select toggle beside it gets the same.
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
       </button>
@@ -318,7 +323,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
             : "bg-black/55 border-white/80 text-white/45"
-        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>

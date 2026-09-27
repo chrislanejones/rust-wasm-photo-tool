@@ -1788,7 +1788,7 @@ export function AppShell() {
   const photoLayerRevision = useGalleryStore((s) => s.layerRevision);
   const photoBounds = usePhotoBounds(
     stamp.toolRef,
-    stamp.state.undoCount + photoLayerRevision,
+    `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
   // ignorant of the pad (and inside its max-lines cap).

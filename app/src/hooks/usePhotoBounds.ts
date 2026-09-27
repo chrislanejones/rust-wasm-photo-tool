@@ -39,9 +39,17 @@ export interface PhotoBounds {
  */
 export function usePhotoBounds(
   stampToolRef: MutableRefObject<ImageHorseTool | null>,
-  /** Bump when the document may have changed. Must include the PIXEL counter:
-   *  a resize, an undo or a flatten all move these bounds. */
-  revision: number,
+  /** Changes whenever the document may have changed. Must include the PIXEL
+   *  counter (a resize, an undo or a flatten all move these bounds) AND
+   *  something that changes when a photo LOADS.
+   *
+   *  It used to be `undoCount + layerRevision` alone, and a fresh import moves
+   *  neither. The effect first runs before the engine has the photo, and the
+   *  tool ref it reads is a ref — its `.current` changing never re-runs an
+   *  effect. So "Photo:" sat on the padded document (640×400 read 660×420) and
+   *  the Resize panel locked its aspect ratio to it, until the first edit
+   *  happened to bump the counter. Measured in QC, 09-27-2026. */
+  revision: number | string,
 ): PhotoBounds | null {
   const [bounds, setBounds] = useState<PhotoBounds | null>(null);
 
