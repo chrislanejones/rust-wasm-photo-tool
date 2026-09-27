@@ -207,8 +207,18 @@ export default tseslint.config(
     // match the file. See docs/AppShell-Refactor-Plan.md for why the next
     // reductions are structural (context + stores + JSX split), not more
     // handler extractions.
+    // 3716 -> 3618 (2026-09-27, B1): SessionContext. The engine facade and the
+    // drawing/paste/text hook instances reach ToolsSidebar, CanvasArea,
+    // ReviewPanel and TopBar through app/session/SessionContext.tsx; 91 props
+    // and their pass-through lines are gone from the return.
+    // 3618 -> 3371 (2026-09-27, B2): ToolsSidebar, CanvasArea, ReviewPanel,
+    // TopBar and GalleryBar read their store-backed values with selectors; the
+    // ~80 props and the set-only wrappers behind them were deleted, not moved.
+    // 3371 -> 2389 (2026-09-27, B3): the JSX return split into app/shell/
+    // (ShellDialogs + ExportDialog, SidebarDock, Workspace, CanvasContextMenu)
+    // and the drag/paste import flow into session/useImageImport.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3716 }] },
+    rules: { "max-lines": ["error", { max: 2389 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -217,8 +227,16 @@ export default tseslint.config(
     // 2909 -> 2802 (2026-09-26): the file had crept to 3025. The two cursor
     // glyphs + getCursorForSubTool moved to canvasCursor.ts, arrowGeometry +
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
+    // 2823 -> 2815 (2026-09-27, B0): the on-canvas ink constants moved to
+    // canvasInk.ts so the React Compiler `"use memo"` opt-in fit under the cap.
+    // 2815 -> 2783 (2026-09-27, B1): 22 props became session-context reads.
+    // 2783 -> 2780 (2026-09-27, B2): 17 props became store reads; the
+    // derivations moved in with them, so the file barely moved.
+    // 2780 -> 1954 (2026-09-27, B4): CropLayer, PastePlacementLayer and
+    // ShapeEditLayer — each drag state + window listeners + overlay — moved
+    // out, the way PerspectiveLayer did.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2823 }] },
+    rules: { "max-lines": ["error", { max: 1954 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

@@ -1997,14 +1997,7 @@ impl ImageHorseTool {
 mod tests {
     use super::*;
 
-    /// A `w×h` buffer of one repeated RGBA value.
-    fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
-        let mut v = Vec::with_capacity((w * h * 4) as usize);
-        for _ in 0..(w * h) {
-            v.extend_from_slice(&rgba);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     /// One pixel of the COMPOSITE (what the canvas shows), not of a layer.
     fn px(tool: &ImageHorseTool, x: u32, y: u32) -> [u8; 4] {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Aperture,
@@ -35,8 +35,11 @@ import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
-import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
-import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
+import { useEngine, useEngineState, useSession } from "@/app/session/SessionContext";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { pinLabelText } from "@/lib/pinLabel";
+import { zMoveFor, zTargetIndex } from "@/lib/shapeZOrder";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
 /** One placed object shown in the Reselect list (text or shape annotation). */
@@ -57,17 +60,6 @@ export interface ReselectObject {
 type SectionKey = "history" | "reselect" | "layers" | "histogram";
 
 interface Props {
-  history: HistoryEntry[];
-  onJump: (index: number) => void;
-  onDelete: (index: number) => void;
-  onClose: () => void;
-  /** Undo / redo buttons in the History section header. */
-  onUndo: () => void;
-  canUndo: boolean;
-  onRedo: () => void;
-  canRedo: boolean;
-  /** Live placed objects (text + shapes) for the Reselect list. */
-  objects: ReselectObject[];
   /** Click an object → load it into the canvas edit overlay to move/resize. */
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
@@ -78,33 +70,11 @@ interface Props {
   onToggleDuplicatePad: (o: ReselectObject) => void;
   /** Which shape's pad is open, so its row reads pressed. */
   duplicatePadId: number | null;
-  /** ▲/▼ on a SHAPE row → restack it (text has no draw order). Optional so
-   *  callers without shape z-order (tests, older composition) still render. */
-  onMoveShape?: (id: number, dir: ZMove) => void | boolean | Promise<boolean>;
   /** Current effective tier — drives the Layers section's allowance. */
   userMode: UserMode;
-  // ── Layers ──
-  /** Layer stack, bottom → top (rendered reversed so the top layer is first). */
-  layers: LayerInfo[];
-  onAddLayer: () => void;
-  onDuplicateLayer: (id: number) => void;
-  onDeleteLayer: (id: number) => void;
-  onSelectLayer: (id: number) => void;
-  onToggleLayerVisible: (id: number, visible: boolean) => void;
-  onSetLayerOpacity: (id: number, opacity: number) => void;
-  onRenameLayer: (id: number, name: string) => void;
-  /** Move a layer to a new stack index (0 = bottom). */
-  onMoveLayer: (id: number, newIndex: number) => void;
-  onMergeDown: (id: number) => void;
-  onFlattenAll: () => void;
   // ── Histogram ──
   /** Pulls the per-channel histogram from Rust (no canvas sampling). */
   getHistogram: () => Promise<Uint32Array | null>;
-  /** Changes when the active image content changes → triggers a resample. */
-  histogramSignature: string;
-  /** Active photo id — when it changes the histogram bars fall down, then rise
-   *  back up once the newly-selected photo has composited. */
-  histogramPhotoKey: string;
   /** Embedded mode: render as a plain flex column (no fixed `.review-panel`
    *  chrome / slide animation) so it can fill the compact master bar. */
   embedded?: boolean;
@@ -113,6 +83,20 @@ interface Props {
    *  compact top bar are in play, where the chrome owns open/close instead. */
   closable?: boolean;
 }
+
+/** Reselect-list names for each shape kind (the engine's kind codes). */
+const KIND_LABEL: Record<number, string> = {
+  0: "Square",
+  1: "Circle",
+  2: "Line",
+  3: "Hand-drawn",
+  4: "Arrow",
+  5: "Pin",
+  6: "Pen",
+  7: "Pen Path",
+  8: "Diamond",
+  9: "Star",
+};
 
 const TOGGLES: {
   key: SectionKey;
@@ -132,39 +116,79 @@ const TOGGLES: {
 ];
 
 export function ReviewPanel({
-  onClose,
-  history,
-  onJump,
-  onDelete,
-  onUndo,
-  canUndo,
-  onRedo,
-  canRedo,
-  objects,
   onSelectObject,
   onDeleteObject,
   onDuplicateObject,
   onToggleDuplicatePad,
   duplicatePadId,
-  onMoveShape,
   userMode,
-  layers,
-  onAddLayer,
-  onDuplicateLayer,
-  onDeleteLayer,
-  onSelectLayer,
-  onToggleLayerVisible,
-  onSetLayerOpacity,
-  onRenameLayer,
-  onMoveLayer,
-  onMergeDown,
-  onFlattenAll,
   getHistogram,
-  histogramSignature,
-  histogramPhotoKey,
-  embedded = false,
-  closable = false,
+  embedded,
+  closable,
 }: Props) {
+  // React Compiler opt-in (vite.config.ts, annotation mode).
+  "use memo";
+  // ⚠️ No `= false` defaults in the props destructure: babel-plugin-react-compiler
+  // 1.0 fails to lower them (AssignmentPattern) and silently skips the whole
+  // component. Every optional boolean here reads `undefined` as false anyway.
+  // reactCompiler.contract.test.ts fails if this stops compiling.
+  // B1 (docs/AppShell-Refactor-Plan.md): history, layers and their engine
+  // actions come from the session context, not 19 props. Bound to the names
+  // the props had so the sections below are untouched.
+  const {
+    jumpToHistory: onJump,
+    deleteHistoryEntry: onDelete,
+    undo: onUndo,
+    redo: onRedo,
+    addLayer,
+    duplicateLayer: onDuplicateLayer,
+    removeLayer: onDeleteLayer,
+    setActiveLayer: onSelectLayer,
+    setLayerVisible: onToggleLayerVisible,
+    setLayerOpacity: onSetLayerOpacity,
+    renameLayer: onRenameLayer,
+    moveLayer: onMoveLayer,
+    mergeDown: onMergeDown,
+    flattenAll: onFlattenAll,
+  } = useEngine();
+  // `addLayer(name?)` — the button wants the default name, not the event.
+  const onAddLayer = () => void addLayer();
+  const { history, layers, undoCount, redoCount } = useEngineState();
+  const canUndo = undoCount > 0;
+  const canRedo = redoCount > 0;
+  const { drawingTools, textTool } = useSession();
+  const { moveShape: onMoveShape } = drawingTools;
+  // B2: store-backed values read here, not passed. The Reselect list is
+  // derived from the live overlays (was AppShell's `reselectObjects`).
+  const setShowHistory = useUIStore((s) => s.setShowHistory);
+  const onClose = () => setShowHistory(false);
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const isImageLoading = useUIStore((s) => s.isImageLoading);
+  const { width, height } = useEngineState();
+  // Changes when the active image content changes → triggers a resample.
+  const histogramSignature = `${activePhotoId ?? ""}:${undoCount}:${redoCount}:${width}x${height}:${isImageLoading ? "loading" : "ready"}`;
+  // When the photo changes the histogram bars fall, then rise on the new one.
+  const histogramPhotoKey = activePhotoId ?? "";
+  // Names are per-kind ordinals computed in list order: Text #1, Square #1,
+  // Line #2, etc. The id is stable within its own (text vs shape) id-space.
+  const objects = useMemo<ReselectObject[]>(() => {
+    const items: ReselectObject[] = [];
+    textTool.annotations.forEach((a, i) => {
+      items.push({ key: `t${a.id}`, type: "text", id: a.id, label: `Text #${i + 1}` });
+    });
+    const counters: Record<number, number> = {};
+    drawingTools.shapes.forEach((s) => {
+      counters[s.kind] = (counters[s.kind] ?? 0) + 1;
+      // Pins show their own callout label (number or letter); everything else
+      // gets an ordinal.
+      const label =
+        s.kind === 5
+          ? `Pin ${pinLabelText(s.number, s.label_kind)}`
+          : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
+      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
+    });
+    return items;
+  }, [textTool.annotations, drawingTools.shapes]);
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
   // and scroll area. All three start open.
@@ -349,7 +373,7 @@ export function ReviewPanel({
                 // Shape rows get ▲/▼. `objects` lists shapes in the engine's
                 // draw order (bottom → top), so the id list IS the z-order and
                 // the same helper the hook uses decides which arrow is live.
-                const restack = onMoveShape && o.type === "shape";
+                const restack = o.type === "shape";
                 return (
                   <ReselectBar
                     key={o.key}

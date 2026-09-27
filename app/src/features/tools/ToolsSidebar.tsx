@@ -2,16 +2,12 @@
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
 import { slideFromLeft } from "@/lib/animations";
-import type {
-  ToolType,
-  StampSettings as StampSettingsType,
-  ToolSettings,
-} from "@/lib/types";
-import type { ExportFormat } from "@/lib/exportImage";
-import type { StampMode } from "./settings/StampSettings";
-import type { ShapesMode } from "@/stores/useToolStore";
+import type { StampSettings as StampSettingsType, ToolSettings } from "@/lib/types";
 import { useToolStore } from "@/stores/useToolStore";
-import type { LevelsControls, PresetControls } from "@/hooks/useTransforms";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useEngine, useEngineState, useSession } from "@/app/session/SessionContext";
 import { LevelsSettings } from "./settings/LevelsSettings";
 import { PresetsSettings } from "./settings/PresetsSettings";
 import { ToolGrid } from "./ToolGrid";
@@ -25,7 +21,6 @@ import {
   type LayerMaskControls,
   type LayerOverlayControls,
 } from "./settings/LayerSettings";
-import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectSettings } from "./settings/SelectSettings";
 import { PerspectiveSettings } from "./settings/PerspectiveSettings";
 import type { SelectionControls } from "./settings/SelectSettings";
@@ -34,8 +29,6 @@ import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { BatchSettings } from "./settings/BatchSettings";
-import type { PhotoEntry } from "@/features/gallery/GalleryBar";
-import type { ImageHorseTool } from "stamp_tool";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 import { AISettings } from "./settings/AISettings";
@@ -44,35 +37,30 @@ import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
-interface ToolsSidebarProps {
+export interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
    *  other embedding of this sidebar keeps working without them. */
   rulersPrefs?: Preferences;
   /** Patch preferences from the Rulers panel. */
   onRulersChange?: (patch: Partial<Preferences>) => void;
 
-  onClose: () => void;
-  activeTool: ToolType;
-  stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   /** Place the selected object into one of the nine grid cells (Text / Shape). */
   onPlace?: (cell: PlacementCell) => void;
-  /** Kind of the currently-selected object — gates the placement grid to the
-   *  matching panel (text grid only when a text is selected, etc.). */
-  selectedKind?: "text" | "shape" | null;
-  /** Selection tools — the Select tool's panel controls. */
-  selection?: SelectionControls;
-  /** Move-layer toggle — Layer Settings tool. */
-  moveActive?: boolean;
+  /** The Select tool's ACTIONS (useSelectionActions). The panel's values —
+   *  tolerance, kind, edge threshold, whether a mask exists — are read from
+   *  useToolStore here and merged in (B2). */
+  selection: Pick<
+    SelectionControls,
+    "onSelectAll" | "onDeselect" | "onDelete" | "onNewLayerCopy" | "onNewLayerCut" | "onRemoveObject"
+  >;
   onToggleMove?: () => void;
   /** Layer stack + selection + mask controls for the Layers panel (v8.38) —
    *  the same data/handlers ReviewPanel gets, one selection driving all. */
-  layers?: LayerInfo[];
-  onSelectLayer?: (id: number) => void;
-  layerMask?: LayerMaskControls;
-  /** Color Overlay controls for the selected layer — same one-set-per-panel
-   *  shape as `layerMask`, acting on whatever the panel's dropdown selected. */
-  layerOverlay?: LayerOverlayControls;
+  /** The two mask handlers that are session decisions (useMaskActions);
+   *  the store-backed editing/value and the engine's remove/apply/invert are
+   *  read here and merged in (B2). */
+  layerMask: Pick<LayerMaskControls, "onAdd" | "onToggleEdit">;
   /** Embedded mode: render the inner content as a plain flex column (no fixed
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
@@ -83,23 +71,6 @@ interface ToolsSidebarProps {
   closable?: boolean;
   /** Total photos in the gallery — drives the Compress panel's count. (It used
    *  to pluralize the Download footer's label too; Export moved to the bar.) */
-  exportFormat: ExportFormat;
-  onExportFormatChange?: (f: ExportFormat) => void;
-  onFlipH: () => void;
-  onFlipV: () => void;
-  onRotate90Cw: () => void;
-  /** "Resize Layer" — see `TransformCropSettingsProps.onResizeLayer`. */
-  onResizeLayer?: () => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
-  onSaturation?: (factor: number) => void;
-  onShadows?: (amount: number) => void;
-  onHighlights?: (amount: number) => void;
-  onSharpen?: (amount: number) => void;
-  /** Enhance › Levels: live preview and commit (useTransforms). */
-  levels?: LevelsControls;
-  presets?: PresetControls;
-  imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
   /** "Apply Resize" — resample only, no re-compression. See AppShell. */
@@ -111,53 +82,12 @@ interface ToolsSidebarProps {
   canRemoveCanvas: boolean;
   imageWidth: number;
   imageHeight: number;
-  currentByteSize: number;
-  currentMime?: string;
-  originalByteSize: number;
-  activePhotoId: string | null;
-  /** WASM undo count of the active photo (used to re-sync Effects sliders). */
-  undoCount: number;
-  quality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   compressProgress: { completed: number; total: number };
-  onApplyCrop?: () => void;
-  /** Allows the Crop tool ratio buttons to drop a centered crop selection
-   *  computed in Rust. Optional — omit to disable ratio buttons. */
-  onSetCropSelection?: (
-    sel: { x: number; y: number; width: number; height: number } | null,
-  ) => void;
-  /** Locked aspect ratio for crop drags. `null` = Free (no constraint). */
-  cropRatio?: [number, number] | null;
-  onCropRatioChange?: (lock: [number, number] | null) => void;
-  toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
-  // Paint sub-mode (paint / blur / pen / erase)
-  brushMode?: "paint" | "blur" | "pen" | "erase";
-  onBrushModeChange?: (mode: "paint" | "blur" | "pen" | "erase") => void;
-  // Color Picker — Edit & Transform tool (bottom of the panel).
-  colorPickerActive?: boolean;
-  onSetColorPickerActive?: (active: boolean) => void;
-  pickedColor?: string;
   /** Re-apply a color from the Color Picker history. */
   onPickColor?: (hex: string) => void;
-  onGlobalBlur?: (intensity: number) => void;
-  // Shapes sub-mode
-  shapesMode?: ShapesMode;
-  onShapesModeChange?: (mode: ShapesMode) => void;
-  // Stamp sub-mode + emoji
-  stampSubMode?: StampMode;
-  onStampSubModeChange?: (mode: StampMode) => void;
-  stampEmoji?: string;
-  stampEmojiSize?: number;
-  onStampEmojiChange?: (e: string) => void;
-  onStampEmojiSizeChange?: (s: number) => void;
-  // Bulk-logo (Images / "emoji" tool)
-  photos: PhotoEntry[];
-  setPhotos: React.Dispatch<React.SetStateAction<PhotoEntry[]>>;
-  stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
-  flushToCanvas: () => void;
-  syncState: () => void;
   /** Whether the current tier may use Replicate AI (Paid only). */
   aiEnabled?: boolean;
   /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
@@ -165,38 +95,15 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
-  onClose,
   rulersPrefs,
   onRulersChange,
-  activeTool,
-  stampSettings,
   onStampSettingsChange,
   onPlace,
-  selectedKind,
   selection,
-  moveActive,
   onToggleMove,
-  layers,
-  onSelectLayer,
   layerMask,
-  layerOverlay,
-  embedded = false,
-  closable = false,
-  exportFormat,
-  onExportFormatChange,
-  onFlipH,
-  onFlipV,
-  onRotate90Cw,
-  onResizeLayer,
-  onBrightness,
-  onContrast,
-  onSaturation,
-  onShadows,
-  onHighlights,
-  onSharpen,
-  levels,
-  presets,
-  imageReady,
+  embedded,
+  closable,
   onResize,
   onResizeOnly,
   onResizeCanvas,
@@ -204,44 +111,128 @@ export function ToolsSidebar({
   canRemoveCanvas,
   imageWidth,
   imageHeight,
-  currentByteSize,
-  currentMime,
-  originalByteSize,
-  activePhotoId,
-  undoCount,
-  quality,
   onQualityChange,
   onQualityCommit,
   compressProgress,
-  onApplyCrop,
-  onSetCropSelection,
-  cropRatio,
-  onCropRatioChange,
-  toolSettings,
   onToolSettingsChange,
-  brushMode,
-  onBrushModeChange,
-  colorPickerActive,
-  onSetColorPickerActive,
-  pickedColor,
   onPickColor,
-  onGlobalBlur,
-  shapesMode,
-  onShapesModeChange,
-  stampSubMode,
-  onStampSubModeChange,
-  stampEmoji,
-  stampEmojiSize,
-  onStampEmojiChange,
-  onStampEmojiSizeChange,
-  photos,
-  setPhotos,
-  stampToolRef,
-  flushToCanvas,
-  syncState,
-  aiEnabled = false,
+  aiEnabled,
   onAIResult,
 }: ToolsSidebarProps) {
+  // React Compiler opt-in (vite.config.ts, annotation mode). The most props
+  // of any component, none memoized — a parent render costs the most here.
+  "use memo";
+  // ⚠️ No `= false` defaults in the props destructure: babel-plugin-react-compiler
+  // 1.0 fails to lower them (AssignmentPattern) and silently skips the whole
+  // component. Every optional boolean here reads `undefined` as false anyway.
+  // reactCompiler.contract.test.ts fails if this stops compiling.
+  // B1 (docs/AppShell-Refactor-Plan.md): the engine and the tool hook
+  // instances come from the session context, not 23 more props. Bound to the
+  // names the props had so the panel wiring below is untouched. The panels
+  // themselves still take these as props — their render tests mount them
+  // without a provider, and B2 is where they read stores directly.
+  const {
+    flipHorizontal: onFlipH,
+    flipVertical: onFlipV,
+    rotate90Cw: onRotate90Cw,
+    adjustBrightness: onBrightness,
+    adjustContrast: onContrast,
+    applyGlobalBlur: onGlobalBlur,
+    adjustSaturation: onSaturation,
+    adjustShadows: onShadows,
+    adjustHighlights: onHighlights,
+    adjustSharpen: onSharpen,
+    levels,
+    presets,
+    setActiveLayer: onSelectLayer,
+    setLayerColorOverlay,
+    removeLayerColorOverlay,
+    applyLayerColorOverlay,
+    toolRef: stampToolRef,
+    flushToCanvas,
+    syncState,
+  } = useEngine();
+  const layerOverlay: LayerOverlayControls = {
+    onSet: setLayerColorOverlay,
+    onRemove: removeLayerColorOverlay,
+    onApply: applyLayerColorOverlay,
+  };
+  const { layers, undoCount, ready: imageReady } = useEngineState();
+  const { drawingTools, pastePlacement } = useSession();
+  const { applyCrop: onApplyCrop, setCropSelection: onSetCropSelection } = drawingTools;
+  const onResizeLayer = pastePlacement.beginLayerResize;
+  // B2: values that already live in a store are read here with a selector
+  // each — one key, one subscription — instead of arriving as props from a
+  // parent that re-rendered for some other reason. The AppShell wrappers that
+  // only called `set` are deleted, not moved; the two that did more
+  // (onToolSettingsChange forwards to an open text input, onQualityChange
+  // also dirties the photo) are still props.
+  const activeTool = useToolStore((s) => s.activeTool);
+  const toolSettings = useToolStore((s) => s.toolSettings);
+  const setToolSettings = useToolStore((s) => s.setToolSettings);
+  const stampSettings = useToolStore((s) => s.stampSettings);
+  const exportFormat = useToolStore((s) => s.exportFormat);
+  const onExportFormatChange = useToolStore((s) => s.setExportFormat);
+  const quality = useToolStore((s) => s.quality);
+  const cropRatio = useToolStore((s) => s.cropRatio);
+  const onCropRatioChange = useToolStore((s) => s.setCropRatio);
+  const brushMode = useToolStore((s) => s.brushMode);
+  const onBrushModeChange = useToolStore((s) => s.setBrushMode);
+  const colorPickerActive = useToolStore((s) => s.colorPickerActive);
+  const onSetColorPickerActive = useToolStore((s) => s.setColorPickerActive);
+  const shapesMode = useToolStore((s) => s.shapesMode);
+  const onShapesModeChange = useToolStore((s) => s.setShapesMode);
+  const stampSubMode = useToolStore((s) => s.stampSubMode);
+  const onStampSubModeChange = useToolStore((s) => s.setStampSubMode);
+  const moveActive = useToolStore((s) => s.moveActive);
+  const pickedColor = toolSettings.brushColor;
+  const stampEmoji = toolSettings.emoji;
+  const stampEmojiSize = toolSettings.emojiSize;
+  const onStampEmojiChange = (e: string) => setToolSettings((prev) => ({ ...prev, emoji: e }));
+  const onStampEmojiSizeChange = (n: number) => setToolSettings((prev) => ({ ...prev, emojiSize: n }));
+  const photos = useGalleryStore((s) => s.photos);
+  const setPhotos = useGalleryStore((s) => s.setPhotos);
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const activeEntry = photos.find((p) => p.id === activePhotoId);
+  const currentByteSize = activeEntry?.byteSize ?? 0;
+  const currentMime = activeEntry?.mimeType;
+  const originalByteSize = activeEntry?.originalByteSize ?? 0;
+  const selectedKind = useAnnotationStore((s) => s.selectedObject?.type ?? null);
+  const setShowTools = useUIStore((s) => s.setShowTools);
+  const onClose = () => setShowTools(false);
+  // The Select panel's controls: the session's actions (prop) + the store's values.
+  const selectionTolerance = useToolStore((s) => s.selectionTolerance);
+  const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
+  const selectionMask = useToolStore((s) => s.selectionMask);
+  const selectionKind = useToolStore((s) => s.selectionKind);
+  const setSelectionKind = useToolStore((s) => s.setSelectionKind);
+  const edgeThreshold = useToolStore((s) => s.edgeThreshold);
+  const setEdgeThreshold = useToolStore((s) => s.setEdgeThreshold);
+  const selectionControls: SelectionControls = {
+    ...selection,
+    tolerance: selectionTolerance,
+    onToleranceChange: setSelectionTolerance,
+    active: selectionMask !== null,
+    kind: selectionKind,
+    onKindChange: setSelectionKind,
+    edgeThreshold,
+    onEdgeThresholdChange: setEdgeThreshold,
+  };
+  // The Layers panel's mask controls: session handlers (prop) + store + engine.
+  const maskEditing = useToolStore((s) => s.maskEditing);
+  const maskPaintValue = useToolStore((s) => s.maskPaintValue);
+  const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
+  const { removeLayerMask, applyLayerMask, invertLayerMask } = useEngine();
+  const layerMaskControls: LayerMaskControls = {
+    editing: maskEditing,
+    value: maskPaintValue,
+    onAdd: layerMask.onAdd,
+    onRemove: removeLayerMask,
+    onApply: applyLayerMask,
+    onInvert: invertLayerMask,
+    onToggleEdit: layerMask.onToggleEdit,
+    onSetValue: setMaskPaintValue,
+  };
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
   const effectsMode = useToolStore((s) => s.effectsMode);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
@@ -377,7 +368,7 @@ export function ToolsSidebar({
         )}
 
         {activeTool === "select" && (
-          <SelectSettings disabled={!imageReady} selection={selection!} />
+          <SelectSettings disabled={!imageReady} selection={selectionControls} />
         )}
 
         {/* Perspective takes no controls prop — it reads usePerspectiveStore
@@ -451,7 +442,7 @@ export function ToolsSidebar({
             onResizeLayer={onResizeLayer}
             layers={layers}
             onSelectLayer={onSelectLayer}
-            mask={layerMask}
+            mask={layerMaskControls}
             overlay={layerOverlay}
             stampToolRef={stampToolRef}
             undoCount={undoCount}

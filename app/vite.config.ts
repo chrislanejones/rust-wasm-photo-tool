@@ -1,5 +1,6 @@
 import { defineConfig, type PluginOption } from "vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
@@ -157,8 +158,25 @@ const swPlugins = (): PluginOption[] => {
   ];
 };
 
+// ─── React Compiler — ANNOTATION mode (AppShell-Refactor-Plan B0) ──────────
+//
+// `app/src` has zero `React.memo` and four `useMemo` in a 3,700-line
+// composition root, so every AppShell render re-renders every child. The
+// refactor plan's next step (B1, a SessionContext) makes that a stroke-rate
+// hazard: a context value whose identity changes per render re-renders every
+// consumer on every brush move. The compiler is here so that is its problem,
+// not a hand-memoization campaign.
+//
+// `annotation`, not `infer`: only functions carrying a `"use memo"` directive
+// are compiled. Today that is the four largest components (ToolsSidebar,
+// CanvasArea, ReviewPanel, TopBar). Flip to `infer` — a separate commit — once
+// `npx eslint app/src --config eslint.config.compiler.mjs` is clean repo-wide;
+// that probe config exists for exactly this.
+const reactCompiler = (): PluginOption =>
+  babel({ presets: [reactCompilerPreset({ compilationMode: "annotation" })] });
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), wasm(), topLevelAwait(), ...swPlugins()],
+  plugins: [react(), reactCompiler(), tailwindcss(), wasm(), topLevelAwait(), ...swPlugins()],
 
   // ADR-024 a12.1 — MODULE workers, not IIFE.
   //

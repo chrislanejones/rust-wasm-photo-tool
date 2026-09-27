@@ -32,3 +32,18 @@ export const BP_TIGHT = 1200;
 // "too small, widen the window" notice.
 export const BP_NARROW = 900;
 export const BP_MOBILE = 600;
+
+/** Whether the three floating panels show their hover-reveal corner close.
+ *  Wide desktop only — there they float beside the canvas and the top bar
+ *  toggle brings one back. Everywhere else the chrome owns open/close (the
+ *  dock's tab strip, the narrow overlay drawers, the compact top bar with both
+ *  side panels open under BP_TIGHT), so a corner X would be a second,
+ *  competing way to do the same thing. Chris, 2026-09-08: "don't let the
+ *  closing work in that compact/tablet mode". */
+export function panelsClosable(
+  bp: { dock: boolean; narrow: boolean; width: number },
+  showTools: boolean,
+  showHistory: boolean,
+): boolean {
+  return !bp.dock && !bp.narrow && !(bp.width < BP_TIGHT && showTools && showHistory);
+}

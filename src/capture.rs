@@ -555,13 +555,7 @@ impl ImageHorseTool {
 mod capture_tests {
     use crate::ImageHorseTool;
 
-    fn solid(w: u32, h: u32, px: [u8; 4]) -> Vec<u8> {
-        let mut v = vec![0u8; (w * h * 4) as usize];
-        for c in v.chunks_exact_mut(4) {
-            c.copy_from_slice(&px);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     /// Minimal reader mirroring the JS decoder, so the test reads the frame the
     /// same way the consumer will rather than trusting the writer's own maths.

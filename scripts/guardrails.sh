@@ -97,7 +97,11 @@ n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | 
 check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
 
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
-      -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
+      -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' \
+      -g '!**/app/shell/SidebarDock.tsx' -g '!**/app/shell/Workspace.tsx' | wc -l)
+# SidebarDock / Workspace: the drawer scrim and the Batch-grid badges moved
+# there from AppShell in B3 (2026-09-27) and keep the exemption they had —
+# same three literals, not new ones.
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
@@ -185,6 +189,55 @@ check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
+
+# ── PROP DRILLING OUT OF AppShell (docs/AppShell-Refactor-Plan.md, B0) ──
+#
+# The thing the AppShell plan reduces is not the line count, it is the number
+# of props AppShell threads into its two biggest children. `max-lines` is the
+# outer ratchet; this is the inner one, so a step that shrinks the file by
+# moving a handler while ADDING a prop (the 2026-07 accretion pattern) is
+# caught here even when the line count says "improved".
+#
+# Counts JSX attributes on each `<ToolsSidebar` / `<CanvasArea` element in
+# AppShell — one `name={…}` or bare `name` per line, which is how the file is
+# formatted — and reports the LARGEST instance (CanvasArea is mounted in both
+# arms of the Batch ternary; the wide-canvas arm carries more). A comment line
+# inside the element does not count. Measured 2026-09-27: 76 and 61 (the
+# plan's "77 / 46" counted by hand; 46 was the Batch-grid arm, and the wide
+# arm is the one that matters).
+# 76 -> 53 and 61 -> 38 (2026-09-27, B1): SessionContext.
+# 53 -> 23 and 38 -> 21 (2026-09-27, B2): consumers read the stores.
+count_jsx_props() {
+  # $1 = element name, $2 = file. Prints the max attribute count over every
+  # `<Name` … `/>` block.
+  awk -v el="$1" '
+    $0 ~ "<" el "$" || $0 ~ "<" el "[[:space:]]" { inside = 1; n = 0; next }
+    inside && /^[[:space:]]*\/>/ { if (n > max) max = n; inside = 0; next }
+    inside && /^[[:space:]]*(\/\/|\/\*|\*)/ { next }
+    inside && /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|$)/ { n++ }
+    END { print max + 0 }
+  ' "$2"
+}
+# B3 moved both elements out of AppShell: <ToolsSidebar> into shell/SidebarDock
+# (its session props arrive as ONE spread `tools` object, whose fields AppShell
+# still spells out — so count the fields there too), <CanvasArea> into
+# shell/Workspace.
+# Counts the fields of a `name={{ … }}` object literal in AppShell (the
+# session props passed through as one spread), so a spread cannot hide growth.
+count_spread_fields() {
+  # $1 = prop name, $2 = its indent in spaces
+  awk -v nm="$1" -v ind="$2" '
+    BEGIN { open_re = "^" sprintf("%" ind "s", "") nm "=\\{\\{$"; close_re = "^" sprintf("%" ind "s", "") "\\}\\}$";
+            field_re = "^" sprintf("%" ind + 2 "s", "") "[A-Za-z_][A-Za-z0-9_]*(:|,)" }
+    $0 ~ open_re { inside = 1; next }
+    inside && $0 ~ close_re { inside = 0; next }
+    inside && $0 ~ field_re { n++ }
+    END { print n + 0 }' app/src/app/AppShell.tsx
+}
+n_sidebar_props=$(( $(count_jsx_props ToolsSidebar app/src/app/shell/SidebarDock.tsx) + $(count_spread_fields tools 8) ))
+check "appshell-sidebar-props" 23 "props on <ToolsSidebar> in AppShell — read the store in the panel instead" "$n_sidebar_props"
+n_canvas_props=$(( $(count_jsx_props CanvasArea app/src/app/shell/Workspace.tsx) + $(count_spread_fields canvas 12) + $(count_spread_fields wide 12) ))
+check "appshell-canvas-props" 21 "props on <CanvasArea> in AppShell — read the store / session context instead" "$n_canvas_props"
 
 # ── src/lib.rs line count: NOT ratcheted ──
 # `librs-lines` (5213 -> 4771 over Aug-Sep 2026) was retired by Chris on

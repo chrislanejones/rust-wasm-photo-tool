@@ -1004,13 +1004,7 @@ mod lasso_session_tests {
         v
     }
 
-    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
-        let mut v = vec![0u8; (w * h * 4) as usize];
-        for px in v.chunks_exact_mut(4) {
-            px.copy_from_slice(&c);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     /// The exact sequence `handleSelectionClick`/`handleLassoMove`/
     /// `handleLassoClose` drive: begin, a move-preview, three more committed
@@ -1195,13 +1189,7 @@ mod lasso_session_tests {
 mod lasso_oplog_restore_tests {
     use crate::ImageHorseTool;
 
-    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
-        let mut v = vec![0u8; (w * h * 4) as usize];
-        for px in v.chunks_exact_mut(4) {
-            px.copy_from_slice(&c);
-        }
-        v
-    }
+    use crate::test_util::solid;
 
     #[test]
     fn oplog_restore_clears_any_lasso_session_left_open_from_the_previous_document() {

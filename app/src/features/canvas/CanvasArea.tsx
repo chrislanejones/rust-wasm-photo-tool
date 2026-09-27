@@ -11,21 +11,16 @@ import React, {
   useState,
 } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
-import { pendingShapeType } from "@/hooks/useDrawingTools";
-import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
-import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
+import { useSession, useEngineState } from "@/app/session/SessionContext";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
-import {
-  cornerDelta,
-  lockAxisDelta,
-  lockPointToAxis,
-  lockScaleFactors,
-} from "@/lib/aspectLock";
 import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { PerspectiveLayer } from "./PerspectiveLayer";
+import { CropLayer } from "./CropLayer";
+import { PastePlacementLayer } from "./PastePlacementLayer";
+import { ShapeEditLayer } from "./ShapeEditLayer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
@@ -40,7 +35,8 @@ import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
@@ -48,41 +44,15 @@ import type { GridKind, RulerUnit } from "@/lib/preferences";
 import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
-import type { ShapeName } from "@/lib/types";
-import { diamondVertices, starVertices } from "@/lib/shapeSloppiness";
 import { getCursorForSubTool, ROTATE_CURSOR } from "./canvasCursor";
-import { arrowGeometry, sloppyShapePath } from "./shapeOverlayPath";
-
-/* On-canvas ink. Neutral black/white on purpose, not theme tokens: these sit on
-   arbitrary photo pixels, so they contrast by pairing a light line with a dark
-   one rather than by hue. Named because each was a literal repeated 2–7 times. */
-/** The dim outside a marquee, and the dark underlay beneath its dashed edge. */
-const MARQUEE_SHADE = "rgba(0,0,0,0.55)";
-/** The dashed box around a shape or text being edited. */
-const EDIT_BOX_STROKE = "rgba(255,255,255,0.85)";
-/** The dark rim on every white drag handle. */
-const HANDLE_OUTLINE = "rgba(0,0,0,0.5)";
-/** The soft shadow that lifts a handle cluster off the image. */
-const HANDLE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
-
-const EMPTY_SEGMENTS = new Float32Array(0);
-
-/** Screen-px movement below which a Select-tool press is a CLICK (fires the
- *  active kind), at or above which it's a marquee DRAG. Screen px, not canvas
- *  px, so the feel is zoom-independent. Matches the crop tool's 5px spirit. */
-const MARQUEE_THRESHOLD_PX = 4;
-
-interface TextInputState {
-  screenX: number;
-  screenY: number;
-  canvasX: number;
-  canvasY: number;
-  text: string;
-  rotation: number;
-  fontSize?: number;
-  fontWeight?: string;
-  textColor?: string;
-}
+import {
+  MARQUEE_SHADE,
+  EDIT_BOX_STROKE,
+  HANDLE_OUTLINE,
+  HANDLE_SHADOW,
+  EMPTY_SEGMENTS,
+  MARQUEE_THRESHOLD_PX,
+} from "./canvasInk";
 
 interface AnnotationBox {
   id: number;
@@ -94,55 +64,12 @@ interface AnnotationBox {
 
 interface Props {
   hookResult: ReturnType<typeof useCloneStamp>;
-  /** Ref for the arrow/shapes/crop rubber-band surface. Owned by AppShell only
-   *  because `useDrawingTools` lives there too and needs the same element; the
-   *  canvas itself is mounted here, beside the main one, so it inherits the
-   *  fit-scale and pan/zoom transform for free. */
-  drawPreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   brushDiameter: number;
   cursorPos: { x: number; y: number };
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
-  activeTool?: string;
-  textInput?: TextInputState | null;
-  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
-  onCanvasClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  onTextKeyDown?: (e: React.KeyboardEvent) => void;
-  onTextChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onTextBlur?: () => void;
-  textSettings?: {
-    fontSize: number;
-    /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
-     *  for the recent-text chips only. */
-    fontFamily?: string;
-    /** Engine typeface id; `""` = the embedded Liberation Sans. */
-    textFontId?: string;
-    fontWeight: string;
-    textColor: string;
-    /** Background-preview fields. The open textarea renders a live preview
-     *  using these so the user can configure their BG before committing. */
-    bgKind?: "none" | "rect" | "bubble";
-    bgColor?: string;
-    bgOpacity?: number;
-    bgPadding?: number;
-    bgCornerRadius?: number;
-    /** Speech-bubble tail angle in degrees (0-359). */
-    bgTail?: number;
-  };
-  colorPickerActive?: boolean;
-  /** Select tool: canvas clicks fire the active selection kind. */
-  selectionActive?: boolean;
-  /** Layer Settings → Move toggle on — drives the canvas cursor. */
-  layerMoveActive?: boolean;
   onSelectionClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  /** Select tool, click-once kinds: a DRAG sweeps a marquee instead of
-   *  clicking — preview here, engine commit on release. Off for the lasso
-   *  kind (its clicks are session anchors; a drag must not fight it). */
-  marqueeActive?: boolean;
-  /** Rect, or the ellipse inscribed in the drag rect — mirrors
-   *  `useToolStore.selectionShape` for the preview outline. */
-  marqueeShape?: "rect" | "ellipse";
   /** Commit the marquee: canvas-space corners + the release modifiers
    *  (Shift add / Alt subtract, flag-gated in the handler). */
   onMarqueeCommit?: (
@@ -152,74 +79,18 @@ interface Props {
     y1: number,
     mods: { shiftKey: boolean; altKey: boolean },
   ) => void;
-  /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
-  selectionMask?: Uint8Array | null;
-  selectionWidth?: number;
-  selectionHeight?: number;
-  /** Magnetic lasso kind: a session may be open, so mouse-moves drive the
-   *  live wire and a double-click closes the loop. */
-  lassoActive?: boolean;
   onLassoMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   onLassoClose?: () => void;
   /** Flat [x,y,…] image-space polylines from Rust — the frozen path and the
    *  live wire. Drawn by LassoOverlay; no geometry happens here. */
   lassoCommitted?: Int32Array | null;
   lassoPreview?: Int32Array | null;
-  containerRef?: React.RefObject<HTMLDivElement | null>;
-  /** ADR-024 a11.1 — the canvas ref callback, owned by AppShell so the
-   *  generation counter outlives this component's remounts. Optional: without
-   *  it the forwarded ref is used directly, exactly as before. */
-  attachCanvas?: (el: HTMLCanvasElement | null) => void;
-  onTextPositionChange?: (canvasX: number, canvasY: number) => void;
+  /** Canvas resize-handle drags on an open text input. Stays a prop because
+   *  it does two things — the tool's live setter AND the panel slider's
+   *  store field — which is a session decision, not a tool one. */
   onTextFontSizeChange?: (size: number) => void;
-  onTextRotationChange?: (angle: number) => void;
-  /** Live, non-destructive text annotations (bbox + id). The text-tool
-   *  hover highlight is drawn over the one whose id matches
-   *  `hoveredAnnotationId`. */
-  annotations?: AnnotationBox[];
-  /** Live shape annotations on the active layer (bbox + id + kind). Only the
-   *  Perspective tool reads them here — it can be pointed at a square or a
-   *  circle the same way it can be pointed at text. */
-  shapes?: { id: number; kind: number; x0: number; y0: number; x1: number; y1: number }[];
   /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
   renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
-  hoveredAnnotationId?: number | null;
-  /** Mousemove handler used to drive the hover highlight while the text
-   *  tool is active. */
-  onCanvasHover?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  cropSelection?: CropSelection | null;
-  onCropChange?: (sel: CropSelection) => void;
-  /** Pending paste-onto-layer placement (movable/resizable bounding box).
-   *  Floats independent of `activeTool` — same pattern as `drawEditState`. */
-  pastePlacementRect?: PastePlacementRect | null;
-  onPastePlacementChange?: (rect: PastePlacementRect) => void;
-  /** Pending shape/arrow being edited via the Figma-style overlay. */
-  drawEditState?: DrawEditState | null;
-  /** Overlay handle drags push new geometry (canvas coords) up through this. */
-  onDrawEditChange?: (start: Point, end: Point) => void;
-  /** Live stroke/shape settings — read at render so panel tweaks update the
-   *  pending shape immediately (same values commitEdit reads at commit). */
-  drawSettings?: {
-    strokeColor: string;
-    strokeWidth: number;
-    arrowStyle: "single" | "double";
-    shape: ShapeName;
-    /** Stroke sloppiness 0-100 (how hand-drawn the outline is), read live so
-     *  a panel tweak while the overlay is open immediately rewobbles it. */
-    sloppiness: number;
-    fillMode: "none" | "solid" | "gradient" | "pixelate";
-    fillColor: string;
-    fillColor2: string;
-    gradientAngle: number;
-  };
-  /** Bézier pen tool (Paint → Pen sub-mode). When active, an interactive
-   *  pen overlay captures the canvas; finished paths commit via onPenCommit. */
-  penActive?: boolean;
-  penColor?: string;
-  penStrokeWidth?: number;
-  /** Live Background fill for the pen preview (shares toolSettings fill). */
-  penFillMode?: "none" | "solid" | "gradient" | "pixelate";
-  penFillColor?: string;
   /** Returns the new annotation's id — `PenOverlay.finish()` needs it to keep
    *  the finished path selected.
    *
@@ -239,9 +110,6 @@ interface Props {
   onPenEditStart?: (id: number) => void;
   onPenEditCommit?: (id: number, flatPoints: number[]) => void;
   onPenEditCancel?: (id: number) => void;
-  /** Reselect from the Review list → open this committed path in the overlay. */
-  penEditRequest?: { id: number; points: number[] } | null;
-  onPenEditRequestHandled?: () => void;
   /** Canvas "Rulers & Grids" config (Settings → Rulers & Grids). Renders a
    *  non-destructive grid + pixel rulers overlay when enabled. */
   guides?: {
@@ -261,70 +129,70 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
       hookResult,
-      drawPreviewRef,
       brushDiameter,
       cursorPos,
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
-      activeTool,
+      onTextFontSizeChange,
+      renderOverlay,
+      onSelectionClick,
+      onMarqueeCommit,
+      onLassoMove,
+      onLassoClose,
+      lassoCommitted,
+      lassoPreview,
+      onPenCommit,
+      onPenHitTest,
+      onPenEditStart,
+      onPenEditCommit,
+      onPenEditCancel,
+      guides,
+    },
+    ref,
+  ) => {
+    // Not a React Compiler opt-in: it skips components with hook-lint
+    // suppressions (this has several). The overlays read the live canvas rect
+    // at render, which is only correct while nothing memoizes this component.
+    const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
+    const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+
+    // B1 (docs/AppShell-Refactor-Plan.md): the tool hook instances and the refs
+    // AppShell owns arrive through the session context instead of 23 props.
+    // The names below are the ones the props had, so nothing under this line
+    // changed in that commit.
+    const { drawingTools, textTool, containerRef, drawPreviewRef, attachCanvas } =
+      useSession();
+    const {
       textInput,
       textareaRef,
       onCanvasClick,
       onTextKeyDown,
       onTextChange,
       onTextBlur,
-      textSettings,
-      containerRef: externalContainerRef,
-      attachCanvas: externalAttachCanvas,
-      onTextPositionChange,
-      onTextFontSizeChange,
-      onTextRotationChange,
-      annotations,
-      shapes,
-      renderOverlay,
-      hoveredAnnotationId,
       onCanvasHover,
-      cropSelection,
-      onCropChange,
-      pastePlacementRect,
-      onPastePlacementChange,
-      colorPickerActive,
-      selectionActive,
-      layerMoveActive,
-      onSelectionClick,
-      marqueeActive,
-      marqueeShape,
-      onMarqueeCommit,
-      selectionMask,
-      selectionWidth,
-      selectionHeight,
-      lassoActive,
-      onLassoMove,
-      onLassoClose,
-      lassoCommitted,
-      lassoPreview,
-      drawEditState,
-      onDrawEditChange,
-      drawSettings,
-      penActive,
-      penColor,
-      penStrokeWidth,
-      penFillMode,
-      penFillColor,
-      onPenCommit,
-      onPenHitTest,
-      onPenEditStart,
-      onPenEditCommit,
-      onPenEditCancel,
-      penEditRequest,
-      onPenEditRequestHandled,
-      guides,
-    },
-    ref,
-  ) => {
-    const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
-    const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+      hoveredAnnotationId,
+      setTextPosition: onTextPositionChange,
+      setTextRotation: onTextRotationChange,
+    } = textTool;
+    // Crop, paste-placement and shape-edit read their own state (B4).
+    const { shapes } = drawingTools;
+    // The selection overlay is canvas-sized; the engine state says how big.
+    const { width: selectionWidth, height: selectionHeight } = useEngineState();
+    // Live text-annotation bounding boxes for the text-tool hover highlight
+    // and the Perspective tool's pick list. Was computed in AppShell every
+    // render; memoized here on the list it derives from.
+    const annotations = useMemo<AnnotationBox[]>(
+      () =>
+        textTool.annotations.map((a) => ({
+          id: a.id,
+          x: a.x + a.tile_offset_x,
+          y: a.y + a.tile_offset_y,
+          tile_w: a.tile_w,
+          tile_h: a.tile_h,
+        })),
+      [textTool.annotations],
+    );
 
     // ADR-024 a11.1 — the canvas ref, via AppShell's identity tracker when it
     // supplies one.
@@ -341,8 +209,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // CanvasArea started a fresh counter from zero. Unit tests were green — the
     // bookkeeping was correct, its OWNER was not.
     //
-    // Falls back to the forwarded ref so the component still works standalone.
-    const attachCanvas = externalAttachCanvas ?? ref;
+    // Read from the session context above; there is no standalone fallback
+    // any more — mounting CanvasArea outside <SessionProvider> throws.
 
     // Stroke gate close half (v8.33): the pointer coming up ANYWHERE ends the
     // stroke — tools continue drags outside the canvas via window listeners, so
@@ -362,8 +230,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // it is on the other, which is the same one-state-two-reads shape Stage 3.5
     // spent the week removing.
     const surfaceKey = canvasSurfaceKey();
-    const internalContainerRef = useRef<HTMLDivElement>(null);
-    const containerRef = externalContainerRef ?? internalContainerRef;
 
     // Spacebar-pan now comes straight from the UI store — it was prop-drilled
     // from AppShell before stage 1. (Compare state is read inside CompareSlider.)
@@ -383,6 +249,65 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // stroke do" — the third of the three places that read `maskEditing`, and
     // like the other two it computes nothing of its own.
     const maskPaintValue = useToolStore((s) => s.maskPaintValue);
+    // B2 (docs/AppShell-Refactor-Plan.md): everything below already lived in
+    // a store and arrived as 17 props that AppShell derived from the same
+    // stores. Read once here; the derivations are the ones AppShell did.
+    const activeTool = useToolStore((s) => s.activeTool);
+    const colorPickerActive = useToolStore((s) => s.colorPickerActive);
+    const moveActive = useToolStore((s) => s.moveActive);
+    const selectionKind = useToolStore((s) => s.selectionKind);
+    const storeSelectionMask = useToolStore((s) => s.selectionMask);
+    const brushMode = useToolStore((s) => s.brushMode);
+    const toolSettings = useToolStore((s) => s.toolSettings);
+    const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
+    const onPenEditRequestHandled = useAnnotationStore((s) => s.clearPenEditRequest);
+    // Select is its own tool: being on it IS the armed state — one gate, no
+    // sub-mode, no toggle. Move-layer stays on `arrow`.
+    const selectionActive = activeTool === "select";
+    const layerMoveActive = activeTool === "arrow" && moveActive;
+    // Gated to the tool(s) that can actually populate this mask: the Select
+    // tool, or the Magic Eraser sub-mode of the Eraser tool, whose brush paints
+    // the same store field (see useMagicEraserTool). Without the second clause
+    // the mask is still written during a Magic Eraser stroke, but this zeroes
+    // it back out before <SelectionOverlay> ever sees it.
+    const selectionMask =
+      activeTool === "select" || (activeTool === "ai" && eraserMode === "magic")
+        ? storeSelectionMask
+        : null;
+    // Drag = marquee for the two marquee modes ONLY. The click-once kinds and
+    // the lasso no longer sweep one: since v7.47 the mode picks the gesture,
+    // so a stray drag in Wand can't quietly produce a rectangle.
+    const marqueeActive = activeTool === "select" && isMarqueeKind(selectionKind);
+    const marqueeShape = isMarqueeKind(selectionKind) ? selectionKind : "rect";
+    // Magnetic lasso: a session-based kind, so it gets the kind-specific gate
+    // the click-once kinds don't need.
+    const lassoActive = activeTool === "select" && selectionKind === "lasso";
+    // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas.
+    const penActive = activeTool === "brush" && brushMode === "pen";
+    const penColor = toolSettings.strokeColor;
+    const penStrokeWidth = toolSettings.strokeWidth;
+    const penFillMode = toolSettings.fillMode;
+    const penFillColor = toolSettings.fillColor;
+    // The open textarea renders a live preview from these, so the user can
+    // configure the BG before committing. `fontFamily` is not read by the
+    // overlay — the face comes from `textFontId` — it feeds the recent-text
+    // chips only.
+    const textSettings = useMemo(
+      () => ({
+        fontSize: toolSettings.fontSize,
+        fontFamily: toolSettings.fontFamily,
+        textFontId: toolSettings.textFontId,
+        fontWeight: toolSettings.fontWeight,
+        textColor: toolSettings.textColor,
+        bgKind: toolSettings.bgKind,
+        bgColor: toolSettings.bgColor,
+        bgOpacity: toolSettings.bgOpacity,
+        bgPadding: toolSettings.bgPadding,
+        bgCornerRadius: toolSettings.bgCornerRadius,
+        bgTail: toolSettings.bgTail,
+      }),
+      [toolSettings],
+    );
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -574,7 +499,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const previewRafRef = useRef<number | null>(null);
     const previewPixelRef = useRef<number>(-1);
     const lastHoverRef = useRef<{ x: number; y: number } | null>(null);
-    const selectionKind = useToolStore((s) => s.selectionKind);
     const selectionTolerance = useToolStore((s) => s.selectionTolerance);
     const edgeThreshold = useToolStore((s) => s.edgeThreshold);
     // Kind → engine code. Only the click-once kinds preview on hover; the
@@ -781,304 +705,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       }
     }, [isDraggingPan]);
 
-    // ── Crop handle drag ───────────────────────────────────────────────
-    const cropDragRef = useRef<{
-      handle: string;
-      startX: number;
-      startY: number;
-      startSel: CropSelection;
-      scaleX: number;
-      scaleY: number;
-    } | null>(null);
 
-    const onCropChangeRef = useRef(onCropChange);
-    useEffect(() => { onCropChangeRef.current = onCropChange; });
 
-    useEffect(() => {
-      const onMove = (e: PointerEvent) => {
-        const drag = cropDragRef.current;
-        if (!drag || !onCropChangeRef.current || !canvasRef.current) return;
-        const canvas = canvasRef.current;
-        const { handle, startX, startY, startSel, scaleX, scaleY } = drag;
-        let dx = (e.clientX - startX) / scaleX;
-        let dy = (e.clientY - startY) / scaleY;
-        // Crop chooses a REGION: free by default, Shift constrains.
-        ({ dx, dy } = cornerDelta("region", e, handle, { dx, dy }, startSel));
-        let { x, y, width: w, height: h } = startSel;
-        switch (handle) {
-          case "nw": x += dx; y += dy; w -= dx; h -= dy; break;
-          case "n":  y += dy; h -= dy; break;
-          case "ne": y += dy; w += dx; h -= dy; break;
-          case "e":  w += dx; break;
-          case "se": w += dx; h += dy; break;
-          case "s":  h += dy; break;
-          case "sw": x += dx; w -= dx; h += dy; break;
-          case "w":  x += dx; w -= dx; break;
-        }
-        const min = 10;
-        w = Math.max(min, w);
-        h = Math.max(min, h);
-        x = Math.max(0, Math.min(x, canvas.width - min));
-        y = Math.max(0, Math.min(y, canvas.height - min));
-        w = Math.min(w, canvas.width - x);
-        h = Math.min(h, canvas.height - y);
-        onCropChangeRef.current({
-          x: Math.round(x), y: Math.round(y),
-          width: Math.round(w), height: Math.round(h),
-        });
-      };
-      const onUp = () => { cropDragRef.current = null; };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      return () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-    }, []);
-
-    const handleCropPointerDown = useCallback(
-      (e: React.PointerEvent<SVGRectElement>, handle: string) => {
-        if (!cropSelection || !canvasRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        cropDragRef.current = {
-          handle,
-          startX: e.clientX,
-          startY: e.clientY,
-          startSel: { ...cropSelection },
-          scaleX: rect.width / canvas.width,
-          scaleY: rect.height / canvas.height,
-        };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      },
-      [cropSelection, canvasRef],
-    );
-
-    // ── Paste-placement drag (move body + resize handles) ──────────────
-    // Same window-listener pattern as the crop handles, extended with a
-    // "move" mode since — unlike crop, where the selection rect overlays the
-    // photo itself — a placed paste needs to be draggable by its body too.
-    const pasteDragRef = useRef<{
-      mode: "move" | "resize";
-      handle: string; // resize: nw|n|ne|e|se|s|sw|w · move: "body"
-      startX: number;
-      startY: number;
-      startRect: PastePlacementRect;
-      scaleX: number;
-      scaleY: number;
-    } | null>(null);
-
-    const onPastePlacementChangeRef = useRef(onPastePlacementChange);
-    useEffect(() => {
-      onPastePlacementChangeRef.current = onPastePlacementChange;
-    });
-
-    useEffect(() => {
-      const onMove = (e: PointerEvent) => {
-        const drag = pasteDragRef.current;
-        if (!drag || !onPastePlacementChangeRef.current) return;
-        const { mode, handle, startX, startY, startRect, scaleX, scaleY } = drag;
-        const dx = (e.clientX - startX) / scaleX;
-        const dy = (e.clientY - startY) / scaleY;
-        if (mode === "move") {
-          const { dx: mdx, dy: mdy } = e.shiftKey
-            ? lockAxisDelta(dx, dy)
-            : { dx, dy };
-          onPastePlacementChangeRef.current({
-            ...startRect,
-            x: Math.round(startRect.x + mdx),
-            y: Math.round(startRect.y + mdy),
-          });
-          return;
-        }
-        let { x, y, width: w, height: h } = startRect;
-        // Both the paste box and "Resize Layer" are this overlay, and both scale
-        // PIXELS: plain drag keeps the ratio, Shift frees it for a skew.
-        const { dx: cdx, dy: cdy } = cornerDelta("raster", e, handle, { dx, dy }, startRect);
-        switch (handle) {
-          case "nw": x += cdx; y += cdy; w -= cdx; h -= cdy; break;
-          case "n":  y += cdy; h -= cdy; break;
-          case "ne": y += cdy; w += cdx; h -= cdy; break;
-          case "e":  w += cdx; break;
-          case "se": w += cdx; h += cdy; break;
-          case "s":  h += cdy; break;
-          case "sw": x += cdx; w -= cdx; h += cdy; break;
-          case "w":  x += cdx; w -= cdx; break;
-        }
-        const min = 10;
-        w = Math.max(min, w);
-        h = Math.max(min, h);
-        onPastePlacementChangeRef.current({
-          x: Math.round(x), y: Math.round(y),
-          width: Math.round(w), height: Math.round(h),
-        });
-      };
-      const onUp = () => { pasteDragRef.current = null; };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      return () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-    }, []);
-
-    const handlePastePointerDown = useCallback(
-      (
-        e: React.PointerEvent<SVGElement>,
-        mode: "move" | "resize",
-        handle: string,
-      ) => {
-        if (!pastePlacementRect || !canvasRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        pasteDragRef.current = {
-          mode,
-          handle,
-          startX: e.clientX,
-          startY: e.clientY,
-          startRect: { ...pastePlacementRect },
-          scaleX: rect.width / canvas.width,
-          scaleY: rect.height / canvas.height,
-        };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      },
-      [pastePlacementRect, canvasRef],
-    );
-
-    // ── Shape/arrow edit-overlay drag ──────────────────────────────────
-    // Same window-listener pattern as the crop handles. Geometry math is
-    // plain JS (trivial); Rust does all pixel rendering at commit.
-    const drawDragRef = useRef<{
-      mode: "resize" | "move" | "endpoint";
-      /** resize: nw|n|ne|e|se|s|sw|w · endpoint: start|end · move: body */
-      handle: string;
-      startX: number;
-      startY: number;
-      startGeom: { sx: number; sy: number; ex: number; ey: number };
-      scaleX: number;
-      scaleY: number;
-    } | null>(null);
-
-    const onDrawEditChangeRef = useRef(onDrawEditChange);
-    useEffect(() => { onDrawEditChangeRef.current = onDrawEditChange; });
-
-    useEffect(() => {
-      const onMove = (e: PointerEvent) => {
-        const drag = drawDragRef.current;
-        const cb = onDrawEditChangeRef.current;
-        if (!drag || !cb) return;
-        const dx = (e.clientX - drag.startX) / drag.scaleX;
-        const dy = (e.clientY - drag.startY) / drag.scaleY;
-        const g = drag.startGeom;
-        if (drag.mode === "move") {
-          // Translate the whole geometry. Shift constrains the drag to
-          // whichever axis (horizontal/vertical) is moving more.
-          const { dx: mdx, dy: mdy } = e.shiftKey
-            ? lockAxisDelta(dx, dy)
-            : { dx, dy };
-          cb({ x: g.sx + mdx, y: g.sy + mdy }, { x: g.ex + mdx, y: g.ey + mdy });
-          return;
-        }
-        if (drag.mode === "endpoint") {
-          // Re-angle a line/arrow by dragging one endpoint freely. Shift
-          // snaps the resulting angle (relative to the fixed endpoint) to
-          // the nearest 90° — lets an arrow go cleanly left/right/up/down.
-          if (drag.handle === "start") {
-            const free = { x: g.sx + dx, y: g.sy + dy };
-            const p = e.shiftKey
-              ? lockPointToAxis(g.ex, g.ey, free.x, free.y)
-              : free;
-            cb(p, { x: g.ex, y: g.ey });
-          } else {
-            const free = { x: g.ex + dx, y: g.ey + dy };
-            const p = e.shiftKey
-              ? lockPointToAxis(g.sx, g.sy, free.x, free.y)
-              : free;
-            cb({ x: g.sx, y: g.sy }, p);
-          }
-          return;
-        }
-        // Resize: scale both endpoints about the bbox side(s) opposite the
-        // dragged handle. Corner handles scale both axes, edge handles one.
-        // Degenerate axes (perfectly horizontal/vertical segments) keep
-        // scale 1 — the endpoint circles re-angle those instead.
-        const x0 = Math.min(g.sx, g.ex);
-        const y0 = Math.min(g.sy, g.ey);
-        const x1 = Math.max(g.sx, g.ex);
-        const y1 = Math.max(g.sy, g.ey);
-        const MIN = 2; // canvas px — don't let the bbox collapse or flip
-        const h = drag.handle;
-        let kx = 1;
-        let ax = x0;
-        if (h.includes("w")) {
-          ax = x1;
-          if (x1 - x0 > 0.5) kx = Math.max(MIN, x1 - (x0 + dx)) / (x1 - x0);
-        } else if (h.includes("e")) {
-          ax = x0;
-          if (x1 - x0 > 0.5) kx = Math.max(MIN, x1 + dx - x0) / (x1 - x0);
-        }
-        let ky = 1;
-        let ay = y0;
-        if (h.includes("n")) {
-          ay = y1;
-          if (y1 - y0 > 0.5) ky = Math.max(MIN, y1 - (y0 + dy)) / (y1 - y0);
-        } else if (h.includes("s")) {
-          ay = y0;
-          if (y1 - y0 > 0.5) ky = Math.max(MIN, y1 + dy - y0) / (y1 - y0);
-        }
-        // Shift-lock only makes sense on corner handles — edge handles leave
-        // one of kx/ky at exactly 1 by construction above, and forcing it
-        // toward the other would pull a single-axis drag off its own axis.
-        if (e.shiftKey && h.length === 2) {
-          ({ kx, ky } = lockScaleFactors(kx, ky));
-        }
-        cb(
-          { x: ax + (g.sx - ax) * kx, y: ay + (g.sy - ay) * ky },
-          { x: ax + (g.ex - ax) * kx, y: ay + (g.ey - ay) * ky },
-        );
-      };
-      const onUp = () => { drawDragRef.current = null; };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      return () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-    }, []);
-
-    const handleDrawPointerDown = useCallback(
-      (
-        e: React.PointerEvent<SVGElement>,
-        mode: "resize" | "move" | "endpoint",
-        handle: string,
-      ) => {
-        if (!drawEditState || !canvasRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        drawDragRef.current = {
-          mode,
-          handle,
-          startX: e.clientX,
-          startY: e.clientY,
-          startGeom: {
-            sx: drawEditState.start.x,
-            sy: drawEditState.start.y,
-            ex: drawEditState.end.x,
-            ey: drawEditState.end.y,
-          },
-          scaleX: rect.width / canvas.width,
-          scaleY: rect.height / canvas.height,
-        };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      },
-      [drawEditState, canvasRef],
-    );
 
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
@@ -1456,8 +1084,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             flushToCanvas={hookResult.flushToCanvas}
             imgW={imgW}
             imgH={imgH}
-            annotations={annotations ?? []}
-            shapes={shapes ?? []}
+            annotations={annotations}
+            shapes={shapes}
             activeLayerId={hookResult.state.activeLayerId}
           />
         )}
@@ -1480,75 +1108,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           />
         )}
 
-        {/* ── Crop overlay: dark mask + rule-of-thirds + draggable handles ── */}
-        {activeTool === "crop" && cropSelection && canvasRef.current && (() => {
-          const canvas = canvasRef.current!;
-          const r = canvas.getBoundingClientRect();
-          const sx = r.width / canvas.width;
-          const sy = r.height / canvas.height;
-          const { x, y, width: sw, height: sh } = cropSelection;
-          const vx = r.left + x * sx;
-          const vy = r.top + y * sy;
-          const vw = sw * sx;
-          const vh = sh * sy;
-          const HS = 9; // handle size in screen px
+        <CropLayer />
 
-          const handles = [
-            { id: "nw", hx: vx,        hy: vy,       cursor: "nw-resize" },
-            { id: "n",  hx: vx+vw/2,   hy: vy,       cursor: "n-resize"  },
-            { id: "ne", hx: vx+vw,     hy: vy,       cursor: "ne-resize" },
-            { id: "e",  hx: vx+vw,     hy: vy+vh/2,  cursor: "e-resize"  },
-            { id: "se", hx: vx+vw,     hy: vy+vh,    cursor: "se-resize" },
-            { id: "s",  hx: vx+vw/2,   hy: vy+vh,    cursor: "s-resize"  },
-            { id: "sw", hx: vx,        hy: vy+vh,    cursor: "sw-resize" },
-            { id: "w",  hx: vx,        hy: vy+vh/2,  cursor: "w-resize"  },
-          ];
-
-          return (
-            <svg
-              style={{
-                position: "fixed",
-                inset: 0,
-                width: "100vw",
-                height: "100vh",
-                pointerEvents: "none",
-                zIndex: 40,
-                overflow: "hidden",
-              }}
-            >
-              {/* Dark overlay — 4 rects framing the crop selection */}
-              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill={MARQUEE_SHADE} />
-              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill={MARQUEE_SHADE} />
-              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill={MARQUEE_SHADE} />
-              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill={MARQUEE_SHADE} />
-
-              {/* Dashed selection border */}
-              <rect x={vx} y={vy} width={vw} height={vh}
-                fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
-
-              {/* Rule-of-thirds guides */}
-              <line x1={vx + vw/3}   y1={vy} x2={vx + vw/3}   y2={vy+vh} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
-              <line x1={vx + 2*vw/3} y1={vy} x2={vx + 2*vw/3} y2={vy+vh} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
-              <line x1={vx} y1={vy + vh/3}   x2={vx+vw} y2={vy + vh/3}   stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
-              <line x1={vx} y1={vy + 2*vh/3} x2={vx+vw} y2={vy + 2*vh/3} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
-
-              {/* Resize handles */}
-              {handles.map(h => (
-                <rect
-                  key={h.id}
-                  x={h.hx - HS/2} y={h.hy - HS/2}
-                  width={HS} height={HS}
-                  fill="white"
-                  stroke="rgba(0,0,0,0.35)"
-                  strokeWidth={1}
-                  rx={1}
-                  style={{ cursor: h.cursor, pointerEvents: "all" }}
-                  onPointerDown={(e) => handleCropPointerDown(e, h.id)}
-                />
-              ))}
-            </svg>
-          );
-        })()}
 
         {/* ── Marquee drag preview (Select tool) ───────────────────────────
             The live outline of the drag before it commits — same fixed-SVG
@@ -1597,440 +1158,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           );
         })()}
 
-        {/* ── Paste-placement overlay: movable/resizable bounding box ──────
-            Floats independent of `activeTool` (same pattern as the shape/arrow
-            edit overlay below) — a pasted image can be adjusted no matter what
-            tool is selected. No dimming mask: the pasted content itself is the
-            visible thing, nothing needs to be dimmed around it. */}
-        {pastePlacementRect && canvasRef.current && (() => {
-          const canvas = canvasRef.current!;
-          const r = canvas.getBoundingClientRect();
-          const sx = r.width / canvas.width;
-          const sy = r.height / canvas.height;
-          const { x, y, width: pw, height: ph } = pastePlacementRect;
-          const vx = r.left + x * sx;
-          const vy = r.top + y * sy;
-          const vw = pw * sx;
-          const vh = ph * sy;
-          const HS = 9; // handle size in screen px
+        <PastePlacementLayer />
 
-          const handles = [
-            { id: "nw", hx: vx,        hy: vy,       cursor: "nw-resize" },
-            { id: "n",  hx: vx+vw/2,   hy: vy,       cursor: "n-resize"  },
-            { id: "ne", hx: vx+vw,     hy: vy,       cursor: "ne-resize" },
-            { id: "e",  hx: vx+vw,     hy: vy+vh/2,  cursor: "e-resize"  },
-            { id: "se", hx: vx+vw,     hy: vy+vh,    cursor: "se-resize" },
-            { id: "s",  hx: vx+vw/2,   hy: vy+vh,    cursor: "s-resize"  },
-            { id: "sw", hx: vx,        hy: vy+vh,    cursor: "sw-resize" },
-            { id: "w",  hx: vx,        hy: vy+vh/2,  cursor: "w-resize"  },
-          ];
 
-          return (
-            <svg
-              data-paste-overlay="true"
-              style={{
-                position: "fixed",
-                inset: 0,
-                width: "100vw",
-                height: "100vh",
-                pointerEvents: "none",
-                // Was 40 (--z-panel), tied with the Gallery filmstrip — DOM
-                // order let the filmstrip win the tie and swallow pointerdowns
-                // on handles near the bottom edge, which the "click outside
-                // commits" listener then read as a commit. 45 (--z-cursor,
-                // "above canvas chrome") matches the shape/arrow overlay below.
-                zIndex: 45,
-                overflow: "hidden",
-              }}
-            >
-              {/* Draggable body (move) — under the handles in z-order. */}
-              <rect
-                x={vx} y={vy} width={vw} height={vh}
-                fill="transparent"
-                stroke="white"
-                strokeWidth={1.5}
-                style={{ cursor: "move", pointerEvents: "all" }}
-                onPointerDown={(e) => handlePastePointerDown(e, "move", "body")}
-              />
-
-              {/* Resize handles */}
-              {handles.map(h => (
-                <rect
-                  key={h.id}
-                  x={h.hx - HS/2} y={h.hy - HS/2}
-                  width={HS} height={HS}
-                  fill="white"
-                  stroke="rgba(0,0,0,0.35)"
-                  strokeWidth={1}
-                  rx={1}
-                  style={{ cursor: h.cursor, pointerEvents: "all" }}
-                  onPointerDown={(e) => handlePastePointerDown(e, "resize", h.id)}
-                />
-              ))}
-            </svg>
-          );
-        })()}
-
-        {/* ── Shape/arrow edit overlay: SVG preview + dashed bbox + handles ──
-            Rendered while a drawn shape/arrow is pending (Figma-style edit
-            box). All sizes for grab targets are in SCREEN px so handles stay
-            grabbable at any zoom; geometry maps through the canvas rect like
-            the crop/text overlays. The preview is clipped to the canvas box
-            to match Rust's raster clipping at commit. */}
-        {drawEditState && drawSettings && canvasRef.current && (() => {
-          const canvas = canvasRef.current!;
-          const r = canvas.getBoundingClientRect();
-          const sx = r.width / canvas.width;
-          const sy = r.height / canvas.height;
-          const toSX = (x: number) => r.left + x * sx;
-          const toSY = (y: number) => r.top + y * sy;
-
-          const { start, end, kind } = drawEditState;
-          // When re-editing an existing shape, render with its own captured
-          // style rather than the live toolbar settings (a new shape has no
-          // `style` and reads the toolbar).
-          const eff = drawEditState.style ?? drawSettings;
-          // Type comes from the shape itself, never from the live panel — same
-          // rule the commit uses, so preview and pixels cannot disagree. See
-          // `pendingShapeType`; reading `drawSettings.shape` here is what let a
-          // Square click retype the circle already on the canvas.
-          const shape =
-            kind === "arrow"
-              ? "line"
-              : pendingShapeType(drawEditState, drawSettings.shape);
-          const isSegment = kind === "arrow" || shape === "line";
-
-          // Bounding box (canvas coords → viewport coords)
-          const bx0 = Math.min(start.x, end.x);
-          const by0 = Math.min(start.y, end.y);
-          const bx1 = Math.max(start.x, end.x);
-          const by1 = Math.max(start.y, end.y);
-          const vx = toSX(bx0);
-          const vy = toSY(by0);
-          const vw = (bx1 - bx0) * sx;
-          const vh = (by1 - by0) * sy;
-
-          const HS = 9;   // resize-square size — screen px, zoom-independent
-          const EP_R = 6; // endpoint-circle radius — screen px
-          const strokeW = Math.max(1, eff.strokeWidth * sx);
-          const color = eff.strokeColor;
-          // Sketchy outline? Read live so a panel tweak while the overlay is
-          // open immediately rewobbles the preview. Mirrors the engine rule:
-          // 0 → clean strokes, > 0 → the wobbly path generator.
-          const sloppyAmt = eff.sloppiness ?? 0;
-          const sloppy = sloppyAmt > 0;
-
-          // Live interior-fill preview. `eff` is the shape's captured style on
-          // reselect, or the live panel for a new shape — both carry fill, so
-          // reselected rect/circles preview their fill too.
-          const fillCfg = eff;
-          let fillAttr = "none";
-          let gradientDef: React.ReactNode = null;
-          if (fillCfg && (shape === "rect" || shape === "circle")) {
-            if (fillCfg.fillMode === "solid") {
-              fillAttr = fillCfg.fillColor;
-            } else if (fillCfg.fillMode === "gradient") {
-              fillAttr = "url(#draw-fill-grad)";
-              const ang = ((fillCfg.gradientAngle ?? 0) * Math.PI) / 180;
-              const dx = 0.5 * Math.cos(ang);
-              const dy = 0.5 * Math.sin(ang);
-              gradientDef = (
-                <defs>
-                  <linearGradient
-                    id="draw-fill-grad"
-                    x1={0.5 - dx} y1={0.5 - dy} x2={0.5 + dx} y2={0.5 + dy}
-                  >
-                    <stop offset="0%" stopColor={fillCfg.fillColor} />
-                    <stop offset="100%" stopColor={fillCfg.fillColor2} />
-                  </linearGradient>
-                </defs>
-              );
-            } else if (fillCfg.fillMode === "pixelate") {
-              // A true live mosaic isn't practical in SVG — preview a checker
-              // hint; the real pixelation is applied to the pixels on commit.
-              fillAttr = "url(#draw-fill-pixelate)";
-              gradientDef = (
-                <defs>
-                  <pattern
-                    id="draw-fill-pixelate"
-                    width="8" height="8"
-                    patternUnits="userSpaceOnUse"
-                  >
-                    <rect width="8" height="8" fill="rgba(120,120,120,0.4)" />
-                    <rect width="4" height="4" fill="rgba(40,40,40,0.5)" />
-                    <rect x="4" y="4" width="4" height="4" fill="rgba(40,40,40,0.5)" />
-                  </pattern>
-                </defs>
-              );
-            }
-          }
-
-          // Move handle (line + dot above the box) — same geometry as the
-          // text overlay's "balloon string".
-          const STEM_GAP = 4;
-          const STEM_LEN = 18;
-          const DOT_OFFSET = 4;
-          const DOT_R = 5;
-
-          const handles = [
-            { id: "nw", hx: vx,          hy: vy,          cursor: "nw-resize" },
-            { id: "n",  hx: vx + vw / 2, hy: vy,          cursor: "n-resize"  },
-            { id: "ne", hx: vx + vw,     hy: vy,          cursor: "ne-resize" },
-            { id: "e",  hx: vx + vw,     hy: vy + vh / 2, cursor: "e-resize"  },
-            { id: "se", hx: vx + vw,     hy: vy + vh,     cursor: "se-resize" },
-            { id: "s",  hx: vx + vw / 2, hy: vy + vh,     cursor: "s-resize"  },
-            { id: "sw", hx: vx,          hy: vy + vh,     cursor: "sw-resize" },
-            { id: "w",  hx: vx,          hy: vy + vh / 2, cursor: "w-resize"  },
-          ];
-
-          // Geometry preview + invisible body hit-area (drag body = move).
-          const bodyProps = {
-            style: { cursor: "move", pointerEvents: "all" } as React.CSSProperties,
-            onPointerDown: (e: React.PointerEvent<SVGElement>) =>
-              handleDrawPointerDown(e, "move", "body"),
-          };
-          let preview: React.ReactNode;
-          let bodyHit: React.ReactNode;
-
-          if (kind === "arrow") {
-            const g = arrowGeometry(
-              start,
-              end,
-              eff.strokeWidth,
-              eff.arrowStyle === "double",
-            );
-            preview = (
-              <>
-                <line
-                  x1={toSX(g.shaftStart.x)} y1={toSY(g.shaftStart.y)}
-                  x2={toSX(g.shaftEnd.x)}   y2={toSY(g.shaftEnd.y)}
-                  stroke={color} strokeWidth={strokeW} strokeLinecap="round"
-                />
-                {g.heads.map((head, i) => (
-                  <polygon
-                    key={i}
-                    points={head.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ")}
-                    fill={color}
-                  />
-                ))}
-              </>
-            );
-            bodyHit = (
-              <line
-                x1={toSX(start.x)} y1={toSY(start.y)}
-                x2={toSX(end.x)}   y2={toSY(end.y)}
-                stroke="transparent" strokeWidth={Math.max(strokeW, 14)}
-                {...bodyProps}
-              />
-            );
-          } else if (shape === "line") {
-            const strokeLayer = sloppy ? (
-              <path
-                d={sloppyShapePath(start, end, "line", sloppyAmt, eff.strokeWidth, toSX, toSY)}
-                fill="none" stroke={color} strokeWidth={strokeW}
-                strokeLinecap="round"
-              />
-            ) : (
-              <line
-                x1={toSX(start.x)} y1={toSY(start.y)}
-                x2={toSX(end.x)}   y2={toSY(end.y)}
-                stroke={color} strokeWidth={strokeW} strokeLinecap="round"
-              />
-            );
-            preview = strokeLayer;
-            bodyHit = (
-              <line
-                x1={toSX(start.x)} y1={toSY(start.y)}
-                x2={toSX(end.x)}   y2={toSY(end.y)}
-                stroke="transparent" strokeWidth={Math.max(strokeW, 14)}
-                {...bodyProps}
-              />
-            );
-          } else if (shape === "circle") {
-            // Rust parity: radius = half the SHORTER bbox dimension.
-            const cr = (Math.min(bx1 - bx0, by1 - by0) / 2) * sx;
-            const ccx = vx + vw / 2;
-            const ccy = vy + vh / 2;
-            // Fill stays a clean circle of that same radius; only the STROKE
-            // roams, and it now roams around the SAME circle (it used to wobble
-            // around the bbox ellipse, so fill and outline disagreed).
-            const fillLayer = (
-              <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} />
-            );
-            // An empty sketchy path means the circle is too small to wobble;
-            // fall back to the clean arc, which is what the engine does.
-            const sloppyD = sloppy
-              ? sloppyShapePath(start, end, "circle", sloppyAmt, eff.strokeWidth, toSX, toSY)
-              : "";
-            const strokeLayer = sloppyD ? (
-              <path
-                d={sloppyD}
-                fill="none" stroke={color} strokeWidth={strokeW}
-                strokeLinecap="round" strokeLinejoin="round"
-              />
-            ) : (
-              <circle cx={ccx} cy={ccy} r={cr} fill="none" stroke={color} strokeWidth={strokeW} />
-            );
-            preview = (
-              <>
-                {gradientDef}
-                {fillLayer}
-                {strokeLayer}
-              </>
-            );
-            bodyHit = (
-              <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
-            );
-          } else if (shape === "diamond" || shape === "star") {
-            // Outline-only (the engine fills only kinds 0/1). Firm → clean
-            // polygon over the exact vertex list Rust rasterises; sketchy →
-            // the same vertices pushed through the wobble path generator.
-            const verts =
-              shape === "diamond"
-                ? diamondVertices(start.x, start.y, end.x, end.y)
-                : starVertices(start.x, start.y, end.x, end.y);
-            const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
-            const strokeLayer = sloppy ? (
-              <path
-                d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY)}
-                fill="none" stroke={color} strokeWidth={strokeW}
-                strokeLinecap="round" strokeLinejoin="round"
-              />
-            ) : (
-              <polygon
-                points={pts}
-                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
-              />
-            );
-            preview = strokeLayer;
-            bodyHit = (
-              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
-            );
-          } else {
-            // rect
-            const fillLayer = (
-              <rect x={vx} y={vy} width={vw} height={vh} fill={fillAttr} />
-            );
-            const strokeLayer = sloppy ? (
-              <path
-                d={sloppyShapePath(start, end, "rect", sloppyAmt, eff.strokeWidth, toSX, toSY)}
-                fill="none" stroke={color} strokeWidth={strokeW}
-                strokeLinecap="round" strokeLinejoin="round"
-              />
-            ) : (
-              <rect
-                x={vx} y={vy} width={vw} height={vh}
-                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
-              />
-            );
-            preview = (
-              <>
-                {gradientDef}
-                {fillLayer}
-                {strokeLayer}
-              </>
-            );
-            bodyHit = (
-              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
-            );
-          }
-
-          return (
-            <svg
-              data-draw-overlay
-              style={{
-                position: "fixed",
-                inset: 0,
-                width: "100vw",
-                height: "100vh",
-                pointerEvents: "none",
-                zIndex: 45,
-                overflow: "hidden",
-              }}
-            >
-              <defs>
-                <clipPath id="draw-edit-clip">
-                  <rect x={r.left} y={r.top} width={r.width} height={r.height} />
-                </clipPath>
-              </defs>
-              {/* Live preview, clipped to the canvas box */}
-              <g clipPath="url(#draw-edit-clip)">{preview}</g>
-
-              {/* Dashed bounding box */}
-              <rect
-                x={vx} y={vy} width={vw} height={vh}
-                fill="none"
-                stroke={EDIT_BOX_STROKE}
-                strokeWidth={1.5}
-                strokeDasharray="5 4"
-              />
-
-              {/* Body hit-area — drag anywhere on the shape to move it */}
-              {bodyHit}
-
-              {/* Move handle: vertical line + dot above the box (same markup
-                  as the text overlay's move handle) */}
-              {(() => {
-                const cx = vx + vw / 2;
-                const stemTop = vy - STEM_GAP;
-                const stemBot = stemTop - STEM_LEN;
-                const dotCy = stemBot - DOT_OFFSET;
-                const filter = HANDLE_SHADOW;
-                return (
-                  <g
-                    style={{ cursor: "move", pointerEvents: "all", filter }}
-                    onPointerDown={(e) => handleDrawPointerDown(e, "move", "body")}
-                  >
-                    {/* Invisible fat hit target for easier grabbing */}
-                    <rect
-                      x={cx - 8}
-                      y={dotCy - DOT_R - 2}
-                      width={16}
-                      height={vy - (dotCy - DOT_R - 2)}
-                      fill="transparent"
-                    />
-                    <line x1={cx} y1={stemTop} x2={cx} y2={stemBot} stroke="white" strokeWidth={2} />
-                    <circle cx={cx} cy={dotCy} r={DOT_R} fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1} />
-                  </g>
-                );
-              })()}
-
-              {/* Resize squares — corners scale both axes, edges one axis */}
-              {handles.map((h) => (
-                <rect
-                  key={h.id}
-                  x={h.hx - HS / 2} y={h.hy - HS / 2}
-                  width={HS} height={HS}
-                  fill="white"
-                  stroke="rgba(0,0,0,0.4)"
-                  strokeWidth={1}
-                  rx={1}
-                  style={{ cursor: h.cursor, pointerEvents: "all" }}
-                  onPointerDown={(e) => handleDrawPointerDown(e, "resize", h.id)}
-                />
-              ))}
-
-              {/* Endpoint circles — line/arrow only: drag to re-angle the
-                  segment (the natural "rotate" for segments) */}
-              {isSegment && (
-                <>
-                  <circle
-                    cx={toSX(start.x)} cy={toSY(start.y)} r={EP_R}
-                    fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1.5}
-                    style={{ cursor: "crosshair", pointerEvents: "all" }}
-                    onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "start")}
-                  />
-                  <circle
-                    cx={toSX(end.x)} cy={toSY(end.y)} r={EP_R}
-                    fill="white" stroke={HANDLE_OUTLINE} strokeWidth={1.5}
-                    style={{ cursor: "crosshair", pointerEvents: "all" }}
-                    onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "end")}
-                  />
-                </>
-              )}
-            </svg>
-          );
-        })()}
+        <ShapeEditLayer />
 
         {/* Brush-size ring — only for the size-based brush tools: Paint's four
             brushes, and the Eraser tool's two canvas-brush modes (brush + Magic
