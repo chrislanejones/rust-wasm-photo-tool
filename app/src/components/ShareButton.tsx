@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { navigateTo } from "@/features/routing";
 import { Share2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { ActionTile } from "@/components/ui/action-tile";
@@ -41,7 +42,15 @@ export function ShareButton({
       // Say which of the three it actually is. "Sign in to create share links"
       // was shown for all of them, including to users who were signed in —
       // sending them to look for a sign-in button they had already used.
-      if (availability === "connecting") {
+      if (availability === "online-off") {
+        toast.info("Online features are off, so nothing leaves this tab.", {
+          description: "A share link uploads a copy of the photo. Turn online features on in Settings › Security to make one.",
+          action: {
+            label: "Settings",
+            onClick: () => navigateTo({ kind: "settings", tab: "security" }),
+          },
+        });
+      } else if (availability === "connecting") {
         toast.info("Still connecting to your account — try that again in a second.");
       } else if (availability === "backend-rejected") {
         toast.error("You're signed in, but the share service didn't accept the session.", {
@@ -92,7 +101,9 @@ export function ShareButton({
       title={
         canShare
           ? "Create a public share link"
-          : availability === "connecting"
+          : availability === "online-off"
+            ? "Online features are off — nothing leaves this tab"
+            : availability === "connecting"
             ? "Connecting to your account…"
             : availability === "backend-rejected"
               ? "Signed in, but the share service didn't accept the session"

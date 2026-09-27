@@ -4,7 +4,9 @@ import {
   internalQuery,
   query,
 } from "./_generated/server";
-import { getUserId, requireUser } from "./users";
+import { getUserId, requireUser, roleOf } from "./users";
+import { entitlementOf } from "./entitlement";
+import { aiCapsFor } from "./aiCaps";
 
 /* ── Per-tier AI job caps ──────────────────────────────────────────────────
  *
@@ -26,18 +28,8 @@ import { getUserId, requireUser } from "./users";
  * usage these tools actually see, and far below the 1,500 the daily cap alone
  * would have allowed.
  *
- * free can't reach here (UI + startJob both gate on tier), but keep it 0 so a
- * stale client can't sneak a job through. */
-const TIER_DAILY_CAP: Record<string, number> = {
-  free: 0,
-  pro: 50,
-  team: 200,
-};
-const TIER_MONTHLY_CAP: Record<string, number> = {
-  free: 0,
-  pro: 300,
-  team: 1500,
-};
+ * The numbers live in `aiCaps.ts` and are chosen by ENTITLEMENT (QC F3): an
+ * admin on a free row gets paid caps, exactly as `users.me` tells the UI. */
 const ONE_DAY_MS = 86_400_000;
 const ONE_MONTH_MS = 30 * ONE_DAY_MS;
 
@@ -77,17 +69,18 @@ export const usage = query({
     const now = Date.now();
     const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
     const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
+    const caps = aiCapsFor(user.tier, entitlementOf(user.tier, await roleOf(ctx, user), true));
 
     return {
       tier: user.tier,
       daily: {
         used: day.used,
-        cap: TIER_DAILY_CAP[user.tier] ?? 0,
+        cap: caps.daily,
         resetsAt: day.resetsAt,
       },
       monthly: {
         used: month.used,
-        cap: TIER_MONTHLY_CAP[user.tier] ?? 0,
+        cap: caps.monthly,
         resetsAt: month.resetsAt,
       },
     };
@@ -152,8 +145,10 @@ export const startJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    const entitlement = entitlementOf(user.tier, await roleOf(ctx, user), true);
+    const caps = aiCapsFor(user.tier, entitlement);
 
-    const cap = TIER_DAILY_CAP[user.tier] ?? 0;
+    const cap = caps.daily;
     if (cap === 0) {
       throw new Error("AI tools require a paid plan");
     }
@@ -166,7 +161,7 @@ export const startJob = internalMutation({
     if (day.used >= cap) {
       throw new Error(`Daily AI limit reached (${cap}/day on ${user.tier})`);
     }
-    const monthCap = TIER_MONTHLY_CAP[user.tier] ?? 0;
+    const monthCap = caps.monthly;
     if (month.used >= monthCap) {
       throw new Error(
         `Monthly AI limit reached (${monthCap}/month on ${user.tier})`,

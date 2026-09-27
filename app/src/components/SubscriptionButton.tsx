@@ -2,11 +2,10 @@
 // selected pane on the right). General (app preferences), Plan & Billing (Stripe
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
-import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useEffect, useRef } from "react";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
-import { DIALOG_OVERLAY, WINDOW_TITLE } from "@/lib/styles";
+import { WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -48,6 +47,7 @@ import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -212,6 +212,14 @@ export function SubscriptionButton({
   const setMyTier = useMutation(api.users.setMyTier);
   const [granting, setGranting] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  // Mirrors `restoreConfirmOpen` for Settings' onEscapeKeyDown, which must
+  // know about the confirm at the moment of the keypress (see below). It lags
+  // by one commit on purpose: if the confirm closes itself on the same press,
+  // Settings still sees "open" and does not close too.
+  const restoreConfirmOpenRef = useRef(false);
+  useEffect(() => {
+    restoreConfirmOpenRef.current = restoreConfirmOpen;
+  }, [restoreConfirmOpen]);
 
   const handleApplyTier = async () => {
     if (!superUser) return;
@@ -281,6 +289,17 @@ export function SubscriptionButton({
           aria-describedby={undefined}
           className="z-[var(--z-modal)] flex h-[80vh] flex-col"
           overlayClassName="z-[var(--z-modal)]"
+          onEscapeKeyDown={(e) => {
+            // Route Escape explicitly while the confirm is open: it closes the
+            // CONFIRM and Settings stays. Radix decides which layer is on top
+            // from the order they last rendered, and on the production build
+            // Settings re-rendered after the confirm opened and still claimed
+            // the key — so Escape closed Settings (and the confirm inside it).
+            if (restoreConfirmOpenRef.current) {
+              e.preventDefault();
+              setRestoreConfirmOpen(false);
+            }
+          }}
         >
           <DialogHeader className="px-4 py-2.5">
             <DialogTitle className={WINDOW_TITLE}>
@@ -496,44 +515,35 @@ export function SubscriptionButton({
               )}
             </div>
           </DialogFooter>
+          {/* Restore confirmation. The shared ConfirmDialog, NOT a hand-rolled
+              portal: the old one sat on <body> at z-idle, BELOW the Settings modal,
+              and Radix's modal sets pointer-events:none on everything outside the
+              open dialog — so Cancel and Restore were both unclickable and the
+              confirm could not be backed out of (QC F1, 09-24-2026). ConfirmDialog
+              alone was not enough: at z-dialog (50) it still opened UNDER the
+              Settings modal (60), whose scrim then took every click — Cancel
+              "worked" only because a scrim click closes the confirm, and Restore
+              never fired. `overModal` lifts it to z-over-modal (70), the same fix
+              #222 makes for Settings › Shared › Delete. It is rendered INSIDE
+              the Settings content, like Shared's confirm: as a sibling of the
+              Settings dialog, Escape reached Settings instead of the confirm on
+              the production build (Radix layer order followed mount timing). */}
+          <ConfirmDialog
+            open={restoreConfirmOpen}
+            onOpenChange={setRestoreConfirmOpen}
+            title="Restore settings?"
+            cancelLabel="Cancel"
+            confirmLabel="Restore"
+            overModal
+            onConfirm={handleRestore}
+          >
+            {tab === "superuser"
+              ? "This clears the Super User tier override and returns to your real account tier."
+              : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
+          </ConfirmDialog>
         </DialogContent>
       </Dialog>
 
-      {/* Restore confirmation — portaled above the Settings modal (z-modal). */}
-      {restoreConfirmOpen &&
-        createPortal(
-          <div
-            className={`${DIALOG_OVERLAY} z-[var(--z-idle)] flex items-center justify-center p-4`}
-            onClick={() => setRestoreConfirmOpen(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Restore settings"
-              className="w-full max-w-sm rounded-xl border border-border bg-bg-secondary p-5 text-text-primary shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold">Restore settings?</h3>
-              <p className="mt-2 text-sm text-text-muted leading-relaxed">
-                {tab === "superuser"
-                  ? "This clears the Super User tier override and returns to your real account tier."
-                  : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Button size="large"
-                  className="flex-1"
-                  onClick={() => setRestoreConfirmOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button size="large" className="flex-1" onClick={handleRestore}>
-                  Restore
-                </Button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
     </>
   );
 }
