@@ -4,7 +4,7 @@
 //   Item 4: PgUp/PgDn gallery cycling
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -21,68 +21,36 @@ import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
-import { canEncode } from "@/lib/encodeSupport";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
-import { namePastedImage } from "@/lib/pastedImageName";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { instantTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
 import { MobileShell } from "@/features/mobile/MobileShell";
-import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
-// Code-split: the compact-mode master bar only loads the first time the window
-// goes ≤1000px, so desktop sessions never download its chunk.
-const MasterBar = lazy(() =>
-  import("@/components/master-bar/MasterBar").then((m) => ({
-    default: m.MasterBar,
-  })),
-);
-import { UserMenu } from "@/components/UserMenu";
-import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { OpenRasterControls } from "@/components/ExportPane";
-import { downloadOraWithToast } from "@/lib/openraster";
-import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
-import { ShortcutModal } from "@/components/ShortcutModal";
-import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { useSession, effectiveMode } from "@/hooks/useEntitlement";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
-import { IdleScreen } from "@/components/IdleScreen";
-import { MultiTabScreen } from "@/components/MultiTabScreen";
-import { UpdatePrompt } from "@/components/UpdatePrompt";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useTabClaim } from "@/hooks/useTabClaim";
-import { Toaster, toast } from "@/components/ui/sonner";
-import { ToolsSidebar } from "@/features/tools";
+import { toast } from "@/components/ui/sonner";
 import { groupById } from "@/features/tools/toolGroups";
 import { activateGroup, useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { PlacementCell } from "@/components/PlacementGrid";
-import { CanvasArea } from "@/features/canvas/CanvasArea";
-import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
-import { ShapeZOrderMenuItems } from "@/features/canvas/ShapeZOrderMenuItems";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
-import { UploadDialog } from "@/features/upload/UploadDialog";
-import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
-import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
-import { FirstRunScreen } from "@/features/upload/FirstRunScreen";
-import { NewActions } from "@/features/upload/NewActions";
-import { ResumeContent } from "@/features/upload/ResumeContent";
 import {
   loadGalleryManifest,
   saveGalleryManifest,
   clearGalleryManifest,
 } from "@/lib/galleryManifest";
 import { getPhotoLimit } from "@/lib/photoLimits";
-import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
-import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
+import { hasReplicateAI, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
@@ -96,13 +64,16 @@ import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
-import { useExportDimensions } from "./session/useExportDimensions";
 import { useCanvasIdentity } from "@/lib/engine/canvasIdentity";
 import { transferCanvasToPort, releaseCanvasFromPort } from "@/lib/engine/port";
 import { useImageSession } from "./session/useImageSession";
 import { SessionProvider } from "./session/SessionContext";
+import { useImageImport } from "./session/useImageImport";
+import { ShellDialogs } from "./shell/ShellDialogs";
+import { SidebarDock } from "./shell/SidebarDock";
+import { Workspace } from "./shell/Workspace";
+import { CanvasContextMenu } from "./shell/CanvasContextMenu";
 import { useColorPicker } from "@/hooks/useColorPicker";
-import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
@@ -116,17 +87,13 @@ import {
   extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
-import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
-import { RadioCards } from "@/components/ui/radio-cards";
-import { useExportFileName } from "@/hooks/useExportFileName";
-import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
   applyExifToVerbatim,
 } from "@/lib/exif";
-import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
+import { panelsClosable } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
@@ -135,45 +102,8 @@ import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
-import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { installConsoleCapture } from "@/lib/diagnosticsLog";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-} from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { ActionTile } from "@/components/ui/action-tile";
-import { ShareButton } from "@/components/ShareButton";
-import {
-  Undo,
-  Redo,
-  Download,
-  Clipboard,
-  Copy,
-  Command as CommandIcon,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Archive,
-  FolderArchive,
-  ImagePlus,
-  Image as ImageIcon,
-  Package,
-  Pipette,
-} from "lucide-react";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 
 // TOOL_SHORTCUT is GONE (2026-07-28) — it was the pre-restructure eleven-tool
 // digit table, kept by hand, and it had gone stale in both columns. Slot 1 now
@@ -222,34 +152,7 @@ function capMessage(mode: UserMode, max: number): string {
   return `Gallery is limited to ${max} photos.`;
 }
 
-// Format choices shown in the Download dialog — a second chance to pick a
-// format for anyone who missed the dropdown in the Compress panel. ORA is the
-// one non-raster choice — the full layered project, not a flattened encode —
-// so it never touches the persisted `exportFormat` preference below.
-type DownloadFormat = ExportFormat | "ora";
-const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; hint: string }[] = [
-  { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
-  { value: "png", label: "PNG", hint: "Lossless · transparency" },
-  { value: "webp", label: "WebP", hint: "Small · transparency" },
-  { value: "avif", label: "AVIF", hint: "Smallest · modern" },
-  { value: "ora", label: "ORA", hint: "Layered · full project" },
-];
 
-/** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
- *  drag/paste import flow before the user picks where the image should land. */
-async function decodeImageSource(
-  source: Blob,
-): Promise<{ pixels: Uint8ClampedArray; w: number; h: number }> {
-  const bitmap = await createImageBitmap(source);
-  const w = bitmap.width;
-  const h = bitmap.height;
-  const oc = new OffscreenCanvas(w, h);
-  const ctx = oc.getContext("2d")!;
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  const rgba = ctx.getImageData(0, 0, w, h).data;
-  return { pixels: new Uint8ClampedArray(rgba.buffer as ArrayBuffer), w, h };
-}
 
 function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
@@ -352,7 +255,6 @@ export function AppShell() {
     if (photos.length > 0) setFirstRun(false); // latches false for the session
   }, [photos.length]);
   const setImageSavings = useGalleryStore((s) => s.setImageSavings);
-  const modifiedPhotos = useGalleryStore((s) => s.modifiedPhotos);
   const setModifiedPhotos = useGalleryStore((s) => s.setModifiedPhotos);
   // originalUrl is populated by the compare effect; not set on photo select
   const originalUrl = useUIStore((s) => s.originalUrl);
@@ -360,7 +262,6 @@ export function AppShell() {
   const compareActive = useUIStore((s) => s.compareActive);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
   // Right-click → Command Palette. Same store flag Alt+, toggles.
-  const setShowCommandPalette = useUIStore((s) => s.setShowCommandPalette);
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const isImageLoading = useUIStore((s) => s.isImageLoading);
@@ -371,7 +272,6 @@ export function AppShell() {
   const finishImageLoad = useUIStore((s) => s.finishImageLoad);
 
   // Item 2: Pan mode state
-  const isPanning = useUIStore((s) => s.isPanning);
   const setIsPanning = useUIStore((s) => s.setIsPanning);
 
   const brushMode = useToolStore((s) => s.brushMode);
@@ -520,10 +420,6 @@ export function AppShell() {
   // timeout (0 = never) and lets the browser throttle the tab.
   const { idle, wake } = useIdleTimeout(prefs.idleTimeoutMin);
 
-  // Single editing tab. Every tab shares one set of IndexedDB databases, so two
-  // open at once silently overwrite each other; whichever tab claimed last wins
-  // and the others park behind MultiTabScreen until "Use here".
-  const { isStale: isStaleTab, claimHere: claimTabHere } = useTabClaim();
 
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
@@ -764,26 +660,15 @@ export function AppShell() {
   // opens this (the "New" dialog) only if there's no prior session to resume.
   const showUpload = useUIStore((s) => s.showUpload);
   const setShowUpload = useUIStore((s) => s.setShowUpload);
-  const showTopBar = useUIStore((s) => s.showTopBar);
   const setShowTopBar = useUIStore((s) => s.setShowTopBar);
   // Compact master-bar active tab (≤1000px). Tools is the default view.
   const masterTab = useUIStore((s) => s.masterTab);
-  const setMasterTab = useUIStore((s) => s.setMasterTab);
   const showTools = useUIStore((s) => s.showTools);
   const setShowTools = useUIStore((s) => s.setShowTools);
   const showGallery = useUIStore((s) => s.showGallery);
   const setShowGallery = useUIStore((s) => s.setShowGallery);
   const showHistory = useUIStore((s) => s.showHistory);
   const setShowHistory = useUIStore((s) => s.setShowHistory);
-  // The three panels' hover-reveal close (PanelCloseButton) exists ONLY in the
-  // wide desktop layout, where they float beside the canvas and the top bar
-  // toggle is what brings one back. Everywhere else the chrome owns open/close
-  // — the dock's tab strip, the narrow overlay drawers, and the compact top
-  // bar (both side panels open under BP_TIGHT) — so a corner X there is a
-  // second, competing way to do the same thing. Chris, 2026-09-08: "don't let
-  // the closing work in that compact/tablet mode".
-  const panelsClosable =
-    !bp.dock && !bp.narrow && !(bp.width < BP_TIGHT && showTools && showHistory);
   // Mobile-version notice (upload & view only): dismissed for this stretch of
   // being at phone width; reset once the window grows back so it re-appears.
   const mobileNoticeDismissed = useUIStore((s) => s.mobileNoticeDismissed);
@@ -792,30 +677,10 @@ export function AppShell() {
   // stretch of being snapped narrow; re-armed once the window grows back wide.
   const compactNoticeDismissed = useUIStore((s) => s.compactNoticeDismissed);
   const setCompactNoticeDismissed = useUIStore((s) => s.setCompactNoticeDismissed);
-  // Most-recently-opened side panel — narrow mode closes the *other* one.
-  const lastPanelRef = useRef<"tools" | "history" | null>(null);
-  const showShortcutModal = useUIStore((s) => s.showShortcutModal);
   const setShowShortcutModal = useUIStore((s) => s.setShowShortcutModal);
-  const showCelebration = useUIStore((s) => s.showCelebration);
   const setShowCelebration = useUIStore((s) => s.setShowCelebration);
-  const showDiagnostics = useUIStore((s) => s.showDiagnostics);
   const setShowDiagnostics = useUIStore((s) => s.setShowDiagnostics);
 
-  // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
-  useEffect(() => {
-    if (showTools) lastPanelRef.current = "tools";
-  }, [showTools]);
-  useEffect(() => {
-    if (showHistory) lastPanelRef.current = "history";
-  }, [showHistory]);
-  // Below BP_NARROW the side panels are overlay drawers that can't coexist —
-  // when both end up open, close whichever opened first.
-  useEffect(() => {
-    if (bp.narrow && showTools && showHistory) {
-      if (lastPanelRef.current === "history") setShowTools(false);
-      else setShowHistory(false);
-    }
-  }, [bp.narrow, showTools, showHistory]);
   // Re-arm the mobile-version notice once the window is wide enough again.
   useEffect(() => {
     if (!bp.mobile) setMobileNoticeDismissed(false);
@@ -832,16 +697,10 @@ export function AppShell() {
   useEffect(() => {
     installConsoleCapture();
   }, []);
-  const deleteAllOpen = useUIStore((s) => s.deleteAllOpen);
   const setDeleteAllOpen = useUIStore((s) => s.setDeleteAllOpen);
   // Per-image + selected delete confirmations (mirror the Delete All dialog).
   // `deletePhotoId` holds the id awaiting confirmation (null = closed).
-  const deletePhotoId = useUIStore((s) => s.deletePhotoId);
   const setDeletePhotoId = useUIStore((s) => s.setDeletePhotoId);
-  const deleteSelectedOpen = useUIStore((s) => s.deleteSelectedOpen);
-  const setDeleteSelectedOpen = useUIStore((s) => s.setDeleteSelectedOpen);
-  const exportDialogOpen = useUIStore((s) => s.exportDialogOpen);
-  const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const activeTool = useToolStore((s) => s.activeTool);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
@@ -868,42 +727,6 @@ export function AppShell() {
   // format on every visit. Same setter signature (SetArg), so the call sites
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
-  const setExportFormat = useToolStore((s) => s.setExportFormat);
-  // The Download dialog is a SECOND format picker, and it was still selling
-  // AVIF as "Smallest · modern" while this browser silently writes PNG. The
-  // Compress panel's note does not reach here, so the dialog has to say it too
-  // — otherwise the more prominent of the two surfaces is the dishonest one.
-  const [avifEncodable, setAvifEncodable] = useState<boolean | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void canEncode("image/avif").then((ok) => {
-      if (live) setAvifEncodable(ok);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const downloadFormats = useMemo(
-    () =>
-      DOWNLOAD_FORMATS.map((o) =>
-        o.value === "avif" && avifEncodable === false
-          ? { ...o, hint: "Not supported here · saves as PNG" }
-          : o,
-      ),
-    [avifEncodable],
-  );
-  /** What will actually be written — drives the dialog's button label so it
-   *  cannot offer "Download AVIF" and then hand over a PNG. */
-  const effectiveExportFormat: ExportFormat =
-    exportFormat === "avif" && avifEncodable === false ? "png" : exportFormat;
-  // The dialog's own format pick, reseeded from the persisted preference each
-  // time it opens — kept separate so an "ora" pick never lands in that store.
-  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(exportFormat);
-  useEffect(() => {
-    if (exportDialogOpen) setDownloadFormat(exportFormat);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportDialogOpen]);
-  const isOraDownload = downloadFormat === "ora";
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -1144,39 +967,6 @@ export function AppShell() {
     canvasBgTransparent,
   });
 
-  // The size the export will actually produce. Computed in an effect, because
-  // the "Photo only" branch costs a whole-image composite per call and used to
-  // run twice per render from JSX prop position — see the hook's header.
-  const exportDims = useExportDimensions({
-    stamp,
-    active: exportDialogOpen,
-    // `effectiveExportFormat`, not `exportFormat`: the dialog must predict the
-    // crop the encoder will actually cause.
-    excludeBackground: !includeCanvasInExport({
-      exportCanvasBackground,
-      format: effectiveExportFormat,
-      canvasBgTransparent,
-    }),
-  });
-
-  const exportName = useExportFileName(
-    exportDialogOpen,
-    activePhotoId,
-    photos.find((p) => p.id === activePhotoId)?.name,
-  );
-  const downloadFromDialog = () => {
-    setExportDialogOpen(false);
-    if (isOraDownload) {
-      void downloadOraWithToast({
-        stampToolRef: stamp.toolRef,
-        flushToCanvas: stamp.flushToCanvas,
-        syncState: stamp.syncState,
-        imageName: activeEntry?.name,
-      });
-      return;
-    }
-    void handleExportAs(exportName.stem());
-  };
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -1765,129 +1555,10 @@ export function AppShell() {
     redStampTool,
   });
 
-  /**
-   * Paste a bitmap from the clipboard into the **active layer**, centered on the
-   * canvas. Accepts either the `clipboardData.items` from a native paste event
-   * or, when called without them, falls back to the async Clipboard API (for an
-   * explicit button/menu invocation). Decodes the image to RGBA and composites
-   * it via the active-layer `paste_region` (one "Paste" history entry in Rust).
-   */
-  // ── Drag / paste image import ────────────────────────────────────────────
-  // A dropped or pasted image doesn't act immediately — it opens a choice
-  // dialog (New layer / Onto image / To gallery). `isDraggingImage` drives the
-  // full-window drop affordance; `importImage` holds the decoded image + a File
-  // (for the gallery path) + a preview URL while the dialog is open.
-  const [isDraggingImage, setIsDraggingImage] = useState(false);
-  const [importImage, setImportImage] = useState<{
-    pixels: Uint8ClampedArray;
-    w: number;
-    h: number;
-    file: File;
-    previewUrl: string;
-  } | null>(null);
 
-  const closeImportDialog = useCallback(() => {
-    setImportImage((prev) => {
-      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-      return null;
-    });
-  }, []);
-
-  const openImportDialog = useCallback(async (source: Blob, file: File) => {
-    try {
-      // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
-      // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
-      if (isSvgFile(file)) {
-        file = await rasterizeSvgToPng(file);
-        source = file;
-      }
-
-      // AN EMPTY WORKSPACE NEVER ASKS — the same rule a multi-image paste
-      // already follows above ("a stack never asks"). Two of this dialog's
-      // three choices stack or merge onto a layer, and with no image open
-      // there is no layer to stack onto: both tiles render disabled and the
-      // only live choice is the gallery. Asking a question with one possible
-      // answer is not a choice, it is a click in the way (Chris, 2026-09-10).
-      //
-      // Gated on the ACTIVE PHOTO, not on gallery length: the layer tiles are
-      // disabled by `hasActivePhoto` at the render site, so this matches
-      // exactly what the dialog would have offered.
-      if (activePhotoId === null) {
-        await handleAddPhotos([file]);
-        return;
-      }
-
-      const { pixels, w, h } = await decodeImageSource(source);
-      const previewUrl = URL.createObjectURL(source);
-      setImportImage((prev) => {
-        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-        return { pixels, w, h, file, previewUrl };
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      toast.error(`Couldn't read image: ${msg}`);
-    }
-  }, [activePhotoId, handleAddPhotos]);
-
-  const handlePasteFromClipboard = useCallback(
-    async (items?: DataTransferItemList | null) => {
-      let source: Blob | null = null;
-      if (items) {
-        // Collect EVERY image on the clipboard, not just the first. Pasting a
-        // multi-file selection out of a file manager hands over one item per
-        // file, and the "Add this image" choice dialog is single-image by
-        // construction — it used to keep item 0 and silently drop the rest.
-        // `getAsFile()` must run before any await (the item list is only valid
-        // during the event turn), which is why this maps eagerly.
-        const pasted = Array.from(items)
-          .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
-          .map((it) => it.getAsFile())
-          .filter((f): f is File => f !== null)
-          .map(namePastedImage);
-        if (pasted.length >= 2) {
-          // A stack never asks — straight to the gallery. handleAddPhotos
-          // trims to the tier cap and toasts when it had to.
-          await handleAddPhotos(pasted);
-          return;
-        }
-        if (pasted[0]) source = pasted[0];
-      }
-      if (!source) {
-        try {
-          const read = await navigator.clipboard.read();
-          for (const clip of read) {
-            const t = clip.types.find((x) => x.startsWith("image/"));
-            if (t) {
-              source = await clip.getType(t);
-              break;
-            }
-          }
-        } catch {
-          /* Clipboard API unavailable / denied — nothing to paste.
-           *
-           * DELIBERATELY SILENT, unlike the start-screen Paste BUTTON
-           * (`NewActions.handlePasteClick`), which toasts all three of its
-           * failure modes. The difference is what triggers each one. That
-           * button is an explicit "paste an image now", so a failure is worth
-           * reporting. This runs on EVERY Ctrl+V over the canvas, including
-           * pasting plain text — which reaches here with no image on the
-           * clipboard and would fire an error toast on an ordinary text paste.
-           * A toast here is noise, not feedback. Leave it quiet. */
-        }
-      }
-      if (!source) return;
-      await openImportDialog(source, namePastedImage(source));
-    },
-    [openImportDialog, handleAddPhotos],
-  );
-
-  // A "New"/start surface is up: the upload dialog, the boot splash, or the
-  // first-run start screen (New actions / Welcome-back). Drag-drop & paste
-  // image-import stay dormant under any of these — the surface owns the image
-  // (or there's no workspace yet). "Add this image" is only for dropping/pasting
-  // onto the live editor when no dialog/start screen is open.
-  const newSurfaceOpen =
-    showUpload || booting || (firstRun && !!resumeManifest);
+  // Drag / paste image import — the whole flow lives in session/useImageImport
+  // (B3); ShellDialogs renders its drop affordance and choice dialog.
+  const imageImport = useImageImport({ stamp, pastePlacement, handleAddPhotos });
 
   // Is a start surface covering the workspace? Spelled exactly like the
   // condition FirstRunScreen renders on below, so the compact chrome cannot
@@ -1898,142 +1569,6 @@ export function AppShell() {
   // the start screen sits OVER the floating panels, which reads deliberately.
   const startSurfaceOpen =
     booting || (firstRun && (showUpload || !!resumeManifest));
-
-  // Native Ctrl/Cmd+V paste of an image → open the import choice dialog.
-  // Skipped while a New/start surface is up, or focus is in a text field.
-  useEffect(() => {
-    const handler = (e: ClipboardEvent) => {
-      if (newSurfaceOpen) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const hasImage = Array.from(items).some(
-        (it) => it.kind === "file" && it.type.startsWith("image/"),
-      );
-      if (!hasImage) return;
-      e.preventDefault();
-      void handlePasteFromClipboard(items);
-    };
-    window.addEventListener("paste", handler);
-    return () => window.removeEventListener("paste", handler);
-  }, [newSurfaceOpen, handlePasteFromClipboard]);
-
-  // Drag an image anywhere over the app → show the full-window drop affordance;
-  // on drop, open the import choice dialog (NOT the New/upload dialog). A depth
-  // counter keeps the overlay steady as the drag crosses child elements.
-  useEffect(() => {
-    if (newSurfaceOpen) return; // a New/start surface owns drops while it's up
-    const isFileDrag = (e: DragEvent) =>
-      !!e.dataTransfer &&
-      Array.from(e.dataTransfer.types || []).includes("Files");
-    let depth = 0;
-    const onEnter = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
-      depth += 1;
-      setIsDraggingImage(true);
-    };
-    const onOver = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
-      e.preventDefault(); // required so the browser fires `drop`
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-    };
-    const onLeave = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) setIsDraggingImage(false);
-    };
-    const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
-      e.preventDefault(); // stop the browser from navigating to the image
-      depth = 0;
-      setIsDraggingImage(false);
-      // isSvgFile catches .svg drops whose source hands over an empty mime.
-      const files = Array.from(e.dataTransfer?.files ?? []).filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
-      );
-      if (files.length === 0) {
-        toast.error("That doesn't look like an image");
-        return;
-      }
-      // A STACK OF IMAGES NEVER ASKS. "Add this image" offers a single-image
-      // choice (stack as layer / merge into layer / new gallery image) and can
-      // only carry one file, so a multi-file drop used to keep files[0] and
-      // silently discard the rest. Two or more now go straight to the gallery
-      // regardless of whether the gallery is empty or already has photos —
-      // handleAddPhotos accepts as many as fit under the tier cap and toasts
-      // when the batch had to be trimmed.
-      if (files.length >= 2) {
-        void handleAddPhotos(files);
-        return;
-      }
-      void openImportDialog(files[0], files[0]);
-    };
-    window.addEventListener("dragenter", onEnter);
-    window.addEventListener("dragover", onOver);
-    window.addEventListener("dragleave", onLeave);
-    window.addEventListener("drop", onDrop);
-    return () => {
-      window.removeEventListener("dragenter", onEnter);
-      window.removeEventListener("dragover", onOver);
-      window.removeEventListener("dragleave", onLeave);
-      window.removeEventListener("drop", onDrop);
-      setIsDraggingImage(false);
-    };
-  }, [newSurfaceOpen, openImportDialog, handleAddPhotos]);
-
-  // ── Import choice actions ──
-  /** Center the imported image over the canvas. */
-  const importDest = useCallback(
-    (w: number, h: number) => {
-      const cw = stamp.state.width || w;
-      const ch = stamp.state.height || h;
-      return { x: Math.round((cw - w) / 2), y: Math.round((ch - h) / 2) };
-    },
-    [stamp.state.width, stamp.state.height],
-  );
-  const importToNewLayer = useCallback(async () => {
-    const img = importImage;
-    if (!img) return;
-    const { x, y } = importDest(img.w, img.h);
-    // Awaited: ADR-024 Stage 3.5 made the layer ops async. Nothing between here
-    // and `begin` reads the engine, so there is no capture to tear — the id is
-    // simply needed before the placement box can be told what to remove on Esc.
-    const layerId = await stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
-    // Same movable/resizable placement as "Merge into layer" — `begin` scales
-    // the box down to fit when the image is bigger than the canvas, so an
-    // oversized paste stays fully visible and resizable instead of baking in
-    // at 1:1 and permanently clipping at the layer edges. Escape aborts the
-    // paste and removes the layer it would have landed on.
-    pastePlacement.begin(img.pixels, img.w, img.h, x, y, () =>
-      void stamp.removeLayer(layerId),
-    );
-    toast.success("Pasted on a new layer — Enter places it, Esc cancels");
-    closeImportDialog();
-  }, [importImage, importDest, stamp, pastePlacement, closeImportDialog]);
-  const importOntoLayer = useCallback(() => {
-    const img = importImage;
-    if (!img) return;
-    const { x, y } = importDest(img.w, img.h);
-    // Seed a movable/resizable placement instead of baking the pixels in
-    // immediately — the bounding-box overlay takes over the canvas; Enter,
-    // clicking away, or switching tools commits it (Escape cancels).
-    pastePlacement.begin(img.pixels, img.w, img.h, x, y);
-    closeImportDialog();
-  }, [importImage, importDest, pastePlacement, closeImportDialog]);
-  const importToGallery = useCallback(() => {
-    const img = importImage;
-    if (!img) return;
-    void handleAddPhotos([img.file]);
-    closeImportDialog();
-  }, [importImage, handleAddPhotos, closeImportDialog]);
 
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
@@ -2481,10 +2016,6 @@ export function AppShell() {
     [exportPhotosToZip, photos],
   );
 
-  // The single Download button always opens the chooser dialog (Canvas Image /
-  // All / Clipboard Copy). The "All" button is hidden when only one image is
-  // loaded. The plural label ("JPEGs") reflects the gallery count.
-  const handleExportClick = useCallback(() => setExportDialogOpen(true), []);
 
   // Ctrl+[ / Ctrl+] — resize the active brush. Routes to whichever brush the
   // current tool uses (paint / blur / clone+redaction stamp / emoji), each
@@ -2618,8 +2149,6 @@ export function AppShell() {
   // photo at once and there is no single before/after. CompareSlider closes an
   // open overlay when Batch opens.
   const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
-  const canUndo = stamp.state.undoCount > 0;
-  const canRedo = stamp.state.redoCount > 0;
 
   return (
     <SessionProvider
@@ -2657,25 +2186,6 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      {/* Narrow-window drawer scrim — dims the canvas behind an open side panel
-          and click-to-closes it. Sits above the canvas (z 10) but below the top
-          bar (30) / panels (40) so all chrome stays bright + interactive. */}
-      <AnimatePresence>
-        {bp.narrow && !bp.dock && (showTools || showHistory) && (
-          <motion.div
-            key="drawer-scrim"
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            onClick={() => {
-              setShowTools(false);
-              setShowHistory(false);
-            }}
-            className="fixed inset-0 z-[20] bg-black/40"
-          />
-        )}
-      </AnimatePresence>
 
       {/* Phone width (< BP_MOBILE): the MOBILE VERSION takes over — upload,
           add, and view the gallery, no editing. An opaque layer over all the
@@ -2708,586 +2218,115 @@ export function AppShell() {
         }}
       />
 
-      {/* Cold start: one full-page surface. It's the splash (logo + spinner)
-          while booting, then the spinner fades, the logo eases up, and EITHER
-          the New actions or the Welcome-back content reveal — same entrance for
-          both. Auto-reopen just fades it out. Mid-session "New" uses the compact
-          UploadDialog below. Not on mobile: MobileShell owns the whole surface
-          there (its own splash, its own empty state, auto-resume). */}
-      <FirstRunScreen
-        show={!bp.mobile && (booting || (firstRun && (showUpload || !!resumeManifest)))}
-        phase={booting ? "loading" : "ready"}
+      {/* Start surfaces, dialogs, confirms, toasts, the export chooser. */}
+      <ShellDialogs
+        mobile={bp.mobile}
         reduceMotion={prefs.reduceMotion}
-      >
-        {resumeManifest ? (
-          <ResumeContent
-            photos={resumeManifest.photos}
-            onResume={handleResumeSession}
-            onStartFresh={handleStartFresh}
-          />
-        ) : (
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
-            <NewActions onFiles={handleAddPhotos} />
-          </div>
-        )}
-      </FirstRunScreen>
-
-      <UploadDialog
-        open={!bp.mobile && showUpload && !resumeManifest && !booting && !firstRun}
-        onClose={() => setShowUpload(false)}
-        onFiles={handleAddPhotos}
-        canClose={photos.length > 0}
-      />
-
-      {/* Drag-an-image-anywhere affordance + the import choice dialog. */}
-      <ImageDropOverlay show={isDraggingImage} />
-      <ImportImageDialog
-        open={importImage !== null}
-        onOpenChange={(o) => {
-          if (!o) closeImportDialog();
+        effectiveUserMode={effectiveUserMode}
+        onResumeSession={handleResumeSession}
+        onStartFresh={handleStartFresh}
+        onAddPhotos={handleAddPhotos}
+        imageImport={imageImport}
+        idle={idle}
+        onWake={wake}
+        onConfirmDeleteAll={confirmDeleteAll}
+        onRemovePhoto={handleRemovePhoto}
+        onDeleteSelected={handleDeleteSelected}
+        exportDialog={{
+          onExportAs: handleExportAs,
+          onExportAll: handleExportAll,
+          onCopyToClipboard: handleCopyToClipboard,
+          exportCanvasBackground,
+          canvasBgTransparent,
         }}
-        previewUrl={importImage?.previewUrl ?? null}
-        width={importImage?.w ?? 0}
-        height={importImage?.h ?? 0}
-        canUseLayers={TIERS[effectiveUserMode].layersPerImage > 0}
-        hasActivePhoto={activePhotoId !== null}
-        onNewLayer={importToNewLayer}
-        onOntoLayer={importOntoLayer}
-        onAddToGallery={importToGallery}
       />
 
-      <ShortcutModal
-        open={showShortcutModal}
-        onClose={() => setShowShortcutModal(false)}
-      />
-
-      <CelebrationDialog
-        open={showCelebration}
-        onOpenChange={setShowCelebration}
-      />
-
-      <IdleScreen open={idle} onContinue={wake} />
-      {/* Another tab took the session. Sits beside IdleScreen because it is
-          the same idea — this tab is parked until you say otherwise — and
-          shares its z-layer so it covers every panel. */}
-      <MultiTabScreen open={isStaleTab} onUseHere={claimTabHere} />
-
-      {/* Diagnostics Window (Alt+Delete) is always available. */}
-      <DiagnosticLogOverlay
-        open={showDiagnostics}
-        onClose={() => setShowDiagnostics(false)}
-        imageMeta={{
-          photoId: activePhotoId,
-          name: activeEntry?.name,
-          mimeType: activeEntry?.mimeType,
-          origWidth: activeEntry?.origWidth,
-          origHeight: activeEntry?.origHeight,
-          currentWidth: stamp.state.width,
-          currentHeight: stamp.state.height,
-          originalByteSize: activeEntry?.originalByteSize,
-          currentByteSize: activeEntry?.byteSize,
-          originalKey: activeEntry?.originalKey,
-          uploadKey: activeEntry?.uploadKey,
-          undoCount: stamp.state.undoCount,
-          redoCount: stamp.state.redoCount,
-          modified:
-            activePhotoId != null &&
-            (modifiedPhotos.has(activePhotoId) ||
-              hasBeenModified ||
-              stamp.state.undoCount > 0),
-          // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
-          // an EMPTY typed array, not a throw. Its consumer
-          // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
-          // than `!png` alone, which is the only reason that would have degraded
-          // safely instead of hashing a zero-byte buffer.
-          getCanvasPng: async () => {
-            const t = stamp.toolRef.current;
-            return t ? new Uint8Array(await t.export_png()) : null;
+      {/* Drawer scrim, compact master bar / wide top bar, Tools sidebar. */}
+      <SidebarDock
+        bp={bp}
+        startSurfaceOpen={startSurfaceOpen}
+        general={general}
+        superUser={superUser}
+        openRaster={openRaster}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        tools={{
+          onStampSettingsChange: handleStampSettingsChange,
+          onResize: handleApplyCompression,
+          onResizeOnly: handleApplyResizeOnly,
+          onResizeCanvas: (w, h) => void handleResizeCanvas(w, h),
+          onRemoveCanvas: () => void handleRemoveCanvas(),
+          canRemoveCanvas: backgroundLayerId !== undefined,
+          // The PHOTO, falling back to the document until the engine has
+          // answered — which is what this showed before #81 anyway, so
+          // nothing flickers.
+          imageWidth: photoBounds?.width ?? stamp.state.width,
+          imageHeight: photoBounds?.height ?? stamp.state.height,
+          onQualityChange: handleQualityChange,
+          onQualityCommit: handleQualityCommit,
+          compressProgress,
+          onPlace: handlePlace,
+          selection: {
+            onSelectAll: handleSelectAll,
+            onDeselect: handleDeselect,
+            onDelete: handleDeleteSelection,
+            onNewLayerCopy: handleNewLayerCopy,
+            onNewLayerCut: handleNewLayerCut,
+            onRemoveObject: handleRemoveObject,
           },
+          onToggleMove: handleToggleMove,
+          layerMask: { onAdd: handleAddMask, onToggleEdit: handleToggleMaskEdit },
+          onToolSettingsChange: handleToolSettingsChange,
+          onPickColor: handlePickColor,
+          aiEnabled: hasReplicateAI(effectiveUserMode),
+          onAIResult: handleAIResult,
         }}
       />
 
-      <Toaster />
 
-      {/* "A new version is ready" — Yes / No. Mounted here beside Toaster,
-          IdleScreen and MultiTabScreen because it is the same kind of thing:
-          an app-level overlay with no place in the tool tree. Nothing else is
-          added to AppShell for it — the state lives in lib/pwa/updatePrompt.ts
-          (reachable from the non-React service-worker triggers) and the markup
-          in components/UpdatePrompt.tsx. */}
-      <UpdatePrompt />
-
-      <ConfirmDialog
-        open={deleteAllOpen}
-        onOpenChange={setDeleteAllOpen}
-        title="Delete all images?"
-        cancelLabel="Cancel"
-        confirmLabel="Delete all"
-        confirmIcon={Trash2}
-        tone="destructive"
-        onConfirm={confirmDeleteAll}
-      >
-        This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
-      </ConfirmDialog>
-
-      {/* Single-image delete confirm — per-image trashcan + right-click "Delete image". */}
-      <ConfirmDialog
-        open={deletePhotoId !== null}
-        onOpenChange={(o) => !o && setDeletePhotoId(null)}
-        title="Delete this image?"
-        cancelLabel="Cancel"
-        confirmLabel="Delete image"
-        confirmIcon={Trash2}
-        tone="destructive"
-        onConfirm={() => {
-          const id = deletePhotoId;
-          setDeletePhotoId(null);
-          if (id) handleRemovePhoto(id);
-        }}
-      >
-        This removes the image and its edit history. This cannot be undone.
-      </ConfirmDialog>
-
-      {/* Delete-selected confirm. */}
-      <ConfirmDialog
-        open={deleteSelectedOpen}
-        onOpenChange={setDeleteSelectedOpen}
-        title={selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
-        cancelLabel="Cancel"
-        confirmLabel={selectedIds.size === 1 ? "Delete image" : "Delete selected"}
-        confirmIcon={Trash2}
-        tone="destructive"
-        onConfirm={() => {
-          setDeleteSelectedOpen(false);
-          handleDeleteSelected();
-        }}
-      >
-        {selectedIds.size === 1
-          ? "This removes the selected image and its edit history. This cannot be undone."
-          : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
-      </ConfirmDialog>
-
-      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Download, Copy, or Share</DialogTitle>
-          </DialogHeader>
-
-          <DialogBody className="space-y-4">
-            <DialogDescription>
-              {photos.length > 1 ? (
-                <>
-                  Save the selected image — or all of them as a{" "}
-                  <span className="font-mono">.zip</span> — copy the canvas to
-                  your clipboard, or create a public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              ) : (
-                <>
-                  Save this image, copy the canvas to your clipboard, or create a
-                  public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              )}
-            </DialogDescription>
-
-            {/* Format picker — a second shot at the format for anyone who missed
-                the Compress dropdown. */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-text-muted">Format</span>
-              <RadioCards
-                name="download-format"
-                value={downloadFormat}
-                onValueChange={(v) => {
-                  setDownloadFormat(v);
-                  if (v !== "ora") setExportFormat(v); // ORA stays local-only
-                }}
-                options={downloadFormats}
-                columns={2}
-              />
-            </div>
-
-            <ExportFileNameField
-              value={exportName.value}
-              defaultStem={exportName.defaultStem}
-              onChange={exportName.onChange}
-              ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
-              onSubmit={downloadFromDialog}
-            />
-          </DialogBody>
-
-          <DialogFooter className="flex-row gap-2">
-            <ActionTile
-              icon={isOraDownload ? Package : ImageIcon}
-              label={isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={downloadFromDialog}
-            />
-            <ShareButton
-              exportPng={async () => {
-                if (exportCanvasBackground) return stamp.exportBlob("png");
-                const tool = stamp.toolRef.current;
-                if (!tool) return null;
-                // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
-                // cropped dimensions that describe them.
-                const cap = await tool.capture_composite_excluding_background();
-                const { rgba, width, height } = cap;
-                cap.free();
-                return encodeRgba(rgba, width, height, "png", 1);
-              }}
-              canvasW={exportDims.width}
-              canvasH={exportDims.height}
-              fileName={photos.find((p) => p.id === activePhotoId)?.name}
-              disabled={!hasImage}
-              onShared={() => setExportDialogOpen(false)}
-            />
-            {photos.length > 1 && (
-              <ActionTile
-                icon={FolderArchive}
-                label={`Download All (${photos.length})`}
-                onClick={() => {
-                  setExportDialogOpen(false);
-                  handleExportAll();
-                }}
-              />
-            )}
-            <ActionTile
-              icon={Clipboard}
-              label="Clipboard"
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleCopyToClipboard();
-              }}
-            />
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Compact master bar (≤1000px): the entire top-bar chrome lives here as
-          a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
-          hidden in this mode. Lazily loaded — Suspense sits outside
-          AnimatePresence so the slide-out still works once the chunk is in. */}
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {bp.dock && showTopBar && !startSurfaceOpen && (
-            <MasterBar
-              activeTab={masterTab}
-              onTab={setMasterTab}
-              onNew={() => setShowUpload(true)}
-              newActive={showUpload}
-              onExport={handleExportClick}
-              canExport={hasImage}
-              settingsSlot={
-                <SubscriptionButton
-                  general={general}
-                  superUser={superUser}
-                  openRaster={openRaster}
-                  // Standalone: the master bar is one flat row with no pills now, so
-                  // each control carries its own fill (same as the compact top bar).
-                  grouped={false}
-                />
-              }
-              userSlot={<UserMenu grouped={false} />}
-            />
-          )}
-        </AnimatePresence>
-      </Suspense>
-
-      <AnimatePresence>
-        {!bp.dock && showTopBar && (
-          <TopBar
-            onZoomIn={handleZoomIn}
-            onZoomOut={handleZoomOut}
-            winWidth={bp.width}
-            drawerMode={bp.narrow}
-            reduceMotion={prefs.reduceMotion}
-            general={general}
-            superUser={superUser}
-            openRaster={openRaster}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {(bp.dock ? masterTab === "tools" && !startSurfaceOpen : showTools) && (
-          <ToolsSidebar
-            rulersPrefs={prefs}
-            onRulersChange={(p) => applyPreferences({ ...prefs, ...p })}
-            embedded={bp.dock}
-            closable={panelsClosable}
-            onStampSettingsChange={handleStampSettingsChange}
-            onResize={handleApplyCompression}
-            onResizeOnly={handleApplyResizeOnly}
-            onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
-            onRemoveCanvas={() => void handleRemoveCanvas()}
-            canRemoveCanvas={backgroundLayerId !== undefined}
-            // The PHOTO, falling back to the document until the engine has
-            // answered — which is what this showed before #81 anyway, so
-            // nothing flickers.
-            imageWidth={photoBounds?.width ?? stamp.state.width}
-            imageHeight={photoBounds?.height ?? stamp.state.height}
-            onQualityChange={handleQualityChange}
-            onQualityCommit={handleQualityCommit}
-            compressProgress={compressProgress}
-            onPlace={handlePlace}
-            selection={{
-              onSelectAll: handleSelectAll,
-              onDeselect: handleDeselect,
-              onDelete: handleDeleteSelection,
-              onNewLayerCopy: handleNewLayerCopy,
-              onNewLayerCut: handleNewLayerCut,
-              onRemoveObject: handleRemoveObject,
-            }}
-            onToggleMove={handleToggleMove}
-            layerMask={{ onAdd: handleAddMask, onToggleEdit: handleToggleMaskEdit }}
-            onToolSettingsChange={handleToolSettingsChange}
-            onPickColor={handlePickColor}
-            aiEnabled={hasReplicateAI(effectiveUserMode)}
-            onAIResult={handleAIResult}
-          />
-        )}
-      </AnimatePresence>
 
       <ContextMenu onOpenChange={shapeZMenu.onOpenChange}>
         <ContextMenuTrigger asChild>
-          <motion.main
-            id="main-canvas"
-            aria-label="Image canvas"
-            tabIndex={-1}
+          <Workspace
+            bp={bp}
+            reduceMotion={prefs.reduceMotion}
             onContextMenu={shapeZMenu.onContextMenu}
-            animate={{
-              // Compact mode: clear the master bar (left). Wide: two-sided push.
-              marginLeft: bp.dock
-                ? MASTER_BAR_WIDTH + 16
-                : !bp.narrow && showTools
-                  ? PANEL_OPEN_GUTTER
-                  : 0,
-              marginRight:
-                !bp.dock && !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
-              // Third side: the Gallery strip pushes the workspace UP the same way
-              // Tools and Review push it in. Wide only — in the dock the gallery
-              // is a column on the left, so a bottom gutter would be a gap
-              // under nothing. (Chris, 2026-09-08.)
-              marginBottom:
-                !bp.dock && !bp.narrow && showGallery ? GALLERY_OPEN_GUTTER : 0,
+            hookResult={effectiveStamp}
+            brush={{ diameter, pos, visible, onCanvasEnter }}
+            onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
+            magnifier={colorPicker.magnifier}
+            canvas={{
+              onTextFontSizeChange: handleTextFontSizeChange,
+              renderOverlay: renderDuplicatePad,
+              onPenCommit: handlePenCommit,
+              onPenHitTest: handlePenHitTest,
+              onPenEditStart: handlePenEditStart,
+              onPenEditCommit: handlePenEditCommit,
+              onPenEditCancel: handlePenEditCancel,
             }}
-            transition={prefs.reduceMotion ? instantTransition : springStandard}
-            className="main-content focus:outline-none"
-            style={{ position: "relative" }}
-          >
-            <>
-              {/* Emoji-grid mode: wrap the grid host in a flex pane sized to
-                  fit between the fixed TopBar and GalleryBar. The grid sits
-                  inside, capped at a 5:3 aspect ratio with gap + padding for
-                  breathing room. Non-emoji mode falls through to the regular
-                  full-size canvas host.
-
-                  ⚠️ This used to claim CanvasArea "is rendered ONCE (a stable
-                  React subtree) so the canvas DOM + WASM pixels survive tool
-                  switches". It is rendered TWICE — once in each arm of this
-                  ternary — so crossing the Batch boundary unmounts one and
-                  mounts the other, and the <canvas> element is genuinely
-                  re-created. Corrected 2026-08-09 after measuring element
-                  identity across tool switches in the browser.
-
-                  The pixels do survive, because WASM owns them and a fresh
-                  CanvasArea re-blits on mount. What does not survive is the
-                  ELEMENT — which is why ADR-024 a11 exists: after
-                  transferControlToOffscreen() the worker would go on drawing
-                  into the discarded one. See lib/engine/canvasIdentity.ts. */}
-              {activeTool === "emoji" ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: showTopBar ? 80 : 12,
-                    // Same constant main-content lifts by, so the two cannot drift.
-                    bottom: 56 + (showGallery ? GALLERY_OPEN_GUTTER : 0),
-                    left: 12,
-                    right: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 0,
-                    minWidth: 0,
-                  }}
-                >
-                  <div
-                    className="canvas-grid-host checkerboard-canvas"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(5, 1fr)",
-                      gridTemplateRows: "repeat(3, 1fr)",
-                      gap: "12px",
-                      padding: "12px",
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      width: "auto",
-                      margin: "auto",
-                      aspectRatio: "5 / 3",
-                    }}
-                  >
-                    <div
-                      className={`canvas-grid-hero${
-                        activePhotoId && photos.length > 0
-                          ? " ring-2 ring-orange-400"
-                          : ""
-                      }`}
-                      style={{
-                        gridArea: "1 / 1 / 3 / 3",
-                        position: "relative",
-                        overflow: "hidden",
-                        borderRadius: "0.375rem",
-                      }}
-                    >
-                      <div style={{ position: "absolute", inset: 0 }}>
-                        <CanvasArea
-                          ref={canvasRef}
-                          hookResult={effectiveStamp}
-                          brushDiameter={diameter}
-                          cursorPos={pos}
-                          cursorVisible={visible}
-                          onCanvasEnter={onCanvasEnter}
-                          onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                          onTextFontSizeChange={handleTextFontSizeChange}
-                          renderOverlay={renderDuplicatePad}
-                          onPenCommit={handlePenCommit}
-                          onPenHitTest={handlePenHitTest}
-                          onPenEditStart={handlePenEditStart}
-                          onPenEditCommit={handlePenEditCommit}
-                          onPenEditCancel={handlePenEditCancel}
-                        />
-                      </div>
-                      {(!activePhotoId || photos.length === 0) && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/95 text-center text-theme-muted-foreground">
-                          <ImagePlus className="h-10 w-10 opacity-60" />
-                          <p className="text-sm font-semibold">No photos loaded</p>
-                          <p className="text-xs">Upload images to start batch editing</p>
-                        </div>
-                      )}
-                      {activePhotoId && photos.length > 0 && (
-                        <div className="absolute top-2 left-2 z-20 rounded-full bg-orange-500 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-white shadow-md">
-                          Selected
-                        </div>
-                      )}
-                    </div>
-                    <GridThumbnails
-                      photos={photos}
-                      activePhotoId={activePhotoId}
-                      onSelectPhoto={handleSelectPhoto}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="canvas-fullsize-host">
-                  <div className="canvas-fullsize-slot">
-                    <CanvasArea
-                      ref={canvasRef}
-                      hookResult={effectiveStamp}
-                      brushDiameter={diameter}
-                      cursorPos={pos}
-                      cursorVisible={visible}
-                      onCanvasEnter={onCanvasEnter}
-                      onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                      onSelectionClick={handleSelectionClick}
-                      onMarqueeCommit={handleMarqueeCommit}
-                      onLassoMove={handleLassoMove}
-                      onLassoClose={handleLassoClose}
-                      lassoCommitted={lassoCommitted}
-                      lassoPreview={lassoPreview}
-                      guides={guidesConfig}
-                      onTextFontSizeChange={handleTextFontSizeChange}
-                      renderOverlay={renderDuplicatePad}
-                      onPenCommit={handlePenCommit}
-                      onPenHitTest={handlePenHitTest}
-                      onPenEditStart={handlePenEditStart}
-                      onPenEditCommit={handlePenEditCommit}
-                      onPenEditCancel={handlePenEditCancel}
-                    />
-                  </div>
-                </div>
-              )}
-              <MagnifierOverlay magnifier={colorPicker.magnifier} />
-            </>
-          </motion.main>
+            wide={{
+              onSelectionClick: handleSelectionClick,
+              onMarqueeCommit: handleMarqueeCommit,
+              onLassoMove: handleLassoMove,
+              onLassoClose: handleLassoClose,
+              lassoCommitted,
+              lassoPreview,
+              guides: guidesConfig,
+            }}
+            onSelectPhoto={handleSelectPhoto}
+          />
         </ContextMenuTrigger>
-
-        <ContextMenuContent className="w-72">
-          {/* Top of the menu: the "do anything" entry point — every tool,
-              sub-mode, setting and action is reachable from here, so it
-              outranks the specific items below it. */}
-          <ContextMenuItem onClick={() => setShowCommandPalette(true)}>
-            <CommandIcon className="h-4 w-4 mr-2" /> Command Palette
-            <ContextMenuShortcut>Alt+,</ContextMenuShortcut>
-          </ContextMenuItem>
-          {/* Shape stacking. Renders only when the right-click landed on a
-              shape on the active layer, so it sits above the general actions
-              the way object actions do in other editors -- and is simply
-              absent on empty canvas. */}
-          <ShapeZOrderMenuItems menu={shapeZMenu} />
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
-            <Undo className="h-4 w-4 mr-2" /> Undo
-            <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem onClick={stamp.redo} disabled={!canRedo}>
-            <Redo className="h-4 w-4 mr-2" /> Redo
-            <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={handleCopyRegion}
-            disabled={!hasImage || !hasActiveRegion}
-          >
-            <Copy className="h-4 w-4 mr-2" /> Copy Selection
-            <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
-            <Clipboard className="h-4 w-4 mr-2" /> Copy to Clipboard
-            <ContextMenuShortcut>Ctrl+Shift+C</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem onClick={handleExport} disabled={!hasImage}>
-            <Download className="h-4 w-4 mr-2" /> Export{" "}
-            {exportFormat.toUpperCase()}
-            <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
-          </ContextMenuItem>
-          {photos.length > 1 && (
-            <ContextMenuItem onClick={handleExportAll}>
-              <Archive className="h-4 w-4 mr-2" /> Export All (ZIP)
-            </ContextMenuItem>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={handleActivateEyedropper}
-            disabled={!hasImage}
-          >
-            <Pipette className="h-4 w-4 mr-2" /> Activate Eyedropper
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={handleZoomIn}>
-            <ZoomIn className="h-4 w-4 mr-2" /> Zoom In
-            <ContextMenuShortcut>Alt+=</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem onClick={handleZoomOut}>
-            <ZoomOut className="h-4 w-4 mr-2" /> Zoom Out
-            <ContextMenuShortcut>Alt+-</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem onClick={stamp.flipHorizontal} disabled={!hasImage}>
-            <RotateCcw className="h-4 w-4 mr-2" /> Flip Horizontal
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={() => activePhotoId && setDeletePhotoId(activePhotoId)}
-            disabled={!activePhotoId}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="h-4 w-4 mr-2" /> Delete image
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <CanvasContextMenu
+          shapeZMenu={shapeZMenu}
+          onCopyRegion={handleCopyRegion}
+          hasActiveRegion={hasActiveRegion}
+          onCopyToClipboard={handleCopyToClipboard}
+          onExport={handleExport}
+          onExportAll={handleExportAll}
+          onActivateEyedropper={handleActivateEyedropper}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+        />
       </ContextMenu>
 
       {/* Gallery: horizontal bottom strip in wide mode; the SAME bar inverted
@@ -3297,7 +2336,7 @@ export function AppShell() {
           <GalleryBar
             vertical={bp.dock}
             onSelect={handleSelectPhoto}
-            closable={panelsClosable}
+            closable={panelsClosable(bp, showTools, showHistory)}
             reduceMotion={prefs.reduceMotion}
             narrow={bp.narrow}
             compressionProgress={compressProgress.items ?? {}}
@@ -3311,7 +2350,7 @@ export function AppShell() {
         {(bp.dock ? masterTab === "review" && !startSurfaceOpen : showHistory) && (
           <ReviewPanel
             embedded={bp.dock}
-            closable={panelsClosable}
+            closable={panelsClosable(bp, showTools, showHistory)}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
             onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
@@ -3343,27 +2382,6 @@ export function AppShell() {
         />
       )}
 
-      {/* Brush cursor — hidden during pan mode. The Eraser tool ("ai") shows
-          it only in its two canvas-brush modes (brush + Magic Eraser); the
-          rembg/inpaint modes are click-actions and keep the arrow. */}
-      {visible &&
-        !isPanning &&
-        !colorPickerActive &&
-        (activeTool === "stamp" ||
-          activeTool === "brush" ||
-          activeTool === "emoji" ||
-          (activeTool === "ai" &&
-            (eraserMode === "brush" || eraserMode === "magic"))) && (
-          <div
-            className="brush-cursor"
-            style={{
-              left: pos.x,
-              top: pos.y,
-              width: diameter,
-              height: diameter,
-            }}
-          />
-        )}
     </div>
     </MotionConfig>
     </SessionProvider>

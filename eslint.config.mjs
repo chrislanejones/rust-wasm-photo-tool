@@ -214,8 +214,11 @@ export default tseslint.config(
     // 3618 -> 3371 (2026-09-27, B2): ToolsSidebar, CanvasArea, ReviewPanel,
     // TopBar and GalleryBar read their store-backed values with selectors; the
     // ~80 props and the set-only wrappers behind them were deleted, not moved.
+    // 3371 -> 2389 (2026-09-27, B3): the JSX return split into app/shell/
+    // (ShellDialogs + ExportDialog, SidebarDock, Workspace, CanvasContextMenu)
+    // and the drag/paste import flow into session/useImageImport.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3371 }] },
+    rules: { "max-lines": ["error", { max: 2389 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

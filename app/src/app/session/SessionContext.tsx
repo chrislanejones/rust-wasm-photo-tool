@@ -126,6 +126,14 @@ export function useEngineState(): CloneStampState {
   return required(useContext(EngineStateContext), "useEngineState");
 }
 
+/** Actions + state as the one `stamp` object the older session hooks take.
+ *  Re-renders per sync like `useEngineState`; prefer the split hooks. */
+export function useEngineFacade(): Engine {
+  const actions = useEngine();
+  const state = useEngineState();
+  return useMemo(() => ({ ...actions, state }) as Engine, [actions, state]);
+}
+
 /** The tool hook instances and the canvas refs AppShell owns. */
 export function useSession(): SessionTools {
   return required(useContext(SessionToolsContext), "useSession");

@@ -97,7 +97,11 @@ n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | 
 check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
 
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
-      -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
+      -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' \
+      -g '!**/app/shell/SidebarDock.tsx' -g '!**/app/shell/Workspace.tsx' | wc -l)
+# SidebarDock / Workspace: the drawer scrim and the Batch-grid badges moved
+# there from AppShell in B3 (2026-09-27) and keep the exemption they had —
+# same three literals, not new ones.
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
@@ -214,9 +218,25 @@ count_jsx_props() {
     END { print max + 0 }
   ' "$2"
 }
-n_sidebar_props=$(count_jsx_props ToolsSidebar app/src/app/AppShell.tsx)
+# B3 moved both elements out of AppShell: <ToolsSidebar> into shell/SidebarDock
+# (its session props arrive as ONE spread `tools` object, whose fields AppShell
+# still spells out — so count the fields there too), <CanvasArea> into
+# shell/Workspace.
+# Counts the fields of a `name={{ … }}` object literal in AppShell (the
+# session props passed through as one spread), so a spread cannot hide growth.
+count_spread_fields() {
+  # $1 = prop name, $2 = its indent in spaces
+  awk -v nm="$1" -v ind="$2" '
+    BEGIN { open_re = "^" sprintf("%" ind "s", "") nm "=\\{\\{$"; close_re = "^" sprintf("%" ind "s", "") "\\}\\}$";
+            field_re = "^" sprintf("%" ind + 2 "s", "") "[A-Za-z_][A-Za-z0-9_]*(:|,)" }
+    $0 ~ open_re { inside = 1; next }
+    inside && $0 ~ close_re { inside = 0; next }
+    inside && $0 ~ field_re { n++ }
+    END { print n + 0 }' app/src/app/AppShell.tsx
+}
+n_sidebar_props=$(( $(count_jsx_props ToolsSidebar app/src/app/shell/SidebarDock.tsx) + $(count_spread_fields tools 8) ))
 check "appshell-sidebar-props" 23 "props on <ToolsSidebar> in AppShell — read the store in the panel instead" "$n_sidebar_props"
-n_canvas_props=$(count_jsx_props CanvasArea app/src/app/AppShell.tsx)
+n_canvas_props=$(( $(count_jsx_props CanvasArea app/src/app/shell/Workspace.tsx) + $(count_spread_fields canvas 12) + $(count_spread_fields wide 12) ))
 check "appshell-canvas-props" 21 "props on <CanvasArea> in AppShell — read the store / session context instead" "$n_canvas_props"
 
 # ── src/lib.rs line count: NOT ratcheted ──

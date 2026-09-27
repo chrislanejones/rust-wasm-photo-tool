@@ -37,7 +37,7 @@ import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
-interface ToolsSidebarProps {
+export interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
    *  other embedding of this sidebar keeps working without them. */
   rulersPrefs?: Preferences;
