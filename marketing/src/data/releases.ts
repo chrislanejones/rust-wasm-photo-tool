@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.2",
+    date: "2026-09-28",
+    headline: "The Select panel's Refine section is readable, and Pro signups are closed.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Refine was one button and five sliders stacked two across. It is six tiles now \u2014 Clean Up, Islands, Holes, Smooth, Feather, Expand \u2014 and a single slider that edits whichever tile is open. Same five operations, same ranges.",
+      },
+      {
+        tag: "ui",
+        text: "Remove Object moves into the Selection grid as its sixth tile, filling a cell that had been empty since September 11th and taking a whole section with it.",
+      },
+      {
+        tag: "fix",
+        text: "Pro signups are closed. Nobody can start a subscription \u2014 the button is gone and the server refuses the call behind it. Anyone who already has one can still open the billing portal and cancel.",
+      },
+      {
+        tag: "infra",
+        text: "Every push used to build both halves of the site, so a marketing typo ran the editor's three-minute Rust build. Each now skips what it cannot affect: a third fewer builds, measured across September.",
+      },
+      {
+        tag: "ui",
+        text: "AppShell lost another 152 lines \u2014 the blur brush, the download dialog's format logic, and the rule that sizes the brush ring each moved into a piece of their own.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's tokens, class names and components are now a design system, so a mockup of a page comes back written in the same names the site already uses.",
+      },
+    ],
+  },
+  {
     version: "v9.1",
     date: "2026-09-26",
     headline: "The app tells you when a stroke will change a mask.",

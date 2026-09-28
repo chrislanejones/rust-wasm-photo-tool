@@ -11031,6 +11031,26 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Verified** | 1280 and 390. Every blurb ≤ 4 lines at both, nothing clipped (`scrollHeight` vs `clientHeight`), cards equal height, last card to footer **96px**, no horizontal scroll. The marketing site has no `prefers-color-scheme` and no `data-theme` — it is dark-only — so "both themes" does not apply here. |
 | **Gates** | tsc 0, build 27 URLs prerendered, eslint 0 errors, guardrails OK. |
 
+## v9.2 Change Summary — 2026-09-28
+
+**The Select panel's Refine section is readable, and Pro signups are closed.** Six PRs: Night 5 part 1 (#248), Vercel build skipping (#252), billing (#254), Refine tiles (#253), the AppShell refactor (#251) and the marketing design-system sync (#250).
+
+| Area | Change |
+| --- | --- |
+| **Refine, rebuilt** (#253) | One Clean Up tile plus five sliders two-across became a 3x2 tile grid — Clean Up, Islands, Holes, Smooth, Feather, Expand — with ONE slider under it editing whichever tile is open. Opens on Holes. Same operations, same ranges, same engine calls. |
+| **Why the six tiles are not one group** | Clean Up is an ACTION (it runs the preset); the other five are a CHOICE (what the slider edits). One `ToolButtonGroup` would announce Clean Up as "radio, not checked, 1 of 6" — a lie about what pressing it does. The five get their own radiogroup laid out with `display: contents`, built on the same `ToolButton` and `useRadioGroup`, so the look and the keyboard (one Tab stop, arrows) are the primitive's. |
+| **Remove Object folded in** (#253) | Now the sixth Selection tile, filling the cell empty since 2026-09-11; its section and full-width button are gone and its copy moved to the Selection lightbulb. Still gated on `ih_patchmatch` — switch off and there are five tiles and an empty cell, as before. |
+| **Paid signup closed** (#254) | Two gates. `convex/stripe.ts` refuses `createCheckoutSession` before it authenticates or reads a price; `app/src/lib/billing.ts` decides what the UI offers. The server one is the gate that holds — a disabled button is a suggestion, and any signed-in user can call a Convex action from the console. Defaults-OFF, the inverse of `ih_patchmatch`'s defaults-ON-with-a-kill shape, because a flag that failed open here would charge a card. |
+| **What stays on** | `createPortalSession` is deliberately ungated so an existing subscriber can still cancel, and a test pins that. The Super User tier toggle never involved Stripe. Marketing's /pricing said "Start Pro" and linked to the editor; it says "Not open yet". |
+| **Builds cut by path** (#252) | Both Vercel projects are git-linked to one repo, so every push built both. `scripts/vercel-ignore-build.sh` skips when every file changed since the branch's last real deployment is on that project's ignorable list; anything it cannot establish builds. `git.deploymentEnabled` blocks `dependabot/**` before a deployment exists — the `**` matters, minimatch's `*` does not cross `/`. |
+| **Measured** (#252) | September: 942 builds, 1,401 build minutes, **1,731 minutes queued** (Hobby allows one at a time), and 103 builds on 09-17 against Hobby's 100/day. Replaying all 234 master commits since 09-01: **468 to 317 builds, −32%.** A skipped build still creates a CANCELED deployment, so the daily-cap effect is unconfirmed; the minutes and the queue slot are not. |
+| **Storage was never the problem** | Bandwidth 3.6 GB of 100, requests ~84k of 1M, functions ~24k of 1M, blob storage **0**. Deleting old deployments would have freed nothing. |
+| **AppShell −152** (#251) | `useEffectBrush` (blur/pixelate/redact, following `usePenActions`), `useDownloadFormat` (the AVIF-fallback rule, now pure and tested), and `brushCursorSize` — an anonymous IIFE at line 950 with no test, the only thing standing between the mask brush and a ring showing the Paint brush's size. 3,716 to 3,564; the max-lines cap moves down with it. |
+| **Marketing design system** (#250) | Six components (ButtonSet, Slider, Pager, NextCards, Footer, Nav) and the token vocabulary uploaded to Claude Design, so a mockup comes back in our own class names. Four silent failures found on the way — 14 stylesheets and tokens.css outside the `@import` closure, absolute font urls, and white preview cards on a light-on-dark site. Each rendered, just wrong, with every gate green. |
+| **Two harness lessons** | A mutation that never APPLIED is neither a kill nor a survival: `sed` cannot match across lines, so two multi-line mutations silently no-opped and read as vacuous tests. And `git checkout HEAD -- <tracked file>` during a mutation run deletes a not-yet-committed change — checkpoint first. |
+| **Gates** | tsc 0, eslint **0 errors**, vitest **119 files / 1,309 tests**, guardrails at baseline, app + marketing builds 0. Engine untouched, so no cargo run and no size change. |
+| **QC** | Sections 1-2 on the production build: boots logged-out, image loads, Select panel opens, Refine tiles and the Remove tile render. Wand click 47.2% selected, Shift+click 94.4% (Add), Ctrl+Z back to 47.2%. |
+
 ## v9.1 Change Summary — 2026-09-26
 
 **The app tells you when a stroke will change a mask.** Three PRs: Night 3 (#242), Night 4 (#246) and the entropy refactor (#247).

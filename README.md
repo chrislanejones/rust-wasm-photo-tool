@@ -85,6 +85,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v9.2 — 2026-09-28
+
+**The Select panel's Refine section is readable, and Pro signups are closed.**
+
+Refine was one button and five sliders stacked two across — ten rows of label,
+number and track in a narrow column, all live at once, with nothing to say
+which one to touch. It is six tiles now and a single slider that edits whichever
+tile is open. Same five operations, same ranges. Remove Object moves into the
+Selection grid as its sixth tile, filling a cell that had been empty since
+September 11th and taking a whole section with it.
+
+Pro signups are off. Nobody can start a subscription: the button is gone and
+the server refuses the call behind it. Anyone who already has one can still
+open the billing portal and cancel — that path is deliberately untouched.
+
+Every push used to build both halves of the site, so a marketing typo ran the
+editor's three-minute Rust build and an editor change rebuilt the marketing
+site. Each now skips what it cannot affect: a third fewer builds, measured
+across September.
+
+Under that, AppShell lost another 152 lines to three extractions, and the
+marketing site's tokens, class names and components are now a design system
+Claude Design can build with.
+
+Engine unchanged at 819,031 bytes.
+
 ### v9.1 — 2026-09-26
 
 **The app tells you when a stroke will change a mask.**
