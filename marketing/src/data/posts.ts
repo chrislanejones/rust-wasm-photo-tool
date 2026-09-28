@@ -81,6 +81,28 @@ export interface Post {
 
 export const POSTS: readonly Post[] = [
   {
+    slug: "entropy-is-the-default",
+    headline: "We spent a month taking the file apart. It got 556 lines longer.",
+    title: "Why refactoring made our biggest file bigger",
+    deck: "Extraction was working and the file still grew, because nothing was measuring the total. The thing that finally held was a number allowed to move in one direction — and the place we tried it second, it cost more than it caught.",
+    description:
+      "AppShell went 3,250 to 3,806 lines during the month it was being dismantled. What code entropy actually looks like, and what a one-way line-count ratchet did and did not fix.",
+    published: "2026-09-28",
+    version: "v9.2",
+    tag: "engineering",
+    // Committed alongside this entry, per the rule above. It is one frame of
+    // the header's own scene — `gen:og --posts` screenshots it under
+    // prefers-reduced-motion, so the card cannot drift from the banner.
+    ogImage: "/og/blog/entropy-is-the-default.png",
+    sources: [
+      "marketing/src/posts/entropy-is-the-default.tsx",
+      "eslint.config.mjs",
+      "scripts/guardrails.sh",
+      "app/src/app/AppShell.tsx",
+      "app/src/stores/useUIStore.ts",
+    ],
+  },
+  {
     slug: "offline-by-construction",
     headline: "The hotel Wi-Fi died. The editor kept running.",
     title: "Image Horse works offline by construction",
