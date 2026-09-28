@@ -92,7 +92,7 @@ export const POSTS: readonly Post[] = [
     description:
       "AppShell went 3,250 to 3,806 lines during the month it was being dismantled, and is still 314 lines above where it started. What code entropy actually looks like, and what a one-way ratchet did and did not fix.",
     published: "2026-09-28",
-    version: "v9.2",
+    version: "v9.3",
     tag: "engineering",
     // WebP, not the generator's PNG. The card is one still frame of the
     // header's own scene — `gen:og --posts` screenshots it under
