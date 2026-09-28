@@ -1,0 +1,40 @@
+/* The preview card's own surface.
+ *
+ * WHY. The generated card sets `body{background:#fff}`, and this site is dark:
+ * --color-ink is oklch(95% …), near-white, and every surface token is tuned
+ * for light-on-dark. On a white card the text of Footer, Nav and NextCards was
+ * invisible and their dark panels painted as black slabs. The render check
+ * still passed it — it measures emptiness and height, not legibility, which is
+ * exactly why the previews get looked at.
+ *
+ * So the card gets the site's own body: --color-paper, the two fixed warm
+ * blooms, --color-ink, --font-body. Copied from the `body` rule in
+ * styles.css — if that rule changes, change this with it.
+ *
+ * `html body` because the card's inline <style> block comes AFTER this link in
+ * the head; a bare `body` selector loses the tie and the card stays white.
+ *
+ * esbuild emits this as _preview/<Name>.css (one copy per preview entry that
+ * imports it) and the card links it automatically.
+ */
+html body {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(62rem 48rem at 76% -10%,
+      color-mix(in oklch, var(--color-bloom-1) 30%, transparent), transparent 66%),
+    radial-gradient(50rem 42rem at 6% 26%,
+      color-mix(in oklch, var(--color-bloom-2) 20%, transparent), transparent 63%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* The grid chrome is drawn in hard-coded light greys, which read as bright
+   scratches on the dark surface. Same job, borrowed from the site's own scale. */
+.ds-cell {
+  border-color: color-mix(in oklch, var(--color-ink) 18%, transparent);
+}
+.ds-cell > h4 {
+  color: var(--color-ink-3);
+}
