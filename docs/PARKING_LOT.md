@@ -4,6 +4,34 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
+The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
+Resize scales the whole artboard — photo plus the 10px Canvas border each side —
+to the number typed. Measured, 1600×1200 JPEG, width set to 800:
+
+| Build | Stored photo |
+| --- | --- |
+| master (pre-#260) | 796×596, with a 3px white frame baked in |
+| v9.3 | **790×590**, photo only |
+
+A 256px PNG set to 200 stores 186×186. So the number a person types is not the
+size they get, and the gap grows with the border. The fix is to scale by
+typed ÷ photo width (not ÷ artboard width) — a one-line change in the resize
+path, but it changes the output of every resize, so it wants its own PR and a
+look at the Canvas Size panel, which may lean on the current behavior.
+
+## OPEN — Auto Compress makes an already-small JPEG heavier (09-28-2026)
+
+Found the same day, identical on master. A q60 JPEG of 32,950 B through
+"Compress Image" comes back at **36,621 B** (+11%) and stores `encodeQuality: 75`
+— it re-encodes at the panel's quality, which is higher than the file's own.
+#259 added the "never hand back a bigger file for fewer pixels" step-down to
+Apply Resize only; Auto Compress has no such guard. Now that `encodeQuality`
+is on the entry, the obvious rule is: if the result is not smaller, keep the
+original bytes and say so.
+
 ## OPEN — 116 · Triangle, star points, oval, rotation — parked; needs the op-log v9 renumber (09-28-2026)
 
 | | |
@@ -60,7 +88,19 @@ Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
 Chromium draws WebGPU canvases blank white even for a bare three.js control, so
 only the WebGL 2 path is verified.
 
-## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+## RESOLVED — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+> **Done 09-28-2026, on `feat/blog-entropy-post`**, when the third post — "We
+> spent a month taking the file apart" — arrived as exactly the trigger below:
+> a third copy. `SceneKit`/`stream`/`fade`/`orbit`/`createScene` are one module
+> (`marketing/src/posts/scene/kit.ts`), the React frame is one
+> (`scene/figure.tsx`, bound per post with `sceneFigure(() => import(...))`),
+> the `.scene` CSS is one (`scene/scene.css`), and the three.js subset is one
+> (`scene/three.ts`). Each post keeps only its builders. The three copies had
+> drifted by comments, one optional `stream()` size and a `lookY` default —
+> nothing a reader could see. Proven so: 28 reduced-motion stills of all three
+> posts, header and every figure, at 1200 and 320 px, 0 pixels different from
+> the pre-refactor build. Scene code across the three posts 48,477 B → 35,992 B.
 
 Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
 post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and

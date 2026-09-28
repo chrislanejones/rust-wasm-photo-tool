@@ -66,6 +66,7 @@ import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import { ShapeZOrderMenuItems } from "@/features/canvas/ShapeZOrderMenuItems";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
+import { autoCompressedPatch } from "@/lib/sizeDelta";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
 import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
@@ -1976,12 +1977,11 @@ export function AppShell() {
    */
   // Extracted whole to session/usePersistActiveCanvas.ts (#45). The internal
   // save that re-encodes the live canvas over its stored original — see that
-  // file for the ADR-039 reason the crop is NOT on the export preference.
+  // file for why it always leaves the backing Canvas out.
   const persistActiveCanvas = usePersistActiveCanvas({
     stamp,
     exportFormat,
     quality,
-    canvasBgTransparent,
   });
 
   const handleApplyCompression = useCallback(
@@ -2008,22 +2008,8 @@ export function AppShell() {
           prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
         );
       }
-      // Instant estimate so the gallery badge reacts immediately; replaced by
-      // the real measured savings once the re-encode below lands.
-      if (activePhotoId) {
-        const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
-        const qualityRatio = quality / 100;
-        // Signed, same convention as the real measurement in
-        // `persistActiveCanvas` that replaces it a moment later: positive is a
-        // saving, negative is growth. An upscale gives areaRatio > 1.
-        const savingsPercent = Math.round((1 - areaRatio * qualityRatio) * 100);
-        if (savingsPercent !== 0) {
-          setImageSavings((prev) => ({
-            ...prev,
-            [activePhotoId]: { savingsPercent },
-          }));
-        }
-      }
+      // No instant badge estimate: the badge derives from the entry's sizes
+      // (lib/sizeDelta), which the re-encode below updates.
 
       // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
       await persistActiveCanvas();
@@ -2115,23 +2101,29 @@ export function AppShell() {
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
-      (id: string, nf: File, nu: string) => {
+      (id: string, nf: File, nu: string, encoded) => {
         URL.revokeObjectURL(nu); // We store to IDB, don't need the blob URL
         const photo = photos.find((p) => p.id === id);
         if (!photo) return;
         void (async () => {
           const oldKey = photo.originalKey;
           const [newKey, newThumb] = await Promise.all([
-            putOriginal(nf, photo.workingWidth, photo.workingHeight),
+            // The WRITTEN dims — the budget loop may have downscaled.
+            putOriginal(nf, encoded.width, encoded.height),
             makeThumbnail(nf),
           ]);
-          setPhotos((p) =>
-            p.map((x) =>
-              x.id !== id
-                ? x
-                : { ...x, originalKey: newKey, thumbBlob: newThumb, byteSize: nf.size },
-            ),
-          );
+          const updated = autoCompressedPatch(photo, nf, newKey, newThumb, encoded);
+          setPhotos((p) => p.map((x) => (x.id !== id ? x : { ...x, ...updated })));
+          // The ACTIVE photo's canvas still holds the pre-compress pixels, and
+          // the next persist (Apply Resize, a canvas op) would re-encode it over
+          // the compressed file — undoing the compression and sending the
+          // PageSpeed score into the red. Reload from the new bytes unless the
+          // canvas has unsaved edits of its own (those win on the next save).
+          const st = useGalleryStore.getState();
+          if (st.activePhotoId === id && !st.hasBeenModified && !st.modifiedPhotos.has(id)) {
+            const fresh = st.photos.find((x) => x.id === id);
+            if (fresh) void loadPhotoFromEntry(fresh);
+          }
           // Auto Compress used to collect NOTHING — it was the one repoint path
           // with no delete at all, so every run over an already-compressed photo
           // stranded a blob (measured as the "pile" in the GC audit). Collect
@@ -2149,7 +2141,7 @@ export function AppShell() {
     // NOTE: intentionally does NOT set `hasBeenModified` — Auto Compress is a
     // batch op over stored files and must not light the active photo's modified
     // dot. Its result is tracked separately via `imageSavings`.
-  }, [photos, selectedIds, activePhotoId, quality, exportFormat, compressAll]);
+  }, [photos, selectedIds, activePhotoId, quality, exportFormat, compressAll, loadPhotoFromEntry]);
 
   // Track per-photo modification state. Any single-image edit marks the active
   // photo with the "modified" dot immediately: canvas edits bump the WASM undo
@@ -2922,6 +2914,7 @@ export function AppShell() {
             currentByteSize={activeEntry?.byteSize ?? 0}
             currentMime={activeEntry?.mimeType}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
+            currentEncodeQuality={activeEntry?.encodeQuality}
             activePhotoId={activePhotoId}
             undoCount={stamp.state.undoCount}
             quality={quality}

@@ -16,7 +16,6 @@ import { Link } from "react-router-dom";
 
 import { external, repoFile } from "../config";
 import { Scene } from "./offline-by-construction.figures";
-import "./offline-by-construction.figures.css";
 
 export default function OfflineByConstruction() {
   return (

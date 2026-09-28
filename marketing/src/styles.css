@@ -3745,6 +3745,16 @@ a { color: inherit; }
      here — so on mobile the collapse costs the brand and buys nothing. */
   .nav-pill.is-condensed .nav-pill__word { max-width: 7.5em; opacity: 1; }
 }
+@media (max-width: 22rem) {
+  /* The phone pill above was fitted at 375px and fits down to 350. Below that
+     it ran out: at 320 the row needs 313px against 288, and the 25px came out
+     of the wordmark, which read "Image Ho". All of it is spacing, so all of it
+     comes back from spacing — the two gaps drop a step (−16), the pill's
+     leading pad drops one (−4), the CTA's inline pad drops one (−8). 28px for
+     25. The logo, the burger and the CTA's height stay at 44px targets. */
+  .nav-pill__row { gap: var(--space-xs); padding-inline-start: var(--space-sm); }
+  .nav-pill__cta { padding-inline: var(--space-sm); }
+}
 @media (min-width: 60.0625rem) {
   /* never leave the sheet open when the viewport grows back to desktop */
   .nav-sheet { display: none; }
