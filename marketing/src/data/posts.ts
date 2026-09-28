@@ -84,16 +84,23 @@ export const POSTS: readonly Post[] = [
     slug: "entropy-is-the-default",
     headline: "We spent a month taking the file apart. It got 556 lines longer.",
     title: "Why refactoring made our biggest file bigger",
-    deck: "Extraction was working and the file still grew, because features kept arriving and nothing was measuring the total. That part is inevitable — entropy is whack-a-mole, and you do not win it. The thing that helped was a number allowed to move in one direction.",
+    // The first clause, up to the em dash, is what the social card prints under
+    // the headline (scripts/gen-og-images.mjs). Keeping it short and whole is
+    // deliberate: the previous wording put three lines of mono on the card and
+    // crowded the headline into the wordmark.
+    deck: "Code entropy, measured, and the ratchet that stops it — extraction was working and the file still grew, because features kept arriving. That part is inevitable: entropy is whack-a-mole and you do not win it. What helped was a number allowed to move in one direction.",
     description:
       "AppShell went 3,250 to 3,806 lines during the month it was being dismantled, and is still 314 lines above where it started. What code entropy actually looks like, and what a one-way ratchet did and did not fix.",
     published: "2026-09-28",
     version: "v9.2",
     tag: "engineering",
-    // Committed alongside this entry, per the rule above. It is one frame of
-    // the header's own scene — `gen:og --posts` screenshots it under
-    // prefers-reduced-motion, so the card cannot drift from the banner.
-    ogImage: "/og/blog/entropy-is-the-default.png",
+    // WebP, not the generator's PNG. The card is one still frame of the
+    // header's own scene — `gen:og --posts` screenshots it under
+    // prefers-reduced-motion, so it cannot drift from the banner — and then
+    // compressed at q85: 283,413 B to 36,640 B, 88% off, with the mono
+    // strapline still pixel-clean under a crop comparison. The PNG is kept
+    // beside it as the source the next regeneration overwrites.
+    ogImage: "/og/blog/entropy-is-the-default.webp",
     sources: [
       "marketing/src/posts/entropy-is-the-default.tsx",
       "eslint.config.mjs",
