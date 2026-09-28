@@ -8,9 +8,9 @@
  * - `transition:` declarations. A transition belongs to the state it animates
  *   (a hover, `.is-open`, `[data-current]`), so it stays beside that state's
  *   rule in styles.css. The reduced-motion block below still reaches them.
- * - The blog posts' figures (src/posts/*.figures.css) and their Three.js
- *   scenes. A post owns its own figures, and those are where the heavier 3D
- *   work goes.
+ * - The blog's figures (src/posts/scene/scene.css, shared by every post, plus
+ *   the worker post's DOM queue in engine-in-a-worker.figures.css) and their
+ *   Three.js scenes. That is where the heavier 3D work goes.
  * - JavaScript motion: the WebGPU cube letters (components/CubeLetters.tsx)
  *   are a spring simulation, not a keyframe.
  *

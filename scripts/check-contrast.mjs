@@ -50,6 +50,7 @@ const PAGES = [
   "/annotate-image", "/clone-stamp", "/pixelate-image", "/blur-image",
   "/batch-image-editor", "/image-editor-no-upload",
   "/blog/offline-by-construction", "/blog/engine-in-a-worker",
+  "/blog/entropy-is-the-default",
 ];
 
 /* Runs in the page. Resolves colours through a canvas so oklch(), color-mix()
