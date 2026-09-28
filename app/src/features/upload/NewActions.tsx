@@ -5,6 +5,7 @@
 //   • compact modal (UploadDialog) mid-session (Alt+N)
 // The wrappers own the logo/title header, sign-in, close button, and any shake.
 import { useRef, useState, useEffect, useCallback } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -202,6 +203,10 @@ export function NewActions({
   // Back rather than Cancel: it returns here, it does not abandon the flow.
   const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
   const setOnlineFeaturesEnabled = useUIStore((s) => s.setOnlineFeaturesEnabled);
+  // Whether the Create AI Image tile exists — asked of the network registry,
+  // the same answer Settings › Security prints. The switch's own label and
+  // checked state below stay on the raw value: they ARE the switch.
+  const aiGenerationAllowed = isNetworkPathAllowed("ai_generation", onlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
   // Publish that step to the store so Settings → Security can lock ITS copy of
   // the online-features switch for the same reason this one locks: flipping off
@@ -551,7 +556,7 @@ export function NewActions({
                     alone beside a blank gap and read as something missing.
                     Five tiles in three columns when it returns. */}
                 <div
-                  className={`grid ${onlineFeaturesEnabled ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
+                  className={`grid ${aiGenerationAllowed ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
                 >
                   <ActionTile
                     ref={firstButtonRef}
@@ -583,7 +588,7 @@ export function NewActions({
                       so a free user sees the whole flow and meets the upsell
                       at the moment they understand what they would be buying.
                       The key says which it is before they start. */}
-                  {onlineFeaturesEnabled && (
+                  {aiGenerationAllowed && (
                     <ActionTile
                       icon={Sparkles}
                       label="Create AI Image"

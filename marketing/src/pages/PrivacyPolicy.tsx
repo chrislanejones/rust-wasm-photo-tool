@@ -129,9 +129,10 @@ export default function PrivacyPolicy() {
             <h2>Cloud features, when you are signed in</h2>
             <p>
               Signing in enables features that need a server: share links, syncing your settings
-              across devices, and keeping edit history off-device. These run on Convex. What is
-              stored there is the material those features need — the document you chose to share
-              or sync, and the account it belongs to. Signed out, none of it runs.
+              across devices, your saved colors, and keeping edit history off-device. These run on
+              Convex. What is stored there is the material those features need — the document you
+              chose to share or sync, the colors you saved, and the account it belongs to. Signed
+              out, none of it runs.
             </p>
             <p>
               Keeping edit history off-device means a flattened copy of an edited photo, stored

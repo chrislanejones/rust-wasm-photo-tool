@@ -39,7 +39,8 @@
 //    a document back.
 import { useEffect, useId, useState } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
-import { Check, CloudOff, RefreshCw, TriangleAlert, Laptop, Upload } from "lucide-react";
+import { CloudOff, RefreshCw, Upload } from "lucide-react";
+import { StatusMark, type StatusKind } from "@/components/ui/status-mark";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { PaneHeading } from "@/components/ui/pane-heading";
@@ -65,44 +66,48 @@ function agoText(at: number, now: number): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-const COPY: Record<SyncState, { icon: typeof Check; title: string; body: string }> = {
+// Each state wears a StatusMark (UI Night 6 §4) — the app's one status
+// vocabulary — instead of a lucide icon picked per state. Standby is `localOnly`,
+// not `working`: THIS tab is not doing anything, another one is, and a spinner
+// here would say the opposite.
+const COPY: Record<SyncState, { mark: StatusKind; title: string; body: string }> = {
   disabled: {
-    icon: CloudOff,
+    mark: "localOnly",
     title: "Tabs only",
     body: "This build has no cloud deployment configured, so your settings stay on this device. Every Image Horse tab here still shows the same thing.",
   },
   local: {
-    icon: Laptop,
+    mark: "localOnly",
     title: "This device only",
     body: "Your settings are kept on this device and shared between its tabs. Sign in to have them follow you to your phone and your other computers.",
   },
   off: {
-    icon: CloudOff,
+    mark: "localOnly",
     title: "Sync is off on this device",
     body: "Nothing is fetched from your account or sent to it. Your settings stay here, and every Image Horse tab on this device still shows the same thing.",
   },
   connecting: {
-    icon: RefreshCw,
+    mark: "working",
     title: "Connecting",
     body: "Fetching what your other devices last saved.",
   },
   standby: {
-    icon: Laptop,
-    title: "Another tab is syncing",
+    mark: "localOnly",
+    title: "Syncing in another tab",
     body: "Image Horse is open in another tab here, and that tab sends and fetches for this device. This one follows along.",
   },
   syncing: {
-    icon: RefreshCw,
+    mark: "working",
     title: "Syncing",
     body: "Sending this device's changes.",
   },
   synced: {
-    icon: Check,
+    mark: "complete",
     title: "Up to date",
     body: "Your settings, remembered panels and tool modes match on every device you are signed in on.",
   },
   error: {
-    icon: TriangleAlert,
+    mark: "attention",
     title: "Could not reach the server",
     body: "Nothing is lost. Your settings are saved on this device, and so is the list of changes still to send. It will keep trying.",
   },
@@ -116,6 +121,14 @@ const REFUSED = {
   title: "The server turned a change down",
   body: "Nothing is lost. Your settings are saved on this device. It will not keep retrying this one — it tries again the next time you change something.",
 };
+
+/** "5:02 pm" — the clock time of the last match. US English, lowercase
+ *  meridiem, as the plan writes it. */
+function clockTime(t: number): string {
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    .format(t)
+    .toLowerCase();
+}
 
 /** States with no "last matched" time worth showing: nothing is matched. */
 const UNMATCHED: SyncState[] = ["disabled", "local", "off"];
@@ -154,7 +167,7 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
 
   const refused = status.state === "error" && !status.willRetry;
   const copy = refused ? { ...COPY.error, ...REFUSED } : COPY[status.state];
-  const Icon = copy.icon;
+  const mark = copy.mark;
   const spinning = status.state === "syncing" || status.state === "connecting";
   // Send applies while the account is empty and this device syncs. It can
   // only be HEARD from the tab doing the talking: a standby tab's send would
@@ -176,7 +189,7 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
       }}
     >
       <Upload aria-hidden className="size-3.5" />
-      {sending ? "Sending…" : "Send this device's settings"}
+      {sending ? "Sending…" : "Send current settings"}
     </Button>
   );
 
@@ -229,14 +242,21 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
         )}
 
         <div className="flex items-start gap-3 rounded-lg border border-border bg-bg-elevated px-3 py-2.5">
-          <Icon
-            aria-hidden
-            className={`mt-0.5 size-4 shrink-0 text-text-muted ${spinning ? "animate-spin" : ""}`}
+          <StatusMark
+            kind={mark}
+            className={`mt-0.5 [&_svg]:size-4 ${spinning ? "[&_svg]:animate-spin" : ""}`}
           />
           <div className="min-w-0 space-y-1">
-            <p className="text-xs font-semibold text-text-primary">{copy.title}</p>
+            <p data-testid="sync-title" className="text-xs font-semibold text-text-primary">
+              {copy.title}
+              {status.state === "synced" && status.lastSyncedAt !== null && (
+                <> · matched {clockTime(status.lastSyncedAt)}</>
+              )}
+            </p>
             <p className="text-xs leading-relaxed text-text-muted">{copy.body}</p>
-            {status.lastSyncedAt !== null && !UNMATCHED.includes(status.state) && (
+            {status.lastSyncedAt !== null &&
+              !UNMATCHED.includes(status.state) &&
+              status.state !== "synced" && (
               <p className="text-xs text-text-muted">
                 Last matched {agoText(status.lastSyncedAt, now)}.
               </p>
@@ -249,10 +269,12 @@ export function SyncPane({ draftEnabled, onDraftEnabledChange }: SyncPaneProps =
 
         {showSend && (
           <div className="space-y-2">
+            <p data-testid="sync-account-empty" className="text-xs font-semibold text-text-primary">
+              Your account is empty
+            </p>
             <p className="text-xs leading-relaxed text-text-muted">
-              Your account has no synced settings yet, and nothing is sent until
-              you change one. Send what this device has now, and your other
-              signed-in devices take it.
+              Nothing is sent until you change a setting. Send what this device
+              has now, and your other signed-in devices take it.
             </p>
             {standby && (
               <p id={sendWhyId} className="text-xs leading-relaxed text-text-muted">

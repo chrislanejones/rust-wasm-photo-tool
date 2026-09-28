@@ -634,3 +634,19 @@ describe("Send this device's settings", () => {
     expect(h.pushes).toEqual([]);
   });
 });
+
+describe("Retry (UI Night 6 §4)", () => {
+  // The status line's Retry calls status.retrySync(). That is only live if the
+  // hook registered its pass — this is the check that the button is connected
+  // to something, not merely rendered.
+  it("mounting the hook registers a retry, so the status line's Retry is live", async () => {
+    await mountDevice();
+    expect(modules.status.retrySync()).toBe(true);
+  });
+
+  it("unmounting unregisters it — no Retry into a hook that is gone", async () => {
+    await mountDevice();
+    act(() => root.unmount());
+    expect(modules.status.retrySync()).toBe(false);
+  });
+});
