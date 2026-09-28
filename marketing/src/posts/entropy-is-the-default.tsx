@@ -9,7 +9,8 @@
  *
  *   3,250  AppShell.tsx at d3366c33 (27 July 2026)
  *   3,806  AppShell.tsx at eac21532 (27 August) — the commit that pinned caps
- *   3,564  AppShell.tsx on master today
+ *   3,564  AppShell.tsx on master today — 242 under the peak, and still
+ *          314 OVER the July figure, which the closing section says plainly
  *
  * The two endpoints are exactly a month apart and each is a real commit, which
  * is why they are these two. eslint.config.mjs's own header says "3,314 ->
@@ -207,9 +208,24 @@ export default function EntropyIsTheDefault() {
 
       <p>
         What is left in AppShell after all of it is composition: the tree, and the wiring between
-        pieces that now live elsewhere. It is <span className="fig">3,564</span> lines, and the next
-        reductions are not more handler extractions — they are structural, and they change what
-        renders. The cap says so either way.
+        pieces that now live elsewhere. The next reductions are not more handler extractions — they
+        are structural, and they change what renders. The cap says so either way.
+      </p>
+
+      <h2 id="net">The part that would be easy to leave out</h2>
+
+      <p>
+        The ratchet stopped the growth. It did not undo it. AppShell is{" "}
+        <span className="fig">3,564</span> lines today — <span className="fig">242</span> below its
+        peak, and still <span className="fig">314</span> above where it was the day we started taking
+        it apart.
+      </p>
+
+      <p>
+        That is not the ratchet failing. Features kept arriving the whole time, and they have to land
+        somewhere; a file that is the composition root of the app will take new lines for as long as
+        the app grows. Entropy here is whack-a-mole, and the honest version is that you do not win it.
+        What the number bought was not a smaller file. It was the end of finding out a month late.
       </p>
 
       <h2 id="see">See it yourself</h2>
