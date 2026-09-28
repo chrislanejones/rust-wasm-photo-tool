@@ -1991,12 +1991,11 @@ export function AppShell() {
    */
   // Extracted whole to session/usePersistActiveCanvas.ts (#45). The internal
   // save that re-encodes the live canvas over its stored original — see that
-  // file for the ADR-039 reason the crop is NOT on the export preference.
+  // file for why it always leaves the backing Canvas out.
   const persistActiveCanvas = usePersistActiveCanvas({
     stamp,
     exportFormat,
     quality,
-    canvasBgTransparent,
   });
 
   const handleApplyCompression = useCallback(

@@ -1,8 +1,8 @@
 // Re-encode the active photo's live canvas and write it back over its stored
 // original, extracted verbatim from AppShell (stage 2). This is the INTERNAL
 // save — not an export — and it is the surface that writes pixels into
-// IndexedDB, so the ADR-039 "don't invent opaque black" rule applies here even
-// though the user never asked for a file.
+// IndexedDB, so it stores the PHOTO only — never the artboard's backing
+// Canvas (see the note at the capture below).
 //
 // Follows `useCanvasActions`: gallery state comes from the store, and only the
 // engine handle plus the encode choices are passed in.
@@ -18,7 +18,6 @@ import {
   encodeRgba,
   extFromMime,
   formatFromMime,
-  wouldInventOpaquePixels,
 } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 
@@ -26,14 +25,10 @@ export function usePersistActiveCanvas({
   stamp,
   exportFormat,
   quality,
-  canvasBgTransparent,
 }: {
   stamp: ReturnType<typeof useCloneStamp>;
   exportFormat: ExportFormat;
   quality: number;
-  /** The backing fill is the "transparent" swatch. With a format that has no
-   *  alpha there is then nothing to include — see `wouldInventOpaquePixels`. */
-  canvasBgTransparent: boolean;
 }) {
   const photos = useGalleryStore((s) => s.photos);
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
@@ -64,23 +59,29 @@ export function usePersistActiveCanvas({
       // together: `pixels`, `tw` and `th` cross three awaits below and are then
       // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
       // scaled as one image. A mismatch here is persisted, not transient.
-      // ⚠️ THE SAVE IS A SURFACE THAT WRITES PIXELS, and it was the one that got
-      // away. v8.53 taught the three EXPORT surfaces not to bake a transparent
-      // artboard into a format with no alpha (ADR-039) — but this internal save
-      // still encoded the full padded composite at the panel's format. Apply
-      // Compression with JPEG selected and the black border went into the
-      // STORED working file, permanently: every later export then carried it as
-      // real pixels, whatever the export setting said. Verified in IndexedDB —
-      // a stored `probe.jpg` at 320×240 with corner rgba(0,0,0,255) beside a
-      // `probe.png` at 240×160 with the photo in the corner.
+      // ⚠️ THE STORED ORIGINAL IS THE PHOTO, NEVER THE MOUNT IT SITS ON.
       //
-      // So the crop happens here too, and NOT on the user's export preference —
-      // this is not a preference. Writing invented black into a saved file is
-      // data loss and is refused regardless of what "Include canvas" says.
-      const dropCanvasToSave = wouldInventOpaquePixels(encodeFormat, canvasBgTransparent);
-      const cap = dropCanvasToSave
-        ? await tool.capture_composite_excluding_background()
-        : await tool.capture_composite();
+      // This used to write the full padded composite — backing Canvas and all
+      // — and only dropped it when the format had no alpha (ADR-039's black
+      // border). With the defaults (10px border, transparent backing) and any
+      // alpha format, that baked a 10px TRANSPARENT margin into `originalKey`.
+      // Two surfaces then shipped it as real pixels:
+      //
+      //  - the batch ZIP, whose "no saved edit" branch copies `originalKey`
+      //    verbatim — so a signed-out user with "Photo only" set got every
+      //    image framed in a thin white-looking line, whatever the export
+      //    setting said;
+      //  - the next gallery load, which wraps `originalKey` in a FRESH
+      //    artboard (`loadPhotoFromEntry`), nesting border inside border.
+      //
+      // So the Canvas is always left out here. It is not the user's pixels, it
+      // is re-added on every load from the Canvas prefs, and "Include canvas"
+      // is an EXPORT choice that the export surfaces apply themselves. This
+      // also subsumes the ADR-039 rule: with no backing there is nothing
+      // transparent to invent black for. On a document with no Canvas layer
+      // nothing is excluded — the composite is only trimmed of fully
+      // transparent margin (see `composite_excluding_background` in lib.rs).
+      const cap = await tool.capture_composite_excluding_background();
       const { rgba: pixels, width: tw, height: th } = cap;
       cap.free();
       // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
@@ -182,7 +183,6 @@ export function usePersistActiveCanvas({
     stamp,
     exportFormat,
     quality,
-    canvasBgTransparent,
     setPhotos,
     setImageSavings,
   ]);
