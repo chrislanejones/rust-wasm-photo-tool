@@ -114,6 +114,8 @@ interface ToolsSidebarProps {
   currentByteSize: number;
   currentMime?: string;
   originalByteSize: number;
+  /** Quality the stored bytes were last lossy-encoded at (PhotoEntry). */
+  currentEncodeQuality?: number;
   activePhotoId: string | null;
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
   undoCount: number;
@@ -207,6 +209,7 @@ export function ToolsSidebar({
   currentByteSize,
   currentMime,
   originalByteSize,
+  currentEncodeQuality,
   activePhotoId,
   undoCount,
   quality,
@@ -344,6 +347,7 @@ export function ToolsSidebar({
             currentByteSize={currentByteSize}
             currentMime={currentMime}
             originalByteSize={originalByteSize}
+            currentEncodeQuality={currentEncodeQuality}
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}
