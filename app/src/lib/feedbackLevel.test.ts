@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as React from "react";
 import { act } from "react";
@@ -114,12 +114,29 @@ describe("the status bar carries both errors", () => {
     expect(bar).toMatch(/data-testid="status-save-failed"/);
   });
 
-  it("reads the SAME sync publisher the toast reads, not a copy", () => {
-    // SyncErrorToast reads useSyncStatus(); so must the chip, or the two could
-    // disagree about whether sync is broken.
-    expect(read("lib/sync/SyncErrorToast.tsx")).toMatch(/useSyncStatus\(\)/);
-    expect(bar).toMatch(/useSyncStatus\(\)\.state === "error"/);
+  it("reads the sync publisher directly, not a copy", () => {
+    expect(bar).toMatch(/const sync = useSyncStatus\(\);/);
+    expect(bar).toMatch(/sync\.state === "error"/);
     expect(bar).toMatch(/data-testid="status-sync-failed"/);
+  });
+
+  it("a sync failure is NOT a toast any more — the status line is the one report", () => {
+    // UI Night 6 §4. A toast is gone in five seconds; the failure is not. This
+    // goes red if anyone brings the toast back: the file, its mount, or a
+    // toast.error() anywhere in the sync module.
+    const syncDir = join(__dirname, "sync");
+    expect(existsSync(join(syncDir, "SyncErrorToast.tsx"))).toBe(false);
+    for (const f of readdirSync(syncDir).filter((n) => /\.tsx?$/.test(n) && !/\.test\./.test(n))) {
+      expect(readFileSync(join(syncDir, f), "utf8"), f).not.toMatch(/toast(\.error)?\(/);
+    }
+  });
+
+  it("the failure line says the changes are safe, and offers Retry only when it can work", () => {
+    const at = bar.indexOf('data-testid="status-sync-failed"');
+    const line = bar.slice(at, at + 1400);
+    expect(line).toContain("Sync failed. Your changes are still saved on this device.");
+    expect(line).toMatch(/sync\.willRetry && \(/);
+    expect(line).toMatch(/retrySync\(\)/);
   });
 
   it("announces both — a status line nobody can hear is still a toast to a screen reader", () => {

@@ -25,7 +25,7 @@ import { reconcile, type RemoteDocState } from "./reconcile";
 import { setCurrentAccount } from "./ledger";
 import { holdsTabClaim, subscribeTabClaim } from "./leader";
 import { useSyncEnabled } from "./enabled";
-import { setSyncStatus } from "./status";
+import { registerSyncRetry, setSyncStatus } from "./status";
 import type { SyncKey } from "./keys";
 
 /** How long to sit on a local change before pushing it. Long enough that
@@ -252,6 +252,18 @@ export function useCloudSync(): void {
     pushTimerRef.current = null;
     retryTimerRef.current = null;
   }, []);
+
+  // The status line's Retry (UI Night 6 §4): drop the pending backoff and run
+  // a pass now. Through runRef so it always calls the latest runSync, which
+  // serializes and bails for a tab without the claim — so this cannot push
+  // twice, and a standby tab's Retry is a no-op rather than a second sender.
+  useEffect(() => {
+    registerSyncRetry(() => {
+      clearTimers();
+      void runRef.current();
+    });
+    return () => registerSyncRetry(null);
+  }, [clearTimers]);
 
   const runSync = useCallback(async () => {
     if (!authedRef.current || !enabledRef.current) return;

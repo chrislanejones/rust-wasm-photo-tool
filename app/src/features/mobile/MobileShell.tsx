@@ -8,6 +8,7 @@
 // tier caps, the persisted gallery manifest — so photos added on a phone are
 // waiting in the gallery when the same browser profile opens the editor wide.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -315,7 +316,33 @@ export function MobileShell({
     [onAddFiles],
   );
 
-  return (
+  // The editor under this layer is COVERED, not gone — it keeps running so a
+  // widened window resumes into live state (see AppShell). But covered is not
+  // enough: measured 09-28 at 390px, once a photo is added the editor's chrome
+  // mounts beneath this layer and Tab walked from "Add Images" straight into
+  // 27 controls nobody could see — New, Tools, Gallery, Review, Export…
+  //
+  // `inert` on the editor's container takes all of it out of the tab order and
+  // the accessibility tree while leaving it mounted and running. It goes on the
+  // CONTAINER, not on a snapshot of siblings: the chrome that caused this
+  // mounts LATER, after a photo is added, and a snapshot would miss it.
+  //
+  // So this layer portals itself to <body> (it is `fixed`, so its position
+  // never depended on where it sat in the tree), and the whole .app-shell goes
+  // inert under it. Dialogs are Radix portals at z-dialog (50), above this
+  // layer's 48, so the shared confirms and the mobile notice still work.
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>(".app-shell");
+    if (!shell) return;
+    const wasInert = shell.hasAttribute("inert");
+    shell.setAttribute("inert", "");
+    return () => {
+      // Only undo what this did — something else may have wanted it inert.
+      if (!wasInert) shell.removeAttribute("inert");
+    };
+  }, []);
+
+  const layer = (
     <div className="fixed inset-0 z-[var(--z-mobile)] flex flex-col bg-bg-primary">
       {/* Header — logo + name on the left, settings and sign-in / avatar on the
           right, in the top bar's own cog-then-user order.
@@ -365,9 +392,13 @@ export function MobileShell({
               Add images from your photo library or camera. They land in your
               gallery, ready to edit next time you're on a bigger screen.
             </p>
+            {/* min-h-11: 44px, the phone's touch floor. `size="large"` is 38px,
+                which is right for a mouse and short for a thumb — measured
+                122x38 at 390 and 320 (UI Night 6 §6). Scoped here, not on the
+                shared size: this layer only exists at phone width. */}
             <Button
               size="large"
-              className="w-full"
+              className="min-h-11 w-full"
               onClick={() => inputRef.current?.click()}
             >
               <ImagePlus className="h-4 w-4" />
@@ -398,7 +429,7 @@ export function MobileShell({
             <p className="flex-1 text-xs text-text-muted">
               {photos.length} of {maxPhotos} photos
             </p>
-            <Button size="large" onClick={() => inputRef.current?.click()}>
+            <Button size="large" className="min-h-11" onClick={() => inputRef.current?.click()}>
               <ImagePlus className="h-4 w-4" />
               Add Images
             </Button>
@@ -432,4 +463,6 @@ export function MobileShell({
       )}
     </div>
   );
+
+  return createPortal(layer, document.body);
 }

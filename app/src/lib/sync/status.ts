@@ -105,3 +105,26 @@ function getServerSnapshot(): SyncStatus {
 export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(subscribe, getSyncStatus, getServerSnapshot);
 }
+
+// ── Retry ────────────────────────────────────────────────────────────────────
+// The status line's "Retry" (UI Night 6 §4) runs a sync pass now instead of
+// waiting out the backoff. useCloudSync owns the pass; it registers it here so
+// a button in the status bar can ask for one without reaching into the hook.
+//
+// It is a REQUEST, not a second sync path: the handler is the hook's own
+// runSync, which serializes passes and still returns early for a tab that does
+// not hold the claim. A Retry cannot double-push.
+let retryHandler: (() => void) | null = null;
+
+/** useCloudSync calls this on mount (and with null on unmount). */
+export function registerSyncRetry(fn: (() => void) | null): void {
+  retryHandler = fn;
+}
+
+/** Ask for a sync pass now. Returns false when nothing is registered — the
+ *  caller should not have shown a Retry at all. */
+export function retrySync(): boolean {
+  if (!retryHandler) return false;
+  retryHandler();
+  return true;
+}

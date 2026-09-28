@@ -11,6 +11,7 @@
 // exactly what a user clicking the equivalent controls by hand would do, which
 // is what keeps the restructure behavior-preserving.
 import { useCallback } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useToolStore } from "@/stores/useToolStore";
 import type { ToolState } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
@@ -126,7 +127,11 @@ export function isBlockedOffline(
   subTool: SubToolDefinition,
   onlineFeaturesEnabled = useUIStore.getState().onlineFeaturesEnabled,
 ): boolean {
-  return !subTool.comingSoon && subTool.requiresNetwork === true && !onlineFeaturesEnabled;
+  return (
+    !subTool.comingSoon &&
+    subTool.requiresNetwork === true &&
+    !isNetworkPathAllowed("ai_processing", onlineFeaturesEnabled)
+  );
 }
 
 // Turning the switch OFF while a server-backed sub-tool is lit moves to its
