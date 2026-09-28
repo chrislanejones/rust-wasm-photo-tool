@@ -762,12 +762,8 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // value-consuming sites born with the feature, in `useSelectionActions.ts`
     // (the refine preview, its readout and Apply) and `useMaskActions.ts`
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
-    // the mask brush — un-awaited, a refused add would still do both). Gate
-    // buckets unchanged.
-    // Photo-only stored originals — 158 -> 157: `usePersistActiveCanvas` had
-    // two awaited captures behind a ternary (with and without the Canvas) and
-    // now has one, because the stored original never includes the Canvas.
-    // Nothing was un-awaited; a site was deleted. Gate buckets unchanged.
+    // the mask brush — un-awaited, a refused add would still do both). Same buckets.
+    // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
     expect(gate.awaited, "cumulative converted sites").toBe(157);
   });
 
