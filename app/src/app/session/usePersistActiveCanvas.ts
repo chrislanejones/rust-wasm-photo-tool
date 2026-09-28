@@ -48,7 +48,16 @@ export function usePersistActiveCanvas({
       ? formatFromMime(entry.mimeType ?? "")
       : null;
     const encodeFormat = sourceFormat ?? exportFormat;
-    const encodeQuality = sourceFormat ? 1 : quality / 100;
+    const lossy = encodeFormat !== "png";
+    // "Apply Resize" used to re-encode at quality 1.0 — "full quality" sounds
+    // lossless, but for a JPEG/WebP/AVIF it is the opposite of what the photo
+    // was: a file Auto Compress had brought to ~200 KB at q≈60 came back at
+    // q=100 and several times heavier, even though it now had FEWER pixels, and
+    // the PageSpeed score dropped into the red after a downscale. Keep the
+    // quality the stored bytes were last encoded at; for an untouched upload
+    // (unknown) use 92, the usual camera/export default.
+    const resizeQuality = entry.encodeQuality ?? 92;
+    const encodeQuality = sourceFormat ? resizeQuality / 100 : quality / 100;
     try {
       // ATOMIC CAPTURE (ADR-024). Was `get_image_data()` + `width()` +
       // `height()`. These three are not merely read together, they TRAVEL
@@ -77,7 +86,20 @@ export function usePersistActiveCanvas({
       // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
       // codec worker, which transfers (detaches) it. Give encodeRgba its own
       // copy so the original `pixels` survives for the thumbnail below.
-      const blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, encodeQuality);
+      let blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, encodeQuality);
+      let storedQuality = sourceFormat ? resizeQuality : quality;
+      // A resize that REMOVED pixels must not produce a heavier file. With an
+      // unknown source quality the 92 guess can overshoot a heavily compressed
+      // upload, so step down until the result is no bigger than what it
+      // replaces. Bounded; worst case keeps the last attempt.
+      const prevArea = entry.origWidth * entry.origHeight;
+      if (sourceFormat && lossy && prevArea > 0 && tw * th <= prevArea) {
+        for (const q of [85, 78, 70, 62, 55]) {
+          if (blob.size <= entry.byteSize || q >= storedQuality) break;
+          blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, q / 100);
+          storedQuality = q;
+        }
+      }
       // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
       // the blob's actual MIME for the stored metadata.
       const mime = blob.type || `image/${encodeFormat}`;
@@ -115,6 +137,9 @@ export function usePersistActiveCanvas({
                 originalKey: newKey,
                 byteSize: blob.size,
                 mimeType: mime,
+                // PNG (requested, or an AVIF fallback) is lossless — no
+                // quality to remember.
+                encodeQuality: lossy && mime !== "image/png" ? storedQuality : undefined,
                 origWidth: tw,
                 origHeight: th,
                 workingWidth: tw,
