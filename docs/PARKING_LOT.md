@@ -4,6 +4,31 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
+
+v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
+original. It does not touch originals already written that way, and a
+"Photo only" ZIP copies a stored original as it is — so a photo resized or
+compressed on an older build keeps shipping its frame. Seen for real: three
+ZIPs Chris downloaded at 5:19–5:30 pm on 09-28 (pre-v9.3), five JPEGs, each
+with a near-white frame measured per side:
+
+| Side lines | Frame line | Photo line |
+| --- | --- | --- |
+| mean brightness | **249–254** | 16–187 |
+| spread along the line | **≤ 4.7** | 10–76 |
+
+2–3px per side, sometimes only left/right. Cropping exactly those lines fixed
+all five (re-measured 0 on every side).
+
+**Options.** (a) Tell affected users to remove and re-add those photos from
+their files — safe, manual. (b) A one-time repair that detects the frame with
+the rule above and crops it from `originalKey`. That rewrites user data in
+IndexedDB, so it goes through the `dexie-migration` skill with fixtures, and it
+must be conservative: a photo whose real edge is a flat white line (a white
+background, a scan) would pass the same test. `uploadKey`, where present, is
+the untouched upload and gives the true aspect ratio to check against.
+
 ## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
 
 Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
