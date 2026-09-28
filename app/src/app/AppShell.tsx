@@ -21,10 +21,7 @@ import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
-import { canEncode } from "@/lib/encodeSupport";
-import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
 import { namePastedImage } from "@/lib/pastedImageName";
-import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -91,6 +88,9 @@ import { useDuplicatePad } from "./session/useDuplicatePad";
 import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { usePenActions } from "./session/usePenActions";
+import { useEffectBrush } from "./session/useEffectBrush";
+import { useDownloadFormat } from "./session/useDownloadFormat";
+import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
@@ -115,7 +115,6 @@ import {
   extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
-import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
 import { useExportFileName } from "@/hooks/useExportFileName";
@@ -222,18 +221,6 @@ function capMessage(mode: UserMode, max: number): string {
   return `Gallery is limited to ${max} photos.`;
 }
 
-// Format choices shown in the Download dialog — a second chance to pick a
-// format for anyone who missed the dropdown in the Compress panel. ORA is the
-// one non-raster choice — the full layered project, not a flattened encode —
-// so it never touches the persisted `exportFormat` preference below.
-type DownloadFormat = ExportFormat | "ora";
-const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; hint: string }[] = [
-  { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
-  { value: "png", label: "PNG", hint: "Lossless · transparency" },
-  { value: "webp", label: "WebP", hint: "Small · transparency" },
-  { value: "avif", label: "AVIF", hint: "Smallest · modern" },
-  { value: "ora", label: "ORA", hint: "Layered · full project" },
-];
 
 /** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
  *  drag/paste import flow before the user picks where the image should land. */
@@ -895,41 +882,13 @@ export function AppShell() {
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
   const setExportFormat = useToolStore((s) => s.setExportFormat);
-  // The Download dialog is a SECOND format picker, and it was still selling
-  // AVIF as "Smallest · modern" while this browser silently writes PNG. The
-  // Compress panel's note does not reach here, so the dialog has to say it too
-  // — otherwise the more prominent of the two surfaces is the dishonest one.
-  const [avifEncodable, setAvifEncodable] = useState<boolean | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void canEncode("image/avif").then((ok) => {
-      if (live) setAvifEncodable(ok);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const downloadFormats = useMemo(
-    () =>
-      DOWNLOAD_FORMATS.map((o) =>
-        o.value === "avif" && avifEncodable === false
-          ? { ...o, hint: "Not supported here · saves as PNG" }
-          : o,
-      ),
-    [avifEncodable],
-  );
-  /** What will actually be written — drives the dialog's button label so it
-   *  cannot offer "Download AVIF" and then hand over a PNG. */
-  const effectiveExportFormat: ExportFormat =
-    exportFormat === "avif" && avifEncodable === false ? "png" : exportFormat;
-  // The dialog's own format pick, reseeded from the persisted preference each
-  // time it opens — kept separate so an "ora" pick never lands in that store.
-  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(exportFormat);
-  useEffect(() => {
-    if (exportDialogOpen) setDownloadFormat(exportFormat);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportDialogOpen]);
-  const isOraDownload = downloadFormat === "ora";
+  const {
+    downloadFormats,
+    effectiveExportFormat,
+    downloadFormat,
+    setDownloadFormat,
+    isOraDownload,
+  } = useDownloadFormat();
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -947,29 +906,14 @@ export function AppShell() {
   const quality = useToolStore((s) => s.quality);
   const setQuality = useToolStore((s) => s.setQuality);
 
-  const effectiveBrushSize = (() => {
-    switch (activeTool) {
-      case "brush":
-        if (brushMode === "blur") return toolSettings.blurSize / 2;
-        if (brushMode === "erase") return toolSettings.eraserSize / 2;
-        return toolSettings.brushSize / 2;
-      case "arrow":
-        // The Layers panel's mask brush — its own size, not the Paint brush's.
-        if (maskEditing) return toolSettings.maskBrushSize / 2;
-        return 0;
-      case "crop":
-        return 0;
-      case "ai":
-        // Eraser tool: the brush eraser and the Magic Eraser share the same
-        // eraserSize field (one physical brush, two jobs — see AISettings).
-        return toolSettings.eraserSize / 2;
-      case "stamp":
-        if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
-        return stampSettings.brushSize;
-      default:
-        return stampSettings.brushSize;
-    }
-  })();
+  const effectiveBrushSize = brushCursorSize({
+    activeTool,
+    brushMode,
+    stampSubMode,
+    maskEditing,
+    toolSettings,
+    stampSettings,
+  });
 
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
@@ -1305,8 +1249,6 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
-  const isBlurringRef = useRef(false);
-
   const {
     getCoords,
     handleSelectionClick,
@@ -1346,101 +1288,7 @@ export function AppShell() {
     if (activeTool !== "arrow") setMoveActive(false);
   }, [activeTool]);
 
-  // `async` is carried, not needed. `effect_down` consumes no return value, so
-  // this is fire-and-forget and Stage 3.5 has no work here. It shares the
-  // `Stamp["onMouseDown"]` slot with the clone stamp's handler, which IS async
-  // now, and the alternative — a second, widened handler type — would only move
-  // the conflict to CanvasArea, whose `hookResult` prop is
-  // `ReturnType<typeof useCloneStamp>` directly. Nothing changes at runtime:
-  // React ignores the returned promise.
-  const blurDown = useCallback(
-    async (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const t = stamp.toolRef.current;
-      if (!t || e.button !== 0) return;
-      isBlurringRef.current = true;
-      const { x, y } = getCoords(e);
-      // Mode branch, hex parse (redaction), undo-snap, and per-stroke
-      // interpolation all live in Rust now (effect_down / effect_move / _up).
-      t.effect_down(
-        x,
-        y,
-        toolSettings.blurSize,
-        toolSettings.blurMode,
-        toolSettings.blurIntensity,
-        toolSettings.pixelSize,
-        toolSettings.redactColor,
-        toolSettings.paintStabilizer,
-      );
-      stamp.flushToCanvas();
-    },
-    [
-      stamp,
-      getCoords,
-      toolSettings.blurMode,
-      toolSettings.blurSize,
-      toolSettings.blurIntensity,
-      toolSettings.pixelSize,
-      toolSettings.redactColor,
-      toolSettings.paintStabilizer,
-    ],
-  );
-
-  // v8.41 — the v8.34 backpressure, via the shared coalescer (the LAST of the
-  // three brushes to get it: paint v8.34, clone stamp earlier today, now this).
-  //
-  // This handler used to await one `effect_move` per pointer event AND call
-  // `flushToCanvas()` per event — no in-flight gate, no rAF gate — the worst
-  // shape of the three, asking for a full recomposite at mouse rate. Its old
-  // comment argued "every dab must land, so it does NOT drop-stale", which
-  // v8.34 overturned: right for a call already SENT, wrong for coalescing
-  // UNSENT ones, because `effect_move` strokes the SEGMENT from the last
-  // landed point — skipped coordinates cost curve detail between samples,
-  // never continuity. Measured on the clone stamp, the unfixed shape banked
-  // 10.8 s of queue on a 1.4 s stroke at a 200 px brush; blur's per-move cost
-  // (a kernel over the brush area) is higher still.
-  //
-  // `effect_move`'s "did anything change" bool is returned from the send, so
-  // the coalescer's flush gate preserves the old guard exactly: moves that
-  // blurred nothing schedule no flush.
-  // Only the flush half rides the rAF gate; syncState stays a stroke-end
-  // affair (blurUp below).
-  const blurFlushRef = useRef(stamp.flushToCanvas);
-  blurFlushRef.current = stamp.flushToCanvas;
-  const blurSchedRef = useRef<StrokeCoalescer | null>(null);
-  if (blurSchedRef.current === null) {
-    blurSchedRef.current = createStrokeCoalescer(() => blurFlushRef.current());
-  }
-  const blurSched = blurSchedRef.current;
-
-  const blurMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isBlurringRef.current) return;
-      if (!stamp.toolRef.current) return;
-      blurSched.submit(getCoords(e), async (x, y) => {
-        const t = stamp.toolRef.current;
-        if (!t) return false;
-        return await t.effect_move(x, y);
-      });
-    },
-    [stamp, getCoords, blurSched],
-  );
-
-  const blurUp = useCallback(() => {
-    if (!isBlurringRef.current) return;
-    isBlurringRef.current = false;
-    // Same stroke-end handoff as paint/clone: drop the unsent pending move
-    // (its segment would land after `effect_up` committed) and reset the rAF
-    // gate a hidden tab would latch. FIFO orders `effect_up` after any move
-    // still in flight.
-    blurSched.strokeEnd();
-    stamp.toolRef.current?.effect_up();
-    // Flush directly at stroke end — the last landed dabs may only have a
-    // scheduled frame that never fires in a hidden tab, and `effect_up` is
-    // where the op log commits the stroke; paint's onMouseUp documents the
-    // save-scheduling half of this at length.
-    stamp.flushToCanvas();
-    stamp.syncState();
-  }, [stamp, blurSched]);
+  const { blurDown, blurMove, blurUp } = useEffectBrush(stamp, getCoords, toolSettings);
 
   const effectiveDrawingTool =
     activeTool === "shapes" && shapesMode === "arrows"

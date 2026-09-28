@@ -203,12 +203,12 @@ export default tseslint.config(
   // measured sizes on 2026-09-26; docs/AppShell-Refactor-Plan.md is the plan
   // for driving them down.
   {
-    // 3718 -> 3649: measured, not moved — the cap had never been lowered to
-    // match the file. See docs/AppShell-Refactor-Plan.md for why the next
-    // reductions are structural (context + stores + JSX split), not more
-    // handler extractions.
+    // 3716 -> 3564: three extractions, measured. The effect brush (blur /
+    // pixelate / redact) and the Download dialog's format logic each became a
+    // session hook, and the brush-cursor radius became a pure function with a
+    // test. The ratchet only ever goes DOWN; raise it and the file has won.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3716 }] },
+    rules: { "max-lines": ["error", { max: 3564 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
