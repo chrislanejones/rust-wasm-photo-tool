@@ -3,6 +3,7 @@
   "buildCommand": "pnpm build",
   "installCommand": "pnpm install",
   "outputDirectory": "dist",
+  "ignoreCommand": "bash ../scripts/vercel-ignore-build.sh app/ src/ convex/ docs/ tests/ benches/ e2e/ .design-sync/ .github/ Cargo.toml Cargo.lock rust-toolchain.toml vercel.json '*.md'",
   "framework": "vite",
 
   "cleanUrls": true,
@@ -67,5 +68,11 @@
       "source": "/shots/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
-  ]
+  ],
+
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  }
 }
