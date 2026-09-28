@@ -48,6 +48,7 @@ import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PAID_SIGNUP_ENABLED, PAID_SIGNUP_OFF_NOTE } from "@/lib/billing";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -424,7 +425,7 @@ export function SubscriptionButton({
                           )}
                           Manage subscription
                         </button>
-                      ) : (
+                      ) : PAID_SIGNUP_ENABLED ? (
                         <button
                           type="button"
                           onClick={() => redirect("checkout")}
@@ -436,6 +437,16 @@ export function SubscriptionButton({
                           )}
                           Upgrade to Pro
                         </button>
+                      ) : (
+                        /* Signup is off (lib/billing.ts). A plain note, not a
+                           disabled "Upgrade to Pro" button: a greyed-out
+                           button invites hovering for a tooltip that explains
+                           nothing, and reads as something broken rather than
+                           something not open yet. The features above still
+                           list what Pro will include. */
+                        <p className="mt-4 rounded-md bg-bg-tertiary px-3 py-2 text-center text-2xs text-theme-muted-foreground">
+                          {PAID_SIGNUP_OFF_NOTE}
+                        </p>
                       )}
                     </div>
 
