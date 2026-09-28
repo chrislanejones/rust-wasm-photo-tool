@@ -129,11 +129,12 @@ export function matteOntoOpaque(
  * ADR-039 condition. Distinct from `includeCanvasInExport` below, which also
  * consults the user's export preference: this one is not a preference at all.
  * Baking black into a saved file is data loss, and it must be refused on every
- * surface that writes pixels, including the INTERNAL working-copy save (see
- * `persistActiveCanvas`) — which is how a black border ended up permanently
- * inside stored files while all three export surfaces were behaving.
+ * surface that writes pixels. The INTERNAL working-copy save
+ * (`usePersistActiveCanvas`) no longer needs this check: it always leaves the
+ * backing Canvas out, so there is no transparent backing to invent black for.
+ * Only used in this file now, hence not exported.
  */
-export function wouldInventOpaquePixels(
+function wouldInventOpaquePixels(
   format: ExportFormat,
   canvasBgTransparent: boolean,
 ): boolean {
