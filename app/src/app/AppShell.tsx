@@ -113,15 +113,14 @@ import {
   compositeSavedEdit,
   encodeRgba,
   EXT,
-  extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
+import { untouchedZipEntry } from "@/lib/zipEntry";
 import { useExportFileName } from "@/hooks/useExportFileName";
 import {
   readExifTiff,
   applyExifToReencoded,
-  applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
@@ -2326,17 +2325,14 @@ export function AppShell() {
         //   - never edited      -> originalKey holds the untouched upload
         //   - compressed only   -> originalKey ALREADY holds the processed
         //                          bytes, so verbatim is the processed result
-        // Keep passes them through as-is; strip scrubs EXIF/GPS on the way out.
+        // Both go out in the chosen format: as-is when they already are,
+        // re-encoded when not (lib/zipEntry.ts).
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
-        bytes = applyExifToVerbatim(
-          new Uint8Array(orig.bytes),
-          orig.mimeType,
+        ({ bytes, mime, ext } = await untouchedZipEntry(orig, exportFormat, quality / 100, {
           mode,
-          exifStripMode,
-        );
-        mime = orig.mimeType;
-        ext = extFromMime(orig.mimeType);
+          stripMode: exifStripMode,
+        }));
       }
 
       // De-dupe filenames within the archive.
@@ -2781,6 +2777,8 @@ export function AppShell() {
           isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`
         }
         onDownload={downloadFromDialog}
+        zipFormat={exportFormat}
+        zipLabel={effectiveExportFormat.toUpperCase()}
         shareAction={
           <ShareButton
             exportPng={async () => {

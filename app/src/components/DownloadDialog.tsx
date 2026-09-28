@@ -16,6 +16,7 @@
 // The pane state lives in `DownloadPanes`, INSIDE DialogContent, on purpose:
 // Radix unmounts the content when the dialog closes, so every open starts
 // back on the first pane with no reset effect to keep in sync.
+import type { ExportFormat } from "@/lib/exportImage";
 import * as React from "react";
 import { FolderArchive, Image as ImageIcon } from "lucide-react";
 import {
@@ -85,6 +86,12 @@ interface DownloadDialogProps {
   shareAction: React.ReactNode;
   onCopy: () => void;
   onDownloadAll: () => void;
+  /** The raster format the zip writes every image in — the store's export
+   *  format, which an ORA pick on "Selected" leaves alone. Lights a tile. */
+  zipFormat: ExportFormat;
+  /** What the browser will ACTUALLY write for it ("PNG" for an AVIF it
+   *  cannot encode), so the button never promises a format it won't deliver. */
+  zipLabel: string;
 }
 
 export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogProps) {
@@ -114,6 +121,8 @@ function DownloadPanes({
   shareAction,
   onCopy,
   onDownloadAll,
+  zipFormat,
+  zipLabel,
 }: Omit<DownloadDialogProps, "open" | "onOpenChange">) {
   const multi = photoCount > 1;
   const [picked, setPicked] = React.useState<Pane>(multi ? "choose" : "selected");
@@ -200,6 +209,20 @@ function DownloadPanes({
         ) : (
           <>
             <PaneHeader title="All Images" onBack={back} />
+            {/* The same tiles as Selected, on the same grid, minus the two that
+                are whole-project files rather than one image each (ORA, PSD).
+                Every image in the zip is written in this format; one already
+                in it goes in untouched (lib/zipEntry.ts). */}
+            <ToolButtonGroup<FormatTileId>
+              label="Format"
+              stacked
+              columns={3}
+              value={zipFormat}
+              onChange={(id) => {
+                if (id !== "psd" && id !== "ora") onFormatChange(id);
+              }}
+              options={formatOptions.filter((o) => o.id !== "ora" && o.id !== "psd")}
+            />
             <DialogDescription>
               Every open image, each with its edits, in one{" "}
               <span className="font-mono">.zip</span>.
@@ -207,7 +230,7 @@ function DownloadPanes({
             <PanelActionBar>
               <PanelAction onClick={onDownloadAll}>
                 <FolderArchive className="h-4 w-4" />
-                Download ({photoCount})
+                Download {photoCount} as {zipLabel}
               </PanelAction>
             </PanelActionBar>
           </>
