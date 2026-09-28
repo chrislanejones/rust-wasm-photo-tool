@@ -4,6 +4,34 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
+The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
+Resize scales the whole artboard — photo plus the 10px Canvas border each side —
+to the number typed. Measured, 1600×1200 JPEG, width set to 800:
+
+| Build | Stored photo |
+| --- | --- |
+| master (pre-#260) | 796×596, with a 3px white frame baked in |
+| v9.3 | **790×590**, photo only |
+
+A 256px PNG set to 200 stores 186×186. So the number a person types is not the
+size they get, and the gap grows with the border. The fix is to scale by
+typed ÷ photo width (not ÷ artboard width) — a one-line change in the resize
+path, but it changes the output of every resize, so it wants its own PR and a
+look at the Canvas Size panel, which may lean on the current behavior.
+
+## OPEN — Auto Compress makes an already-small JPEG heavier (09-28-2026)
+
+Found the same day, identical on master. A q60 JPEG of 32,950 B through
+"Compress Image" comes back at **36,621 B** (+11%) and stores `encodeQuality: 75`
+— it re-encodes at the panel's quality, which is higher than the file's own.
+#259 added the "never hand back a bigger file for fewer pixels" step-down to
+Apply Resize only; Auto Compress has no such guard. Now that `encodeQuality`
+is on the entry, the obvious rule is: if the result is not smaller, keep the
+original bytes and say so.
+
 ## OPEN — 116 · Triangle, star points, oval, rotation — parked; needs the op-log v9 renumber (09-28-2026)
 
 | | |
