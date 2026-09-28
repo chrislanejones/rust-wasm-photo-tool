@@ -37,7 +37,6 @@
 
 import { external, repoFile } from "../config";
 import { Scene } from "./entropy.figures";
-import "./entropy.figures.css";
 
 export default function EntropyIsTheDefault() {
   return (

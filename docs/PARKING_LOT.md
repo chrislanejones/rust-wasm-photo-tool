@@ -60,7 +60,19 @@ Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
 Chromium draws WebGPU canvases blank white even for a bare three.js control, so
 only the WebGL 2 path is verified.
 
-## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+## RESOLVED — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+> **Done 09-28-2026, on `feat/blog-entropy-post`**, when the third post — "We
+> spent a month taking the file apart" — arrived as exactly the trigger below:
+> a third copy. `SceneKit`/`stream`/`fade`/`orbit`/`createScene` are one module
+> (`marketing/src/posts/scene/kit.ts`), the React frame is one
+> (`scene/figure.tsx`, bound per post with `sceneFigure(() => import(...))`),
+> the `.scene` CSS is one (`scene/scene.css`), and the three.js subset is one
+> (`scene/three.ts`). Each post keeps only its builders. The three copies had
+> drifted by comments, one optional `stream()` size and a `lookY` default —
+> nothing a reader could see. Proven so: 28 reduced-motion stills of all three
+> posts, header and every figure, at 1200 and 320 px, 0 pixels different from
+> the pre-refactor build. Scene code across the three posts 48,477 B → 35,992 B.
 
 Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
 post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and
