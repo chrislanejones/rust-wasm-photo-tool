@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — 116 · Triangle, star points, oval, rotation — parked; needs the op-log v9 renumber (09-28-2026)
+
+| | |
+|---|---|
+| **What** | A triangle, a star with a chosen number of points, an **oval**, and a rotation handle on every shape |
+| **Branch** | `feat/shapes-triangle-rotate` (#187) — triangle, star points and rotation are built there; the oval is not yet |
+| **Blocked on** | the op-log format going **v8 → v9**. Rotation adds a field to every shape, which is a format change; #131's v8 is live, so #187 has to renumber rather than reuse it |
+| **Why the oval waits with them** | Circle is a true circle (`drawPreview.ts` clamps to `Math.min(w, h)`; the engine's `draw_shape` kind 1 matches), so there is no free ellipse today and an oval is a new engine shape kind. Built on master now it would claim a kind number #187 is also counting on — the parallel-branch collision that has already happened twice (v6, v8) |
+| **Decided** | Chris, 09-28: build the oval on the #187 branch, alongside the triangle, when the v9 renumber lands |
+| **Also stale** | `/in-the-works` still lists this under "Being built now". It is parked; that page should say so when this is picked up |
+
 ## OPEN — UI Night 3 leftovers: what the three tool panels surfaced outside themselves (09-25-2026)
 
 Night 3 normalized Paint, Eraser and Crop and stopped at three. These are the
