@@ -334,3 +334,13 @@
     -webkit-box-orient: vertical;
   }
 }
+@media (max-width: 24rem) {
+  /* A third line below 384px, by the same argument one width down. At 320 the
+     two-line cap still cut four subtitles across the blog, and each lost the
+     word that carried it: "…in the same commit" became "…in the same…", and
+     the offline post's precache list lost "woff2". The clamp is a ceiling, not
+     a height — a subtitle that fits in two lines still takes two — so only the
+     ones that were being cut grow, and they grow into the empty air the
+     phone's 4:3 frame leaves above the staging. */
+  .scene__header-sub { -webkit-line-clamp: 3; }
+}

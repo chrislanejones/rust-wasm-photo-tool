@@ -43,16 +43,16 @@ function buildThreads(sc: SceneKit): Ticker {
   sc.dashed([3.3, 0.1, -0.45], [2.9, 0.1, 0.4], C.accent);
 
   sc.header("Main thread", "React · pointer input · layout", "Engine worker", "engine · own wasm memory · canvas");
-  sc.label("postMessage", [0, 0.9, -2.6], { tone: "ink3", size: 11, minor: true });
-  sc.label("UI", [-3.6, 0.62, -1.0], { tone: "ink2", size: 11, minor: true });
-  sc.label("input", [-1.9, 0.55, -1.0], { tone: "ink2", size: 11, minor: true });
-  sc.label("<canvas> — element stays, surface gone", [-2.9, 0.18, 1.0], { tone: "ink3", size: 11, dy: 90, minor: true });
-  sc.label("engine", [3.3, 1.08, -1.0], { tone: "ink", size: 11, minor: true });
-  sc.label("linear memory", [3.3, 0.1, -1.0], { tone: "ink2", size: 11, dy: 110, minor: true });
-  sc.label("OffscreenCanvas · putImageData here", [2.9, 0.22, 1.0], { tone: "accent", size: 11, dy: 90, minor: true });
-  const l1 = sc.label("call { id, method, args } →", [0.35, 0.55, -0.55], { tone: "accent", size: 11, dy: -150, minor: true });
-  const l2 = sc.label("← reply { id, ok, value }", [0, 0.9, -0.05], { tone: "ink2", size: 11, dy: 40, minor: true });
-  const l3 = sc.label("blit → (no reply, not queued)", [0, 0.8, 1.05], { tone: "accent2", size: 11, dy: 90, minor: true });
+  sc.label("postMessage", [0, 0.9, -2.6], { tone: "ink3", size: 11 });
+  sc.label("UI", [-3.6, 0.62, -1.0], { tone: "ink2", size: 11 });
+  sc.label("input", [-1.9, 0.55, -1.0], { tone: "ink2", size: 11 });
+  sc.label("<canvas> — element stays, surface gone", [-2.9, 0.18, 1.0], { tone: "ink3", size: 11, dy: 90 });
+  sc.label("engine", [3.3, 1.08, -1.0], { tone: "ink", size: 11 });
+  sc.label("linear memory", [3.3, 0.1, -1.0], { tone: "ink2", size: 11, dy: 110 });
+  sc.label("OffscreenCanvas · putImageData here", [2.9, 0.22, 1.0], { tone: "accent", size: 11, dy: 90 });
+  const l1 = sc.label("call { id, method, args } →", [0.35, 0.55, -0.55], { tone: "accent", size: 11, dy: -150 });
+  const l2 = sc.label("← reply { id, ok, value }", [0, 0.9, -0.05], { tone: "ink2", size: 11, dy: 40 });
+  const l3 = sc.label("blit → (no reply, not queued)", [0, 0.8, 1.05], { tone: "accent2", size: 11, dy: 90 });
   for (const l of [l1, l2, l3]) sc.show(l, false);
 
   const calls = stream(sc, { from: [-1.5, 0.55, -0.55], to: [2.0, 0.55, -0.55], color: C.accent, shape: "cube", period: 0.55, duration: 0.8, lift: 0.7 });
@@ -89,8 +89,8 @@ function buildDoors(sc: SceneKit): Ticker {
     sc.slab(2.4, 0.12, 1.35, C.paper4, C.accent).position.set(2.5, 0, z);
   }
   sc.dashed([0, 0.04, -3.7], [0, 0.04, 3.7], C.ink3);
-  sc.label("sender", [-2.5, 0.06, -3.6], { tone: "ink3", dy: -60, minor: true });
-  sc.label("receiver (worker)", [2.5, 0.06, -3.6], { tone: "accent", dy: -60, minor: true });
+  sc.label("sender", [-2.5, 0.06, -3.6], { tone: "ink3", dy: -60 });
+  sc.label("receiver (worker)", [2.5, 0.06, -3.6], { tone: "accent", dy: -60 });
 
   const names = ["Copy", "Move", "Share", "WASM memory"];
   const subs = [
@@ -107,13 +107,13 @@ function buildDoors(sc: SceneKit): Ticker {
   ];
   rows.forEach((z, i) => {
     const wall = i === 3;
-    sc.label(names[i], [-3.85, 0.1, z], { tone: wall ? "accent2" : "ink", size: 13, weight: 700, dx: -100, dy: -90, mono: false });
+    sc.label(names[i], [-3.85, 0.1, z], { tone: wall ? "accent2" : "ink", size: 13, weight: 700, dx: -100, dy: -90, mono: false, minor: false });
     // 10px, a rung under the verdicts opposite: the mechanism line carries the
     // longest string in the figure — `[[ArrayBufferDetachKey]]` is one
     // unbreakable 24-character token — and at 11px it does not fit the gutter
     // the nearest row leaves, so it lost its tail to an ellipsis.
-    sc.label(subs[i], [-3.85, 0.1, z], { tone: "ink3", size: 10, dx: -100, dy: 10, wrap: true, minor: true });
-    sc.label(verdict[i], [3.85, 0.1, z], { tone: wall ? "accent2" : "ink2", size: 11, dx: 0, dy: -50, wrap: true, minor: true });
+    sc.label(subs[i], [-3.85, 0.1, z], { tone: "ink3", size: 10, dx: -100, dy: 10, wrap: true });
+    sc.label(verdict[i], [3.85, 0.1, z], { tone: wall ? "accent2" : "ink2", size: 11, dx: 0, dy: -50, wrap: true });
   });
 
   const blk = (color: number, edge: number) => sc.slab(0.9, 0.55, 0.9, color, edge);
@@ -157,7 +157,7 @@ function buildDoors(sc: SceneKit): Ticker {
     sc.scene.add(r);
     return r;
   });
-  const bang = sc.label("TypeError", [0.2, 0.9, rows[3]], { tone: "accent2", size: 12, weight: 700, minor: true });
+  const bang = sc.label("TypeError", [0.2, 0.9, rows[3]], { tone: "accent2", size: 12, weight: 700 });
   sc.show(bang, false);
   const red = new T.Color(C.accent2);
   const base = new T.Color(C.paper2);
@@ -225,7 +225,7 @@ function buildCanvas(sc: SceneKit): Ticker {
   eng.position.set(3.3, 0.88, -1.0);
   eng.material.emissive = new T.Color(C.accent);
   eng.material.emissiveIntensity = 0.25;
-  sc.label("engine · linear memory", [3.3, 0.1, -1.0], { tone: "ink2", size: 11, dy: 110, minor: true });
+  sc.label("engine · linear memory", [3.3, 0.1, -1.0], { tone: "ink2", size: 11, dy: 110 });
   // the canvas: a frame plus a "surface" plane that gets painted
   const frame = sc.slab(2.0, 0.08, 1.2, C.paper2, C.ink2);
   const surf = sc.slab(1.7, 0.03, 0.95, C.paper4, C.ink3);
@@ -241,12 +241,12 @@ function buildCanvas(sc: SceneKit): Ticker {
   const pix = Array.from({ length: 14 }, () => sc.packet(C.accent, "cube", 0.09));
   for (const p of pix) p.material.transparent = true;
   const blits = stream(sc, { from: [-1.6, 0.4, 1.05], to: [2.0, 0.4, 1.05], color: C.accent2, shape: "disc", period: 0.3, duration: 0.6, lift: 0.25, count: 6 });
-  const lblCanvas = sc.label("<canvas>", [0, 0, 0], { tone: "ink", size: 11, minor: true });
-  const lblOff = sc.label("OffscreenCanvas", [0, 0, 0], { tone: "accent", size: 11, minor: true });
+  const lblCanvas = sc.label("<canvas>", [0, 0, 0], { tone: "ink", size: 11 });
+  const lblOff = sc.label("OffscreenCanvas", [0, 0, 0], { tone: "accent", size: 11 });
   // Wrapped: this is the longest label in the figure and the only one that
   // overran the 46% cap the rest sit comfortably inside.
-  const lblEl = sc.label("element stays in the DOM · no 2D context here any more", [-2.9, 0.18, 1.0], { tone: "ink3", size: 11, dy: 90, wrap: "wide", minor: true });
-  const lblBlit = sc.label("blit → fire-and-forget", [0, 0.75, 1.05], { tone: "accent2", size: 11, dy: 90, minor: true });
+  const lblEl = sc.label("element stays in the DOM · no 2D context here any more", [-2.9, 0.18, 1.0], { tone: "ink3", size: 11, dy: 90, wrap: "wide" });
+  const lblBlit = sc.label("blit → fire-and-forget", [0, 0.75, 1.05], { tone: "accent2", size: 11, dy: 90 });
   sc.period = 12;
   sc.chapters = CANVAS_CHAPTERS;
   const accent = new T.Color(C.accent);

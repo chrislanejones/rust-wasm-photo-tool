@@ -31,7 +31,7 @@ function buildCut(sc: SceneKit): Ticker {
   const cloud = CLOUD.map(([x, z, name, dy]) => {
     const s = sc.slab(1.3, 0.4, 0.9, C.paper4, C.ink3);
     s.position.set(x, 0.29, z);
-    sc.label(name, [x, dy > 0 ? 0.1 : 0.55, z], { tone: "ink3", size: 11, dy, minor: true });
+    sc.label(name, [x, dy > 0 ? 0.1 : 0.55, z], { tone: "ink3", size: 11, dy });
     return s;
   });
 
@@ -62,13 +62,13 @@ function buildCut(sc: SceneKit): Ticker {
   const queue = Array.from({ length: 5 }, () => sc.packet(C.accent, "cube", 0.13));
 
   sc.header("Network", "Convex · Clerk · Replicate · sample images", "Browser tab", "UI · engine worker · IndexedDB");
-  sc.label("UI · pointer", [1.8, 0.1, -1.1], { tone: "ink2", size: 11, dy: 95, minor: true });
-  sc.label("engine · own wasm memory", [3.9, 1.0, -1.1], { tone: "ink", size: 11, dy: -20, minor: true });
-  sc.label("<canvas>", [1.8, 0.2, 0.3], { tone: "accent", size: 11, dy: 90, minor: true });
-  sc.label("IndexedDB · originals · op log · keyframes", [2.9, 0.3, 1.3], { tone: "ink2", size: 11, dy: 110, minor: true });
-  const wire = sc.label("sync · sign-in · AI over the wire", [0, 1.5, -0.3], { tone: "ink3", size: 11, dy: -50, minor: true });
-  const off = sc.label("offline — no wire needed here", [0, 1.5, -0.3], { tone: "accent2", size: 12, weight: 700, dy: -50, minor: true });
-  const held = sc.label("held · replays on reconnect", [0.9, 0.3, 0.9], { tone: "accent", size: 11, dy: 90, minor: true });
+  sc.label("UI · pointer", [1.8, 0.1, -1.1], { tone: "ink2", size: 11, dy: 95 });
+  sc.label("engine · own wasm memory", [3.9, 1.0, -1.1], { tone: "ink", size: 11, dy: -20 });
+  sc.label("<canvas>", [1.8, 0.2, 0.3], { tone: "accent", size: 11, dy: 90 });
+  sc.label("IndexedDB · originals · op log · keyframes", [2.9, 0.3, 1.3], { tone: "ink2", size: 11, dy: 110 });
+  const wire = sc.label("sync · sign-in · AI over the wire", [0, 1.5, -0.3], { tone: "ink3", size: 11, dy: -50 });
+  const off = sc.label("offline — no wire needed here", [0, 1.5, -0.3], { tone: "accent2", size: 12, weight: 700, dy: -50 });
+  const held = sc.label("held · replays on reconnect", [0.9, 0.3, 0.9], { tone: "accent", size: 11, dy: 90 });
   sc.show(off, false);
   sc.show(held, false);
 
@@ -183,15 +183,15 @@ function buildIdb(sc: SceneKit): Ticker {
     const s = sc.slab(1.3, 0.4, 0.9, C.paper2, C.ink2);
     s.position.set(x, 0.29, z);
     s.material.emissive = new T.Color(C.accent);
-    sc.label(name, [x, dy > 0 ? 0.1 : 0.55, z], { tone: "ink2", size: 11, dy, minor: true });
+    sc.label(name, [x, dy > 0 ? 0.1 : 0.55, z], { tone: "ink2", size: 11, dy });
     return s;
   });
 
-  sc.label("input", [-4.5, 0.5, -0.6], { tone: "ink2", size: 11, minor: true });
-  const opsLbl = sc.label("op log · 0 ops", [-2.9, 0.15, 1.0], { tone: "accent", size: 11, dy: 90, minor: true });
-  const gone = sc.label("tab closed — engine and memory gone", [-2.5, 1.6, -0.6], { tone: "accent2", size: 12, weight: 700, dy: -50, minor: true });
-  const txn = sc.label("one readwrite transaction", [0, 1.6, -0.2], { tone: "accent", size: 11, dy: -50, minor: true });
-  const back = sc.label("oplog_restore() replays", [0, 1.6, -0.2], { tone: "ink", size: 11, dy: -50, minor: true });
+  sc.label("input", [-4.5, 0.5, -0.6], { tone: "ink2", size: 11 });
+  const opsLbl = sc.label("op log · 0 ops", [-2.9, 0.15, 1.0], { tone: "accent", size: 11, dy: 90 });
+  const gone = sc.label("tab closed — engine and memory gone", [-2.5, 1.6, -0.6], { tone: "accent2", size: 12, weight: 700, dy: -50 });
+  const txn = sc.label("one readwrite transaction", [0, 1.6, -0.2], { tone: "accent", size: 11, dy: -50 });
+  const back = sc.label("oplog_restore() replays", [0, 1.6, -0.2], { tone: "ink", size: 11, dy: -50 });
   sc.show(gone, false);
   sc.show(txn, false);
   sc.show(back, false);
@@ -313,13 +313,13 @@ function buildCache(sc: SceneKit): Ticker {
     return p;
   });
 
-  sc.label("origin · 9 hashed assets · ~3.6 MB", [-2.9, 1.2, -0.7], { tone: "ink2", size: 11, dy: -20, minor: true });
-  sc.label("version.json · never precached · no-store", [-2.9, 0.4, 1.2], { tone: "ink3", size: 11, dy: 80, minor: true });
-  sc.label("the tab · index.html", [3.7, 0.6, -1.0], { tone: "ink", size: 11, minor: true });
-  sc.label("Cache Storage · precache", [2.9, 0.2, 1.0], { tone: "accent", size: 11, dy: 110, minor: true });
-  const eng = sc.label("stamp_tool.wasm · 817 KB", [1.6 + 4 * 0.32, 0.42, 1.0], { tone: "accent", size: 10, dy: -80, minor: true });
-  const dead = sc.label("no network", [-2.9, 1.4, -0.7], { tone: "accent2", size: 12, weight: 700, dy: -140, minor: true });
-  const skew = sc.label("build hash → skew guard", [0.4, 1.4, 0.2], { tone: "ink3", size: 11, dy: -50, minor: true });
+  sc.label("origin · 9 hashed assets · ~3.6 MB", [-2.9, 1.2, -0.7], { tone: "ink2", size: 11, dy: -20 });
+  sc.label("version.json · never precached · no-store", [-2.9, 0.4, 1.2], { tone: "ink3", size: 11, dy: 80 });
+  sc.label("the tab · index.html", [3.7, 0.6, -1.0], { tone: "ink", size: 11 });
+  sc.label("Cache Storage · precache", [2.9, 0.2, 1.0], { tone: "accent", size: 11, dy: 110 });
+  const eng = sc.label("stamp_tool.wasm · 817 KB", [1.6 + 4 * 0.32, 0.42, 1.0], { tone: "accent", size: 10, dy: -80 });
+  const dead = sc.label("no network", [-2.9, 1.4, -0.7], { tone: "accent2", size: 12, weight: 700, dy: -140 });
+  const skew = sc.label("build hash → skew guard", [0.4, 1.4, 0.2], { tone: "ink3", size: 11, dy: -50 });
   sc.show(dead, false);
   sc.show(skew, false);
   sc.show(eng, false);

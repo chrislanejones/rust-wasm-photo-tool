@@ -133,7 +133,14 @@ interface LabelOpts {
   /** An annotation rather than a heading: dropped on a phone, where the frame
    *  is a third of the width and they pile on top of each other. The figcaption
    *  carries the same information at every size, so nothing is lost with the
-   *  scene left as the picture it still reads as. */
+   *  scene left as the picture it still reads as.
+   *
+   *  TRUE BY DEFAULT. It used to be opt-in, and 60 of the blog's 61 labels
+   *  opted in — the rule was written out 60 times, and the one post that
+   *  forgot it (the entropy post, first draft) put sixteen labels on top of
+   *  each other at 320px. Pass `minor: false` only for a label that has to
+   *  survive on a phone because nothing else in the frame says what it names;
+   *  a scene's side headings belong in `header()`, which is never minor. */
   minor?: boolean;
 }
 
@@ -225,7 +232,7 @@ export class SceneKit {
     if (opts.bare) classes.push("scene__label--bare");
     if (opts.wrap) classes.push("scene__label--wrap");
     if (opts.wrap === "wide") classes.push("scene__label--wrap-wide");
-    if (opts.minor) classes.push("scene__label--minor");
+    if (opts.minor ?? true) classes.push("scene__label--minor");
     // A label pinned by its right edge grows leftward, so its text has to be
     // ragged-left or a wrapped second line drifts away from the anchor.
     if ((opts.dx ?? -50) <= -100) classes.push("scene__label--end");

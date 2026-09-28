@@ -73,7 +73,6 @@ function buildGiants(sc: SceneKit): Ticker {
       tone: "ink2",
       size: 11,
       dy: f.low ? 70 : -40,
-      minor: true,
     });
     return { m, h, cnt, f };
   });
@@ -92,7 +91,6 @@ function buildGiants(sc: SceneKit): Ticker {
     tone: "accent",
     size: 11,
     dy: 110,
-    minor: true,
     wrap: true,
   });
 
@@ -129,7 +127,12 @@ function buildGiants(sc: SceneKit): Ticker {
   sc.show(grow, false);
   sc.show(pin, false);
   sc.show(ceilLbl, false);
-  sc.header("Lines per file", "the five pinned in eslint.config.mjs · ui/ for scale", "900", "the max-lines ceiling");
+  // Short enough for two lines at 320px. The longer "the five pinned in
+  // eslint.config.mjs · ui/ for scale" took a third line there, and this
+  // scene's tallest tower reaches up into the heading row — the other posts'
+  // scenes sit low enough to give a third line room, this one does not. The
+  // post's source note names eslint.config.mjs; the frame does not need to.
+  sc.header("Lines per file", "the five pinned caps · ui/ for scale", "900", "the max-lines ceiling");
 
   const dismantle = stream(sc, {
     from: [-2.9, TOP + 2.6, 0.2],
@@ -221,15 +224,15 @@ function buildDrift(sc: SceneKit): Ticker {
     b.material.emissive = new T.Color(sc.C.accent);
     b.material.emissiveIntensity = 0.3;
     const p = sc.packet(sc.C.accent, "cube", 0.14);
-    sc.label(n, [x, 0.1, z], { tone: "ink3", size: 10, dy: 100, minor: true });
+    sc.label(n, [x, 0.1, z], { tone: "ink3", size: 10, dy: 100 });
     return { s, b, p, i, to: new T.Vector3(x, 0.7, z), tint: new T.Color(tints[i]) };
   });
 
   const drifted = [
-    sc.label("24px · .btn-icon", [sites[0].to.x, 0.95, sites[0].to.z], { tone: "ink2", size: 10, dy: -60, minor: true }),
-    sc.label("30px · IconButton", [sites[1].to.x, 0.95, sites[1].to.z], { tone: "accent", size: 10, dy: -60, minor: true }),
-    sc.label("36px · until 2026-08-20", [sites[2].to.x, 0.95, sites[2].to.z], { tone: "ink3", size: 10, dy: -60, minor: true }),
-    sc.label("title= instead of the shared tooltip", [sites[6].to.x, 0.95, sites[6].to.z], { tone: "ink3", size: 10, dy: -60, minor: true, wrap: true }),
+    sc.label("24px · .btn-icon", [sites[0].to.x, 0.95, sites[0].to.z], { tone: "ink2", size: 10, dy: -60 }),
+    sc.label("30px · IconButton", [sites[1].to.x, 0.95, sites[1].to.z], { tone: "accent", size: 10, dy: -60 }),
+    sc.label("36px · until 2026-08-20", [sites[2].to.x, 0.95, sites[2].to.z], { tone: "ink3", size: 10, dy: -60 }),
+    sc.label("title= instead of the shared tooltip", [sites[6].to.x, 0.95, sites[6].to.z], { tone: "ink3", size: 10, dy: -60, wrap: true }),
   ];
   const fixLbl = sc.label("a fix lands in the primitive", [-3.9, 1.4, 0.2], { tone: "accent", size: 11, weight: 700, dy: -50, wrap: true });
   const missLbl = sc.label("six pasted copies never get it", [1.05, 1.55, 0], { tone: "accent2", size: 12, weight: 700, dy: -50, wrap: "wide" });
@@ -335,7 +338,7 @@ function buildRatchet(sc: SceneKit): Ticker {
     cap.position.set(x, TOP + H(f.from), 0);
     sc.label(f.name, [x, TOP + H(f.from) + 0.1, 0.55], { tone: "ink", size: 11, weight: 700, dy: -150, wrap: true });
     const cnt = sc.label(fmt(f.from), [x, TOP + H(f.from) + 0.1, 0.55], { tone: up ? "accent2" : "ink2", size: 11, dy: -55 });
-    const note = sc.label(f.note, [x, TOP, 0.55], { tone: "ink3", size: 10, dy: 120, minor: true, wrap: true });
+    const note = sc.label(f.note, [x, TOP, 0.55], { tone: "ink3", size: 10, dy: 120, wrap: true });
     return { m, cap, cnt, note, f, edge };
   });
 
