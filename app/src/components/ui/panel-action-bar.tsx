@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
  *  ("Resize canvas → 1920×1080") and under `flex-1` it wrapped to three lines
  *  and dragged its sibling to the same height (measured: 54px → 70px for BOTH
  *  buttons the moment the target dimensions changed). */
-type PanelActionBarLayout = "full" | "split" | "halves";
+type PanelActionBarLayout = "full" | "split" | "halves" | "thirds";
 
 /** The id of the bar's reason line, while one renders. A `PanelAction` that
  *  is disabled picks it up as `aria-describedby`, so the sentence under the
@@ -51,7 +51,9 @@ interface PanelActionBarProps {
   /** `full` (default) — one action, full width. `split` — two actions pushed
    *  to opposite edges, secondary first in source order. `halves` — two
    *  actions side by side, 50% each; only for SHORT fixed labels, since a
-   *  label wider than its half overflows instead of wrapping. */
+   *  label wider than its half overflows instead of wrapping. `thirds` —
+   *  three equal tracks (the Download dialog's Download / Share / Clipboard);
+   *  labels there may wrap, so keep them to two words. */
   layout?: PanelActionBarLayout;
   /** Why the action(s) cannot run right now — "Drag a crop box on the
    *  canvas first." Visible text under the bar (a tooltip would not show on
@@ -83,6 +85,11 @@ export function PanelActionBar({
             ? // Two equal tracks; each action stretches to fill its own half.
               // Canvas Size (Chris, 09-24-2026: "50% and 50% width").
               "grid grid-cols-2 gap-2"
+            : layout === "thirds"
+              ? // Three equal tracks — the Download dialog's Download / Share
+                // link / Clipboard. Unlike halves, a label may wrap onto a
+                // second line on a narrow phone rather than overflow.
+                "grid grid-cols-3 gap-2 [&>*]:min-w-0 [&>*]:whitespace-normal"
             : [
               // `justify-between` is the two-on-one-line case. `flex-wrap` plus
               // the last child's `ml-auto` is the OVERFLOW case: a pair too wide

@@ -119,13 +119,39 @@ export const fadeIn: Variants = {
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-// Swap between two panels occupying the same slot (e.g. the upload actions ⇄
-// the New Canvas setup). A subtle horizontal slide + fade; pair with
-// <AnimatePresence mode="wait"> and a unique key per panel.
+// Swap between two panes occupying the same slot in a multi-pane dialog — New
+// → New Canvas, New → Create AI Image, and the Download dialog's Selected /
+// All panes. ONE effect for all three so stepping in and out of any of them
+// feels the same.
+//
+// DIRECTIONAL: pass `custom={1}` stepping IN (the new pane arrives from the
+// right, the old one leaves left) and `custom={-1}` stepping BACK (mirrored),
+// so Back visibly returns the way you came. The small scale + blur is what
+// makes it read as a pane sliding over rather than content jumping. Pair with
+// <AnimatePresence mode="wait" custom={direction}> — the `custom` on the
+// presence is what lets the EXITING pane read the new direction. `PaneSwap`
+// in components/ui/dialog-pane.tsx wires that up; use it instead of this.
 export const panelSwap: Variants = {
-  hidden: { opacity: 0, x: 12 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.2 } },
-  exit: { opacity: 0, x: -12, transition: { duration: 0.12 } },
+  hidden: (dir: number = 1) => ({
+    opacity: 0,
+    x: 28 * dir,
+    scale: 0.98,
+    filter: "blur(4px)",
+  }),
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { type: "spring", stiffness: 420, damping: 36, mass: 0.8 },
+  },
+  exit: (dir: number = 1) => ({
+    opacity: 0,
+    x: -28 * dir,
+    scale: 0.98,
+    filter: "blur(4px)",
+    transition: { duration: 0.14, ease: "easeIn" },
+  }),
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
