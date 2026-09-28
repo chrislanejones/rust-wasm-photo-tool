@@ -764,7 +764,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Gate
     // buckets unchanged.
-    expect(gate.awaited, "cumulative converted sites").toBe(158);
+    expect(gate.awaited, "cumulative converted sites").toBe(160); // 158 -> 160: ADR-072's two producer sites; no paragraph, this file is AT its max-lines cap
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

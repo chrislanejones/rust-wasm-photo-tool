@@ -2,8 +2,12 @@
 //
 // The Select panel's settings are shown in every mode and DISABLED WITH A
 // REASON where the mode does not use them — never hidden. Per mode: which
-// sliders are live, and that each disabled one says why. Plus the readout
-// line and the Combine group writing the store.
+// sliders are live, and that each disabled one says why. Plus the readout line.
+//
+// COMBINE IS NOT TESTED HERE ANY MORE. The four-mode strip moved to the Review
+// panel; its cases moved with it, unchanged in substance, to
+// features/canvas/ReviewPanel.combine.test.ts. They were deleted from here
+// rather than left asserting against a control this panel no longer renders.
 //
 // jsdom + zustand: a store change does not re-render a mounted component
 // here, so each case sets the store BEFORE a fresh render.
@@ -155,48 +159,6 @@ describe("the readout", () => {
     expect(container.querySelector('[data-testid="selection-coverage"]')?.textContent).toBe(
       "Selected 18.4% · 2.1 MP",
     );
-  });
-});
-
-describe("Combine", () => {
-  /** By ACCESSIBLE NAME, not visible text. The segments went icon-only with
-   *  the Select Panel design (09-27-2026), so the name moved to `aria-label`
-   *  and the chosen one is spelled out in the section header instead. Reading
-   *  the name is what a screen reader does, and it holds whichever way the
-   *  control is drawn — querying visible text was the thing that broke. */
-  const radio = (name: string) => {
-    const b = [...container.querySelectorAll("button")].find(
-      (x) => (x.getAttribute("aria-label") ?? x.textContent?.trim()) === name,
-    );
-    if (!b) throw new Error(`no ${name} button`);
-    return b;
-  };
-
-  it("offers New selection / Add / Subtract / Intersect, with the store's mode lit", () => {
-    useToolStore.setState({ selectionCombine: 3 });
-    render("wand");
-    for (const n of ["New selection", "Add", "Subtract", "Intersect"]) expect(() => radio(n)).not.toThrow();
-    // Lit = the ToolButton active style on master; once Night 2 (#230) lands
-    // the same tile also says so as a checked radio. Either counts.
-    const lit = (b: HTMLButtonElement) =>
-      b.getAttribute("aria-checked") === "true" ||
-      b.className.split(/\s+/).includes("border-theme-primary");
-    expect(lit(radio("Intersect"))).toBe(true);
-    expect(lit(radio("New selection"))).toBe(false);
-  });
-
-  it("clicking a mode writes it to the store", () => {
-    render("wand");
-    act(() => radio("Subtract").click());
-    expect(useToolStore.getState().selectionCombine).toBe(2);
-    act(() => radio("Intersect").click());
-    expect(useToolStore.getState().selectionCombine).toBe(3);
-  });
-
-  it("applies in modes where Tolerance does not — a marquee combines too", () => {
-    render("rect");
-    act(() => radio("Add").click());
-    expect(useToolStore.getState().selectionCombine).toBe(1);
   });
 });
 
