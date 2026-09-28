@@ -113,17 +113,14 @@ import {
   compositeSavedEdit,
   encodeRgba,
   EXT,
-  extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
-import { RadioCards } from "@/components/ui/radio-cards";
+import { untouchedZipEntry } from "@/lib/zipEntry";
 import { useExportFileName } from "@/hooks/useExportFileName";
-import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
-  applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
@@ -145,17 +142,8 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { ActionTile } from "@/components/ui/action-tile";
 import { ShareButton } from "@/components/ShareButton";
+import { DownloadDialog } from "@/components/DownloadDialog";
 import {
   Undo,
   Redo,
@@ -168,10 +156,7 @@ import {
   ZoomOut,
   RotateCcw,
   Archive,
-  FolderArchive,
   ImagePlus,
-  Image as ImageIcon,
-  Package,
   Pipette,
 } from "lucide-react";
 
@@ -2340,17 +2325,14 @@ export function AppShell() {
         //   - never edited      -> originalKey holds the untouched upload
         //   - compressed only   -> originalKey ALREADY holds the processed
         //                          bytes, so verbatim is the processed result
-        // Keep passes them through as-is; strip scrubs EXIF/GPS on the way out.
+        // Both go out in the chosen format: as-is when they already are,
+        // re-encoded when not (lib/zipEntry.ts).
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
-        bytes = applyExifToVerbatim(
-          new Uint8Array(orig.bytes),
-          orig.mimeType,
+        ({ bytes, mime, ext } = await untouchedZipEntry(orig, exportFormat, quality / 100, {
           mode,
-          exifStripMode,
-        );
-        mime = orig.mimeType;
-        ext = extFromMime(orig.mimeType);
+          stripMode: exifStripMode,
+        }));
       }
 
       // De-dupe filenames within the archive.
@@ -2779,106 +2761,53 @@ export function AppShell() {
           : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
       </ConfirmDialog>
 
-      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Download, Copy, or Share</DialogTitle>
-          </DialogHeader>
-
-          <DialogBody className="space-y-4">
-            <DialogDescription>
-              {photos.length > 1 ? (
-                <>
-                  Save the selected image — or all of them as a{" "}
-                  <span className="font-mono">.zip</span> — copy the canvas to
-                  your clipboard, or create a public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              ) : (
-                <>
-                  Save this image, copy the canvas to your clipboard, or create a
-                  public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              )}
-            </DialogDescription>
-
-            {/* Format picker — a second shot at the format for anyone who missed
-                the Compress dropdown. */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-text-muted">Format</span>
-              <RadioCards
-                name="download-format"
-                value={downloadFormat}
-                onValueChange={(v) => {
-                  setDownloadFormat(v);
-                  if (v !== "ora") setExportFormat(v); // ORA stays local-only
-                }}
-                options={downloadFormats}
-                columns={2}
-              />
-            </div>
-
-            <ExportFileNameField
-              value={exportName.value}
-              defaultStem={exportName.defaultStem}
-              onChange={exportName.onChange}
-              ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
-              onSubmit={downloadFromDialog}
-            />
-          </DialogBody>
-
-          <DialogFooter className="flex-row gap-2">
-            <ActionTile
-              icon={isOraDownload ? Package : ImageIcon}
-              label={isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={downloadFromDialog}
-            />
-            <ShareButton
-              exportPng={async () => {
-                if (exportCanvasBackground) return stamp.exportBlob("png");
-                const tool = stamp.toolRef.current;
-                if (!tool) return null;
-                // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
-                // cropped dimensions that describe them.
-                const cap = await tool.capture_composite_excluding_background();
-                const { rgba, width, height } = cap;
-                cap.free();
-                return encodeRgba(rgba, width, height, "png", 1);
-              }}
-              canvasW={exportDims.width}
-              canvasH={exportDims.height}
-              fileName={photos.find((p) => p.id === activePhotoId)?.name}
-              disabled={!hasImage}
-              onShared={() => setExportDialogOpen(false)}
-            />
-            {photos.length > 1 && (
-              <ActionTile
-                icon={FolderArchive}
-                label={`Download All (${photos.length})`}
-                onClick={() => {
-                  setExportDialogOpen(false);
-                  handleExportAll();
-                }}
-              />
-            )}
-            <ActionTile
-              icon={Clipboard}
-              label="Clipboard"
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleCopyToClipboard();
-              }}
-            />
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DownloadDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        photoCount={photos.length}
+        formats={downloadFormats}
+        format={downloadFormat}
+        onFormatChange={(v) => {
+          setDownloadFormat(v);
+          if (v !== "ora") setExportFormat(v); // ORA stays local-only
+        }}
+        fileName={exportName}
+        ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
+        downloadLabel={
+          isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`
+        }
+        onDownload={downloadFromDialog}
+        zipFormat={exportFormat}
+        zipLabel={effectiveExportFormat.toUpperCase()}
+        shareAction={
+          <ShareButton
+            exportPng={async () => {
+              if (exportCanvasBackground) return stamp.exportBlob("png");
+              const tool = stamp.toolRef.current;
+              if (!tool) return null;
+              // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
+              // cropped dimensions that describe them.
+              const cap = await tool.capture_composite_excluding_background();
+              const { rgba, width, height } = cap;
+              cap.free();
+              return encodeRgba(rgba, width, height, "png", 1);
+            }}
+            canvasW={exportDims.width}
+            canvasH={exportDims.height}
+            fileName={photos.find((p) => p.id === activePhotoId)?.name}
+            disabled={!hasImage}
+            onShared={() => setExportDialogOpen(false)}
+          />
+        }
+        onCopy={() => {
+          setExportDialogOpen(false);
+          void handleCopyToClipboard();
+        }}
+        onDownloadAll={() => {
+          setExportDialogOpen(false);
+          handleExportAll();
+        }}
+      />
 
       {/* Compact master bar (≤1000px): the entire top-bar chrome lives here as
           a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
