@@ -85,6 +85,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v9.3 — 2026-09-28
+
+**A resize no longer makes a photo heavier, and a “Photo only” ZIP has no white line.**
+
+A “Photo only” ZIP came out with every photo framed in a thin white line.
+Saving a photo after a resize or a compression was writing the Canvas border
+into the stored file, and the ZIP copies that file as it is. The stored file is
+just the photo now, and the border is added only when you ask for it.
+
+Apply Resize made photos heavier. It re-encoded at full quality, so a 33 KB
+JPEG cut to half its width came back at 154 KB and its PageSpeed score fell
+from 99 to 88. It keeps the quality the file was last saved at now, and a resize
+that removes pixels never hands back a bigger file — the same photo comes back
+at 32 KB. The score and the gallery's size badges read the real file, too.
+
+Everything that can reach a server is one list: Settings › Security, the
+online switch, the home page's table and the privacy policy all read it. Sync
+reports in the status line, failures included, with a Retry. On a phone, 27
+invisible desktop controls are out of the tab order.
+
+A third blog post, “We spent a month taking the file apart. It got 556 lines
+longer.” The blog reads on a 320px phone now, and the menu bar's name no
+longer gets cut to “Image Ho”.
+
+Engine 819,031 → 820,591 bytes.
+
 ### v9.2 — 2026-09-28
 
 **The Select panel's Refine section is readable, and Pro signups are closed.**
