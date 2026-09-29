@@ -6,8 +6,10 @@
 // UI thread.
 //
 // Scope guardrails (see SESSION_LOG):
-//   - No WASM here. The Rust engine stays on the main thread; thumbnail resize
-//     uses OffscreenCanvas drawImage instead of the Rust bilinear resizer.
+//   - No ENGINE wasm here. The Rust engine stays out of this worker; thumbnail
+//     resize uses OffscreenCanvas drawImage instead of the Rust bilinear
+//     resizer. The one wasm this worker loads is the AVIF encoder, lazily, on
+//     the first AVIF encode (lib/avifEncoder.ts, ADR-072).
 //   - Pixel buffers arrive as transferables (see codecWorkerClient.ts). Each
 //     call builds its own OffscreenCanvas and holds no shared state, so
 //     concurrent calls are safe.
@@ -16,6 +18,7 @@
 // app/src/lib/codecWorkerClient.ts and always keeps a main-thread fallback.
 
 import * as Comlink from "comlink";
+import { encodeAvif } from "@/lib/avifEncoder";
 
 /**
  * Wrap raw RGBA bytes as ImageData over a fresh (non-shared) ArrayBuffer.
@@ -49,6 +52,10 @@ const codecApi = {
   /**
    * Encode an RGBA buffer to `type` (a MIME string, e.g. "image/webp") at the
    * given quality. `pixels` is consumed (transferred in).
+   *
+   * AVIF goes through the shipped wasm encoder (lib/avifEncoder.ts) — no
+   * browser can encode it from a canvas. If that encoder fails, fall through
+   * to `convertToBlob`, which answers with an honest image/png blob.
    */
   async encodeImage(
     pixels: Uint8Array,
@@ -57,6 +64,13 @@ const codecApi = {
     type: string,
     quality: number,
   ): Promise<Blob> {
+    if (type === "image/avif") {
+      try {
+        return await encodeAvif(pixels, width, height, quality);
+      } catch (err) {
+        console.warn("AVIF encoder failed, falling back to canvas", err);
+      }
+    }
     const oc = new OffscreenCanvas(width, height);
     const ctx = oc.getContext("2d")!;
     ctx.putImageData(toImageData(pixels, width, height), 0, 0);
