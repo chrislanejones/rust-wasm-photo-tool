@@ -69,14 +69,15 @@ export type TextMode = (typeof TEXT_MODES)[number];
 // serializes the index, the engine stores a quad, not a mode.
 export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
- *  rename, and AI Rename (names every photo from what the engine sees in it).
+ *  crop (one ratio for every photo — carousels), bulk rename, and AI Rename
+ *  (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
  *  `TEXT_MODES` above.
  *
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "crop", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */

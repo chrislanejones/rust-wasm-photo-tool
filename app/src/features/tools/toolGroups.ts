@@ -678,7 +678,7 @@ const batchGroup: ToolGroupDefinition = {
   id: "batch",
   label: "Batch",
   icon: PackageOpen,
-  description: "Stamp a logo, add text or rename every loaded photo at once",
+  description: "Stamp a logo, add text, crop or rename every loaded photo at once",
   shortcutKey: "5",
   subTools: [
     {
@@ -698,6 +698,15 @@ const batchGroup: ToolGroupDefinition = {
       tool: "emoji",
       mode: "text",
       keywords: ["text", "caption", "bulk", "overlay"],
+    },
+    {
+      id: "crop",
+      label: "Crop",
+      description: "Crop every loaded photo to the same ratio and size — for carousels",
+      icon: Crop,
+      tool: "emoji",
+      mode: "crop",
+      keywords: ["crop", "carousel", "aspect ratio", "same size", "bulk"],
     },
     {
       id: "rename",

@@ -94,6 +94,7 @@ import { useDownloadFormat } from "./session/useDownloadFormat";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
@@ -1625,11 +1626,15 @@ export function AppShell() {
     `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
-  // ignorant of the pad (and inside its max-lines cap).
-  const renderDuplicatePad = useCallback(
-    (frame: OverlayFrame) =>
-      duplicatePad.canvasProps ? <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} /> : null,
-    [duplicatePad.canvasProps],
+  // ignorant of the pad and the Batch › Crop frame (and inside its max-lines cap).
+  const renderCanvasOverlays = useCallback(
+    (frame: OverlayFrame) => (
+      <>
+        {duplicatePad.canvasProps && <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} />}
+        <BatchCropOverlay {...frame} photoBounds={photoBounds} undoCount={stamp.state.undoCount} />
+      </>
+    ),
+    [duplicatePad.canvasProps, photoBounds, stamp.state.undoCount],
   );
 
   const redStampTool = useRedStampTool({
@@ -3114,7 +3119,7 @@ export function AppShell() {
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
                           shapes={drawingTools.shapes}
-                          renderOverlay={renderDuplicatePad}
+                          renderOverlay={renderCanvasOverlays}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
                           cropSelection={drawingTools.cropSelection}
@@ -3251,7 +3256,7 @@ export function AppShell() {
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
                       shapes={drawingTools.shapes}
-                      renderOverlay={renderDuplicatePad}
+                      renderOverlay={renderCanvasOverlays}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
                       cropSelection={drawingTools.cropSelection}

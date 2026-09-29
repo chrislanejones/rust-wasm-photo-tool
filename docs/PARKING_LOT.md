@@ -4,6 +4,15 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+
+CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
+| 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
 ## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
 
 v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
