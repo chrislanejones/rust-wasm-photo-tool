@@ -20,20 +20,21 @@ import { resolve } from "node:path";
  * header config serving the app still names it:
  *
  *   vercel.json    production (edit.imagehorse.app) — the policy users get
- *   netlify.toml   the old Netlify origin, still serving while the gallery
- *                  decision is open, and a second builder
  *
  * ⚠️ It used to read netlify.toml ONLY, and stayed that way through the move to
  * Vercel. With vercel.json's hash deliberately broken it went 2/2 green
- * (2026-09-15) — a test guarding a file production does not serve. If a third
- * host ever serves the app, add its config below or this goes vacuous again.
+ * (2026-09-15) — a test guarding a file production does not serve. netlify.toml
+ * went with the Netlify origin on 2026-09-27, so CONFIGS is down to one entry
+ * and that trap is one step closer, not further away: the loop below cannot
+ * tell "one host, correctly checked" from "a second host nobody added". If
+ * another host ever serves the app, add its config to CONFIGS.
  *
- * The hash is looked for inside each CSP header's `script-src` directive, not
- * anywhere in the file: both files carry long rationale comments, and a hash
- * left behind in one of those would otherwise satisfy the check.
+ * The hash is looked for inside the CSP header's `script-src` directive, not
+ * anywhere in the file, so a hash left behind in another directive — or in a
+ * second policy on the same file — cannot satisfy the check.
  *
  * If you changed the theme script deliberately: run this test, take the hash it
- * prints, and paste it into `script-src` in BOTH files.
+ * prints, and paste it into `script-src` in vercel.json.
  */
 const ROOT = resolve(__dirname, "../../..");
 
@@ -70,19 +71,6 @@ function policiesFromVercelJson(text: string): string[] {
     .map((h) => h.value);
 }
 
-/** Every CSP header value in netlify.toml, report-only or enforcing. */
-function policiesFromNetlifyToml(text: string): string[] {
-  // No TOML parser in the tree, so match the header's own assignment —
-  // `Content-Security-Policy… = """…"""` at the start of a line — which a `#`
-  // comment cannot be. A trailing `\` in a TOML multi-line string swallows the
-  // newline and the next line's indentation, so join those the same way.
-  return [
-    ...text.matchAll(
-      /^[ \t]*Content-Security-Policy(?:-Report-Only)?[ \t]*=[ \t]*"""([\s\S]*?)"""/gim,
-    ),
-  ].map((m) => m[1].replace(/\\\r?\n\s*/g, ""));
-}
-
 /** The source tokens of a policy's `script-src` directive, or [] if absent. */
 function scriptSrc(policy: string): string[] {
   for (const directive of policy.split(";")) {
@@ -92,10 +80,7 @@ function scriptSrc(policy: string): string[] {
   return [];
 }
 
-const CONFIGS = [
-  { file: "vercel.json", policies: policiesFromVercelJson },
-  { file: "netlify.toml", policies: policiesFromNetlifyToml },
-];
+const CONFIGS = [{ file: "vercel.json", policies: policiesFromVercelJson }];
 
 describe("CSP inline-script hash", () => {
   const html = readFileSync(resolve(ROOT, "app/index.html"), "utf8");
@@ -122,7 +107,7 @@ describe("CSP inline-script hash", () => {
           `${file} does not allow the current inline script.\n` +
             `Expected script-src to contain:  ${want}\n` +
             `The theme setter in app/index.html changed; paste that hash into ` +
-            `script-src in vercel.json AND netlify.toml.`,
+            `script-src in vercel.json.`,
         ).toContain(want);
       }
     });
