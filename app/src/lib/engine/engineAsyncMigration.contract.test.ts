@@ -764,12 +764,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Same buckets.
     // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
-    // Batch › Crop — 157 -> 163: six awaited sites born with the feature, all
-    // in `CropBatchPanel.tsx`. `undo_count` (twice) gates the re-apply rewind —
-    // un-awaited, a Promise never equals the recorded count and re-apply would
-    // silently crop the already-cropped photo; `photo_bounds` / `width` /
-    // `height` size the crop; `undo` is the rewind itself. Same buckets.
-    expect(gate.awaited, "cumulative converted sites").toBe(163);
+    expect(gate.awaited, "cumulative converted sites").toBe(164); // +7: Batch › Crop (CropBatchPanel)
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

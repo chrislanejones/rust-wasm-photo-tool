@@ -3,12 +3,16 @@
 // shape as the Logo and Text panels in BatchSettings.tsx: every non-active
 // photo is re-encoded and written back to IDB; the active photo goes through
 // the live engine so the crop is a normal undo step.
-import { useCallback, useEffect, useRef, useState } from "react";
+//
+// The FRAME: by default every photo is cropped at the anchor. Drag the frame
+// on the preview (BatchCropOverlay) and that photo keeps your framing instead;
+// click through the gallery to frame each slide before cropping them all.
+import { useCallback, useEffect, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
+import { PlacementGrid } from "@/components/PlacementGrid";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { toast } from "@/components/ui/sonner";
 import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
@@ -24,10 +28,16 @@ import {
   anchoredCropRect,
   batchCropOutputSize,
   cropRgba,
+  framedCropRect,
   type BatchCropRatioId,
   type BatchCropWidth,
 } from "@/lib/batchCrop";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import {
+  useBatchCropStore,
+  showsOriginalFraming,
+  type BatchCropWidthId,
+} from "@/stores/useBatchCropStore";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 
@@ -44,13 +54,12 @@ const RATIO_OPTIONS = BATCH_CROP_RATIOS.map((r) => ({
 
 /** Output width. 1080 is the carousel standard (1080×1080, 1080×1350); "Keep"
  *  leaves each crop at its own resolution — same shape, sizes may differ. */
-const WIDTH_OPTIONS = [
+const WIDTH_OPTIONS: readonly { id: BatchCropWidthId; label: string }[] = [
   { id: "keep", label: "Keep" },
   { id: "1080", label: "1080px" },
   { id: "1440", label: "1440px" },
-] as const;
-type WidthId = (typeof WIDTH_OPTIONS)[number]["id"];
-const widthOf = (id: WidthId): BatchCropWidth => (id === "keep" ? null : Number(id));
+];
+const widthOf = (id: BatchCropWidthId): BatchCropWidth => (id === "keep" ? null : Number(id));
 const ratioDims = (id: BatchCropRatioId): [number, number] =>
   BATCH_CROP_RATIOS.find((r) => r.id === id)!.dims;
 
@@ -74,9 +83,15 @@ export function CropBatchPanel({
   flushToCanvas,
   syncState,
 }: CropBatchPanelProps) {
-  const [ratioId, setRatioId] = useState<BatchCropRatioId>("1:1");
-  const [anchor, setAnchor] = useState<PlacementCell>("center");
-  const [widthId, setWidthId] = useState<WidthId>("1080");
+  const ratioId = useBatchCropStore((s) => s.ratioId);
+  const setRatioId = useBatchCropStore((s) => s.setRatioId);
+  const anchor = useBatchCropStore((s) => s.anchor);
+  const setAnchor = useBatchCropStore((s) => s.setAnchor);
+  const widthId = useBatchCropStore((s) => s.widthId);
+  const setWidthId = useBatchCropStore((s) => s.setWidthId);
+  const framing = useBatchCropStore((s) => s.framing);
+  const clearFraming = useBatchCropStore((s) => s.clearFraming);
+  const framedCount = photos.filter((p) => framing[p.id]).length;
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
     done: 0,
@@ -88,24 +103,19 @@ export function CropBatchPanel({
   // Per-photo pre-crop baseline key (same idea as the logo/text panels): every
   // "Apply" crops the ORIGINAL framing, so switching 1:1 → 4:5 and applying
   // again re-crops the whole photo instead of a square that's already lost
-  // its sides.
-  const cropBaselineRef = useRef<Map<string, string>>(new Map());
-
+  // its sides. Held in useBatchCropStore so the preview frame can tell whether
+  // the photo it sits on is still the original.
+  //
   // The active photo can't be reset from a baseline — `load_image` only takes
   // pixels at the document's CURRENT size, and a crop changed that size. So we
   // remember how many undo steps our last crop pushed and the undo count it
-  // left behind; if nothing has happened since, re-apply rewinds those steps
-  // first. If the user has edited since, we crop what they see instead.
-  const activeCropRef = useRef<Map<string, { undoCount: number; steps: number }>>(
-    new Map(),
-  );
+  // left behind (`activeCrop`); if nothing has happened since, re-apply rewinds
+  // those steps first. If the user has edited since, we crop what they see.
+  const baselineKeys = () => Object.values(useBatchCropStore.getState().baselines);
 
-  // Baselines live in a ref and in no manifest — declared as GC roots, exactly
-  // like the logo and text baselines.
-  useEffect(
-    () => registerExtraRootProvider(() => cropBaselineRef.current.values()),
-    [],
-  );
+  // Baselines live in a store and in no manifest — declared as GC roots,
+  // exactly like the logo and text baselines.
+  useEffect(() => registerExtraRootProvider(baselineKeys), []);
 
   /** The gallery as of now — see the identical helper in BatchSettings. */
   const latestPhotos = () => useGalleryStore.getState().photos;
@@ -130,6 +140,14 @@ export function CropBatchPanel({
     setProgress({ done: 0, total: photos.length });
     const ratio = ratioDims(ratioId);
     const targetWidth = widthOf(widthId);
+    const crops = useBatchCropStore.getState();
+    // A hand-set frame if the preview has one for this photo, else the anchor.
+    const rectFor = (id: string, w: number, h: number, useFraming: boolean) => {
+      const f = useFraming ? crops.framing[id] : undefined;
+      return f
+        ? framedCropRect(w, h, ratio[0], ratio[1], f)
+        : anchoredCropRect(w, h, ratio[0], ratio[1], anchor);
+    };
 
     try {
       const { default: init, resize_pixels, encode_png_pixels } = await import(
@@ -145,10 +163,8 @@ export function CropBatchPanel({
       const others = photos.filter((p) => p.id !== activePhotoId);
       for (const photo of others) {
         try {
-          if (!cropBaselineRef.current.has(photo.id)) {
-            cropBaselineRef.current.set(photo.id, photo.originalKey);
-          }
-          const baselineKey = cropBaselineRef.current.get(photo.id)!;
+          crops.setBaseline(photo.id, photo.originalKey);
+          const baselineKey = useBatchCropStore.getState().baselines[photo.id]!;
           const original = await getOriginal(baselineKey);
           if (!original) {
             done++;
@@ -160,13 +176,8 @@ export function CropBatchPanel({
           });
           const working = await makeWorkingCopy(file);
 
-          const rect = anchoredCropRect(
-            working.width,
-            working.height,
-            ratio[0],
-            ratio[1],
-            anchor,
-          );
+          // Always the baseline's pixels, so a framing always applies.
+          const rect = rectFor(photo.id, working.width, working.height, true);
           const out = batchCropOutputSize(rect, ratio, targetWidth);
           let pixels = cropRgba(working.pixels, working.width, rect);
           if (out.width !== rect.width || out.height !== rect.height) {
@@ -215,6 +226,8 @@ export function CropBatchPanel({
                     byteSize: pngBlob.size,
                     originalKey: newKey,
                     thumbBlob: newThumb,
+                    workingWidth: out.width,
+                    workingHeight: out.height,
                   },
             ),
           );
@@ -224,7 +237,7 @@ export function CropBatchPanel({
             newKey,
             photoId: photo.id,
             photos: latestPhotos(),
-            extraRoots: [baselineKey, ...cropBaselineRef.current.values()],
+            extraRoots: [baselineKey, ...baselineKeys()],
           });
           succeeded++;
         } catch (err) {
@@ -240,17 +253,24 @@ export function CropBatchPanel({
         try {
           const tool = stampToolRef.current;
           if (tool) {
-            const prior = activeCropRef.current.get(active.id);
+            const prior = crops.activeCrop[active.id];
             if (prior && (await tool.undo_count()) === prior.undoCount) {
               for (let i = 0; i < prior.steps; i++) await tool.undo();
             }
+            // Only replay a hand framing on the pixels it was drawn on.
+            const onOriginal = showsOriginalFraming(
+              useBatchCropStore.getState(),
+              active.id,
+              active.originalKey,
+              await tool.undo_count(),
+            );
             // Crop the PHOTO, not the padded artboard around it.
             const b = await tool.photo_bounds();
             const [bx, by, bw, bh] =
               b && b.length >= 4
                 ? [b[0]!, b[1]!, b[2]!, b[3]!]
                 : [0, 0, await tool.width(), await tool.height()];
-            const rect = anchoredCropRect(bw, bh, ratio[0], ratio[1], anchor);
+            const rect = rectFor(active.id, bw, bh, onOriginal);
             const out = batchCropOutputSize(rect, ratio, targetWidth);
             tool.crop(bx + rect.x, by + rect.y, rect.width, rect.height);
             let steps = 1;
@@ -258,7 +278,7 @@ export function CropBatchPanel({
               tool.resize_with_filter(out.width, out.height, LANCZOS3);
               steps = 2;
             }
-            activeCropRef.current.set(active.id, {
+            crops.setActiveCrop(active.id, {
               undoCount: await tool.undo_count(),
               steps,
             });
@@ -315,10 +335,31 @@ export function CropBatchPanel({
 
       <PlacementGrid
         label="Keep"
-        info="Which part of each photo survives the crop — center trims evenly, top keeps the top of a tall photo."
+        info="Which part of each photo survives the crop — center trims evenly, top keeps the top of a tall photo. Picking one resets any frames you dragged."
         value={anchor}
         onChange={setAnchor}
       />
+
+      <div className="space-y-2">
+        <p className="text-2xs text-theme-muted-foreground">
+          Drag the frame on the preview to choose what each photo keeps. Click
+          another photo in the gallery to frame it too.
+        </p>
+        {framedCount > 0 && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-2xs text-theme-muted-foreground">
+              {`${framedCount} of ${photos.length} framed by hand`}
+            </span>
+            {activePhotoId && framing[activePhotoId] && (
+              <Button
+                onClick={() => clearFraming(activePhotoId)}
+              >
+                Reset this frame
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div>
         <ToolButtonGroup
