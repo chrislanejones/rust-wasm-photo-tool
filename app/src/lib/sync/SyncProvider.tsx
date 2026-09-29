@@ -8,7 +8,6 @@
 // than start catching up.
 import { useCloudSync } from "./useCloudSync";
 import { SyncErrorBoundary } from "./SyncErrorBoundary";
-import { SyncErrorToast } from "./SyncErrorToast";
 import { setCurrentAccount } from "./ledger";
 
 // Importing the registry is what CREATES the three documents and subscribes
@@ -47,7 +46,10 @@ export function SyncProvider() {
   // failure must not be one of the things that just went away.
   return (
     <>
-      <SyncErrorToast />
+      {/* No toast here any more (UI Night 6 §4). A sync failure is reported
+          by the status bar, which lives in the app chrome OUTSIDE this
+          provider — so it still survives the boundary below catching a crash,
+          which is the guarantee the toast used to sit out here to give. */}
       <SyncErrorBoundary>
         <CloudSync />
       </SyncErrorBoundary>

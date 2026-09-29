@@ -42,7 +42,16 @@ export function useAutoCompress() {
         /** Long-edge floor for budget-driven downscaling (default 1280). */
         minLongEdge?: number;
       },
-      onPhotoCompressed: (id: string, newFile: File, newUrl: string) => void,
+      onPhotoCompressed: (
+        id: string,
+        newFile: File,
+        newUrl: string,
+        /** What was actually written — the budget loop may have shrunk the
+         *  dimensions and lowered the quality below what was asked for. The
+         *  caller stores these on the PhotoEntry so later panel math starts
+         *  from the file that is really on disk, not the one before it. */
+        encoded: { width: number; height: number; quality: number },
+      ) => void,
     ) => {
       const {
         // Resize threshold: anything over 2500px on either side gets scaled
@@ -194,7 +203,9 @@ export function useAutoCompress() {
           const newFile = new File(
             [blob],
             photo.file.name.replace(/\.[^.]+$/, ext),
-            { type: format },
+            // The blob's own type: an encoder that can't do AVIF answers with
+            // PNG, and the stored MIME has to say what the bytes really are.
+            { type: blob.type || format },
           );
 
           const newUrl = URL.createObjectURL(blob);
@@ -207,7 +218,11 @@ export function useAutoCompress() {
               ? Math.round((1 - compressedSize / originalSize) * 100)
               : 0;
 
-          onPhotoCompressed(photo.id, newFile, newUrl);
+          onPhotoCompressed(photo.id, newFile, newUrl, {
+            width: cw,
+            height: ch,
+            quality: Math.round(q * 100),
+          });
 
           items[photo.id] = 100;
           savings[photo.id] = { originalSize, compressedSize, savingsPercent };

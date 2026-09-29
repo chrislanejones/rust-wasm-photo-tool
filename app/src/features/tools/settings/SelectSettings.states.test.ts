@@ -23,16 +23,19 @@ let container: HTMLDivElement;
 let root: Root;
 
 const noop = () => {};
+/** Calls recorded by the last controls() — which action a tile actually ran. */
+let calls: string[] = [];
 function controls(kind: SelectionKind, active = false): SelectionControls {
+  const spy = (name: string) => () => calls.push(name);
   return {
     tolerance: 24,
     onToleranceChange: noop,
-    onSelectAll: noop,
-    onDeselect: noop,
-    onDelete: noop,
-    onNewLayerCopy: noop,
-    onNewLayerCut: noop,
-    onRemoveObject: noop,
+    onSelectAll: spy("all"),
+    onDeselect: spy("deselect"),
+    onDelete: spy("delete"),
+    onNewLayerCopy: spy("copy"),
+    onNewLayerCut: spy("cut"),
+    onRemoveObject: spy("remove"),
     active,
     kind,
     onKindChange: noop,
@@ -68,7 +71,33 @@ function slider(name: string): HTMLInputElement {
 
 const text = () => container.textContent ?? "";
 
+/** Refine shows ONE slider — whichever operation's tile is open. The five
+ *  per-operation sliders it replaced are gone, so there is nothing to name.
+ *  It is the LAST range input on the panel: Tolerance and Edge sensitivity
+ *  belong to the mode section above, and nothing below Refine has a slider. */
+function openSlider(): HTMLInputElement {
+  const inputs = [...container.querySelectorAll('input[type="range"]')] as HTMLInputElement[];
+  if (inputs.length === 0) throw new Error("no range input on the panel");
+  return inputs[inputs.length - 1];
+}
+
+/** The text SizeSlider prints over that slider. Asserting this — not merely
+ *  that the word appears somewhere — is what catches a label frozen on one
+ *  operation while the value tracks another: the TILES carry those same five
+ *  words, so a page-wide search always finds them. */
+function openSliderLabel(): string {
+  const input = openSlider();
+  let el: HTMLElement | null = input.parentElement;
+  // Walk out until a container holds label text as well as the input.
+  for (let i = 0; el && i < 4; i++, el = el.parentElement) {
+    const t = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (t && !/^\s*$/.test(t)) return t;
+  }
+  return "";
+}
+
 beforeEach(() => {
+  calls = [];
   useToolStore.setState({
     selectionCombine: 0,
     selectionCoverage: null,
@@ -182,19 +211,59 @@ describe("Refine", () => {
     render("wand", false);
     expect(button("Clean Up").disabled).toBe(true);
     expect(button("Apply").disabled).toBe(true);
-    for (const name of ["Islands", "Holes", "Smooth", "Feather", "Expand"]) {
-      expect(slider(name).disabled, name).toBe(true);
+    // All six tiles, not five sliders — the five operations are tiles now and
+    // only the open one has a slider.
+    for (const name of ["Clean Up", "Islands", "Holes", "Smooth", "Feather", "Expand"]) {
+      expect(button(name).disabled, name).toBe(true);
     }
+    expect(openSlider().disabled).toBe(true);
     expect(text()).toContain("Select something to refine it.");
   });
 
-  it("starts at the Clean Up values", () => {
+  it("starts on Holes, and every tile opens its own operation at the Clean Up value", () => {
     render("wand", true);
-    expect(Number(slider("Islands").value)).toBe(4);
-    expect(Number(slider("Holes").value)).toBe(6);
-    expect(Number(slider("Smooth").value)).toBe(2);
-    expect(Number(slider("Feather").value)).toBe(1);
-    expect(Number(slider("Expand").value)).toBe(-1);
+    // The panel opens on Holes (the one people reach for after a wand click),
+    // so its value is what the single slider shows before anything is clicked.
+    expect(button("Holes").getAttribute("aria-checked")).toBe("true");
+    expect(Number(openSlider().value)).toBe(6);
+
+    // Each tile swaps the slider to ITS operation: label, value and range.
+    // A tile that changed the label but not the value would be the real bug
+    // here, so both are asserted every time.
+    const expected = [
+      ["Islands", 4, 0, 200],
+      ["Smooth", 2, 0, 8],
+      ["Feather", 1, 0, 8],
+      ["Expand", -1, -10, 10],
+      ["Holes", 6, 0, 200],
+    ] as const;
+    for (const [name, value, min, max] of expected) {
+      act(() => button(name).click());
+      expect(button(name).getAttribute("aria-checked"), name).toBe("true");
+      const s = openSlider();
+      expect(Number(s.value), name).toBe(value);
+      expect(Number(s.min), name).toBe(min);
+      expect(Number(s.max), name).toBe(max);
+      // …and the SLIDER is labeled with the operation it is editing. The
+      // tiles print these same words, so this must read the slider's own
+      // label or a frozen label passes.
+      expect(openSliderLabel(), name).toContain(name);
+    }
+  });
+
+  it("the five operations are ONE radio group; Clean Up is not in it", () => {
+    render("wand", true);
+    // Clean Up runs the preset — announcing it as "radio, 1 of 6" would be a
+    // lie about what pressing it does.
+    expect(button("Clean Up").getAttribute("role")).not.toBe("radio");
+    for (const name of ["Islands", "Holes", "Smooth", "Feather", "Expand"]) {
+      expect(button(name).getAttribute("role"), name).toBe("radio");
+    }
+    // One Tab stop: only the checked tile is reachable, the rest are arrows.
+    const stops = ["Islands", "Holes", "Smooth", "Feather", "Expand"].filter(
+      (n) => button(n).tabIndex === 0,
+    );
+    expect(stops).toEqual(["Holes"]);
   });
 
   it("Clean Up and Apply each send ONE request to the session hook", () => {
@@ -217,6 +286,17 @@ describe("Refine", () => {
       render(kind, true);
       expect(button("Clean Up").disabled, kind).toBe(false);
     }
+  });
+
+  it("every Selection tile runs ITS action — Remove included", () => {
+    // Remove Object used to be a section of its own with a full-width button.
+    // Folding it into the grid as a sixth tile is only correct if it still
+    // calls onRemoveObject, and only a click proves that.
+    render("wand", true);
+    for (const name of ["All", "Deselect", "Delete", "Copy", "Cut", "Remove"]) {
+      act(() => button(name).click());
+    }
+    expect(calls).toEqual(["all", "deselect", "delete", "copy", "cut", "remove"]);
   });
 
   it("the Apply label says when a preview is what it will apply", () => {

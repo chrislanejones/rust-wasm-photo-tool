@@ -29,6 +29,24 @@ async function stripePost(
   return json;
 }
 
+/** Paid signup — OFF. Chris, 09-27-2026: "that stripe area is not ready
+ *  disable for now."
+ *
+ *  THIS is the real gate, not the disabled button in SubscriptionButton.tsx:
+ *  a disabled button is a suggestion, and any signed-in user can call a Convex
+ *  action straight from the console. Refusing here is what makes it impossible
+ *  to charge a card.
+ *
+ *  `createPortalSession` below is deliberately NOT gated — anyone who already
+ *  subscribed must still be able to see and cancel their subscription.
+ *
+ *  Re-enabling takes this flag AND `PAID_SIGNUP_ENABLED` in
+ *  app/src/lib/billing.ts, which is what the UI reads. Two switches on
+ *  purpose: one of them flipped alone leaves a button that always errors, or
+ *  a gate with no way to reach it — both visible, neither able to take money. */
+const PAID_SIGNUP_ENABLED = false;
+const PAID_SIGNUP_OFF_MESSAGE = "Pro signups are not open yet.";
+
 /**
  * Create a Stripe Checkout Session for the Pro subscription and return its URL.
  * The client redirects the browser to it. We stamp the Convex user id into the
@@ -37,6 +55,7 @@ async function stripePost(
 export const createCheckoutSession = action({
   args: { origin: v.string() },
   handler: async (ctx, args): Promise<{ url: string }> => {
+    if (!PAID_SIGNUP_ENABLED) throw new Error(PAID_SIGNUP_OFF_MESSAGE);
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     // Ensure a users row exists; upsert returns its id.

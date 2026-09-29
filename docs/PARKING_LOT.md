@@ -48,6 +48,79 @@ Two follow-ups that were deliberately left out of that session's diff:
   sitting on a host nothing builds from. Confirm it is set on Vercel, then
   delete it there; rotating it is the safer call.
 
+## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+
+CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
+| 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
+## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
+
+v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
+original. It does not touch originals already written that way, and a
+"Photo only" ZIP copies a stored original as it is — so a photo resized or
+compressed on an older build keeps shipping its frame. Seen for real: three
+ZIPs Chris downloaded at 5:19–5:30 pm on 09-28 (pre-v9.3), five JPEGs, each
+with a near-white frame measured per side:
+
+| Side lines | Frame line | Photo line |
+| --- | --- | --- |
+| mean brightness | **249–254** | 16–187 |
+| spread along the line | **≤ 4.7** | 10–76 |
+
+2–3px per side, sometimes only left/right. Cropping exactly those lines fixed
+all five (re-measured 0 on every side).
+
+**Options.** (a) Tell affected users to remove and re-add those photos from
+their files — safe, manual. (b) A one-time repair that detects the frame with
+the rule above and crops it from `originalKey`. That rewrites user data in
+IndexedDB, so it goes through the `dexie-migration` skill with fixtures, and it
+must be conservative: a photo whose real edge is a flat white line (a white
+background, a scan) would pass the same test. `uploadKey`, where present, is
+the untouched upload and gives the true aspect ratio to check against.
+
+## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
+The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
+Resize scales the whole artboard — photo plus the 10px Canvas border each side —
+to the number typed. Measured, 1600×1200 JPEG, width set to 800:
+
+| Build | Stored photo |
+| --- | --- |
+| master (pre-#260) | 796×596, with a 3px white frame baked in |
+| v9.3 | **790×590**, photo only |
+
+A 256px PNG set to 200 stores 186×186. So the number a person types is not the
+size they get, and the gap grows with the border. The fix is to scale by
+typed ÷ photo width (not ÷ artboard width) — a one-line change in the resize
+path, but it changes the output of every resize, so it wants its own PR and a
+look at the Canvas Size panel, which may lean on the current behavior.
+
+## OPEN — Auto Compress makes an already-small JPEG heavier (09-28-2026)
+
+Found the same day, identical on master. A q60 JPEG of 32,950 B through
+"Compress Image" comes back at **36,621 B** (+11%) and stores `encodeQuality: 75`
+— it re-encodes at the panel's quality, which is higher than the file's own.
+#259 added the "never hand back a bigger file for fewer pixels" step-down to
+Apply Resize only; Auto Compress has no such guard. Now that `encodeQuality`
+is on the entry, the obvious rule is: if the result is not smaller, keep the
+original bytes and say so.
+
+## OPEN — 116 · Triangle, star points, oval, rotation — parked; needs the op-log v9 renumber (09-28-2026)
+
+| | |
+|---|---|
+| **What** | A triangle, a star with a chosen number of points, an **oval**, and a rotation handle on every shape |
+| **Branch** | `feat/shapes-triangle-rotate` (#187) — triangle, star points and rotation are built there; the oval is not yet |
+| **Blocked on** | the op-log format going **v8 → v9**. Rotation adds a field to every shape, which is a format change; #131's v8 is live, so #187 has to renumber rather than reuse it |
+| **Why the oval waits with them** | Circle is a true circle (`drawPreview.ts` clamps to `Math.min(w, h)`; the engine's `draw_shape` kind 1 matches), so there is no free ellipse today and an oval is a new engine shape kind. Built on master now it would claim a kind number #187 is also counting on — the parallel-branch collision that has already happened twice (v6, v8) |
+| **Decided** | Chris, 09-28: build the oval on the #187 branch, alongside the triangle, when the v9 renumber lands |
+| **Also stale** | `/in-the-works` still lists this under "Being built now". It is parked; that page should say so when this is picked up |
+
 ## OPEN — UI Night 3 leftovers: what the three tool panels surfaced outside themselves (09-25-2026)
 
 Night 3 normalized Paint, Eraser and Crop and stopped at three. These are the
@@ -93,7 +166,19 @@ Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
 Chromium draws WebGPU canvases blank white even for a bare three.js control, so
 only the WebGL 2 path is verified.
 
-## OPEN — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+## RESOLVED — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+> **Done 09-28-2026, on `feat/blog-entropy-post`**, when the third post — "We
+> spent a month taking the file apart" — arrived as exactly the trigger below:
+> a third copy. `SceneKit`/`stream`/`fade`/`orbit`/`createScene` are one module
+> (`marketing/src/posts/scene/kit.ts`), the React frame is one
+> (`scene/figure.tsx`, bound per post with `sceneFigure(() => import(...))`),
+> the `.scene` CSS is one (`scene/scene.css`), and the three.js subset is one
+> (`scene/three.ts`). Each post keeps only its builders. The three copies had
+> drifted by comments, one optional `stream()` size and a `lookY` default —
+> nothing a reader could see. Proven so: 28 reduced-motion stills of all three
+> posts, header and every figure, at 1200 and 320 px, 0 pixels different from
+> the pre-refactor build. Scene code across the three posts 48,477 B → 35,992 B.
 
 Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
 post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and

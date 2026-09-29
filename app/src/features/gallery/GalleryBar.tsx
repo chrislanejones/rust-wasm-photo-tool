@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { formatBytes } from "@/lib/format";
+import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -30,7 +31,17 @@ export interface PhotoEntry {
   /** Immutable key of the *upload* original — A/B compare baseline. Never
    *  replaced by Apply Compression or Auto Compress. */
   uploadKey?: string;
+  /** Quality (1..100) the stored bytes were last LOSSY-encoded at, by Apply
+   *  Compression or Auto Compress. Undefined for an untouched upload (its
+   *  camera/encoder quality is unknown) and for a lossless PNG. Persisted with
+   *  the gallery manifest, so it survives a reload for anonymous and signed-in
+   *  sessions alike. Two readers: the Resize & Compress panel models a pending
+   *  quality change RELATIVE to it (a file already at 75 does not shrink by
+   *  25% again at 75), and "Apply Resize" re-encodes at it instead of at 100,
+   *  which used to inflate an already-compressed photo several times over. */
+  encodeQuality?: number;
 }
+
 
 interface Props {
   photos: PhotoEntry[];
@@ -119,7 +130,13 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   // that GREW (an upscale, or a quality raised past the original) showed no
   // badge at all and looked untouched. Growth is unbounded and routinely passes
   // 100%: a file 2.5x the upload reads "+150%".
-  const sizeDelta = savings?.savingsPercent ?? 0;
+  //
+  // Read from the entry's own sizes first. The separate `savings` map used to
+  // be the only source, and it drifted: Auto Compress measured against the
+  // CURRENT file rather than the upload (so a second run reset the badge), and
+  // Apply Compression flashed an area×quality guess. The map is kept only as a
+  // fallback for an entry with no recorded upload size.
+  const sizeDelta = sizeDeltaPercent(entry) ?? savings?.savingsPercent ?? 0;
   const hasSavings = sizeDelta !== 0;
   const grew = sizeDelta < 0;
 

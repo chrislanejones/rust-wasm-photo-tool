@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -103,7 +104,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       // only drawn: a tile or button that forgot the switch still cannot send
       // a picture. Read at call time, not captured, so a switch flipped a
       // moment ago counts.
-      if (!useUIStore.getState().onlineFeaturesEnabled) {
+      if (!isNetworkPathAllowed("ai_processing", useUIStore.getState().onlineFeaturesEnabled)) {
         setTextResult(null);
         setError(ONLINE_FEATURES_OFF_ERROR);
         setPhase("error");

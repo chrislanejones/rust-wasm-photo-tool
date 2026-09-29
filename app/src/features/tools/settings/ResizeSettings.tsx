@@ -53,6 +53,9 @@ interface ResizeSettingsProps {
   currentMime?: string;
   /** Immutable size at upload, in bytes — the performance-gain baseline. */
   originalByteSize: number;
+  /** Quality the current file was last lossy-encoded at; undefined when
+   *  unknown (an untouched upload) or lossless. */
+  currentEncodeQuality?: number;
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
@@ -83,6 +86,7 @@ export function ResizeSettings({
   currentByteSize,
   currentMime,
   originalByteSize,
+  currentEncodeQuality,
   activePhotoId,
   quality,
   onQualityChange,
@@ -245,6 +249,24 @@ export function ResizeSettings({
   // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
   // scores low, and resizing or lowering quality (smaller projected delivery)
   // raises it.
+  //
+  // The model must mirror what the Apply button will ACTUALLY write, or the
+  // numbers lie in both directions:
+  //   - nothing pending, or dimensions only ("Apply Resize"): the file keeps
+  //     its own format and quality, so the projection is the current bytes
+  //     scaled by area. This used to multiply by quality/100 regardless, so an
+  //     already-compressed photo was scored as if it would shrink another 25%
+  //     at the default 75 — and then Apply Resize wrote something bigger.
+  //   - compression pending: quality is RELATIVE to the quality the file is
+  //     already at. A file stored at q=60 re-encoded at q=50 does not lose
+  //     half its bytes. Unknown (an untouched upload) counts as 100, which is
+  //     the old absolute model.
+  const modelQuality = compressionChanged
+    ? Math.min(100, Math.round((quality * 100) / (currentEncodeQuality ?? 100)))
+    : 100;
+  const modelFormat: ExportFormat | undefined = compressionChanged
+    ? effectiveFormat
+    : undefined;
   const newW = parseInt(width, 10) || imageWidth;
   const newH = parseInt(height, 10) || imageHeight;
   const [lighthouseScore, setLighthouseScore] = useState(0);
@@ -259,13 +281,14 @@ export function ResizeSettings({
       origBytes: originalByteSize,
       newW,
       newH,
-      quality,
+      quality: modelQuality,
       curMime: currentMime,
       // Model the format that will ACTUALLY land, not the one requested. AVIF
       // weights as the most efficient format in the Rust scorer, so an AVIF
       // selection the browser cannot encode would promise a large gain and then
       // write a PNG — the panel contradicting its own note one line below.
-      newFormat: effectiveFormat,
+      // Undefined with no compression pending: the file keeps its own format.
+      newFormat: modelFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -282,12 +305,13 @@ export function ResizeSettings({
     originalByteSize,
     newW,
     newH,
-    quality,
+    modelQuality,
+    modelFormat,
     // effectiveFormat, not exportFormat: the AVIF probe resolves asynchronously,
     // so the first render models AVIF and only the re-run after `avifOk` lands
     // corrects it. Depending on exportFormat alone would leave the AVIF numbers
-    // on screen permanently, since exportFormat never changed.
-    effectiveFormat,
+    // on screen permanently, since exportFormat never changed. (It reaches
+    // the call through `modelFormat`.)
   ]);
 
   return (

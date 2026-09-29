@@ -48,7 +48,7 @@ const btn = (label: string) =>
   [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === label) as
     | HTMLButtonElement
     | undefined;
-const SEND = "Send this device's settings";
+const SEND = "Send current settings";
 
 describe("Sync › Send, visible and disabled beats disappearing", () => {
   it("in standby, Send is still rendered, disabled, and described by the reason", () => {

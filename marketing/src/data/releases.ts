@@ -24,6 +24,76 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.3",
+    date: "2026-09-28",
+    headline: "A resize no longer makes a photo heavier, and a “Photo only” ZIP has no white line.",
+    entries: [
+      {
+        tag: "fix",
+        text: "A \u201cPhoto only\u201d ZIP came out with every photo framed in a thin white line. Saving a photo after a resize or a compression was writing the Canvas border into the stored file, and the ZIP copies that file as it is. The stored file is just the photo now; the border is added when you ask for it and not before. Reopening a photo no longer nests one border inside another, either.",
+      },
+      {
+        tag: "fix",
+        text: "Apply Resize made photos heavier. It re-encoded at full quality, so a 33 KB JPEG cut to half its width came back at 154 KB and its PageSpeed score fell from 99 to 88. It keeps the quality the file was last saved at now, and a resize that removes pixels never hands back a bigger file: the same photo comes back at 32 KB.",
+      },
+      {
+        tag: "fix",
+        text: "The PageSpeed score and the gallery\u2019s size badges read the file you actually have, including after several edits in a row, instead of an estimate made before the save landed.",
+      },
+      {
+        tag: "ui",
+        text: "Everything that can reach a server is one list now. Settings \u203a Security, the online switch, the home page\u2019s table and the privacy policy all read it, so they can\u2019t disagree \u2014 and a test fails if the privacy policy stops naming one of them.",
+      },
+      {
+        tag: "ui",
+        text: "Sync says what it\u2019s doing in the status line: up to date and since when, an empty account with a button to send your settings, or syncing in another tab. A failure shows there too, with a Retry, instead of in a toast that disappears.",
+      },
+      {
+        tag: "fix",
+        text: "On a phone, the desktop editor waiting under the phone layout stayed in the tab order \u2014 27 invisible controls a keyboard could land on once you added a photo. It\u2019s zero now.",
+      },
+      {
+        tag: "feature",
+        text: "A third blog post: \u201cWe spent a month taking the file apart. It got 556 lines longer.\u201d What code entropy looks like in a file you\u2019re actively refactoring, what a line count that only goes down did and didn\u2019t fix, and why the file is still bigger than when we started. Its figures move.",
+      },
+      {
+        tag: "ui",
+        text: "The blog reads on a 320px phone. Figure labels that piled on top of each other are hidden there \u2014 the caption under each figure says the same thing \u2014 and the menu bar\u2019s \u201cImage Horse\u201d no longer gets cut to \u201cImage Ho\u201d below 350px.",
+      },
+    ],
+  },
+  {
+    version: "v9.2",
+    date: "2026-09-28",
+    headline: "The Select panel's Refine section is readable, and Pro signups are closed.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Refine was one button and five sliders stacked two across. It is six tiles now \u2014 Clean Up, Islands, Holes, Smooth, Feather, Expand \u2014 and a single slider that edits whichever tile is open. Same five operations, same ranges.",
+      },
+      {
+        tag: "ui",
+        text: "Remove Object moves into the Selection grid as its sixth tile, filling a cell that had been empty since September 11th and taking a whole section with it.",
+      },
+      {
+        tag: "fix",
+        text: "Pro signups are closed. Nobody can start a subscription \u2014 the button is gone and the server refuses the call behind it. Anyone who already has one can still open the billing portal and cancel.",
+      },
+      {
+        tag: "infra",
+        text: "Every push used to build both halves of the site, so a marketing typo ran the editor's three-minute Rust build. Each now skips what it cannot affect: a third fewer builds, measured across September.",
+      },
+      {
+        tag: "ui",
+        text: "AppShell lost another 152 lines \u2014 the blur brush, the download dialog's format logic, and the rule that sizes the brush ring each moved into a piece of their own.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's tokens, class names and components are now a design system, so a mockup of a page comes back written in the same names the site already uses.",
+      },
+    ],
+  },
+  {
     version: "v9.1",
     date: "2026-09-26",
     headline: "The app tells you when a stroke will change a mask.",
