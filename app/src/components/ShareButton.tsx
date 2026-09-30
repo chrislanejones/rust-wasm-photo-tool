@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link2 } from "lucide-react";
 import { PanelAction } from "@/components/ui/panel-action-bar";
 import { toast } from "@/components/ui/sonner";
 import { useShare } from "@/hooks/useShare";
@@ -81,6 +82,7 @@ export function ShareButton({
     // The Download dialog's action row is the tool panels' PanelActionBar
     // (Apply Crop), so this is a PanelAction beside Download and Clipboard.
     <PanelAction
+      icon={Link2}
       onClick={handleClick}
       disabled={disabled || busy}
       title={
