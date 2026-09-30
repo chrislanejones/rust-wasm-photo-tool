@@ -12,7 +12,6 @@ import {
   PanelAction,
   PanelActionBar,
 } from "@/components/ui/panel-action-bar";
-import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ReselectBar } from "@/components/ui/reselect-bar";
@@ -64,6 +63,15 @@ function ratioIdFromLock(lock: [number, number] | null): RatioId {
   }
   return "free";
 }
+
+type TransformId = "flipH" | "flipV" | "rotCw" | "rotCcw";
+
+const TRANSFORM_OPTIONS: { id: TransformId; label: string; icon: typeof Square }[] = [
+  { id: "flipH", label: "Flip H", icon: FlipHorizontal },
+  { id: "flipV", label: "Flip V", icon: FlipVertical },
+  { id: "rotCw", label: "Rotate 90°", icon: RotateCw },
+  { id: "rotCcw", label: "Rotate −90°", icon: RotateCcw },
+];
 
 /* ── Main component ──────────────────────────────────────────────────── */
 
@@ -226,36 +234,24 @@ export function TransformCropSettings({
             </>
           }
         />
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-          <ActionTile
-            icon={FlipHorizontal}
-            label="Flip H"
-            disabled={disabled}
-            onClick={onFlipH}
-          />
-          <ActionTile
-            icon={FlipVertical}
-            label="Flip V"
-            disabled={disabled}
-            onClick={onFlipV}
-          />
-          <ActionTile
-            icon={RotateCw}
-            label="Rotate 90°"
-            disabled={disabled}
-            onClick={onRotate90Cw}
-          />
-          <ActionTile
-            icon={RotateCcw}
-            label="Rotate −90°"
-            disabled={disabled}
-            onClick={() => {
+        {/* The same stacked ToolButtonGroup as Crop's ratios above, in its
+            2×2 layout and ACTION mode (no `value`, so no tile ever lights). */}
+        <ToolButtonGroup<TransformId>
+          stacked
+          columns={2}
+          disabled={disabled}
+          options={TRANSFORM_OPTIONS}
+          onChange={(id) => {
+            if (id === "flipH") onFlipH();
+            else if (id === "flipV") onFlipV();
+            else if (id === "rotCw") onRotate90Cw();
+            else {
               onRotate90Cw();
               onRotate90Cw();
               onRotate90Cw();
-            }}
-          />
-        </div>
+            }
+          }}
+        />
       </div>
       )}
 
@@ -274,12 +270,11 @@ export function TransformCropSettings({
           <PanelActionBar>
             <PanelAction
               pressed={colorPickerActive}
+              pressedLabel="Click image to pick"
               disabled={disabled}
               onClick={() => onSetColorPickerActive(!colorPickerActive)}
             >
-              {colorPickerActive
-                ? "Click image to pick"
-                : "Activate Eyedropper"}
+              Activate Eyedropper
             </PanelAction>
           </PanelActionBar>
 

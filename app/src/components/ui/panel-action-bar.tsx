@@ -152,6 +152,13 @@ export interface PanelActionProps
    *  for a plain action: `aria-pressed="false"` on a button that does not
    *  toggle tells a screen reader the wrong thing. */
   pressed?: boolean;
+  /** The TWO-STATE variant: the label shown while `pressed` is true, with
+   *  `children` the label while it is off — the eyedropper's "Activate
+   *  Eyedropper" ↔ "Click image to pick". One button whose label and lit
+   *  treatment carry the state, so a caller does not hand-roll the ternary
+   *  (or a second button) to say "this is on now". Ignored unless `pressed`
+   *  is passed. */
+  pressedLabel?: React.ReactNode;
   /** A lucide glyph in front of the label. Decorative: the label is the name. */
   icon?: LucideIcon;
 }
@@ -159,7 +166,7 @@ export interface PanelActionProps
 export const PanelAction = React.forwardRef<
   HTMLButtonElement,
   PanelActionProps
->(({ className, tone = "default", pressed, icon: Icon, children, ...props }, ref) => {
+>(({ className, tone = "default", pressed, pressedLabel, icon: Icon, children, ...props }, ref) => {
   const reasonId = React.useContext(ReasonIdContext);
   return (
   <Button
@@ -181,7 +188,7 @@ export const PanelAction = React.forwardRef<
     {...props}
   >
     {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
-    {children}
+    {pressed && pressedLabel !== undefined ? pressedLabel : children}
   </Button>
   );
 });
