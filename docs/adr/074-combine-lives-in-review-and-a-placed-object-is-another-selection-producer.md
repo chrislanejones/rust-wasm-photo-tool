@@ -1,4 +1,4 @@
-# ADR-072 — Combine lives in Review, and a placed object is another selection producer
+# ADR-074 — Combine lives in Review, and a placed object is another selection producer
 
 - **Status:** Draft
 - **Date:** 2026-09-28

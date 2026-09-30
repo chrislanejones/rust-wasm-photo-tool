@@ -23,7 +23,10 @@ jobs:
     outputs:
       # The SHIPPED configuration's sha256, for the deploy sentinel's tier-2
       # reproducibility check (ADR-046): CI's build of this commit must equal
-      # Netlify's build of this commit, byte for byte.
+      # the deployed build of this commit, byte for byte. That is Vercel's build
+      # since 2026-09-12, and since Netlify was retired on 2026-09-27 these two
+      # are the ONLY builders — a disagreement no longer has a third opinion to
+      # break the tie, so reproduce locally before believing either side.
       wasm_sha256: ${{ steps.wasm.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
@@ -48,13 +51,14 @@ jobs:
       # A re-run went green on its own, which is the worst version of this bug:
       # it looks like flake and it is actually an unpinned dependency.
       #
-      # netlify.toml already pins `cargo install wasm-pack --version 0.15.0`
-      # and its comment names this exact risk — "the tool that runs wasm-opt
-      # could change under a build with no commit." That pin was applied to
-      # Netlify and never here, so the two halves of the same build disagreed.
-      # 0.15.0 is chosen because it is what Netlify pins and what produced every
-      # shipped binary; wasm-opt affects the output size the deploy sentinel
-      # bounds (ADR-037), so this is the version that keeps CI and prod honest.
+      # The deploy host already pins `cargo install wasm-pack --version 0.15.0`
+      # — the root vercel.json's installCommand, and netlify.toml before it —
+      # naming this exact risk: "the tool that runs wasm-opt could change under a
+      # build with no commit." That pin was applied to the host and never here,
+      # so the two halves of the same build disagreed. 0.15.0 is what vercel.json
+      # pins and what produced every shipped binary; wasm-opt affects the output
+      # size the deploy sentinel bounds (ADR-037), so this is the version that
+      # keeps CI and prod honest.
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: v0.15.0
@@ -66,7 +70,7 @@ jobs:
       # feature-free, as the comment above says it must.
       - run: IH_WASM_FEATURES= ./scripts/build-wasm.sh
       # And the SHIPPED configuration (tiles,patchmatch), whose sha256 the
-      # deploy sentinel compares against Netlify's build of the same commit.
+      # deploy sentinel compares against the LIVE build of the same commit.
       # Second build, ~1 min: the cost of proving two machines agree.
       - name: Build the shipped configuration and record its sha256
         id: wasm
@@ -96,13 +100,14 @@ jobs:
       # A re-run went green on its own, which is the worst version of this bug:
       # it looks like flake and it is actually an unpinned dependency.
       #
-      # netlify.toml already pins `cargo install wasm-pack --version 0.15.0`
-      # and its comment names this exact risk — "the tool that runs wasm-opt
-      # could change under a build with no commit." That pin was applied to
-      # Netlify and never here, so the two halves of the same build disagreed.
-      # 0.15.0 is chosen because it is what Netlify pins and what produced every
-      # shipped binary; wasm-opt affects the output size the deploy sentinel
-      # bounds (ADR-037), so this is the version that keeps CI and prod honest.
+      # The deploy host already pins `cargo install wasm-pack --version 0.15.0`
+      # — the root vercel.json's installCommand, and netlify.toml before it —
+      # naming this exact risk: "the tool that runs wasm-opt could change under a
+      # build with no commit." That pin was applied to the host and never here,
+      # so the two halves of the same build disagreed. 0.15.0 is what vercel.json
+      # pins and what produced every shipped binary; wasm-opt affects the output
+      # size the deploy sentinel bounds (ADR-037), so this is the version that
+      # keeps CI and prod honest.
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: v0.15.0
@@ -396,6 +401,18 @@ jobs:
           filter: blob:none
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+      # The UI ratchets (ui-spacing / ui-radius / ui-raw-button) are counted
+      # from the TypeScript syntax tree by scripts/ui-ratchet-counts.mjs, which
+      # needs `typescript` — an app dependency. Before UI Night 7 this job had
+      # no node_modules at all; without these three steps the counter cannot
+      # load and guardrails.sh fails FATAL (by design: a counter that cannot
+      # run must never read as zero). Same setup as every other Node job here.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: ./scripts/guardrails.sh
 
       # scripts/gate-run.sh is the shared helper for RUNNING a gate: it takes

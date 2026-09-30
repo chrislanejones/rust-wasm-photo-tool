@@ -113,30 +113,27 @@ describe("SyncProvider, when the cloud half throws during render", () => {
     expect(seen.at(-1)).toBe("error");
   });
 
-  it("shows ONE toast for the episode, however many times it fails again", async () => {
+  it("never toasts — not once, however many times it fails again", async () => {
+    // UI Night 6 §4: the failure lives in the status line until it clears. The
+    // toast this replaced was one-per-episode to stop it re-opening through a
+    // retry loop; a persistent readout cannot spam, so the rule became simpler.
     await mount();
-    expect(toastError).toHaveBeenCalledTimes(1);
-    expect(toastError.mock.calls[0][0]).toBe("Settings sync isn't working");
-
-    // What an offline stretch looks like from the status store: a local change
-    // flips it to "syncing", the push fails, it is "error" again. Twice.
     const { setSyncStatus } = await import("./status");
     for (let i = 0; i < 2; i++) {
       await act(async () => setSyncStatus({ state: "syncing" }));
       await act(async () => setSyncStatus({ state: "error", lastError: `again ${i}` }));
     }
-    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
+    // …and the store the status bar reads still says so.
+    expect(seen.at(-1)).toBe("error");
   });
 
-  it("takes the toast down on recovery, and may speak again after that", async () => {
+  it("recovery clears the error from the store, so the status line goes away", async () => {
     await mount();
     const { setSyncStatus } = await import("./status");
-
     await act(async () => setSyncStatus({ state: "synced", lastError: null }));
-    expect(toastDismiss).toHaveBeenCalledWith("settings-sync-error");
-
-    await act(async () => setSyncStatus({ state: "error", lastError: "a new episode" }));
-    expect(toastError).toHaveBeenCalledTimes(2);
+    expect(seen.at(-1)).toBe("synced");
+    expect(toastDismiss).not.toHaveBeenCalled();
   });
 
   it("retries by remounting, so an open tab recovers without a reload", async () => {

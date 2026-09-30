@@ -4,10 +4,13 @@ import type { ExportFormat } from "@/lib/exportImage";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 
-/** The Download dialog offers one more choice than the Compress panel: ORA is
- *  the one non-raster choice — the full layered project, not a flattened
- *  encode — so it never touches the persisted `exportFormat` preference. */
-export type DownloadFormat = ExportFormat | "ora";
+/** The Download dialog offers two more choices than the Compress panel, and
+ *  neither is a raster encode, so neither touches the persisted `exportFormat`
+ *  preference: ORA (the full layered project) and SVG (an uploaded SVG written
+ *  back out as a vector, with its crop — lib/svgPassthrough.ts). SVG is not in
+ *  `DOWNLOAD_FORMATS`: the dialog draws its tile itself, because whether it is
+ *  enabled depends on the images, not on the browser. */
+export type DownloadFormat = ExportFormat | "ora" | "svg";
 
 export interface DownloadFormatOption {
   value: DownloadFormat;
@@ -81,7 +84,8 @@ export function useDownloadFormat() {
   const downloadFormats = useMemo(() => labelFormats(avifEncodable), [avifEncodable]);
 
   // The dialog's own format pick, reseeded from the persisted preference each
-  // time it opens — kept separate so an "ora" pick never lands in that store.
+  // time it opens — kept separate so an "ora" or "svg" pick never lands in
+  // that store.
   const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(exportFormat);
   useEffect(() => {
     if (exportDialogOpen) setDownloadFormat(exportFormat);
@@ -96,5 +100,6 @@ export function useDownloadFormat() {
     downloadFormat,
     setDownloadFormat,
     isOraDownload: downloadFormat === "ora",
+    isSvgDownload: downloadFormat === "svg",
   };
 }

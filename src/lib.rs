@@ -851,6 +851,28 @@ impl ImageHorseTool {
     }
 }
 
+/// `Some((x, y, w, h))` when the layer is exactly one solid rectangle — every
+/// pixel inside its tight bounding box fully opaque, every pixel outside it
+/// fully transparent — and that rectangle sits strictly inside the document.
+/// `None` for anything else (soft-edged strokes, holes, a full-bleed layer),
+/// which `resize_with_filter` resamples whole as before.
+pub(crate) fn opaque_rect(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+    let (x, y, rw, rh) = tight_bbox(data, w, h)?;
+    if x == 0 && y == 0 && rw == w && rh == h {
+        return None;
+    }
+    for ry in y..y + rh {
+        let row = (ry * w + x) as usize * 4;
+        if data[row..row + rw as usize * 4]
+            .chunks_exact(4)
+            .any(|px| px[3] != 255)
+        {
+            return None;
+        }
+    }
+    Some((x, y, rw, rh))
+}
+
 /// Tight bounding box `(x, y, w, h)` of every pixel with non-zero alpha in an
 /// RGBA `w×h` buffer. `None` if every pixel is fully transparent (nothing to
 /// crop to).
@@ -2393,8 +2415,13 @@ impl ImageHorseTool {
     }
 
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0; (w as usize) * (h as usize) * 4];
+        };
         transform::copy_region(
-            &self.layers[self.active].buf.data,
+            &layer.buf.data,
             self.width as i32,
             self.height as i32,
             x,
@@ -2503,12 +2530,51 @@ impl ImageHorseTool {
         let sy = new_h as f64 / oh as f64;
         let s_uniform = (sx * sy).sqrt();
 
+        let resample = |data: &[u8], w: u32, h: u32, nw: u32, nh: u32| match filter {
+            0 => transform::resize_nearest(data, w, h, nw, nh),
+            2 => transform::resize_catmull_rom(data, w, h, nw, nh),
+            3 => transform::resize_lanczos3(data, w, h, nw, nh),
+            _ => transform::resize_bilinear(data, w, h, nw, nh),
+        };
+
         for layer in &mut self.layers {
-            let resized = match filter {
-                0 => transform::resize_nearest(&layer.buf.data, ow, oh, new_w, new_h),
-                2 => transform::resize_catmull_rom(&layer.buf.data, ow, oh, new_w, new_h),
-                3 => transform::resize_lanczos3(&layer.buf.data, ow, oh, new_w, new_h),
-                _ => transform::resize_bilinear(&layer.buf.data, ow, oh, new_w, new_h),
+            // A layer that is ONE solid opaque rectangle floating on
+            // transparency — the artboard's Photo layer, a pasted image — is
+            // resampled as that rectangle alone and pasted back hard-edged.
+            //
+            // Resampling the whole buffer instead blends the photo's edge with
+            // the transparent margin around it: every filter but nearest leaves
+            // a 1–3px ring of PARTIAL alpha (wider on an upscale). Under the
+            // Canvas nobody sees it, but "Photo only" excludes the Canvas and
+            // crops to alpha > 0, so the ring ships — matted onto white in a
+            // JPEG, see-through in a PNG/WebP. That was the thin white line
+            // around every resized photo in a ZIP. Measured on an 800×600 photo
+            // on a 25px grey artboard halved with Lanczos: a 405×305 export
+            // with 4,192 semi-transparent pixels, against 400×300 and none.
+            let resized = match opaque_rect(&layer.buf.data, ow, oh) {
+                Some((x, y, rw, rh)) => {
+                    let nx0 = ((x as f64 * sx).round() as u32).min(new_w - 1);
+                    let ny0 = ((y as f64 * sy).round() as u32).min(new_h - 1);
+                    let nx1 = (((x + rw) as f64 * sx).round() as u32).clamp(nx0 + 1, new_w);
+                    let ny1 = (((y + rh) as f64 * sy).round() as u32).clamp(ny0 + 1, new_h);
+                    let (nrw, nrh) = (nx1 - nx0, ny1 - ny0);
+                    let (rect, _, _) = transform::crop(&layer.buf.data, ow, oh, x, y, rw, rh);
+                    let mut scaled = resample(&rect, rw, rh, nrw, nrh);
+                    // Every source pixel was opaque, so every output pixel is:
+                    // pin it rather than trust a kernel's rounding to land on 255.
+                    for px in scaled.chunks_exact_mut(4) {
+                        px[3] = 255;
+                    }
+                    let mut out = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
+                    let row_bytes = nrw as usize * 4;
+                    for ry in 0..nrh as usize {
+                        let dst = ((ny0 as usize + ry) * new_w as usize + nx0 as usize) * 4;
+                        out[dst..dst + row_bytes]
+                            .copy_from_slice(&scaled[ry * row_bytes..(ry + 1) * row_bytes]);
+                    }
+                    out
+                }
+                None => resample(&layer.buf.data, ow, oh, new_w, new_h),
             };
             layer.buf.data = resized;
             layer.buf.width = new_w;
@@ -3054,18 +3120,28 @@ impl ImageHorseTool {
 
     /// Returns [r, g, b, a] for the pixel at (x, y), clamped to image bounds.
     pub fn get_pixel(&self, x: i32, y: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0, 0, 0, 0];
+        };
         let w = self.width as i32;
         let h = self.height as i32;
         if w == 0 || h == 0 || x < 0 || y < 0 || x >= w || y >= h {
             return vec![0, 0, 0, 255];
         }
         let idx = (y as usize * self.width as usize + x as usize) * 4;
-        self.layers[self.active].buf.data[idx..idx + 4].to_vec()
+        layer.buf.data[idx..idx + 4].to_vec()
     }
 
     /// Returns a flat RGBA grid of (2*radius+1)² pixels centered on (cx, cy).
     /// Out-of-bounds pixels are returned as opaque black.
     pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
         let side = 2 * radius + 1;
         let mut out = Vec::with_capacity((side * side * 4) as usize);
         let w = self.width as i32;
@@ -3078,7 +3154,7 @@ impl ImageHorseTool {
                     out.extend_from_slice(&[0, 0, 0, 255]);
                 } else {
                     let idx = (py as usize * self.width as usize + px as usize) * 4;
-                    out.extend_from_slice(&self.layers[self.active].buf.data[idx..idx + 4]);
+                    out.extend_from_slice(&layer.buf.data[idx..idx + 4]);
                 }
             }
         }

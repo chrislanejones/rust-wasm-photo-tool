@@ -50,7 +50,7 @@ interface Props<T extends string> {
   columns?: 2 | 3 | 4 | 5;
   /** One icon-only row in a recessed trough, the active segment raised — the
    *  Combine control (design: "Select Panel", 09-27-2026; the control moved to
-   *  the REVIEW panel in ADR-072, the variant did not change).
+   *  the REVIEW panel in ADR-074, the variant did not change).
    *
    *  A VARIANT, not a second control. It is the same `useRadioGroup` as the
    *  grid, so Night 2's contract comes with it unchanged: one Tab stop, arrow

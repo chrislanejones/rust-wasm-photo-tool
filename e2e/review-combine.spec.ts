@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Review › Combine — a placed object as a selection producer (ADR-072).
+// Review › Combine — a placed object as a selection producer (ADR-074).
 //
 // The unit tests cover the two ends of this feature: `objectSelection.test.ts`
 // pins the geometry and `ReviewPanel.combine.test.ts` pins the panel writing

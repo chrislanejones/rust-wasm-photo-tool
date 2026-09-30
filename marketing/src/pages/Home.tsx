@@ -9,6 +9,7 @@ import { SHOTS } from "../data/shots";
 import { POSTS, fmtPostDate, postPath } from "../data/posts";
 import { GROUPS } from "../data/comingSoon";
 import { EDITOR_URL, GITHUB_URL, external } from "../config";
+import { NETWORK_PATHS } from "../../../shared/networkPaths";
 
 type Where = "all" | "local" | "server";
 
@@ -23,6 +24,29 @@ interface Op {
   op: React.ReactNode;
   where: Exclude<Where, "all">;
   detail: React.ReactNode;
+}
+
+/* The table's copy for each server row. Kept here, in the page's own voice,
+ * because it is marketing text — but WHICH rows exist comes from the registry
+ * (shared/networkPaths.ts), so a new network path cannot ship without a row.
+ * A row with no entry here still appears, carrying the registry's own `sends`
+ * line — visible and plain rather than missing. */
+const SERVER_ROW_DETAIL: Record<string, string> = {
+  "Remove background, remove object, read text": "AI models that don't fit in a browser — sign in first",
+  "Sync and share links": "Optional — the free editor never uploads",
+};
+
+/** One server row per distinct `homeRow` in the registry, in registry order. */
+function SERVER_ROWS(): Op[] {
+  const seen = new Map<string, string>();
+  for (const p of NETWORK_PATHS) {
+    if (p.homeRow && !seen.has(p.homeRow)) seen.set(p.homeRow, p.sends);
+  }
+  return [...seen].map(([row, sends]) => ({
+    op: row,
+    where: "server" as const,
+    detail: SERVER_ROW_DETAIL[row] ?? sends,
+  }));
 }
 
 /* Every operation, and the machine it runs on.
@@ -45,12 +69,7 @@ const OPS: Op[] = [
     ),
   },
   { op: "Camera data (location, device)", where: "local", detail: "Keep it, strip it, or drop just the GPS" },
-  {
-    op: "Remove background, remove object, read text",
-    where: "server",
-    detail: "AI models that don't fit in a browser — sign in first",
-  },
-  { op: "Sync and share links", where: "server", detail: "Optional — the free editor never uploads" },
+  ...SERVER_ROWS(),
 ];
 
 const FILTERS = [

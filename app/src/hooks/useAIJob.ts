@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -14,6 +15,9 @@ export interface AIResultPixels {
   pixels: Uint8ClampedArray;
   width: number;
   height: number;
+  /** The photo the job was started on — the caller must not apply the
+   *  result to any other. */
+  photoKey?: string;
 }
 
 type Phase = "idle" | "uploading" | "running" | "done" | "error";
@@ -57,6 +61,8 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const [textResult, setTextResult] = useState<string | null>(null);
   // Guard so a re-render doesn't decode/apply the same finished job twice.
   const consumedRef = useRef<Id<"ai_jobs"> | null>(null);
+  // The photo the running job belongs to, carried onto its result.
+  const photoKeyRef = useRef<string | undefined>(undefined);
 
   const job = useQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
 
@@ -74,7 +80,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       if (job.outputUrl) {
         urlToPixels(job.outputUrl)
           .then((r) => {
-            onImageResult(r);
+            onImageResult({ ...r, photoKey: photoKeyRef.current });
             setPhase("done");
           })
           .catch((e) => {
@@ -103,7 +109,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       // only drawn: a tile or button that forgot the switch still cannot send
       // a picture. Read at call time, not captured, so a switch flipped a
       // moment ago counts.
-      if (!useUIStore.getState().onlineFeaturesEnabled) {
+      if (!isNetworkPathAllowed("ai_processing", useUIStore.getState().onlineFeaturesEnabled)) {
         setTextResult(null);
         setError(ONLINE_FEATURES_OFF_ERROR);
         setPhase("error");
@@ -111,6 +117,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       }
       setError(null);
       setTextResult(null);
+      photoKeyRef.current = photoKey;
       setPhase("uploading");
       try {
         // Tag as image/png so the stored blob's content-type is correct —

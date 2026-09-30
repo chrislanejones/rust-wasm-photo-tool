@@ -762,9 +762,9 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // value-consuming sites born with the feature, in `useSelectionActions.ts`
     // (the refine preview, its readout and Apply) and `useMaskActions.ts`
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
-    // the mask brush — un-awaited, a refused add would still do both). Gate
-    // buckets unchanged.
-    expect(gate.awaited, "cumulative converted sites").toBe(160); // 158 -> 160: ADR-072's two producer sites; no paragraph, this file is AT its max-lines cap
+    // the mask brush — un-awaited, a refused add would still do both). Same buckets.
+    // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
+    expect(gate.awaited, "cumulative converted sites").toBe(175); // +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3); +2: Review › Combine producers (ADR-074)
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

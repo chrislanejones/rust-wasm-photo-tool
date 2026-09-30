@@ -70,14 +70,15 @@ export type TextMode = (typeof TEXT_MODES)[number];
 // serializes the index, the engine stores a quad, not a mode.
 export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
- *  rename, and AI Rename (names every photo from what the engine sees in it).
+ *  crop (one ratio for every photo — carousels), bulk rename, and AI Rename
+ *  (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
  *  `TEXT_MODES` above.
  *
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "crop", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
@@ -210,7 +211,7 @@ export interface ToolState {
   selectionMask: Uint8Array | null;
   /** How the next region combines with the current selection — the Review
    *  panel's Combine section (New / Add / Subtract / Intersect; it lived on the
-   *  Select panel until ADR-072). Shift and Alt still override it for one
+   *  Select panel until ADR-074). Shift and Alt still override it for one
    *  gesture, and it applies to a placed object's footprint as well as to a
    *  canvas gesture. NOT PERSISTED (outside `partialize`):
    *  a session-scoped choice, and a reload that came back in Subtract would

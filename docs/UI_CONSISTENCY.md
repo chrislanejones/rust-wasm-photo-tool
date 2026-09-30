@@ -11,7 +11,8 @@
 >
 > **This is a constitution, not a gate.** Nothing here blocks CI tonight.
 > Turning a rule into a ratchet is Night 7, and only for rules a grep can
-> check without going red on a sentence.
+> check without going red on a sentence. **Done 09-29-2026 — see §6: R1, R3 and
+> raw `<button>` are ratchets, counted from the syntax tree, not by grep.**
 
 ## 1. The ten rules
 
@@ -220,6 +221,29 @@ numbers would have gone green on documentation.
 So R1, R3 and R7 are ratchet candidates for Night 7. R5, R6 and R9 need a real
 parser or a human. R10 needs neither — it needs this file to be kept.
 
+**Night 7 (09-29-2026): what became a gate.** Not a grep, for the reason
+above. `scripts/ui-ratchet-counts.mjs` reads the TypeScript syntax tree, where
+comments are not nodes and so cannot count, and it reads a string only when it
+is a class list. It self-tests on a planted snippet before it touches the repo.
+
+| Ratchet | Rule | Baseline |
+| --- | --- | ---: |
+| `ui-spacing` | R1 — padding/gap/space off the scale | **53** |
+| `ui-radius` | R3 — bare `rounded`, `rounded-xl`/`2xl`, arbitrary | **52** |
+| `ui-raw-button` | a raw `<button>` outside `components/ui/` | **37** |
+
+Every baseline was reconciled against the text inventory line by line: each
+hit the text finds and the parser does not is a comment, a test, a JS
+identifier (`rounded: 16`) or a directional house radius the text regex cuts
+short (`rounded-r-full` read as `rounded-r`). Proven both ways: a real
+`<button className="rounded p-5">` turns all three red; the same text in a
+comment, or as a sentence, moves none of them.
+
+R7 was already a ratchet (`z-index`). Its GalleryBar exclusion was reviewed and
+kept — see UI_EXCEPTIONS.md. The raw-button count had grown 34 → 37 since
+Night 3, all in Night 6, while nothing was watching it; that is the argument
+for the gate in one number.
+
 ## 7. The semantic contract: four modes (Night 2, 09-24-2026)
 
 Every row-of-buttons control is in exactly one of these modes. Nights 3 to 6
@@ -304,3 +328,28 @@ house dashed ring on `:focus-visible` (styles.css).
 **390px has no tool panels.** Phone width is the "Mobile version" (upload and
 download only). The panel's small-window surface is 960px dock mode, which the
 Night 3 screenshots add.
+
+## 9. Whose value is it? Per-photo, per-tool, app (09-30-2026)
+
+"When I switch photos I can't tell whether the numbers belong to this photo or
+are left over from the last one." Every panel control is one of these kinds,
+and the kind decides what a photo switch does to it. The panels that are
+per-photo render inside `features/tools/PerPhotoRegion`, which names the photo
+("3 of 12 · IMG_2041"), re-highlights on every switch, and locks (with in-place
+skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
+
+| Kind | On a switch | Examples |
+| --- | --- | --- |
+| **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Crop framing |
+| **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset), Presets, Flip/Rotate, Apply buttons |
+| **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
+| **App** | Stays | Rulers & grid preferences, theme |
+
+Per-photo panels (`PER_PHOTO_TOOLS` in ToolsSidebar): Resize & Compress, Crop &
+Transform, Perspective, Adjustments / Levels / Presets, Layers / Canvas Size /
+Guides. Select is per-tool at the panel level; its per-photo part (the
+selection) is cleared on a switch by `usePhotoSwitchReset`.
+
+Known exception: export quality is seeded from the previous photo until edit
+archives carry it (AppShell quality seed). Guides are cleared rather than
+reloaded until they are persisted per photo (`useGuidesStore` TODO).

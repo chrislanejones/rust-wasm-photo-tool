@@ -88,8 +88,7 @@ check() {
 
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
-    -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
-    -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' \
+    -g '!**/CompareSlider.tsx' -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' \
   | rg -v 'allow: raw-color' | wc -l)
 check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
@@ -99,6 +98,33 @@ check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
       -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
+
+# ── UI rules R1, R3 and raw <button> (UI Night 7, docs/UI_CONSISTENCY.md §6) ──
+# Counted by scripts/ui-ratchet-counts.mjs from the TypeScript syntax tree, NOT
+# by rg: a grep here would go red on a comment explaining the rule, which this
+# repo has already done twice. Comments are not syntax nodes, so they cannot
+# count; a string only counts when it is a class list. The counter self-tests
+# on a planted snippet first, and ANY failure is fatal here — an erroring
+# counter must never read as zero violations.
+#
+# Baselines are the counts on 09-29-2026, reconciled line by line against the
+# text inventory (scripts/ui-inventory.mjs): every hit the text finds and this
+# does not is a comment, a test, a JS identifier (`rounded: 16`) or a
+# directional house radius the text regex truncates (`rounded-r-full`).
+#   ui-spacing     R1 — padding/gap/space off the 0·0.5·1·1.5·2·3·4·6·8 scale
+#   ui-radius      R3 — bare `rounded`, `rounded-xl/2xl`, arbitrary `rounded-[…]`
+#   ui-raw-button  a raw <button> outside components/ui/ (JSX elements, not text)
+# Fixing these CHANGES PIXELS (a radius sweep touches ~50 sites), so they are
+# frozen here and paid down on purpose, not in a sweep.
+ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
+  echo "::error::scripts/ui-ratchet-counts.mjs failed — see its output above"
+  echo "FATAL: a guardrail counter failed to execute." >&2
+  exit 1
+}
+ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
+check "ui-spacing" 53 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-radius" 52 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-raw-button" 37 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
 #

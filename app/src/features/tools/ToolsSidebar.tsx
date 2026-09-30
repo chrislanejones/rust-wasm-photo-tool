@@ -43,6 +43,19 @@ import type { AIResultPixels } from "@/hooks/useAIJob";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { PerPhotoRegion } from "./PerPhotoRegion";
+
+/** Panels whose values belong to the open photo (skeleton plan §1): the rest —
+ *  brush, stamp, shapes, text, select, AI, batch — are per-tool settings and
+ *  must not change, lock or carry a photo name when the photo does. */
+const PER_PHOTO_TOOLS: ReadonlySet<string> = new Set([
+  "compress", // Resize & Compress — W/H, quality
+  "crop", // Crop & Transform — the crop box
+  "perspective",
+  "effects", // Adjustments, Levels, Presets
+  "arrow", // Layers, Canvas Size, Guides (not Rulers)
+]);
 
 interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
@@ -114,6 +127,8 @@ interface ToolsSidebarProps {
   currentByteSize: number;
   currentMime?: string;
   originalByteSize: number;
+  /** Quality the stored bytes were last lossy-encoded at (PhotoEntry). */
+  currentEncodeQuality?: number;
   activePhotoId: string | null;
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
   undoCount: number;
@@ -207,6 +222,7 @@ export function ToolsSidebar({
   currentByteSize,
   currentMime,
   originalByteSize,
+  currentEncodeQuality,
   activePhotoId,
   undoCount,
   quality,
@@ -244,6 +260,7 @@ export function ToolsSidebar({
 }: ToolsSidebarProps) {
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
   const effectsMode = useToolStore((s) => s.effectsMode);
+  const documentRevision = useGalleryStore((s) => s.documentRevision);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
   // the groups that absorbed several old tools. Edit is the case that needs it
   // most — Crop, Transform and Color Picker are all `crop`, so switching on the
@@ -336,6 +353,9 @@ export function ToolsSidebar({
         // anything.
         className="flex-1 overflow-y-auto px-panel pt-panel pb-1.5 space-y-5 scrollbar-thin"
       >
+        {/* Per-photo panels name their photo, cue every switch and lock while
+            one is in flight (PerPhotoRegion). Per-tool panels don't. */}
+        <PerPhotoRegion enabled={PER_PHOTO_TOOLS.has(activeTool) && !(activeTool === "arrow" && showRulersPanel)}>
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
@@ -344,6 +364,7 @@ export function ToolsSidebar({
             currentByteSize={currentByteSize}
             currentMime={currentMime}
             originalByteSize={originalByteSize}
+            currentEncodeQuality={currentEncodeQuality}
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}
@@ -402,9 +423,10 @@ export function ToolsSidebar({
 
         {activeTool === "effects" && effectsMode === "levels" && (
           <LevelsSettings
-            // Keyed on the photo so switching photos starts fresh sliders and a
-            // fresh preview on the new pixels.
-            key={activePhotoId ?? "no-photo"}
+            // Keyed on the DOCUMENT, not the photo id: the id moves before the
+            // load, and a remount then ran begin()/histogram() against the
+            // outgoing photo. documentRevision bumps once the pixels are in.
+            key={`levels-${documentRevision}`}
             levels={levels}
             imageReady={imageReady}
           />
@@ -412,8 +434,9 @@ export function ToolsSidebar({
 
         {activeTool === "effects" && effectsMode === "presets" && (
           <PresetsSettings
-            // Keyed on the photo so a new photo starts with no preview open.
-            key={activePhotoId ?? "no-photo"}
+            // Keyed on the document (see Levels above) so a new photo starts
+            // with no preview open, on its own pixels.
+            key={`presets-${documentRevision}`}
             presets={presets}
             imageReady={imageReady}
           />
@@ -519,6 +542,7 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
           />
         )}
+        </PerPhotoRegion>
       </motion.div>
 
       {/* The "Download & Share {FORMAT}" footer used to live here — a

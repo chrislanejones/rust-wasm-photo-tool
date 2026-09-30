@@ -114,7 +114,12 @@ impl ImageHorseTool {
     /// The ACTIVE layer's raw RGBA, for a pure-function pass that will hand the
     /// result straight back to [`Self::apply_blurred_layer_rgba`].
     pub fn active_layer_rgba(&self) -> Vec<u8> {
-        self.layers[self.active].buf.data.clone()
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
+        layer.buf.data.clone()
     }
 
     /// Write `pixels` back into the ACTIVE layer as the result of a blur, with

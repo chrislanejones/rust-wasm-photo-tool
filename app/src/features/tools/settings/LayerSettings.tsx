@@ -167,6 +167,7 @@ export function LayerSettings({
   canRemoveCanvas,
   section,
 }: LayerSettingsProps) {
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
   // Mask brush size + feather — read straight from the store (PaintSettings'
   // precedent for tool state) rather than threaded through AppShell: the
   // Layer Mask section below is their only consumer.
@@ -731,6 +732,9 @@ export function LayerSettings({
           info="Resizes the backing canvas, not the photo — content keeps its native resolution, centered; new area uses the backing color."
         />
         <CanvasResize
+          // A typed W/H draft is this photo's; a switch between two photos
+          // of the same size used to carry it over (it re-seeds on size only).
+          key={activePhotoId ?? "no-photo"}
           width={canvasWidth}
           height={canvasHeight}
           disabled={disabled}

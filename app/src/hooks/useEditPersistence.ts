@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -320,7 +321,10 @@ export function cloudPhotosAllowed(
   isAuthenticated: boolean,
   onlineFeaturesEnabled: boolean,
 ): boolean {
-  return isAuthenticated && onlineFeaturesEnabled;
+  // Through the registry, so the switch and Settings › Security are reading
+  // the same answer (shared/networkPaths.ts). Identical to the old
+  // `isAuthenticated && onlineFeaturesEnabled` — pinned in networkPaths.test.ts.
+  return isAuthenticated && isNetworkPathAllowed("photo_backup", onlineFeaturesEnabled);
 }
 
 export function useEditPersistence() {

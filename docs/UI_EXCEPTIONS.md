@@ -44,12 +44,12 @@ which is the blunter of the two instruments.
 
 | File | Hits it hides | Reason | Verdict |
 | --- | ---: | --- | --- |
-| `features/gallery/GalleryBar.tsx` | **7** | unknown — inherited | **Real.** Review Night 7. |
-| `features/canvas/CompareSlider.tsx` | **2** | unknown — inherited | **Real.** Review Night 7. |
-| `components/MagnifierOverlay.tsx` | **1** | unknown — inherited | **Real.** Review Night 7. |
-| `features/canvas/CanvasArea.tsx` | **0** | unknown — inherited | **Dead.** Drop it. |
-| `features/canvas/PenOverlay.tsx` | **0** | unknown — inherited | **Dead.** Drop it. |
-| `lib/colors.ts` | **0** | unknown — inherited | **Dead.** The check matches Tailwind class names; this file holds hex. |
+| `features/gallery/GalleryBar.tsx` | **7** | **on-photo ink** — white text and icons drawn over a thumbnail | **Legitimate** (Night 7). See below. |
+| `features/canvas/CompareSlider.tsx` | **2** | **on-photo ink** — the divider and its label, over the photo | **Legitimate** (Night 7). |
+| `components/MagnifierOverlay.tsx` | **1** | **on-photo ink** — the readout on a black scrim | **Legitimate** (Night 7). |
+| ~~`features/canvas/CanvasArea.tsx`~~ | 0 | — | **Dropped Night 7.** |
+| ~~`features/canvas/PenOverlay.tsx`~~ | 0 | — | **Dropped Night 7.** |
+| ~~`lib/colors.ts`~~ | 0 | — | **Dropped Night 7.** |
 
 Measured 09-23-2026, and the arithmetic closes exactly, which is what makes it
 trustworthy:
@@ -67,14 +67,25 @@ exclusions can be deleted today without moving the count by one. They are not
 protecting anything; they are only removing three files from the reach of a
 check that will otherwise catch the next raw color someone puts in them.
 
-**Not done tonight.** Night 1 changes no gate. It is a two-line diff for
-Night 7, and the count stays at 22 either way.
+**Done Night 7 (09-29-2026).** The three dead globs are gone from
+`guardrails.sh`, and `raw-colors` still reads **22** — the prediction held.
+
+**Why the other three stay, and what would retire them.** All ten hits are the
+same thing: white drawn on top of a PHOTO — a count over a thumbnail, a check
+mark, the compare divider, a magnifier readout. That ink must be white in both
+themes, because the photo under it does not change with the theme; a theme
+token such as `text-theme-primary` would turn it dark in light mode and it
+would vanish. So they are not drift. What is missing is a token that SAYS
+"on a photo": e.g. `--color-on-photo: #fff` in both themes and `text-on-photo`
+/ `bg-on-photo`. Swapping to it is pixel-identical (white stays white) and would
+let all three exclusions go. **Not done:** naming a new token is a design
+decision, so it is a proposal for Chris, not a night's change.
 
 ### `z-index` — baseline 4
 
 | File | Hits it hides | Reason | Verdict |
 | --- | ---: | --- | --- |
-| `features/gallery/GalleryBar.tsx` | **7** | unknown — inherited | Review Night 7. |
+| `features/gallery/GalleryBar.tsx` | **7** | **local stacking inside one thumbnail**: scrim `z-10`, label `z-20`, the two corner buttons `z-30` | **Legitimate** (Night 7). The `--z-*` tokens name APP layers (dialog, sticky nav); these never leave the tile's own stacking context, and naming them as app layers would be wrong. |
 | `app/AppShell.tsx` | **3** | unknown — inherited | Expected — AppShell is the stacking root, and it is being dismantled anyway. |
 
 10 hidden against a visible baseline of 4. Of every UI check, this is the one
