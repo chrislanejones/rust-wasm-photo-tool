@@ -145,6 +145,8 @@ import {
 } from "@/components/ui/context-menu";
 import { ShareButton } from "@/components/ShareButton";
 import { DownloadDialog } from "@/components/DownloadDialog";
+import { downloadActiveSvg, downloadSvgZip } from "./session/svgDownload";
+import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import {
   Undo,
   Redo,
@@ -875,7 +877,14 @@ export function AppShell() {
     downloadFormat,
     setDownloadFormat,
     isOraDownload,
+    isSvgDownload,
   } = useDownloadFormat();
+  // SVG export (lib/svgPassthrough): live for the open image when it was
+  // uploaded as SVG, and for the zip when any image was.
+  const svgSources = useSvgSourceStore((s) => s.sources);
+  const svgAll = photos.filter((p) => p.id in svgSources).length;
+  const activeIsSvg = !!activePhotoId && activePhotoId in svgSources;
+  const svgSelectedDownload = isSvgDownload && activeIsSvg;
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -1123,6 +1132,18 @@ export function AppShell() {
   );
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
+    if (svgSelectedDownload && activePhotoId) {
+      void downloadActiveSvg(activePhotoId, stamp.toolRef.current, exportName.stem()).then(
+        (ok) => {
+          if (!ok) {
+            toast.error(
+              "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
+            );
+          }
+        },
+      );
+      return;
+    }
     if (isOraDownload) {
       void downloadOraWithToast({
         stampToolRef: stamp.toolRef,
@@ -1712,6 +1733,9 @@ export function AppShell() {
     try {
       // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
       // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
+      // The gallery route gets the SVG itself: `handleAddPhotos` rasterizes it
+      // too, and keeps the markup for SVG export on the way.
+      const galleryFile = file;
       if (isSvgFile(file)) {
         file = await rasterizeSvgToPng(file);
         source = file;
@@ -1728,7 +1752,7 @@ export function AppShell() {
       // disabled by `hasActivePhoto` at the render site, so this matches
       // exactly what the dialog would have offered.
       if (activePhotoId === null) {
-        await handleAddPhotos([file]);
+        await handleAddPhotos([galleryFile]);
         return;
       }
 
@@ -1736,7 +1760,7 @@ export function AppShell() {
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
         if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-        return { pixels, w, h, file, previewUrl };
+        return { pixels, w, h, file: galleryFile, previewUrl };
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -2384,6 +2408,23 @@ export function AppShell() {
     [exportPhotosToZip, photos],
   );
 
+  const handleExportAllSvg = useCallback(async () => {
+    const { written, skipped } = await downloadSvgZip({
+      photos,
+      activePhotoId,
+      tool: stamp.toolRef.current,
+      loadPhotoEdit,
+      filename: "svgs.zip",
+    });
+    if (skipped > 0) {
+      toast.error(
+        written > 0
+          ? `${skipped} SVG${skipped === 1 ? " was" : "s were"} left out — changed beyond a crop.`
+          : "No SVG could be saved — each has been changed beyond a crop.",
+      );
+    }
+  }, [photos, activePhotoId, stamp.toolRef, loadPhotoEdit]);
+
   // The single Download button always opens the chooser dialog (Canvas Image /
   // All / Clipboard Copy). The "All" button is hidden when only one image is
   // loaded. The plural label ("JPEGs") reflects the gallery count.
@@ -2774,13 +2815,25 @@ export function AppShell() {
         format={downloadFormat}
         onFormatChange={(v) => {
           setDownloadFormat(v);
-          if (v !== "ora") setExportFormat(v); // ORA stays local-only
+          // ORA and SVG stay local-only
+          if (v !== "ora" && v !== "svg") setExportFormat(v);
         }}
         fileName={exportName}
-        ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
-        downloadLabel={
-          isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`
+        ext={
+          svgSelectedDownload
+            ? ".svg"
+            : isOraDownload
+              ? ".ora"
+              : EXT[effectiveExportFormat]
         }
+        downloadLabel={
+          svgSelectedDownload
+            ? "Download SVG"
+            : isOraDownload
+              ? "Download ORA"
+              : `Download ${effectiveExportFormat.toUpperCase()}`
+        }
+        svg={{ selected: activeIsSvg, all: svgAll }}
         onDownload={downloadFromDialog}
         zipFormat={exportFormat}
         zipLabel={effectiveExportFormat.toUpperCase()}
@@ -2810,7 +2863,8 @@ export function AppShell() {
         }}
         onDownloadAll={() => {
           setExportDialogOpen(false);
-          handleExportAll();
+          if (isSvgDownload && svgAll > 0) void handleExportAllSvg();
+          else handleExportAll();
         }}
       />
 

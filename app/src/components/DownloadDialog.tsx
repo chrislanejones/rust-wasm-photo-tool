@@ -10,6 +10,11 @@
 //                   actions in a row: Download, Share link, Clipboard.
 //   2b. All       — one full-width Download (N) that zips every image.
 //
+// SVG sits in both Format pickers and is disabled until an SVG is open: on
+// Selected, when the image being worked on was uploaded as an SVG; on All, when
+// any of them was. It writes the uploaded SVG back out, cropped the way the
+// image was cropped (lib/svgPassthrough.ts) — a zip of them on All.
+//
 // The action rows are the tool panels' PanelActionBar — the Apply Crop button
 // — so the bottom of every pane looks like the bottom of every tool panel.
 //
@@ -38,6 +43,7 @@ import {
   FileOraIcon,
   FilePngIcon,
   FilePsdIcon,
+  FileSvgIcon,
   FileWebpIcon,
 } from "@/components/icons/FileTypeIcons";
 import type {
@@ -48,6 +54,9 @@ import type {
 /** The format picker's ids: every real download format, plus PSD, which is
  *  shown (disabled, "Coming soon") but can never be picked. */
 type FormatTileId = DownloadFormat | "psd";
+
+const SVG_HINT = "Vector · keeps crop";
+const SVG_OFF_HINT = "SVG uploads only";
 
 /** The file-type glyphs carry lettering, so they get a larger slot than the
  *  tile's default 24px icon. Inline size, not a class: ToolButton's
@@ -60,6 +69,7 @@ const FORMAT_TILE_ICONS: Record<FormatTileId, React.ComponentType> = {
   webp: () => <FileWebpIcon style={BIG} />,
   avif: () => <FileAvifIcon style={BIG} />,
   ora: () => <FileOraIcon style={BIG} />,
+  svg: () => <FileSvgIcon style={BIG} />,
   psd: () => <FilePsdIcon style={BIG} />,
 };
 
@@ -92,6 +102,9 @@ interface DownloadDialogProps {
   /** What the browser will ACTUALLY write for it ("PNG" for an AVIF it
    *  cannot encode), so the button never promises a format it won't deliver. */
   zipLabel: string;
+  /** Where the SVG tile is live: `selected` — the open image is an SVG;
+   *  `all` — how many of the open images are. */
+  svg: { selected: boolean; all: number };
 }
 
 export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogProps) {
@@ -123,6 +136,7 @@ function DownloadPanes({
   onDownloadAll,
   zipFormat,
   zipLabel,
+  svg,
 }: Omit<DownloadDialogProps, "open" | "onOpenChange">) {
   const multi = photoCount > 1;
   const [picked, setPicked] = React.useState<Pane>(multi ? "choose" : "selected");
@@ -137,6 +151,20 @@ function DownloadPanes({
   };
   const back = multi ? () => go("choose") : undefined;
 
+  const svgTile = (enabled: boolean) => ({
+    id: "svg" as const,
+    label: enabled ? SVG_HINT : SVG_OFF_HINT,
+    icon: FORMAT_TILE_ICONS.svg,
+    title: enabled
+      ? `SVG — ${SVG_HINT}. Painting and filters stay in the other formats.`
+      : "SVG — only for images uploaded as SVG.",
+    disabled: !enabled,
+  });
+  // An SVG pick that the pane cannot honor (picked on All, then Selected on a
+  // raster image) shows the raster format the button will actually write.
+  const selectedValue: FormatTileId = format === "svg" && !svg.selected ? zipFormat : format;
+  const allSvg = format === "svg" && svg.all > 0;
+
   const formatOptions = [
     ...formats.map((f) => ({
       id: f.value as FormatTileId,
@@ -144,6 +172,7 @@ function DownloadPanes({
       icon: FORMAT_TILE_ICONS[f.value],
       title: `${f.label} — ${f.hint}`,
     })),
+    svgTile(svg.selected),
     {
       id: "psd" as const,
       label: "Coming soon",
@@ -185,7 +214,7 @@ function DownloadPanes({
               label="Format"
               stacked
               columns={3}
-              value={format}
+              value={selectedValue}
               onChange={(id) => {
                 if (id !== "psd") onFormatChange(id);
               }}
@@ -212,25 +241,40 @@ function DownloadPanes({
             {/* The same tiles as Selected, on the same grid, minus the two that
                 are whole-project files rather than one image each (ORA, PSD).
                 Every image in the zip is written in this format; one already
-                in it goes in untouched (lib/zipEntry.ts). */}
+                in it goes in untouched (lib/zipEntry.ts). SVG is live here
+                when ANY open image is an SVG, and zips just those. */}
             <ToolButtonGroup<FormatTileId>
               label="Format"
               stacked
               columns={3}
-              value={zipFormat}
+              value={allSvg ? "svg" : zipFormat}
               onChange={(id) => {
                 if (id !== "psd" && id !== "ora") onFormatChange(id);
               }}
-              options={formatOptions.filter((o) => o.id !== "ora" && o.id !== "psd")}
+              options={formatOptions
+                .filter((o) => o.id !== "ora" && o.id !== "psd")
+                .map((o) => (o.id === "svg" ? svgTile(svg.all > 0) : o))}
             />
             <DialogDescription>
-              Every open image, each with its edits, in one{" "}
-              <span className="font-mono">.zip</span>.
+              {allSvg ? (
+                <>
+                  Every image uploaded as SVG, each with its crop, in one{" "}
+                  <span className="font-mono">.zip</span>
+                  {svg.all < photoCount ? " — the others are left out." : "."}
+                </>
+              ) : (
+                <>
+                  Every open image, each with its edits, in one{" "}
+                  <span className="font-mono">.zip</span>.
+                </>
+              )}
             </DialogDescription>
             <PanelActionBar>
               <PanelAction onClick={onDownloadAll}>
                 <FolderArchive className="h-4 w-4" />
-                Download {photoCount} as {zipLabel}
+                {allSvg
+                  ? `Download ${svg.all} as SVG`
+                  : `Download ${photoCount} as ${zipLabel}`}
               </PanelAction>
             </PanelActionBar>
           </>
