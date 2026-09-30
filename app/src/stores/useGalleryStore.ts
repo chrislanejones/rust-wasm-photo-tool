@@ -44,6 +44,11 @@ interface GalleryState {
    * scheduling of a save, not anything a reload needs to remember.
    */
   layerRevision: number;
+  /** Bumps when a load has finished putting a document in the engine — AFTER
+   *  the pixels arrive, unlike `activePhotoId`, which moves before the load.
+   *  Panels that read the engine when they mount (Levels, Presets) key on
+   *  this, so they never start against the outgoing photo. Session-only. */
+  documentRevision: number;
   /** Gallery cap for the current tier. */
   maxPhotos: number;
   /** Prior-session manifest offered on the Resume screen (null = none). */
@@ -59,6 +64,7 @@ interface GalleryState {
   setHasBeenModified: (v: SetArg<boolean>) => void;
   /** Record a layer-panel edit that carries no undo entry (#53). */
   bumpLayerRevision: () => void;
+  bumpDocumentRevision: () => void;
   setMaxPhotos: (v: SetArg<number>) => void;
   setResumeManifest: (v: SetArg<GalleryManifest | null>) => void;
 }
@@ -73,6 +79,7 @@ export const useGalleryStore = create<GalleryState>()(
   modifiedPhotos: new Set(),
   hasBeenModified: false,
   layerRevision: 0,
+  documentRevision: 0,
   maxPhotos: DEFAULT_PHOTO_LIMIT,
   resumeManifest: null,
 
@@ -87,6 +94,7 @@ export const useGalleryStore = create<GalleryState>()(
   setHasBeenModified: (v) =>
     set((s) => ({ hasBeenModified: resolveSet(v, s.hasBeenModified) })),
   bumpLayerRevision: () => set((s) => ({ layerRevision: s.layerRevision + 1 })),
+  bumpDocumentRevision: () => set((s) => ({ documentRevision: s.documentRevision + 1 })),
   setMaxPhotos: (v) => set((s) => ({ maxPhotos: resolveSet(v, s.maxPhotos) })),
   setResumeManifest: (v) =>
     set((s) => ({ resumeManifest: resolveSet(v, s.resumeManifest) })),

@@ -36,6 +36,7 @@ import {
   sizeLiveCanvas,
 } from "@/lib/engine/port";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { setEngineDocument } from "@/lib/engineDocument";
 import { makeLoadQueue, isStale, claimEngineDocument, type LoadOpts } from "./engineLoadQueue";
 export type { LoadOpts } from "./engineLoadQueue";
@@ -595,6 +596,7 @@ export function useEngineCore(
       }
       sourcePosRef.current = null;
       syncState();
+      useGalleryStore.getState().bumpDocumentRevision();
       return true;
     }),
     [canvasRef, syncState, flushToCanvas, serialLoad],
@@ -646,6 +648,7 @@ export function useEngineCore(
       // Restored annotation lists differ from whatever was showing — same
       // re-sync the undo path performs.
       useAnnotationStore.getState().bumpAnnotations();
+      useGalleryStore.getState().bumpDocumentRevision();
       return true;
     }),
     [flushToCanvas, syncState, serialLoad],
@@ -842,6 +845,7 @@ export function useEngineCore(
 
       flushToCanvas();
       syncState();
+      useGalleryStore.getState().bumpDocumentRevision();
       return true;
     }),
     [canvasRef, flushToCanvas, syncState, serialLoad],

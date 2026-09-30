@@ -43,6 +43,7 @@ import type { AIResultPixels } from "@/hooks/useAIJob";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
@@ -247,6 +248,7 @@ export function ToolsSidebar({
 }: ToolsSidebarProps) {
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
   const effectsMode = useToolStore((s) => s.effectsMode);
+  const documentRevision = useGalleryStore((s) => s.documentRevision);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
   // the groups that absorbed several old tools. Edit is the case that needs it
   // most — Crop, Transform and Color Picker are all `crop`, so switching on the
@@ -406,9 +408,10 @@ export function ToolsSidebar({
 
         {activeTool === "effects" && effectsMode === "levels" && (
           <LevelsSettings
-            // Keyed on the photo so switching photos starts fresh sliders and a
-            // fresh preview on the new pixels.
-            key={activePhotoId ?? "no-photo"}
+            // Keyed on the DOCUMENT, not the photo id: the id moves before the
+            // load, and a remount then ran begin()/histogram() against the
+            // outgoing photo. documentRevision bumps once the pixels are in.
+            key={`levels-${documentRevision}`}
             levels={levels}
             imageReady={imageReady}
           />
@@ -416,8 +419,9 @@ export function ToolsSidebar({
 
         {activeTool === "effects" && effectsMode === "presets" && (
           <PresetsSettings
-            // Keyed on the photo so a new photo starts with no preview open.
-            key={activePhotoId ?? "no-photo"}
+            // Keyed on the document (see Levels above) so a new photo starts
+            // with no preview open, on its own pixels.
+            key={`presets-${documentRevision}`}
             presets={presets}
             imageReady={imageReady}
           />

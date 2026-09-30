@@ -94,6 +94,7 @@ import { useDownloadFormat } from "./session/useDownloadFormat";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
 import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
@@ -1296,6 +1297,7 @@ export function AppShell() {
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
   });
+  usePhotoSwitchReset(activePhotoId, drawingTools.clearCropSelection);
 
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
