@@ -1895,7 +1895,7 @@ export function AppShell() {
       if (depth === 0) setIsDraggingImage(false);
     };
     const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
+      if (!isFileDrag(e) || e.defaultPrevented) return; // a drop zone took it
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
