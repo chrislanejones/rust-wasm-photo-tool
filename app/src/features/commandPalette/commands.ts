@@ -334,7 +334,10 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       id: "action.toggle-history",
       label: "Toggle Edit History",
       group: "actions",
-      keywords: ["history panel", "review", "edits"],
+      // "combine" reaches it too: the New / Add / Subtract / Intersect strip
+      // moved into this panel out of the Select tool, and the palette is where
+      // someone who remembers the control but not where it lives will look.
+      keywords: ["history panel", "review", "edits", "combine", "selection", "layers"],
       icon: History,
       shortcut: "Alt+R",
       run: () => ui().setShowHistory((v) => !v),

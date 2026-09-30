@@ -207,8 +207,10 @@ export default tseslint.config(
     // pixelate / redact) and the Download dialog's format logic each became a
     // session hook, and the brush-cursor radius became a pure function with a
     // test. The ratchet only ever goes DOWN; raise it and the file has won.
+    // 3564 -> 3540 (ADR-075): the selection overlay's tool gate went, and the
+    // ratchet follows the file down in the same commit.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3564 }] },
+    rules: { "max-lines": ["error", { max: 3540 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
