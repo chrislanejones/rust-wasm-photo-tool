@@ -7,6 +7,9 @@ import {
   framingFromRect,
   moveCropRect,
   resizeCropRectFromCorner,
+  freeCropRectFromCorner,
+  cornerToward,
+  ratioLabel,
 } from "./batchCrop";
 
 describe("anchoredCropRect", () => {
@@ -144,5 +147,56 @@ describe("resizeCropRectFromCorner", () => {
   it("never shrinks below the minimum frame", () => {
     const out = resizeCropRectFromCorner(400, 300, 1, 1, r, "se", 100, 100);
     expect(out.width).toBe(30); // 10% of the 300px largest square
+  });
+});
+
+describe("freeCropRectFromCorner (Shift-drag)", () => {
+  const start = { x: 100, y: 100, width: 200, height: 200 };
+
+  it("breaks the ratio: each axis follows the pointer on its own", () => {
+    expect(freeCropRectFromCorner(1000, 800, start, "se", 500, 200)).toEqual({
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 100,
+    });
+  });
+
+  it("pins the opposite corner and stops at the photo edge", () => {
+    expect(freeCropRectFromCorner(1000, 800, start, "nw", -50, 20)).toEqual({
+      x: 0,
+      y: 20,
+      width: 300,
+      height: 280,
+    });
+  });
+
+  it("never collapses below the minimum side", () => {
+    const r = freeCropRectFromCorner(1000, 800, start, "se", 90, 90);
+    expect(r.width).toBe(8);
+    expect(r.height).toBe(8);
+  });
+
+  it("draws from a zero-size start (a fresh drag on the photo)", () => {
+    const at = { x: 400, y: 300, width: 0, height: 0 };
+    const corner = cornerToward(400, 300, 250, 500);
+    expect(corner).toBe("sw");
+    expect(freeCropRectFromCorner(1000, 800, at, corner, 250, 500)).toEqual({
+      x: 250,
+      y: 300,
+      width: 150,
+      height: 200,
+    });
+  });
+});
+
+describe("ratioLabel", () => {
+  it("names presets, including a scaled-up custom that equals one", () => {
+    expect(ratioLabel([4, 5])).toBe("4:5");
+    expect(ratioLabel([800, 1000])).toBe("4:5");
+  });
+  it("prints a custom ratio against 1", () => {
+    expect(ratioLabel([640, 500])).toBe("1.28:1");
+    expect(ratioLabel([500, 640])).toBe("1:1.28");
   });
 });

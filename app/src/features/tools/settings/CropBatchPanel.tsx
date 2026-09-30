@@ -5,9 +5,11 @@
 // the live engine so the crop is a normal undo step.
 //
 // The FRAME: by default every photo is cropped at the anchor. Drag the frame
-// on the preview (BatchCropOverlay) and that photo keeps your framing instead;
-// click through the gallery to frame each slide before cropping them all.
-import { useCallback, useEffect, useState } from "react";
+// on the preview (BatchCropOverlay) and, on release, that framing becomes the
+// one every photo follows (the gallery thumbnails shade what will be cut);
+// frame another photo to give it its own. Shift-drag breaks the ratio — the
+// free shape becomes the custom ratio for every photo. Enter runs Crop All.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
@@ -29,7 +31,7 @@ import {
   batchCropOutputSize,
   cropRgba,
   framedCropRect,
-  type BatchCropRatioId,
+  ratioLabel,
   type BatchCropWidth,
 } from "@/lib/batchCrop";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -38,6 +40,8 @@ import { rebaseOnOriginalCrop } from "@/lib/svgPassthrough";
 import {
   useBatchCropStore,
   showsOriginalFraming,
+  cropRatioOf,
+  framingFor,
   type BatchCropWidthId,
 } from "@/stores/useBatchCropStore";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -62,8 +66,6 @@ const WIDTH_OPTIONS: readonly { id: BatchCropWidthId; label: string }[] = [
   { id: "1440", label: "1440px" },
 ];
 const widthOf = (id: BatchCropWidthId): BatchCropWidth => (id === "keep" ? null : Number(id));
-const ratioDims = (id: BatchCropRatioId): [number, number] =>
-  BATCH_CROP_RATIOS.find((r) => r.id === id)!.dims;
 
 /** Rust `resize_with_filter` code for Lanczos3 — the Resize panel's best. */
 const LANCZOS3 = 3;
@@ -86,6 +88,9 @@ export function CropBatchPanel({
   syncState,
 }: CropBatchPanelProps) {
   const ratioId = useBatchCropStore((s) => s.ratioId);
+  const custom = useBatchCropStore((s) => s.customRatio);
+  // The shape every photo gets — a Shift-drag's custom one, else the tile's.
+  const label = useBatchCropStore((s) => ratioLabel(cropRatioOf(s)));
   const setRatioId = useBatchCropStore((s) => s.setRatioId);
   const anchor = useBatchCropStore((s) => s.anchor);
   const setAnchor = useBatchCropStore((s) => s.setAnchor);
@@ -93,7 +98,10 @@ export function CropBatchPanel({
   const setWidthId = useBatchCropStore((s) => s.setWidthId);
   const framing = useBatchCropStore((s) => s.framing);
   const clearFraming = useBatchCropStore((s) => s.clearFraming);
+  const shared = useBatchCropStore((s) => s.shared);
+  const setApplyAll = useBatchCropStore((s) => s.setApplyAll);
   const framedCount = photos.filter((p) => framing[p.id]).length;
+  const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
     done: 0,
@@ -130,22 +138,25 @@ export function CropBatchPanel({
 
   const sizeNote = (() => {
     const targetWidth = widthOf(widthId);
-    if (targetWidth === null) return `Each photo keeps its own resolution at ${ratioId}.`;
-    const s = batchCropOutputSize({ width: 1, height: 1 }, ratioDims(ratioId), targetWidth);
+    if (targetWidth === null) return `Each photo keeps its own resolution at ${label}.`;
+    const dims = cropRatioOf(useBatchCropStore.getState());
+    const s = batchCropOutputSize({ width: 1, height: 1 }, dims, targetWidth);
     return `Every photo comes out ${s.width}×${s.height}.`;
   })();
 
   const applyToAll = useCallback(async () => {
-    if (photos.length === 0) return;
+    // Enter can arrive while a pass is still running; the button can't.
+    if (photos.length === 0 || runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     setErrorMsg(null);
     setProgress({ done: 0, total: photos.length });
-    const ratio = ratioDims(ratioId);
     const targetWidth = widthOf(widthId);
     const crops = useBatchCropStore.getState();
-    // A hand-set frame if the preview has one for this photo, else the anchor.
+    const ratio = cropRatioOf(crops);
+    // The photo's own frame, else the shared one, else the anchor.
     const rectFor = (id: string, w: number, h: number, useFraming: boolean) => {
-      const f = useFraming ? crops.framing[id] : undefined;
+      const f = useFraming ? framingFor(crops, id) : undefined;
       return f
         ? framedCropRect(w, h, ratio[0], ratio[1], f)
         : anchoredCropRect(w, h, ratio[0], ratio[1], anchor);
@@ -311,19 +322,19 @@ export function CropBatchPanel({
 
       setAppliedCount(succeeded);
       toast.success(
-        `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${ratioId}`,
+        `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${ratioLabel(ratio)}`,
       );
     } catch (err) {
       console.error("Bulk-crop: fatal error", err);
       setErrorMsg("Something went wrong.");
       toast.error("Couldn't crop the photos.");
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   }, [
     photos,
     activePhotoId,
-    ratioId,
     widthId,
     anchor,
     setPhotos,
@@ -331,6 +342,13 @@ export function CropBatchPanel({
     flushToCanvas,
     syncState,
   ]);
+
+  // Enter → Crop All, through the app's own Enter-to-crop shortcut (which
+  // already stands aside for text fields and focused buttons).
+  useEffect(() => {
+    setApplyAll(() => void applyToAll());
+    return () => setApplyAll(null);
+  }, [applyToAll, setApplyAll]);
 
   return (
     <div className="space-y-6">
@@ -343,10 +361,16 @@ export function CropBatchPanel({
         <ToolButtonGroup
           aria-label="Ratio"
           options={RATIO_OPTIONS}
-          value={ratioId}
+          // A Shift-drag's custom shape lights no tile; picking one ends it.
+          value={custom ? undefined : ratioId}
           onChange={setRatioId}
           columns={4}
         />
+        {custom && (
+          <p className="mt-2 text-2xs text-theme-muted-foreground">
+            {`Custom ${label}, from a Shift-drag. Pick a ratio to go back.`}
+          </p>
+        )}
       </div>
 
       <PlacementGrid
@@ -358,13 +382,16 @@ export function CropBatchPanel({
 
       <div className="space-y-2">
         <p className="text-2xs text-theme-muted-foreground">
-          Drag the frame on the preview to choose what each photo keeps. Click
-          another photo in the gallery to frame it too.
+          Drag on the preview to frame the crop; let go and every photo
+          follows it — the gallery shades what each one loses. Hold Shift to
+          break the ratio. Frame another photo to give it its own. Enter crops
+          them all.
         </p>
         {framedCount > 0 && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-2xs text-theme-muted-foreground">
               {`${framedCount} of ${photos.length} framed by hand`}
+              {shared && framedCount < photos.length ? " · the rest follow the last frame" : ""}
             </span>
             {activePhotoId && framing[activePhotoId] && (
               <Button
@@ -396,7 +423,7 @@ export function CropBatchPanel({
       >
         {running
           ? `Processing ${progress.done}/${progress.total}…`
-          : `Crop All Images to ${ratioId}`}
+          : `Crop All Images to ${label}`}
       </Button>
 
       {appliedCount !== null && !running && (

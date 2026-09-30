@@ -130,6 +130,7 @@ import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useBatchCropStore } from "@/stores/useBatchCropStore";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -842,6 +843,8 @@ export function AppShell() {
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const activeTool = useToolStore((s) => s.activeTool);
+  // Batch › Crop's Crop All while its panel is mounted — Enter runs it.
+  const batchCropApply = useBatchCropStore((s) => s.applyAll);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
   // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
@@ -2522,8 +2525,8 @@ export function AppShell() {
     onToggleMove: handleToggleMove,
     onLayerToFront: handleLayerToFront,
     onLayerToBack: handleLayerToBack,
-    onApplyCrop: drawingTools.applyCrop,
-    hasCropSelection: drawingTools.cropSelection !== null,
+    onApplyCrop: batchCropApply ?? drawingTools.applyCrop,
+    hasCropSelection: drawingTools.cropSelection !== null || batchCropApply !== null,
     onShowCelebration: () => setShowCelebration(true),
     onAdjustBrushSize: adjustBrushSize,
     setShowUpload,

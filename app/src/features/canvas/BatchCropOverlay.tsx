@@ -1,13 +1,16 @@
 // Batch › Crop — the crop frame on the preview. Drag inside it to move, drag a
-// corner to resize (ratio locked), and that photo keeps your framing when
-// "Crop All" runs. Photos you never touch fall back to the panel's anchor.
+// corner to resize (ratio locked; hold Shift to break it), or drag anywhere
+// else on the photo to draw a new frame. Nothing is committed until the mouse
+// is let go: THEN the frame is stored, the other photos' gallery thumbnails
+// shade what Enter / "Crop All" will cut (BatchCropThumbShade), and the
+// frame becomes the one every photo without its own framing follows.
 //
 // Mounted through CanvasArea's `renderOverlay` like DuplicatePadOverlay, and
 // positioned the same way: a box the size of the canvas's fit-scaled CSS box,
 // riding the same pan/zoom transform, so percentages land on image pixels.
 // The frame is measured in PHOTO px (inside `photoBounds`), not document px,
 // because the crop is of the photo, not the padded artboard around it.
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { OverlayFrame } from "./overlayFrame";
 import type { PhotoBounds } from "@/hooks/usePhotoBounds";
 import {
@@ -16,13 +19,21 @@ import {
   framingFromRect,
   moveCropRect,
   resizeCropRectFromCorner,
-  BATCH_CROP_RATIOS,
+  freeCropRectFromCorner,
+  cornerToward,
+  ratioLabel,
   type CropCorner,
   type CropRect,
 } from "@/lib/batchCrop";
-import { useBatchCropStore, showsOriginalFraming } from "@/stores/useBatchCropStore";
+import {
+  useBatchCropStore,
+  showsOriginalFraming,
+  cropRatioOf,
+  framingFor,
+} from "@/stores/useBatchCropStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { useUIStore } from "@/stores/useUIStore";
 
 // On-photo colors are inline, not theme tokens: they sit on the user's
 // picture, where only a black shade and a white line read on anything — the
@@ -57,21 +68,31 @@ export function BatchCropOverlay({
   undoCount,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
-    kind: "move" | CropCorner;
+    /** "draw" = a fresh frame dragged out from an empty spot on the photo. */
+    kind: "move" | "draw" | CropCorner;
     startX: number;
     startY: number;
     start: CropRect;
   } | null>(null);
+  /** The frame WHILE a drag is in flight. Local on purpose: the store (and so
+   *  the thumbnails' shade) only hears about it on release. `free` = Shift was
+   *  down, so the shape is the new custom ratio. */
+  const [draft, setDraft] = useState<{ rect: CropRect; free: boolean } | null>(null);
 
   const on = useToolStore((s) => s.activeTool === "emoji" && s.batchMode === "crop");
   const photoId = useGalleryStore((s) => s.activePhotoId);
+  // Space / H pan: step out of the way so the drag reaches the canvas.
+  const hit = useUIStore((s) => s.isPanning) ? "none" : "auto";
   const originalKey = useGalleryStore(
     (s) => s.photos.find((p) => p.id === s.activePhotoId)?.originalKey,
   );
-  const ratioId = useBatchCropStore((s) => s.ratioId);
+  // A Shift-drag's custom shape, else the ratio tile's.
+  const rw = useBatchCropStore((s) => cropRatioOf(s)[0]);
+  const rh = useBatchCropStore((s) => cropRatioOf(s)[1]);
   const anchor = useBatchCropStore((s) => s.anchor);
-  const framing = useBatchCropStore((s) => (photoId ? s.framing[photoId] : undefined));
+  const framing = useBatchCropStore((s) => (photoId ? framingFor(s, photoId) : undefined));
   const setFraming = useBatchCropStore((s) => s.setFraming);
   const clearFraming = useBatchCropStore((s) => s.clearFraming);
   const onOriginal = useBatchCropStore((s) =>
@@ -82,11 +103,20 @@ export function BatchCropOverlay({
   const b = photoBounds ?? { x: 0, y: 0, width, height };
   if (b.width < 2 || b.height < 2) return null;
 
-  const [rw, rh] = BATCH_CROP_RATIOS.find((r) => r.id === ratioId)!.dims;
-  const rect = framing
+  const stored = framing
     ? framedCropRect(b.width, b.height, rw, rh, framing)
     : anchoredCropRect(b.width, b.height, rw, rh, anchor);
-  const commit = (r: CropRect) => setFraming(photoId, framingFromRect(b.width, b.height, rw, rh, r));
+  const rect = draft?.rect ?? stored;
+  const label = ratioLabel(draft?.free ? [rect.width, rect.height] : [rw, rh]);
+  /** Store a frame. A free (Shift) frame's own shape becomes the ratio. */
+  const commit = (r: CropRect, free = false) => {
+    const [cw, ch] = free ? [r.width, r.height] : [rw, rh];
+    setFraming(
+      photoId,
+      framingFromRect(b.width, b.height, cw, ch, r),
+      free ? [r.width, r.height] : undefined,
+    );
+  };
 
   /** Screen px → document px, from the box's live on-screen size. */
   const docPerScreen = () => {
@@ -94,11 +124,37 @@ export function BatchCropOverlay({
     return box && box.width > 0 ? width / box.width : 1;
   };
 
+  /** Take focus off whatever was clicked last (a ratio tile, say): the app's
+   *  Enter shortcut stands aside for a focused button, so without this, Enter
+   *  after a drag would re-press the tile instead of cropping. */
+  const grabFocus = () => frameRef.current?.focus({ preventScroll: true });
+
   const startDrag = (e: React.PointerEvent<HTMLElement>, kind: "move" | CropCorner) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
+    grabFocus();
     dragRef.current = { kind, startX: e.clientX, startY: e.clientY, start: rect };
+  };
+  /** Pointer down on the photo OUTSIDE the frame: start a new one there. */
+  const startDraw = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return;
+    const box = boxRef.current?.getBoundingClientRect();
+    if (!box || box.width <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    grabFocus();
+    const k = width / box.width;
+    const x = Math.max(0, Math.min(b.width, (e.clientX - box.left) * k - b.x));
+    const y = Math.max(0, Math.min(b.height, (e.clientY - box.top) * k - b.y));
+    dragRef.current = {
+      kind: "draw",
+      startX: e.clientX,
+      startY: e.clientY,
+      start: { x, y, width: 0, height: 0 },
+    };
   };
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     const d = dragRef.current;
@@ -108,18 +164,30 @@ export function BatchCropOverlay({
     const dx = (e.clientX - d.startX) * k;
     const dy = (e.clientY - d.startY) * k;
     if (d.kind === "move") {
-      commit(moveCropRect(b.width, b.height, d.start, dx, dy));
+      setDraft({ rect: moveCropRect(b.width, b.height, d.start, dx, dy), free: false });
       return;
     }
+    // A fresh frame is a corner drag from a zero-size box: the corner is
+    // whichever way the pointer has gone. Ignore a click-sized wobble.
+    if (d.kind === "draw" && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 4) return;
+    const corner = d.kind === "draw" ? cornerToward(0, 0, dx, dy) : d.kind;
     // Where the dragged corner started, plus the pointer's travel.
-    const cx = d.start.x + (d.kind === "ne" || d.kind === "se" ? d.start.width : 0);
-    const cy = d.start.y + (d.kind === "sw" || d.kind === "se" ? d.start.height : 0);
-    commit(resizeCropRectFromCorner(b.width, b.height, rw, rh, d.start, d.kind, cx + dx, cy + dy));
+    const cx = d.start.x + (corner === "ne" || corner === "se" ? d.start.width : 0);
+    const cy = d.start.y + (corner === "sw" || corner === "se" ? d.start.height : 0);
+    // Shift breaks the ratio, read per move so it can be pressed mid-drag.
+    setDraft(
+      e.shiftKey
+        ? { rect: freeCropRectFromCorner(b.width, b.height, d.start, corner, cx + dx, cy + dy), free: true }
+        : { rect: resizeCropRectFromCorner(b.width, b.height, rw, rh, d.start, corner, cx + dx, cy + dy), free: false },
+    );
   };
+  /** Let go: NOW the frame is stored and the thumbnails re-shade. */
   const endDrag = (e: React.PointerEvent<HTMLElement>) => {
     if (!dragRef.current) return;
     e.stopPropagation();
     dragRef.current = null;
+    if (draft) commit(draft.rect, draft.free);
+    setDraft(null);
   };
 
   // Keyboard: arrows move 1% (Shift: 10%), + / − resize, 0 resets.
@@ -200,11 +268,33 @@ export function BatchCropOverlay({
         />
       </svg>
 
+      {/* The photo itself: a drag that starts outside the frame draws a new
+          one. Under the frame and the handles, so those still win. */}
+      <div
+        aria-hidden="true"
+        data-testid="batch-crop-draw-area"
+        onPointerDown={startDraw}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={{
+          position: "absolute",
+          left: pctX(0),
+          top: pctY(0),
+          width: `${(b.width / width) * 100}%`,
+          height: `${(b.height / height) * 100}%`,
+          cursor: "crosshair",
+          pointerEvents: hit,
+          touchAction: "none",
+        }}
+      />
+
       {/* The frame body: drag to move, focus + arrows for keyboard users. */}
       <div
+        ref={frameRef}
         tabIndex={0}
         role="group"
-        aria-label={`Crop frame, ${ratioId}. Drag to move, drag a corner to resize. Arrow keys move, plus and minus resize, 0 resets.`}
+        aria-label={`Crop frame, ${label}. Drag to move, drag a corner to resize, Shift-drag to break the ratio. Enter crops every photo. Arrow keys move, plus and minus resize, 0 resets.`}
         onPointerDown={(e) => startDrag(e, "move")}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -222,7 +312,7 @@ export function BatchCropOverlay({
           width: `${(rect.width / width) * 100}%`,
           height: `${(rect.height / height) * 100}%`,
           cursor: "move",
-          pointerEvents: "auto",
+          pointerEvents: hit,
           touchAction: "none",
         }}
       />
@@ -246,7 +336,7 @@ export function BatchCropOverlay({
             border: "1px solid rgba(0,0,0,0.35)",
             borderRadius: 2,
             cursor: c.cursor,
-            pointerEvents: "auto",
+            pointerEvents: hit,
             touchAction: "none",
           }}
         />

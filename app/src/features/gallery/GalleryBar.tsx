@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { useThumbDevelop } from "./useThumbDevelop";
+import { BatchCropThumbShade } from "./BatchCropThumbShade";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -205,6 +206,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         onLoad={develop.onImgReady}
         onError={develop.onImgReady}
       />
+      <BatchCropThumbShade entry={entry} isActive={isActive} cover={Boolean(vertical)} />
 
       <AnimatePresence>
         {isCompressing && (
