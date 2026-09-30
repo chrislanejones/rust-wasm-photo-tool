@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { canEncode } from "@/lib/encodeSupport";
-import type { ExportFormat } from "@/lib/exportImage";
+import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 
@@ -10,7 +10,23 @@ import { useUIStore } from "@/stores/useUIStore";
  *  back out as a vector, with its crop — lib/svgPassthrough.ts). SVG is not in
  *  `DOWNLOAD_FORMATS`: the dialog draws its tile itself, because whether it is
  *  enabled depends on the images, not on the browser. */
-export type DownloadFormat = ExportFormat | "ora" | "svg";
+export type DownloadFormat = ExportFormat | "ora" | "svg" | PluginFormatId;
+
+/** A format a plugin added (Settings → Plugins, lib/plugins): its manifest
+ *  id, e.g. "psd". Any string that is not one of the built-ins above — the
+ *  dialog resolves it against the ACTIVE plugin formats on every render, so a
+ *  plugin switched off while the dialog is open drops back to a raster pick. */
+export type PluginFormatId = string & { readonly __plugin?: never };
+
+export function isExportFormat(v: string): v is ExportFormat {
+  return (EXPORT_FORMATS as readonly string[]).includes(v);
+}
+
+/** ORA, SVG or a plugin format: a whole-project or vector file, never a
+ *  raster encode, so never written to the persisted `exportFormat`. */
+export function isBuiltInDownloadFormat(v: string): v is ExportFormat | "ora" | "svg" {
+  return isExportFormat(v) || v === "ora" || v === "svg";
+}
 
 export interface DownloadFormatOption {
   value: DownloadFormat;

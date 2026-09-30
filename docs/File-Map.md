@@ -173,6 +173,9 @@ app/src/
 │   │                                 pane-heading, status-note, segmented-tabs, swatch, tooltip
 │   │                                 (+ HintTooltip). Repeated class strings live in lib/styles.ts
 │   ├── ParkedScreen.tsx              "This tab is parked" card behind IdleScreen + MultiTabScreen
+│   ├── PluginsPane.tsx               Settings → Plugins: the master "Allow plugins" switch, Add from
+│   │                                 file / from a link, and a row per added plugin; commits as
+│   │                                 pressed (ADR-075, docs/Plugins.md)
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
@@ -300,6 +303,13 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
+    ├── plugins/                      Plugins (ADR-075, docs/Plugins.md): a file a person adds from
+    │                                 Settings, kept in its own IndexedDB and loaded as a blob: module.
+    │                                 load.ts checks it field by field, store.ts keeps it, state.ts
+    │                                 holds the list + the two switches, document.ts is the
+    │                                 LayeredDocument a format plugin speaks, bridge.ts the ONE place
+    │                                 that moves one in/out of the engine, download.ts +
+    │                                 importAsNewPhoto.ts the shared funnels. No plugin lives here
     ├── preferences.ts                App-wide prefs (Settings → General / Appearance / Rulers &
     │                                 Grids / Security / Layers and Canvas): the shape, the defaults,
     │                                 the clamps, and the canonical serializer that is ALSO the sync

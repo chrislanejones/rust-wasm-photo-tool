@@ -21,7 +21,10 @@ const FILE_OUTLINE =
   "M12 22h6a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v6";
 const FILE_FOLD = "M14 2v5a1 1 0 0 0 1 1h5";
 
-function makeFileTypeIcon(label: string) {
+/** Exported for the Download dialog, whose plugin-format tiles need a glyph
+ *  for a label nobody here knew in advance ("IHL"). Built-in formats get
+ *  theirs below, at module scope, so each keeps one component identity. */
+export function makeFileTypeIcon(label: string) {
   // 4 letters get 15 units, 3 get 12 — measured against the open corner
   // (x 1 → 16) so the longest name never touches the right-hand edge.
   const textLength = label.length >= 4 ? 15 : 12;

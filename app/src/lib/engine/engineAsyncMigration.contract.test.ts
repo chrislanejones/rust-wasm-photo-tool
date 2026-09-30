@@ -764,7 +764,13 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Same buckets.
     // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
-    expect(gate.awaited, "cumulative converted sites").toBe(173); // +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3)
+    // Plugins (ADR-075) — 173 -> 176: three awaited sites born with the
+    // feature, all in `lib/plugins/bridge.ts`, the ONE file that moves a
+    // plugin's LayeredDocument in and out of the engine (`capture_layer_stack`
+    // for the stack, `get_layer_png` per layer, `export_png` for the merged
+    // image). A format plugin itself never calls the engine, so a second
+    // format adds zero sites here. Gate buckets unchanged.
+    expect(gate.awaited, "cumulative converted sites").toBe(176); // +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3); +3: plugins bridge
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
