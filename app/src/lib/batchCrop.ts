@@ -205,3 +205,53 @@ export function resizeCropRectFromCorner(
     height: ch,
   };
 }
+
+/** Smallest side a Shift (free-ratio) drag can make, in photo px. */
+const MIN_FREE_SIDE = 8;
+
+/**
+ * Shift-drag: resize `rect` by moving one CORNER to (px, py) with the ratio
+ * UNLOCKED — the opposite corner pinned, the moving one clamped to the photo.
+ * The shape this leaves becomes the batch's custom ratio (see
+ * `useBatchCropStore.customRatio`), so every photo is still cropped the same.
+ */
+export function freeCropRectFromCorner(
+  w: number,
+  h: number,
+  rect: CropRect,
+  corner: CropCorner,
+  px: number,
+  py: number,
+): CropRect {
+  const west = corner === "nw" || corner === "sw";
+  const north = corner === "nw" || corner === "ne";
+  const ox = west ? rect.x + rect.width : rect.x;
+  const oy = north ? rect.y + rect.height : rect.y;
+  const side = (o: number, p: number, max: number, back: boolean) => {
+    const min = Math.min(MIN_FREE_SIDE, back ? o : max - o);
+    return Math.round(clamp(back ? o - p : p - o, min, back ? o : max - o));
+  };
+  const cw = Math.max(1, side(ox, px, w, west));
+  const ch = Math.max(1, side(oy, py, h, north));
+  return {
+    x: west ? ox - cw : ox,
+    y: north ? oy - ch : oy,
+    width: cw,
+    height: ch,
+  };
+}
+
+/** The corner a fresh drag from (x0, y0) toward (x1, y1) is pulling. */
+export function cornerToward(x0: number, y0: number, x1: number, y1: number): CropCorner {
+  return y1 < y0 ? (x1 < x0 ? "nw" : "ne") : x1 < x0 ? "sw" : "se";
+}
+
+/** A ratio for display: presets by name, a custom one as "1.28:1". */
+export function ratioLabel(dims: [number, number]): string {
+  const preset = BATCH_CROP_RATIOS.find(
+    (r) => r.dims[0] * dims[1] === r.dims[1] * dims[0],
+  );
+  if (preset) return preset.label;
+  const r = dims[0] / dims[1];
+  return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1 / r).toFixed(2)}`;
+}
