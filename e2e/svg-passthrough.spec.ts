@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -36,6 +36,10 @@ async function upload(page: Page, files: { name: string; mimeType: string; buffe
 const svgFile = (name: string) => ({ name, mimeType: "image/svg+xml", buffer: Buffer.from(SVG) });
 const pngFile = () => ({ name: "checker.png", mimeType: "image/png", buffer: readFileSync(FIXTURE_PNG) });
 
+/** The tile's name is its hint; the "SVG" is the icon's lettering. */
+const svgTile = (dialog: Locator) =>
+  dialog.getByRole("radio").filter({ has: dialog.page().getByText("SVG", { exact: true }) });
+
 async function openExportDialog(page: Page) {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
@@ -57,7 +61,7 @@ test.beforeEach(async ({ page }) => {
 test("the SVG tile is disabled for a raster image", async ({ page }) => {
   await upload(page, [pngFile()]);
   const dialog = await openExportDialog(page);
-  const svg = dialog.getByRole("radio", { name: /^SVG/ });
+  const svg = svgTile(dialog);
   await expect(svg).toBeDisabled();
   await expect(svg).toContainText("SVG uploads only");
 });
@@ -68,7 +72,7 @@ test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox c
   await upload(page, [svgFile("shapes.svg")]);
 
   let dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: /^SVG/ }).click();
+  await svgTile(dialog).click();
   await expect(dialog.getByRole("button", { name: "Download SVG" })).toBeVisible();
   let dl = await downloadText(page, () =>
     dialog.getByRole("button", { name: "Download SVG" }).click(),
@@ -85,7 +89,7 @@ test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox c
   await page.waitForTimeout(800);
 
   dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: /^SVG/ }).click();
+  await svgTile(dialog).click();
   dl = await downloadText(page, () => dialog.getByRole("button", { name: "Download SVG" }).click());
   const text = dl.bytes.toString("utf8");
   const vb = text.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
@@ -102,7 +106,7 @@ test("All Images zips just the SVGs", async ({ page }) => {
   await upload(page, [svgFile("one.svg"), pngFile(), svgFile("two.svg")]);
   const dialog = await openExportDialog(page);
   await dialog.getByText(/^Download All Images/).click();
-  await dialog.getByRole("radio", { name: /^SVG/ }).click();
+  await svgTile(dialog).click();
   const button = dialog.getByRole("button", { name: "Download 2 as SVG" });
   await expect(button).toBeVisible();
   await expect(dialog.getByText(/the others are left out/)).toBeVisible();
