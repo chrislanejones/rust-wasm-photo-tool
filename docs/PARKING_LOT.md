@@ -4,6 +4,39 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — fast photo switching can show one photo while another is selected (09-30-2026)
+
+Found by the "Skeleton UI + photo switching" plan's §0, which stops the visual
+work until this is fixed. Reproduce: `IH_RACE=1 pnpm exec playwright test
+e2e/photo-switch-state.spec.ts -g "§0.7"`. Edit photo A, then PgDn/PgUp five
+times in a second.
+
+| Master, 6 runs | Result |
+| --- | --- |
+| **2** | correct: A lit, A's edit on screen |
+| **3** | A lit, canvas **black** |
+| **1** | A lit, canvas shows **B**; status bar reads "Original 256×256 · Photo 1220×820"; B gains an "edited" dot it never earned |
+
+In the last state, an edit lands on B's document while the app's id says A.
+Evidence: `~/ai-repo/photo-switch-evidence/`.
+
+**Cause (from reading, not yet isolated):** engine loads carry no supersession
+token. `handleSelectPhoto`'s `isCurrent()` stops at the moment the load is
+issued; `loadImageFromPixels` / `loadFromSaved` / `restoreFromOplog`
+(`useEngineCore.ts`) finish their awaits and assign `toolRef.current`
+last-writer-wins on the one shared worker port. `setEngineDocument` is set
+before the load completes (`useImageSession.ts` ~378). The A→B→A bounce also
+early-returns on `entry.id === activePhotoId` (React state) instead of
+`activeIdRef.current`.
+
+**Fix shape:** a switch generation carried into every engine load, with a stale
+load dropped before it touches `toolRef` or the canvas. That is the canvas
+pipeline, so per the plan's §7 it is its own session, not a skeleton PR.
+
+Also found reading the same code, unverified: an AI result (rembg / inpaint /
+upscale) started on A is applied to whatever photo is open when it returns
+(`useAIJob.ts` → `handleAIResult`), with no photo-id check.
+
 ## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
 
 Netlify was retired on 09-27-2026 (see docs/Deploying.md, "Retiring Netlify").

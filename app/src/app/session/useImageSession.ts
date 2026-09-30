@@ -222,6 +222,12 @@ export function useImageSession({
   //     debounce above exists as well. Belt and braces, on purpose — this is
   //     user data with no backup.
   const dirtyRef = useRef(false);
+  // The two non-count inputs of isDirty, readable from inside the stable
+  // flushEditArchive when a caller hands it a live undo count.
+  const hasBeenModifiedRef = useRef(hasBeenModified);
+  hasBeenModifiedRef.current = hasBeenModified;
+  const layerRevisionRef = useRef(layerRevision);
+  layerRevisionRef.current = layerRevision;
   const savingRef = useRef(false);
   /** photoId → the engine's undo count when its archive was last written.
    *  Absent ≡ never written this session. Keyed per photo because gallery
@@ -235,7 +241,19 @@ export function useImageSession({
   );
 
   const flushEditArchive = useCallback(
-    async (photoId?: string, opts?: { detachCloudUpload?: boolean }) => {
+    async (
+      photoId?: string,
+      opts?: {
+        detachCloudUpload?: boolean;
+        /** The engine's own undo count, read by the caller just now. The
+         *  `stamp.state.undoCount` mirror lags it by one async sync, and a
+         *  photo saved once reads CLEAN on that stale value (it equals the
+         *  saved point), so the switch lost an edit released an instant
+         *  before it. Passed only by the switch; the debounce and unload
+         *  paths fire long after the mirror has caught up. */
+        liveUndoCount?: number;
+      },
+    ) => {
       // A caller with a specific photo in mind MUST pass it. `activeIdRef` has
       // already been advanced to the INCOMING photo by the time a switch reaches
       // its saveOutgoing block — it is set synchronously so gallery cycling
@@ -244,13 +262,19 @@ export function useImageSession({
       // The ownership guard refuses exactly that, which would turn a routing
       // change into a silently dropped save.
       const id = photoId ?? activeIdRef.current;
-      if (!id || !dirtyRef.current || !stamp.toolRef.current) return;
+      const live = opts?.liveUndoCount;
+      if (!id || !stamp.toolRef.current) return;
+      const dirty =
+        live === undefined
+          ? dirtyRef.current
+          : isDirty(live, savedUndoRef.current.get(id), hasBeenModifiedRef.current, layerRevisionRef.current);
+      if (!dirty) return;
       if (savingRef.current) return; // never overlap two archive writes
       savingRef.current = true;
       // Read BEFORE the await: `savePhotoEdit` captures the engine's state at
       // its own moment, and an edit landing mid-write must leave the document
       // dirty rather than be marked saved by a write that predates it.
-      const writtenAtUndoCount = stamp.state.undoCount;
+      const writtenAtUndoCount = live ?? stamp.state.undoCount;
       try {
         const wrote = await savePhotoEdit(id, stamp.toolRef, opts);
         // Only on a write the ownership guard actually allowed. A refused save
@@ -550,9 +574,17 @@ export function useImageSession({
       // each photo and made switching slow ("only when logged in").
       // `layerRevision` included for the same reason as the autosave effect:
       // a layer-panel-only edit moves neither of the other two (#53).
+      //
+      // Ask the ENGINE for the undo count as well as `stamp.state.undoCount`.
+      // That mirror only catches up on the next async syncState, so an edit
+      // committed an instant before the switch still read 0 here: the save
+      // was skipped and the edit was gone when you came back (e2e
+      // photo-switch-state, "switch 0ms after release"). The worker answers
+      // in order, so this read already includes that edit.
+      const liveUndo = stamp.toolRef.current ? await stamp.toolRef.current.undo_count() : 0;
       if (
         activePhotoId &&
-        (stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
+        (liveUndo > 0 || stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
       ) {
         const outgoing = activePhotoId;
         setModifiedPhotos((prev) => {
@@ -579,7 +611,7 @@ export function useImageSession({
           // the outgoing document while the UI has moved on. The archive bytes
           // are captured synchronously before the upload detaches, so the
           // upload cannot read a document that has since been replaced.
-          await flushEditArchive(outgoing, { detachCloudUpload: true });
+          await flushEditArchive(outgoing, { detachCloudUpload: true, liveUndoCount: liveUndo });
         }
       }
       if (!isCurrent()) return; // a newer selection superseded this one
