@@ -10,6 +10,8 @@
 // The only honest test is therefore empirical — encode one pixel and read back
 // what actually arrived. Feature strings and UA sniffing cannot answer this.
 //
+// AVIF is the exception — see `hasShippedEncoder` below.
+//
 // Probes are cached per MIME because the answer cannot change within a page
 // session, and the probe itself allocates a canvas.
 
@@ -30,11 +32,21 @@ async function probe(mime: string): Promise<boolean> {
   }
 }
 
+/** AVIF is the one type we do not leave to the canvas: Image Horse ships its
+ *  own wasm encoder for it (lib/avifEncoder.ts), so the question is whether
+ *  THIS browser can run WebAssembly, not whether its canvas can write AVIF.
+ *  Probing by actually encoding would fetch ~3.5 MB of encoder just to open
+ *  a dialog. If the encoder later fails anyway, the canvas fallback writes an
+ *  honest image/png and callers name the file from `blob.type`. */
+function hasShippedEncoder(mime: string): boolean {
+  return mime === "image/avif" && typeof WebAssembly === "object";
+}
+
 /** Resolves true only if `mime` round-trips as itself. Cached per type. */
 export function canEncode(mime: string): Promise<boolean> {
   let p = cache.get(mime);
   if (!p) {
-    p = probe(mime);
+    p = hasShippedEncoder(mime) ? Promise.resolve(true) : probe(mime);
     cache.set(mime, p);
   }
   return p;
