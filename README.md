@@ -85,6 +85,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v9.4 — 2026-09-29
+
+**Batch › Crop: every photo the same shape for a carousel, and you pick what each one keeps.**
+
+Batch › Crop cuts every loaded photo to one ratio at once, and to one width if
+you want it. Pick 4:5 at 1080 and every slide comes out 1080×1350.
+
+The preview shows the crop. Drag the frame to move it, drag a corner to make it
+smaller, or use the arrow keys. Each photo keeps its own frame, so you can click
+through the gallery and frame every slide before you crop. Photos you don't
+touch use the nine-cell grid. Cropping again starts from the original photo, and
+the open photo's crop is one undo.
+
+Download, Copy or Share starts with a choice now: this image, or all of them.
+Download All used to write an unedited photo in whatever format you uploaded
+it in. Every photo comes out in the format you pick now.
+
+The old Netlify address redirects to edit.imagehorse.app, and Netlify builds
+nothing.
+
 ### v9.3 — 2026-09-28
 
 **A resize no longer makes a photo heavier, and a “Photo only” ZIP has no white line.**
