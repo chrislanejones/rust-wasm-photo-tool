@@ -1233,6 +1233,7 @@ impl ImageHorseTool {
             init_w: dest_w.max(PASTE_MIN_SIZE),
             init_h: dest_h.max(PASTE_MIN_SIZE),
             is_layer_source: false,
+            rotation: 0.0,
         });
     }
 
@@ -1361,6 +1362,7 @@ impl ImageHorseTool {
             init_w: bw,
             init_h: bh,
             is_layer_source: true,
+            rotation: 0.0,
         });
         vec![bx as i32, by as i32, bw as i32, bh as i32]
     }
@@ -1374,6 +1376,23 @@ impl ImageHorseTool {
             p.dest_y = dest_y;
             p.dest_w = dest_w.max(PASTE_MIN_SIZE);
             p.dest_h = dest_h.max(PASTE_MIN_SIZE);
+        }
+    }
+
+    /// Set the live placement's rotation about the box center, in radians
+    /// (clockwise on screen). Called every rotate-handle drag frame. No-op
+    /// without an active preview; non-finite angles are ignored.
+    pub fn set_paste_preview_rotation(&mut self, radians: f32) {
+        if !radians.is_finite() {
+            return;
+        }
+        if let Some(p) = &mut self.paste_preview {
+            p.rotation = radians.rem_euclid(std::f32::consts::TAU);
+            // Snap float noise around a full turn back to exactly axis-aligned
+            // so the fast unrotated path (and pixel-exact bakes) come back.
+            if p.rotation < 1e-6 || std::f32::consts::TAU - p.rotation < 1e-6 {
+                p.rotation = 0.0;
+            }
         }
     }
 
@@ -1413,27 +1432,24 @@ impl ImageHorseTool {
         }
         let resized = p.dest_w != p.init_w || p.dest_h != p.init_h;
         let moved = p.dest_x != p.init_x || p.dest_y != p.init_y;
+        let rotated = p.rotation != 0.0;
 
         if p.is_layer_source {
-            self.snap("Resize Layer");
+            self.snap(if rotated {
+                "Rotate Layer"
+            } else {
+                "Resize Layer"
+            });
             let scaled = Self::scale_paste_source(&p, p.dest_w, p.dest_h, filter);
+            let (w, h) = (self.width as i32, self.height as i32);
             let buf = &mut self.layers[self.active].buf.data;
             buf.iter_mut().for_each(|b| *b = 0);
-            crate::transform::paste_region(
-                buf,
-                self.width as i32,
-                self.height as i32,
-                &scaled,
-                p.dest_w,
-                p.dest_h,
-                p.dest_x,
-                p.dest_y,
-            );
+            Self::bake_paste(buf, w, h, &p, &scaled, filter);
             return;
         }
 
         self.snap("Paste");
-        if resized || moved {
+        if resized || moved || rotated {
             // Intermediate bake at the initial fit rect, snapshotted, then
             // wiped — leaves history reading "Paste" → "Resize/Move Layer"
             // with the final bake done fresh over the pre-paste pixels.
@@ -1449,7 +1465,9 @@ impl ImageHorseTool {
                 p.init_x,
                 p.init_y,
             );
-            self.snap(if resized {
+            self.snap(if rotated {
+                "Rotate Layer"
+            } else if resized {
                 "Resize Layer"
             } else {
                 "Move Layer"
@@ -1457,16 +1475,46 @@ impl ImageHorseTool {
             self.layers[self.active].buf.data = before;
         }
         let scaled = Self::scale_paste_source(&p, p.dest_w, p.dest_h, filter);
-        crate::transform::paste_region(
+        let (w, h) = (self.width as i32, self.height as i32);
+        Self::bake_paste(
             &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
+            w,
+            h,
+            &p,
             &scaled,
-            p.dest_w,
-            p.dest_h,
-            p.dest_x,
-            p.dest_y,
+            filter,
         );
+    }
+
+    /// Composite an already-scaled (dest_w × dest_h) preview into `buf` at its
+    /// dest rect, rotated about the rect's center when the preview carries a
+    /// rotation. Rotated bakes interpolate unless `filter` asked for nearest.
+    fn bake_paste(
+        buf: &mut [u8],
+        img_w: i32,
+        img_h: i32,
+        p: &PastePreview,
+        scaled: &[u8],
+        filter: u8,
+    ) {
+        if p.rotation == 0.0 {
+            crate::transform::paste_region(
+                buf, img_w, img_h, scaled, p.dest_w, p.dest_h, p.dest_x, p.dest_y,
+            );
+        } else {
+            crate::transform::paste_region_rotated(
+                buf,
+                img_w,
+                img_h,
+                scaled,
+                p.dest_w,
+                p.dest_h,
+                p.dest_x as f32 + p.dest_w as f32 / 2.0,
+                p.dest_y as f32 + p.dest_h as f32 / 2.0,
+                p.rotation,
+                filter != 0,
+            );
+        }
     }
 
     /// Resample a preview's ORIGINAL source pixels to (w, h) with `filter`

@@ -398,6 +398,9 @@ struct PastePreview {
     init_w: u32,
     init_h: u32,
     is_layer_source: bool,
+    /// Rotation of the placed box about its own center, in radians (clockwise
+    /// on screen). 0 = axis-aligned, which keeps the plain `paste_region` path.
+    rotation: f32,
 }
 
 /// Export quality a fresh document starts at, 1..=100. ADR-031.
@@ -1184,16 +1187,33 @@ impl ImageHorseTool {
             } else {
                 transform::resize_nearest(&p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h)
             };
-            transform::paste_region(
-                &mut cache,
-                self.width as i32,
-                self.height as i32,
-                &scaled,
-                p.dest_w,
-                p.dest_h,
-                p.dest_x,
-                p.dest_y,
-            );
+            if p.rotation == 0.0 {
+                transform::paste_region(
+                    &mut cache,
+                    self.width as i32,
+                    self.height as i32,
+                    &scaled,
+                    p.dest_w,
+                    p.dest_h,
+                    p.dest_x,
+                    p.dest_y,
+                );
+            } else {
+                // Nearest sampling — this runs every drag frame; the commit
+                // bake interpolates.
+                transform::paste_region_rotated(
+                    &mut cache,
+                    self.width as i32,
+                    self.height as i32,
+                    &scaled,
+                    p.dest_w,
+                    p.dest_h,
+                    p.dest_x as f32 + p.dest_w as f32 / 2.0,
+                    p.dest_y as f32 + p.dest_h as f32 / 2.0,
+                    p.rotation,
+                    false,
+                );
+            }
         }
         self.composite_cache = cache;
         // Op-log empty-base rebase FIRST (the two syncs below must run against
@@ -4398,6 +4418,43 @@ mod layer_persistence_tests {
         assert_eq!(px(&t, 3, 3), [255, 255, 255, 255]);
         assert_eq!(t.undo_count(), undo_before + 1, "one Paste history step");
         assert!(t.paste_preview.is_none(), "preview cleared after commit");
+    }
+
+    #[test]
+    fn rotated_paste_preview_bakes_rotated_with_rotate_history_step() {
+        let mut t = ImageHorseTool::new(30, 30);
+        t.load_image(&solid(30, 30, [0, 0, 0, 255]));
+        // A 16×10 white bar centered on the canvas (10 = PASTE_MIN_SIZE).
+        t.begin_paste_preview(&solid(16, 10, [255, 255, 255, 255]), 16, 10, 7, 10, 16, 10);
+        t.set_paste_preview_rotation(std::f32::consts::FRAC_PI_2);
+        t.recomposite();
+        let undo_before = t.undo_count();
+        // Nearest: crisp edges.
+        t.commit_paste_preview(0);
+        // Rotated 90° about (15,15) the bar spans x 10..20, y 7..23.
+        assert_eq!(
+            px(&t, 15, 8),
+            [255, 255, 255, 255],
+            "vertical span after rotate"
+        );
+        assert_eq!(px(&t, 15, 21), [255, 255, 255, 255]);
+        assert_eq!(px(&t, 8, 15), [0, 0, 0, 255], "old horizontal ends gone");
+        assert_eq!(px(&t, 21, 15), [0, 0, 0, 255]);
+        assert_eq!(t.undo_count(), undo_before + 2, "Paste + Rotate Layer");
+    }
+
+    #[test]
+    fn full_turn_rotation_snaps_back_to_axis_aligned() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.begin_paste_preview(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0, 2, 2);
+        t.set_paste_preview_rotation(std::f32::consts::TAU);
+        assert_eq!(t.paste_preview.as_ref().map(|p| p.rotation), Some(0.0));
+        t.set_paste_preview_rotation(f32::NAN);
+        assert_eq!(
+            t.paste_preview.as_ref().map(|p| p.rotation),
+            Some(0.0),
+            "NaN ignored"
+        );
     }
 
     #[test]

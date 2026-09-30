@@ -221,12 +221,14 @@ export default tseslint.config(
     // 2909 -> 2802 (2026-09-26): the file had crept to 3025. The two cursor
     // glyphs + getCursorForSubTool moved to canvasCursor.ts, arrowGeometry +
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
-    // 2823 -> 2323 (shapes v9): the Shapes edit overlay (preview, bbox,
+    // 2823 -> 2665 (#279): the paste-placement bounding box (drag + SVG, now with
+    // a rotate knob) moved out to features/canvas/PastePlacementOverlay.tsx.
+    // 2665 -> 2166 (shapes v9): the Shapes edit overlay (preview, bbox,
     // move/resize/rotate handles, and its drag state) moved out to
-    // features/canvas/ShapeEditOverlay.tsx when rotation landed. It imports
-    // the shared helpers above rather than keeping a second copy.
+    // features/canvas/ShapeEditOverlay.tsx when rotation landed. It imports the
+    // shared helpers above rather than keeping a second copy.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2323 }] },
+    rules: { "max-lines": ["error", { max: 2166 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

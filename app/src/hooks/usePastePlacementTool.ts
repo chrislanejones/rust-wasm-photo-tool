@@ -7,6 +7,8 @@ export interface PastePlacementRect {
   y: number;
   width: number;
   height: number;
+  /** Clockwise degrees about the box center. 0 = axis-aligned. */
+  rotation: number;
 }
 
 interface Opts {
@@ -21,8 +23,8 @@ interface Opts {
 }
 
 /**
- * Paste-onto-layer placement: gives a pasted image a movable/resizable
- * bounding box instead of baking it straight into the active layer. The
+ * Paste-onto-layer placement: gives a pasted image a movable/resizable/
+ * rotatable bounding box instead of baking it straight into the active layer. The
  * placement is previewed non-destructively in Rust via `begin_paste_preview`/
  * `set_paste_preview_rect` (rendered into the composite without touching the
  * active layer's stored pixels); `commit` bakes it as a single "Paste" history
@@ -76,7 +78,7 @@ export function usePastePlacementTool({
         width,
         height,
       );
-      setRect({ x, y, width, height });
+      setRect({ x, y, width, height, rotation: 0 });
       flushToCanvas();
     },
     [toolRef, canvasRef, flushToCanvas],
@@ -91,6 +93,7 @@ export function usePastePlacementTool({
         y: Math.round(next.y),
         width: Math.round(next.width),
         height: Math.round(next.height),
+        rotation: next.rotation,
       };
       t.set_paste_preview_rect(
         rounded.x,
@@ -98,6 +101,7 @@ export function usePastePlacementTool({
         rounded.width,
         rounded.height,
       );
+      t.set_paste_preview_rotation((rounded.rotation * Math.PI) / 180);
       setRect(rounded);
       flushToCanvas();
     },
@@ -139,6 +143,7 @@ export function usePastePlacementTool({
       y: seeded[1],
       width: Math.max(1, seeded[2]),
       height: Math.max(1, seeded[3]),
+      rotation: 0,
     });
     flushToCanvas();
   }, [toolRef, canvasRef, flushToCanvas]);
