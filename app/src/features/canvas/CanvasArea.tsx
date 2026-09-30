@@ -30,6 +30,7 @@ import { SelectionOverlay } from "./SelectionOverlay";
 import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
+import { PastePlacementOverlay } from "./PastePlacementOverlay";
 import type { OverlayFrame } from "./overlayFrame";
 import {
   textInkOffset,
@@ -856,99 +857,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       [cropSelection, canvasRef],
     );
 
-    // ── Paste-placement drag (move body + resize handles) ──────────────
-    // Same window-listener pattern as the crop handles, extended with a
-    // "move" mode since — unlike crop, where the selection rect overlays the
-    // photo itself — a placed paste needs to be draggable by its body too.
-    const pasteDragRef = useRef<{
-      mode: "move" | "resize";
-      handle: string; // resize: nw|n|ne|e|se|s|sw|w · move: "body"
-      startX: number;
-      startY: number;
-      startRect: PastePlacementRect;
-      scaleX: number;
-      scaleY: number;
-    } | null>(null);
-
-    const onPastePlacementChangeRef = useRef(onPastePlacementChange);
-    useEffect(() => {
-      onPastePlacementChangeRef.current = onPastePlacementChange;
-    });
-
-    useEffect(() => {
-      const onMove = (e: PointerEvent) => {
-        const drag = pasteDragRef.current;
-        if (!drag || !onPastePlacementChangeRef.current) return;
-        const { mode, handle, startX, startY, startRect, scaleX, scaleY } = drag;
-        const dx = (e.clientX - startX) / scaleX;
-        const dy = (e.clientY - startY) / scaleY;
-        if (mode === "move") {
-          const { dx: mdx, dy: mdy } = e.shiftKey
-            ? lockAxisDelta(dx, dy)
-            : { dx, dy };
-          onPastePlacementChangeRef.current({
-            ...startRect,
-            x: Math.round(startRect.x + mdx),
-            y: Math.round(startRect.y + mdy),
-          });
-          return;
-        }
-        let { x, y, width: w, height: h } = startRect;
-        // Both the paste box and "Resize Layer" are this overlay, and both scale
-        // PIXELS: plain drag keeps the ratio, Shift frees it for a skew.
-        const { dx: cdx, dy: cdy } = cornerDelta("raster", e, handle, { dx, dy }, startRect);
-        switch (handle) {
-          case "nw": x += cdx; y += cdy; w -= cdx; h -= cdy; break;
-          case "n":  y += cdy; h -= cdy; break;
-          case "ne": y += cdy; w += cdx; h -= cdy; break;
-          case "e":  w += cdx; break;
-          case "se": w += cdx; h += cdy; break;
-          case "s":  h += cdy; break;
-          case "sw": x += cdx; w -= cdx; h += cdy; break;
-          case "w":  x += cdx; w -= cdx; break;
-        }
-        const min = 10;
-        w = Math.max(min, w);
-        h = Math.max(min, h);
-        onPastePlacementChangeRef.current({
-          x: Math.round(x), y: Math.round(y),
-          width: Math.round(w), height: Math.round(h),
-        });
-      };
-      const onUp = () => { pasteDragRef.current = null; };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      return () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-    }, []);
-
-    const handlePastePointerDown = useCallback(
-      (
-        e: React.PointerEvent<SVGElement>,
-        mode: "move" | "resize",
-        handle: string,
-      ) => {
-        if (!pastePlacementRect || !canvasRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        pasteDragRef.current = {
-          mode,
-          handle,
-          startX: e.clientX,
-          startY: e.clientY,
-          startRect: { ...pastePlacementRect },
-          scaleX: rect.width / canvas.width,
-          scaleY: rect.height / canvas.height,
-        };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      },
-      [pastePlacementRect, canvasRef],
-    );
-
     // ── Shape/arrow edit-overlay drag ──────────────────────────────────
     // Same window-listener pattern as the crop handles. Geometry math is
     // plain JS (trivial); Rust does all pixel rendering at commit.
@@ -1597,79 +1505,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           );
         })()}
 
-        {/* ── Paste-placement overlay: movable/resizable bounding box ──────
-            Floats independent of `activeTool` (same pattern as the shape/arrow
-            edit overlay below) — a pasted image can be adjusted no matter what
-            tool is selected. No dimming mask: the pasted content itself is the
-            visible thing, nothing needs to be dimmed around it. */}
-        {pastePlacementRect && canvasRef.current && (() => {
-          const canvas = canvasRef.current!;
-          const r = canvas.getBoundingClientRect();
-          const sx = r.width / canvas.width;
-          const sy = r.height / canvas.height;
-          const { x, y, width: pw, height: ph } = pastePlacementRect;
-          const vx = r.left + x * sx;
-          const vy = r.top + y * sy;
-          const vw = pw * sx;
-          const vh = ph * sy;
-          const HS = 9; // handle size in screen px
-
-          const handles = [
-            { id: "nw", hx: vx,        hy: vy,       cursor: "nw-resize" },
-            { id: "n",  hx: vx+vw/2,   hy: vy,       cursor: "n-resize"  },
-            { id: "ne", hx: vx+vw,     hy: vy,       cursor: "ne-resize" },
-            { id: "e",  hx: vx+vw,     hy: vy+vh/2,  cursor: "e-resize"  },
-            { id: "se", hx: vx+vw,     hy: vy+vh,    cursor: "se-resize" },
-            { id: "s",  hx: vx+vw/2,   hy: vy+vh,    cursor: "s-resize"  },
-            { id: "sw", hx: vx,        hy: vy+vh,    cursor: "sw-resize" },
-            { id: "w",  hx: vx,        hy: vy+vh/2,  cursor: "w-resize"  },
-          ];
-
-          return (
-            <svg
-              data-paste-overlay="true"
-              style={{
-                position: "fixed",
-                inset: 0,
-                width: "100vw",
-                height: "100vh",
-                pointerEvents: "none",
-                // Was 40 (--z-panel), tied with the Gallery filmstrip — DOM
-                // order let the filmstrip win the tie and swallow pointerdowns
-                // on handles near the bottom edge, which the "click outside
-                // commits" listener then read as a commit. 45 (--z-cursor,
-                // "above canvas chrome") matches the shape/arrow overlay below.
-                zIndex: 45,
-                overflow: "hidden",
-              }}
-            >
-              {/* Draggable body (move) — under the handles in z-order. */}
-              <rect
-                x={vx} y={vy} width={vw} height={vh}
-                fill="transparent"
-                stroke="white"
-                strokeWidth={1.5}
-                style={{ cursor: "move", pointerEvents: "all" }}
-                onPointerDown={(e) => handlePastePointerDown(e, "move", "body")}
-              />
-
-              {/* Resize handles */}
-              {handles.map(h => (
-                <rect
-                  key={h.id}
-                  x={h.hx - HS/2} y={h.hy - HS/2}
-                  width={HS} height={HS}
-                  fill="white"
-                  stroke="rgba(0,0,0,0.35)"
-                  strokeWidth={1}
-                  rx={1}
-                  style={{ cursor: h.cursor, pointerEvents: "all" }}
-                  onPointerDown={(e) => handlePastePointerDown(e, "resize", h.id)}
-                />
-              ))}
-            </svg>
-          );
-        })()}
+        {pastePlacementRect && onPastePlacementChange && (
+          <PastePlacementOverlay
+            rect={pastePlacementRect}
+            canvasRef={canvasRef}
+            onChange={onPastePlacementChange}
+          />
+        )}
 
         {/* ── Shape/arrow edit overlay: SVG preview + dashed bbox + handles ──
             Rendered while a drawn shape/arrow is pending (Figma-style edit

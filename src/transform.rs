@@ -168,6 +168,106 @@ pub fn paste_region(
     }
 }
 
+/// Alpha-composite `pixels` (src_w × src_h RGBA) onto `data`, rotated by
+/// `angle` radians (clockwise on screen, since +y points down) about the
+/// canvas-space point (`cx`, `cy`), which the source's own center lands on.
+/// Inverse-maps every destination pixel inside the rotated box's bounds back
+/// into source space, so there are no holes. `bilinear` false samples nearest
+/// (the cheap per-frame preview); true interpolates in premultiplied space
+/// (the commit bake), which also anti-aliases the rotated edges.
+#[allow(clippy::too_many_arguments)]
+pub fn paste_region_rotated(
+    data: &mut [u8],
+    img_w: i32,
+    img_h: i32,
+    pixels: &[u8],
+    src_w: u32,
+    src_h: u32,
+    cx: f32,
+    cy: f32,
+    angle: f32,
+    bilinear: bool,
+) {
+    if pixels.len() != (src_w * src_h * 4) as usize || src_w == 0 || src_h == 0 {
+        return;
+    }
+    let (sin, cos) = angle.sin_cos();
+    let (hw, hh) = (src_w as f32 / 2.0, src_h as f32 / 2.0);
+    // Axis-aligned bounds of the rotated box, clipped to the canvas.
+    let ex = hw * cos.abs() + hh * sin.abs();
+    let ey = hw * sin.abs() + hh * cos.abs();
+    let x0 = ((cx - ex).floor() as i32).max(0);
+    let y0 = ((cy - ey).floor() as i32).max(0);
+    let x1 = ((cx + ex).ceil() as i32).min(img_w);
+    let y1 = ((cy + ey).ceil() as i32).min(img_h);
+    let (sw, sh) = (src_w as i32, src_h as i32);
+    let px = |x: i32, y: i32| -> [f32; 4] {
+        if x < 0 || y < 0 || x >= sw || y >= sh {
+            return [0.0; 4];
+        }
+        let i = ((y * sw + x) * 4) as usize;
+        let a = pixels[i + 3] as f32 / 255.0;
+        [
+            pixels[i] as f32 * a,
+            pixels[i + 1] as f32 * a,
+            pixels[i + 2] as f32 * a,
+            a,
+        ]
+    };
+    for dy in y0..y1 {
+        for dx in x0..x1 {
+            // Pixel center → source space (inverse rotation).
+            let rx = dx as f32 + 0.5 - cx;
+            let ry = dy as f32 + 0.5 - cy;
+            let lx = rx * cos + ry * sin + hw;
+            let ly = -rx * sin + ry * cos + hh;
+            // Bilinear reaches half a pixel past the edge so the rotated
+            // border fades out instead of stair-stepping.
+            let m = if bilinear { 0.5 } else { 0.0 };
+            if lx < -m || ly < -m || lx >= src_w as f32 + m || ly >= src_h as f32 + m {
+                continue;
+            }
+            // Premultiplied RGB (0..255 scale) + straight alpha (0..1).
+            let s = if bilinear {
+                let fx = lx - 0.5;
+                let fy = ly - 0.5;
+                let ix = fx.floor() as i32;
+                let iy = fy.floor() as i32;
+                let tx = fx - ix as f32;
+                let ty = fy - iy as f32;
+                let (a, b, c, d) = (
+                    px(ix, iy),
+                    px(ix + 1, iy),
+                    px(ix, iy + 1),
+                    px(ix + 1, iy + 1),
+                );
+                let mut o = [0.0f32; 4];
+                for k in 0..4 {
+                    let top = a[k] + (b[k] - a[k]) * tx;
+                    let bot = c[k] + (d[k] - c[k]) * tx;
+                    o[k] = top + (bot - top) * ty;
+                }
+                o
+            } else {
+                px(lx as i32, ly as i32)
+            };
+            let sa = s[3];
+            if sa <= 1e-6 {
+                continue;
+            }
+            let di = ((dy * img_w + dx) * 4) as usize;
+            let da = data[di + 3] as f32 / 255.0;
+            let out_a = sa + da * (1.0 - sa);
+            for c in 0..3 {
+                let dv = data[di + c] as f32;
+                let ov = (s[c] + dv * da * (1.0 - sa)) / out_a;
+                data[di + c] = ov.round().clamp(0.0, 255.0) as u8;
+            }
+            data[di + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
 /// Shift the whole `data` buffer (RGBA, `img_w × img_h`) by (dx, dy) into a
 /// fresh buffer of the same dimensions. Content moved off-canvas is dropped;
 /// newly exposed area is left fully transparent. Used by the Move tool to

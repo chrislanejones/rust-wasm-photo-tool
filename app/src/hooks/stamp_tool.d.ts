@@ -1152,6 +1152,9 @@ declare module "stamp_tool" {
       dest_w: number,
       dest_h: number,
     ): void;
+    /** Set the live placement's rotation about the box center, in radians
+     *  (clockwise on screen). Baked on commit as a "Rotate Layer" step. */
+    set_paste_preview_rotation(radians: number): void;
     /** Discard the in-progress preview without committing (Escape). No history. */
     cancel_paste_preview(): void;
     /** True while a placement preview is active. */
