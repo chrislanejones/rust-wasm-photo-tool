@@ -4,11 +4,13 @@
 //
 // Rust does the heavy lifting where it can: PNG encoding goes through the
 // WASM `encode_png_pixels`, and annotation compositing reuses the same
-// `ImageHorseTool` pipeline the editor uses. Lossy formats (JPEG/WebP/AVIF)
-// go through the browser codec — matching the single-image export path, since
-// the Rust `png` crate only handles PNG.
+// `ImageHorseTool` pipeline the editor uses. JPEG/WebP go through the browser
+// codec — matching the single-image export path, since the Rust `png` crate
+// only handles PNG. AVIF goes through the lazily loaded wasm encoder in
+// lib/avifEncoder.ts, because no browser can encode it from a canvas.
 
 import type { SavedEdit } from "@/lib/editPersistence";
+import { encodeAvif } from "@/lib/avifEncoder";
 import { encodeViaWorker } from "@/lib/codecWorkerClient";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
 
@@ -31,8 +33,8 @@ const MIME: Record<ExportFormat, string> = {
  *  pixels it cannot represent — it writes them OPAQUE BLACK. Measured in
  *  Chrome: a transparent margin round-trips out of `convertToBlob` as
  *  rgba(0,0,5,255) for image/jpeg, while png/webp both keep rgba(0,0,0,0).
- *  (AVIF does carry alpha; where the browser cannot encode it, `blob.type`
- *  comes back image/png and the PNG rule applies anyway.) */
+ *  (AVIF carries alpha too; it is encoded by lib/avifEncoder.ts, and in the
+ *  rare case that fails the canvas fallback writes PNG, which also does.) */
 export const ALPHA_CAPABLE_FORMATS: ReadonlySet<ExportFormat> = new Set([
   "png",
   "webp",
@@ -319,8 +321,9 @@ export async function compositeSavedEdit(
 /**
  * Encode an RGBA buffer to the requested format. PNG goes through Rust
  * (`encode_png_pixels`); lossy formats are offloaded to the codec worker
- * (`OffscreenCanvas.convertToBlob` off the main thread) and fall back to the
- * main-thread `convertToBlob` if the worker is unavailable.
+ * (`OffscreenCanvas.convertToBlob` off the main thread, or the wasm AVIF
+ * encoder for AVIF) and fall back to the main thread if the worker is
+ * unavailable.
  *
  * NOTE: on the worker path this DETACHES `pixels` (transferred, zero-copy).
  * Callers that reuse `pixels` after this call must pass a copy.
@@ -359,6 +362,15 @@ export async function encodeRgba(
   // this read would throw — but encodeViaWorker only returns null before any
   // transfer (probe failed) OR after a post-probe failure at reuse-safe call
   // sites, so `pixels` is valid here.
+  if (format === "avif") {
+    try {
+      return await encodeAvif(pixels, w, h, quality);
+    } catch (err) {
+      // convertToBlob below then answers image/png, and every caller names
+      // the file from `blob.type`, so the name still matches the bytes.
+      console.warn("AVIF encoder failed, falling back to canvas", err);
+    }
+  }
   const oc = new OffscreenCanvas(w, h);
   const ctx = oc.getContext("2d")!;
   // Copy into a fresh (non-shared) ArrayBuffer so ImageData accepts it.

@@ -3256,7 +3256,7 @@ export function AppShell() {
                       selectionActive={activeTool === "select"}
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      // Ungated (ADR-074): a selection shows whatever tool is
+                      // Ungated (ADR-075): a selection shows whatever tool is
                       // held. Review › Combine makes one from ANY tool, and a
                       // selection you cannot see is one you cannot trust.
                       selectionMask={selectionMask}

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Review › Combine — a placed object as a selection producer (ADR-074).
+// Review › Combine — a placed object as a selection producer (ADR-075).
 //
 // The unit tests cover the two ends of this feature: `objectSelection.test.ts`
 // pins the geometry and `ReviewPanel.combine.test.ts` pins the panel writing
@@ -20,7 +20,7 @@ import { join } from "node:path";
 //      selection back to nothing, so the four buttons really do drive it
 //   4. the marching ants DRAW on the canvas while Shapes is held, and clear
 //      when the selection does — the overlay is no longer gated on the Select
-//      tool (ADR-074; the first cut left it gated and a combine was invisible)
+//      tool (ADR-075; the first cut left it gated and a combine was invisible)
 //
 // Runs against the production build in logged-out demo mode and drives the real
 // mouse, the real toggles and the real rows.

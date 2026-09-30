@@ -63,7 +63,7 @@ export function SelectionOverlay({
     <canvas
       ref={ref}
       // e2e/review-combine.spec.ts finds the ants by this: it pins that they
-      // draw while a tool other than Select is held (ADR-074).
+      // draw while a tool other than Select is held (ADR-075).
       data-testid="selection-overlay"
       width={width}
       height={height}

@@ -16,7 +16,7 @@
 /** Combine mode the engine's `set_selection_combine` takes:
  *  0 = replace (default), 1 = union (add), 2 = subtract (remove),
  *  3 = intersect. The Review panel's Combine section picks the standing mode
- *  (it was the Select panel's until ADR-074); the modifiers override it for one
+ *  (it was the Select panel's until ADR-075); the modifiers override it for one
  *  gesture. */
 export type SelectionCombineMode = 0 | 1 | 2 | 3;
 

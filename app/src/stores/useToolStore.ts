@@ -211,7 +211,7 @@ export interface ToolState {
   selectionMask: Uint8Array | null;
   /** How the next region combines with the current selection — the Review
    *  panel's Combine section (New / Add / Subtract / Intersect; it lived on the
-   *  Select panel until ADR-074). Shift and Alt still override it for one
+   *  Select panel until ADR-075). Shift and Alt still override it for one
    *  gesture, and it applies to a placed object's footprint as well as to a
    *  canvas gesture. NOT PERSISTED (outside `partialize`):
    *  a session-scoped choice, and a reload that came back in Subtract would
