@@ -317,7 +317,7 @@ export function CropBatchPanel({
   ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
         <SectionHeader
           title="Crop"

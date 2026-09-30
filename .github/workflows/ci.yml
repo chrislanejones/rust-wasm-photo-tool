@@ -401,6 +401,18 @@ jobs:
           filter: blob:none
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+      # The UI ratchets (ui-spacing / ui-radius / ui-raw-button) are counted
+      # from the TypeScript syntax tree by scripts/ui-ratchet-counts.mjs, which
+      # needs `typescript` — an app dependency. Before UI Night 7 this job had
+      # no node_modules at all; without these three steps the counter cannot
+      # load and guardrails.sh fails FATAL (by design: a counter that cannot
+      # run must never read as zero). Same setup as every other Node job here.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: ./scripts/guardrails.sh
 
       # scripts/gate-run.sh is the shared helper for RUNNING a gate: it takes

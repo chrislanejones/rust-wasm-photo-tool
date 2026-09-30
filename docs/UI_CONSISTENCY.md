@@ -11,7 +11,8 @@
 >
 > **This is a constitution, not a gate.** Nothing here blocks CI tonight.
 > Turning a rule into a ratchet is Night 7, and only for rules a grep can
-> check without going red on a sentence.
+> check without going red on a sentence. **Done 09-29-2026 — see §6: R1, R3 and
+> raw `<button>` are ratchets, counted from the syntax tree, not by grep.**
 
 ## 1. The ten rules
 
@@ -219,6 +220,29 @@ numbers would have gone green on documentation.
 
 So R1, R3 and R7 are ratchet candidates for Night 7. R5, R6 and R9 need a real
 parser or a human. R10 needs neither — it needs this file to be kept.
+
+**Night 7 (09-29-2026): what became a gate.** Not a grep, for the reason
+above. `scripts/ui-ratchet-counts.mjs` reads the TypeScript syntax tree, where
+comments are not nodes and so cannot count, and it reads a string only when it
+is a class list. It self-tests on a planted snippet before it touches the repo.
+
+| Ratchet | Rule | Baseline |
+| --- | --- | ---: |
+| `ui-spacing` | R1 — padding/gap/space off the scale | **53** |
+| `ui-radius` | R3 — bare `rounded`, `rounded-xl`/`2xl`, arbitrary | **52** |
+| `ui-raw-button` | a raw `<button>` outside `components/ui/` | **37** |
+
+Every baseline was reconciled against the text inventory line by line: each
+hit the text finds and the parser does not is a comment, a test, a JS
+identifier (`rounded: 16`) or a directional house radius the text regex cuts
+short (`rounded-r-full` read as `rounded-r`). Proven both ways: a real
+`<button className="rounded p-5">` turns all three red; the same text in a
+comment, or as a sentence, moves none of them.
+
+R7 was already a ratchet (`z-index`). Its GalleryBar exclusion was reviewed and
+kept — see UI_EXCEPTIONS.md. The raw-button count had grown 34 → 37 since
+Night 3, all in Night 6, while nothing was watching it; that is the argument
+for the gate in one number.
 
 ## 7. The semantic contract: four modes (Night 2, 09-24-2026)
 
