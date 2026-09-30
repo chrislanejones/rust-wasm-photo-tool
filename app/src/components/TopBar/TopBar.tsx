@@ -309,7 +309,10 @@ export function TopBar({
                   aria-pressed={compareActive}
                   disabled={!canCompare}
                   standalone={compact}
-                  tooltip={{ label: compareActive ? "Hide A/B Compare" : "A/B Compare" }}
+                  tooltip={{
+                    label: compareActive ? "Hide A/B Compare" : "A/B Compare",
+                    shortcut: "Alt + C",
+                  }}
                 />
                 <IconButton
                   icon={ArrowDownFromLine}

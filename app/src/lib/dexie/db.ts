@@ -1,6 +1,6 @@
 // Dexie.js content layer for Image Horse — a typed, declarative IndexedDB
 // schema for the heavy data (originals, edited working copies, gallery
-// metadata). See app/src/lib/dexie/USAGE.md and docs/IndexedDB-Investigation.md.
+// metadata). See app/src/lib/dexie/USAGE.md and docs/archive/IndexedDB-Investigation.md.
 //
 // This is a NEW, parallel database ("image-horse-dexie") — it does NOT touch the
 // three live hand-rolled stores (image-horse-originals / -edits / -gallery). It
@@ -175,7 +175,7 @@ class ImageHorseDB extends Dexie {
     super("image-horse-dexie");
     // Schema strings: first field is the primary key, the rest are indexes.
     // Bump the version + add a new `.version(n).stores({...}).upgrade(...)`
-    // block to evolve the schema (see docs/IndexedDB-Investigation.md §6).
+    // block to evolve the schema (see docs/archive/IndexedDB-Investigation.md §6).
     // SHIPPED versions below are frozen — never edit or remove them
     // (dexie-migration skill hard rule).
     this.version(1).stores({

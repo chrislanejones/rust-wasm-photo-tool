@@ -31,6 +31,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolButtonOption } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ToolPanel } from "@/components/ui/tool-panel";
 import { settingsPanelMotion } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +63,7 @@ export interface ToolModeToggleProps<T extends string> {
   /** Disable the mode tiles (forwarded to ToolButtonGroup). Default false. */
   disabled?: boolean;
   /** Body slot — renders the active mode's settings. Mounted inside the
-   *  per-mode `motion.div` (space-y-4), below the SectionHeader, so returning
+   *  per-mode `motion.div` (via `ToolPanel`, 16px rhythm), below the SectionHeader, so returning
    *  a fragment of siblings reproduces the pre-extraction DOM exactly. */
   children: (mode: T) => React.ReactNode;
   className?: string;
@@ -92,9 +93,10 @@ export function ToolModeToggle<T extends string>({
     // The `-mt-2` existed to tuck the icon row under the panel's top padding.
     // With the row gone the title would ride too high, so it only applies in
     // the legacy branch.
-    <div className={cn("space-y-2.5", showModeRow && "-mt-2", className)}>
+    <div className={cn("space-y-2", showModeRow && "-mt-2", className)}>
       {showModeRow && (
         <ToolButtonGroup
+          aria-label="Mode"
           stacked
           columns={columns}
           options={modes}
@@ -105,18 +107,19 @@ export function ToolModeToggle<T extends string>({
       )}
 
       <AnimatePresence mode="wait">
-        <motion.div
-          key={activeMode}
-          {...settingsPanelMotion}
-          className="space-y-4"
-        >
-          {active?.info != null && (
-            <SectionHeader
-              title={active.title ?? active.label}
-              info={active.info}
-            />
-          )}
-          {children(activeMode)}
+        <motion.div key={activeMode} {...settingsPanelMotion}>
+          {/* The panel's rhythm comes from ToolPanel, the same frame the
+              single-mode panels (Eraser, Crop) use — one number, not one
+              per panel. */}
+          <ToolPanel>
+            {active?.info != null && (
+              <SectionHeader
+                title={active.title ?? active.label}
+                info={active.info}
+              />
+            )}
+            {children(activeMode)}
+          </ToolPanel>
         </motion.div>
       </AnimatePresence>
     </div>

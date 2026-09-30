@@ -556,7 +556,7 @@ export function useTextTool({
         // to sit on one side of the commit or the other. `find` returning
         // undefined is a HANDLED case — it falls through to a fresh text input,
         // which is right for emptying a text and clicking where it used to be.
-        // See docs/engine-worker-capture-sweep.md, "Capture 4 is withdrawn".
+        // See docs/engine-worker-capture-sweep.md (git history; moved out of the repo 2026-09-17), "Capture 4 is withdrawn".
         //
         // Un-awaited, `hitId` would be a Promise and `Promise >= 0` is false —
         // no crash, just a click on existing text silently opening a NEW blank

@@ -49,6 +49,7 @@
   --z-mobile-viewer: 49; /* mobile single-photo viewer — above the mobile grid, still under dialogs */
   --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
   --z-modal: 60; /* modals layered above dialogs */
+  --z-over-modal: 70; /* a confirm opened from inside a modal (Settings › Shared › Delete) */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
@@ -676,6 +677,82 @@ html.reduce-motion .skeleton::after {
   display: none;
 }
 
+/* ── Per-photo panels during a photo switch (features/tools/PerPhotoRegion) ──
+   The switch CUE: the photo line re-highlights on every switch (~400 ms fade).
+   A fade is motion, so reduced motion holds a steady tint for the same beat
+   instead — the cue survives, only the motion goes. `!important` + a class is
+   what beats the global `html.reduce-motion *` duration kill (as .spinner-icon
+   does); without it the tint would last 0.001 ms. */
+@keyframes per-photo-name-fade {
+  0%   { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes per-photo-name-hold {
+  0%, 99% { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100%    { background-color: transparent; }
+}
+.per-photo-name {
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+.per-photo-name-flash {
+  animation: per-photo-name-fade 400ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .per-photo-name-flash {
+    animation: per-photo-name-hold 400ms steps(1, end);
+  }
+}
+html.reduce-motion .per-photo-name-flash {
+  animation: per-photo-name-hold 400ms steps(1, end) !important;
+  animation-duration: 400ms !important;
+}
+
+/* The slow-switch SKELETON, in place: a switch that takes over 300 ms turns
+   the panel's controls into muted blocks WITHOUT replacing them, so every box
+   keeps its exact size and nothing moves when the new photo's values arrive
+   (layout shift is the bug skeletons exist to prevent). The region is `inert`
+   while this shows; the photo line stays readable. */
+[data-switch-skeleton] {
+  position: relative;
+  isolation: isolate;
+}
+[data-switch-skeleton] > :not(.per-photo-name)
+  :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
+  color: transparent !important;
+  border-color: transparent !important;
+  background: var(--muted) !important;
+  box-shadow: none !important;
+  border-radius: 4px;
+}
+[data-switch-skeleton] > :not(.per-photo-name) :is(svg, img, canvas) {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-webkit-slider-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-moz-range-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+  animation: skeleton-shimmer 1.6s var(--ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-switch-skeleton]::after {
+    display: none;
+  }
+}
+html.reduce-motion [data-switch-skeleton]::after {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SPINNER (single source of truth — components/ui/spinner.tsx)
 
@@ -718,6 +795,23 @@ html.reduce-motion .canvas-spinner {
   transform: translate(-50%, -50%);
   z-index: var(--z-cursor);
   mix-blend-mode: difference;
+}
+
+/* Mask editing: the ring wears the value the stroke will paint — black hides,
+   white reveals — so the cursor answers "what will this stroke change" without
+   anyone reading a panel. It is the third of the three places driven by
+   `maskEditing`, and it computes nothing itself.
+
+   `difference` is dropped on purpose: differencing black against a photo is a
+   no-op, so the black ring would simply vanish over dark pixels. The paired
+   light/dark outline used by the selection cursors carries it over any photo
+   instead — the halo is always the opposite of the ink. */
+.brush-cursor--mask {
+  mix-blend-mode: normal;
+  border-color: var(--mask-cursor-ink);
+  box-shadow:
+    0 0 0 1.5px var(--mask-cursor-halo),
+    inset 0 0 0 1.5px var(--mask-cursor-halo);
 }
 
 /* Source marker crosshair */
@@ -929,6 +1023,40 @@ textarea:focus-visible {
 
 .reselect-list {
   padding-top: 0;
+}
+
+/* ── Combine section (Review → Combine) ──────────────────────────────────
+   The mode strip and its readout, above the object list. `flex: 0 0 auto` is
+   the point: the object list below is the `.history-list` that takes the
+   section's leftover height and scrolls, so the controls must NOT shrink with
+   it — at thirds-height the strip would otherwise be squeezed out of reach,
+   which is the one thing a standing choice cannot afford to be. */
+.combine-mode {
+  flex: 0 0 auto;
+  padding: 0 10px 6px;
+}
+
+/* The "Selected 18.4% · 2.1 MP" line under the strip. Same words the Select
+   panel and the status-bar chip show, so the three cannot disagree. */
+.combine-coverage {
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The active mode's name, in the section head beside the lightbulb. Truncates
+   rather than overflows: "New selection" is the longest of the four and the head
+   also carries the section name, the lightbulb and the ✕ inside 260px — narrower
+   still in the compact master bar. Same three properties `.layers-summary-name`
+   uses for the same reason. */
+.combine-active {
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Layers list ─────────────────────────────────────────────────────── */
@@ -1595,6 +1723,9 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
+/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
+   chip in token classes on the house radius. This bare rule stays only for
+   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
 kbd {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -1645,6 +1776,32 @@ kbd {
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+/* Dialog controls at phone width — 44px targets (Night 5 §6).
+ *
+ * Every dialog's close is `Button size="tiny"`, which IS `.btn-icon`: 24×24,
+ * measured on a phone. The footer buttons measured 38px tall.
+ *
+ * ⚠️ Two traps shaped this rule, both measured rather than assumed:
+ *  1. `.btn-icon` is UN-LAYERED (brace depth 0 in this file), and Tailwind v4
+ *     puts utilities in `@layer utilities`. Un-layered CSS beats ANY layered
+ *     rule whatever its specificity, so a `max-sm:size-11` on the close would
+ *     have lost silently. This rule is un-layered too, and one attribute more
+ *     specific than `.btn-icon`.
+ *  2. It sets width and height ONLY — never `position`. UploadDialog pins its
+ *     close with the `absolute` utility; a position here would out-rank that
+ *     and pull the button out of its corner.
+ * Scoped by data-slot so the zoom controls and every other `.btn-icon` keep
+ * their dense desktop size. */
+@media (max-width: 639.98px) {
+  .btn-icon[data-slot="dialog-close"] {
+    width: 44px;
+    height: 44px;
+  }
+  [data-slot="dialog-footer"] button {
+    min-height: 44px;
+  }
 }
 
 .btn-icon:hover:not(:disabled) {
@@ -2232,6 +2389,18 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 
 input[type="range"]:focus {
   outline: none;
+}
+
+/* The house focus ring, on keyboard focus only (Night 3, 09-25-2026). The
+   base `input[type="range"] { outline: none }` above sits later in the file
+   than the global `input:focus-visible` rule at equal specificity, and the
+   `:focus` rule outranks it, so a keyboard user on a slider got only the
+   thumb halo below: `--accent-dim` is 15% alpha, measured 1.14:1 against the
+   light panel and 1.47:1 against the dark one. Invisible, for practical
+   purposes. The halo stays; the dashed ink ring (14.3:1) now leads. */
+input[type="range"]:focus-visible {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: 2px;
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {

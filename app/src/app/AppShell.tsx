@@ -21,10 +21,7 @@ import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
-import { canEncode } from "@/lib/encodeSupport";
-import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
 import { namePastedImage } from "@/lib/pastedImageName";
-import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -42,6 +39,7 @@ const MasterBar = lazy(() =>
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { OpenRasterControls } from "@/components/ExportPane";
+import { downloadOraWithToast } from "@/lib/openraster";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -68,6 +66,7 @@ import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import { ShapeZOrderMenuItems } from "@/features/canvas/ShapeZOrderMenuItems";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
+import { autoCompressedPatch } from "@/lib/sizeDelta";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
 import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
@@ -90,8 +89,13 @@ import { useDuplicatePad } from "./session/useDuplicatePad";
 import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { usePenActions } from "./session/usePenActions";
+import { useEffectBrush } from "./session/useEffectBrush";
+import { useDownloadFormat } from "./session/useDownloadFormat";
+import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
+import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
@@ -111,18 +115,14 @@ import {
   compositeSavedEdit,
   encodeRgba,
   EXT,
-  extFromMime,
   includeCanvasInExport,
 } from "@/lib/exportImage";
-import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
-import { RadioCards } from "@/components/ui/radio-cards";
+import { untouchedZipEntry } from "@/lib/zipEntry";
 import { useExportFileName } from "@/hooks/useExportFileName";
-import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   readExifTiff,
   applyExifToReencoded,
-  applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
@@ -130,6 +130,7 @@ import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useBatchCropStore } from "@/stores/useBatchCropStore";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -144,17 +145,10 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { ActionTile } from "@/components/ui/action-tile";
 import { ShareButton } from "@/components/ShareButton";
+import { DownloadDialog } from "@/components/DownloadDialog";
+import { downloadActiveSvg, downloadSvgZip } from "./session/svgDownload";
+import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import {
   Undo,
   Redo,
@@ -167,9 +161,7 @@ import {
   ZoomOut,
   RotateCcw,
   Archive,
-  FolderArchive,
   ImagePlus,
-  Image as ImageIcon,
   Pipette,
 } from "lucide-react";
 
@@ -220,14 +212,6 @@ function capMessage(mode: UserMode, max: number): string {
   return `Gallery is limited to ${max} photos.`;
 }
 
-// Format choices shown in the Download dialog — a second chance to pick a
-// format for anyone who missed the dropdown in the Compress panel.
-const DOWNLOAD_FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
-  { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
-  { value: "png", label: "PNG", hint: "Lossless · transparency" },
-  { value: "webp", label: "WebP", hint: "Small · transparency" },
-  { value: "avif", label: "AVIF", hint: "Smallest · modern" },
-];
 
 /** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
  *  drag/paste import flow before the user picks where the image should land. */
@@ -859,6 +843,8 @@ export function AppShell() {
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const activeTool = useToolStore((s) => s.activeTool);
+  // Batch › Crop's Crop All while its panel is mounted — Enter runs it.
+  const batchCropApply = useBatchCropStore((s) => s.applyAll);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
   // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
@@ -889,33 +875,20 @@ export function AppShell() {
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
   const setExportFormat = useToolStore((s) => s.setExportFormat);
-  // The Download dialog is a SECOND format picker, and it was still selling
-  // AVIF as "Smallest · modern" while this browser silently writes PNG. The
-  // Compress panel's note does not reach here, so the dialog has to say it too
-  // — otherwise the more prominent of the two surfaces is the dishonest one.
-  const [avifEncodable, setAvifEncodable] = useState<boolean | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void canEncode("image/avif").then((ok) => {
-      if (live) setAvifEncodable(ok);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const downloadFormats = useMemo(
-    () =>
-      DOWNLOAD_FORMATS.map((o) =>
-        o.value === "avif" && avifEncodable === false
-          ? { ...o, hint: "Not supported here · saves as PNG" }
-          : o,
-      ),
-    [avifEncodable],
-  );
-  /** What will actually be written — drives the dialog's button label so it
-   *  cannot offer "Download AVIF" and then hand over a PNG. */
-  const effectiveExportFormat: ExportFormat =
-    exportFormat === "avif" && avifEncodable === false ? "png" : exportFormat;
+  const {
+    downloadFormats,
+    effectiveExportFormat,
+    downloadFormat,
+    setDownloadFormat,
+    isOraDownload,
+    isSvgDownload,
+  } = useDownloadFormat();
+  // SVG export (lib/svgPassthrough): live for the open image when it was
+  // uploaded as SVG, and for the zip when any image was.
+  const svgSources = useSvgSourceStore((s) => s.sources);
+  const svgAll = photos.filter((p) => p.id in svgSources).length;
+  const activeIsSvg = !!activePhotoId && activePhotoId in svgSources;
+  const svgSelectedDownload = isSvgDownload && activeIsSvg;
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -933,29 +906,14 @@ export function AppShell() {
   const quality = useToolStore((s) => s.quality);
   const setQuality = useToolStore((s) => s.setQuality);
 
-  const effectiveBrushSize = (() => {
-    switch (activeTool) {
-      case "brush":
-        if (brushMode === "blur") return toolSettings.blurSize / 2;
-        if (brushMode === "erase") return toolSettings.eraserSize / 2;
-        return toolSettings.brushSize / 2;
-      case "arrow":
-        // The Layers panel's mask brush — its own size, not the Paint brush's.
-        if (maskEditing) return toolSettings.maskBrushSize / 2;
-        return 0;
-      case "crop":
-        return 0;
-      case "ai":
-        // Eraser tool: the brush eraser and the Magic Eraser share the same
-        // eraserSize field (one physical brush, two jobs — see AISettings).
-        return toolSettings.eraserSize / 2;
-      case "stamp":
-        if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
-        return stampSettings.brushSize;
-      default:
-        return stampSettings.brushSize;
-    }
-  })();
+  const effectiveBrushSize = brushCursorSize({
+    activeTool,
+    brushMode,
+    stampSubMode,
+    maskEditing,
+    toolSettings,
+    stampSettings,
+  });
 
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
@@ -1178,6 +1136,27 @@ export function AppShell() {
   );
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
+    if (svgSelectedDownload && activePhotoId) {
+      void downloadActiveSvg(activePhotoId, stamp.toolRef.current, exportName.stem()).then(
+        (ok) => {
+          if (!ok) {
+            toast.error(
+              "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
+            );
+          }
+        },
+      );
+      return;
+    }
+    if (isOraDownload) {
+      void downloadOraWithToast({
+        stampToolRef: stamp.toolRef,
+        flushToCanvas: stamp.flushToCanvas,
+        syncState: stamp.syncState,
+        imageName: activeEntry?.name,
+      });
+      return;
+    }
     void handleExportAs(exportName.stem());
   };
 
@@ -1282,8 +1261,6 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
-  const isBlurringRef = useRef(false);
-
   const {
     getCoords,
     handleSelectionClick,
@@ -1323,101 +1300,7 @@ export function AppShell() {
     if (activeTool !== "arrow") setMoveActive(false);
   }, [activeTool]);
 
-  // `async` is carried, not needed. `effect_down` consumes no return value, so
-  // this is fire-and-forget and Stage 3.5 has no work here. It shares the
-  // `Stamp["onMouseDown"]` slot with the clone stamp's handler, which IS async
-  // now, and the alternative — a second, widened handler type — would only move
-  // the conflict to CanvasArea, whose `hookResult` prop is
-  // `ReturnType<typeof useCloneStamp>` directly. Nothing changes at runtime:
-  // React ignores the returned promise.
-  const blurDown = useCallback(
-    async (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const t = stamp.toolRef.current;
-      if (!t || e.button !== 0) return;
-      isBlurringRef.current = true;
-      const { x, y } = getCoords(e);
-      // Mode branch, hex parse (redaction), undo-snap, and per-stroke
-      // interpolation all live in Rust now (effect_down / effect_move / _up).
-      t.effect_down(
-        x,
-        y,
-        toolSettings.blurSize,
-        toolSettings.blurMode,
-        toolSettings.blurIntensity,
-        toolSettings.pixelSize,
-        toolSettings.redactColor,
-        toolSettings.paintStabilizer,
-      );
-      stamp.flushToCanvas();
-    },
-    [
-      stamp,
-      getCoords,
-      toolSettings.blurMode,
-      toolSettings.blurSize,
-      toolSettings.blurIntensity,
-      toolSettings.pixelSize,
-      toolSettings.redactColor,
-      toolSettings.paintStabilizer,
-    ],
-  );
-
-  // v8.41 — the v8.34 backpressure, via the shared coalescer (the LAST of the
-  // three brushes to get it: paint v8.34, clone stamp earlier today, now this).
-  //
-  // This handler used to await one `effect_move` per pointer event AND call
-  // `flushToCanvas()` per event — no in-flight gate, no rAF gate — the worst
-  // shape of the three, asking for a full recomposite at mouse rate. Its old
-  // comment argued "every dab must land, so it does NOT drop-stale", which
-  // v8.34 overturned: right for a call already SENT, wrong for coalescing
-  // UNSENT ones, because `effect_move` strokes the SEGMENT from the last
-  // landed point — skipped coordinates cost curve detail between samples,
-  // never continuity. Measured on the clone stamp, the unfixed shape banked
-  // 10.8 s of queue on a 1.4 s stroke at a 200 px brush; blur's per-move cost
-  // (a kernel over the brush area) is higher still.
-  //
-  // `effect_move`'s "did anything change" bool is returned from the send, so
-  // the coalescer's flush gate preserves the old guard exactly: moves that
-  // blurred nothing schedule no flush.
-  // Only the flush half rides the rAF gate; syncState stays a stroke-end
-  // affair (blurUp below).
-  const blurFlushRef = useRef(stamp.flushToCanvas);
-  blurFlushRef.current = stamp.flushToCanvas;
-  const blurSchedRef = useRef<StrokeCoalescer | null>(null);
-  if (blurSchedRef.current === null) {
-    blurSchedRef.current = createStrokeCoalescer(() => blurFlushRef.current());
-  }
-  const blurSched = blurSchedRef.current;
-
-  const blurMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isBlurringRef.current) return;
-      if (!stamp.toolRef.current) return;
-      blurSched.submit(getCoords(e), async (x, y) => {
-        const t = stamp.toolRef.current;
-        if (!t) return false;
-        return await t.effect_move(x, y);
-      });
-    },
-    [stamp, getCoords, blurSched],
-  );
-
-  const blurUp = useCallback(() => {
-    if (!isBlurringRef.current) return;
-    isBlurringRef.current = false;
-    // Same stroke-end handoff as paint/clone: drop the unsent pending move
-    // (its segment would land after `effect_up` committed) and reset the rAF
-    // gate a hidden tab would latch. FIFO orders `effect_up` after any move
-    // still in flight.
-    blurSched.strokeEnd();
-    stamp.toolRef.current?.effect_up();
-    // Flush directly at stroke end — the last landed dabs may only have a
-    // scheduled frame that never fires in a hidden tab, and `effect_up` is
-    // where the op log commits the stroke; paint's onMouseUp documents the
-    // save-scheduling half of this at length.
-    stamp.flushToCanvas();
-    stamp.syncState();
-  }, [stamp, blurSched]);
+  const { blurDown, blurMove, blurUp } = useEffectBrush(stamp, getCoords, toolSettings);
 
   const effectiveDrawingTool =
     activeTool === "shapes" && shapesMode === "arrows"
@@ -1438,6 +1321,7 @@ export function AppShell() {
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
   });
+  usePhotoSwitchReset(activePhotoId, drawingTools.clearCropSelection);
 
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
@@ -1765,14 +1649,18 @@ export function AppShell() {
   const photoLayerRevision = useGalleryStore((s) => s.layerRevision);
   const photoBounds = usePhotoBounds(
     stamp.toolRef,
-    stamp.state.undoCount + photoLayerRevision,
+    `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
-  // ignorant of the pad (and inside its max-lines cap).
-  const renderDuplicatePad = useCallback(
-    (frame: OverlayFrame) =>
-      duplicatePad.canvasProps ? <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} /> : null,
-    [duplicatePad.canvasProps],
+  // ignorant of the pad and the Batch › Crop frame (and inside its max-lines cap).
+  const renderCanvasOverlays = useCallback(
+    (frame: OverlayFrame) => (
+      <>
+        {duplicatePad.canvasProps && <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} />}
+        <BatchCropOverlay {...frame} photoBounds={photoBounds} undoCount={stamp.state.undoCount} />
+      </>
+    ),
+    [duplicatePad.canvasProps, photoBounds, stamp.state.undoCount],
   );
 
   const redStampTool = useRedStampTool({
@@ -1850,6 +1738,9 @@ export function AppShell() {
     try {
       // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
       // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
+      // The gallery route gets the SVG itself: `handleAddPhotos` rasterizes it
+      // too, and keeps the markup for SVG export on the way.
+      const galleryFile = file;
       if (isSvgFile(file)) {
         file = await rasterizeSvgToPng(file);
         source = file;
@@ -1866,7 +1757,7 @@ export function AppShell() {
       // disabled by `hasActivePhoto` at the render site, so this matches
       // exactly what the dialog would have offered.
       if (activePhotoId === null) {
-        await handleAddPhotos([file]);
+        await handleAddPhotos([galleryFile]);
         return;
       }
 
@@ -1874,7 +1765,7 @@ export function AppShell() {
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
         if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-        return { pixels, w, h, file, previewUrl };
+        return { pixels, w, h, file: galleryFile, previewUrl };
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -2004,7 +1895,7 @@ export function AppShell() {
       if (depth === 0) setIsDraggingImage(false);
     };
     const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
+      if (!isFileDrag(e) || e.defaultPrevented) return; // a drop zone took it
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
@@ -2119,12 +2010,11 @@ export function AppShell() {
    */
   // Extracted whole to session/usePersistActiveCanvas.ts (#45). The internal
   // save that re-encodes the live canvas over its stored original — see that
-  // file for the ADR-039 reason the crop is NOT on the export preference.
+  // file for why it always leaves the backing Canvas out.
   const persistActiveCanvas = usePersistActiveCanvas({
     stamp,
     exportFormat,
     quality,
-    canvasBgTransparent,
   });
 
   const handleApplyCompression = useCallback(
@@ -2151,22 +2041,8 @@ export function AppShell() {
           prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
         );
       }
-      // Instant estimate so the gallery badge reacts immediately; replaced by
-      // the real measured savings once the re-encode below lands.
-      if (activePhotoId) {
-        const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
-        const qualityRatio = quality / 100;
-        // Signed, same convention as the real measurement in
-        // `persistActiveCanvas` that replaces it a moment later: positive is a
-        // saving, negative is growth. An upscale gives areaRatio > 1.
-        const savingsPercent = Math.round((1 - areaRatio * qualityRatio) * 100);
-        if (savingsPercent !== 0) {
-          setImageSavings((prev) => ({
-            ...prev,
-            [activePhotoId]: { savingsPercent },
-          }));
-        }
-      }
+      // No instant badge estimate: the badge derives from the entry's sizes
+      // (lib/sizeDelta), which the re-encode below updates.
 
       // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
       await persistActiveCanvas();
@@ -2258,23 +2134,29 @@ export function AppShell() {
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
-      (id: string, nf: File, nu: string) => {
+      (id: string, nf: File, nu: string, encoded) => {
         URL.revokeObjectURL(nu); // We store to IDB, don't need the blob URL
         const photo = photos.find((p) => p.id === id);
         if (!photo) return;
         void (async () => {
           const oldKey = photo.originalKey;
           const [newKey, newThumb] = await Promise.all([
-            putOriginal(nf, photo.workingWidth, photo.workingHeight),
+            // The WRITTEN dims — the budget loop may have downscaled.
+            putOriginal(nf, encoded.width, encoded.height),
             makeThumbnail(nf),
           ]);
-          setPhotos((p) =>
-            p.map((x) =>
-              x.id !== id
-                ? x
-                : { ...x, originalKey: newKey, thumbBlob: newThumb, byteSize: nf.size },
-            ),
-          );
+          const updated = autoCompressedPatch(photo, nf, newKey, newThumb, encoded);
+          setPhotos((p) => p.map((x) => (x.id !== id ? x : { ...x, ...updated })));
+          // The ACTIVE photo's canvas still holds the pre-compress pixels, and
+          // the next persist (Apply Resize, a canvas op) would re-encode it over
+          // the compressed file — undoing the compression and sending the
+          // PageSpeed score into the red. Reload from the new bytes unless the
+          // canvas has unsaved edits of its own (those win on the next save).
+          const st = useGalleryStore.getState();
+          if (st.activePhotoId === id && !st.hasBeenModified && !st.modifiedPhotos.has(id)) {
+            const fresh = st.photos.find((x) => x.id === id);
+            if (fresh) void loadPhotoFromEntry(fresh);
+          }
           // Auto Compress used to collect NOTHING — it was the one repoint path
           // with no delete at all, so every run over an already-compressed photo
           // stranded a blob (measured as the "pile" in the GC audit). Collect
@@ -2292,7 +2174,7 @@ export function AppShell() {
     // NOTE: intentionally does NOT set `hasBeenModified` — Auto Compress is a
     // batch op over stored files and must not light the active photo's modified
     // dot. Its result is tracked separately via `imageSavings`.
-  }, [photos, selectedIds, activePhotoId, quality, exportFormat, compressAll]);
+  }, [photos, selectedIds, activePhotoId, quality, exportFormat, compressAll, loadPhotoFromEntry]);
 
   // Track per-photo modification state. Any single-image edit marks the active
   // photo with the "modified" dot immediately: canvas edits bump the WASM undo
@@ -2477,17 +2359,14 @@ export function AppShell() {
         //   - never edited      -> originalKey holds the untouched upload
         //   - compressed only   -> originalKey ALREADY holds the processed
         //                          bytes, so verbatim is the processed result
-        // Keep passes them through as-is; strip scrubs EXIF/GPS on the way out.
+        // Both go out in the chosen format: as-is when they already are,
+        // re-encoded when not (lib/zipEntry.ts).
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
-        bytes = applyExifToVerbatim(
-          new Uint8Array(orig.bytes),
-          orig.mimeType,
+        ({ bytes, mime, ext } = await untouchedZipEntry(orig, exportFormat, quality / 100, {
           mode,
-          exifStripMode,
-        );
-        mime = orig.mimeType;
-        ext = extFromMime(orig.mimeType);
+          stripMode: exifStripMode,
+        }));
       }
 
       // De-dupe filenames within the archive.
@@ -2533,6 +2412,23 @@ export function AppShell() {
     () => exportPhotosToZip(photos, "photos.zip"),
     [exportPhotosToZip, photos],
   );
+
+  const handleExportAllSvg = useCallback(async () => {
+    const { written, skipped } = await downloadSvgZip({
+      photos,
+      activePhotoId,
+      tool: stamp.toolRef.current,
+      loadPhotoEdit,
+      filename: "svgs.zip",
+    });
+    if (skipped > 0) {
+      toast.error(
+        written > 0
+          ? `${skipped} SVG${skipped === 1 ? " was" : "s were"} left out — changed beyond a crop.`
+          : "No SVG could be saved — each has been changed beyond a crop.",
+      );
+    }
+  }, [photos, activePhotoId, stamp.toolRef, loadPhotoEdit]);
 
   // The single Download button always opens the chooser dialog (Canvas Image /
   // All / Clipboard Copy). The "All" button is hidden when only one image is
@@ -2629,8 +2525,8 @@ export function AppShell() {
     onToggleMove: handleToggleMove,
     onLayerToFront: handleLayerToFront,
     onLayerToBack: handleLayerToBack,
-    onApplyCrop: drawingTools.applyCrop,
-    hasCropSelection: drawingTools.cropSelection !== null,
+    onApplyCrop: batchCropApply ?? drawingTools.applyCrop,
+    hasCropSelection: drawingTools.cropSelection !== null || batchCropApply !== null,
     onShowCelebration: () => setShowCelebration(true),
     onAdjustBrushSize: adjustBrushSize,
     setShowUpload,
@@ -2649,6 +2545,10 @@ export function AppShell() {
       if (g === "batch" && photos.length <= 1) return;
       const group = groupById(g);
       if (group) activateGroup(group);
+    },
+    // canCompare is declared below this call; read via closure.
+    onToggleCompare: () => {
+      if (canCompare) handleToggleCompare();
     },
     onFlipH: stamp.flipHorizontal,
     onFlipV: stamp.flipVertical,
@@ -2912,103 +2812,66 @@ export function AppShell() {
           : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
       </ConfirmDialog>
 
-      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Download, Copy, or Share</DialogTitle>
-          </DialogHeader>
-
-          <DialogBody className="space-y-4">
-            <DialogDescription>
-              {photos.length > 1 ? (
-                <>
-                  Save the selected image — or all of them as a{" "}
-                  <span className="font-mono">.zip</span> — copy the canvas to
-                  your clipboard, or create a public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              ) : (
-                <>
-                  Save this image, copy the canvas to your clipboard, or create a
-                  public{" "}
-                  <strong className="font-semibold text-text-secondary">
-                    share link
-                  </strong>{" "}
-                  anyone can open.
-                </>
-              )}
-            </DialogDescription>
-
-            {/* Format picker — a second shot at the format for anyone who missed
-                the Compress dropdown. */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-text-muted">Format</span>
-              <RadioCards
-                name="download-format"
-                value={exportFormat}
-                onValueChange={setExportFormat}
-                options={downloadFormats}
-                columns={2}
-              />
-            </div>
-
-            <ExportFileNameField
-              value={exportName.value}
-              defaultStem={exportName.defaultStem}
-              onChange={exportName.onChange}
-              ext={EXT[effectiveExportFormat]}
-              onSubmit={downloadFromDialog}
-            />
-          </DialogBody>
-
-          <DialogFooter className="flex-row gap-2">
-            <ActionTile
-              icon={ImageIcon}
-              label={`Download ${effectiveExportFormat.toUpperCase()}`}
-              onClick={downloadFromDialog}
-            />
-            <ShareButton
-              exportPng={async () => {
-                if (exportCanvasBackground) return stamp.exportBlob("png");
-                const tool = stamp.toolRef.current;
-                if (!tool) return null;
-                // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
-                // cropped dimensions that describe them.
-                const cap = await tool.capture_composite_excluding_background();
-                const { rgba, width, height } = cap;
-                cap.free();
-                return encodeRgba(rgba, width, height, "png", 1);
-              }}
-              canvasW={exportDims.width}
-              canvasH={exportDims.height}
-              fileName={photos.find((p) => p.id === activePhotoId)?.name}
-              disabled={!hasImage}
-              onShared={() => setExportDialogOpen(false)}
-            />
-            {photos.length > 1 && (
-              <ActionTile
-                icon={FolderArchive}
-                label={`Download All (${photos.length})`}
-                onClick={() => {
-                  setExportDialogOpen(false);
-                  handleExportAll();
-                }}
-              />
-            )}
-            <ActionTile
-              icon={Clipboard}
-              label="Clipboard"
-              onClick={() => {
-                setExportDialogOpen(false);
-                void handleCopyToClipboard();
-              }}
-            />
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DownloadDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        photoCount={photos.length}
+        formats={downloadFormats}
+        format={downloadFormat}
+        onFormatChange={(v) => {
+          setDownloadFormat(v);
+          // ORA and SVG stay local-only
+          if (v !== "ora" && v !== "svg") setExportFormat(v);
+        }}
+        fileName={exportName}
+        ext={
+          svgSelectedDownload
+            ? ".svg"
+            : isOraDownload
+              ? ".ora"
+              : EXT[effectiveExportFormat]
+        }
+        downloadLabel={
+          svgSelectedDownload
+            ? "Download SVG"
+            : isOraDownload
+              ? "Download ORA"
+              : `Download ${effectiveExportFormat.toUpperCase()}`
+        }
+        svg={{ selected: activeIsSvg, all: svgAll }}
+        onDownload={downloadFromDialog}
+        zipFormat={exportFormat}
+        zipLabel={effectiveExportFormat.toUpperCase()}
+        shareAction={
+          <ShareButton
+            exportPng={async () => {
+              if (exportCanvasBackground) return stamp.exportBlob("png");
+              const tool = stamp.toolRef.current;
+              if (!tool) return null;
+              // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
+              // cropped dimensions that describe them.
+              const cap = await tool.capture_composite_excluding_background();
+              const { rgba, width, height } = cap;
+              cap.free();
+              return encodeRgba(rgba, width, height, "png", 1);
+            }}
+            canvasW={exportDims.width}
+            canvasH={exportDims.height}
+            fileName={photos.find((p) => p.id === activePhotoId)?.name}
+            disabled={!hasImage}
+            onShared={() => setExportDialogOpen(false)}
+          />
+        }
+        onCopy={() => {
+          setExportDialogOpen(false);
+          void handleCopyToClipboard();
+        }}
+        onDownloadAll={() => {
+          setExportDialogOpen(false);
+          if (isSvgDownload && svgAll > 0) void handleExportAllSvg();
+          else handleExportAll();
+        }}
+      />
 
       {/* Compact master bar (≤1000px): the entire top-bar chrome lives here as
           a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
@@ -3113,6 +2976,7 @@ export function AppShell() {
             currentByteSize={activeEntry?.byteSize ?? 0}
             currentMime={activeEntry?.mimeType}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
+            currentEncodeQuality={activeEntry?.encodeQuality}
             activePhotoId={activePhotoId}
             undoCount={stamp.state.undoCount}
             quality={quality}
@@ -3314,7 +3178,7 @@ export function AppShell() {
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
                           shapes={drawingTools.shapes}
-                          renderOverlay={renderDuplicatePad}
+                          renderOverlay={renderCanvasOverlays}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
                           cropSelection={drawingTools.cropSelection}
@@ -3392,20 +3256,10 @@ export function AppShell() {
                       selectionActive={activeTool === "select"}
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      // Gated to the tool(s) that can actually populate this
-                      // mask: the Select tool (selection's home since the
-                      // v7.44 split — was Adjust & Select), or the Magic
-                      // Eraser sub-mode of the Eraser tool, whose brush
-                      // paints the same store field (see useMagicEraserTool).
-                      // Without the second clause the mask is still written
-                      // during a Magic Eraser stroke, but this prop zeroes
-                      // it back out before <SelectionOverlay> ever sees it.
-                      selectionMask={
-                        activeTool === "select" ||
-                        (activeTool === "ai" && eraserMode === "magic")
-                          ? selectionMask
-                          : null
-                      }
+                      // Ungated (ADR-075): a selection shows whatever tool is
+                      // held. Review › Combine makes one from ANY tool, and a
+                      // selection you cannot see is one you cannot trust.
+                      selectionMask={selectionMask}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       // Drag = marquee for the two marquee modes ONLY. The
@@ -3451,7 +3305,7 @@ export function AppShell() {
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
                       shapes={drawingTools.shapes}
-                      renderOverlay={renderDuplicatePad}
+                      renderOverlay={renderCanvasOverlays}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
                       cropSelection={drawingTools.cropSelection}

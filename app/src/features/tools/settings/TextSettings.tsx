@@ -4,7 +4,7 @@ import { Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
@@ -147,8 +147,12 @@ export function TextSettings({
   // OCR's own job instance — never runs an image model, so onImageResult is
   // genuinely a no-op here (useAIJob only calls it for rembg/upscale/inpaint;
   // text models surface solely through the returned textResult).
-  const { run: runOcr, phase: ocrPhase, busy: ocrBusy, error: ocrError, textResult } =
+  const { run: runOcr, phase: ocrPhase, busy: ocrBusy, error: ocrError, textResult: ocrText } =
     useAIJob(() => {});
+  // The photo the last OCR ran on. The panel stays mounted across photo
+  // switches, so without this the next photo showed the last one's text.
+  const [ocrPhotoId, setOcrPhotoId] = useState<string | null>(null);
+  const textResult = ocrPhotoId === activePhotoId ? ocrText : null;
   const [copied, setCopied] = useState(false);
   // OCR uploads the image — not offered while "Everything in your browser" is
   // on (useAIJob refuses it too).
@@ -161,6 +165,7 @@ export function TextSettings({
     if (!tool || !activePhotoId) return;
     const png = new Uint8Array(await tool.export_png());
     setCopied(false);
+    setOcrPhotoId(activePhotoId);
     void runOcr("ocr", activePhotoId, png);
   };
 

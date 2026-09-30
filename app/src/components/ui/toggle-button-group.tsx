@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 import { motion } from "framer-motion";
 import { hoverPop } from "@/lib/animations";
 import type { LucideIcon } from "lucide-react";
@@ -12,7 +13,9 @@ export interface ToggleGroupItem {
   key: string;
   icon: LucideIcon;
   label: string;
-  /** Whether this button is currently on (multiple may be on at once). */
+  /** Whether this button is currently on. In the default TOGGLE mode any
+   *  number may be on and each announces `aria-pressed`; in `mode="select"`
+   *  this is the one checked radio. */
   active: boolean;
   onToggle: () => void;
   /** Grays the button out and drops it from the tab order. Added for the top
@@ -48,6 +51,22 @@ interface ToggleButtonGroupProps {
   equalWidth?: boolean;
   /** Extra classes on the group container. */
   className?: string;
+  /** TOGGLE (default): independent on/off buttons, each with `aria-pressed`
+   *  — the top bar's Tools / Gallery / Review, the Review panel's sections.
+   *  SELECT: exactly one of these is on — every labeled pair in Settings. A
+   *  named radio group with one Tab stop and arrow keys; it looks identical.
+   *
+   *  Declared rather than inferred, unlike `tool-button-group`'s mode: every
+   *  item here carries `active` either way, and "one is on right now" does
+   *  not prove "only one can be". docs/UI_CONSISTENCY.md §7. */
+  mode?: "toggle" | "select";
+  /** The group's accessible name. Required in practice for `mode="select"`
+   *  (a radio group must have one); prefer `aria-labelledby` pointing at the
+   *  heading that is already on screen. */
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  /** A sentence that explains the group, e.g. why some options are off. */
+  "aria-describedby"?: string;
 }
 
 /* NO `variant` PROP, and there was one for an afternoon on 2026-08-20 — a
@@ -64,10 +83,11 @@ interface ToggleButtonGroupProps {
    that was wrong, not the panel. */
 
 /**
- * A pill-style group of multi-select toggle buttons — the Tools / Gallery /
- * Review cluster in the top bar and the History / Reselect / Layers cluster
- * in the Review panel share this component. "Multi-select" because each button
- * toggles on/off independently; any number can be active at once.
+ * A pill-style group of labeled buttons, in one of two modes (see `mode`).
+ * TOGGLE: the Tools / Gallery / Review cluster in the top bar and the History
+ * / Reselect / Layers cluster in the Review panel, where each button toggles
+ * on/off independently. SELECT: the labeled pairs across Settings — Sync on /
+ * Sync off, the three theme choices — where exactly one is on.
  */
 export function ToggleButtonGroup({
   items,
@@ -77,7 +97,25 @@ export function ToggleButtonGroup({
   equalWidth = false,
   bare = false,
   className,
+  mode = "toggle",
+  ...aria
 }: ToggleButtonGroupProps) {
+  const isSelect = mode === "select";
+  const radio = useRadioGroup({
+    ids: items.map((it) => it.key),
+    selected: items.find((it) => it.active)?.key,
+    isDisabled: (i) => !!items[i].disabled,
+    onSelect: (key) => items.find((it) => it.key === key)?.onToggle(),
+  });
+  // `bare` is `display: contents`, which is no box to hang a role on reliably,
+  // so a bare group names nothing. Only the compact top bar is bare, and it is
+  // a TOGGLE group whose buttons carry their own names.
+  const named = !bare && (aria["aria-label"] || aria["aria-labelledby"]);
+  const groupSemantics = isSelect
+    ? { ...radio.groupProps, ...aria }
+    : named
+      ? { role: "group" as const, ...aria }
+      : {};
   return (
     // `equalWidth` swaps flex for a single-row grid whose columns are all
     // `1fr`. In a shrink-to-fit container every fr column resolves to the
@@ -98,13 +136,16 @@ export function ToggleButtonGroup({
             ],
         className,
       )}
+      {...groupSemantics}
     >
-      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }) => {
+      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }, i) => {
         const button = (
           <motion.button
             whileHover="hover"
             onClick={onToggle}
             disabled={disabled}
+            // SELECT: a radio in a roving group. TOGGLE: a toggle button.
+            {...(isSelect ? radio.itemProps(i) : { "aria-pressed": active })}
             title={tooltip ? undefined : label}
             // #64: an `aria-label` REPLACES the accessible name, so it goes on
             // icon-only buttons and nowhere else. This component is both:

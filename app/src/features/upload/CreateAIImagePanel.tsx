@@ -18,12 +18,12 @@
 // so the second vocabulary was pure cost. It is now the same components, the
 // same tokens and the same field classes (`@/lib/styles`) the sidebar ships.
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ChevronLeft, Plus, Sparkles, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { Button } from "@/components/ui/button";
+import { PaneHeader } from "@/components/ui/dialog-pane";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { FieldLabel } from "@/components/ui/field-label";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { FIELD_TEXTAREA } from "@/lib/styles";
@@ -139,12 +139,19 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
   return (
     <>
       {/* Step 2 of THAT menu, in the same frame as New Canvas — same width,
-          same footer geometry, same swap animation. The left button is Back,
-          not Cancel, because it returns there. Esc dismisses the whole flow,
-          which the surrounding dialog already handles. */}
-      <SectionHeader
+          same PaneHeader, same footer geometry, same swap animation. The
+          header's button is Back, not Cancel, because it returns there. Esc
+          dismisses the whole flow, which the surrounding dialog already
+          handles. */}
+      <PaneHeader
         title="Create AI Image"
-        info="Describe the image you want, pick the model that suits the job, and generate it. The prompt — and any reference images you attach — are sent to Replicate; the photos already open in this tab are not."
+        onBack={back}
+        aside={
+          <InfoTooltip
+            label="Create AI Image"
+            info="Describe the image you want, pick the model that suits the job, and generate it. The prompt — and any reference images you attach — are sent to Replicate; the photos already open in this tab are not."
+          />
+        }
       />
 
       {/* ── Model ────────────────────────────────────────────────
@@ -293,6 +300,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
           placeholder — now rendered by the same ToolButtonGroup the
           Crop ratios use rather than a private copy of it. */}
       <ToolButtonGroup<string>
+        aria-label="Aspect ratio"
         columns={5}
         label={
           <>
@@ -332,21 +340,13 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
         {GENERATE_BLOCKED_REASON}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Button size="large" onClick={back} className="w-full">
-          <ChevronLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <Button
-          size="large"
-          disabled
-          title={GENERATE_BLOCKED_REASON}
-          className="w-full"
-        >
-          <Sparkles className="h-4 w-4" />
+      {/* Back is in the PaneHeader at the top; the bottom row is the one
+          commit, in the tool panels' Apply Crop button. */}
+      <PanelActionBar>
+        <PanelAction disabled title={GENERATE_BLOCKED_REASON}>
           Generate Image
-        </Button>
-      </div>
+        </PanelAction>
+      </PanelActionBar>
     </>
   );
 }

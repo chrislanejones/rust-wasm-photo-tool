@@ -286,6 +286,17 @@ describe("sanity: the harness actually reaches the real handler", () => {
     expect(onZoomOut).toHaveBeenCalledTimes(1);
     expect(onGroupChange).not.toHaveBeenCalled();
   });
+
+  it("Alt+C toggles A/B Compare", () => {
+    const onToggleCompare = vi.fn();
+    mount(baseProps({ onToggleCompare }));
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { code: "KeyC", altKey: true, bubbles: true }),
+      );
+    });
+    expect(onToggleCompare).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("Ctrl+J / Ctrl+Shift+J -> selection to a new layer", () => {

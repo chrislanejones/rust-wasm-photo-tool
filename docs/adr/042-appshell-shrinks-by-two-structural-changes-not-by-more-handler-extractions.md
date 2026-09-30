@@ -1,6 +1,12 @@
 # ADR-042: AppShell shrinks by two structural changes, not by more handler extractions
 Date: 2026-09-02   Status: draft
 
+> **2026-09-26:** the pre-mortem's warning sign fired — the AppShell cap went
+> 2026-08-27 → 2026-09-26 without being lowered, and three other pinned files
+> went over theirs unnoticed because the ratchet was `warn`. The ratchet is
+> now `error`, and the two structural changes are sequenced with numbers in
+> [`docs/AppShell-Refactor-Plan.md`](../AppShell-Refactor-Plan.md).
+
 ## Context
 `AppShell.tsx` is 3,718 lines after the first #45 extraction, and the whole
 file was inventoried before the second one was chosen. Its component logic

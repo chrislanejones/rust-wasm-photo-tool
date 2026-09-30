@@ -9,7 +9,7 @@
 //
 // Changes commit as pressed, like Sync's switch on desktop — this pane has no
 // Apply, and a beta switch is not a Settings preference.
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useId } from "react";
 import { Beaker, Link2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaneHeading } from "@/components/ui/pane-heading";
@@ -49,12 +49,15 @@ function BetaRow({ feature }: { feature: BetaFeature }) {
     }
   };
 
+  const headingId = useId();
   return (
     <section className="space-y-2 rounded-lg border border-border bg-bg-elevated p-3">
-      <PaneHeading title={feature.label}>{feature.blurb}</PaneHeading>
+      <PaneHeading id={headingId} title={feature.label}>{feature.blurb}</PaneHeading>
 
       <ToggleButtonGroup
         fill
+        mode="select"
+        aria-labelledby={headingId}
         items={[
           {
             key: "on",

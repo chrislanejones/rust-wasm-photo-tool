@@ -74,7 +74,10 @@ const CARDS: Card[] = [
       "50 AI passes a day, 300 a month",
       "100-photo gallery",
     ],
-    cta: "Start Pro",
+    // Signups are not open (app/src/lib/billing.ts turns checkout off, and
+    // convex/stripe.ts refuses it). "Start Pro" sent you to the editor, where
+    // there is now nothing to start — a CTA that cannot do what it says.
+    cta: "Not open yet",
     lead: true,
   },
 ];

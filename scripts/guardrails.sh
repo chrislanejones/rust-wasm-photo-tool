@@ -88,10 +88,9 @@ check() {
 
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
-    -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
-    -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' \
+    -g '!**/CompareSlider.tsx' -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
+check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
@@ -99,6 +98,33 @@ check "type-scale" 8 "off-scale type / faux weights (§4)" "$n_type"
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
       -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
+
+# ── UI rules R1, R3 and raw <button> (UI Night 7, docs/UI_CONSISTENCY.md §6) ──
+# Counted by scripts/ui-ratchet-counts.mjs from the TypeScript syntax tree, NOT
+# by rg: a grep here would go red on a comment explaining the rule, which this
+# repo has already done twice. Comments are not syntax nodes, so they cannot
+# count; a string only counts when it is a class list. The counter self-tests
+# on a planted snippet first, and ANY failure is fatal here — an erroring
+# counter must never read as zero violations.
+#
+# Baselines are the counts on 09-29-2026, reconciled line by line against the
+# text inventory (scripts/ui-inventory.mjs): every hit the text finds and this
+# does not is a comment, a test, a JS identifier (`rounded: 16`) or a
+# directional house radius the text regex truncates (`rounded-r-full`).
+#   ui-spacing     R1 — padding/gap/space off the 0·0.5·1·1.5·2·3·4·6·8 scale
+#   ui-radius      R3 — bare `rounded`, `rounded-xl/2xl`, arbitrary `rounded-[…]`
+#   ui-raw-button  a raw <button> outside components/ui/ (JSX elements, not text)
+# Fixing these CHANGES PIXELS (a radius sweep touches ~50 sites), so they are
+# frozen here and paid down on purpose, not in a sweep.
+ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
+  echo "::error::scripts/ui-ratchet-counts.mjs failed — see its output above"
+  echo "FATAL: a guardrail counter failed to execute." >&2
+  exit 1
+}
+ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
+check "ui-spacing" 53 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-radius" 52 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-raw-button" 37 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
 #
@@ -151,7 +177,10 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # ops_engine_parity that is 7 lines a naive pass misfiles as production code.
 # Match `cfg(all(test` too, and check the `mod` declaration, not just the file.
 #
-# What 47 now means: 45 genuine production sites — 35 of them SIMD `unsafe`,
+# 47 -> 46 on 2026-09-26: measured, not annotated — a production site left.
+# The breakdown below is now 44 production + the same 2 test panics.
+#
+# What 47 meant: 45 genuine production sites — 35 of them SIMD `unsafe`,
 # which is expected and unchanged since v7.72 — plus exactly 2 test panics that
 # CANNOT carry a same-line annotation:
 #   src/ops_engine_parity.rs  the multi-line `panic!(` in assert_flat_identical
@@ -166,51 +195,27 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # followed by a standalone `//` comment makes rustfmt align that comment to the
 # annotation column, shoving unrelated prose out to column ~70. A blank line
 # between them prevents it.
-check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
+# 47 -> 46 (2026-09-20). Paid down by #131 (`2d188420`, "fonts arrive at
+# runtime"), which annotated two test-only sites `// allow: rust-panic` —
+# ⚠️ and then did not record it: that commit touches ZERO lines of this file.
+# Measured in a clean clone at both commits rather than inferred from the diff:
+#   6a3de6be (the commit before #131)  47
+#   2d188420 (#131)                    46
+#   5bd73cce (v8.80, master today)     46
+# ADR-058 documents the lowering as part of the change; the branch carried it,
+# the merge did not. Three CI runs have printed "IMPROVED rust-panics: 46 < 47"
+# since, which is this script asking to be told. A ratchet left loose is not a
+# ratchet — 46 is the new ceiling and the two annotated sites can no longer be
+# un-annotated for free.
+check "rust-panics" 46 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 4 "role=button needs aria-label (§8)" "$n_aria"
 
-# ── src/lib.rs SIZE RATCHET (the Rust twin of eslint's max-lines) ──
-#
-# The TS side got `max-lines` with per-file baselines on 2026-08-27; this is the
-# same idea for the one Rust file with the same problem. lib.rs is 5,213 lines
-# and holds the whole wasm_bindgen surface, so it cannot simply be split — but
-# it can be stopped from growing, and its stateless free functions and op-log
-# persistence surface are already coherent chunks ready for the
-# `annotations.rs` / `capture.rs` extraction treatment.
-#
-# Same rule as every other baseline here: this number only goes DOWN. When an
-# extraction lands, lower it in the same commit.
-#
-# Deliberately NOT rustc's `dead_code` lint, which was the obvious candidate
-# and does not work in this crate — an unused private fn added to lib.rs,
-# history.rs or edges.rs produces no diagnostic at all under
-# `cargo check --all-features` (verified 2026-08-27 with --message-format=json:
-# zero compiler-message entries), while the identical probe warns in a minimal
-# crate on the same pinned 1.97.1 toolchain. Cause not identified; do not
-# re-derive it as "pub items are exempt" — the probe was private, and cdylib
-# and wasm-bindgen were both ruled out by isolation.
-# 5213 -> 5183 (layer Color Overlay, 2026-08-28): `Layer::from_snapshot_pixels`
-# moved the two hand-built snapshot layers out to layer.rs, and the Color
-# Overlay engine tests were written into layer.rs's own test module rather than
-# here. Lowered in the same commit as the extraction, per the rule above.
-# 4912 -> 4798 (shape perspective, 2026-09-11): `oplog_sync_annotations`'
-# annotation diff — 110 lines of pure comparison over two lists and the log's
-# document — moved out to `ops::annotation_sync_ops`, beside the `Op` variants
-# it emits and the `#[serde(skip)]` fields whose hazards it has to remember.
-# Lowered in the same commit as the extraction, per the rule above.
-# 4798 -> 4808 (merging master into shape perspective, 2026-09-16). ⚠️ READ THIS
-# BEFORE CONCLUDING THE RATCHET WAS RAISED TO GO GREEN. It was not: measured
-# against MASTER this is a LOWERING of 4912 -> 4808, which is the ratchet doing
-# its job. The 4798 above was set on this branch while it was 30 commits behind,
-# against a lib.rs that contained neither Levels (#152) nor Presets (#153); both
-# add engine surface to lib.rs, and merging brought those lines in legitimately.
-# Two branches ratcheting the same counter independently is the only way this
-# number can move UP without new slop, and the check for it is the one below:
-# 4808 must be lower than the baseline on the branch you are merging INTO.
-n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4808 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+# ── src/lib.rs line count: NOT ratcheted ──
+# `librs-lines` (5213 -> 4771 over Aug-Sep 2026) was retired by Chris on
+# 09-25-2026. lib.rs is refactored often enough that a blocking line count cost
+# more than it caught. Don't reintroduce it without asking.
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
@@ -235,6 +240,71 @@ if [ -z "$n_deadexp" ]; then
 fi
 check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
 
+# ── THE BASE COMMIT THE THREE MATCHED PAIRS DIFF AGAINST ──
+#
+# All three co-change checks below ask one question — did one side of a pair
+# move without the other? — and all three need one thing to ask it: a commit to
+# diff HEAD against. Resolved ONCE, here, because three copies of the same
+# resolution are three chances for them to drift apart.
+#
+# ⚠️ THIS IS WHERE ALL THREE WERE VACUOUS UNTIL 2026-09-20, AND THE MESSAGE
+# THEY PRINTED SAID THE OPPOSITE. It read "no origin/master to diff against
+# (runs in CI)", and CI was the one place it did not run: `actions/checkout`
+# clones at depth 1 by default, so `origin/master` is absent on the runner, and
+# 12 of the 13 checkout steps in ci.yml took that default. Measured on two real
+# runs, not inferred:
+#   pull_request 35487378044 → skip, skip, skip
+#   push master  35456540646 → ok (0 hunks), ok (0 hunks), ok (0 hunks)
+# So they never compared a one-sided edit on a PULL REQUEST — the only event
+# where one is still catchable before it lands — and on master they reported a
+# pass against an empty diff, because there origin/master IS HEAD. Both states
+# were empty; only one of them admitted it. The other half of the fix is in
+# ci.yml, which now gives this job the history; this half is the part that
+# refuses to go quiet again.
+#
+# Three HONEST states, none of which flatters:
+#   compare  a base exists and there is something to diff → the check has teeth
+#   n/a      the base IS HEAD and the tree is clean       → nothing to compare,
+#            and printing "ok" for that is the exact lie this block removes
+#   absent   no origin/master at all                      → a bare local clone,
+#            and FATAL in CI, where it means a broken checkout rather than a
+#            local convenience. A gate that no-ops on its own misconfiguration
+#            is the class of check this repo keeps finding green and empty.
+pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+pair_head=$(git rev-parse HEAD 2>/dev/null || true)
+
+if [ -z "$pair_base" ] && [ -n "${GITHUB_ACTIONS:-}" ]; then
+  echo "::error::matched-pair checks have no base commit — origin/master is missing from this checkout."
+  echo "FATAL: the three co-change checks cannot run, so this job cannot substantiate a pass." >&2
+  echo "  The guardrails job needs 'fetch-depth: 0' on its checkout (.github/workflows/ci.yml)." >&2
+  exit 1
+fi
+
+# Returns 0 when a pair check can do real work. When it cannot it PRINTS why
+# and returns 1, so the reason always reaches the log and all three call sites
+# read the same way.
+#
+# ⚠️ The `git status` half of the n/a test is load-bearing, not decoration. The
+# diffs below are TWO-DOT on purpose so they see the working tree — that is what
+# makes this usable as a pre-push guard on uncommitted work. On a local master
+# branch the base IS HEAD while the edit sits unstaged, and calling that "n/a"
+# would switch the check off in precisely the situation it was written for. So
+# n/a needs both: base == HEAD *and* nothing modified. `-uno` keeps a stray
+# untracked file (a scratch note, SESSION_LOG.md) from counting as an edit.
+pair_can_compare() {
+  if [ -z "$pair_base" ]; then
+    echo "  skip $1: no origin/master in this checkout — run 'git fetch origin master' first."
+    echo "       (Local-only state. On a CI runner this is fatal, not a skip — see above.)"
+    return 1
+  fi
+  if [ "$pair_base" = "$pair_head" ] && [ -z "$(git status --porcelain -uno 2>/dev/null)" ]; then
+    echo "  n/a $1: HEAD is origin/master with a clean tree — no one-sided edit to compare."
+    echo "       (This check has teeth on a pull request, which is where it now runs.)"
+    return 1
+  fi
+  return 0
+}
+
 # ── MATCHED PAIR: the blur oracle (ADR-030) ──
 # `src/simd/blur.rs` (what the engine actually runs) and
 # `app/src/lib/webgpu/blurReference.ts` (the oracle the GPU shader is checked
@@ -249,13 +319,10 @@ check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)
 # Same scoping rule as the anchor pair below: match a changed line carrying the
 # blur's actual arithmetic, not any edit to the file, so a comment cannot turn
 # this red.
-blur_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$blur_base" ]; then
-  echo "  skip blur-oracle-pair: no origin/master to diff against (runs in CI)"
-else
-  rust_blur=$(git diff "$blur_base" -- src/simd/blur.rs \
+if pair_can_compare blur-oracle-pair; then
+  rust_blur=$(git diff "$pair_base" -- src/simd/blur.rs \
     | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
-  ts_blur=$(git diff "$blur_base" -- app/src/lib/webgpu/blurReference.ts \
+  ts_blur=$(git diff "$pair_base" -- app/src/lib/webgpu/blurReference.ts \
     | grep -cE '^[+-].*(F\(|Math\.fround|kernel\[|buildGaussianKernel)' || true)
   if [ "$rust_blur" -gt 0 ] && [ "$ts_blur" -eq 0 ]; then
     echo "FAIL blur-oracle-pair: src/simd/blur.rs changed, blurReference.ts did not."
@@ -291,11 +358,10 @@ fi
 # ⚠️ NEEDS A BASE REF, so it cannot run in a bare local checkout. It SAYS so
 # rather than passing quietly — a co-change check that silently no-ops is worth
 # less than no check, and "verified in one environment" is this repo's most
-# expensive recurring mistake.
-pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$pair_base" ]; then
-  echo "  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)"
-else
+# expensive recurring mistake. That warning was right and the code under it was
+# wrong for months: the message it printed named CI as the place this runs, and
+# CI was the one place it did not. See the base-commit block above.
+if pair_can_compare rotated-anchor-pair; then
   formula_changed=$(git diff "$pair_base" -- src/text.rs \
     | grep -cE '^[+-].*(hw \* cos|hw \* sin|hh \* cos|hh \* sin)' || true)
   pivot_changed=$(git diff "$pair_base" -- app/src/features/canvas/CanvasArea.tsx \
@@ -329,13 +395,10 @@ fi
 #
 # Two-dot diff, so the working tree counts -- a pre-push guard that only sees
 # committed work passes on the very change it was written for.
-shader_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
-if [ -z "$shader_base" ]; then
-  echo "  skip blur-shader-pair: no origin/master to diff against (runs in CI)"
-else
-  rust_arith=$(git diff "$shader_base" -- src/simd/blur.rs \
+if pair_can_compare blur-shader-pair; then
+  rust_arith=$(git diff "$pair_base" -- src/simd/blur.rs \
     | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
-  wgsl_arith=$(git diff "$shader_base" -- app/src/lib/webgpu/gpuBlur.ts \
+  wgsl_arith=$(git diff "$pair_base" -- app/src/lib/webgpu/gpuBlur.ts \
     | grep -cE '^[+-].*(acc = acc \+|kernel\[|floor\(c\.|clamp\(floor)' || true)
   if [ "$rust_arith" -gt 0 ] && [ "$wgsl_arith" -eq 0 ]; then
     echo "FAIL blur-shader-pair: src/simd/blur.rs changed, the WGSL shader did not."

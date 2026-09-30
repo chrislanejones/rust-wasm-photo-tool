@@ -8,7 +8,9 @@ Everything runs from one workflow, [`.github/workflows/ci.yml`](../.github/workf
 
 Deploys are **not** driven by Actions — the hosts build on push themselves. CI mirrors those builds so a break fails here first.
 
-> **Before adding or trusting a gate, read [`vacuous-checks.md`](vacuous-checks.md).**
+> **Before adding or trusting a gate, read `vacuous-checks.md`** — moved out of the
+> repo on 2026-09-17 with the other finished working documents (see
+> [README.md](README.md)); `git log --all -- docs/vacuous-checks.md` finds it.
 > This repo has produced fourteen checks that were green because they could not
 > fail — including one in this file's own deploy sentinel, which passed on a
 > real featureless build for its entire life.
@@ -19,8 +21,8 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 
 | Job | What it does | Mirrors |
 | --- | --- | --- |
-| `rust` | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, then `wasm-pack build` | Netlify's Rust build |
-| `web` | Typecheck (`tsc -b`) + `pnpm build:all` (WASM + editor app) | Netlify's app build |
+| `rust` | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, then `wasm-pack build` | Vercel's Rust build |
+| `web` | Typecheck (`tsc -b`) + `pnpm build:all` (WASM + editor app) | Vercel's app build |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
 | `convex` | `convex codegen` + a `_generated` drift check | — |
 | `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` export | The manual check that caught the five-week featureless-prod bug |
@@ -144,7 +146,7 @@ Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
 **The `convex` job is skipped.** It needs `CONVEX_DEPLOY_KEY` — see Setup notes.
 
-**`deploy-sentinel` fails after a green build.** The build was fine and the *deploy* is wrong — usually a Cargo feature set in the root `vercel.json` (or `netlify.toml`) that doesn't match `build:wasm`. Check the served wasm's size and exports, not the local one.
+**`deploy-sentinel` fails after a green build.** The build was fine and the *deploy* is wrong — usually a Cargo feature set in the root `vercel.json` that doesn't match `build:wasm`. Check the served wasm's size and exports, not the local one.
 
 **`deploy-sentinel` fails tier 2 — "the SAME commit and DIFFERENT bytes".** The builders disagree, and the first thing to check is `.cargo/config.toml`: its `--remap-path-prefix` list must name *every* builder by its `$CARGO_HOME`, and there is no wildcard. Vercel's is `/rust`, not a home directory — it was missed when the editor moved hosts, and production shipped 24 B off CI for it.
 
@@ -152,4 +154,14 @@ Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
 - **Vercel** — git root → root `vercel.json` → installs Rust + `wasm-pack` → builds the editor app → `www-dist` → **edit.imagehorse.app** (canonical since v8.76)
 - **Vercel** — `marketing/` root → `marketing/vercel.json` → builds the marketing site → `dist` → **imagehorse.app**
-- **Netlify** — git root → `netlify.toml` → the same editor build → `www-dist`. Still live, still builds PR previews, kept as the rollback path. Not what the sentinel checks.
+Netlify is **gone** as of 2026-09-27. `rust-wasm-photo-tool.netlify.app` is now a
+301 to `edit.imagehorse.app` and nothing there builds this tree any more, so CI
+and Vercel are the only two builders left.
+
+⚠️ That is the cost worth naming. Three independent builders of the same commit
+is what made the post-move byte drift readable — laptop, CI and Netlify all
+agreed on 823,503 B and Vercel alone produced 823,479 B, which is how its `/rust`
+`CARGO_HOME` was found. With one builder against one, the next such drift has
+nothing to break the tie: CI says one number, production says another, and
+neither is obviously the odd one out. When that happens, reproduce locally first
+— the laptop is now the third opinion.

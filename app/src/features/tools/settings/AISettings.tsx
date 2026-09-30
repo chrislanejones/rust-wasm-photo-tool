@@ -17,8 +17,10 @@ import { useEffect, useRef, useState } from "react";
 import { Scissors, Eraser, BroomSparkles, Trash2, Lock, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { StabilizerRow } from "./StabilizerRow";
-import { SizeSlider } from "@/components/SizeSlider";
+import { AdvancedStabilizer } from "./StabilizerRow";
+import { Kbd } from "@/components/ui/kbd";
+import { ToolPanel } from "@/components/ui/tool-panel";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { MutableRefObject } from "react";
@@ -252,7 +254,7 @@ export function AISettings({
     // The four mode tiles moved to the ToolsSidebar header (SubtoolRow), which
     // reads/writes this same `eraserMode` via toolModes.ts. `-mt-2` went with
     // them — it only existed to tuck that row under the panel's top padding.
-    <div className="space-y-4">
+    <ToolPanel>
       {/* The AI sub-tool owns BOTH Replicate actions, so its header names the
           sub-tool rather than whichever mode happens to be set. Brush and
           Magic Eraser are their own Create sub-tools and keep their own. */}
@@ -298,8 +300,9 @@ export function AISettings({
               takes `settings.paintStabilizer` (usePaintTool.ts:91-98) and
               `types.ts:39` already documents the setting as "shared by the
               Paint brush and the Eraser". There was simply no control, so a
-              working feature was unreachable from this panel. */}
-          <StabilizerRow
+              working feature was unreachable from this panel. It sits in
+              Advanced, exactly as in Paint; the closed summary says the level. */}
+          <AdvancedStabilizer
             value={settings.paintStabilizer}
             onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
           />
@@ -334,7 +337,7 @@ export function AISettings({
             />
             {/* Last in the row, matching Brush Eraser above. The mask drag is
                 the same paint stroke engine, so the same leash applies. */}
-            <StabilizerRow
+            <AdvancedStabilizer
               value={settings.paintStabilizer}
               onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
             />
@@ -379,7 +382,7 @@ export function AISettings({
             <div className="space-y-3 rounded-lg border border-border bg-bg-elevated/60 p-3">
               <p className="text-2xs leading-relaxed text-text-secondary">
                 Paint over the object on the canvas, then choose Remove Object.
-                Press <kbd className="font-mono">Esc</kbd> to cancel.
+                Press <Kbd>Esc</Kbd> to cancel.
               </p>
               <SizeSlider
                 label="Brush Size"
@@ -389,6 +392,7 @@ export function AISettings({
                 onChange={setMaskBrush}
                 presets={MASK_BRUSH_PRESETS}
                 disabled={inpaintBusy}
+                reason={inpaintBusy ? "Locked while the object is being removed." : undefined}
               />
               <div className="flex items-center gap-2">
                 <Button
@@ -499,6 +503,6 @@ export function AISettings({
           )}
         </>
       )}
-    </div>
+    </ToolPanel>
   );
 }

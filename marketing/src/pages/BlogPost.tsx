@@ -1,7 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
 import NotFound from "./NotFound";
-import { POSTS, fmtPostDate, postFor, postPath } from "../data/posts";
+import { pickNextCardsForPost } from "../data/nextCards";
+import { fmtPostDate, postFor, postPath } from "../data/posts";
 import { POST_BODIES, POST_TOPPERS } from "../posts/registry";
 import { AUTHOR } from "../seo";
 
@@ -48,10 +50,11 @@ export default function BlogPost() {
   const Body = POST_BODIES[post.slug];
   const Topper = POST_TOPPERS[post.slug];
 
-  // POSTS is newest first, so the entry before this one is the newer post.
-  const i = POSTS.indexOf(post);
-  const newer = i > 0 ? POSTS[i - 1] : undefined;
-  const older = i < POSTS.length - 1 ? POSTS[i + 1] : undefined;
+  // The foot was an Older/Newer pair walking POSTS in order. With two posts
+  // that is one link and a dead end, and it could only ever offer more blog —
+  // never the tool the post is about. It is now the site's four-card grid,
+  // led by another post so the writing still comes first.
+  const cards = pickNextCardsForPost(postPath(post));
 
   return (
     <>
@@ -104,22 +107,7 @@ export default function BlogPost() {
           <Body />
         </article>
 
-        {(newer || older) && (
-          <nav className="post-next" aria-label="More posts">
-            {older && (
-              <Link className="post-next__link" to={postPath(older)}>
-                <span className="post-next__label">Older</span>
-                <span className="post-next__title">{older.headline}</span>
-              </Link>
-            )}
-            {newer && (
-              <Link className="post-next__link post-next__link--newer" to={postPath(newer)}>
-                <span className="post-next__label">Newer</span>
-                <span className="post-next__title">{newer.headline}</span>
-              </Link>
-            )}
-          </nav>
-        )}
+        <NextCards cards={cards} heading="Read next" label="More to read" />
 
       </main>
 

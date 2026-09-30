@@ -194,6 +194,7 @@ export function ColorPickerDialog({
           {/* ── Left: the picker surface ─────────────────────────────── */}
           <div className="space-y-3">
             <ToolButtonGroup
+              aria-label="Picker shape"
               options={PICKER_MODES}
               value={mode}
               onChange={setMode}

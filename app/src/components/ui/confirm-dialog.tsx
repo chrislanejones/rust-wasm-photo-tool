@@ -43,6 +43,9 @@ interface ConfirmDialogProps {
   /** Renders a Cancel-style button (it just closes) before the confirm one.
    *  Omit for a single full-width button. */
   cancelLabel?: string;
+  /** Opened from inside a modal (Settings): lift it above that modal, or it
+   *  opens behind it and the button that opened it seems to do nothing. */
+  overModal?: boolean;
 }
 
 export function ConfirmDialog({
@@ -56,11 +59,13 @@ export function ConfirmDialog({
   onConfirm,
   tone,
   cancelLabel,
+  overModal,
 }: ConfirmDialogProps) {
   const width = cancelLabel ? "flex-1" : "w-full";
+  const layer = overModal ? "z-[var(--z-over-modal)]" : undefined;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className={layer ? `max-w-sm ${layer}` : "max-w-sm"} overlayClassName={layer}>
         <DialogHeader>
           <DialogTitle className={TitleIcon ? "flex items-center gap-2" : undefined}>
             {TitleIcon && <TitleIcon className="h-5 w-5 text-theme-accent" />}

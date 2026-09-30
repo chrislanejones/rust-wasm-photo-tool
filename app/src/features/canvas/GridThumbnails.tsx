@@ -4,6 +4,7 @@
 // the canvas DOM/WASM pixels survive tool switches.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { BatchCropThumbShade } from "@/features/gallery/BatchCropThumbShade";
 
 interface Props {
   photos: PhotoEntry[];
@@ -138,10 +139,14 @@ export function GridThumbnails({
                   src={url}
                   alt={p.name}
                   draggable={false}
-                  className="max-h-full max-w-full object-contain"
+                  // Fills the tile (letterboxed) rather than sitting at its
+                  // natural size, so the Batch › Crop shade below — sized to
+                  // the tile — lands on the same pixels.
+                  className="h-full w-full object-contain"
                 />
               )}
             </button>
+            <BatchCropThumbShade entry={p} isActive={false} cover={false} />
             {isLastTile && overflowCount > 0 && (
               <span className="absolute bottom-1 right-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-2xs text-zinc-100">
                 +{overflowCount} more

@@ -13,12 +13,17 @@ interface PaneHeadingProps {
   compact?: boolean;
   /** Wrapper spacing only, e.g. `pt-2` for a section that follows another. */
   className?: string;
+  /** Lands on the `<h3>`, so the control under the heading can name itself
+   *  with `aria-labelledby` instead of repeating the words (Night 2). */
+  id?: string;
 }
 
-export function PaneHeading({ title, children, compact, className }: PaneHeadingProps) {
+export function PaneHeading({ title, children, compact, className, id }: PaneHeadingProps) {
   return (
     <div className={className}>
-      <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+      <h3 id={id} className="text-sm font-semibold text-text-primary">
+        {title}
+      </h3>
       {children != null && (
         <p
           className={

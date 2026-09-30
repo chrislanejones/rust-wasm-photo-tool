@@ -592,7 +592,7 @@ export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
  *  ✅ **STAGE 3.5 IS COMPLETE.** The gate is at its floor: everything still
  *  counted dissolves at Stage 4, and there is no conversion work left. The last
  *  two — `AppShell`'s `handlePenCommit` / `handlePenHitTest` — landed in v8.19 as
- *  the PenOverlay state-machine change `docs/pen-overlay-async-design.md`
+ *  the PenOverlay state-machine change `docs/pen-overlay-async-design.md (git history; moved out of the repo 2026-09-17)`
  *  specified, not as awaits.
  *
  *  ⚠️ THIS PARAGRAPH WAS WRONG FROM 2026-08-08 TO v8.17. It said "the 166

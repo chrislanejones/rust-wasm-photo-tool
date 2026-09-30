@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import { COMMITS } from "../data/commits";
 import { RELEASES, type Tag, type Release } from "../data/releases";
+import NextCards from "../components/NextCards";
+import Pager from "../components/Pager";
+import { pickNextCards } from "../data/nextCards";
 
 // Two datasets, deliberately kept apart:
 //   RELEASES — the log itself, and the month counts
@@ -43,6 +46,10 @@ const monthName = (key: string) => `${FULL[parseInt(key.slice(5, 7), 10) - 1]} $
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const COMMIT_DAYS = Object.keys(COMMITS).sort();
+
+/** Releases per page. 248 of them in one document was thousands of nodes laid
+ *  out and painted for a reader who sees fifteen. */
+const PER_PAGE = 15;
 
 /** "all" means the whole log, so it gets a summary card of its own rather than
  *  being the only view without one. */
@@ -211,6 +218,33 @@ export default function Trail() {
   const latest = RELEASES.length ? RELEASES[0].version : null;
   const perMonth = new Map(months);
 
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE));
+
+  // Picking a month re-filters under the pager. Without this, choosing a month
+  // with two releases while sitting on page 9 leaves the reader on a page that
+  // no longer exists, looking at an empty log.
+  useEffect(() => setPage(1), [active]);
+
+  // Clamped rather than trusted: `shown` can shrink for reasons other than the
+  // month changing, and a first index past the end renders nothing.
+  const current = Math.min(page, pageCount);
+  const start = (current - 1) * PER_PAGE;
+  const pageItems = shown.slice(start, start + PER_PAGE);
+
+  // Paging keeps the scroll position, which on page 2 means landing halfway
+  // down a list that starts above you. Move to the head of the log — but not
+  // on first render, which would yank a reader arriving at the page.
+  const logRef = useRef<HTMLElement>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    logRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [current]);
+
   let lastMonth: string | null = null;
 
   return (
@@ -266,15 +300,20 @@ export default function Trail() {
 
         <Summary monthKey={active} />
 
-        <section className="trail-log" aria-label="Releases">
+        <section className="trail-log" aria-label="Releases" ref={logRef}>
+          {/* role="status" so a screen reader hears the new range after a page
+              or month change, which is otherwise a silent swap of the list. */}
           <p className="trail-log__count" role="status">
-            {plural(shown.length, "release", "releases")} · {isMonth ? monthName(active) : "all time"}
+            {shown.length
+              ? `${start + 1}–${Math.min(start + PER_PAGE, shown.length)} of ${plural(shown.length, "release", "releases")}`
+              : plural(0, "release", "releases")}{" "}
+            · {isMonth ? monthName(active) : "all time"}
           </p>
 
           <div className="trail-log__list">
             {!shown.length && <p className="trail-log__empty">No releases in this month.</p>}
 
-            {shown.map((r) => {
+            {pageItems.map((r) => {
               const key = r.date.slice(0, 7);
               const openMonth = !isMonth && key !== lastMonth;
               lastMonth = key;
@@ -319,7 +358,11 @@ export default function Trail() {
               );
             })}
           </div>
+
+          <Pager page={current} pageCount={pageCount} onPage={setPage} label="Release pages" />
         </section>
+
+        <NextCards cards={pickNextCards("/trail-log")} />
       </main>
 
       <Footer line="Shipped in the open, one day at a time." />

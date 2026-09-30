@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Monitor, Moon, Sun, Sparkles, Accessibility } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { ThemeChoice } from "@/lib/preferences";
@@ -30,14 +31,18 @@ export function AppearancePane({
   reduceMotion,
   onReduceMotionChange,
 }: AppearancePaneProps) {
+  const themeId = useId();
+  const motionId = useId();
   return (
     <div className="space-y-4">
-      <PaneHeading title="Theme">
+      <PaneHeading id={themeId} title="Theme">
         Match your system, or force dark / light. Applied on Apply &amp; Save;
         “System” follows your OS setting and updates live.
       </PaneHeading>
       <ToggleButtonGroup
         fill
+        mode="select"
+        aria-labelledby={themeId}
         items={THEMES.map(({ value: v, label, icon }) => ({
           key: v,
           icon,
@@ -48,12 +53,14 @@ export function AppearancePane({
       />
 
       {/* ── Reduce motion — below Theme, same toggle style ─────────────────── */}
-      <PaneHeading title="Motion" className="pt-2">
+      <PaneHeading id={motionId} title="Motion" className="pt-2">
         Minimize animations — panel slides, fades and transitions — for a
         calmer, faster interface. Helpful if motion bothers you.
       </PaneHeading>
       <ToggleButtonGroup
         fill
+        mode="select"
+        aria-labelledby={motionId}
         items={[
           {
             key: "full",

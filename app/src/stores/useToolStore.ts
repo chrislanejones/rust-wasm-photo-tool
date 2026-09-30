@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import type { SelectionCombineMode } from "@/lib/selectionBool";
 import type { SelectionCoverage } from "@/lib/selectionCoverage";
+import type { ObjectRef } from "@/lib/objectSelection";
 import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
@@ -69,14 +70,15 @@ export type TextMode = (typeof TEXT_MODES)[number];
 // serializes the index, the engine stores a quad, not a mode.
 export type PerspectiveMode = "perspective" | "distort" | "skew";
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
- *  rename, and AI Rename (names every photo from what the engine sees in it).
+ *  crop (one ratio for every photo — carousels), bulk rename, and AI Rename
+ *  (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
  *  `TEXT_MODES` above.
  *
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "crop", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
@@ -207,9 +209,11 @@ export interface ToolState {
   cropRatio: [number, number] | null;
   selectionTolerance: number;
   selectionMask: Uint8Array | null;
-  /** How the next selection combines with the current one — the Select
-   *  panel's Combine group (New / Add / Subtract / Intersect). Shift and Alt
-   *  still override it for one gesture. NOT PERSISTED (outside `partialize`):
+  /** How the next region combines with the current selection — the Review
+   *  panel's Combine section (New / Add / Subtract / Intersect; it lived on the
+   *  Select panel until ADR-075). Shift and Alt still override it for one
+   *  gesture, and it applies to a placed object's footprint as well as to a
+   *  canvas gesture. NOT PERSISTED (outside `partialize`):
    *  a session-scoped choice, and a reload that came back in Subtract would
    *  make the first click look broken. No IndexedDB change. */
   selectionCombine: SelectionCombineMode;
@@ -229,6 +233,16 @@ export interface ToolState {
    *  would mean threading props through AppShell), so it asks through the
    *  store and `useSelectionActions` answers. `n` makes each request new. */
   refineRequest: { kind: "apply" | "cleanUp"; n: number } | null;
+  /** Review → Combine → an object row: "combine the area this placed text or
+   *  shape covers into the selection, with the standing Combine mode".
+   *
+   *  Same panel-to-hook channel `refineRequest` opened, and for the same
+   *  reason: the Review panel has no engine handle, and the alternative is two
+   *  more props threaded through AppShell — which ADR-042 exists to stop, and
+   *  which its `max-lines` ratchet would refuse. `n` makes each request new,
+   *  so clicking the same row twice asks twice (the engine no-ops the second
+   *  one when it changes nothing, rather than pushing an empty step). */
+  combineRequest: (ObjectRef & { n: number }) | null;
   /** AI › Object Removal is painting its mask ON the canvas right now.
    *
    *  This replaced a portal-mounted popup that painted on its own private
@@ -295,6 +309,7 @@ export interface ToolState {
   setSelectionRefine: (v: SetArg<RefineSettings>) => void;
   setRefinePreviewing: (v: boolean) => void;
   requestRefine: (kind: "apply" | "cleanUp") => void;
+  requestCombine: (ref: ObjectRef) => void;
   /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
    *  the mask describes one object on one image, so carrying it into the next
    *  visit to the panel could only ever remove the wrong thing. */
@@ -391,6 +406,7 @@ export const useToolStore = create<ToolState>()(
       selectionRefine: CLEAN_UP,
       refinePreviewing: false,
       refineRequest: null,
+      combineRequest: null,
       objectRemovalMasking: false,
       cropSelectionActive: false,
       objectRemovalStrokes: [],
@@ -479,6 +495,8 @@ export const useToolStore = create<ToolState>()(
       setRefinePreviewing: (v) => set({ refinePreviewing: v }),
       requestRefine: (kind) =>
         set((s) => ({ refineRequest: { kind, n: (s.refineRequest?.n ?? 0) + 1 } })),
+      requestCombine: (ref) =>
+        set((s) => ({ combineRequest: { ...ref, n: (s.combineRequest?.n ?? 0) + 1 } })),
       setObjectRemovalMasking: (v) =>
         set((s) => {
           const next = resolveSet(v, s.objectRemovalMasking);
@@ -540,7 +558,7 @@ export const useToolStore = create<ToolState>()(
       // stampSettings / toolSettings (these DO push into the engine via
       // stamp.setBrushSize/… so persisting them would need a one-time WASM sync
       // on rehydrate — deferred to the AppShell wiring; see
-      // docs/State-Management.md §6).
+      // docs/archive/State-Management.md §6).
       partialize: (s): ToolPersisted => ({
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,

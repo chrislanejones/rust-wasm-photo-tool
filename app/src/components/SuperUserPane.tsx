@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Crown, User, UserX } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { UserMode } from "@/components/StatusBar";
@@ -68,9 +69,11 @@ const TEST_PASSWORD =
   (import.meta.env.VITE_DEV_TEST_PASSWORD as string | undefined) ?? "";
 
 export function SuperUserPane({ mode, onSelect, entitlement }: SuperUserControls) {
+  const headingId = useId();
+  const whyId = useId();
   return (
     <div className="space-y-4">
-      <PaneHeading title="Super User">
+      <PaneHeading id={headingId} title="Super User">
         Look at the app as another kind of account. This changes what YOU see,
         on this device, and nothing else: your account, your files and what the
         server allows are untouched. Use <strong>Apply</strong> in the footer to
@@ -80,6 +83,9 @@ export function SuperUserPane({ mode, onSelect, entitlement }: SuperUserControls
 
       <ToggleButtonGroup
         fill
+        mode="select"
+        aria-labelledby={headingId}
+        aria-describedby={whyId}
         items={TIERS_LIST.map(({ mode: m, label, icon }) => ({
           key: m,
           icon,
@@ -91,7 +97,7 @@ export function SuperUserPane({ mode, onSelect, entitlement }: SuperUserControls
           onToggle: () => onSelect(m),
         }))}
       />
-      <p className="pl-1 text-2xs leading-relaxed text-text-muted">
+      <p id={whyId} className="pl-1 text-2xs leading-relaxed text-text-muted">
         You can look down the ladder, never up — a preview you are not entitled
         to would show buttons the server refuses.
       </p>

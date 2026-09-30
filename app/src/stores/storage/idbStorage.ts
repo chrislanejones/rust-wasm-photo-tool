@@ -4,7 +4,7 @@
 // key/value store, this is ~40 LOC, it matches the three content stores we
 // already maintain (originalsStore / editPersistence / galleryManifest), and it
 // avoids touching the lockfile (the pnpm store-v11 install gotcha — see
-// docs/IndexedDB-Investigation.md §4).
+// docs/archive/IndexedDB-Investigation.md §4).
 //
 // Lives in its OWN database, separate from the content DBs, so a corrupt or
 // cleared preferences cache can never take down originals or edit history.
@@ -98,7 +98,7 @@ const lastWritten = new Map<string, string>();
  *
  * All three methods are async — `persist` hydrates the store after first paint,
  * so only persist small, cosmetic "remember my choice" prefs (never transient
- * dialog flags or heavy data). See docs/State-Management.md §6.
+ * dialog flags or heavy data). See docs/archive/State-Management.md §6.
  *
  * setItem de-dupes: identical consecutive writes are skipped (see `lastWritten`).
  */

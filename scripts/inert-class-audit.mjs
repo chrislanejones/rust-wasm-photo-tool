@@ -66,7 +66,13 @@ function sourceFiles(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...sourceFiles(p));
-    else if ([".ts", ".tsx"].includes(extname(p))) out.push(p);
+    // Test files are skipped. A test is never rendered, so no string in one can
+    // be a class that "renders nothing" — but a test that ASSERTS on a class
+    // name reads exactly like one: `/text-text-secondary/` was reported as an
+    // inert `text-text-secondary/` the first time Night 5's dialog contract
+    // test ran. Allowlisting those would have been wrong (they are not prose,
+    // and the list would grow with every such test); not scanning is right.
+    else if ([".ts", ".tsx"].includes(extname(p)) && !/\.test\.tsx?$/.test(name)) out.push(p);
   }
   return out;
 }

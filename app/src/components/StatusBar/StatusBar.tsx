@@ -9,8 +9,13 @@ import { formatBytes } from "@/lib/format";
 import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import type { UserMode } from "@/lib/tiers";
 import { useToolStore } from "@/stores/useToolStore";
 import { describeCoverage } from "@/lib/selectionCoverage";
+import { useSaveStatus } from "@/lib/saveStatus";
+import { retrySync, useSyncStatus } from "@/lib/sync/status";
+import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
+import { StatusMark } from "@/components/ui/status-mark";
 
 export interface ShortcutHint {
   keys: string;
@@ -71,9 +76,10 @@ const MARKETING_URL = "https://imagehorse.app";
  *  session. */
 const BRAND_COLLAPSE_MS = 5 * 60 * 1000;
 
-/** Tier of the current user. Lives here historically; consumed by
- *  `photoLimits` and AppShell even though the status bar no longer shows it. */
-export type UserMode = "demo" | "loggedIn" | "paid";
+/** Tier of the current user. Lived here historically; now defined beside the
+ *  tier table in `lib/tiers.ts` (which imported it from here — a component
+ *  under a lib module) and re-exported so importers keep working. */
+export type { UserMode };
 
 interface Props {
   state: CloneStampState;
@@ -109,6 +115,15 @@ export function StatusBar({
   const uploadDims = useUploadDimensions();
   // Read from the tool store, like uploadDims above, so AppShell gains no prop.
   const coverage = useToolStore((s) => s.selectionCoverage);
+  // The ONE publisher of "what will the next brush stroke change" — the same
+  // value the canvas cursor reads. Neither computes its own answer; that drift
+  // is what this pass exists to stop.
+  const maskEditing = useToolStore((s) => s.maskEditing);
+  // Night 5 feedback hierarchy: two errors that used to live ONLY in a toast.
+  // Each reads its single publisher; neither computes its own answer.
+  const saveFailed = useSaveStatus().failed;
+  const sync = useSyncStatus();
+  const syncFailed = sync.state === "error";
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -165,6 +180,7 @@ export function StatusBar({
   const hints: ShortcutHint[] = [...dynamic.slice(0, fillTo), ...locked];
   return (
     <footer className="status-bar">
+      <PhotoSwitchAnnouncer />
       <div className="status-section">
         {/* The name is spelled out in aria-label because after five minutes
             the visible words are gone and a bare 🐴 would be announced as
@@ -206,6 +222,56 @@ export function StatusBar({
         {/* Same slot rules as Undo NN% beside it: here while something is
             selected, gone when nothing is, and neutral at every value — a
             0.02% selection is information, not an error. */}
+        {/* Same slot rules as Undo NN% and the selection readout: present
+            while true, absent when not, never alarming. Before this, the tile
+            label in Layer Settings ("Paint mask" / "Painting mask") was the
+            ONLY place in the app that said a stroke would change the mask
+            instead of the pixels, and you had to go looking at it. */}
+        {/* Errors that need action, held here until they clear. A toast is
+            gone before you look; these are what is still TRUE after it has
+            gone. Leftmost, because a failure outranks a readout. */}
+        {saveFailed && (
+          <>
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-save-failed" role="status">
+              <StatusMark kind="failed" />
+              Couldn&rsquo;t save changes
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {syncFailed && (
+          <>
+            {/* The ONE place a sync failure is reported (UI Night 6 §4): it
+                sits here until it clears. It used to be a toast as well, and
+                a toast is gone in five seconds while the failure is not. */}
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-sync-failed" role="status">
+              <StatusMark kind="attention" />
+              Sync failed. Your changes are still saved on this device.
+              {/* Only when a retry can succeed. A change the server REFUSED is
+                  not retried on a timer and would be refused again, so a
+                  Retry there would be a button that does nothing. */}
+              {sync.willRetry && (
+                <button
+                  type="button"
+                  data-testid="status-sync-retry"
+                  onClick={() => retrySync()}
+                  className="ml-1 rounded px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
+                >
+                  Retry
+                </button>
+              )}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {maskEditing && (
+          <>
+            <span className="status-zoom" data-testid="status-mask-editing">
+              Editing mask &middot; black hides, white reveals
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {coverage && (
           <>
             <span className="status-zoom" data-testid="status-selection">

@@ -353,9 +353,10 @@ everything to legacy-only. Shipped v7.5. See
 
 ### SVG import: rasterize at the boundary
 
-Chrome's `createImageBitmap()` cannot decode SVG, and the security
-firewall (`lib/security/imageFirewall.ts`) rejects raw SVG outright
-(it can carry `<script>`/`onload`/`foreignObject`). SVGs are converted
+Chrome's `createImageBitmap()` cannot decode SVG, and raw SVG is never
+handed to the decoder (it can carry `<script>`/`onload`/`foreignObject`;
+the `lib/security/imageFirewall.ts` this used to cite no longer exists,
+so the boundary below is the only guard). SVGs are converted
 to PNG at both import funnels via `lib/rasterizeSvg.ts` — loaded into
 an `<img>` (scripts never execute there), drawn to a canvas, only the
 pixels kept. The stored gallery "original" is the PNG, not the SVG
@@ -420,7 +421,7 @@ a shipped GPU accelerator is describing something that is not in this tree.
 
 ### Metadata scrub (Settings → Security)
 
-Every export path can strip EXIF/GPS/XMP/IPTC (`lib/exif.ts`,
+Every export path can strip EXIF/GPS/XMP/IPTC (`lib/exif/`,
 dependency-free, JPEG/PNG/WebP) before pixels leave the device; a
 `'location'` mode removes just GPS and keeps camera/lens/timestamp. See
 [ADR-010](adr/010-metadata-scrub-privacy-modes.md).

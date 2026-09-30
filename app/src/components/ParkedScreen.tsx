@@ -61,7 +61,7 @@ export function ParkedScreen({
         <DialogTitle className="mt-3 text-base font-semibold leading-normal tracking-normal text-text-primary">
           {title}
         </DialogTitle>
-        <DialogDescription className="mt-1.5 text-sm leading-relaxed text-text-secondary">
+        <DialogDescription className="mt-1.5">
           {children}
         </DialogDescription>
         <Button size="large" className="mt-4 w-full" onClick={onAction}>

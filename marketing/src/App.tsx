@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
+import NajiBanner from "./components/NajiBanner";
 import useHead from "./useHead";
 import { trackPageView } from "./lib/analytics";
 import { PAGE_ROUTES } from "./routes";
@@ -96,6 +97,8 @@ export default function App() {
       <a className="skip" href="#main">
         Skip to content
       </a>
+      {/* After the skip link, so that stays the first Tab stop. */}
+      <NajiBanner />
       <ScrollBehaviour />
       <Nav onOpenSearch={() => setSearchOpen((o) => !o)} searchOpen={searchOpen} />
       {/* Pages are separate chunks (see routes.ts). The fallback never shows

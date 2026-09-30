@@ -1,7 +1,8 @@
 //! Operation log — a serializable, replayable history of edits over a
 //! single-layer document.
 //!
-//! Feature-gated behind `tiles`; not part of the default wasm build. The log
+//! Feature-gated behind `tiles`, which the shipped wasm is built with
+//! (`scripts/build-wasm.sh`; ADR-017). The log
 //! is the source of truth for undo/redo and content-addressed persistence:
 //! every edit is an [`Op`], appended in order, with periodic keyframe
 //! snapshots so replay does not have to start from scratch.

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import NajiArabic from "../components/NajiArabic";
 import { PEOPLE, type Person } from "../data/people";
 import { EDITOR_URL, external } from "../config";
@@ -125,6 +127,7 @@ export default function About() {
             Open the editor
           </a>
         </section>
+        <NextCards cards={pickNextCards("/about")} />
       </main>
 
       <Footer line="The horse came first. The software took the name." />

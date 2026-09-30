@@ -11,7 +11,8 @@
 >
 > **This is a constitution, not a gate.** Nothing here blocks CI tonight.
 > Turning a rule into a ratchet is Night 7, and only for rules a grep can
-> check without going red on a sentence.
+> check without going red on a sentence. **Done 09-29-2026 — see §6: R1, R3 and
+> raw `<button>` are ratchets, counted from the syntax tree, not by grep.**
 
 ## 1. The ten rules
 
@@ -42,7 +43,10 @@ looks right — `SubscriptionButton` has its own confirm dialog while five other
 files use `ui/confirm-dialog`.
 
 **R6 — A control that expresses a choice must say which choice.** Exclusive
-selection needs `aria-pressed`, `aria-checked` or a native radio. A row of
+selection is a radio group: `role="radio"` + `aria-checked` inside a named
+`role="radiogroup"`, or a native radio. `aria-pressed` is for independent
+toggles only; on an exclusive set it announces N unrelated pressed/unpressed
+buttons and never says they are a set (corrected on Night 2, see §7). A row of
 buttons with no state announces itself to a screen reader as a row of
 unrelated buttons. Today **exactly 2 of the app's 43 segmented-control
 call sites expose selection state**; 3 more are action rows where silence is
@@ -155,8 +159,13 @@ Import these. Do not re-implement them.
 | Pane heading | `ui/pane-heading` · section: `ui/section-header` |
 | Panel footer actions | `ui/panel-action-bar` |
 | Numeric field | `ui/number-field` |
-| Slider | `components/SizeSlider` — **not in `ui/`**, see Inventory Finding 5 |
-| Keyboard chip | the global `kbd` rule — **no component**, see Inventory §7 |
+| Slider | `ui/size-slider` (moved into `ui/` on Night 3, 15 importers) |
+| Preset row (25 / 50 / 75 / 100) | `ui/preset-row` — a named radio group; `SizeSlider` renders it |
+| One control: label, value, control, reason | `ui/control-row` |
+| A tool panel's body rhythm | `ui/tool-panel` |
+| Settings most strokes do not need | `ui/advanced-section` |
+| "Why is this off" line | `ReasonNote` in `ui/status-note` (both `reason` slots use it) |
+| Keyboard chip | `ui/kbd`. The bare `kbd` CSS rule is legacy, kept for 6 unmoved files |
 
 `ui/dialog` is the modal survivor; `Modal` and `SmallDialog` are being
 retired, which was already decided and is tracked in `PARKING_LOT.md`.
@@ -211,3 +220,136 @@ numbers would have gone green on documentation.
 
 So R1, R3 and R7 are ratchet candidates for Night 7. R5, R6 and R9 need a real
 parser or a human. R10 needs neither — it needs this file to be kept.
+
+**Night 7 (09-29-2026): what became a gate.** Not a grep, for the reason
+above. `scripts/ui-ratchet-counts.mjs` reads the TypeScript syntax tree, where
+comments are not nodes and so cannot count, and it reads a string only when it
+is a class list. It self-tests on a planted snippet before it touches the repo.
+
+| Ratchet | Rule | Baseline |
+| --- | --- | ---: |
+| `ui-spacing` | R1 — padding/gap/space off the scale | **53** |
+| `ui-radius` | R3 — bare `rounded`, `rounded-xl`/`2xl`, arbitrary | **52** |
+| `ui-raw-button` | a raw `<button>` outside `components/ui/` | **37** |
+
+Every baseline was reconciled against the text inventory line by line: each
+hit the text finds and the parser does not is a comment, a test, a JS
+identifier (`rounded: 16`) or a directional house radius the text regex cuts
+short (`rounded-r-full` read as `rounded-r`). Proven both ways: a real
+`<button className="rounded p-5">` turns all three red; the same text in a
+comment, or as a sentence, moves none of them.
+
+R7 was already a ratchet (`z-index`). Its GalleryBar exclusion was reviewed and
+kept — see UI_EXCEPTIONS.md. The raw-button count had grown 34 → 37 since
+Night 3, all in Night 6, while nothing was watching it; that is the argument
+for the gate in one number.
+
+## 7. The semantic contract: four modes (Night 2, 09-24-2026)
+
+Every row-of-buttons control is in exactly one of these modes. Nights 3 to 6
+build on this table. It is the reason R6 reads the way it does.
+
+| Mode | Means | Semantics | Keyboard |
+| --- | --- | --- | --- |
+| **ACTION** | a button that does something | none: a plain `<button>` | one Tab stop per button |
+| **TOGGLE** | independent on/off, several may be on | `aria-pressed` on each | one Tab stop per button |
+| **SELECT** | exactly one of N | `role="radiogroup"` with an accessible name on the container; `role="radio"` + `aria-checked` on each option | **one** Tab stop for the group (the checked option); arrows move and select; Home/End |
+| **SWITCH** | one binary control with no visible pair | `ui/switch`, or `role="switch"` + `aria-checked` | one Tab stop |
+
+**How each primitive picks its mode.**
+
+| Primitive | ACTION | TOGGLE | SELECT |
+| --- | --- | --- | --- |
+| `ui/tool-button-group` | no `value` prop | an option carries its own `active` (per tile; a group can mix ACTION and TOGGLE tiles, as Guides does) | a `value` prop is passed, even `undefined` |
+| `ui/toggle-button-group` | not used today | the default: every item carries `active` | `mode="select"` |
+
+`tool-button-group` derives its mode from props it already had, so none of
+its 29 call sites needed a new prop to be correct. `toggle-button-group`
+cannot do that. Every item carries `active` whether the set is exclusive or
+not, and "exactly one is on right now" does not prove "only one can be on".
+So exclusivity is declared, not inferred. That costs one prop at 12 call
+sites, and it was the honest price.
+
+**The name.** A radio group must have an accessible name. It comes from, in
+order: an explicit `aria-labelledby` pointing at the rendered heading (the
+Settings panes pass the `PaneHeading` id); the group's own `label` prop
+(`tool-button-group` wires it up with `aria-labelledby` automatically); or an
+explicit `aria-label` that repeats the visible heading text (tool panels,
+where the heading is a `SectionHeader` or a bare `<label>`).
+
+**What SELECT does not change.** How it looks. The lit tile, the pill and the
+spacing are the same classes as before. The only visible difference is that
+the focus ring moves with the arrow keys.
+
+## 8. The tool-panel grammar (Night 3, 09-25-2026)
+
+One panel = these parts, top to bottom. Every name was checked against the
+Night 1 inventory first; where a part already existed it was reused, not
+renamed.
+
+| Part | Primitive | New? | Notes |
+| --- | --- | --- | --- |
+| Frame | `ToolPanel` | new | `space-y-4`, nothing else. Needed: Crop was at 12px with a `-mt-2` while Paint and Eraser were at 16px |
+| Header | `SectionHeader` | reused | No `ToolHeader`; that would have been a second name for this |
+| Primary control | whatever the tool's main choice is | — | Crop's Ratio grid, Blur's mode row |
+| Control rows | `ControlRow` (and `SizeSlider` on it) | new | `data-slot` label / value / control / reason. Header to control is 8px everywhere |
+| Presets | `PresetRow` | new | Radio group named "<label> presets" |
+| Advanced | `AdvancedSection` | new | Collapsed by default, last before the actions; closed summary names the state inside |
+| Actions | `PanelActionBar` | reused | Gained `reason` |
+
+**Measured (1280px, DOM probe, same fixture):**
+
+| Panel | Header offset | Row gap | Label to control |
+| --- | --- | --- | --- |
+| Paint | 0 → 0 | 16 → 16 | 6 (sliders), 4 (Color, Stabilizer) → **8** |
+| Eraser | 0 → 0 | 16 → 16 | 6 / 4 → **8** |
+| Crop | **−8 → 0** | **12 → 16** | 8 → 8 |
+
+**Where Paint and Crop disagreed, and what changed in the primitive:**
+
+| Disagreement | Paint | Crop | Resolution |
+| --- | --- | --- | --- |
+| Panel rhythm | 16px via ToolModeToggle | 12px + `-mt-2` | `ToolPanel` owns the number; ToolModeToggle renders it too |
+| Label → control | 6px (`SizeSlider`) | 8px (`ToolButtonGroup` label) | `ControlRow` is 8px; the slider moved, not the 15 tile-group importers |
+| How a group is named | `StabilizerRow`: bare `<label>` + `aria-label` repeating it | `ToolButtonGroup label="Ratio"` | `ControlRow` hands the control its label id: `aria-labelledby` the words on screen |
+| Disabled with no reason | none disabled | Apply Crop greyed, silent | `reason` slot on both `ControlRow` and `PanelActionBar`, one `ReasonNote` |
+| Value slot | sliders show one | tile grids do not | `value` is optional; a lit tile already says its state |
+
+**Semantics added on the way (R6):** preset rows and the color swatches were
+exclusive choices that announced nothing. Both are named radio groups now,
+one Tab stop each. The swatch group sits on a `display: contents` element so
+the swatches and the "+" still wrap as one row; Chromium keeps the role
+(checked in the accessibility tree, and pinned by `e2e/ui-night3-panels.spec.ts`).
+
+**Focus (R8):** a range input's only keyboard focus cue was a 15%-alpha thumb
+halo, 1.14:1 on the light panel and 1.47:1 on the dark. Ranges now get the
+house dashed ring on `:focus-visible` (styles.css).
+
+**390px has no tool panels.** Phone width is the "Mobile version" (upload and
+download only). The panel's small-window surface is 960px dock mode, which the
+Night 3 screenshots add.
+
+## 9. Whose value is it? Per-photo, per-tool, app (09-30-2026)
+
+"When I switch photos I can't tell whether the numbers belong to this photo or
+are left over from the last one." Every panel control is one of these kinds,
+and the kind decides what a photo switch does to it. The panels that are
+per-photo render inside `features/tools/PerPhotoRegion`, which names the photo
+("3 of 12 · IMG_2041"), re-highlights on every switch, and locks (with in-place
+skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
+
+| Kind | On a switch | Examples |
+| --- | --- | --- |
+| **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Crop framing |
+| **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset), Presets, Flip/Rotate, Apply buttons |
+| **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
+| **App** | Stays | Rulers & grid preferences, theme |
+
+Per-photo panels (`PER_PHOTO_TOOLS` in ToolsSidebar): Resize & Compress, Crop &
+Transform, Perspective, Adjustments / Levels / Presets, Layers / Canvas Size /
+Guides. Select is per-tool at the panel level; its per-photo part (the
+selection) is cleared on a switch by `usePhotoSwitchReset`.
+
+Known exception: export quality is seeded from the previous photo until edit
+archives carry it (AppShell quality seed). Guides are cleared rather than
+reloaded until they are persisted per photo (`useGuidesStore` TODO).

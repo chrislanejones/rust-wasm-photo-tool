@@ -522,6 +522,30 @@ pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> Rend
 /// `history.rs` and `fonts.rs` already use.
 #[wasm_bindgen]
 impl ImageHorseTool {
+    /// DEPRECATED: prefer `add_text_annotation` + `flatten_text_annotations`
+    /// for the re-editable overlay flow. Kept as a one-shot direct-to-pixels
+    /// fallback for callers (currently: Batch Text) that don't need re-edit —
+    /// Batch runs each photo through a disposable `ImageHorseTool` that's
+    /// `.free()`'d right after export, so there's no live annotation state
+    /// to speak of, just bake-and-export.
+    ///
+    /// Render text entirely in Rust (Liberation Sans, embedded font) and
+    /// composite it onto the image buffer at (dest_x, dest_y).
+    /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
+    /// `dest_x/dest_y` is the top-left corner of the unrotated TEXT block —
+    /// when `background_kind` adds a background box, it grows outward from
+    /// the text by `bg_padding` on every side, so the text itself never
+    /// shifts and callers don't need to re-derive their placement math when
+    /// background is toggled on.
+    /// `angle_deg` rotates the rendered tile clockwise (positive) around its center.
+    ///
+    /// `background_kind`: 0 = none, 1 = solid rect. NOT 2 (speech bubble) —
+    /// batch text is a one-shot flatten with no live overlay to hang a
+    /// tail-direction control off, so the bubble path is intentionally
+    /// unreachable from here. Shares `build_annotation_tile` with
+    /// `add_text_annotation`/`update_text_annotation` (shadow off, no tail)
+    /// so the rect-fill/padding/corner-radius rendering can't drift between
+    /// the live-overlay and batch entry points.
     pub fn commit_text(
         &mut self,
         text: &str,

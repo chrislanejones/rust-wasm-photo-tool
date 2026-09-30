@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import { useCanvasCoords } from "@/hooks/useCanvasCoords";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
 import {
@@ -25,6 +26,7 @@ import { toast } from "@/components/ui/sonner";
 import { toCoverage } from "@/lib/selectionCoverage";
 import { createLiveRetune } from "@/lib/liveRetune";
 import { CLEAN_UP, isNoopRefine, refineArgs, type RefineSettings } from "@/lib/selectionRefine";
+import { objectFootprint } from "@/lib/objectSelection";
 
 /** Quiet time before a Tolerance tick re-runs the selection. Long enough to
  *  skip the ticks of one drag, short enough to read as live. */
@@ -233,16 +235,9 @@ export function useSelectionActions(
     liveRetune.current.schedule({ tolerance: selectionTolerance, edge: edgeThreshold });
   }, [selectionTolerance, edgeThreshold]);
 
-  const getCoords = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
-    const c = canvasRef.current;
-    if (!c) return { x: 0, y: 0 };
-    const r = c.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) * c.width) / r.width,
-      y: ((e.clientY - r.top) * c.height) / r.height,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The same mapping every canvas tool uses; one implementation, stable for a
+  // stable ref, so nothing downstream re-memoizes.
+  const getCoords = useCanvasCoords(canvasRef);
 
   // Which engine call a canvas click makes is the ONLY difference between the
   // three click-once selection kinds — all three return the same canvas-sized
@@ -515,6 +510,59 @@ export function useSelectionActions(
     },
     [stamp, setSelectionMask],
   );
+  // ── Review → Combine: A PLACED OBJECT IS A SELECTION PRODUCER ────────────
+  //
+  // Combine moved out of the Select panel into the Review panel, beside the
+  // Reselect list, so the standing mode now has to mean something for the
+  // things in that list as well as for canvas gestures. It does, by being the
+  // same pipeline: `set_selection_combine` then a marquee producer, exactly as
+  // handleMarqueeCommit above — so New / Add / Subtract / Intersect, the ants,
+  // the coverage readout and the undo step all behave as they do for a drag,
+  // and nothing downstream learns the region came from a shape.
+  // `lib/objectSelection.ts` owns which producer and which corners.
+  //
+  // STORE-DRIVEN, not a prop: the Review panel has no engine handle, and the
+  // alternative is threading two more props through AppShell — which is what
+  // the Refine section's `refineRequest` nonce already refused to do, for the
+  // same reason and with the same shape (ADR-042; AppShell's max-lines ratchet
+  // would fail the build). One nonce, one effect, AppShell untouched.
+  //
+  // NO MODIFIERS, unlike every gesture path: the caller is a row in a list,
+  // where Shift-click already means something else everywhere in this app. The
+  // standing mode is the whole intent — which is also the argument for the four
+  // buttons being somewhere you can see them.
+  //
+  // syncState, which the marquee path does NOT do: a producer pushes a history
+  // step ("Marquee" in New mode, "Add/Subtract/Intersect Selection" otherwise),
+  // so the engine's undo count moves and `stamp.state.undoCount` has to move
+  // with it — the miss handleSelectAll documents. It matters more here than
+  // anywhere else: the History list is in the SAME panel, inches above the row
+  // that was clicked, so a step that failed to appear is visibly wrong.
+  const combineRequest = useToolStore((s) => s.combineRequest);
+  const lastCombine = useRef(combineRequest?.n ?? 0);
+  useEffect(() => {
+    if (!combineRequest || combineRequest.n === lastCombine.current) return;
+    lastCombine.current = combineRequest.n;
+    const tool = stampRef.current.toolRef.current;
+    if (!tool) return;
+    void (async () => {
+      // Read at click time from the engine, not from the row: see
+      // `objectFootprint`. `null` = deleted, on another layer, or no area —
+      // do nothing rather than clear the selection with an empty marquee.
+      const f = await objectFootprint(tool, combineRequest);
+      if (!f) return;
+      const mode = useToolStore.getState().selectionCombine;
+      tool.set_selection_combine(mode);
+      setCombineHint(mode);
+      // `await` per branch, not around the ternary — see handleSelectionClick.
+      const mask =
+        f.producer === "ellipse"
+          ? await tool.ellipse_select(f.x0, f.y0, f.x1, f.y1)
+          : await tool.rect_select(f.x0, f.y0, f.x1, f.y1);
+      stampRef.current.syncState();
+      useToolStore.getState().setSelectionMask(mask.length ? mask : null);
+    })();
+  }, [combineRequest]);
   // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer
   // Settings tool; Select-vs-Move exclusivity now falls out of them being
   // different tools, so there is no selection flag left to clear.

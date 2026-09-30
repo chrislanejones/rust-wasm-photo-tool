@@ -7,7 +7,7 @@
  */
 
 :root {
-  /* The About v2 title. Same clamp as /coming-soon's, one rung under
+  /* The About v2 title. Same clamp as /in-the-works's, one rung under
      --text-hero: this headline is eight words, not four short sentences. */
   --text-about-title: clamp(2.5rem, 4vw + 1rem, 4.75rem);
   /* A person's name on the board. */

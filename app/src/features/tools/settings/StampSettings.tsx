@@ -3,7 +3,7 @@ import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 import { Copy, Stamp as StampIcon, Smile } from "lucide-react";
 import type { StampSettings } from "@/lib/types";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { StabilizerRow } from "./StabilizerRow";
 import { useToolStore } from "@/stores/useToolStore";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";

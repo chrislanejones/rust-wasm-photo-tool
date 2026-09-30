@@ -107,7 +107,9 @@ test("Color Overlay: swatch tints, strength blends, undo reverses, apply bakes",
   console.log("[smoke] before overlay:", before);
 
   // 2. Picking a swatch IS the on-switch. Full strength → the exact color.
-  await page.getByRole("button", { name: `Color ${RED}`, exact: true }).first().click();
+  // A swatch is a radio since UI Night 3 (ColorSwatchGrid is a named radio
+  // group: picking a color is one of N), so it is found by that role.
+  await page.getByRole("radio", { name: `Color ${RED}`, exact: true }).first().click();
   const tinted = await centrePixel(page);
   console.log("[smoke] after red swatch:", tinted);
   expect(tinted[0]).toBe(0xef);
@@ -141,7 +143,7 @@ test("Color Overlay: swatch tints, strength blends, undo reverses, apply bakes",
   await expect(page.getByLabel("Color overlay strength")).toHaveCount(0);
 
   // 6. Re-apply, then bake it in. Pixels stay; the live controls go.
-  await page.getByRole("button", { name: `Color ${RED}`, exact: true }).first().click();
+  await page.getByRole("radio", { name: `Color ${RED}`, exact: true }).first().click();
   const retinted = await centrePixel(page);
   expect(retinted[0]).toBe(0xef);
 

@@ -1,7 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { EDITOR_URL, external } from "../config";
-import { TOOL_PAGES, toolPageFor, type RunsOn } from "../data/toolPages";
+import { toolPageFor, type RunsOn } from "../data/toolPages";
 
 /* One component for all ten tool landing pages, ported from the ToolPage v2
  * design.
@@ -59,9 +61,13 @@ export default function ToolLanding() {
   if (!tool) return null;
 
   const runs = RUNS_ON[tool.runsOn];
-  const related = tool.related
-    .map((s) => TOOL_PAGES.find((t) => t.slug === s))
-    .filter((t): t is (typeof TOOL_PAGES)[number] => Boolean(t));
+
+  // `related` names three sibling tools and the grid holds four, so the page
+  // used to end one card short of everywhere else. The three stay first — they
+  // are hand-picked and better than any shuffle — and the fourth is seeded off
+  // this path, which is also the only card here that can reach the writing,
+  // the log or the .ora pages.
+  const cards = pickNextCards(tool.slug, tool.related);
 
   return (
     <>
@@ -128,23 +134,7 @@ export default function ToolLanding() {
           </section>
         </article>
 
-        {related.length > 0 && (
-          <nav className="tp-next" aria-label="Related tools">
-            <h2 className="tp-next__h2">Next</h2>
-            <ul className="tp-next__list">
-              {related.map((r) => (
-                <li className="tp-next__li" key={r.slug}>
-                  <Link className="tp-next__card" to={r.slug}>
-                    <span className="tp-next__group">{r.group}</span>
-                    <span className="tp-next__label">{r.label}</span>
-                    <span className="tp-next__blurb">{r.blurb}</span>
-                    <span className="tp-next__slug">{r.slug} &rarr;</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
+        <NextCards cards={cards} label="Related pages" />
 
         <section className="tp-close">
           <div className="tp-close__text">

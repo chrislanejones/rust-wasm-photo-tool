@@ -48,6 +48,7 @@ export const SHORTCUT_GROUPS = [
       { keys: ["Alt", "T"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "R"], action: "Toggle Review" },
+      { keys: ["Alt", "C"], action: "Toggle A/B Compare" },
       { keys: ["Alt", "/"], action: "Toggle This Modal" },
     ],
   },

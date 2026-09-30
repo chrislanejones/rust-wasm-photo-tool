@@ -1,5 +1,7 @@
 import { Fragment, useState, type CSSProperties } from "react";
 import Footer from "../components/Footer";
+import NextCards from "../components/NextCards";
+import { pickNextCards } from "../data/nextCards";
 import { CrownIcon, DownloadIcon, LayersIcon, UserCheckIcon, UserXIcon } from "../components/Icons";
 import { GITHUB_URL, external } from "../config";
 import { KEY_LABEL, TABLES } from "../data/schema";
@@ -516,6 +518,7 @@ export default function Architecture() {
             </p>
           </div>
         </section>
+        <NextCards cards={pickNextCards("/architecture")} />
       </main>
 
       <Footer line="One plane is the editor. The other is optional." />

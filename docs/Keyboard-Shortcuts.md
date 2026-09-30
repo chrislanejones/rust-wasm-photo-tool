@@ -49,6 +49,7 @@ Reset Zoom — that is a different chord.)
 | `Alt + T`      | Toggle Tools |
 | `Alt + G`      | Toggle Gallery |
 | `Alt + R`      | Toggle Review |
+| `Alt + C`      | Toggle A/B Compare |
 | `Alt + /`      | Toggle this shortcut modal |
 | `Alt + S`      | Open Settings |
 

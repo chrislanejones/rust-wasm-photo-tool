@@ -30,7 +30,7 @@
 // `arrow` with no mode, because those two tools are single-mode tools whose
 // panels hold several features apiece. Derive identity and those six tiles
 // light up three-at-a-time. So each sub-tool carries its own stable id and the
-// store tracks the active one. See docs/toolbar-migration-map.md § Design note.
+// store tracks the active one. See docs/archive/toolbar-migration-map.md § Design note.
 import type { ToolType } from "@/lib/types";
 import {
   Aperture,
@@ -678,7 +678,7 @@ const batchGroup: ToolGroupDefinition = {
   id: "batch",
   label: "Batch",
   icon: PackageOpen,
-  description: "Stamp a logo, add text or rename every loaded photo at once",
+  description: "Stamp a logo, add text, crop or rename every loaded photo at once",
   shortcutKey: "5",
   subTools: [
     {
@@ -698,6 +698,15 @@ const batchGroup: ToolGroupDefinition = {
       tool: "emoji",
       mode: "text",
       keywords: ["text", "caption", "bulk", "overlay"],
+    },
+    {
+      id: "crop",
+      label: "Crop",
+      description: "Crop every loaded photo to the same ratio and size — for carousels",
+      icon: Crop,
+      tool: "emoji",
+      mode: "crop",
+      keywords: ["crop", "carousel", "aspect ratio", "same size", "bulk"],
     },
     {
       id: "rename",

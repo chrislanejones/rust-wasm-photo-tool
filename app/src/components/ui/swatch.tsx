@@ -3,6 +3,7 @@
 // exact button). Its own module because the grid imports the picker, so the
 // picker importing the grid back would be a cycle.
 import { X } from "lucide-react";
+import type { RadioItemProps } from "@/components/ui/use-radio-group";
 
 interface SwatchProps {
   color: string;
@@ -15,6 +16,10 @@ interface SwatchProps {
   /** Accessible name of the remove badge. Defaults to "Remove #hex". */
   removeLabel?: string;
   title?: string;
+  /** Radio semantics from the group that owns this swatch (ColorSwatchGrid).
+   *  A swatch picks exactly one color, so inside a grid it is a radio: its
+   *  lit ring is otherwise a state nothing announces. */
+  radio?: RadioItemProps;
 }
 
 export function Swatch({
@@ -26,6 +31,7 @@ export function Swatch({
   label,
   removeLabel,
   title,
+  radio,
 }: SwatchProps) {
   // The "transparent" entry is the transparent backing canvas: render the same
   // transparency checkerboard the canvas itself shows (`.checkerboard-canvas`,
@@ -41,6 +47,7 @@ export function Swatch({
     <span className="relative inline-flex group">
       <button
         type="button"
+        {...radio}
         onClick={onClick}
         disabled={disabled}
         className={[

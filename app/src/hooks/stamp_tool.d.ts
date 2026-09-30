@@ -308,7 +308,6 @@ declare module "stamp_tool" {
     set_source(x: number, y: number): void;
     has_source(): boolean;
     set_brush_size(size: number): void;
-    get_brush_size(): number;
     set_hardness(h: number): void;
     set_opacity(o: number): void;
     set_spacing(s: number): void;
@@ -581,7 +580,6 @@ declare module "stamp_tool" {
       b: number,
     ): void;
     begin_redact_stroke(): void;
-    begin_draw_stroke(label: string): void;
     draw_arrow(
       from_x: number,
       from_y: number,
@@ -606,14 +604,6 @@ declare module "stamp_tool" {
       src_h: number,
       dest_x: number,
       dest_y: number,
-    ): void;
-    stamp_red(
-      pixels: Uint8Array,
-      src_w: number,
-      src_h: number,
-      dest_x: number,
-      dest_y: number,
-      target_size: number,
     ): void;
     /** Render text with the embedded Liberation Sans font and composite onto the
      *  buffer. `dest_x/dest_y` is the top-left of the TEXT itself — a background
@@ -864,9 +854,6 @@ declare module "stamp_tool" {
 
     // Item 9: Crop preview in WASM
     // Uncomment after adding the Rust implementations
-    // preview_crop(x: number, y: number, w: number, h: number): void;
-    // cancel_crop_preview(): boolean;
-    // apply_crop_from_preview(x: number, y: number, w: number, h: number): void;
 
     // Live text annotations (non-destructive overlay layer)
     text_annotation_count(): number;
@@ -1108,7 +1095,6 @@ declare module "stamp_tool" {
     apply_layer_mask(id: number): boolean;
     /** Invert the mask (reveal↔hide). False if it has none. */
     invert_layer_mask(id: number): boolean;
-    has_layer_mask(id: number): boolean;
     /** Paint the active layer's mask with the brush engine. `value` 0=hide, 255=reveal;
      *  `opacity`/`hardness` are 0..1. Creates a white mask first if the layer has none. */
     mask_paint_down(
@@ -1142,8 +1128,6 @@ declare module "stamp_tool" {
     /** Live, non-destructive drag offset for the active layer; recomposite then
      *  renders it shifted by (dx,dy). (0,0) clears it. No history. */
     set_move_preview(dx: number, dy: number): void;
-    /** Discard an in-progress move preview without committing. No history. */
-    cancel_move_preview(): void;
     /** Commit a move of the active layer's pixels + annotations by (dx,dy).
      *  Pushes one "Move Layer" snapshot; a zero delta is a no-op. */
     translate_active_layer(dx: number, dy: number): void;
@@ -1255,12 +1239,6 @@ declare module "stamp_tool" {
       number: number, r: number, g: number, b: number,
       label_kind: number,
     ): number;
-    /** Add a freehand/polyline pen (kind 6). `points` is a flat [x0,y0,x1,y1,…] array. Pushes "Add Pen". */
-    add_polyline_annotation(
-      points: Float64Array,
-      color_hex: string,
-      stroke_width: number,
-    ): number;
     /** Restore a persisted polyline WITHOUT pushing history. Color is raw r,g,b. */
     restore_polyline_annotation(
       points: Float64Array,
@@ -1284,8 +1262,6 @@ declare module "stamp_tool" {
       fill_kind: number,
       fill_r: number, fill_g: number, fill_b: number, fill_a: number,
     ): number;
-    /** Replace just the control points of an annotation (no history) — live drag-edit. */
-    set_annotation_points(id: number, points: Float64Array): void;
     /** Commit a Bézier-path reshape + restyle: snapshot "Edit Pen Path", replace
      *  points, and apply stroke color/width + solid Background fill (fill_kind
      *  0 = none, 1 = solid fill_color_hex) so reselecting a path can fill it. */

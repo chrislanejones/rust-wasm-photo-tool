@@ -5,22 +5,21 @@
 //   • compact modal (UploadDialog) mid-session (Alt+N)
 // The wrappers own the logo/title header, sign-in, close button, and any shake.
 import { useRef, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import {
   Upload,
   FolderOpen,
   Clipboard,
   Images,
   SquarePen,
-  ChevronLeft,
   Link,
   Sparkles,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
-import { panelSwap } from "@/lib/animations";
+import { PaneHeader, PaneSwap } from "@/components/ui/dialog-pane";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { NumberField } from "@/components/ui/number-field";
-import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { IconButton } from "@/components/ui/icon-button";
 import { Switch } from "@/components/ui/switch";
@@ -202,6 +201,10 @@ export function NewActions({
   // Back rather than Cancel: it returns here, it does not abandon the flow.
   const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
   const setOnlineFeaturesEnabled = useUIStore((s) => s.setOnlineFeaturesEnabled);
+  // Whether the Create AI Image tile exists — asked of the network registry,
+  // the same answer Settings › Security prints. The switch's own label and
+  // checked state below stay on the raw value: they ARE the switch.
+  const aiGenerationAllowed = isNetworkPathAllowed("ai_generation", onlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
   // Publish that step to the store so Settings → Security can lock ITS copy of
   // the online-features switch for the same reason this one locks: flipping off
@@ -228,11 +231,18 @@ export function NewActions({
   // Which size-preset category tab is showing (Social / Web / Video / Paper).
   const [blankCat, setBlankCat] = useState(PRESET_CATEGORIES[0].id);
 
-  // Let the wrapper drop its logo/title header while the New Canvas panel is
-  // open. Fires on mount (false) too, so reopening the dialog restores it.
+  // Let the wrapper drop its logo/title header while a sub-pane (New Canvas
+  // or Create AI Image) is open — both panes carry their own PaneHeader, so
+  // the logo would be a second title. Fires on mount (false) too, so
+  // reopening the dialog restores it.
   useEffect(() => {
-    onBlankModeChange?.(blankMode);
-  }, [blankMode, onBlankModeChange]);
+    onBlankModeChange?.(blankMode || aiMode);
+  }, [blankMode, aiMode, onBlankModeChange]);
+
+  // Which pane is showing, and which way the swap slides: into a sub-pane is
+  // forward, back to the tile grid is backward (see PaneSwap).
+  const pane = blankMode ? "blank" : aiMode ? "ai" : "default";
+  const paneDirection = pane === "default" ? -1 : 1;
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -250,6 +260,11 @@ export function NewActions({
   );
 
   const handleDrop = (e: React.DragEvent) => {
+    // preventDefault is load-bearing: AppShell's window-level onDrop skips any
+    // drop that is already defaultPrevented. onFilesAdded closes this dialog
+    // synchronously, React flushes that (and the window listener's effect)
+    // before the event bubbles, so without it the same drop imported twice:
+    // 11 images dropped -> 22 in the gallery. The Batch logo well relies on it too.
     e.preventDefault();
     setDragging(false);
     processFiles(Array.from(e.dataTransfer.files));
@@ -406,17 +421,29 @@ export function NewActions({
           // when swapping the upload actions ⇄ New Canvas panel.
           className="rounded-xl min-h-[18rem] flex flex-col"
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {blankMode ? (
-              <motion.div
-                key="blank"
-                variants={panelSwap}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="flex flex-col gap-4"
-              >
+          <PaneSwap
+            paneKey={pane}
+            direction={paneDirection}
+            className={
+              pane === "blank"
+                ? "flex flex-col gap-4"
+                : pane === "ai"
+                  ? // SCROLLS, unlike its siblings, because it is the tallest
+                    // panel in this frame and the dialog card around it is
+                    // `overflow-hidden` (UploadDialog) — content past the fold
+                    // there is not merely below the viewport, it is CLIPPED,
+                    // so Generate would be unreachable on a short laptop
+                    // screen with nothing on screen to say why. A capped
+                    // height with its own scroll keeps the whole step
+                    // reachable at any window size.
+                    "flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-0.5"
+                  : "flex flex-1 flex-col items-center gap-4"
+            }
+          >
+            {pane === "blank" ? (
+              <>
                 {/* ── New Canvas setup (Photoshop-style "New Document") ── */}
+                <PaneHeader title="New Canvas" onBack={() => setBlankMode(false)} />
                 <div className="flex items-end gap-2">
                   <NumberField
                     label="width"
@@ -496,36 +523,14 @@ export function NewActions({
                   Transparent background
                 </button>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Button size="large"
-                    onClick={() => setBlankMode(false)}
-                    className="w-full"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button size="large" onClick={createBlank} className="w-full">
-                    <SquarePen className="h-4 w-4" />
-                    Create Canvas
-                  </Button>
-                </div>
-              </motion.div>
-            ) : aiMode ? (
-              <motion.div
-                key="ai"
-                variants={panelSwap}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                // SCROLLS, unlike its siblings, because it is the tallest
-                // panel in this frame and the dialog card around it is
-                // `overflow-hidden` (UploadDialog) — content past the fold
-                // there is not merely below the viewport, it is CLIPPED, so
-                // Generate would be unreachable on a short laptop screen with
-                // nothing on screen to say why. A capped height with its own
-                // scroll keeps the whole step reachable at any window size.
-                className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-0.5"
-              >
+                {/* Back is in the PaneHeader; the bottom row is the one
+                    commit, in the tool panels' Apply Crop button. */}
+                <PanelActionBar>
+                  <PanelAction onClick={createBlank}>Create Canvas</PanelAction>
+                </PanelActionBar>
+              </>
+            ) : pane === "ai" ? (
+              <>
                 {/* The draft itself lives in its own file — see
                     CreateAIImagePanel. The model is held HERE so it survives
                     Back: a preference, not part of the draft. */}
@@ -534,16 +539,9 @@ export function NewActions({
                   onModelChange={setAiModel}
                   onBack={() => setAiMode(false)}
                 />
-              </motion.div>
+              </>
             ) : (
-              <motion.div
-                key="default"
-                variants={panelSwap}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="flex flex-1 flex-col items-center gap-4"
-              >
+              <>
                 {/* Three columns of stacked tiles — the same ActionTile the
                     tool panels use (Select → Magic Wand), icon on top. While
                     `Create AI Image` is off (onlineFeaturesEnabled) there are
@@ -551,7 +549,7 @@ export function NewActions({
                     alone beside a blank gap and read as something missing.
                     Five tiles in three columns when it returns. */}
                 <div
-                  className={`grid ${onlineFeaturesEnabled ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
+                  className={`grid ${aiGenerationAllowed ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
                 >
                   <ActionTile
                     ref={firstButtonRef}
@@ -583,7 +581,7 @@ export function NewActions({
                       so a free user sees the whole flow and meets the upsell
                       at the moment they understand what they would be buying.
                       The key says which it is before they start. */}
-                  {onlineFeaturesEnabled && (
+                  {aiGenerationAllowed && (
                     <ActionTile
                       icon={Sparkles}
                       label="Create AI Image"
@@ -617,9 +615,9 @@ export function NewActions({
                     Supports PNG, JPG, GIF, WebP, AVIF, SVG
                   </p>
                 </div>
-              </motion.div>
+              </>
             )}
-          </AnimatePresence>
+          </PaneSwap>
         </div>
       </div>
 

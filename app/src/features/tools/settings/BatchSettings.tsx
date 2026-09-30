@@ -3,13 +3,13 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, FileEdit, ScanEye, X } from "lucide-react";
+import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -22,8 +22,9 @@ import {
   makeThumbnail,
   makeThumbnailFromPixels,
 } from "@/lib/workingCopy";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, type BatchMode } from "@/stores/useToolStore";
 import { AIRenamePanel } from "./AIRenamePanel";
+import { CropBatchPanel } from "./CropBatchPanel";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
@@ -47,9 +48,10 @@ const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
  *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
  *  own components), so ToolModeToggle only contributes the icon-row selector
  *  and stays silent on the header row rather than duplicating it. */
-const BATCH_TOOL_MODES: readonly ToolMode<"logo" | "text" | "rename" | "airename">[] = [
+const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "logo", label: "Logo", icon: ImagePlus },
   { id: "text", label: "Text", icon: Type },
+  { id: "crop", label: "Crop", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
 ];
@@ -510,7 +512,7 @@ export function BatchSettings({
             // what the user sees.
             // Throwaway engine (the one-port allowlist), so these two cannot tear —
             // nothing else can mutate it between them. Ordinary awaits, not a capture;
-            // see docs/engine-worker-capture-sweep.md.
+            // see docs/engine-worker-capture-sweep.md (git history; moved out of the repo 2026-09-17).
             const workW = await tool.width();
             const workH = await tool.height();
             const targetLogoW = Math.max(
@@ -557,8 +559,8 @@ export function BatchSettings({
       );
     } catch (err) {
       console.error("Bulk-logo: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the logo. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the logo.");
     } finally {
       setRunning(false);
     }
@@ -581,6 +583,8 @@ export function BatchSettings({
   // `useState` here none of the three could see it.
   const mode = useToolStore((s) => s.batchMode);
   const setMode = useToolStore((s) => s.setBatchMode);
+  // What the pixel-baking panels (Text, Crop) all take.
+  const panelProps = { photos, activePhotoId, setPhotos, stampToolRef, flushToCanvas, syncState };
 
   return (
     // No `showModeRow` — the tiles live in the ToolsSidebar header now; this
@@ -588,14 +592,9 @@ export function BatchSettings({
     <ToolModeToggle modes={BATCH_TOOL_MODES} activeMode={mode} onModeChange={setMode}>
       {(m) =>
         m === "text" ? (
-        <TextBatchPanel
-          photos={photos}
-          activePhotoId={activePhotoId}
-          setPhotos={setPhotos}
-          stampToolRef={stampToolRef}
-          flushToCanvas={flushToCanvas}
-          syncState={syncState}
-        />
+        <TextBatchPanel {...panelProps} />
+      ) : m === "crop" ? (
+        <CropBatchPanel {...panelProps} />
       ) : m === "rename" ? (
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
@@ -1254,8 +1253,8 @@ function TextBatchPanel({
       );
     } catch (err) {
       console.error("Bulk-text: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the text. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the text.");
     } finally {
       setRunning(false);
     }
@@ -1327,7 +1326,7 @@ function TextBatchPanel({
           ))}
         </SelectField>
         <ToolButtonGroup
-          className="mt-2"
+          className="mt-2" aria-label="Font weight"
           options={WEIGHT_OPTIONS}
           value={bold ? "bold" : "normal"}
           onChange={(id) => setBold(id === "bold")}

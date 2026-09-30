@@ -8,7 +8,7 @@
 // holds three numbers and draws the histogram they are set against.
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/ui/section-header";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import {
   PanelAction,
   PanelActionBar,

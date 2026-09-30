@@ -14,6 +14,10 @@ import {
   Plus,
   Settings,
   Redo2,
+  Square,
+  SquaresIntersect,
+  SquaresSubtract,
+  SquaresUnite,
   Undo2,
   X,
 } from "lucide-react";
@@ -32,7 +36,12 @@ import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
+import { useToolStore } from "@/stores/useToolStore";
+import type { SelectionCombineMode } from "@/lib/selectionBool";
+import { describeCoverage } from "@/lib/selectionCoverage";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
@@ -54,7 +63,7 @@ export interface ReselectObject {
 }
 
 /** The toggleable body sections of the Review panel. */
-type SectionKey = "history" | "reselect" | "layers" | "histogram";
+type SectionKey = "history" | "reselect" | "layers" | "histogram" | "combine";
 
 interface Props {
   history: HistoryEntry[];
@@ -129,7 +138,66 @@ const TOGGLES: {
     tooltip: { label: "Reselect" },
   },
   { key: "histogram", icon: ChartArea, label: "Histogram", tooltip: { label: "Histogram" } },
+  // Last, after Histogram, and closed on first open like it — see `open` below.
+  { key: "combine", icon: SquaresUnite, label: "Combine", tooltip: { label: "Combine" } },
 ];
+
+/* ── Combine ───────────────────────────────────────────────────────────────
+   MOVED HERE FROM THE SELECT PANEL (SelectSettings.tsx, where it was the
+   "Combine" section). It was never really a Select-tool setting: it decides
+   how the NEXT region meets the one you have, and the Select tool was only
+   the first thing that produced a region. Sitting in that panel it was also
+   unreachable while you were holding any other tool, which is how "Add" ended
+   up being something people only knew as Shift.
+
+   Review is where it belongs: one panel away from History (the steps it
+   creates), Layers (what a selection becomes) and Reselect (the placed shapes
+   and text it now also applies to — an object is another producer, see
+   `lib/objectSelection.ts` and the `combineRequest` effect in
+   `useSelectionActions.ts`).
+
+   The strip itself is unchanged — same `ToolButtonGroup segmented`, same store
+   field, same four modes in the same order — so the modifier overrides, the
+   engine's `set_selection_combine` and every gesture path carry on reading
+   exactly what they read before. */
+type CombineId = "new" | "add" | "subtract" | "intersect";
+const COMBINE_IDS: readonly CombineId[] = ["new", "add", "subtract", "intersect"];
+const COMBINE_OPTIONS = [
+  // "New selection", not "New": the top bar already has a "New" (a new
+  // image), and two buttons with one name that do unrelated things is what a
+  // screen reader user would hear side by side.
+  { id: "new", label: "New selection", icon: Square, title: "Each selection replaces the last" },
+  { id: "add", label: "Add", icon: SquaresUnite, title: "Add to the selection (or hold Shift)" },
+  {
+    id: "subtract",
+    label: "Subtract",
+    icon: SquaresSubtract,
+    title: "Take away from the selection (or hold Alt)",
+  },
+  {
+    id: "intersect",
+    label: "Intersect",
+    icon: SquaresIntersect,
+    title: "Keep only where the two overlap",
+  },
+] as const;
+
+/** What clicking an object row will do, spelled out for that row's tooltip.
+ *  The mode names the CONTROL ("Subtract"); a row has to name the OUTCOME for
+ *  this object, because the row is the thing being clicked and the strip is
+ *  four icons away. */
+function combineRowTitle(mode: SelectionCombineMode, label: string): string {
+  switch (mode) {
+    case 1:
+      return `Add ${label} to the selection`;
+    case 2:
+      return `Subtract ${label} from the selection`;
+    case 3:
+      return `Keep only where the selection overlaps ${label}`;
+    default:
+      return `Select ${label} — replacing the current selection`;
+  }
+}
 
 export function ReviewPanel({
   onClose,
@@ -173,11 +241,14 @@ export function ReviewPanel({
     layers: true,
     reselect: true,
     histogram: false, // starts closed to keep the panel roomy
+    combine: false, // likewise — and it is a standing choice, not a reading
   });
   // At most three sections open at once. Closing is always allowed. Opening a
   // fourth evicts one to make room: Reselect yields first (so clicking Histogram
   // bumps Reselect), but if you've manually closed a different section there's a
-  // free slot and Histogram just fills it — nothing gets bumped.
+  // free slot and Histogram just fills it — nothing gets bumped. Combine is the
+  // fifth toggle and plays by the same rule; at 260px wide the cap is what keeps
+  // three sections readable, not how many sections exist.
   const toggle = (k: SectionKey) =>
     setOpen((prev) => {
       if (prev[k]) return { ...prev, [k]: false };
@@ -216,6 +287,19 @@ export function ReviewPanel({
   // Shape ids in draw order (bottom → top) — `objects` carries shapes in the
   // order `get_shape_annotations()` returns them, which IS the z-order.
   const shapeIds = objects.filter((o) => o.type === "shape").map((o) => o.id);
+
+  // ── Combine ──────────────────────────────────────────────────────────────
+  // Read straight from the store rather than threaded as props: the field is
+  // the same one every gesture path already reads (`selectionCombine`), and
+  // routing it through AppShell would add two props and a second copy of the
+  // mode to keep in step. Same call the Select panel made from its own panel.
+  const combine = useToolStore((s) => s.selectionCombine);
+  const setCombine = useToolStore((s) => s.setSelectionCombine);
+  const coverage = useToolStore((s) => s.selectionCoverage);
+  // The row click, on the same panel→hook channel the Refine section uses:
+  // this panel has no engine handle, and `useSelectionActions` answers with
+  // the producer call. AppShell is not involved and gains no props.
+  const requestCombine = useToolStore((s) => s.requestCombine);
 
   const commitRename = (id: number) => {
     const name = renameDraft.trim();
@@ -277,10 +361,10 @@ export function ReviewPanel({
               <History className="h-3.5 w-3.5" />
               <span className="review-section-name">History</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <Button size="tiny" onClick={onUndo} disabled={!canUndo} title="Undo">
+                <Button size="tiny" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo">
                   <Undo2 className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="tiny" onClick={onRedo} disabled={!canRedo} title="Redo">
+                <Button size="tiny" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo">
                   <Redo2 className="h-3.5 w-3.5" />
                 </Button>
                 <TinyNumberBox>{history.length}</TinyNumberBox>
@@ -330,6 +414,7 @@ export function ReviewPanel({
                 <TinyNumberBox>{objects.length}</TinyNumberBox>
                 <Button size="tiny"
                   onClick={() => toggle("reselect")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
@@ -418,6 +503,7 @@ export function ReviewPanel({
                     const t = subToolByKey("edit/resize-layer");
                     if (t) activateSubTool(t);
                   }}
+                  aria-label="Open the Layers tool"
                   title="Open the Layers tool (move, resize, mask)"
                 >
                   <Settings className="h-3.5 w-3.5" />
@@ -425,6 +511,11 @@ export function ReviewPanel({
                 <Button size="tiny"
                   onClick={onAddLayer}
                   disabled={!canAddLayer}
+                  // The NAME says what it does; the title below says why it is
+                  // disabled. Before this, the only name was that title, so a
+                  // screen reader heard "Layer limit reached (8)" and never
+                  // learned the button adds a layer.
+                  aria-label="Add layer"
                   title={
                     !layersUnlocked
                       ? "Layers require a logged-in or paid account"
@@ -444,6 +535,7 @@ export function ReviewPanel({
                 </Button>
                 <Button size="tiny"
                   onClick={() => toggle("layers")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
@@ -656,6 +748,7 @@ export function ReviewPanel({
               <div className="ml-auto flex items-center gap-1.5">
                 <Button size="tiny"
                   onClick={() => toggle("histogram")}
+                  aria-label="Close section"
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
@@ -668,6 +761,112 @@ export function ReviewPanel({
               photoKey={histogramPhotoKey}
               active={open.histogram}
             />
+          </section>
+        )}
+
+        {/* ── Combine: how the next region meets the selection, and the placed
+            objects as regions. Moved here from the Select panel — see the
+            COMBINE_OPTIONS block above for why. ──────────────────────────── */}
+        {open.combine && (
+          <section className="review-section">
+            <div className="review-section-head">
+              <SquaresUnite className="h-3.5 w-3.5" />
+              <span className="review-section-name">Combine</span>
+              <div className="ml-auto flex items-center gap-1.5">
+                {/* The strip is icon-only, so the chosen mode's NAME lives here
+                    — the same job SectionHeader's `value` did for it in the
+                    Select panel. Without it the only way to read the current
+                    mode is to decode four near-identical square glyphs. */}
+                <span className="combine-active">{COMBINE_OPTIONS[combine]?.label}</span>
+                <InfoTooltip
+                  label="Combine"
+                  info={
+                    <>
+                      How the next region meets the selection you have. It
+                      applies to every selection gesture — wand, lasso, marquee
+                      — and to the objects listed below: click one to combine
+                      the area it covers. Holding <kbd>Shift</kbd> adds and{" "}
+                      <kbd>Alt</kbd> subtracts for one gesture, whatever is
+                      chosen here. An object contributes its box, or its
+                      ellipse for a circle, not its outline. The marching ants show
+                      the result on the canvas whatever tool you hold, and what
+                      you build here is what Select → Delete / Copy / Cut and
+                      Layer Settings → Add mask all act on.
+                    </>
+                  }
+                />
+                <Button size="tiny"
+                  onClick={() => toggle("combine")}
+                  aria-label="Close section"
+                  title="Close section"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="combine-mode">
+              <ToolButtonGroup<CombineId>
+                segmented
+                aria-label="Combine mode"
+                value={COMBINE_IDS[combine]}
+                onChange={(id) => setCombine(COMBINE_IDS.indexOf(id) as SelectionCombineMode)}
+                options={COMBINE_OPTIONS}
+              />
+              {/* Always present — "Nothing selected" rather than an absent line,
+                  so a combine that took nothing reads as a miss and not as
+                  nothing happening. Same words and same formatter as the Select
+                  panel's readout and the status-bar chip, so the three cannot
+                  disagree.
+
+                  KNOWN, ACCEPTED: this is a SECOND live region for the same
+                  number — the Select panel's readout is the other one, and with
+                  the Select tool held AND this section open a change announces
+                  twice. Kept anyway, because this is the copy that is more often
+                  the only one there: combining an object is a Review action you
+                  take while holding any tool, and the Select panel's readout
+                  does not exist unless that tool is the active one. Announcing
+                  twice in the overlapping case beats announcing nothing in the
+                  common one. (The status-bar chip is not a live region, so it is
+                  not a third.) */}
+              <p
+                className="combine-coverage"
+                aria-live="polite"
+                data-testid="combine-coverage"
+              >
+                {coverage ? describeCoverage(coverage) : "Nothing selected"}
+              </p>
+            </div>
+            {/* The same rows as Reselect, with one job instead of five: a click
+                combines, and there is no ✕, no duplicate and no restacking —
+                this list is about regions, and deleting a shape from the panel
+                that is combining it would be a different verb wearing the same
+                row. */}
+            {/* Named, unlike the other sections' lists, and it has to be: a row
+                here and a row in Reselect have the same accessible name (their
+                label) and do completely different things. The group name is
+                what tells a screen-reader user which list they are in. */}
+            <div
+              className="history-list reselect-list"
+              role="group"
+              aria-label="Combine an object into the selection"
+            >
+              {objects.length === 0 && (
+                <div className="history-empty">
+                  <span className="large-badge">
+                    Add text or a shape to combine the area it covers
+                  </span>
+                </div>
+              )}
+              {objects.map((o, oIdx) => (
+                <ReselectBar
+                  key={o.key}
+                  index={oIdx + 1}
+                  label={o.label}
+                  onSelect={() => requestCombine({ type: o.type, id: o.id })}
+                  title={combineRowTitle(combine, o.label)}
+                />
+              ))}
+            </div>
           </section>
         )}
       </div>

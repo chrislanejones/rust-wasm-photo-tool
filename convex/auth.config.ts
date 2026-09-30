@@ -24,7 +24,7 @@
 // keys" in the production console. The production deployment
 // (pastel-alligator-180) is not being used by the deployed app at all.
 // Consolidating onto one production instance is Chris's call; see
-// docs/share-links-auth-mismatch.md.
+// docs/share-links-auth-mismatch.md (git history; moved out of the repo 2026-09-17).
 export default {
   providers: [
     {
