@@ -1,4 +1,4 @@
-// The Download, Copy, or Share dialog — a MULTI-PANE dialog, in the same frame
+// The Export dialog (Download, Copy, Share) — a MULTI-PANE dialog, in the same frame
 // as the New dialog's New Canvas and Create AI Image panes (PaneSwap +
 // PaneHeader, components/ui/dialog-pane.tsx).
 //
@@ -122,7 +122,7 @@ export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Download, Copy, or Share</DialogTitle>
+          <DialogTitle>Export</DialogTitle>
         </DialogHeader>
         <DownloadPanes {...rest} />
       </DialogContent>
@@ -198,8 +198,7 @@ function DownloadPanes({
         {pane === "choose" ? (
           <>
             <DialogDescription>
-              Download the image you are working on — and copy or share it —
-              or download all {photoCount} as a{" "}
+              One image, or all {photoCount} as a{" "}
               <span className="font-mono">.zip</span>.
             </DialogDescription>
             <div className="grid grid-cols-2 gap-3">
