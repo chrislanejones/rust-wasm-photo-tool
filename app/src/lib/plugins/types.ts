@@ -7,7 +7,7 @@
 // beside it. It lives in its own repository, is built to a single file there,
 // and a person ADDS it from Settings → Plugins — from a file they downloaded,
 // or from a URL. The app keeps the module's source in IndexedDB on that device
-// and loads it from there on every visit (ADR-075). Nothing is fetched on the
+// and loads it from there on every visit (ADR-076). Nothing is fetched on the
 // app's own initiative, ever: a plugin arrives because a person handed it in.
 //
 // A plugin runs in the page, with the same access as the app. That is said

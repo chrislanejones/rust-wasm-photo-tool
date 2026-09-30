@@ -24,6 +24,57 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.5",
+    date: "2026-09-30",
+    headline: "Switching photos fast no longer loses or mixes up your edits, SVGs come back out as SVGs, and AVIF is a real AVIF.",
+    entries: [
+      {
+        tag: "fix",
+        text: "Edit a photo, then page through the gallery fast, and the gallery could light one photo while the canvas showed another. Worse, the saved copy of the first photo could end up with the second one\u2019s pixels. That\u2019s fixed. An edit you let go of an instant before a switch is kept too; it was lost 6 times in 12 before.",
+      },
+      {
+        tag: "fix",
+        text: "A crop box, a selection or an object-removal stroke from the last photo no longer follows you to the next one. Apply Crop used to stay armed with the old photo\u2019s coordinates.",
+      },
+      {
+        tag: "ui",
+        text: "The panels that belong to one photo now say which photo: \u201c1 of 2 \u00b7 checker\u201d. The line lights up on every switch. The controls lock while the next photo loads, and on a slow switch they turn into skeletons in place.",
+      },
+      {
+        tag: "feature",
+        text: "Upload an SVG, crop it, and download it as an SVG, alone or zipped with the others. Only the frame changes, so the drawing stays a vector. The SVG is kept for the session; reload and the SVG tile turns off until you upload it again.",
+      },
+      {
+        tag: "feature",
+        text: "AVIF export writes a real AVIF. Asking for one used to hand you a PNG. The encoder is about 3.5 MB and loads the first time you export an AVIF, not before.",
+      },
+      {
+        tag: "feature",
+        text: "Batch \u203a Crop: let go of the frame and the other photos shade what they will lose. Hold Shift while you drag to break the ratio. Enter crops all of them.",
+      },
+      {
+        tag: "ui",
+        text: "Combine (New, Add, Subtract, Intersect) moved from Select to Review. Click a text box or a shape in the list and its outline becomes the selection.",
+      },
+      {
+        tag: "ui",
+        text: "Download, Copy or Share is called Export now. The formats sit under \u201cImage format\u201d, ORA and PSD under \u201cLayered file\u201d, and Download, Share link and Clipboard have icons. The PSD tile says \u201cActivate with plugin\u201d.",
+      },
+      {
+        tag: "fix",
+        text: "Dropping several photos on the New dialog imported each one twice. Once now.",
+      },
+      {
+        tag: "rust",
+        text: "The engine no longer panics when the panels read annotations while a saved photo is being rebuilt. The wasm is 250 bytes smaller: 820,341.",
+      },
+      {
+        tag: "infra",
+        text: "Spacing, corner radius and raw <button> counts are CI ratchets now, so they can only go down. Counted from the code\u2019s syntax tree, so a comment can\u2019t trip them. No pixels changed.",
+      },
+    ],
+  },
+  {
     version: "v9.4",
     date: "2026-09-29",
     headline: "Batch \u203a Crop: every photo the same shape for a carousel, and you pick what each one keeps.",

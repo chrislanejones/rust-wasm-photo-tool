@@ -148,7 +148,7 @@ import {
 } from "@/components/ui/context-menu";
 import { ShareButton } from "@/components/ShareButton";
 import { DownloadDialog } from "@/components/DownloadDialog";
-import { downloadActiveSvg, downloadSvgZip } from "./session/svgDownload";
+import { downloadActiveSvgWithToast, downloadSvgZip } from "./session/svgDownload";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import {
   Undo,
@@ -884,7 +884,6 @@ export function AppShell() {
     isOraDownload,
     isSvgDownload,
   } = useDownloadFormat();
-  // Formats the active plugins add (Settings → Plugins), and the pick's half.
   const plugin = usePluginDownload(downloadFormat, stamp);
   // SVG export (lib/svgPassthrough): live for the open image when it was
   // uploaded as SVG, and for the zip when any image was.
@@ -1140,15 +1139,7 @@ export function AppShell() {
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
     if (svgSelectedDownload && activePhotoId) {
-      void downloadActiveSvg(activePhotoId, stamp.toolRef.current, exportName.stem()).then(
-        (ok) => {
-          if (!ok) {
-            toast.error(
-              "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
-            );
-          }
-        },
-      );
+      void downloadActiveSvgWithToast(activePhotoId, stamp.toolRef.current, exportName.stem());
       return;
     }
     if (isOraDownload) {
@@ -1902,7 +1893,7 @@ export function AppShell() {
       if (depth === 0) setIsDraggingImage(false);
     };
     const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e)) return;
+      if (!isFileDrag(e) || e.defaultPrevented) return; // a drop zone took it
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
@@ -3264,20 +3255,10 @@ export function AppShell() {
                       selectionActive={activeTool === "select"}
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      // Gated to the tool(s) that can actually populate this
-                      // mask: the Select tool (selection's home since the
-                      // v7.44 split — was Adjust & Select), or the Magic
-                      // Eraser sub-mode of the Eraser tool, whose brush
-                      // paints the same store field (see useMagicEraserTool).
-                      // Without the second clause the mask is still written
-                      // during a Magic Eraser stroke, but this prop zeroes
-                      // it back out before <SelectionOverlay> ever sees it.
-                      selectionMask={
-                        activeTool === "select" ||
-                        (activeTool === "ai" && eraserMode === "magic")
-                          ? selectionMask
-                          : null
-                      }
+                      // Ungated (ADR-075): a selection shows whatever tool is
+                      // held. Review › Combine makes one from ANY tool, and a
+                      // selection you cannot see is one you cannot trust.
+                      selectionMask={selectionMask}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       // Drag = marquee for the two marquee modes ONLY. The

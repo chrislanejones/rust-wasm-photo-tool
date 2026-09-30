@@ -207,8 +207,12 @@ export default tseslint.config(
     // pixelate / redact) and the Download dialog's format logic each became a
     // session hook, and the brush-cursor radius became a pure function with a
     // test. The ratchet only ever goes DOWN; raise it and the file has won.
+    // 3564 -> 3540 (ADR-075): the selection overlay's tool gate went, and the
+    // ratchet follows the file down in the same commit.
+    // 3540 -> 3539 (plugins, ADR-076): the plugin half of Download is a session
+    // hook, and the SVG refusal toast moved into svgDownload.ts beside ORA's.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3564 }] },
+    rules: { "max-lines": ["error", { max: 3539 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -217,8 +221,10 @@ export default tseslint.config(
     // 2909 -> 2802 (2026-09-26): the file had crept to 3025. The two cursor
     // glyphs + getCursorForSubTool moved to canvasCursor.ts, arrowGeometry +
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
+    // 2823 -> 2665: the paste-placement bounding box (drag + SVG, now with a
+    // rotate knob) moved out to features/canvas/PastePlacementOverlay.tsx.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2823 }] },
+    rules: { "max-lines": ["error", { max: 2665 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

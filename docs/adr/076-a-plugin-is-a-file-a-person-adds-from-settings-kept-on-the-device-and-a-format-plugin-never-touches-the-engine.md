@@ -1,4 +1,4 @@
-# ADR-075 — A plugin is a file a person adds from Settings, kept on the device, and a format plugin never touches the engine
+# ADR-076 — A plugin is a file a person adds from Settings, kept on the device, and a format plugin never touches the engine
 
 - **Status:** Draft
 - **Date:** 2026-09-30

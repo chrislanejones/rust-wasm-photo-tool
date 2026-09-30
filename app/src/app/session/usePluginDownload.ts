@@ -18,6 +18,7 @@ interface Engine {
   syncState: () => void;
 }
 
+/** Formats the active plugins add (Settings → Plugins), and the pick's half. */
 export function usePluginDownload(downloadFormat: DownloadFormat, stamp: Engine) {
   const formats = useActivePluginFormats();
   const active: ActiveFormat | undefined = isBuiltInDownloadFormat(downloadFormat)

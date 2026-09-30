@@ -260,6 +260,11 @@ export function NewActions({
   );
 
   const handleDrop = (e: React.DragEvent) => {
+    // preventDefault is load-bearing: AppShell's window-level onDrop skips any
+    // drop that is already defaultPrevented. onFilesAdded closes this dialog
+    // synchronously, React flushes that (and the window listener's effect)
+    // before the event bubbles, so without it the same drop imported twice:
+    // 11 images dropped -> 22 in the gallery. The Batch logo well relies on it too.
     e.preventDefault();
     setDragging(false);
     processFiles(Array.from(e.dataTransfer.files));

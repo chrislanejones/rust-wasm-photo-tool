@@ -17,6 +17,10 @@ import type { LayerInfo } from "@/hooks/useEngineCore";
 import { flattenAllLayersInPlace } from "@/lib/openraster/export";
 import type { LayeredDocument, LayeredLayer } from "./document";
 
+// Engine-call audit (ADR-076): this file's three awaited sites, `capture_layer_stack`
+// for the stack, `get_layer_png` per layer and `export_png` for the merged image,
+// are the "+3: plugins bridge" in engineAsyncMigration.contract.test.ts (175 -> 178).
+// A format plugin itself never calls the engine, so a second format adds none.
 async function engine() {
   const mod = await import("stamp_tool");
   await mod.default(); // idempotent: returns the already-initialized wasm

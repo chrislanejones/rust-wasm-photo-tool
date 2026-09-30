@@ -1,6 +1,6 @@
 # Plugins
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md) · [OpenRaster (.ora)](OpenRaster-Export-Import.md) · [ADR-075](adr/075-a-plugin-is-a-file-a-person-adds-from-settings-kept-on-the-device-and-a-format-plugin-never-touches-the-engine.md).
+> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md) · [OpenRaster (.ora)](OpenRaster-Export-Import.md) · [ADR-076](adr/076-a-plugin-is-a-file-a-person-adds-from-settings-kept-on-the-device-and-a-format-plugin-never-touches-the-engine.md).
 
 A plugin is a feature that comes from **outside** Image Horse and stays **off**
 until a person adds it and turns it on in **Settings → Plugins**. The first one

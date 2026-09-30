@@ -1,4 +1,4 @@
-// Plugins — the public surface. See docs/Plugins.md and ADR-075.
+// Plugins — the public surface. See docs/Plugins.md and ADR-076.
 export {
   hydrateInstalledPlugins,
   installedPlugins,

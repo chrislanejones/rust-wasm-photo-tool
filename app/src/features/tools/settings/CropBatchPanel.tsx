@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { PlacementGrid } from "@/components/PlacementGrid";
@@ -355,10 +356,21 @@ export function CropBatchPanel({
       <div>
         <SectionHeader
           title="Crop"
-          info="Every photo is cropped to the same shape, so a carousel's slides all line up."
+          info={
+            <>
+              Every photo is cropped to the same shape, so a carousel&apos;s
+              slides all line up. Drag on the preview to frame the crop; let go
+              and every photo follows it — the gallery shades what each one
+              loses. Hold Shift to break the ratio. Frame another photo to give
+              it its own. Enter crops them all.
+            </>
+          }
           className="mb-2"
         />
+        {/* Stacked tiles, the same grid as Select → Refine / Selection and
+            Edit → Crop's ratios. */}
         <ToolButtonGroup
+          stacked
           aria-label="Ratio"
           options={RATIO_OPTIONS}
           // A Shift-drag's custom shape lights no tile; picking one ends it.
@@ -380,29 +392,17 @@ export function CropBatchPanel({
         onChange={setAnchor}
       />
 
-      <div className="space-y-2">
-        <p className="text-2xs text-theme-muted-foreground">
-          Drag on the preview to frame the crop; let go and every photo
-          follows it — the gallery shades what each one loses. Hold Shift to
-          break the ratio. Frame another photo to give it its own. Enter crops
-          them all.
-        </p>
-        {framedCount > 0 && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-2xs text-theme-muted-foreground">
-              {`${framedCount} of ${photos.length} framed by hand`}
-              {shared && framedCount < photos.length ? " · the rest follow the last frame" : ""}
-            </span>
-            {activePhotoId && framing[activePhotoId] && (
-              <Button
-                onClick={() => clearFraming(activePhotoId)}
-              >
-                Reset this frame
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      {framedCount > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-2xs text-theme-muted-foreground">
+            {`${framedCount} of ${photos.length} framed by hand`}
+            {shared && framedCount < photos.length ? " · the rest follow the last frame" : ""}
+          </span>
+          {activePhotoId && framing[activePhotoId] && (
+            <Button onClick={() => clearFraming(activePhotoId)}>Reset this frame</Button>
+          )}
+        </div>
+      )}
 
       <div>
         <ToolButtonGroup
@@ -415,16 +415,13 @@ export function CropBatchPanel({
         <p className="mt-2 text-2xs text-theme-muted-foreground">{sizeNote}</p>
       </div>
 
-      <Button
-        size="large"
-        onClick={applyToAll}
-        disabled={running || photos.length === 0}
-        className="w-full"
-      >
-        {running
-          ? `Processing ${progress.done}/${progress.total}…`
-          : `Crop All Images to ${label}`}
-      </Button>
+      <PanelActionBar>
+        <PanelAction onClick={applyToAll} disabled={running || photos.length === 0}>
+          {running
+            ? `Processing ${progress.done}/${progress.total}…`
+            : `Crop All Images to ${label}`}
+        </PanelAction>
+      </PanelActionBar>
 
       {appliedCount !== null && !running && (
         <SuccessCallout>

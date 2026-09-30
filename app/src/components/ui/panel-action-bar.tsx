@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReasonNote } from "@/components/ui/status-note";
 import { cn } from "@/lib/utils";
@@ -26,12 +27,16 @@ import { cn } from "@/lib/utils";
  * cost more vertical room than it buys, and it would need a second scroll
  * container to sit outside of.
  *
- * NO ICONS. Crop carried a `<Crop/>`, Color Picker a `<Pipette/>` and Remove
+ * ICONS ARE OPT-IN (`icon`). Crop carried a `<Crop/>`, Color Picker a `<Pipette/>` and Remove
  * Object an `<Eraser/>`; the other three carried none. The label is doing the
  * work in every one of them ("Apply Crop" does not need a picture of a crop),
  * and one icon among six is how the drift this file exists to end got started.
- * If an action ever genuinely needs a glyph, `children` still takes one — but
- * it should be the odd one out for a reason, not by inheritance.
+ * The default is still none. The one place that opts in is the Download
+ * dialog (Chris, 09-30-2026: "add icons in front of this"), where three
+ * different verbs — save a file, make a link, copy to the clipboard — sit in a
+ * row and the glyph is how you tell them apart at a glance. Pass `icon`; do
+ * not hand-place an svg in `children`, so every glyph gets the same size and
+ * the same aria-hidden.
  */
 
 /** Two-up layouts push the pair APART (Chris, 2026-09-16): the secondary hugs
@@ -147,12 +152,21 @@ export interface PanelActionProps
    *  for a plain action: `aria-pressed="false"` on a button that does not
    *  toggle tells a screen reader the wrong thing. */
   pressed?: boolean;
+  /** The TWO-STATE variant: the label shown while `pressed` is true, with
+   *  `children` the label while it is off — the eyedropper's "Activate
+   *  Eyedropper" ↔ "Click image to pick". One button whose label and lit
+   *  treatment carry the state, so a caller does not hand-roll the ternary
+   *  (or a second button) to say "this is on now". Ignored unless `pressed`
+   *  is passed. */
+  pressedLabel?: React.ReactNode;
+  /** A lucide glyph in front of the label. Decorative: the label is the name. */
+  icon?: LucideIcon;
 }
 
 export const PanelAction = React.forwardRef<
   HTMLButtonElement,
   PanelActionProps
->(({ className, tone = "default", pressed, ...props }, ref) => {
+>(({ className, tone = "default", pressed, pressedLabel, icon: Icon, children, ...props }, ref) => {
   const reasonId = React.useContext(ReasonIdContext);
   return (
   <Button
@@ -172,7 +186,10 @@ export const PanelAction = React.forwardRef<
       className,
     )}
     {...props}
-  />
+  >
+    {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+    {pressed && pressedLabel !== undefined ? pressedLabel : children}
+  </Button>
   );
 });
 PanelAction.displayName = "PanelAction";
