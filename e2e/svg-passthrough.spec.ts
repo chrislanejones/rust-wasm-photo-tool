@@ -64,6 +64,9 @@ test("the SVG tile is disabled for a raster image", async ({ page }) => {
   const svg = svgTile(dialog);
   await expect(svg).toBeDisabled();
   await expect(svg).toContainText("SVG uploads only");
+  // PSD ships as a separate plugin, so its tile points there, not at a date.
+  const psd = dialog.getByRole("radio", { name: "Activate with plugin" });
+  await expect(psd).toBeDisabled();
 });
 
 test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox cropped", async ({

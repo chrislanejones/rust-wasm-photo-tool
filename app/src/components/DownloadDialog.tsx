@@ -52,7 +52,8 @@ import type {
 } from "@/app/session/useDownloadFormat";
 
 /** The format picker's ids: every real download format, plus PSD, which is
- *  shown (disabled, "Coming soon") but can never be picked. */
+ *  shown disabled ("Activate with plugin") and can never be picked here. PSD
+ *  export ships as a separate plugin (its own repo), added from Settings. */
 type FormatTileId = DownloadFormat | "psd";
 
 const SVG_HINT = "Vector · keeps crop";
@@ -175,9 +176,9 @@ function DownloadPanes({
     svgTile(svg.selected),
     {
       id: "psd" as const,
-      label: "Coming soon",
+      label: "Activate with plugin",
       icon: FORMAT_TILE_ICONS.psd,
-      title: "PSD — layered Photoshop file. Coming soon.",
+      title: "PSD — layered Photoshop file. Activate with the PSD plugin in Settings.",
       disabled: true,
     },
   ];
