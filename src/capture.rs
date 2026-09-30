@@ -537,11 +537,10 @@ impl ImageHorseTool {
         if id < 0 {
             return MISS;
         }
-        match self.layers[self.active]
-            .shape_annotations
-            .iter()
-            .find(|s| s.id as i32 == id)
-        {
+        let Some(layer) = self.active_layer() else {
+            return MISS;
+        };
+        match layer.shape_annotations.iter().find(|s| s.id as i32 == id) {
             Some(s) if s.kind == KIND_BEZIER => PenHit {
                 id,
                 points: s.points.iter().flat_map(|&(px, py)| [px, py]).collect(),

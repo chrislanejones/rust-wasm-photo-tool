@@ -2415,8 +2415,13 @@ impl ImageHorseTool {
     }
 
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0; (w as usize) * (h as usize) * 4];
+        };
         transform::copy_region(
-            &self.layers[self.active].buf.data,
+            &layer.buf.data,
             self.width as i32,
             self.height as i32,
             x,
@@ -3115,18 +3120,28 @@ impl ImageHorseTool {
 
     /// Returns [r, g, b, a] for the pixel at (x, y), clamped to image bounds.
     pub fn get_pixel(&self, x: i32, y: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0, 0, 0, 0];
+        };
         let w = self.width as i32;
         let h = self.height as i32;
         if w == 0 || h == 0 || x < 0 || y < 0 || x >= w || y >= h {
             return vec![0, 0, 0, 255];
         }
         let idx = (y as usize * self.width as usize + x as usize) * 4;
-        self.layers[self.active].buf.data[idx..idx + 4].to_vec()
+        layer.buf.data[idx..idx + 4].to_vec()
     }
 
     /// Returns a flat RGBA grid of (2*radius+1)² pixels centered on (cx, cy).
     /// Out-of-bounds pixels are returned as opaque black.
     pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
         let side = 2 * radius + 1;
         let mut out = Vec::with_capacity((side * side * 4) as usize);
         let w = self.width as i32;
@@ -3139,7 +3154,7 @@ impl ImageHorseTool {
                     out.extend_from_slice(&[0, 0, 0, 255]);
                 } else {
                     let idx = (py as usize * self.width as usize + px as usize) * 4;
-                    out.extend_from_slice(&self.layers[self.active].buf.data[idx..idx + 4]);
+                    out.extend_from_slice(&layer.buf.data[idx..idx + 4]);
                 }
             }
         }
