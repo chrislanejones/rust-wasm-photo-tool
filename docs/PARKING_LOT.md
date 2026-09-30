@@ -2995,7 +2995,8 @@ ever been written to it.
   `layer-active`**, on plain `<li>` elements with no `aria-selected` or
   `aria-pressed`. Screen readers and automation cannot tell which layer is
   active. WCAG 2.1 AA is a project invariant, so this is a real gap, not polish.
-- **OPEN — Chris wants real AVIF encoding, and it is a dependency decision.**
+- **RESOLVED 2026-09-29 by option (1), see ADR-074** (`lib/avifEncoder.ts`).
+  Kept for the record: **Chris wants real AVIF encoding, and it is a dependency decision.**
   No encoder exists anywhere today: nothing in `package.json`, no `ravif`/
   `rav1e` in `Cargo.toml`. Chrome decodes AVIF but cannot encode it from a
   canvas, and that is not a flag — there is no browser API to reach. Options:
