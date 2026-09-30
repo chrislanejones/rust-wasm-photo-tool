@@ -50,7 +50,7 @@
   - **Reselect** — every committed text and shape annotation as a row; click to re-select it on the canvas, hover the ✕ to delete
   - **Layers** — the photo's layer stack: add, rename, hide, reorder, set opacity, delete, flatten, with the per-tier limit shown
   - **Histogram** — the live RGB / Luma scope
-  - **Combine** — how the next region meets the selection you have: **New selection / Add / Subtract / Intersect**, the standing choice for every selection gesture (Shift and Alt still override it for one gesture). Starts closed. Moved here out of the Select panel, and it now applies to placed objects too: the same text-and-shape list Reselect shows, where clicking a row combines the area that object covers — its box, or its ellipse for a circle
+  - **Combine** — how the next region meets the selection you have: **New selection / Add / Subtract / Intersect**, the standing choice for every selection gesture (Shift and Alt still override it for one gesture). Starts closed. Moved here out of the Select panel, and it now applies to placed objects too: the same text-and-shape list Reselect shows, where clicking a row combines the area that object covers — its box, or its ellipse for a circle. The marching ants show the selection on the canvas whatever tool is held
 - **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
 - **Keyboard Shortcut Modal** — Alt+/ opens a full reference overlay grouped by category (two columns per group)

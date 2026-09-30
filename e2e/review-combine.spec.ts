@@ -18,6 +18,9 @@ import { join } from "node:path";
 //   2. it is ONE undo step, and one Ctrl+Z takes it back
 //   3. the standing mode applies: Subtract on the same object takes the
 //      selection back to nothing, so the four buttons really do drive it
+//   4. the marching ants DRAW on the canvas while Shapes is held, and clear
+//      when the selection does — the overlay is no longer gated on the Select
+//      tool (ADR-074; the first cut left it gated and a combine was invisible)
 //
 // Runs against the production build in logged-out demo mode and drives the real
 // mouse, the real toggles and the real rows.
@@ -231,12 +234,19 @@ test("Review › Combine: an object row makes a real selection, and the mode dri
   expect.soft(afterCombine, "a row click selects the object's footprint").toBeGreaterThan(10_000);
   expect.soft(afterCombine, "and not the whole canvas").toBeLessThan(65_536);
   await expect.soft(readout(page), "the readout names the coverage").toContainText("Selected");
+  // ── 4. …and the ants are ON THE CANVAS, with Shapes still the active tool.
+  await expect
+    .soft(page.getByTestId("selection-overlay"), "ants draw under the Shapes tool")
+    .toBeVisible();
 
   // ── 2. ONE undo step, and Ctrl+Z takes it back.
   expect.soft(undoAfter - undoBefore, "one history step per combine").toBe(1);
   await page.keyboard.press("Control+z");
   await page.waitForTimeout(700);
   expect.soft(await selectedPixels(page), "undo restores no-selection").toBe(0);
+  await expect
+    .soft(page.getByTestId("selection-overlay"), "no selection, no ants")
+    .toHaveCount(0);
 
   // ── 3. The standing mode drives it. Re-combine in New, then switch to
   // Subtract and click the same row: taking a region out of itself leaves

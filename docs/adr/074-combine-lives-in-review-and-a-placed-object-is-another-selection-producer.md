@@ -151,17 +151,20 @@ outside the persistence allowlist).
   combine reads **"Marquee"** — the label `rect_select` passes. The other three
   modes are named after the mode by the engine (`combine_label`), so they read
   correctly already. The fix is the rejected `object_select` export above.
-- **KNOWN, ACCEPTED, and measured in a browser: the marching ants do not draw
-  while another tool is held.** `AppShell` gates the `selectionMask` prop on
-  `activeTool === "select"` (plus the Magic Eraser, which writes the same
-  field), so a combine performed while holding Shapes changes the coverage
-  readout in this section and the status-bar chip, but puts nothing on the
-  canvas until you pick Select. Deliberately NOT widened here: the engine does
-  not clip a paint, stamp or eraser stroke to the selection (`src/paint.rs`
-  touches it only for the Magic Eraser's own mask), so ants under the Paint
-  brush would promise a constraint that does not exist. Widening the gate is a
-  decision about every tool, not about this section, and it wants its own
-  change — the lightbulb says where the ants are meanwhile.
+- **The marching ants now draw whatever tool is held.** The first cut of this
+  change left `AppShell`'s gate in place (`activeTool === "select"`, plus the
+  Magic Eraser, which writes the same field), and a browser run showed what that
+  costs: a combine made while holding Shapes changed the readout and the status
+  chip and put nothing on the canvas. The gate is gone; `selectionMask` reaches
+  `<SelectionOverlay>` for every tool. **The trade, decided by Chris on
+  2026-09-30:** the engine does not clip a paint, stamp or eraser stroke to the
+  selection (`src/paint.rs` touches it only for the Magic Eraser's own mask), so
+  ants under the Paint brush show a selection that the brush ignores. A visible
+  selection that does not constrain the brush was judged better than an
+  invisible one that exists. Clipping strokes to the selection is the follow-up
+  that would make the two agree. `e2e/review-combine.spec.ts` pins the ants
+  under the Shapes tool; AppShell's `max-lines` cap follows the file down
+  3564 → 3540.
 - **Ellipse fidelity is per-kind, not general.** A circle selects a circle; a
   diamond, a star and a bézier select their boxes. The section's lightbulb says
   so out loud rather than letting a user discover it.
@@ -171,7 +174,7 @@ outside the persistence allowlist).
   deleted.
 - Two pinned numbers moved deliberately: `accessibleNames.test.ts`'s "Close
   section" count 3 → 4, and `engineAsyncMigration.contract.test.ts`'s awaited
-  sites 158 → 160 — the `rect_select` / `ellipse_select` pair in
+  sites +2 (158 → 160 as written; 173 → 175 after merging master's own bumps) — the `rect_select` / `ellipse_select` pair in
   `useSelectionActions`, twins of `handleMarqueeCommit`'s. `objectFootprint`'s
   two annotation reads are awaited too but do not appear in that count: it
   takes the handle as a typed PARAMETER, which the audit's receiver regex
@@ -179,6 +182,7 @@ outside the persistence allowlist).
   file's convention is a paragraph per bump; this one gets a pointer here
   instead, because the file is AT its `max-lines` cap and that ratchet only
   ever goes down.
-- AppShell is untouched — no new props, no new state, no line-count change.
-  The next person adding a Review section should use the same store-nonce
+- AppShell gains no props and no state — its only change is the overlay gate
+  above, which made it shorter. The next person adding a Review section should
+  use the same store-nonce
   channel rather than reaching for props.

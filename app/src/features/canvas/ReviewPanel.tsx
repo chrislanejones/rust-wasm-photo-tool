@@ -788,11 +788,10 @@ export function ReviewPanel({
                       the area it covers. Holding <kbd>Shift</kbd> adds and{" "}
                       <kbd>Alt</kbd> subtracts for one gesture, whatever is
                       chosen here. An object contributes its box, or its
-                      ellipse for a circle, not its outline. The count below is
-                      what the selection covers; the marching ants draw on the
-                      canvas with the Select tool, and what you build here is
-                      what Select → Delete / Copy / Cut and Layer Settings →
-                      Add mask all act on.
+                      ellipse for a circle, not its outline. The marching ants show
+                      the result on the canvas whatever tool you hold, and what
+                      you build here is what Select → Delete / Copy / Cut and
+                      Layer Settings → Add mask all act on.
                     </>
                   }
                 />
