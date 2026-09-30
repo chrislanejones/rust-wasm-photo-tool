@@ -44,9 +44,14 @@ describe("icon-only controls carry a real name", () => {
     expect(elementWithTitle(review, title)).toContain(`aria-label="${name}"`);
   });
 
-  it("all three ReviewPanel 'Close section' buttons", () => {
+  it("every ReviewPanel 'Close section' button", () => {
+    // One per closable section: Reselect, Layers, Histogram and — since the
+    // Combine strip moved here out of the Select panel — Combine. History is
+    // the exception: its header slot is spent on Undo / Redo / the step count.
+    // A number, not a floor, so a section that ships WITHOUT the ✕ (or with an
+    // unnamed one) is the failure this catches.
     const n = review.split('aria-label="Close section"').length - 1;
-    expect(n).toBe(3);
+    expect(n).toBe(4);
   });
 
   it("Add layer is named for what it does, not for why it is disabled", () => {
