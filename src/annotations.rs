@@ -818,7 +818,12 @@ impl ImageHorseTool {
     // and deleted via the Reselect list until flattened at export.
 
     pub fn shape_annotation_count(&self) -> usize {
-        self.layers[self.active].shape_annotations.len()
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return 0;
+        };
+        layer.shape_annotations.len()
     }
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
@@ -1530,7 +1535,12 @@ impl ImageHorseTool {
     /// JSON dump of all shape annotations (metadata only). Used by the JS
     /// overlay for hit-testing and by the Reselect list.
     pub fn get_shape_annotations(&self) -> String {
-        shapes_to_json(&self.layers[self.active].shape_annotations)
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return "[]".to_string();
+        };
+        shapes_to_json(&layer.shape_annotations)
     }
 
     /// Hit-test shape annotations against a canvas-space point. Iterates
@@ -1549,7 +1559,12 @@ impl ImageHorseTool {
     /// ⚠️ Mirrored by hand in `app/src/lib/annotationHitTest.ts` — #60's drift
     /// guard hashes this body, so a change here must be ported there first.
     pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
-        for s in self.layers[self.active].shape_annotations.iter().rev() {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return -1;
+        };
+        for s in layer.shape_annotations.iter().rev() {
             let pad = (s.stroke_width * 0.5).max(6.0);
             let hit = if s.kind == 2
                 || s.kind == 4
@@ -1647,7 +1662,12 @@ impl ImageHorseTool {
     /// Number of live (uncommitted) text annotations. Cheap getter so JS
     /// can decide whether to do the overlay-aware flush.
     pub fn text_annotation_count(&self) -> usize {
-        self.layers[self.active].text_annotations.len()
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return 0;
+        };
+        layer.text_annotations.len()
     }
 
     /// Where the visible ink of `text`'s FIRST line begins inside the
@@ -2207,7 +2227,12 @@ impl ImageHorseTool {
     /// identity quad are different answers ("no such annotation" vs "that one
     /// is unwarped") and the caller distinguishes them by length.
     pub fn text_perspective_of(&self, id: u32) -> Vec<f32> {
-        self.layers[self.active]
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
+        layer
             .text_annotations
             .iter()
             .find(|a| a.id == id)
@@ -2271,7 +2296,12 @@ impl ImageHorseTool {
     /// unwarped") and the caller distinguishes them by length — the same
     /// contract [`text_perspective_of`](Self::text_perspective_of) keeps.
     pub fn shape_perspective_of(&self, id: u32) -> Vec<f32> {
-        self.layers[self.active]
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
+        layer
             .shape_annotations
             .iter()
             .find(|s| s.id == id)
@@ -2408,14 +2438,24 @@ impl ImageHorseTool {
     /// Rust). Used by the JS overlay for hit-testing bounds and by
     /// editPersistence for round-tripping across photo switches.
     pub fn get_text_annotations(&self) -> String {
-        annotations_to_json(&self.layers[self.active].text_annotations)
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return "[]".to_string();
+        };
+        annotations_to_json(&layer.text_annotations)
     }
 
     /// Hit-test annotations against a canvas-space point. Iterates
     /// newest-first (last-added wins on overlap). Returns the id, or -1.
     /// (Sentinel -1 is used because wasm-bindgen Option support is uneven.)
     pub fn text_annotation_at(&self, x: i32, y: i32) -> i32 {
-        for a in self.layers[self.active].text_annotations.iter().rev() {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return -1;
+        };
+        for a in layer.text_annotations.iter().rev() {
             let tx = a.x + a.tile_offset_x;
             let ty = a.y + a.tile_offset_y;
             if x >= tx && y >= ty && x < tx + a.tile_w as i32 && y < ty + a.tile_h as i32 {

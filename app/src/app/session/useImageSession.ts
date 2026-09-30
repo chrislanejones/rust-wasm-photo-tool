@@ -27,6 +27,7 @@ import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
+import type { LoadOpts } from "@/hooks/useEngineCore";
 import { whenStrokeIdle } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
 
@@ -161,9 +162,10 @@ export function useImageSession({
       width: number,
       height: number,
       artboard?: { pad: number; r: number; g: number; b: number; a: number },
-    ) => {
+      opts?: LoadOpts,
+    ): Promise<boolean> => {
       startImageLoad();
-      void stamp.loadImageFromPixels(pixels, width, height, artboard);
+      return stamp.loadImageFromPixels(pixels, width, height, artboard, opts);
     },
     [stamp, startImageLoad],
   );
@@ -171,7 +173,15 @@ export function useImageSession({
   /** Apply a finished AI image result (decoded RGBA) back to the canvas as the
    *  new working image, and mark the photo modified so it persists. */
   const handleAIResult = useCallback(
-    (r: { pixels: Uint8ClampedArray; width: number; height: number }) => {
+    (r: { pixels: Uint8ClampedArray; width: number; height: number; photoKey?: string }) => {
+      // A job runs for seconds to minutes and the panel stays mounted across
+      // switches. Its result belongs to the photo it was started on; applied
+      // to whatever is open now, it replaced that photo and marked it
+      // modified, so the next autosave wrote it into the wrong archive.
+      if (r.photoKey && r.photoKey !== activeIdRef.current) {
+        toast.info("That AI result was for another photo, so it wasn't applied. Open that photo and run it again.");
+        return;
+      }
       // AI result replaces the doc — re-normalize to the artboard (border +
       // backing) when "Canvas on import" is on, exactly like every other load.
       loadImageFromPixels(
@@ -276,7 +286,9 @@ export function useImageSession({
       // dirty rather than be marked saved by a write that predates it.
       const writtenAtUndoCount = live ?? stamp.state.undoCount;
       try {
-        const wrote = await savePhotoEdit(id, stamp.toolRef, opts);
+        // In the document queue: the ownership check inside savePhotoEdit and
+        // its capture must not straddle a load (see LoadOpts.photoId).
+        const wrote = await stamp.serialize(() => savePhotoEdit(id, stamp.toolRef, opts));
         // Only on a write the ownership guard actually allowed. A refused save
         // returns false and must NOT move the saved point, or the next undo
         // would compare against a write that never happened.
@@ -384,22 +396,20 @@ export function useImageSession({
       // Every load is normalized: when "Canvas on import" is on, a gallery
       // switch lands the photo on the same padded artboard as a fresh import
       // (border + backing), not just at native size.
-      loadImageFromPixels(
+      await loadImageFromPixels(
         working.pixels,
         working.width,
         working.height,
         prefs.canvasArtboard
           ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
           : undefined,
+        { isCurrent, photoId: entry.id },
       );
-      // The engine has been handed THIS photo's pixels. `loadImageFromPixels`
-      // is fire-and-forget (it voids the engine promise), so this is "committed
-      // to", not "finished". If that load were to fail the marker would name a
-      // photo the engine never got — which is exactly the unguarded behavior
-      // shipping today, so it degrades to the status quo rather than to a
-      // refusal. Parked as OPEN: making the engine load awaitable would let
-      // ownership follow the document instead of the intent.
-      setEngineDocument(entry.id);
+      // Ownership is recorded INSIDE the load, in the document queue, the
+      // moment the engine holds this photo (LoadOpts.photoId). It used to be
+      // set here — first before the load finished, then after the await —
+      // and both left a window where the marker named one photo while the
+      // engine held another, and a save in that window wrote the wrong photo.
     },
     [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
@@ -496,18 +506,23 @@ export function useImageSession({
             // border is applied in Rust by the idempotent `set_artboard_border`.
             // Gallery-switch / AI-result paths run the SAME normalization, so
             // every load with artboard on ends up at photo + 2×pad.
-            loadImageFromPixels(
+            // An import is a selection too: bump the sequence so a switch still
+            // in flight stops before it touches the engine or the active id.
+            ++selectSeqRef.current;
+            const importedId = entry.id;
+            void loadImageFromPixels(
               working.pixels,
               working.width,
               working.height,
               prefs.canvasArtboard && !opts?.skipArtboard
                 ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
                 : undefined,
+              // Fresh import — ownership is set inside the load (LoadOpts.photoId).
+              { photoId: importedId },
             );
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
-            setEngineDocument(entry.id); // fresh import — the engine holds it now
             setCompareActive(false);
           }
         } catch (err) {
@@ -544,7 +559,11 @@ export function useImageSession({
   // ── Select photo ───────────────────────────────────────────────────────────
   const handleSelectPhoto = useCallback(
     async (entry: PhotoEntry) => {
-      if (entry.id === activePhotoId) return;
+      // `activeIdRef`, not the React state: the state only moves after the
+      // outgoing save, so a click back to the photo you just left (A→B→A)
+      // matched it, returned without bumping the sequence, and B's switch
+      // finished — you clicked A and got B.
+      if (entry.id === (activeIdRef.current ?? activePhotoId)) return;
 
       // Claim the latest selection. Any await below that resolves after a newer
       // click bails before touching the canvas, so highlight and pixels stay in sync.
@@ -597,7 +616,8 @@ export function useImageSession({
           // The outgoing photo's still-debouncing op-log save would be
           // dropped by the photo switch — land it while the engine still
           // holds the outgoing document. No-op when persistence is off.
-          await flushPendingOplogSave(stamp.toolRef.current);
+          const tool = stamp.toolRef.current;
+          await stamp.serialize(() => flushPendingOplogSave(tool));
           // Through flushEditArchive rather than calling savePhotoEdit
           // directly, so the switch finally inherits `savingRef`. Bypassing
           // that overlap guard is how one brush stroke became ten concurrent
@@ -635,14 +655,14 @@ export function useImageSession({
       // existing archive/original paths unchanged; the working copy remains
       // the safety net for one release.
       setActiveOplogPhoto(entry.id);
-      const restored = await stamp.restoreFromOplog(entry.id);
+      const restored = await stamp.restoreFromOplog(entry.id, { isCurrent, photoId: entry.id });
       // Ownership tracks the ENGINE, not the UI, so it is recorded BEFORE the
       // supersession check: a switch that gets superseded still replaced the
       // document. Recording it after the `isCurrent` bail would leave the
       // marker naming the PREVIOUS photo while the engine holds this one, and
       // the next entirely legitimate save would be refused. False refusals lose
       // real work — the one outcome this guard must never produce.
-      if (restored) setEngineDocument(entry.id);
+      // (Ownership is set inside the load when it restores — LoadOpts.photoId.)
       if (!isCurrent()) return;
       if (restored) {
         setLoadProgress(100);
@@ -658,8 +678,7 @@ export function useImageSession({
       if (!isCurrent()) return;
       if (saved) {
         setLoadProgress(20);
-        await stamp.loadFromSaved(saved);
-        setEngineDocument(entry.id); // before the bail — see the op-log note above
+        await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
         if (!isCurrent()) return;
         setLoadProgress(100);
         setTimeout(() => {

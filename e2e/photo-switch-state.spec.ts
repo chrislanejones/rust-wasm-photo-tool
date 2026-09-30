@@ -130,7 +130,6 @@ test("§0.1 slow A→B→A: B stays untouched, A keeps its +40", async ({ page }
 });
 
 test("§0.2 fast A↔B five times in a second: nobody gets the other's pixels", async ({ page }) => {
-  test.skip(!process.env.IH_RACE, "Known race, red about half the time until engine loads carry a supersession token — see docs/PARKING_LOT.md. Run with IH_RACE=1.");
   const { b0 } = await setup(page);
   await drag(page, "Brightness", 40);
   const a1 = await settled(page);
@@ -214,7 +213,6 @@ const activeThumb = (page: Page) =>
   );
 
 test("§0.7 edited A, fast switching: the lit photo and the canvas agree, and it is A", async ({ page }) => {
-  test.skip(!process.env.IH_RACE, "Known race, red about half the time until engine loads carry a supersession token — see docs/PARKING_LOT.md. Run with IH_RACE=1.");
   const { b0 } = await setup(page);
   await drag(page, "Brightness", 40);
   const a1 = await settled(page);

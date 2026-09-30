@@ -4,38 +4,30 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — fast photo switching can show one photo while another is selected (09-30-2026)
+## FIXED 09-30-2026 — fast photo switching showed one photo while another was selected
 
-Found by the "Skeleton UI + photo switching" plan's §0, which stops the visual
-work until this is fixed. Reproduce: `IH_RACE=1 pnpm exec playwright test
-e2e/photo-switch-state.spec.ts -g "§0.7"`. Edit photo A, then PgDn/PgUp five
-times in a second.
+Fixed on `fix/photo-switch-load-token`. Two causes, both needed (30 runs each of
+e2e photo-switch-state §0.2 / §0.5 / §0.7):
 
-| Master, 6 runs | Result |
-| --- | --- |
-| **2** | correct: A lit, A's edit on screen |
-| **3** | A lit, canvas **black** |
-| **1** | A lit, canvas shows **B**; status bar reads "Original 256×256 · Photo 1220×820"; B gains an "edited" dot it never earned |
+| Build | Failures | Engine panics |
+| --- | --- | --- |
+| master | ~4 of 6 per test | yes |
+| TypeScript fix only | 6 of 24 | yes |
+| engine fix only | 11 of 30 | 0 |
+| **both** | **0 of 30** | **0** |
 
-In the last state, an edit lands on B's document while the app's id says A.
-Evidence: `~/ai-repo/photo-switch-evidence/`.
+1. **Engine panic.** Rebuilding a saved photo empties the layer stack
+   (`begin_layer_restore`) across many worker messages; a UI poll landing in
+   that window indexed `self.layers[self.active]` and panicked, poisoning the
+   instance (black canvas, hung loads). 13 read-only getters now go through
+   `active_layer()` and answer empty.
+2. **Loads and saves interleaved.** Loads now run one at a time and skip when
+   stale; the ownership marker moves inside the load; archive saves run in the
+   same queue. The trace showed photo A's archive written with photo B's
+   pixels — the marker still said A after B's load had finished.
 
-**Cause (from reading, not yet isolated):** engine loads carry no supersession
-token. `handleSelectPhoto`'s `isCurrent()` stops at the moment the load is
-issued; `loadImageFromPixels` / `loadFromSaved` / `restoreFromOplog`
-(`useEngineCore.ts`) finish their awaits and assign `toolRef.current`
-last-writer-wins on the one shared worker port. `setEngineDocument` is set
-before the load completes (`useImageSession.ts` ~378). The A→B→A bounce also
-early-returns on `entry.id === activePhotoId` (React state) instead of
-`activeIdRef.current`.
-
-**Fix shape:** a switch generation carried into every engine load, with a stale
-load dropped before it touches `toolRef` or the canvas. That is the canvas
-pipeline, so per the plan's §7 it is its own session, not a skeleton PR.
-
-Also found reading the same code, unverified: an AI result (rembg / inpaint /
-upscale) started on A is applied to whatever photo is open when it returns
-(`useAIJob.ts` → `handleAIResult`), with no photo-id check.
+Still open from the same work: stale engine handles reject with "engine
+document replaced" as an UNHANDLED rejection (console noise, ~140 per 30 runs).
 
 ## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
 
