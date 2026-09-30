@@ -3,6 +3,7 @@
 //
 //   src/data/commits.ts   ← `git log master`             (the Trail Log squares)
 //   src/data/features.ts  ← docs/Features.md             (the /features list)
+//   src/data/source-dates.json ← git log, per page source (the sitemap lastmod)
 //
 // Run it as part of the release routine, from anywhere:
 //
@@ -110,6 +111,9 @@ const md = readFileSync(resolve(root, "docs", "Features.md"), "utf8");
 const plain = (s) =>
   s
     .replace(/\*\*(.+?)\*\*/g, "$1") // bold
+    // Italic, AFTER bold so no `**` is left to half-match. Without this an
+    // `*emphasized*` word reaches /features with its asterisks on.
+    .replace(/\*(.+?)\*/g, "$1")
     .replace(/`(.+?)`/g, "$1") // code
     .replace(/\[(.+?)\]\((.+?)\)/g, "$1") // links → their text
     .trim();
@@ -269,3 +273,9 @@ console.log(
   `celebrationStats.ts  ${monthName} ${monthEntries} entries · ${monthRels.length} releases · ` +
     `${allTime} all-time · feature ${monthTags.feature ?? 0} · fix ${monthTags.fix ?? 0} · latest ${latest.version}`,
 );
+
+// ── src/data/source-dates.json ──────────────────────────────────────────
+// The sitemap's `lastmod` dates. Its own script, run from here so the routine's
+// one "regenerate the derived data" step covers it too. See gen-sitemap-dates.mjs
+// for why the dates are committed instead of read from git at build time.
+execFileSync(process.execPath, [resolve(here, "gen-sitemap-dates.mjs")], { stdio: "inherit" });

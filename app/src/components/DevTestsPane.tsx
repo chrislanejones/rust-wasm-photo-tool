@@ -3,7 +3,8 @@
 // (an actual idle timeout).
 import { useState } from "react";
 import { MonitorPause } from "lucide-react";
-import { IdleScreenDialog } from "@/components/IdleScreenDialog";
+import { IdleScreen } from "@/components/IdleScreen";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 // Declared at module scope, not inside DevTestsPane: a component defined during
 // render gets a fresh type identity every render, so React unmounts and remounts
@@ -34,13 +35,10 @@ export function DevTestsPane() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">Dev Tests</h3>
-        <p className="mt-1 text-xs text-text-secondary">
-          Open dialogs in isolation to preview and tweak them without triggering
-          their real conditions.
-        </p>
-      </div>
+      <PaneHeading title="Dev Tests">
+        Open dialogs in isolation to preview and tweak them without triggering
+        their real conditions.
+      </PaneHeading>
 
       <div className="space-y-2">
         <Row
@@ -50,9 +48,9 @@ export function DevTestsPane() {
         />
       </div>
 
-      <IdleScreenDialog
+      <IdleScreen
         open={idleOpen}
-        dismissible
+        preview
         onContinue={() => setIdleOpen(false)}
       />
     </div>

@@ -5,6 +5,7 @@ import { ShareViewer } from "@/components/ShareViewer";
 import { CommandPalette } from "@/features/commandPalette";
 import { RouteSync, SHARE_PARAM } from "@/features/routing";
 import { MovedNotice } from "@/features/hostMove";
+import { SyncProvider } from "@/lib/sync";
 
 export default function App() {
   // A `?v=<token>` link opens the read-only share viewer instead of the editor.
@@ -34,6 +35,12 @@ export default function App() {
       {/* Retired Netlify address only: "we moved, download your library
           first". Renders nothing anywhere else; see features/hostMove. */}
       <MovedNotice />
+      {/* Keeps preferences, remembered UI choices and tool modes the same in
+          every tab, and on every device the user is signed in on. Renders
+          nothing; see lib/sync and ADR-061. Mounted here rather than in
+          AppShell so it outlives IdleScreen and MultiTabScreen — a parked tab
+          should come back current, not start catching up. */}
+      <SyncProvider />
     </TooltipProvider>
   );
 }

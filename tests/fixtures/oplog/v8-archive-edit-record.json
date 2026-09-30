@@ -1,0 +1,90 @@
+{
+  "capturedFrom": "https://edit.imagehorse.app",
+  "capturedAtUtc": "2026-09-20",
+  "servingCommit": "34dd0d9",
+  "note": "The live archive record for the same session as v8-text-font-wrap-shape, with every PNG replaced by its byte length. This is the OTHER persisted copy of the same document (image-horse-edits -> edits), and it is what a reload falls back to when the op log cannot be restored.",
+  "canvasW": 276,
+  "canvasH": 276,
+  "annotations": [
+    {
+      "id": 1,
+      "text": "wrap me across several lines please",
+      "x": 116,
+      "y": 102,
+      "font_size": 24,
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "bold": false,
+      "font_id": "liberation-serif",
+      "rotation_deg": 0,
+      "background_kind": 0,
+      "bg_r": 255,
+      "bg_g": 255,
+      "bg_b": 255,
+      "bg_a": 255,
+      "bg_padding": 8,
+      "bg_corner_radius": 8,
+      "bg_tail": 135,
+      "shadow_box": false,
+      "shadow_text": false,
+      "shadow_r": 0,
+      "shadow_g": 0,
+      "shadow_b": 0,
+      "shadow_a": 0,
+      "shadow_dx": 0,
+      "shadow_dy": 0,
+      "shadow_blur": 0
+    }
+  ],
+  "shapes": [
+    {
+      "id": 1,
+      "kind": 0,
+      "x0": 118,
+      "y0": 154,
+      "x1": 136,
+      "y1": 181,
+      "r": 239,
+      "g": 68,
+      "b": 68,
+      "stroke_width": 3,
+      "arrow_style": 0,
+      "sloppiness": 50,
+      "number": 0,
+      "label_kind": 0,
+      "fill_kind": 0,
+      "fill_r": 59,
+      "fill_g": 130,
+      "fill_b": 246,
+      "fill_a": 255,
+      "fill2_r": 236,
+      "fill2_g": 72,
+      "fill2_b": 153,
+      "fill2_a": 255,
+      "fill_angle": 0,
+      "fill_block": 16,
+      "perspective": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        0,
+        1
+      ],
+      "points": []
+    }
+  ],
+  "undoStackLabels": [
+    "Add Text",
+    "Edit Text",
+    "Edit Text",
+    "Add Shape"
+  ],
+  "layerNames": [
+    "Canvas",
+    "Photo"
+  ]
+}

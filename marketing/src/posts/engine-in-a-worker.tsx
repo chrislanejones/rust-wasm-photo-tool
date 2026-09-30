@@ -1,7 +1,9 @@
 /* "The engine left the main thread. The pixels stayed put."
  *
  * Body only — the headline, the deck, the dateline and the footer are the
- * shell's (pages/BlogPost.tsx). This file starts at the first paragraph.
+ * shell's (pages/BlogPost.tsx). This file starts at the first paragraph. The
+ * one thing it adds above that is `Topper`, the scene behind the shell's
+ * headline, at the bottom of this file.
  *
  * Every figure in here is in the repository. The blocking times and the
  * round-trip numbers come from docs/engine-worker-feasibility.md and
@@ -90,7 +92,7 @@ export default function EngineInAWorker() {
           of these three documents, and they are linked rather than summarized
           so a reader who doubts a number can go and check it. */}
       <p className="post__sourcenote">
-        Shipped as the default in v8.32 on 13 August 2026. Everything measured below comes from the
+        Shipped as the default in v8.32 on September 18th, 2026. Everything measured below comes from the
         repository's own records —{" "}
         <a href={repoFile("docs/adr/024-engine-in-a-worker.md")} {...external}>
           ADR-024
@@ -288,13 +290,17 @@ export default function EngineInAWorker() {
               a value — that is tabular data, and a screen reader should get the
               numbers rather than a wall of unlabeled bars. The bar itself is
               decorative and the figure it depicts is in the next cell as text. */}
-          <table className="scale__grid">
-            <tbody>
+          {/* Roles stated explicitly: the phone layout (styles.css) changes
+              these elements' `display`, which drops implicit table semantics
+              in some screen readers. */}
+          <table className="scale__grid" role="table">
+            <tbody role="rowgroup">
               {PAYLOADS.map((p) => {
                 const over = overBudget(p);
                 return (
                   <tr
                     key={p.label}
+                    role="row"
                     className={[
                       "scale__row",
                       p.budget && "scale__row--budget",
@@ -303,18 +309,18 @@ export default function EngineInAWorker() {
                       .filter(Boolean)
                       .join(" ")}
                   >
-                    <th scope="row" className="scale__label">
+                    <th scope="row" role="rowheader" className="scale__label">
                       {p.label}
                       {p.note && <span className="scale__note">{p.note}</span>}
                     </th>
-                    <td className="scale__track">
+                    <td role="cell" className="scale__track">
                       <span
                         className="scale__bar"
                         style={{ width: `${widthOf(p.bytes).toFixed(2)}%` }}
                         aria-hidden="true"
                       />
                     </td>
-                    <td className="scale__value">
+                    <td role="cell" className="scale__value">
                       <span className="fig">{p.size}</span>
                       {over !== null && (
                         <span className="scale__over">{over.toLocaleString("en-US")}× over</span>
@@ -692,7 +698,7 @@ export default function EngineInAWorker() {
 
       <p>
         Every stage was reversible by itself, and the whole arc sat behind a flag that stayed off for
-        five weeks. It became the default on 13 August 2026, in v8.32.
+        five weeks. It became the default on September 18th, 2026, in v8.32.
       </p>
 
       <h2 id="see-it">See it yourself</h2>
@@ -771,4 +777,14 @@ export default function EngineInAWorker() {
       <p className="post__kicker">The engine works in the back room now. The tab just paints.</p>
     </>
   );
+}
+
+/* The header banner. FIG 1's scene, full-bleed and unlabeled, behind the
+ * headline the shell renders — the shell owns the words, this owns what sits
+ * under them. Wired up in registry.tsx.
+ *
+ * The same picture is the post's share card: scripts/gen-og-images.mjs loads
+ * the built post, screenshots this scene, and lays the card over it. */
+export function Topper() {
+  return <Scene kind="threads" backdrop />;
 }

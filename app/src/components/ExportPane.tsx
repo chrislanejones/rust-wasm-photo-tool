@@ -5,7 +5,8 @@ import { Package, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { exportOra, importOraAsNewPhoto } from "@/lib/openraster";
+import { downloadOraWithToast, importOraAsNewPhoto } from "@/lib/openraster";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 export interface OpenRasterControls {
   stampToolRef: MutableRefObject<ImageHorseTool | null>;
@@ -21,13 +22,6 @@ export interface OpenRasterControls {
     files: File[],
     opts?: { skipArtboard?: boolean },
   ) => Promise<void>;
-}
-
-/** Strip a trailing extension (".png", ".jpg", …) so "Vacation Photo.png" →
- *  "Vacation Photo"; falls back to "image-horse" when there's nothing usable. */
-function baseFileName(name: string | null | undefined): string {
-  const stripped = (name ?? "").replace(/\.[a-z0-9]{2,5}$/i, "").trim();
-  return stripped || "image-horse";
 }
 
 /**
@@ -51,39 +45,9 @@ export function ExportPane({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async () => {
-    const tool = stampToolRef.current;
-    if (!tool) {
-      toast.error("Open or create an image first.");
-      return;
-    }
     setBusy("export");
-    try {
-      const { blob, flattenedAnnotations } = await exportOra(tool);
-      // The export flatten path can touch the live document (see export.ts) —
-      // refresh the layer panel + canvas so it reflects the flattened state.
-      if (flattenedAnnotations) {
-        flushToCanvas();
-        syncState();
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${baseFileName(imageName)}.ora`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Exported .ora", {
-        description: flattenedAnnotations
-          ? "Live text/shape annotations were flattened into pixels for export."
-          : undefined,
-      });
-    } catch (err) {
-      console.error("Export .ora failed:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't export the .ora file.",
-      );
-    } finally {
-      setBusy(null);
-    }
+    await downloadOraWithToast({ stampToolRef, flushToCanvas, syncState, imageName });
+    setBusy(null);
   };
 
   const handleImportFile = async (file: File) => {
@@ -110,13 +74,10 @@ export function ExportPane({
     <div className="space-y-6">
       {/* Import */}
       <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Import</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Open an OpenRaster (.ora) project as a new photo, with its full
-            layer stack restored. Your currently open photo is untouched.
-          </p>
-        </div>
+        <PaneHeading title="Import">
+          Open an OpenRaster (.ora) project as a new photo, with its full
+          layer stack restored. Your currently open photo is untouched.
+        </PaneHeading>
         <Button
           size="large"
           disabled={busy !== null}
@@ -141,13 +102,10 @@ export function ExportPane({
 
       {/* Export */}
       <div className="space-y-3 pt-4 border-t border-theme-sidebar-border">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Export</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Export the full project — every layer — to OpenRaster (.ora), an
-            open, layered format that opens in Krita, GIMP, and other editors.
-          </p>
-        </div>
+        <PaneHeading title="Export">
+          Export the full project — every layer — to OpenRaster (.ora), an
+          open, layered format that opens in Krita, GIMP, and other editors.
+        </PaneHeading>
         <Button
           size="large"
           disabled={busy !== null}

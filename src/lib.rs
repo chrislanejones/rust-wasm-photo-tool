@@ -26,6 +26,7 @@ mod describe;
 mod drawing;
 mod edges;
 mod effects;
+mod fonts;
 mod history;
 mod layer;
 mod levels;
@@ -39,6 +40,7 @@ mod presets;
 // bytes are identical either way.
 pub mod perspective;
 mod selection;
+mod selection_refine;
 mod settings;
 mod stabilizer;
 mod stamp;
@@ -102,7 +104,7 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 use crate::annotations::build_text_annotation;
 use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
-use crate::layer::{build_annotation_tile, composite_layers, composite_layers_into, Layer};
+use crate::layer::{composite_layers, composite_layers_into, Layer};
 use crate::stamp::StampState;
 
 /// Module-init hook: route Rust panics to `console.error` with a readable
@@ -463,11 +465,16 @@ pub struct ImageHorseTool {
     selection: Option<Vec<bool>>,
     /// How the NEXT tool-produced selection mask combines with the current
     /// selection: 0 = replace (default / historical behavior), 1 = add
-    /// (union), 2 = subtract. Set by JS from the Shift/Alt modifier when the
-    /// `ih_selection_bool` flag is on; the producers (wand/edge/color-range and
-    /// the lasso at close) route through `apply_produced_selection`. Stays 0
-    /// when the flag is off, so nothing about the shipped behavior changes.
+    /// (union), 2 = subtract, 3 = intersect. Set by JS from the panel's
+    /// Combine group or the Shift/Alt modifier; the producers (wand/edge/
+    /// color-range and the lasso at close) route through
+    /// `apply_produced_selection`.
     selection_combine: u8,
+    /// The last click-once selection, kept so a tolerance change can re-run
+    /// it in place (`selection_retune`). See `selection::SelectionRetune`.
+    selection_retune: Option<crate::selection::SelectionRetune>,
+    /// The Refine sliders' preview copy — only feeds the readout.
+    refine_preview: Option<Vec<bool>>,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
     /// RNG seeded and deterministic (never reads system time/entropy) while
@@ -844,10 +851,32 @@ impl ImageHorseTool {
     }
 }
 
+/// `Some((x, y, w, h))` when the layer is exactly one solid rectangle — every
+/// pixel inside its tight bounding box fully opaque, every pixel outside it
+/// fully transparent — and that rectangle sits strictly inside the document.
+/// `None` for anything else (soft-edged strokes, holes, a full-bleed layer),
+/// which `resize_with_filter` resamples whole as before.
+pub(crate) fn opaque_rect(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+    let (x, y, rw, rh) = tight_bbox(data, w, h)?;
+    if x == 0 && y == 0 && rw == w && rh == h {
+        return None;
+    }
+    for ry in y..y + rh {
+        let row = (ry * w + x) as usize * 4;
+        if data[row..row + rw as usize * 4]
+            .chunks_exact(4)
+            .any(|px| px[3] != 255)
+        {
+            return None;
+        }
+    }
+    Some((x, y, rw, rh))
+}
+
 /// Tight bounding box `(x, y, w, h)` of every pixel with non-zero alpha in an
 /// RGBA `w×h` buffer. `None` if every pixel is fully transparent (nothing to
 /// crop to).
-fn tight_bbox(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+pub(crate) fn tight_bbox(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
     let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
     let mut found = false;
     for y in 0..h {
@@ -894,6 +923,8 @@ impl ImageHorseTool {
             editing_text_id: None,
             selection: None,
             selection_combine: 0,
+            selection_retune: None,
+            refine_preview: None,
             #[cfg(feature = "patchmatch")]
             patchmatch_seed_counter: 0,
             lasso: None,
@@ -1700,6 +1731,7 @@ impl ImageHorseTool {
                     t.shadow_dx,
                     t.shadow_dy,
                     t.shadow_blur,
+                    &t.font_id,
                 )
             })
             .collect();
@@ -2062,10 +2094,6 @@ impl ImageHorseTool {
         self.stamp.set_brush_size(size);
     }
 
-    pub fn get_brush_size(&self) -> u32 {
-        self.stamp.brush_size
-    }
-
     pub fn set_hardness(&mut self, h: f64) {
         self.stamp.set_hardness(h);
     }
@@ -2386,50 +2414,14 @@ impl ImageHorseTool {
         });
     }
 
-    /// Preview crop overlay in WASM.
-    /// Saves a snapshot, applies darkening overlay + dashed border.
-    /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
-    pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.snap("Crop Preview");
-        transform::apply_crop_overlay(
-            &mut self.layers[self.active].buf.data,
-            self.width,
-            self.height,
-            x,
-            y,
-            w,
-            h,
-            0.5,
-        );
-        transform::draw_crop_border(
-            &mut self.layers[self.active].buf.data,
-            self.width,
-            self.height,
-            x,
-            y,
-            w,
-            h,
-            [255, 255, 255, 200],
-            5,
-            5,
-        );
-    }
-
-    /// Remove the crop preview (undo the snapshot pushed by preview_crop).
-    pub fn cancel_crop_preview(&mut self) -> bool {
-        self.undo()
-    }
-
-    /// Apply crop after preview: undo preview first, then crop for real.
-    pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        // Drop the preview snapshot/overlay, then crop the real pixels.
-        self.undo();
-        self.crop(x, y, w, h);
-    }
-
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0; (w as usize) * (h as usize) * 4];
+        };
         transform::copy_region(
-            &self.layers[self.active].buf.data,
+            &layer.buf.data,
             self.width as i32,
             self.height as i32,
             x,
@@ -2538,12 +2530,51 @@ impl ImageHorseTool {
         let sy = new_h as f64 / oh as f64;
         let s_uniform = (sx * sy).sqrt();
 
+        let resample = |data: &[u8], w: u32, h: u32, nw: u32, nh: u32| match filter {
+            0 => transform::resize_nearest(data, w, h, nw, nh),
+            2 => transform::resize_catmull_rom(data, w, h, nw, nh),
+            3 => transform::resize_lanczos3(data, w, h, nw, nh),
+            _ => transform::resize_bilinear(data, w, h, nw, nh),
+        };
+
         for layer in &mut self.layers {
-            let resized = match filter {
-                0 => transform::resize_nearest(&layer.buf.data, ow, oh, new_w, new_h),
-                2 => transform::resize_catmull_rom(&layer.buf.data, ow, oh, new_w, new_h),
-                3 => transform::resize_lanczos3(&layer.buf.data, ow, oh, new_w, new_h),
-                _ => transform::resize_bilinear(&layer.buf.data, ow, oh, new_w, new_h),
+            // A layer that is ONE solid opaque rectangle floating on
+            // transparency — the artboard's Photo layer, a pasted image — is
+            // resampled as that rectangle alone and pasted back hard-edged.
+            //
+            // Resampling the whole buffer instead blends the photo's edge with
+            // the transparent margin around it: every filter but nearest leaves
+            // a 1–3px ring of PARTIAL alpha (wider on an upscale). Under the
+            // Canvas nobody sees it, but "Photo only" excludes the Canvas and
+            // crops to alpha > 0, so the ring ships — matted onto white in a
+            // JPEG, see-through in a PNG/WebP. That was the thin white line
+            // around every resized photo in a ZIP. Measured on an 800×600 photo
+            // on a 25px grey artboard halved with Lanczos: a 405×305 export
+            // with 4,192 semi-transparent pixels, against 400×300 and none.
+            let resized = match opaque_rect(&layer.buf.data, ow, oh) {
+                Some((x, y, rw, rh)) => {
+                    let nx0 = ((x as f64 * sx).round() as u32).min(new_w - 1);
+                    let ny0 = ((y as f64 * sy).round() as u32).min(new_h - 1);
+                    let nx1 = (((x + rw) as f64 * sx).round() as u32).clamp(nx0 + 1, new_w);
+                    let ny1 = (((y + rh) as f64 * sy).round() as u32).clamp(ny0 + 1, new_h);
+                    let (nrw, nrh) = (nx1 - nx0, ny1 - ny0);
+                    let (rect, _, _) = transform::crop(&layer.buf.data, ow, oh, x, y, rw, rh);
+                    let mut scaled = resample(&rect, rw, rh, nrw, nrh);
+                    // Every source pixel was opaque, so every output pixel is:
+                    // pin it rather than trust a kernel's rounding to land on 255.
+                    for px in scaled.chunks_exact_mut(4) {
+                        px[3] = 255;
+                    }
+                    let mut out = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
+                    let row_bytes = nrw as usize * 4;
+                    for ry in 0..nrh as usize {
+                        let dst = ((ny0 as usize + ry) * new_w as usize + nx0 as usize) * 4;
+                        out[dst..dst + row_bytes]
+                            .copy_from_slice(&scaled[ry * row_bytes..(ry + 1) * row_bytes]);
+                    }
+                    out
+                }
+                None => resample(&layer.buf.data, ow, oh, new_w, new_h),
             };
             layer.buf.data = resized;
             layer.buf.width = new_w;
@@ -2610,6 +2641,7 @@ impl ImageHorseTool {
                         (a.shadow_dx as f64 * sx).round() as i32,
                         (a.shadow_dy as f64 * sy).round() as i32,
                         (a.shadow_blur as f64 * s_uniform).round() as u32,
+                        &a.font_id,
                     )
                 })
                 .collect();
@@ -3043,142 +3075,6 @@ impl ImageHorseTool {
             dest_y,
         );
     }
-    /// Like stamp_pixels but scales the source to `target_size × target_size`
-    /// first (bilinear), then composites it centered on (dest_x, dest_y).
-    /// Pushes "Red Stamp" to history (not "Emoji").
-    pub fn stamp_red(
-        &mut self,
-        pixels: &[u8],
-        src_w: u32,
-        src_h: u32,
-        dest_x: i32,
-        dest_y: i32,
-        target_size: u32,
-    ) {
-        self.snap("Red Stamp");
-        // Scale stamp to target_size preserving aspect ratio
-        let scale = target_size as f64 / src_w.max(src_h) as f64;
-        let new_w = ((src_w as f64 * scale).round() as u32).max(1);
-        let new_h = ((src_h as f64 * scale).round() as u32).max(1);
-        let scaled = transform::resize_bilinear(pixels, src_w, src_h, new_w, new_h);
-        // Center on dest
-        let cx = dest_x - (new_w as i32 / 2);
-        let cy = dest_y - (new_h as i32 / 2);
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            &scaled,
-            new_w,
-            new_h,
-            cx,
-            cy,
-        );
-    }
-
-    /// DEPRECATED: prefer `add_text_annotation` + `flatten_text_annotations`
-    /// for the re-editable overlay flow. Kept as a one-shot direct-to-pixels
-    /// fallback for callers (currently: Batch Text) that don't need re-edit —
-    /// Batch runs each photo through a disposable `ImageHorseTool` that's
-    /// `.free()`'d right after export, so there's no live annotation state
-    /// to speak of, just bake-and-export.
-    ///
-    /// Render text entirely in Rust (Liberation Sans, embedded font) and
-    /// composite it onto the image buffer at (dest_x, dest_y).
-    /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
-    /// `dest_x/dest_y` is the top-left corner of the unrotated TEXT block —
-    /// when `background_kind` adds a background box, it grows outward from
-    /// the text by `bg_padding` on every side, so the text itself never
-    /// shifts and callers don't need to re-derive their placement math when
-    /// background is toggled on.
-    /// `angle_deg` rotates the rendered tile clockwise (positive) around its center.
-    ///
-    /// `background_kind`: 0 = none, 1 = solid rect. NOT 2 (speech bubble) —
-    /// batch text is a one-shot flatten with no live overlay to hang a
-    /// tail-direction control off, so the bubble path is intentionally
-    /// unreachable from here. Shares `build_annotation_tile` with
-    /// `add_text_annotation`/`update_text_annotation` (shadow off, no tail)
-    /// so the rect-fill/padding/corner-radius rendering can't drift between
-    /// the live-overlay and batch entry points.
-    pub fn commit_text(
-        &mut self,
-        text: &str,
-        font_size: f32,
-        r: u8,
-        g: u8,
-        b: u8,
-        bold: bool,
-        dest_x: i32,
-        dest_y: i32,
-        angle_deg: f32,
-        background_kind: u8,
-        bg_r: u8,
-        bg_g: u8,
-        bg_b: u8,
-        bg_a: u8,
-        bg_padding: u32,
-        bg_corner_radius: u32,
-    ) {
-        // Clamp to the two kinds this entry point actually supports — any
-        // other value falls back to "none" rather than reaching
-        // `build_annotation_tile`'s speech-bubble path (kind 2) with a
-        // meaningless zero-length tail.
-        let background_kind = if background_kind == 1 { 1 } else { 0 };
-
-        // Background rect grows outward from the text by `bg_padding`; shift
-        // the tile's base origin so the text itself stays anchored at
-        // (dest_x, dest_y) regardless of whether a background is on.
-        let pad = if background_kind == 1 { bg_padding } else { 0 };
-        let base_x = dest_x - pad as i32;
-        let base_y = dest_y - pad as i32;
-
-        let (tile_pixels, tile_w, tile_h, off_x, off_y) = build_annotation_tile(
-            text,
-            font_size,
-            0, // no box: this path draws to a caller-chosen anchor, not a box
-            r,
-            g,
-            b,
-            bold,
-            angle_deg as f64,
-            background_kind,
-            bg_r,
-            bg_g,
-            bg_b,
-            bg_a,
-            bg_padding,
-            bg_corner_radius,
-            0, // bg_tail — no speech-bubble support on this path
-            false,
-            false,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0, // shadow off
-        );
-
-        self.snap("Text");
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            &tile_pixels,
-            tile_w,
-            tile_h,
-            base_x + off_x,
-            base_y + off_y,
-        );
-    }
-
-    /// Returns [width, height] in pixels of the text as rendered by `commit_text`,
-    /// without modifying the image buffer. Used to size the text-input handle box.
-    pub fn measure_text(&self, text: &str, font_size: f32, bold: bool) -> Vec<u32> {
-        let (w, h) = crate::text::measure(text, font_size, bold);
-        vec![w, h]
-    }
 
     /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
     /// `target_size`, and composite it centered on (dest_x, dest_y).
@@ -3224,18 +3120,28 @@ impl ImageHorseTool {
 
     /// Returns [r, g, b, a] for the pixel at (x, y), clamped to image bounds.
     pub fn get_pixel(&self, x: i32, y: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return vec![0, 0, 0, 0];
+        };
         let w = self.width as i32;
         let h = self.height as i32;
         if w == 0 || h == 0 || x < 0 || y < 0 || x >= w || y >= h {
             return vec![0, 0, 0, 255];
         }
         let idx = (y as usize * self.width as usize + x as usize) * 4;
-        self.layers[self.active].buf.data[idx..idx + 4].to_vec()
+        layer.buf.data[idx..idx + 4].to_vec()
     }
 
     /// Returns a flat RGBA grid of (2*radius+1)² pixels centered on (cx, cy).
     /// Out-of-bounds pixels are returned as opaque black.
     pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
+        // Mid-restore the stack is empty (see `active_layer`): answer
+        // "nothing" rather than panic and poison the wasm instance.
+        let Some(layer) = self.active_layer() else {
+            return Vec::new();
+        };
         let side = 2 * radius + 1;
         let mut out = Vec::with_capacity((side * side * 4) as usize);
         let w = self.width as i32;
@@ -3248,7 +3154,7 @@ impl ImageHorseTool {
                     out.extend_from_slice(&[0, 0, 0, 255]);
                 } else {
                     let idx = (py as usize * self.width as usize + px as usize) * 4;
-                    out.extend_from_slice(&self.layers[self.active].buf.data[idx..idx + 4]);
+                    out.extend_from_slice(&layer.buf.data[idx..idx + 4]);
                 }
             }
         }
@@ -3684,10 +3590,10 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(200, 100);
         let dest_x = 50i32;
         let dest_y = 30i32;
-        let m = t.measure_text("Hi", 24.0, false);
+        let m = t.measure_text("Hi", 24.0, false, "");
         let raw_h = m[1];
         t.commit_text(
-            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0, "",
         );
         let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
         assert_eq!(
@@ -3705,10 +3611,10 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(200, 100);
         let dest_x = 50i32;
         let dest_y = 30i32;
-        let m = t.measure_text("Hi", 24.0, false);
+        let m = t.measure_text("Hi", 24.0, false, "");
         let raw_h = m[1];
         t.commit_text(
-            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0, "",
         );
         let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
         assert_eq!(
@@ -3732,15 +3638,16 @@ mod layer_tests {
             let mut t = ImageHorseTool::new(200, 100);
             let dest_x = 50i32;
             let dest_y = 30i32;
-            let m = t.measure_text("Hi", 24.0, false);
+            let m = t.measure_text("Hi", 24.0, false, "");
             let raw_h = m[1];
             if bg_on {
                 t.commit_text(
-                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5,
+                    0, "",
                 );
             } else {
                 t.commit_text(
-                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0, "",
                 );
             }
             let row = dest_y as u32 + raw_h / 2;
@@ -4409,7 +4316,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [10, 20, 30, 255]));
         t.add_text_annotation(
-            "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
         );
         t.add_shape_annotation(
             1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
@@ -4657,9 +4564,40 @@ mod layer_persistence_tests {
             1.0,
         );
         t.restore_text_annotation(
-            "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi",
+            16.0,
+            0,
+            0,
+            0,
+            false,
+            2,
+            2,
+            0.0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
             // shadow params (box, text, r, g, b, a, dx, dy, blur)
-            false, false, 0, 0, 0, 0, 0, 0, 0,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            // font_id, then the box axes and the quad (ADR-060). An empty
+            // slice is the "no quad recorded" case every pre-v8.81 archive
+            // hits.
+            0,
+            0,
+            &[],
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

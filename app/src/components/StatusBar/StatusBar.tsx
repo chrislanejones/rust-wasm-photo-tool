@@ -6,8 +6,16 @@ import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
+import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import type { UserMode } from "@/lib/tiers";
+import { useToolStore } from "@/stores/useToolStore";
+import { describeCoverage } from "@/lib/selectionCoverage";
+import { useSaveStatus } from "@/lib/saveStatus";
+import { retrySync, useSyncStatus } from "@/lib/sync/status";
+import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
+import { StatusMark } from "@/components/ui/status-mark";
 
 export interface ShortcutHint {
   keys: string;
@@ -20,7 +28,7 @@ export interface ShortcutHint {
 const BASE_HINTS: ShortcutHint[] = [
   { keys: "Ctrl+Z", label: "undo" },
   { keys: "Ctrl+Shift+Z", label: "redo" },
-  { keys: "Space", label: "pan" },
+  { keys: "H or Space", label: "pan" },
   { keys: "PgUp/Dn", label: "photos" },
   { keys: "Alt+Scroll", label: "zoom" },
   // Routing (v7.24) — the palette can copy a link straight to the view you're
@@ -62,9 +70,16 @@ const BASE_SLOTS_COMPACT = 1;
 
 const MARKETING_URL = "https://imagehorse.app";
 
-/** Tier of the current user. Lives here historically; consumed by
- *  `photoLimits` and AppShell even though the status bar no longer shows it. */
-export type UserMode = "demo" | "loggedIn" | "paid";
+/** After this long the brand's words slide away and only the horse stays —
+ *  still the same link. Five minutes is long enough to have read it once and
+ *  short enough that it stops taking room from the hints for the rest of the
+ *  session. */
+const BRAND_COLLAPSE_MS = 5 * 60 * 1000;
+
+/** Tier of the current user. Lived here historically; now defined beside the
+ *  tier table in `lib/tiers.ts` (which imported it from here — a component
+ *  under a lib module) and re-exported so importers keep working. */
+export type { UserMode };
 
 interface Props {
   state: CloneStampState;
@@ -80,6 +95,9 @@ interface Props {
    *  dynamic slot). Falls through to the cycling interface-hint pool when
    *  absent, so that slot never sits empty. */
   activeToolHint2?: ShortcutHint;
+  /** How deep undo can go right now (#37). `null` until the engine has a
+   *  document and has told us its byte budget — see `useUndoDepth`. */
+  undoDepth?: UndoDepth | null;
 }
 
 export function StatusBar({
@@ -89,11 +107,23 @@ export function StatusBar({
   photoHeight,
   activeToolHint,
   activeToolHint2,
+  undoDepth,
 }: Props) {
   const sizeLabel = formatBytes(fileSize);
   // Read from the gallery store rather than two more props out of AppShell —
   // see the hook for why `entry.origWidth` is NOT the upload size.
   const uploadDims = useUploadDimensions();
+  // Read from the tool store, like uploadDims above, so AppShell gains no prop.
+  const coverage = useToolStore((s) => s.selectionCoverage);
+  // The ONE publisher of "what will the next brush stroke change" — the same
+  // value the canvas cursor reads. Neither computes its own answer; that drift
+  // is what this pass exists to stop.
+  const maskEditing = useToolStore((s) => s.maskEditing);
+  // Night 5 feedback hierarchy: two errors that used to live ONLY in a toast.
+  // Each reads its single publisher; neither computes its own answer.
+  const saveFailed = useSaveStatus().failed;
+  const sync = useSyncStatus();
+  const syncFailed = sync.state === "error";
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -120,6 +150,13 @@ export function StatusBar({
     return () => window.clearInterval(id);
   }, []);
 
+  // One-way: once the words have gone they stay gone for the session.
+  const [brandCollapsed, setBrandCollapsed] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setBrandCollapsed(true), BRAND_COLLAPSE_MS);
+    return () => window.clearTimeout(id);
+  }, []);
+
   // Tool slots first — desktop only. Compact drops them (see the slot map).
   const dynamic: ShortcutHint[] = [];
   if (!compact) {
@@ -143,16 +180,26 @@ export function StatusBar({
   const hints: ShortcutHint[] = [...dynamic.slice(0, fillTo), ...locked];
   return (
     <footer className="status-bar">
+      <PhotoSwitchAnnouncer />
       <div className="status-section">
+        {/* The name is spelled out in aria-label because after five minutes
+            the visible words are gone and a bare 🐴 would be announced as
+            "horse face". It starts with the visible words, so speech input
+            ("click Image Horse") still matches while they are showing. */}
         <a
           href={MARKETING_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="status-brand-link whitespace-nowrap"
+          data-collapsed={brandCollapsed || undefined}
           title="Visit imagehorse.app"
+          aria-label="Image Horse — visit imagehorse.app (opens in a new tab)"
         >
-          <span>🐴 Image Horse</span>
-          <ExternalLink size={12} aria-hidden="true" />
+          <span aria-hidden="true">🐴</span>
+          <span className="status-brand-name" aria-hidden="true">
+            <span>Image Horse</span>
+            <ExternalLink size={12} />
+          </span>
         </a>
       </div>
 
@@ -168,6 +215,79 @@ export function StatusBar({
       </div>
 
       <div className="status-section status-right">
+        {/* Left of every size readout, so the two dimension readouts stay
+            side by side. Neutral on purpose at every value: this replaced a
+            toast that read as a warning, and a readout that turns red at 4%
+            would just be the toast again. */}
+        {/* Same slot rules as Undo NN% beside it: here while something is
+            selected, gone when nothing is, and neutral at every value — a
+            0.02% selection is information, not an error. */}
+        {/* Same slot rules as Undo NN% and the selection readout: present
+            while true, absent when not, never alarming. Before this, the tile
+            label in Layer Settings ("Paint mask" / "Painting mask") was the
+            ONLY place in the app that said a stroke would change the mask
+            instead of the pixels, and you had to go looking at it. */}
+        {/* Errors that need action, held here until they clear. A toast is
+            gone before you look; these are what is still TRUE after it has
+            gone. Leftmost, because a failure outranks a readout. */}
+        {saveFailed && (
+          <>
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-save-failed" role="status">
+              <StatusMark kind="failed" />
+              Couldn&rsquo;t save changes
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {syncFailed && (
+          <>
+            {/* The ONE place a sync failure is reported (UI Night 6 §4): it
+                sits here until it clears. It used to be a toast as well, and
+                a toast is gone in five seconds while the failure is not. */}
+            <span className="status-zoom inline-flex items-center gap-1" data-testid="status-sync-failed" role="status">
+              <StatusMark kind="attention" />
+              Sync failed. Your changes are still saved on this device.
+              {/* Only when a retry can succeed. A change the server REFUSED is
+                  not retried on a timer and would be refused again, so a
+                  Retry there would be a button that does nothing. */}
+              {sync.willRetry && (
+                <button
+                  type="button"
+                  data-testid="status-sync-retry"
+                  onClick={() => retrySync()}
+                  className="ml-1 rounded px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
+                >
+                  Retry
+                </button>
+              )}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {maskEditing && (
+          <>
+            <span className="status-zoom" data-testid="status-mask-editing">
+              Editing mask &middot; black hides, white reveals
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {coverage && (
+          <>
+            <span className="status-zoom" data-testid="status-selection">
+              {describeCoverage(coverage)}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {undoDepth && (
+          <>
+            <span className="status-zoom" title={describeUndoDepth(undoDepth)}>
+              Undo {undoDepth.percent}%
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         {sizeLabel && (
           <>
             <span className="status-zoom">{sizeLabel}</span>

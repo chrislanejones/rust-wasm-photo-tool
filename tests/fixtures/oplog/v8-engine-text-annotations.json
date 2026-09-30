@@ -1,0 +1,11 @@
+{
+  "note": "ImageHorseTool::get_text_annotations() output for ONE text with a non-default face and a dragged box. This is what the save path is handed; compare it with v8-archive-edit-record.json, which is what actually reaches disk.",
+  "producedBy": "cargo test against the crate at commit 3325ed0e (OP_FORMAT_VERSION 8): add_text_annotation(..., font_id=\"liberation-serif\") then set_text_wrap_width(id,168) and set_text_box_height(id,96), printing get_text_annotations().",
+  "capturedAtUtc": "2026-09-20",
+  "fieldsTheArchiveDropsToday": [
+    "wrap_width",
+    "box_height",
+    "perspective"
+  ],
+  "engineJson": "[{\"id\":1,\"wrap_width\":168,\"box_height\":96,\"perspective\":[0,0,1,0,1,1,0,1],\"text\":\"wrap me across several lines please\",\"x\":116,\"y\":102,\"font_size\":24,\"r\":0,\"g\":0,\"b\":0,\"bold\":false,\"font_id\":\"liberation-serif\",\"rotation_deg\":0,\"tile_w\":164,\"tile_h\":106,\"tile_offset_x\":0,\"tile_offset_y\":0,\"background_kind\":0,\"bg_r\":255,\"bg_g\":255,\"bg_b\":255,\"bg_a\":255,\"bg_padding\":8,\"bg_corner_radius\":8,\"bg_tail\":135,\"shadow_box\":false,\"shadow_text\":false,\"shadow_r\":0,\"shadow_g\":0,\"shadow_b\":0,\"shadow_a\":0,\"shadow_dx\":0,\"shadow_dy\":0,\"shadow_blur\":0}]"
+}

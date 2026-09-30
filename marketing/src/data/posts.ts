@@ -69,16 +69,67 @@ export interface Post {
 
   /** Social card, site-relative. Falls back to the site default.
    *
-   *  Left unset until the PNG is actually committed. `pnpm gen:og` writes one
-   *  card per post to public/og/blog/<slug>.png — it needs a Chromium
-   *  (`pnpm exec playwright install chromium`) and is deliberately not part of
-   *  `pnpm build`. Point this at "/og/blog/<slug>.png" once that file is in the
-   *  repo, and not before: a route claiming a card that is not there unfurls as
-   *  a broken image, which is worse than the generic one. */
+   *  Left unset until the PNG is actually committed. `pnpm gen:og --posts`
+   *  writes one card per post to public/og/blog/<slug>.png, after a
+   *  `pnpm build` (it reads the built post for the header scene). It needs a
+   *  Chromium (`pnpm exec playwright install chromium`) and is deliberately not
+   *  part of `pnpm build`. Point this at "/og/blog/<slug>.png" once that file
+   *  is in the repo, and not before: a route claiming a card that is not there
+   *  unfurls as a broken image, which is worse than the generic one. */
   ogImage?: string;
 }
 
 export const POSTS: readonly Post[] = [
+  {
+    slug: "entropy-is-the-default",
+    headline: "We spent a month taking the file apart. It got 556 lines longer.",
+    title: "Why refactoring made our biggest file bigger",
+    // The first clause, up to the em dash, is what the social card prints under
+    // the headline (scripts/gen-og-images.mjs). Keeping it short and whole is
+    // deliberate: the previous wording put three lines of mono on the card and
+    // crowded the headline into the wordmark.
+    deck: "Code entropy, measured, and the ratchet that stops it — extraction was working and the file still grew, because features kept arriving. That part is inevitable: entropy is whack-a-mole and you do not win it. What helped was a number allowed to move in one direction.",
+    description:
+      "AppShell went 3,250 to 3,806 lines during the month it was being dismantled, and is still 314 lines above where it started. What code entropy actually looks like, and what a one-way ratchet did and did not fix.",
+    published: "2026-09-28",
+    version: "v9.3",
+    tag: "engineering",
+    // WebP, not the generator's PNG. The card is one still frame of the
+    // header's own scene — `gen:og --posts` screenshots it under
+    // prefers-reduced-motion, so it cannot drift from the banner — and then
+    // compressed at q85: 283,413 B to 36,640 B, 88% off, with the mono
+    // strapline still pixel-clean under a crop comparison. The PNG is kept
+    // beside it as the source the next regeneration overwrites.
+    ogImage: "/og/blog/entropy-is-the-default.webp",
+    sources: [
+      "marketing/src/posts/entropy-is-the-default.tsx",
+      "eslint.config.mjs",
+      "scripts/guardrails.sh",
+      "app/src/app/AppShell.tsx",
+      "app/src/stores/useUIStore.ts",
+    ],
+  },
+  {
+    slug: "offline-by-construction",
+    headline: "The hotel Wi-Fi died. The editor kept running.",
+    title: "Image Horse works offline by construction",
+    deck: "Why an image editor whose engine runs in a Web Worker and whose truth lives in IndexedDB keeps working when the Wi-Fi doesn't — and what that buys a ward, an operating room, or anyone whose work can't wait for a signal.",
+    description:
+      "The engine runs in a Web Worker and the truth lives in IndexedDB, so Image Horse keeps editing when the network drops — measured, not assumed, and built for the hardest network in the building.",
+    published: "2026-09-22",
+    version: "v8.85",
+    tag: "engineering",
+    // WebP, not the generator's PNG: this card was drawn by hand. It ships as
+    // exported, uncompressed, at 49,800 bytes.
+    ogImage: "/og/blog/offline-by-construction.webp",
+    sources: [
+      "marketing/src/posts/offline-by-construction.tsx",
+      "docs/Architecture.md",
+      "app/src/lib/oplogPersistence.ts",
+      "docs/adr/019-opt-in-precache-service-worker.md",
+      "docs/adr/049-the-service-worker-is-blocked-on-eviction-reach-not-the-precache.md",
+    ],
+  },
   {
     slug: "engine-in-a-worker",
     headline: "We moved the engine off the main thread. The pixels stayed put.",
@@ -86,9 +137,10 @@ export const POSTS: readonly Post[] = [
     deck: "How Image Horse moved its Rust engine into a worker without ever sending a frame across a thread boundary — and why the obvious way to do it is impossible.",
     description:
       "The Rust engine behind Image Horse now runs in a Web Worker. Heavy operations blocked the UI for 129–137 ms; they block it for none. Here is what it took.",
-    published: "2026-08-13",
+    published: "2026-09-18",
     version: "v8.32",
     tag: "engineering",
+    ogImage: "/og/blog/engine-in-a-worker.png",
     sources: [
       "marketing/src/posts/engine-in-a-worker.tsx",
       "docs/adr/024-engine-in-a-worker.md",
@@ -106,17 +158,16 @@ export const postFor = (slug: string): Post | undefined => POSTS.find((p) => p.s
 /** `/blog/<slug>` — the one place the URL shape is written down. */
 export const postPath = (post: Post) => `/blog/${post.slug}`;
 
-/** Display form: "13 August 2026".
+/** Display form: "September 18th, 2026".
  *
  *  Parsed off the string rather than through `new Date(iso)`, which reads a
  *  bare ISO date as UTC midnight and renders it in the reader's local zone —
  *  so anyone west of Greenwich sees a post published a day early.
  *
- *  This is deliberately the same shape and the same technique as `fmtDate` in
- *  pages/Trail.tsx, so a date on /blog and a date on /trail-log cannot read
- *  differently. It is duplicated rather than extracted because there are two
- *  of them; if a third appears, that is the moment to lift all three into one
- *  module rather than now. */
+ *  Chris asked for this exact shape (month, ordinal day, year) on 2026-09-22,
+ *  which is deliberately NOT the shape `fmtDate` in pages/Trail.tsx uses
+ *  ("13 August 2026") — the two used to match on purpose; they no longer do,
+ *  and that is a decision, not drift. */
 const MONTHS_FULL = [
   "January",
   "February",
@@ -132,7 +183,24 @@ const MONTHS_FULL = [
   "December",
 ];
 
+/** "18" → "18th". English ordinal suffix: everything in 11–13 is "th"
+ *  regardless of its last digit (the rule the mod-10 switch alone gets
+ *  wrong — 11 is not "11st"). */
+const ordinal = (n: number) => {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+};
+
 export const fmtPostDate = (iso: string) => {
   const [y, m, d] = iso.split("-");
-  return `${parseInt(d, 10)} ${MONTHS_FULL[parseInt(m, 10) - 1]} ${y}`;
+  return `${MONTHS_FULL[parseInt(m, 10) - 1]} ${ordinal(parseInt(d, 10))}, ${y}`;
 };

@@ -4,6 +4,10 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** The undo history's byte budget (512 MB). The status bar's undo-depth
+   *  readout divides it by one whole-image copy — see lib/undoDepth.ts. */
+  export function history_max_bytes(): number;
+
   /** Stroke-stabilizer leash in px for a UI level ("off"/"low"/"med"/"high");
    *  0 = off.
    *
@@ -304,7 +308,6 @@ declare module "stamp_tool" {
     set_source(x: number, y: number): void;
     has_source(): boolean;
     set_brush_size(size: number): void;
-    get_brush_size(): number;
     set_hardness(h: number): void;
     set_opacity(o: number): void;
     set_spacing(s: number): void;
@@ -577,7 +580,6 @@ declare module "stamp_tool" {
       b: number,
     ): void;
     begin_redact_stroke(): void;
-    begin_draw_stroke(label: string): void;
     draw_arrow(
       from_x: number,
       from_y: number,
@@ -603,14 +605,6 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
     ): void;
-    stamp_red(
-      pixels: Uint8Array,
-      src_w: number,
-      src_h: number,
-      dest_x: number,
-      dest_y: number,
-      target_size: number,
-    ): void;
     /** Render text with the embedded Liberation Sans font and composite onto the
      *  buffer. `dest_x/dest_y` is the top-left of the TEXT itself — a background
      *  box (kind 1) grows outward from it by `bg_padding`, text position never
@@ -633,9 +627,15 @@ declare module "stamp_tool" {
       bg_a: number,
       bg_padding: number,
       bg_corner_radius: number,
+      font_id: string,
     ): void;
     /** Returns [width, height] in pixels for the given text, without committing. */
-    measure_text(text: string, font_size: number, bold: boolean): Uint32Array;
+    measure_text(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Uint32Array;
     /** Render a stamp label (bordered, rotated) entirely in Rust and composite centered on dest. */
     commit_red_stamp(
       label: string,
@@ -743,6 +743,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): number;
     update_text_annotation(
       id: number,
@@ -769,7 +770,12 @@ declare module "stamp_tool" {
     text_annotation_count(): number;
     /** [dx, dy] where the first line's glyph ink begins inside the
      *  annotation tile — the overlay↔engine anchor mapping for bg-kind 0. */
-    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    text_ink_offset(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Int32Array;
     /** `text_ink_offset` extended to every background kind: [dx, dy] of the
      *  first line's ink inside the FULL tile (bubble tail margin +
      *  bg_padding included; no-shadow geometry). The overlay↔engine anchor
@@ -781,6 +787,7 @@ declare module "stamp_tool" {
       bold: boolean,
       background_kind: number,
       bg_padding: number,
+      font_id: string,
     ): Int32Array;
     get_text_annotations(): string;
     /** Duplicate a text annotation, offset by (dx, dy). Returns the NEW id,
@@ -827,6 +834,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): boolean;
     push_annotation_to_redo_snapshot(
       snap_idx: number,
@@ -841,23 +849,27 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): boolean;
 
     // Item 9: Crop preview in WASM
     // Uncomment after adding the Rust implementations
-    // preview_crop(x: number, y: number, w: number, h: number): void;
-    // cancel_crop_preview(): boolean;
-    // apply_crop_from_preview(x: number, y: number, w: number, h: number): void;
 
     // Live text annotations (non-destructive overlay layer)
     text_annotation_count(): number;
-    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    text_ink_offset(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Int32Array;
     text_ink_offset_bg(
       text: string,
       font_size: number,
       bold: boolean,
       background_kind: number,
       bg_padding: number,
+      font_id: string,
     ): Int32Array;
     add_text_annotation(
       text: string,
@@ -877,6 +889,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): number;
     update_text_annotation(
       id: number,
@@ -914,6 +927,27 @@ declare module "stamp_tool" {
      *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
      *  generated types, so a drift here type-checks and dies at runtime. */
     set_text_box_height(id: number, box_height: number): boolean;
+    /** Set a text annotation's TYPEFACE and rebuild its tile. `""` restores the
+     *  embedded Liberation Sans. Returns false if `id` isn't on the active
+     *  layer. v8.76.
+     *
+     *  The face is NOT validated: an id this binary has no bytes for renders
+     *  in the fallback but is STILL STORED, so the same document comes back
+     *  correct once `ensureEngineFonts` has registered it. Check `has_font`
+     *  before OFFERING a face, not before setting one.
+     *
+     *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
+     *  generated types, so a drift here type-checks and dies at runtime. */
+    set_text_font(id: number, font_id: string): boolean;
+    /** Hand the engine a TTF/OTF face to rasterise with, under `font_id`.
+     *  Throws (a string) on anything `ab_glyph` cannot read — a truncated
+     *  download, a WOFF2 file, a hostile file. Idempotent: re-registering an
+     *  id already present succeeds and changes nothing, which is what keeps
+     *  `textMetricsCache` sound. v8.76. */
+    register_font(font_id: string, bold: boolean, bytes: Uint8Array): void;
+    /** Whether `font_id` at `bold` will actually be used rather than silently
+     *  falling back to the embedded Liberation Sans. v8.76. */
+    has_font(font_id: string, bold: boolean): boolean;
     /** Set a text annotation's projective corner quad and rebuild its tile
      *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALIZED 0..1
      *  across the tile, in TL/TR/BR/BL order. Returns false for a wrong-length
@@ -1061,7 +1095,6 @@ declare module "stamp_tool" {
     apply_layer_mask(id: number): boolean;
     /** Invert the mask (reveal↔hide). False if it has none. */
     invert_layer_mask(id: number): boolean;
-    has_layer_mask(id: number): boolean;
     /** Paint the active layer's mask with the brush engine. `value` 0=hide, 255=reveal;
      *  `opacity`/`hardness` are 0..1. Creates a white mask first if the layer has none. */
     mask_paint_down(
@@ -1095,8 +1128,6 @@ declare module "stamp_tool" {
     /** Live, non-destructive drag offset for the active layer; recomposite then
      *  renders it shifted by (dx,dy). (0,0) clears it. No history. */
     set_move_preview(dx: number, dy: number): void;
-    /** Discard an in-progress move preview without committing. No history. */
-    cancel_move_preview(): void;
     /** Commit a move of the active layer's pixels + annotations by (dx,dy).
      *  Pushes one "Move Layer" snapshot; a zero delta is a no-op. */
     translate_active_layer(dx: number, dy: number): void;
@@ -1178,6 +1209,14 @@ declare module "stamp_tool" {
       shadow_text: boolean,
       shadow_r: number, shadow_g: number, shadow_b: number, shadow_a: number,
       shadow_dx: number, shadow_dy: number, shadow_blur: number,
+      font_id: string,
+      /** Reflow width in px; 0 = size the box to the text. ADR-060. */
+      wrap_width: number,
+      /** Box height in px; 0 = size the box to the text. ADR-060. */
+      box_height: number,
+      /** Flat [x0,y0,x1,y1,x2,y2,x3,y3] normalized quad. Any length but 8 is
+       *  read as the identity, which is what every pre-v8.81 archive means. */
+      perspective: Float32Array,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;
@@ -1206,12 +1245,6 @@ declare module "stamp_tool" {
       number: number, r: number, g: number, b: number,
       label_kind: number,
     ): number;
-    /** Add a freehand/polyline pen (kind 6). `points` is a flat [x0,y0,x1,y1,…] array. Pushes "Add Pen". */
-    add_polyline_annotation(
-      points: Float64Array,
-      color_hex: string,
-      stroke_width: number,
-    ): number;
     /** Restore a persisted polyline WITHOUT pushing history. Color is raw r,g,b. */
     restore_polyline_annotation(
       points: Float64Array,
@@ -1235,8 +1268,6 @@ declare module "stamp_tool" {
       fill_kind: number,
       fill_r: number, fill_g: number, fill_b: number, fill_a: number,
     ): number;
-    /** Replace just the control points of an annotation (no history) — live drag-edit. */
-    set_annotation_points(id: number, points: Float64Array): void;
     /** Commit a Bézier-path reshape + restyle: snapshot "Edit Pen Path", replace
      *  points, and apply stroke color/width + solid Background fill (fill_kind
      *  0 = none, 1 = solid fill_color_hex) so reselecting a path can fill it. */
@@ -1382,6 +1413,37 @@ declare module "stamp_tool" {
     /** Current selection as an RGBA overlay (empty if nothing selected). */
     selection_overlay(): Uint8Array;
     has_selection(): boolean;
+    /** `[selected, total]` pixels — the "Selected 18.4% · 2.1 MP" readout.
+     *  One count over the selection plane; `[0, w*h]` with nothing selected. */
+    selection_coverage(): Uint32Array;
+    /** Whether `selection_retune` would re-run anything: the last selection
+     *  was a wand / edge-aware / color-range click and nothing has touched the
+     *  history since. */
+    selection_can_retune(): boolean;
+    /** Re-run the last click-once selection from the same seed with a new
+     *  tolerance (and edge threshold, for edge-aware) — the live Tolerance
+     *  slider. Replaces that click's result in place: combines with the
+     *  selection from BEFORE the click and pushes no undo step of its own.
+     *  Returns the overlay RGBA; empty when the result selects nothing OR
+     *  there was nothing to re-run — re-read `selection_overlay` to tell. */
+    selection_retune(tolerance: number, edge_threshold: number): Uint8Array;
+    /** Refine preview on a COPY (islands, holes, smooth radius, signed
+     *  expand): the overlay the refined selection would draw. The selection
+     *  and history are untouched. Empty when the result selects nothing. */
+    selection_refine_preview(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** `[selected, total]` of the last refine preview — the readout while a
+     *  Refine slider moves. */
+    selection_refine_preview_coverage(): Uint32Array;
+    /** Drop the refine preview copy. */
+    selection_refine_cancel(): void;
+    /** Apply the refine ops: ONE undo step ("Refine Selection"), recomputed
+     *  from the parameters. Returns the overlay. */
+    selection_refine_apply(islands: number, holes: number, smooth: number, expand: number): Uint8Array;
+    /** Add a mask to layer `id` from `source`: 0 reveal all, 1 hide all,
+     *  2 reveal the selection, 3 hide the selection. `feather` softens the
+     *  selection's edge (2 and 3). One undo step. False if the layer is
+     *  missing or already masked, or 2/3 with nothing selected. */
+    add_layer_mask_from(id: number, source: number, feather: number): boolean;
     /** Deselect (no history). */
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
@@ -1401,7 +1463,7 @@ declare module "stamp_tool" {
     selection_union(mask: Uint8Array): boolean;
     selection_subtract(mask: Uint8Array): boolean;
     /** Combine mode for the NEXT producer call: 0 = replace, 1 = union,
-     *  2 = subtract (clamped). The producers (wand / edge / color-range /
+     *  2 = subtract, 3 = intersect (clamped). The producers (wand / edge / color-range /
      *  lasso-close) route their mask through this so Shift/Alt-drag adds or
      *  subtracts instead of replacing. Reset to 0 after each use is the
      *  caller's job. */

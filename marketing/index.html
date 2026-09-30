@@ -20,16 +20,20 @@
     <!-- seo:end -->
 
     <meta name="theme-color" content="#1b1210" />
-    <link rel="icon" href="/Image-Horse-Logo.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Self-hosted, and preloaded so they arrive with the stylesheet instead of
+         after it. The @font-face rules are in src/tokens.css. These were a
+         Google Fonts <link>, a render-blocking stylesheet on a second origin
+         (Lighthouse estimated about 0.9 s of mobile first paint), and the
+         late swap reflowed the headline: 701 to 882 px wide at 1.4 s on a
+         local desktop load. Only the latin files are preloaded, since every
+         page needs them. The latin-ext files load only when a page uses a
+         character from that range. -->
+    <link rel="preload" href="/fonts/geist-latin-v5.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-latin-v24.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>

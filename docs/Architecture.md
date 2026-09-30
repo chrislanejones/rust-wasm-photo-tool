@@ -104,7 +104,7 @@
 │  │                                                               │ │
 │  │  users · subscriptions · projects · images · layers ·         │ │
 │  │  annotations · history · recent_texts · user_colors ·         │ │
-│  │  photo_edits · shares · ai_jobs                               │ │
+│  │  photo_edits · shares · ai_jobs · sync_docs                   │ │
 │  │                                                               │ │
 │  │  Auth via Clerk (AUTH_ENABLED false path = fully local)       │ │
 │  └───────────────────────────────────────────────────────────────┘ │
@@ -276,7 +276,7 @@ recording and persistence detail.
 [ADR-033](adr/033-the-text-box-has-a-height-and-the-op-log-goes-to-v4.md)
 named — [ADR-034](adr/034-perspective-is-projective-and-text-keeps-its-corners.md)
 took it to 5 for the text perspective quads, and
-[ADR-053](adr/053-a-shapes-perspective-is-normalized-over-its-bbox-and-its-tile-is-padded.md)
+[ADR-053](adr/053-a-shapes-perspective-is-normalised-over-its-bbox-and-its-tile-is-padded.md)
 to 6 for the SHAPE quads. `OP_FORMAT_VERSION` in `src/ops.rs`
 is the value; v2 through v5 blobs all still decode through the one path, and
 that prefix-extension property is pinned by tests
@@ -302,6 +302,43 @@ still describes only the original three stores and predates
 `useAnnotationStore`/`useGuidesStore` — flagged stale, out of scope for
 this pass).
 
+### Sync: one document, every tab and every signed-in device
+
+Settings, the remembered UI choices and the tool modes are replicated
+as three canonically-serialized JSON **documents** (`prefs`, `ui`,
+`tools`) by `app/src/lib/sync/`. Two hops, and they are not the same
+hop: a `BroadcastChannel` carries a change to every other tab on this
+device instantly, needs no account and works offline — it is the only
+sync a signed-out user gets, and it is a real one — while a single
+reactive Convex query over the generic `sync_docs` table carries it to
+the user's other devices when signed in. Both land through the same
+`adopt` on the same document, so there is exactly one code path by
+which app state changes from outside.
+
+The only decision the layer makes is `reconcile(local, remote) →
+adopt | push | hold | idle`, which is pure, imports nothing, and is
+enumerated in `reconcile.test.ts`. Revisions decide it; the clock is
+only a tiebreak when two devices both changed a document. A document
+is pushed only when it is locally **dirty** (changed here, signed in,
+never sent), and that pending change lives in a per-account ledger in
+localStorage — shared by every tab, kept across a reload, and never
+owed to an account other than the one it was made in. `sync:push` is a
+compare-and-set on the revision the change was based on, so a
+mutation Convex queued offline cannot land on top of newer work. Only
+the tab holding the "Use Image Horse here?" claim talks to the server.
+
+⚠️ **The photo archive is deliberately outside this layer** — see
+`lib/sync/docs.ts` and [ADR-061](adr/061-sync-is-a-document-layer-and-the-archive-is-not-in-it.md).
+Replicating edits is a different problem, and it is blocked on the
+open op-log entry in [PARKING_LOT.md](PARKING_LOT.md).
+
+`lib/preferences.ts` used to hold its own Convex pull/push against
+`users.settings`; that field is legacy now, adopted while an account
+has no `prefs` row and ignored after one exists. "Forget the synced
+copy" turns every document into a `value: null` marker and clears it. `user_colors` and
+`recent_texts` keep their own tables — a row per item is the right
+shape for a capped list, and a whole-document blob is not.
+
 ### Persistence: Dexie originals read-through
 
 Original photo bytes are content-addressed (SHA-256) and read through
@@ -316,9 +353,10 @@ everything to legacy-only. Shipped v7.5. See
 
 ### SVG import: rasterize at the boundary
 
-Chrome's `createImageBitmap()` cannot decode SVG, and the security
-firewall (`lib/security/imageFirewall.ts`) rejects raw SVG outright
-(it can carry `<script>`/`onload`/`foreignObject`). SVGs are converted
+Chrome's `createImageBitmap()` cannot decode SVG, and raw SVG is never
+handed to the decoder (it can carry `<script>`/`onload`/`foreignObject`;
+the `lib/security/imageFirewall.ts` this used to cite no longer exists,
+so the boundary below is the only guard). SVGs are converted
 to PNG at both import funnels via `lib/rasterizeSvg.ts` — loaded into
 an `<img>` (scripts never execute there), drawn to a canvas, only the
 pixels kept. The stored gallery "original" is the PNG, not the SVG
@@ -383,7 +421,7 @@ a shipped GPU accelerator is describing something that is not in this tree.
 
 ### Metadata scrub (Settings → Security)
 
-Every export path can strip EXIF/GPS/XMP/IPTC (`lib/exif.ts`,
+Every export path can strip EXIF/GPS/XMP/IPTC (`lib/exif/`,
 dependency-free, JPEG/PNG/WebP) before pixels leave the device; a
 `'location'` mode removes just GPS and keeps camera/lens/timestamp. See
 [ADR-010](adr/010-metadata-scrub-privacy-modes.md).
@@ -422,6 +460,10 @@ editing path.
 - **Annotations** — arrow/shape/text commits save geometry/color/
   timestamp to the Convex `annotations` table for cross-session
   recovery.
+- **Synced documents** — `convex/sync.ts` stores one canonical JSON
+  blob per (user, key) in `sync_docs`, and knows nothing about what is
+  in them. Everything that decides anything lives on the client; see
+  "Sync" above.
 - **AI Jobs Pipeline** — UI triggers → `convex/aiJobs.ts` /
   `convex/ai.ts` call Replicate → webhook updates status → `useQuery`
   auto-updates the UI → result loaded into WASM memory.

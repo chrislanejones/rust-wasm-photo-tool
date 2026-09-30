@@ -1,5 +1,7 @@
 import * as React from "react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReasonNote } from "@/components/ui/status-note";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,12 +27,16 @@ import { cn } from "@/lib/utils";
  * cost more vertical room than it buys, and it would need a second scroll
  * container to sit outside of.
  *
- * NO ICONS. Crop carried a `<Crop/>`, Color Picker a `<Pipette/>` and Remove
+ * ICONS ARE OPT-IN (`icon`). Crop carried a `<Crop/>`, Color Picker a `<Pipette/>` and Remove
  * Object an `<Eraser/>`; the other three carried none. The label is doing the
  * work in every one of them ("Apply Crop" does not need a picture of a crop),
  * and one icon among six is how the drift this file exists to end got started.
- * If an action ever genuinely needs a glyph, `children` still takes one — but
- * it should be the odd one out for a reason, not by inheritance.
+ * The default is still none. The one place that opts in is the Download
+ * dialog (Chris, 09-30-2026: "add icons in front of this"), where three
+ * different verbs — save a file, make a link, copy to the clipboard — sit in a
+ * row and the glyph is how you tell them apart at a glance. Pass `icon`; do
+ * not hand-place an svg in `children`, so every glyph gets the same size and
+ * the same aria-hidden.
  */
 
 /** Two-up layouts push the pair APART (Chris, 2026-09-16): the secondary hugs
@@ -39,22 +45,39 @@ import { cn } from "@/lib/utils";
  *  ("Resize canvas → 1920×1080") and under `flex-1` it wrapped to three lines
  *  and dragged its sibling to the same height (measured: 54px → 70px for BOTH
  *  buttons the moment the target dimensions changed). */
-type PanelActionBarLayout = "full" | "split";
+type PanelActionBarLayout = "full" | "split" | "halves" | "thirds";
+
+/** The id of the bar's reason line, while one renders. A `PanelAction` that
+ *  is disabled picks it up as `aria-describedby`, so the sentence under the
+ *  bar is also what a screen reader hears on the dead button. */
+const ReasonIdContext = React.createContext<string | undefined>(undefined);
 
 interface PanelActionBarProps {
   /** `full` (default) — one action, full width. `split` — two actions pushed
-   *  to opposite edges, secondary first in source order. */
+   *  to opposite edges, secondary first in source order. `halves` — two
+   *  actions side by side, 50% each; only for SHORT fixed labels, since a
+   *  label wider than its half overflows instead of wrapping. `thirds` —
+   *  three equal tracks (the Download dialog's Download / Share / Clipboard);
+   *  labels there may wrap, so keep them to two words. */
   layout?: PanelActionBarLayout;
+  /** Why the action(s) cannot run right now — "Drag a crop box on the
+   *  canvas first." Visible text under the bar (a tooltip would not show on
+   *  touch, and a disabled button gets no hover anyway). Pass it only while
+   *  the action is disabled; a reason under a live button is noise. */
+  reason?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }
 
 export function PanelActionBar({
   layout = "full",
+  reason,
   children,
   className,
 }: PanelActionBarProps) {
-  return (
+  const baseId = React.useId();
+  const reasonId = reason ? `${baseId}-reason` : undefined;
+  const bar = (
     <div
       className={cn(
         layout === "full"
@@ -63,7 +86,16 @@ export function PanelActionBar({
             // action itself having to carry `w-full` (which would then have to
             // be un-set for the split layout).
             "grid"
-          : [
+          : layout === "halves"
+            ? // Two equal tracks; each action stretches to fill its own half.
+              // Canvas Size (Chris, 09-24-2026: "50% and 50% width").
+              "grid grid-cols-2 gap-2"
+            : layout === "thirds"
+              ? // Three equal tracks — the Download dialog's Download / Share
+                // link / Clipboard. Unlike halves, a label may wrap onto a
+                // second line on a narrow phone rather than overflow.
+                "grid grid-cols-3 gap-2 [&>*]:min-w-0 [&>*]:whitespace-normal"
+            : [
               // `justify-between` is the two-on-one-line case. `flex-wrap` plus
               // the last child's `ml-auto` is the OVERFLOW case: a pair too wide
               // for a 226px sidebar column drops the primary onto its own row
@@ -79,6 +111,15 @@ export function PanelActionBar({
     >
       {children}
     </div>
+  );
+  if (!reason) return bar;
+  return (
+    <ReasonIdContext.Provider value={reasonId}>
+      <div className="space-y-2">
+        {bar}
+        <ReasonNote id={reasonId}>{reason}</ReasonNote>
+      </div>
+    </ReasonIdContext.Provider>
   );
 }
 
@@ -111,17 +152,22 @@ export interface PanelActionProps
    *  for a plain action: `aria-pressed="false"` on a button that does not
    *  toggle tells a screen reader the wrong thing. */
   pressed?: boolean;
+  /** A lucide glyph in front of the label. Decorative: the label is the name. */
+  icon?: LucideIcon;
 }
 
 export const PanelAction = React.forwardRef<
   HTMLButtonElement,
   PanelActionProps
->(({ className, tone = "default", pressed, ...props }, ref) => (
+>(({ className, tone = "default", pressed, icon: Icon, children, ...props }, ref) => {
+  const reasonId = React.useContext(ReasonIdContext);
+  return (
   <Button
     ref={ref}
     size="large"
     type="button"
     aria-pressed={pressed}
+    aria-describedby={props.disabled ? reasonId : undefined}
     className={cn(
       // `whitespace-nowrap` + `shrink-0` is what makes the split layout wrap
       // the BUTTON rather than the button's text: without it both actions
@@ -133,6 +179,10 @@ export const PanelAction = React.forwardRef<
       className,
     )}
     {...props}
-  />
-));
+  >
+    {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+    {children}
+  </Button>
+  );
+});
 PanelAction.displayName = "PanelAction";

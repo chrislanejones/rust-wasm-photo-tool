@@ -7,6 +7,11 @@ import path from "path";
 // fights styles.css for no gain.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // The footer's copyright year. Stamped once per build so the client and
+    // SSR bundles (built by the same `pnpm build`) print the same year.
+    __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -17,6 +22,12 @@ export default defineConfig({
     // and the dispatcher is null: "Cannot read properties of null (reading
     // 'useContext')" the moment a hook runs.
     dedupe: ["react", "react-dom", "react-router"],
+  },
+  build: {
+    // scripts/prerender.mjs reads this to find each page's chunk (and any CSS
+    // it imports) and link it from that page's HTML. It deletes the file once
+    // read, so it never ships.
+    manifest: true,
   },
   ssr: {
     // Bundle EVERYTHING into dist-ssr/entry-server.js rather than leaving bare

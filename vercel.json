@@ -4,6 +4,7 @@
   "installCommand": "export PATH=\"${CARGO_HOME:-$HOME/.cargo}/bin:$PATH\" && rustup show && cargo install wasm-pack --version 0.15.0 --locked && pnpm install",
   "buildCommand": "export PATH=\"${CARGO_HOME:-$HOME/.cargo}/bin:$PATH\" && bash ./scripts/build-wasm.sh && pnpm --filter stamp-tool build && bash ./scripts/write-build-info.sh www-dist",
   "outputDirectory": "www-dist",
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh marketing/ docs/ .design-sync/ .github/ e2e/ tests/ benches/ '*.md'",
   "rewrites": [
     {
       "source": "/((?!_vercel/).*)",
@@ -36,5 +37,10 @@
         }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  }
 }

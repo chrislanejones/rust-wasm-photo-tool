@@ -9,3 +9,11 @@
 // This is Vite's own convention rather than a cast at the call site: the types
 // come from the installed Vite version, so they stay correct across upgrades and
 // every future `import.meta.env` read is covered without another local fix.
+
+/** The year of the build, from `define` in vite.config.ts. */
+declare const __BUILD_YEAR__: number;
+
+interface ImportMetaEnv {
+  /** Public Web3Forms key for /contact — see WEB3FORMS_KEY in config.ts. */
+  readonly VITE_WEB3FORMS_KEY?: string;
+}

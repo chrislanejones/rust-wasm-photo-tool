@@ -1,7 +1,8 @@
 //! Operation log — a serializable, replayable history of edits over a
 //! single-layer document.
 //!
-//! Feature-gated behind `tiles`; not part of the default wasm build. The log
+//! Feature-gated behind `tiles`, which the shipped wasm is built with
+//! (`scripts/build-wasm.sh`; ADR-017). The log
 //! is the source of truth for undo/redo and content-addressed persistence:
 //! every edit is an [`Op`], appended in order, with periodic keyframe
 //! snapshots so replay does not have to start from scratch.
@@ -139,8 +140,58 @@ use serde::{Deserialize, Serialize};
 /// A v6 document decodes with every shape firm — exactly what a v6 document
 /// meant.
 ///
-/// **8** — shape ROTATION and the star's POINT COUNT: the same move a sixth
-/// time, for two fields at once.
+/// **8** — v8.8x, the font selector: text annotations gained a `font_id`
+/// naming the typeface the engine rasterises them with. The recipe a SIXTH
+/// time, clause for clause:
+///
+///   * `font_id` is `#[serde(skip)]` on [`TextParams`], so the struct's wire
+///     layout is STILL byte-identical to v2's.
+///   * The face rides in an APPENDED variant ([`Op::TextFont`]), after
+///     `ShapeSloppiness`, so no existing variant is renumbered.
+///   * `encode_annotations` gained a NINTH trailing element, keeping v8 blobs
+///     a strict prefix-extension of v7 ones.
+///
+/// ⚠️ This step was WRITTEN as v6, on a branch that then sat unmerged while
+/// v6 and v7 shipped for shapes. `TextFont` was moved to the END of the enum
+/// on merge rather than left where the branch put it: the two shape variants
+/// are on users' disks and `TextFont` never was, so the only renumbering that
+/// costs anything is the one that did not happen.
+///
+/// A v7 document decodes with every `font_id` empty — the embedded Liberation
+/// Sans, which is the only face that existed when it was written and therefore
+/// exactly what it meant. Pinned by `v7_blobs_still_decode_under_v8`.
+///
+/// ⚠️ The skipped-field default and the semantic default AGREE here, unlike
+/// the quad (see `default_quad_if_unset`). `String::default()` is `""`, and
+/// `""` is defined by `fonts::DEFAULT_FONT_ID`'s contract to mean the embedded
+/// face. That is why this step needs no promoting function — but it is a
+/// property to check, not to assume, the next time a field is added.
+///
+/// ## v8.81 fixed a text-settings loss and DELIBERATELY DID NOT BUMP THIS
+///
+/// ADR-060. `Op::TextEdit` / `Op::ShapeEdit` used to REPLACE the annotation
+/// they name, which reset the four `#[serde(skip)]` axes to their decode
+/// defaults — so the typeface and the box a user set were erased by the next
+/// edit, and only on reload, because only replay runs `apply`. Applying those
+/// two ops now MERGES (see `TextParams::carry_skipped_from`).
+///
+/// **No version number was taken, and that is the decision, not an oversight.**
+/// A bump is for a change in what the BYTES are; this is a change in what the
+/// engine does with bytes it was already reading, and the wire layout is
+/// untouched — a v8 writer and this reader still agree frame for frame. Taking
+/// a number here would have cost every existing log (`decode_op` accepts
+/// `2..=OP_FORMAT_VERSION`, so v9 bytes are unreadable by every shipped build,
+/// and PR #187 needs v9 for a change that genuinely IS new bytes).
+///
+/// The honest cost is that v8 bytes now replay differently than they did under
+/// v8.80. That is intended and it is the repair: the old replay lost data the
+/// log demonstrably contained, so every existing log comes back MORE like what
+/// its user saw, never less. Pinned on real captured production bytes by
+/// `tests/oplog_v8_text_settings_replay.rs` and `tests/oplog_v7_v8_fixture_resume.rs`.
+///
+/// **9** — shape ROTATION and the star's POINT COUNT: the same move a seventh
+/// time, for two fields at once. (ADR-070: #187 was written as v8, and v8 had
+/// shipped for the typeface by the time it merged.)
 ///
 ///   * `rotation_deg` and `star_points` are both `#[serde(skip)]` on
 ///     [`ShapeParams`], so the `ShapeAdd`/`ShapeEdit` wire layout is still
@@ -149,23 +200,18 @@ use serde::{Deserialize, Serialize};
 ///     star (`annotations::canonical_star_points`) — so, like sloppiness, no
 ///     normalization step is needed on decode.
 ///   * The values ride in two APPENDED variants, [`Op::ShapeRotation`] and
-///     [`Op::ShapeStarPoints`], after `ShapeSloppiness`, so no existing
-///     variant is renumbered.
-///   * `encode_annotations` gained a NINTH (per-shape rotation) and a TENTH
-///     (per-shape star points) tuple element, keeping v8 blobs a strict
-///     prefix-extension of v7.
+///     [`Op::ShapeStarPoints`], after `TextFont` (indices 19 and 20), so no
+///     existing variant is renumbered.
+///   * `encode_annotations` gained a TENTH (per-shape rotation) and an
+///     ELEVENTH (per-shape star points) tuple element after v8's fonts,
+///     keeping v9 blobs a strict prefix-extension of v8.
 ///
-/// A v7 document decodes with every shape unrotated and every star
-/// five-pointed — exactly what a v7 document meant. Pinned by
-/// `v7_blobs_still_decode_under_v8` and `v7_op_bytes_still_decode_under_v8`.
-/// (`decode_annotations` reads v8 as the v7 prefix plus a two-vector tail —
-/// the same bytes as the 10-tuple `encode_annotations` writes.)
-///
-/// v8 also changes what `Op::ShapeEdit` MEANS on replay, without changing its
-/// bytes: it now leaves the four skipped fields (quad, sloppiness, rotation,
-/// star points) as they were, because a decoded ShapeEdit carries only their
-/// defaults and replaying it used to wipe them. See `apply`.
-pub const OP_FORMAT_VERSION: u8 = 8;
+/// A v7 or v8 document decodes with every shape unrotated and every star
+/// five-pointed — exactly what it meant. Pinned by
+/// `v7_blobs_still_decode_under_v9`, `v8_blobs_still_decode_under_v9` and
+/// `tests/oplog_v7_v8_fixture_resume.rs`, which replays real captured bytes
+/// and must pass unedited: a `TextFont` frame sits at index 18 in them.
+pub const OP_FORMAT_VERSION: u8 = 9;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -283,6 +329,16 @@ pub struct TextParams {
     /// the identity — exactly what every pre-v8.42 annotation meant.
     #[serde(skip)]
     pub perspective: [(f32, f32); 4],
+    /// Typeface id; `""` = the embedded Liberation Sans. v8.76.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width`, `box_height` and `perspective` above — read that
+    /// comment, it applies word for word. The face travels beside the struct
+    /// instead: as the seventh element of `encode_annotations`, and as
+    /// [`Op::TextFont`] in the log. Deserialises to `""`, which is exactly
+    /// what every pre-v8.76 annotation meant.
+    #[serde(skip)]
+    pub font_id: String,
 }
 
 /// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
@@ -410,7 +466,43 @@ impl TextParams {
             shadow_dx: a.shadow_dx,
             shadow_dy: a.shadow_dy,
             shadow_blur: a.shadow_blur,
+            font_id: a.font_id.clone(),
         }
+    }
+
+    /// Carry the four `#[serde(skip)]` fields over from the annotation this
+    /// payload is about to replace — ADR-060.
+    ///
+    /// ⚠️ THIS IS WHAT MAKES `Op::TextEdit` NON-DESTRUCTIVE, and it is not a
+    /// nicety. `wrap_width`, `box_height`, `perspective` and `font_id` are
+    /// `#[serde(skip)]` (see the fields' comments — they have to be, or every
+    /// `TextAdd`/`TextEdit` payload already on a user's disk mis-decodes), so
+    /// an encoded `TextEdit` **physically cannot carry them**. What comes back
+    /// out of `postcard` is therefore not "the user chose the default" — it is
+    /// *no information at all*, and a replace that honored it silently reset
+    /// the typeface and the box on every text edit.
+    ///
+    /// Measured on a captured production log (`tests/fixtures/oplog/`): a
+    /// `TextFont` then a `TextWrap` established `liberation-serif` / 299 px,
+    /// and the next `TextEdit` put them back to `""` / 0. That is the reload
+    /// bug this method fixes, and the same bytes replay correctly with it.
+    ///
+    /// Resetting a setting to its default is still representable — that is the
+    /// property that makes the absent value safe to ignore here.
+    /// `annotation_sync_ops` emits `TextFont { font_id: "" }` /
+    /// `TextWrap { wrap_width: 0 }` whenever the live value differs from the
+    /// log's, *including* when the new value is the default. So every genuine
+    /// reset rides its own op and nothing depends on `TextEdit` clearing
+    /// anything.
+    /// `prev` is `&mut` and `font_id` is MOVED out of it rather than cloned:
+    /// the only caller overwrites `prev` with `self` on the next line, so the
+    /// emptied string is never observable, and replaying a long log stops
+    /// allocating one `String` per `TextEdit`.
+    fn carry_skipped_from(&mut self, prev: &mut TextParams) {
+        self.wrap_width = prev.wrap_width;
+        self.box_height = prev.box_height;
+        self.perspective = prev.perspective;
+        self.font_id = std::mem::take(&mut prev.font_id);
     }
 }
 
@@ -485,6 +577,29 @@ impl ShapeParams {
             perspective: crate::perspective::NormQuad(self.perspective),
         }
     }
+
+    /// The shape twin of [`TextParams::carry_skipped_from`] — ADR-060. Read
+    /// that doc comment; it applies word for word, with `sloppiness`,
+    /// `perspective`, `rotation_deg` and `star_points` as the four
+    /// `#[serde(skip)]` fields an encoded `Op::ShapeEdit` physically cannot
+    /// carry.
+    ///
+    /// It is fixed here at the same time as the text one deliberately. The
+    /// comment on `annotation_sync_ops` says the four skipped axes are
+    /// "handled identically below; keep them that way, because one of them
+    /// being forgotten is the failure this comment exists to prevent" — and a
+    /// merge rule that held for text and not for shapes would be exactly that
+    /// failure, waiting for the first log that edits a sketchy shape after
+    /// drawing it. No such log has shipped yet only because `ShapeSloppiness`
+    /// is new; the defect is the same age as `ShapeEdit`.
+    fn carry_skipped_from(&mut self, prev: &ShapeParams) {
+        self.sloppiness = prev.sloppiness;
+        self.perspective = prev.perspective;
+        // v9 (ADR-070): rotation and star points are the other two
+        // `#[serde(skip)]` axes, owned by `ShapeRotation` / `ShapeStarPoints`.
+        self.rotation_deg = prev.rotation_deg;
+        self.star_points = prev.star_points;
+    }
 }
 
 /// Diff live annotation lists against the log's document and return the ops
@@ -527,23 +642,24 @@ pub(crate) fn annotation_sync_ops(
     }
     for a in texts {
         let params = TextParams::from_annotation(a);
-        // ⚠️ `TextParams::wrap_width`, `box_height` AND `perspective`
-        // are all `#[serde(skip)]` (they have to be — see the fields'
-        // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
-        // any of them. Every such change therefore needs its own
-        // `TextWrap` / `TextBoxHeight` / `TextPerspective` op, or
-        // replay rebuilds the text unboxed and unwarped, the composite
-        // hash diverges, and the log marks itself broken — silently
-        // falling the user back to snapshot undo. The three are handled
-        // identically; keep them that way, because one of them being
-        // forgotten is the failure this comment exists to prevent.
-        // (v8.42 added the third; the comment said "two axes" and this
-        // is what following it looks like.)
+        // ⚠️ `TextParams::wrap_width`, `box_height`, `perspective` AND
+        // `font_id` are all `#[serde(skip)]` (they have to be — see the
+        // fields' comments), so `TextAdd`/`TextEdit` physically CANNOT
+        // carry any of them. Every such change therefore needs its own
+        // `TextWrap` / `TextBoxHeight` / `TextPerspective` / `TextFont`
+        // op, or replay rebuilds the text unboxed, unwarped and in the
+        // wrong typeface, the composite hash diverges, and the log marks
+        // itself broken — silently falling the user back to snapshot
+        // undo. The four are handled identically; keep them that way,
+        // because one of them being forgotten is the failure this comment
+        // exists to prevent, and it has already happened twice (v8.42
+        // added the third, v8.8x the fourth).
         match log_doc.texts.iter().find(|t| t.id == a.id) {
             None => {
                 let wrap = params.wrap_width;
                 let box_h = params.box_height;
                 let quad = params.perspective;
+                let font = params.font_id.clone();
                 pending.push(Op::TextAdd(params));
                 if wrap != 0 {
                     pending.push(Op::TextWrap {
@@ -565,6 +681,14 @@ pub(crate) fn annotation_sync_ops(
                 if !crate::perspective::is_identity(&quad) {
                     pending.push(Op::TextPerspective { id: a.id, quad });
                 }
+                // "" is the embedded face — same "unset means the
+                // default" shape as `wrap == 0`.
+                if !font.is_empty() {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: font,
+                    });
+                }
             }
             Some(t) => {
                 if t.wrap_width != params.wrap_width {
@@ -585,7 +709,13 @@ pub(crate) fn annotation_sync_ops(
                         quad: params.perspective,
                     });
                 }
-                // Compare everything EXCEPT the three skipped fields,
+                if t.font_id != params.font_id {
+                    pending.push(Op::TextFont {
+                        id: a.id,
+                        font_id: params.font_id.clone(),
+                    });
+                }
+                // Compare everything EXCEPT the four skipped fields,
                 // which the branches above already accounted for —
                 // otherwise a box-only drag would also emit a redundant
                 // TextEdit (and `TextParams` derives PartialEq over the
@@ -595,6 +725,7 @@ pub(crate) fn annotation_sync_ops(
                 without_box.wrap_width = params.wrap_width;
                 without_box.box_height = params.box_height;
                 without_box.perspective = params.perspective;
+                without_box.font_id = params.font_id.clone();
                 if without_box != params {
                     pending.push(Op::TextEdit(params));
                 }
@@ -809,14 +940,29 @@ pub enum Op {
     /// itself broken over. Reuse the rationale on [`Op::TextWrap`]: appended,
     /// never inserted, so the variants already on disk keep their indices.
     ShapeSloppiness { id: u32, sloppiness: u8 },
-    /// v8 — a shape's rotation in degrees, clockwise about its bbox center,
-    /// normalized to (-180, 180]. The sixth of the appended family, for the
+    /// v8.8x — a text annotation's TYPEFACE. `""` is the embedded Liberation
+    /// Sans; anything else names a face registered via `register_font`.
+    ///
+    /// Appended after [`Op::ShapeSloppiness`], for the sixth time, for the
+    /// reason spelled out on [`Op::TextWrap`]: postcard indexes enum variants
+    /// positionally, so appending is invisible to every op already on a user's
+    /// disk and inserting would renumber all of them. It sits LAST rather than
+    /// beside `PerspectiveWarp` where its branch first put it — see the ⚠️ on
+    /// [`OP_FORMAT_VERSION`]'s **8**.
+    ///
+    /// A `String`, not an index — replaying a log on a machine with a
+    /// different set of faces registered must mean "this face is missing", not
+    /// "this is a different face". `fonts::with_face` turns a missing one into
+    /// a visible fallback rather than a failed replay.
+    TextFont { id: u32, font_id: String },
+    /// v9 — a shape's rotation in degrees, clockwise about its bbox center,
+    /// normalized to (-180, 180]. The seventh of the appended family, for the
     /// reason on [`Op::ShapeSloppiness`]: `#[serde(skip)]` on
     /// [`ShapeParams::rotation_deg`] means `ShapeAdd`/`ShapeEdit` cannot carry
     /// it. Appended, never inserted.
     ShapeRotation { id: u32, rotation_deg: f64 },
-    /// v8 — a star's point count, canonical (0 = the classic five, else
-    /// 3..=12). Appended after [`Op::ShapeRotation`]; same rule, same reason.
+    /// v9 — a star's point count, canonical (0 = the classic five, else
+    /// 3..=12). Appended after [`Op::ShapeRotation`] (which follows `TextFont`); same rule, same reason.
     ShapeStarPoints { id: u32, star_points: u8 },
 }
 
@@ -855,6 +1001,10 @@ impl Op {
             // Same reasoning as ShapePerspective: a sloppiness change is a
             // style decision the user made in the panel, worth its own entry.
             Op::ShapeSloppiness { .. } => "Edit Shape",
+            // Its OWN label, like TextPerspective and unlike TextWrap: picking
+            // a typeface is a deliberate styling choice the user will want to
+            // find in the History panel, not a by-product of dragging a box.
+            Op::TextFont { .. } => "Text Font",
             // Its own verb, like "Perspective": rotating is a gesture on the
             // canvas handle, not a panel restyle, and the History panel is
             // where the user goes to find that step again.
@@ -1029,8 +1179,10 @@ pub fn encode_annotations(
     // index — the eighth element, same trick. `ShapeParams::sloppiness` is
     // `#[serde(skip)]`, so this tuple is the ONLY place a keyframe carries it:
     // the op log still mirrors it with `Op::ShapeSloppiness` appended frames.
-    // v8 appends the per-shape ROTATION (degrees) as the ninth element and the
-    // per-shape STAR POINTS (canonical u8) as the tenth — same trick, same
+    // v8 appends the per-TEXT typeface ids — the ninth element, parallel to
+    // `texts` by index, same trick again.
+    // v9 appends the per-shape ROTATION (degrees) as the tenth element and the
+    // per-shape STAR POINTS (canonical u8) as the eleventh — same trick, same
     // reason: both fields are `#[serde(skip)]`, so these vectors are the only
     // place a keyframe carries them.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
@@ -1038,6 +1190,7 @@ pub fn encode_annotations(
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
     let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
     let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+    let fonts: Vec<&str> = texts.iter().map(|t| t.font_id.as_str()).collect();
     let shape_rotations: Vec<f64> = shapes.iter().map(|s| s.rotation_deg).collect();
     let shape_star_points: Vec<u8> = shapes.iter().map(|s| s.star_points).collect();
     if let Ok(body) = postcard::to_allocvec(&(
@@ -1049,6 +1202,7 @@ pub fn encode_annotations(
         &quads,
         &shape_quads,
         &shape_sloppiness,
+        &fonts,
         &shape_rotations,
         &shape_star_points,
     )) {
@@ -1080,7 +1234,7 @@ pub fn decode_annotations(
     // out of bytes at the element it never wrote, so the fallback fires and
     // the missing values default to 0 — "size the box to the text" on both
     // axes, which is precisely what a v2 or v3 document meant.
-    type V7 = (
+    type V8 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
         Option<CanvasParams>,
@@ -1089,18 +1243,29 @@ pub fn decode_annotations(
         Vec<[(f32, f32); 4]>,
         Vec<[(f32, f32); 4]>,
         Vec<u8>,
+        Vec<String>,
     );
-    // v8 is read THROUGH the v7 branch, not beside it. A postcard tuple is its
-    // elements back to back, so a v8 blob is a v7 blob with two more vectors
-    // after it: `take_from_bytes` decodes the v7 prefix and hands back the
+    // v9 is read THROUGH the v8 branch, not beside it. A postcard tuple is its
+    // elements back to back, so a v9 blob is a v8 blob with two more vectors
+    // after it: `take_from_bytes` decodes the v8 prefix and hands back the
     // tail, and the tail either holds (rotations, star points) or is empty.
-    // A separate `V8` branch meant a second copy of everything below plus a
-    // second postcard decoder for the 10-tuple — ~5 KB of wasm (measured) for
-    // two loops.
+    // A separate `V9` branch meant a second copy of everything below plus a
+    // second postcard decoder for the 11-tuple — ~5 KB of wasm (measured on
+    // the v8 form of this trick) for two loops.
     if let Ok((
-        (mut texts, mut shapes, canvas, wraps, heights, quads, shape_quads, shape_sloppiness),
-        v8_tail,
-    )) = postcard::take_from_bytes::<V7>(body)
+        (
+            mut texts,
+            mut shapes,
+            canvas,
+            wraps,
+            heights,
+            quads,
+            shape_quads,
+            shape_sloppiness,
+            fonts,
+        ),
+        v9_tail,
+    )) = postcard::take_from_bytes::<V8>(body)
     {
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
@@ -1117,9 +1282,13 @@ pub fn decode_annotations(
         for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
             sp.sloppiness = sl;
         }
-        // Empty tail = a v7 blob: every shape unrotated and five-pointed, which
-        // is what `#[serde(skip)]` already left and what v7 meant.
-        if let Ok((rotations, star_points)) = postcard::from_bytes::<(Vec<f64>, Vec<u8>)>(v8_tail) {
+        for (t, f) in texts.iter_mut().zip(fonts) {
+            t.font_id = f;
+        }
+        // Empty tail = a v8 (or older-with-fonts) blob: every shape unrotated
+        // and five-pointed, which is what `#[serde(skip)]` already left and
+        // what v8 meant.
+        if let Ok((rotations, star_points)) = postcard::from_bytes::<(Vec<f64>, Vec<u8>)>(v9_tail) {
             // Normalized on the way in, like every other door the values come
             // through: a stored NaN would otherwise reach every outline point.
             for (sp, r) in shapes.iter_mut().zip(rotations) {
@@ -1128,6 +1297,44 @@ pub fn decode_annotations(
             for (sp, n) in shapes.iter_mut().zip(star_points) {
                 sp.star_points = crate::annotations::canonical_star_points(sp.kind, n);
             }
+        }
+        return Ok((texts, shapes, canvas));
+    }
+    type V7 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u8>,
+    );
+    if let Ok((
+        mut texts,
+        mut shapes,
+        canvas,
+        wraps,
+        heights,
+        quads,
+        shape_quads,
+        shape_sloppiness,
+    )) = postcard::from_bytes::<V7>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (sp, q) in shapes.iter_mut().zip(shape_quads) {
+            sp.perspective = default_quad_if_unset(q);
+        }
+        for (sp, sl) in shapes.iter_mut().zip(shape_sloppiness) {
+            sp.sloppiness = sl;
         }
         return Ok((texts, shapes, canvas));
     }
@@ -1400,6 +1607,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         t.shadow_dx,
         t.shadow_dy,
         t.shadow_blur,
+        &t.font_id,
     )
 }
 
@@ -1568,7 +1776,13 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         Op::TextEdit(p) => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == p.id) {
-                *t = p.clone();
+                // MERGE, not replace — ADR-060. The payload cannot carry the
+                // four `#[serde(skip)]` axes, so the annotation keeps its own;
+                // `TextParams::carry_skipped_from` is where the whole argument
+                // lives.
+                let mut next = p.clone();
+                next.carry_skipped_from(t);
+                *t = next;
             }
         }
         Op::TextRemove { id } => {
@@ -1597,6 +1811,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::ShapeSloppiness { id, sloppiness } => {
             if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
                 sp.sloppiness = *sloppiness;
+            }
+        }
+        Op::TextFont { id, font_id } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.font_id = font_id.clone();
             }
         }
         Op::ShapeRotation { id, rotation_deg } => {
@@ -1639,29 +1858,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         Op::ShapeEdit(p) => {
             if let Some(s) = doc.shapes.iter_mut().find(|s| s.id == p.id) {
-                // ⚠️ The four `#[serde(skip)]` fields are OWNED BY THEIR SIDE
-                // OPS (ShapePerspective / ShapeSloppiness / ShapeRotation /
-                // ShapeStarPoints), never by ShapeEdit, so they are carried
-                // over rather than replaced.
-                //
-                // This was `*s = p.clone()`, and it was only correct while the
-                // op had never been through the codec. A ShapeEdit read back
-                // from disk holds those fields at their DEFAULTS — serde never
-                // wrote them — so after a reload, replaying one (any undo that
-                // seeks back past it and forward again, or a restore) put the
-                // shape back unwarped, firm, unrotated and five-pointed while
-                // the engine still showed it warped: a composite mismatch, a
-                // broken log, snapshot undo for the rest of the session. The
-                // in-memory op happened to carry the right values, which is
-                // why nothing that never persisted could see it. Pinned by
-                // `a_decoded_shape_edit_keeps_the_side_op_fields`.
-                let (quad, sloppiness, rotation_deg, star_points) =
-                    (s.perspective, s.sloppiness, s.rotation_deg, s.star_points);
-                *s = p.clone();
-                s.perspective = quad;
-                s.sloppiness = sloppiness;
-                s.rotation_deg = rotation_deg;
-                s.star_points = star_points;
+                // MERGE, not replace — ADR-060, same rule as `TextEdit` above
+                // and for the same reason. See `ShapeParams::carry_skipped_from`.
+                let mut next = p.clone();
+                next.carry_skipped_from(s);
+                *s = next;
             }
         }
         Op::ShapeRemove { id } => {
@@ -1968,6 +2169,7 @@ mod tests {
             wrap_width: 0,
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
+            font_id: String::new(),
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -2641,6 +2843,7 @@ mod v2_migration_tests {
             wrap_width: 0,
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
+            font_id: String::new(),
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -2994,6 +3197,156 @@ mod v2_migration_tests {
                 .unwrap_or_else(|e| panic!("v4 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
             assert_eq!(decoded, op, "v4 op must mean the same thing under v5");
         }
+    }
+
+    /// A v7 writer emitted `[7] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads, shape_sloppiness))` — the 8-tuple, with no
+    /// font ids. Reconstructed byte-for-byte rather than by calling the current
+    /// encoder, because an encoder that drifted would produce a test that
+    /// agrees with itself.
+    fn v7_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![7u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                texts,
+                &shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &shape_sloppiness,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v7_blobs_still_decode_under_v8() {
+        // The load-bearing one, for the sixth time. Anyone who has opened the
+        // app since v8.76 has v7 blobs in IndexedDB, and `ih_oplog_persist`
+        // ships ON — a rejected log costs them their cross-reload undo.
+        let mut t = a_text(11);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        t.perspective = a_quad();
+        let (got, shapes, canvas) = decode_annotations(&v7_annotation_blob(&[t]))
+            .expect("a v7 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].wrap_width, 240, "the v7 width survives the step");
+        assert_eq!(got[0].box_height, 310, "the v7 height survives the step");
+        assert_eq!(
+            got[0].perspective,
+            a_quad(),
+            "the v7 quad survives the step"
+        );
+        assert_eq!(
+            got[0].font_id, "",
+            "a v7 document meant the embedded Liberation Sans, because it was \
+             the only face that existed — the skipped-field default and the \
+             semantic default agree here, unlike the quad"
+        );
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v8_blobs_round_trip_the_font_id() {
+        let mut t = a_text(12);
+        t.wrap_width = 240;
+        t.perspective = a_quad();
+        t.font_id = "liberation-serif".into();
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(got[0].wrap_width, 240);
+        assert_eq!(got[0].perspective, a_quad());
+        assert_eq!(got[0].font_id, "liberation-serif", "v8 carries the face");
+    }
+
+    #[test]
+    fn v7_op_bytes_still_decode_under_v8() {
+        // Appending `TextFont` must not renumber the variants already on disk
+        // — `ShapeSloppiness` was appended last before it, so it is the one
+        // that would break first. `PerspectiveWarp` held that seat when this
+        // test was written against v6; the two shape variants landed in front
+        // of it while the branch waited, which is exactly the renumbering this
+        // test exists to catch.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextBoxHeight {
+                id: 5,
+                box_height: 310,
+            },
+            Op::TextPerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 30,
+                    h: 40,
+                },
+                quad: a_quad(),
+            },
+            Op::ShapePerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::ShapeSloppiness {
+                id: 5,
+                sloppiness: 80,
+            },
+        ] {
+            let mut v7_bytes = vec![7u8];
+            v7_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v7_bytes)
+                .unwrap_or_else(|e| panic!("v7 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v7 op must mean the same thing under v8");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_font_id_field() {
+        // FOURTH instance of the measurement, and the one that matters most:
+        // `font_id` is a String, so if it ever reached the wire it would add a
+        // length prefix AND its bytes, shifting every persisted
+        // TextAdd/TextEdit payload in every user's IndexedDB by a variable
+        // amount. Zero is the only acceptable answer.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.font_id = "a-very-long-typeface-identifier".into();
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "font_id must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_font_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextFont {
+                id: 2,
+                font_id: "liberation-mono".into(),
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].font_id, "", "untouched");
+        assert_eq!(doc.texts[1].font_id, "liberation-mono");
     }
 
     #[test]
@@ -3458,14 +3811,14 @@ mod v2_migration_tests {
         );
     }
 
-    // ── v8: rotation and the star's point count ────────────────────────────
-    // The same guarantees a sixth time, for two fields at once — plus the
-    // ShapeEdit replay fix that rides with them.
+    // ── v9: rotation and the star's point count ────────────────────────────
+    // The same guarantees a seventh time, for two fields at once (ADR-070:
+    // #187 was written as v8; v8 shipped for the typeface first).
 
     /// A v7 writer emitted `[7] ++ postcard((texts, shapes, canvas, wraps,
     /// heights, quads, shape_quads, shape_sloppiness))` — the 8-tuple, with no
     /// rotation and no star points. Reconstructed byte-for-byte.
-    fn v7_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
+    fn v7_shape_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
         let mut out = vec![7u8];
         let texts: Vec<TextParams> = Vec::new();
         let canvas: Option<CanvasParams> = None;
@@ -3504,8 +3857,8 @@ mod v2_migration_tests {
     }
 
     #[test]
-    fn v7_blobs_still_decode_under_v8() {
-        // Sixth iteration of the load-bearing read. v7 blobs hold shapes whose
+    fn v7_shape_blobs_still_decode_under_v9() {
+        // Seventh iteration of the load-bearing read. v7 blobs hold shapes whose
         // rotation and point-count elements do not exist — they meant
         // "unrotated" and "five points", and that must survive the step, along
         // with everything v7 did carry.
@@ -3513,7 +3866,7 @@ mod v2_migration_tests {
         sp.kind = 9;
         sp.perspective = a_quad();
         sp.sloppiness = 30;
-        let (_, shapes, _) = decode_annotations(&v7_annotation_blob(&[sp]))
+        let (_, shapes, _) = decode_annotations(&v7_shape_annotation_blob(&[sp]))
             .expect("a v7 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
         assert_eq!(shapes.len(), 1);
         assert_eq!(shapes[0].perspective, a_quad(), "the v7 quad survives");
@@ -3523,10 +3876,10 @@ mod v2_migration_tests {
     }
 
     #[test]
-    fn v8_round_trips_rotation_and_star_points() {
+    fn v9_round_trips_rotation_and_star_points() {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        assert_eq!(OP_FORMAT_VERSION, 8);
+        assert_eq!(OP_FORMAT_VERSION, 9);
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
             shapes[0],
@@ -3537,7 +3890,7 @@ mod v2_migration_tests {
     }
 
     #[test]
-    fn v7_op_bytes_still_decode_under_v8() {
+    fn v7_shape_op_bytes_still_decode_under_v9() {
         // Appending `ShapeRotation`/`ShapeStarPoints` must not renumber the
         // variants already on disk — `ShapeSloppiness` was appended last before
         // them, so it is the one that would break first.
@@ -3567,8 +3920,98 @@ mod v2_migration_tests {
             v7_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
             let decoded = decode_op(&v7_bytes)
                 .unwrap_or_else(|e| panic!("v7 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
-            assert_eq!(decoded, op, "v7 op must mean the same thing under v8");
+            assert_eq!(decoded, op, "v7 op must mean the same thing under v9");
         }
+    }
+
+    /// A v8 writer emitted `[8] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads, shape_quads, shape_sloppiness, fonts))` — the 9-tuple,
+    /// with the typeface ids and no rotation or star points. Reconstructed
+    /// byte-for-byte, like the v7 one above.
+    fn v8_annotation_blob(texts: &[TextParams], shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![8u8];
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+        let fonts: Vec<&str> = texts.iter().map(|t| t.font_id.as_str()).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                texts,
+                shapes,
+                &canvas,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &shape_sloppiness,
+                &fonts,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v8_blobs_still_decode_under_v9() {
+        // The one the ADR exists for. A v8 blob has the typeface ids and stops:
+        // v9 reads it through the same prefix and finds an empty tail, so every
+        // shape is unrotated and five-pointed, and the face must still come back.
+        let mut t = a_text(21);
+        t.font_id = "liberation-serif".into();
+        let mut sp = a_shape(3);
+        sp.kind = 9;
+        sp.sloppiness = 30;
+        let (texts, shapes, _) = decode_annotations(&v8_annotation_blob(&[t], &[sp]))
+            .expect("a v8 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(texts[0].font_id, "liberation-serif", "the v8 face survives");
+        assert_eq!(shapes[0].sloppiness, 30, "the v8 sloppiness survives");
+        assert_eq!(shapes[0].rotation_deg, 0.0, "a v8 shape meant 'unrotated'");
+        assert_eq!(shapes[0].star_points, 0, "a v8 star meant 'five points'");
+    }
+
+    #[test]
+    fn op_variant_indices_are_append_only() {
+        // postcard writes an enum as `varint(index) ++ payload`, so a variant
+        // inserted or reordered shifts every later one and an old log replays
+        // as the wrong op without an error (ADR-070). Pinning the indices the
+        // v9 bump depends on: `TextFont` is on users' disks at 18, and the two
+        // shape variants land after it.
+        let idx = |op: &Op| postcard::to_allocvec(op).unwrap()[0]; // allow: rust-panic
+        assert_eq!(
+            idx(&Op::ShapeSloppiness {
+                id: 1,
+                sloppiness: 1
+            }),
+            17,
+            "ShapeSloppiness"
+        );
+        assert_eq!(
+            idx(&Op::TextFont {
+                id: 1,
+                font_id: String::new()
+            }),
+            18,
+            "TextFont — captured in tests/fixtures/oplog, must never move"
+        );
+        assert_eq!(
+            idx(&Op::ShapeRotation {
+                id: 1,
+                rotation_deg: 0.0
+            }),
+            19,
+            "ShapeRotation"
+        );
+        assert_eq!(
+            idx(&Op::ShapeStarPoints {
+                id: 1,
+                star_points: 0
+            }),
+            20,
+            "ShapeStarPoints"
+        );
     }
 
     #[test]

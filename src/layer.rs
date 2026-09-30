@@ -513,9 +513,12 @@ pub(crate) fn build_annotation_tile(
     shadow_dx: i32,
     shadow_dy: i32,
     shadow_blur: u32,
+    // Which typeface to rasterise with; "" is the embedded Liberation Sans and
+    // what every annotation written before v8.76 means. See `crate::fonts`.
+    font_id: &str,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::grow_to_box_height(
-        crate::text::render_text(text, font_size, r, g, b, bold),
+        crate::text::render_text(text, font_size, r, g, b, bold, font_id),
         box_height,
     );
     let raw_w = rendered.width;
@@ -771,13 +774,14 @@ pub(crate) fn annotation_ink_offset(
     bold: bool,
     background_kind: u8,
     bg_padding: u32,
+    font_id: &str,
 ) -> (i32, i32) {
     let pad = (font_size * 0.25).ceil() as i32;
     let first = text.lines().next().unwrap_or("");
     let (ink_x, ink_y) = if first.trim().is_empty() {
         (pad, pad)
     } else {
-        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold);
+        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold, font_id);
         crate::utils::ink_bounds(&rendered.pixels, rendered.width, rendered.height)
             .map(|(min_x, min_y, _, _)| (min_x as i32, min_y as i32))
             .unwrap_or((pad, pad))
@@ -831,26 +835,7 @@ impl ImageHorseTool {
     /// having to special-case an empty layer.
     pub(crate) fn layer_content_bbox(&self, idx: usize) -> (u32, u32, u32, u32) {
         let (ow, oh) = (self.width, self.height);
-        let data = &self.layers[idx].buf.data;
-        let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
-        let mut found = false;
-        for y in 0..oh {
-            let row = (y * ow) as usize * 4;
-            for x in 0..ow {
-                if data[row + x as usize * 4 + 3] != 0 {
-                    found = true;
-                    minx = minx.min(x);
-                    miny = miny.min(y);
-                    maxx = maxx.max(x);
-                    maxy = maxy.max(y);
-                }
-            }
-        }
-        if found {
-            (minx, miny, maxx - minx + 1, maxy - miny + 1)
-        } else {
-            (0, 0, ow, oh)
-        }
+        crate::tight_bbox(&self.layers[idx].buf.data, ow, oh).unwrap_or((0, 0, ow, oh))
     }
 }
 
@@ -1108,12 +1093,6 @@ impl ImageHorseTool {
         } else {
             Some((dx, dy))
         };
-    }
-
-    /// Move tool — discard any in-progress move preview without committing
-    /// (drag abort / Escape). No history.
-    pub fn cancel_move_preview(&mut self) {
-        self.move_preview = None;
     }
 
     /// Move tool — commit a move of the ACTIVE layer's content by (dx, dy):
@@ -1615,6 +1594,18 @@ impl ImageHorseTool {
     }
 
     /// Discard layer `id`'s mask (reveal everything again). False if it had none.
+    /// Whether layer `id` currently has a mask.
+    ///
+    /// Restored 09-26-2026. It was deleted as an export "nothing calls", which
+    /// was true on the day that branch was cut — `tests/selection_refine.rs`
+    /// arrived on master afterwards (#233, v8.98) and calls it twice. The
+    /// deletion only surfaced when the two met, and only under
+    /// `cargo clippy --all-targets` with NO features, which is what the
+    /// pre-push hook runs; `cargo test --features tiles` compiled fine.
+    pub fn has_layer_mask(&self, id: u32) -> bool {
+        self.layers.iter().any(|l| l.id == id && l.mask.is_some())
+    }
+
     pub fn remove_layer_mask(&mut self, id: u32) -> bool {
         let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
             return false;
@@ -1665,11 +1656,6 @@ impl ImageHorseTool {
         }
         self.recomposite();
         true
-    }
-
-    /// Whether layer `id` currently has a mask.
-    pub fn has_layer_mask(&self, id: u32) -> bool {
-        self.layers.iter().any(|l| l.id == id && l.mask.is_some())
     }
 
     // ── Layer color overlay (non-destructive style) ──────────────────────
@@ -1780,6 +1766,19 @@ impl ImageHorseTool {
     /// Begin rebuilding the layer stack from persisted data: empties the stack
     /// and clears history + id counters. Must be followed by one or more
     /// `push_restored_layer` calls and a `finish_layer_restore`.
+    /// The active layer, or `None` while the stack is empty — which it is
+    /// between `begin_layer_restore` and `finish_layer_restore`. A saved
+    /// photo is rebuilt over many separate worker messages, and the UI's own
+    /// polls (annotation lists, hit tests) share that queue, so a read can
+    /// land mid-rebuild. Indexing `self.layers[self.active]` there panicked
+    /// (annotations.rs `get_text_annotations` / `get_shape_annotations`,
+    /// measured on fast photo switching), and a panic poisons the instance
+    /// for the rest of the session: black canvas, hung loads, and saves that
+    /// captured the wrong document. Read-only getters go through this.
+    pub(crate) fn active_layer(&self) -> Option<&Layer> {
+        self.layers.get(self.active)
+    }
+
     pub fn begin_layer_restore(&mut self) {
         self.layers.clear();
         self.hist.clear();
@@ -1874,25 +1873,57 @@ impl ImageHorseTool {
         shadow_dx: i32,
         shadow_dy: i32,
         shadow_blur: u32,
+        // The typeface. Carried since v8.76 - it was the first of the four
+        // appended text axes to reach this path, and for two versions it was
+        // the ONLY one, on the argument that a lost font has no handle to grab
+        // while a lost box "degrades to a look the user can restore with a
+        // drag". That argument was wrong about the user: a box dragged narrow
+        // comes back as text running off the canvas, and the drag that would
+        // restore it is the same drag that got lost. The other three follow
+        // below.
+        font_id: &str,
+        // THE THREE AXES THAT USED TO BE DROPPED HERE - ADR-060.
+        //
+        // Until v8.81 this path hard-coded `0`, `0` and the identity quad and
+        // said so in three comments filed as ADR-024-F7: "the op-log path
+        // (which DOES carry it) is the one the resume actually uses." That
+        // premise is FALSE in the case that matters. Measured on production
+        // 2026-09-20: in every run where the user dragged the text box before
+        // the first save, no op log was persisted at all, so the resume landed
+        // on exactly this path - the one that carried none of it - and the
+        // text came back unwrapped, on one line, running off the canvas.
+        //
+        // `annotations_to_json` has always written all three. The archive
+        // stripper dropped them on the way to disk and this signature had
+        // nowhere to put them if it had not; both halves are fixed together
+        // because either one alone still loses the box.
+        wrap_width: u32,
+        box_height: u32,
+        // The normalized corner quad as a flat `[x0,y0,x1,y1,x2,y2,x3,y3]` -
+        // `annotations_to_json`'s own layout, so the persisted JSON rides
+        // straight in. Any OTHER length means "no quad recorded", which is
+        // every archive written before v8.81, and restores to the identity:
+        // exactly what those documents meant.
+        perspective: &[f32],
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let quad = if perspective.len() == 8 {
+            [
+                (perspective[0], perspective[1]),
+                (perspective[2], perspective[3]),
+                (perspective[4], perspective[5]),
+                (perspective[6], perspective[7]),
+            ]
+        } else {
+            crate::perspective::IDENTITY_QUAD
+        };
         let ann = build_text_annotation(
             id,
             text,
-            // ⚠️ The layer-JSON restore path does not carry a reflow width yet, so a
-            // text annotation rebuilt from it comes back unwrapped. Filed as
-            // ADR-024-F7; the op-log path (which DOES carry it, via
-            // Op::TextWrap) is the one the resume actually uses.
-            0,
-            // Same gap on the second axis (v8.41): no box height in layer JSON,
-            // so a restore through here comes back sized to its text.
-            // Op::TextBoxHeight carries it on the path that matters.
-            0,
-            // Third instance of the same gap (v8.42): layer JSON carries no
-            // corner quad, so a restore through here comes back unwarped.
-            // Op::TextPerspective carries it on the path that matters.
-            crate::perspective::IDENTITY_QUAD,
+            wrap_width,
+            box_height,
+            quad,
             font_size,
             r,
             g,
@@ -1918,6 +1949,7 @@ impl ImageHorseTool {
             shadow_dx,
             shadow_dy,
             shadow_blur,
+            font_id,
         );
         let active = self.active;
         if let Some(layer) = self.layers.get_mut(active) {
@@ -2022,7 +2054,7 @@ mod tests {
         // (text, font_size, r, g, b, bold, x, y, rotation_deg, background_kind,
         //  bg_r, bg_g, bg_b, bg_a, bg_padding, bg_corner_radius, bg_tail)
         t.add_text_annotation(
-            text, 24.0, 0, 0, 0, false, 100, 100, deg, 0, 0, 0, 0, 0, 0, 0, 0,
+            text, 24.0, 0, 0, 0, false, 100, 100, deg, 0, 0, 0, 0, 0, 0, 0, 0, "",
         );
         ink_min(&t)
     }
@@ -2258,12 +2290,12 @@ mod tests {
                             let (tile, w, h, off_x, off_y) = build_annotation_tile(
                                 "Hg", fs, box_h, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
                                 0, // bg_a = 0: transparent bg, geometry unchanged
-                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0,
+                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0, "",
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
                                 .expect("tile has visible ink"); // allow: rust-panic
-                            let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
+                            let want = annotation_ink_offset("Hg", fs, bold, kind, pad, "");
                             assert_eq!(
                                 (ink.0 as i32, ink.1 as i32),
                                 want,
@@ -2285,7 +2317,7 @@ mod tests {
         let plain = |box_h: u32| {
             let (tile, w, h, _, _) = build_annotation_tile(
                 "Hg", 24.0, box_h, 255, 255, 255, false, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, false, false,
-                0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, "",
             );
             let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)

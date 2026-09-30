@@ -1,0 +1,105 @@
+/* .pager — page-at-a-time navigation for a long list.
+ *
+ * Used by the Trail Log. Kept out of trail.css because nothing here is about
+ * releases; the next long list on the site gets the same row for free.
+ *
+ * Targets are 40px square, which is the smallest a thumb reliably hits, and
+ * every one is a real <button> so the row tabs in order and Enter works
+ * without a keydown handler.
+ */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding-top: var(--space-xl);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  margin-top: var(--space-xl);
+}
+
+.pager__list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pager__n,
+.pager__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-2);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
+}
+
+.pager__n:hover,
+.pager__step:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.pager__n:focus-visible,
+.pager__step:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The current page. aria-current carries this to a screen reader; the fill is
+   the sighted half of the same statement. */
+.pager__n[aria-current="page"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 700;
+}
+
+.pager__step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pager__gap {
+  padding: 0 var(--space-2xs);
+  color: var(--color-ink-3);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+}
+
+/* On a phone the two word buttons and up to seven numbers will not sit on one
+   line. Numbers first, steps split beneath them. */
+@media (max-width: 560px) {
+  .pager {
+    gap: var(--space-xs);
+  }
+  .pager__list {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .pager__step {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pager__n,
+  .pager__step {
+    transition: none;
+  }
+}

@@ -63,7 +63,7 @@ fn shape_annotations_scale_with_a_resampling_resize() {
 fn text_annotations_scale_with_a_resampling_resize() {
     let mut t = tool_200();
     t.add_text_annotation(
-        "hi", 20.0, 0, 0, 0, false, 100, 100, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "hi", 20.0, 0, 0, 0, false, 100, 100, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     );
     t.resize_with_filter(100, 100, 1);
 
@@ -79,7 +79,7 @@ fn text_annotations_scale_with_a_resampling_resize() {
 fn the_cached_text_tile_is_rebuilt_at_the_new_size() {
     let mut t = tool_200();
     t.add_text_annotation(
-        "hello", 40.0, 0, 0, 0, false, 20, 20, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "hello", 40.0, 0, 0, 0, false, 20, 20, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     );
     let before = num(&t.get_text_annotations(), "\"tile_w\":");
     t.resize_with_filter(100, 100, 1);

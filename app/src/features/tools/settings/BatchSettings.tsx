@@ -3,14 +3,13 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, FileEdit, ScanEye, X } from "lucide-react";
+import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -23,12 +22,24 @@ import {
   makeThumbnail,
   makeThumbnailFromPixels,
 } from "@/lib/workingCopy";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, type BatchMode } from "@/stores/useToolStore";
 import { AIRenamePanel } from "./AIRenamePanel";
+import { CropBatchPanel } from "./CropBatchPanel";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
 import { measureTextAwaited } from "@/lib/engine/textMetricsCache";
+import { ensureEngineFonts, faceCss } from "@/lib/engineFonts";
+import { useEngineFaces } from "@/hooks/useEngineFaces";
+import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
+import { SelectField } from "@/components/ui/select-field";
+
+/** Batch › Text weight — a two-tile pick, the same group every other
+ *  pick-one-of-N control in the panels uses. */
+const WEIGHT_OPTIONS = [
+  { id: "normal", label: "Normal" },
+  { id: "bold", label: "Bold" },
+] as const;
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -37,9 +48,10 @@ const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
  *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
  *  own components), so ToolModeToggle only contributes the icon-row selector
  *  and stays silent on the header row rather than duplicating it. */
-const BATCH_TOOL_MODES: readonly ToolMode<"logo" | "text" | "rename" | "airename">[] = [
+const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "logo", label: "Logo", icon: ImagePlus },
   { id: "text", label: "Text", icon: Type },
+  { id: "crop", label: "Crop", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
 ];
@@ -500,7 +512,7 @@ export function BatchSettings({
             // what the user sees.
             // Throwaway engine (the one-port allowlist), so these two cannot tear —
             // nothing else can mutate it between them. Ordinary awaits, not a capture;
-            // see docs/engine-worker-capture-sweep.md.
+            // see docs/engine-worker-capture-sweep.md (git history; moved out of the repo 2026-09-17).
             const workW = await tool.width();
             const workH = await tool.height();
             const targetLogoW = Math.max(
@@ -547,8 +559,8 @@ export function BatchSettings({
       );
     } catch (err) {
       console.error("Bulk-logo: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the logo. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the logo.");
     } finally {
       setRunning(false);
     }
@@ -571,6 +583,8 @@ export function BatchSettings({
   // `useState` here none of the three could see it.
   const mode = useToolStore((s) => s.batchMode);
   const setMode = useToolStore((s) => s.setBatchMode);
+  // What the pixel-baking panels (Text, Crop) all take.
+  const panelProps = { photos, activePhotoId, setPhotos, stampToolRef, flushToCanvas, syncState };
 
   return (
     // No `showModeRow` — the tiles live in the ToolsSidebar header now; this
@@ -578,14 +592,9 @@ export function BatchSettings({
     <ToolModeToggle modes={BATCH_TOOL_MODES} activeMode={mode} onModeChange={setMode}>
       {(m) =>
         m === "text" ? (
-        <TextBatchPanel
-          photos={photos}
-          activePhotoId={activePhotoId}
-          setPhotos={setPhotos}
-          stampToolRef={stampToolRef}
-          flushToCanvas={flushToCanvas}
-          syncState={syncState}
-        />
+        <TextBatchPanel {...panelProps} />
+      ) : m === "crop" ? (
+        <CropBatchPanel {...panelProps} />
       ) : m === "rename" ? (
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
@@ -709,17 +718,13 @@ export function BatchSettings({
       </Button>
 
       {appliedCount !== null && !running && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
-        >
+        <SuccessCallout>
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
-        </div>
+        </SuccessCallout>
       )}
 
       {errorMsg && (
-        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
+        <ErrorNote>{errorMsg}</ErrorNote>
       )}
       </>
       )
@@ -903,20 +908,8 @@ function RenameBatchPanel({
 
 type TextPosition = PlacementCell;
 
-const TEXT_FONT_FAMILIES = [
-  { label: "Sans Serif", value: "sans-serif" },
-  { label: "Serif", value: "serif" },
-  { label: "Monospace", value: "monospace" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Georgia", value: "Georgia, serif" },
-  { label: "Times New Roman", value: "Times New Roman, serif" },
-  { label: "Courier New", value: "Courier New, monospace" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-  { label: "Impact", value: "Impact, sans-serif" },
-  { label: "Comic Sans", value: "Comic Sans MS, cursive" },
-  { label: "Trebuchet", value: "Trebuchet MS, sans-serif" },
-  { label: "Palatino", value: "Palatino, serif" },
-] as const;
+// The twelve-entry font list that used to live here was the SECOND inert copy
+// of the one #113 removed from the Text tool — `useEngineFaces` has the story.
 
 // Background is a plain solid box only — no speech-bubble/tail here. Batch
 // text is a disposable bake-and-export render per photo (see `applyToAll`
@@ -956,7 +949,9 @@ function TextBatchPanel({
   const [text, setText] = useState("");
   const [fontSize, setFontSize] = useState(32);
   const [bold, setBold] = useState(false);
-  const [fontFamily, setFontFamily] = useState("sans-serif");
+  // The ENGINE's face id, not a CSS string — `faceCss` derives the preview.
+  const [fontId, setFontId] = useState("");
+  const faces = useEngineFaces(stampToolRef);
   const [textColor, setTextColor] = useState("#ffffff");
   const [bgKind, setBgKind] = useState<TextBgKind>("none");
   const [bgColor, setBgColor] = useState("#ffffff");
@@ -1052,8 +1047,13 @@ function TextBatchPanel({
           let composited: Uint8Array;
           try {
             tool.load_image(targetBytes);
+            // ⚠️ THIS ENGINE HAS ITS OWN FONT REGISTRY — it is thread-local
+            // to a wasm INSTANCE and this is a throwaway one per photo.
+            // Without this the batch bakes the fallback face while the preview
+            // shows the chosen one. Idempotent; the bytes are fetched once.
+            await ensureEngineFonts(tool);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
-            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            const m = await measureTextAwaited(tool, text, fontSize, bold, fontId);
             // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
             // necessary. The note here used to say a miss "becomes reachable under
             // Stage 3.5 and this is where it has to be handled". It could not have
@@ -1093,6 +1093,7 @@ function TextBatchPanel({
               bgA,
               bgPad,
               bgRadius,
+              fontId,
             );
             // The `await` sits INSIDE the wrapper deliberately: `new Uint8Array` of a
             // Promise is an EMPTY typed array, not a throw, and `encode_png_pixels`
@@ -1191,10 +1192,10 @@ function TextBatchPanel({
                 tool.load_image(baseBytes);
               }
             }
-            // Throwaway engine — same reasoning as the logo path above.
+            await ensureEngineFonts(tool); // its font registry starts empty too
             const workW = await tool.width();
             const workH = await tool.height();
-            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            const m = await measureTextAwaited(tool, text, fontSize, bold, fontId);
             // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
             // necessary. The note here used to say a miss "becomes reachable under
             // Stage 3.5 and this is where it has to be handled". It could not have
@@ -1233,6 +1234,7 @@ function TextBatchPanel({
               bgA,
               bgPad,
               bgRadius,
+              fontId,
             );
             flushToCanvas();
             syncState();
@@ -1251,8 +1253,8 @@ function TextBatchPanel({
       );
     } catch (err) {
       console.error("Bulk-text: fatal error", err);
-      setErrorMsg("Something went wrong. Check the console.");
-      toast.error("Couldn't apply the text. Check the console.");
+      setErrorMsg("Something went wrong.");
+      toast.error("Couldn't apply the text.");
     } finally {
       setRunning(false);
     }
@@ -1270,6 +1272,7 @@ function TextBatchPanel({
     margin,
     photos,
     activePhotoId,
+    fontId,
     setPhotos,
     stampToolRef,
     flushToCanvas,
@@ -1281,7 +1284,7 @@ function TextBatchPanel({
       <div>
         <SectionHeader
           title="Text"
-          info="Rendered in Rust (Liberation Sans). Bold applies to the output; the font family below is a preview only — the baked text stays Liberation Sans."
+          info="Rendered by the engine, not the browser. The font and weight below are what gets baked into every photo."
           className="mb-2"
         />
         <textarea
@@ -1289,7 +1292,7 @@ function TextBatchPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Enter overlay text…"
-          style={{ fontFamily, fontWeight: bold ? "bold" : "normal" }}
+          style={{ fontFamily: faceCss(fontId), fontWeight: bold ? "bold" : "normal" }}
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
       </div>
@@ -1303,31 +1306,31 @@ function TextBatchPanel({
         unit="px"
       />
 
-      {/* Font family (preview only) + weight (real — Liberation Sans Bold). */}
+      {/* Font family + weight — both real as of v8.76. */}
       <div>
         <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Font
         </p>
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value)}
-          style={{ fontFamily }}
-          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
+        {/* The Text tool's own font picker (Text › Font Family), not a
+            sixth spelling of a select — this one had its own padding, fill
+            and focus ring and no chevron. */}
+        <SelectField
+          value={fontId}
+          onChange={(e) => setFontId(e.target.value)}
+          style={{ fontFamily: faceCss(fontId) }}
         >
-          {TEXT_FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+          {faces.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
               {f.label}
             </option>
           ))}
-        </select>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <ToolButton active={!bold} onClick={() => setBold(false)}>
-            Normal
-          </ToolButton>
-          <ToolButton active={bold} onClick={() => setBold(true)}>
-            Bold
-          </ToolButton>
-        </div>
+        </SelectField>
+        <ToolButtonGroup
+          className="mt-2" aria-label="Font weight"
+          options={WEIGHT_OPTIONS}
+          value={bold ? "bold" : "normal"}
+          onChange={(id) => setBold(id === "bold")}
+        />
       </div>
 
       <ColorSwatchGrid
@@ -1411,17 +1414,13 @@ function TextBatchPanel({
       </Button>
 
       {appliedCount !== null && !running && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
-        >
+        <SuccessCallout>
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
-        </div>
+        </SuccessCallout>
       )}
 
       {errorMsg && (
-        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
+        <ErrorNote>{errorMsg}</ErrorNote>
       )}
     </div>
   );

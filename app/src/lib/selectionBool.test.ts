@@ -91,3 +91,23 @@ describe("selectionCombineMode gates itself on the switch", () => {
     }
   });
 });
+
+describe("the panel's standing Combine mode (base)", () => {
+  it("is what a gesture gets with no modifier held", () => {
+    for (const base of [0, 1, 2, 3] as const) {
+      expect(selectionCombineMode({ shiftKey: false, altKey: false }, base)).toBe(base);
+    }
+  });
+
+  it("is overridden by Shift and Alt for one gesture", () => {
+    expect(selectionCombineMode({ shiftKey: true, altKey: false }, 3)).toBe(1);
+    expect(selectionCombineMode({ shiftKey: false, altKey: true }, 3)).toBe(2);
+  });
+
+  // The kill switch turns off the hidden shortcut, not the visible control.
+  it("survives the kill switch — only the modifiers are killed", () => {
+    fakeStorage.setItem(KEY, "0");
+    expect(selectionCombineMode({ shiftKey: true, altKey: false }, 3)).toBe(3);
+    expect(selectionCombineMode({ shiftKey: false, altKey: false }, 2)).toBe(2);
+  });
+});

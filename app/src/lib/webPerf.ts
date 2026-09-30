@@ -22,7 +22,8 @@ export interface WebPerfInput {
   quality: number;
   /** Current file's MIME type (e.g. "image/jpeg"); undefined if unknown. */
   curMime?: string;
-  /** Pending output format from the panel's Format dropdown. */
+  /** Pending output format from the panel's Format dropdown. Undefined means
+   *  the file keeps its current format (no compression pending). */
   newFormat?: "png" | "jpeg" | "webp" | "avif";
 }
 
@@ -72,7 +73,7 @@ export async function getWebPerfMetrics(
     input.newH,
     input.quality,
     formatCode(input.curMime),
-    formatCode(input.newFormat),
+    formatCode(input.newFormat ?? input.curMime),
   );
   return {
     lighthouseScore: Math.round(score),

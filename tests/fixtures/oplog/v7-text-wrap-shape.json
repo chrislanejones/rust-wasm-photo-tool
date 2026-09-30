@@ -1,0 +1,86 @@
+{
+  "capturedFrom": "local production build of commit 6a3de6be (the commit before #131), served on 127.0.0.1:4931",
+  "capturedAtUtc": "2026-09-20",
+  "servingCommit": "6a3de6be (OP_FORMAT_VERSION = 7; wasm 858,087 B vs v8's 814,202 B)",
+  "session": "text whose box was dragged narrower, then a 50%-sloppy rectangle (same script as the v8 captures; this build has no font selector, so there is no TextFont op)",
+  "sourceImage": "e2e/fixtures/checker.png (256x256) imported with the default artboard -> 276x276 document",
+  "opFormatVersionInBytes": [
+    7
+  ],
+  "ops": [
+    {
+      "version": 7,
+      "variant": 5,
+      "op": "TextAdd",
+      "frameBytes": 50
+    },
+    {
+      "version": 7,
+      "variant": 12,
+      "op": "TextWrap",
+      "frameBytes": 5
+    },
+    {
+      "version": 7,
+      "variant": 6,
+      "op": "TextEdit",
+      "frameBytes": 77
+    },
+    {
+      "version": 7,
+      "variant": 8,
+      "op": "ShapeAdd",
+      "frameBytes": 62
+    },
+    {
+      "version": 7,
+      "variant": 17,
+      "op": "ShapeSloppiness",
+      "frameBytes": 4
+    }
+  ],
+  "frameFraming": "[u32 LE frame length][format-version u8][postcard(Op)] repeated",
+  "baseKeyframe": {
+    "file": "base-keyframe-276x276.png",
+    "byteIdenticalToTheV8Capture": true,
+    "atOp": 0,
+    "width": 276,
+    "height": 276,
+    "annotationsFile": "base-annotations.v7.bin",
+    "annotationsVersionByte": 7
+  },
+  "cursor": 5,
+  "dexieManifestAsWritten": {
+    "opCount": 5,
+    "chunkCount": 3,
+    "formatVersion": 1,
+    "generation": 0,
+    "cursor": 5,
+    "stale": false
+  },
+  "dexieChunkBoundaries": [
+    {
+      "chunkSeq": 0,
+      "opCount": 1,
+      "bytes": 54,
+      "formatVersion": 1
+    },
+    {
+      "chunkSeq": 1,
+      "opCount": 2,
+      "bytes": 90,
+      "formatVersion": 1
+    },
+    {
+      "chunkSeq": 2,
+      "opCount": 2,
+      "bytes": 74,
+      "formatVersion": 1
+    }
+  ],
+  "sha256": {
+    "frames": "ebb590dad4ffab3cc2da986dfa8f24019d76657d3ec6de476083c930f554e282",
+    "baseKeyframePng": "2a32830dc17a17dd4ff25b015e6d268b5a36814ce4c1ac84850e33047978dfca",
+    "baseAnnotations": "fd1a19dfefececc93eea05f70920826df4ec782a21c0b08c1b5cd4b566fe1136"
+  }
+}

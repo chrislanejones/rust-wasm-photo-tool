@@ -144,6 +144,9 @@ describe("Batch gating matches the rail and the router", () => {
 
 describe("sub-tools that were previously unreachable", () => {
   it("OCR is a first-class entry now", () => {
+    // OCR uploads the image, so it only runs with online features on —
+    // the off case is pinned in features/tools/onlineGate.test.ts.
+    useUIStore.setState({ onlineFeaturesEnabled: true });
     byId(build(), "sub.create.ocr")!.run();
     expect(useToolStore.getState().activeTool).toBe("text");
     expect(useToolStore.getState().textMode).toBe("ocr");

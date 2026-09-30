@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -22,6 +23,7 @@ import type {
   PersistedLayer,
 } from "@/lib/editPersistence";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
+import { useUIStore } from "@/stores/useUIStore";
 import { mayUpload, recordUpload, isUploadRetryEnabled } from "@/lib/uploadBudget";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
@@ -299,10 +301,41 @@ function withTimeout<T>(p: Promise<T>, what: string): Promise<T> {
   ]);
 }
 
+/**
+ * May the CLOUD half of photo persistence run?
+ *
+ * Signed in is not enough. Settings › Security promises that with "Everything
+ * in your browser" off, "your photos never leave this tab" — and until
+ * 09-22-2026 this hook uploaded the flattened archive of every edit on the
+ * strength of `isAuthenticated` alone, so a signed-in person with the switch
+ * OFF was sending exactly what the pane said they were not. The switch gated
+ * the AI tools (they carry `requiresNetwork`, ADR-062 era) and nothing else;
+ * this path is not a tool, so it went straight through the net.
+ *
+ * DELETES ARE DELIBERATELY NOT GATED BY THIS. Removing a copy from the server
+ * sends no pixels, and refusing it while the switch is off would strand data
+ * on a server the person has just asked to stop using. See `deletePhotoEdit`
+ * and `clearAllEdits`, which stay on `isAuthenticated` alone.
+ */
+export function cloudPhotosAllowed(
+  isAuthenticated: boolean,
+  onlineFeaturesEnabled: boolean,
+): boolean {
+  // Through the registry, so the switch and Settings › Security are reading
+  // the same answer (shared/networkPaths.ts). Identical to the old
+  // `isAuthenticated && onlineFeaturesEnabled` — pinned in networkPaths.test.ts.
+  return isAuthenticated && isNetworkPathAllowed("photo_backup", onlineFeaturesEnabled);
+}
+
 export function useEditPersistence() {
   // isAuthenticated stays false until the JWT handshake with Convex succeeds,
   // so mismatched keys keep the app on the local IDB path rather than crashing.
   const { isAuthenticated } = useConvexAuth();
+  // The consent switch, the same store field Settings › Security and the New
+  // dialog share. Read as state (not a ref) so a change re-creates the
+  // callbacks below and the next save sees it.
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
+  const cloudAllowed = cloudPhotosAllowed(isAuthenticated, onlineFeatures);
   const convex = useConvex();
   const generateUploadUrl = useMutation(api.photoEdits.generateUploadUrl);
   const saveEdit = useMutation(api.photoEdits.save);
@@ -350,7 +383,7 @@ export function useEditPersistence() {
       const written = await idbSave(photoId, toolRef);
       if (!written) return false;
 
-      if (isAuthenticated) {
+      if (cloudAllowed) {
         try {
           const tool = toolRef.current;
           // Unreachable in practice — idbSave returns false without a tool, so
@@ -617,7 +650,7 @@ export function useEditPersistence() {
       // the user's work. A failed cloud leg costs freshness, not data.
       return true;
     },
-    [isAuthenticated, generateUploadUrl, saveEdit, discardFailedUpload],
+    [cloudAllowed, generateUploadUrl, saveEdit, discardFailedUpload],
   );
 
   const loadPhotoEdit = useCallback(
@@ -626,7 +659,7 @@ export function useEditPersistence() {
       const local = await idbLoad(photoId);
       if (local) return local;
 
-      if (isAuthenticated) {
+      if (cloudAllowed) {
         try {
           const edit = await convex.query(api.photoEdits.getEdit, { photoKey: photoId });
           if (edit?.downloadUrl) {
@@ -672,7 +705,7 @@ export function useEditPersistence() {
       }
       return null;
     },
-    [isAuthenticated, convex],
+    [cloudAllowed, convex],
   );
 
   const deletePhotoEdit = useCallback(

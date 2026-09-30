@@ -19,13 +19,13 @@
     "react-dom": "catalog:",
     "react-router": "^7.18.3",
     "react-router-dom": "^7.18.3",
-    "three": "0.165.0"
+    "three": "0.170.0"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@types/three": "0.165.0",
+    "@types/three": "0.170.0",
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"

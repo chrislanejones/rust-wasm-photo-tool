@@ -45,27 +45,37 @@ set -uo pipefail
 # and then the real failure it exists to catch (a featureless wasm, which once
 # shipped for ten releases) goes through unnoticed.
 #
-# The Netlify host stays alive as the rollback path and is NOT the default any
-# more. To aim this anywhere else for one run:
+# The Netlify host was retired on 2026-09-27 and is now a 301 to this default,
+# so it is no longer a rollback target — pointing the sentinel at it would just
+# follow the redirect back here and check the same deploy twice. To aim this
+# anywhere else for one run (a Vercel preview URL, say):
 #
-#   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
+#   SENTINEL_SITE=https://<deployment>.vercel.app ./scripts/deploy-sentinel.sh
 SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
+
+# ⚠️ THE FLOOR IS LOAD-BEARING IN A NEW WAY SINCE 2026-09-18, AND A RED FLOOR IS
+# NOT EVIDENCE THAT THE FLOOR IS STALE.
+#
+# It has always been the featureless-build detector: a wasm this small means the
+# engine was compiled without --features tiles,patchmatch, which is the v7.36-v7.45
+# bug where Netlify shipped a featureless engine for ten releases.
+#
+# It now also holds a second line. The fonts work removes ~63,109 B of TrueType
+# hinting bytecode that ab_glyph never executes. Applied TO THE FONTS BRANCH that
+# lands at 814,202 B, comfortably inside the band. Applied to master ALONE it gives
+# roughly 794,978 B — BELOW this floor — so the saving is coupled to the feature it
+# pays for and cannot be banked separately.
+#
+# That is the failure mode to expect: someone recovers the hinting on its own, sees
+# this go red, reads the floor as out of date, and lowers it. Lowering it here would
+# re-open the featureless-build hole to buy a saving that has nowhere to go. If you
+# are here because the floor went red, the question is what made the engine small,
+# not whether 800000 is still the right number.
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
-# 840000 -> 860000 (Chris, 2026-09-16). The FLOOR is the featureless detector
-# and stays at 800000 — that decision was made on 09-15 and is not revisited
-# here. This is the ceiling, and it is a drift alarm, not a budget.
-#
-# It went red on attributable growth rather than mystery: Enhance > Presets
-# (#153) added 9,248 B and shape perspective (#130) added 12,194 B, taking the
-# live engine 823,714 -> 845,156 B. Both are features that were reviewed and
-# merged, so the number the alarm was set against is the thing that is out of
-# date.
-#
-# 860000 leaves ~14,800 B of headroom, which is deliberately less than one
-# embedded TTF (61,972 B) — ADR-051's argument that a font cannot be embedded
-# without moving this band has to keep failing loudly, and a ceiling raised far
-# enough to absorb one would silence it.
-MAX_WASM="${SENTINEL_MAX_WASM:-860000}"
+# There is no CEILING. It was a drift alarm (840000 -> 860000 on 09-16) and
+# Chris retired it on 09-25-2026: engine growth is watched in the release
+# metrics, not blocked here. The FLOOR above stays — it is the featureless-build
+# detector, a different job, and the 09-15 decision to keep it is unchanged.
 # Methods that only exist when the engine is built --features tiles,patchmatch.
 # `oplog_active` is the tiles/op-log surface; `remove_object` is PatchMatch.
 #
@@ -135,7 +145,7 @@ for sym in "${REQUIRED_SYMBOLS[@]}" "${WIRED_SYMBOLS[@]}"; do
   grep -qE "${sym}\([A-Za-z0-9_\$, ]*\)[[:space:]]*\{" "$TMP/glue.js" || missing+=("$sym")
 done
 if [ ${#missing[@]} -gt 0 ]; then
-  fail "live glue is MISSING engine exports: ${missing[*]} — production is serving a featureless build (see netlify.toml --features tiles,patchmatch)"
+  fail "live glue is MISSING engine exports: ${missing[*]} — production is serving a featureless build (see FEATURES in scripts/build-wasm.sh)"
 fi
 echo "  exports    : ${REQUIRED_SYMBOLS[*]} ${WIRED_SYMBOLS[*]} all declared"
 
@@ -165,11 +175,13 @@ echo "  wasm       : $wasm ($size bytes)"
 # for its whole life and the floor was the only thing that ever caught a
 # featureless deploy. Don't remove the survivor.
 live_sha="$(sha256sum "$TMP/engine.wasm" | cut -d' ' -f1)"
-# ⚠️ A 200 IS NOT PROOF THE FILE EXISTS. Netlify's SPA fallback serves
-# index.html for ANY unknown path, so `curl -f` on a missing build-info.json
-# succeeds and hands back HTML. Checked against the real site 2026-09-05: it
-# returned the app shell, and an earlier version of this block read that as
-# "present but malformed" and failed a perfectly healthy deploy.
+# ⚠️ A 200 IS NOT PROOF THE FILE EXISTS. The SPA fallback serves index.html for
+# ANY unknown path, so `curl -f` on a missing build-info.json succeeds and hands
+# back HTML. Checked against the real site 2026-09-05: it returned the app shell,
+# and an earlier version of this block read that as "present but malformed" and
+# failed a perfectly healthy deploy. Netlify's `[[redirects]]` did this; the root
+# vercel.json's `rewrites` rule does exactly the same thing, so the hazard moved
+# hosts with the app.
 #
 # So there are THREE outcomes, not two, and they are kept apart deliberately —
 # each one means a different thing is broken and needs a different fix:
@@ -244,16 +256,16 @@ if [ "$build_info_state" = "json" ]; then
 elif [ "$build_info_state" = "notjson" ]; then
   got="$(head -c 60 "$TMP/build-info.json" | tr '\n' ' ')"
   fail "build-info.json did not come back as JSON — the server answered with
-  something else, which on Netlify means the SPA FALLBACK served index.html
-  because the file is not there.
+  something else, which means the SPA FALLBACK (vercel.json's rewrites rule)
+  served index.html because the file is not there.
   first bytes: ${got}
   The engine itself may be perfectly fine; what is broken is the deploy's
   record of what it built, so tiers 1 and 2 cannot run at all. In order:
     1. did the build run \`scripts/write-build-info.sh\`? It is the LAST step of
-       netlify.toml's command — a failure earlier in that chain skips it while
-       still publishing the site
+       vercel.json's buildCommand — a failure earlier in that chain skips it
+       while still publishing the site
     2. is it landing somewhere other than the publish dir? It writes to
-       www-dist/build-info.json and netlify.toml publishes www-dist
+       www-dist/build-info.json and vercel.json's outputDirectory is www-dist
     3. is a redirect or rewrite rule catching /build-info.json before the
        static file does?"
 else
@@ -267,9 +279,6 @@ fi
 
 if [ "$size" -lt "$MIN_WASM" ]; then
   fail "live wasm is ${size}B, under the ${MIN_WASM}B floor — that is the size of a FEATURELESS build"
-fi
-if [ "$size" -gt "$MAX_WASM" ]; then
-  fail "live wasm is ${size}B, over the ${MAX_WASM}B ceiling — unexpected growth, check what landed"
 fi
 
 echo "SENTINEL PASS: live engine is real (${size}B, all exports present, sha256 ${live_sha:0:16}…)."

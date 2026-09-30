@@ -360,6 +360,7 @@ impl ImageHorseTool {
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
+        font_id: &str,
     ) -> bool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -396,6 +397,7 @@ impl ImageHorseTool {
             0,
             0,
             0, // shadow off; set via set_text_shadow
+            font_id,
         );
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
@@ -432,6 +434,7 @@ impl ImageHorseTool {
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
+        font_id: &str,
     ) -> bool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -468,6 +471,7 @@ impl ImageHorseTool {
             0,
             0,
             0, // shadow off; set via set_text_shadow
+            font_id,
         );
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,

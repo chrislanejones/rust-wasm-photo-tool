@@ -7,8 +7,9 @@
 //!   1. θ = 0 is byte-identical to the renderer before rotation existed, for
 //!      every kind and style that existed then (hashes recorded on
 //!      origin/master 4890bf1f, before the first edit);
-//!   2. a rotated outline IS the outline through the rotated corners — crisp
-//!      edges, exactly the pixels a polygon through those points gets;
+//!   2. a rotated outline puts ink on its rotated corners and none on the old
+//!      ones (the pixel-exact polygon comparison lives in
+//!      `annotations::rotation_outline_tests`, where `drawing` is reachable);
 //!   3. a rotated FILL covers the rotated area, not the unrotated one;
 //!   4. a circle ignores θ unless it has a gradient (it is rotation-invariant
 //!      otherwise, and the frontend preview does the same);
@@ -21,7 +22,7 @@
 //!
 //! Featureless on purpose (no `ops`/`tiles`), so plain `cargo test` and
 //! `cargo clippy --all-targets` both compile and run it. The op-log half —
-//! v8 encoding, v7 back-compat, the ShapeEdit replay fix — lives in
+//! v9 encoding, v7 and v8 back-compat, the ShapeEdit replay fix — lives in
 //! `src/ops.rs`'s test module and `src/ops_engine_parity.rs`, which are
 //! already `tiles`-gated where they are declared.
 
@@ -201,36 +202,6 @@ fn rotate(p: (f64, f64), deg: f64, c: (f64, f64)) -> (f64, f64) {
     (c.0 + dx * cos - dy * sin, c.1 + dx * sin + dy * cos)
 }
 
-fn flat(pts: &[(f64, f64)]) -> Vec<f64> {
-    pts.iter().flat_map(|&(x, y)| [x, y]).collect()
-}
-
-/// Draw `pts` as a pen polyline in the house stroke — `draw_polyline` issues
-/// the same thick segments the rotated outline does.
-fn polyline_pixels(pts: &[(f64, f64)]) -> Vec<u8> {
-    let mut t = white_tool();
-    t.add_polyline_annotation(&flat(pts), "#e02020", 3.0);
-    t.get_image_data()
-}
-
-#[test]
-fn a_rotated_rect_is_exactly_the_polygon_through_its_rotated_corners() {
-    let (x0, y0, x1, y1) = (24.0, 20.0, 72.0, 52.0);
-    let c = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-    for deg in [30.0, -65.0, 90.0, 180.0] {
-        let mut t = white_tool();
-        add(&mut t, 0, (x0, y0, x1, y1), 0, 0, 0, 0, deg);
-        let rotated = t.get_image_data();
-
-        let corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)];
-        let pts: Vec<_> = corners.iter().map(|&p| rotate(p, deg, c)).collect();
-        assert!(
-            rotated == polyline_pixels(&pts),
-            "{deg}°: the rotated rect's pixels differ from the polygon through its rotated corners"
-        );
-    }
-}
-
 #[test]
 fn a_rotated_rect_puts_ink_on_its_rotated_corners_and_none_on_the_old_ones() {
     let (x0, y0, x1, y1) = (24.0, 20.0, 72.0, 60.0);
@@ -248,16 +219,6 @@ fn a_rotated_rect_puts_ink_on_its_rotated_corners_and_none_on_the_old_ones() {
             "ink left behind at the UNROTATED corner {corner:?}"
         );
     }
-}
-
-#[test]
-fn a_rotated_line_turns_about_its_midpoint() {
-    let (a, b) = ((20.0, 40.0), (76.0, 40.0));
-    let c = (48.0, 40.0);
-    let mut t = white_tool();
-    add(&mut t, 2, (a.0, a.1, b.0, b.1), 0, 0, 0, 0, 90.0);
-    let pts = [rotate(a, 90.0, c), rotate(b, 90.0, c)];
-    assert!(t.get_image_data() == polyline_pixels(&pts));
 }
 
 #[test]

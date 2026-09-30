@@ -11,7 +11,20 @@
 // cheaper middle is one preview at a time on the real canvas — the same
 // machinery Levels already uses, at one remap per hover.
 import { useEffect, useRef, useState } from "react";
-import { Flame, Cloud, Moon, Sun, Snowflake, Wand2 } from "lucide-react";
+import {
+  Flame,
+  Cloud,
+  Moon,
+  Sun,
+  Snowflake,
+  Wand2,
+  Contrast,
+  Clapperboard,
+  Feather,
+  CloudRain,
+  Eclipse,
+  Sunrise,
+} from "lucide-react";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButton } from "@/components/ui/tool-button";
 import type { PresetControls, PresetStack } from "@/hooks/useTransforms";
@@ -21,7 +34,16 @@ import type { PresetControls, PresetStack } from "@/hooks/useTransforms";
  *  ABSOLUTE 8-bit (-255..255). That last pair is the trap: 0.1 there is a tenth
  *  of one level out of 255 and does nothing at all, so these are tens.
  *  Enhance/Vivid/Fade/Dark keep the brightness and contrast the Quick Adjust
- *  grid used, so the looks people already know do not change under them. */
+ *  grid used, so the looks people already know do not change under them.
+ *
+ *  THERE IS NO HUE OR TEMPERATURE KNOB, and that is the shape of this table.
+ *  Shadows and highlights add the SAME delta to R, G and B (see
+ *  `simd::color`), so every component here moves luminance or saturation and
+ *  none of them moves color. Warm and Cool are saturation, not temperature —
+ *  a Sepia or a split-tone cannot be written as a row in this table at all, it
+ *  needs a filter the engine does not have. So the twelve spread out over the
+ *  axes that DO exist: how bright, how hard the curve, how much color, and
+ *  which end of the range gets recovered. */
 interface Preset extends PresetStack {
   label: string;
   Icon: typeof Flame;
@@ -88,6 +110,66 @@ const PRESETS: Preset[] = [
     saturation: 0.78,
     shadows: 0,
     highlights: 8,
+  },
+  {
+    label: "Mono",
+    Icon: Contrast,
+    blurb: "Black and white, with the tones left where they were",
+    brightness: 0.02,
+    contrast: 1.2,
+    saturation: 0,
+    shadows: 10,
+    highlights: 8,
+  },
+  {
+    label: "Noir",
+    Icon: Clapperboard,
+    blurb: "Black and white with hard contrast and heavy blacks",
+    brightness: -0.05,
+    contrast: 1.6,
+    saturation: 0,
+    shadows: -24,
+    highlights: 18,
+  },
+  {
+    label: "Airy",
+    Icon: Feather,
+    blurb: "Opens the picture up bright and light",
+    brightness: 0.16,
+    contrast: 0.9,
+    saturation: 0.95,
+    shadows: 30,
+    highlights: -8,
+  },
+  {
+    label: "Moody",
+    Icon: CloudRain,
+    blurb: "Dark and saturated, with the shadows closed down",
+    brightness: -0.1,
+    contrast: 1.35,
+    saturation: 1.15,
+    shadows: -20,
+    highlights: 20,
+  },
+  {
+    label: "Recover",
+    Icon: Eclipse,
+    blurb: "Pulls detail back out of a blown-out sky",
+    brightness: 0,
+    contrast: 1.05,
+    saturation: 1.05,
+    shadows: 12,
+    highlights: 45,
+  },
+  {
+    label: "Lift",
+    Icon: Sunrise,
+    blurb: "Opens deep shadows on a dark or backlit photo",
+    brightness: 0.1,
+    contrast: 1.05,
+    saturation: 1.05,
+    shadows: 48,
+    highlights: 6,
   },
 ];
 

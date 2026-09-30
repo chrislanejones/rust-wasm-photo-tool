@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Share2 } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
-import { ToolButton } from "@/components/ui/tool-button";
+import { Link2 } from "lucide-react";
+import { PanelAction } from "@/components/ui/panel-action-bar";
 import { toast } from "@/components/ui/sonner";
 import { useShare } from "@/hooks/useShare";
 
@@ -80,9 +79,10 @@ export function ShareButton({
   };
 
   return (
-    <ToolButton
-      stacked
-      className="flex-1"
+    // The Download dialog's action row is the tool panels' PanelActionBar
+    // (Apply Crop), so this is a PanelAction beside Download and Clipboard.
+    <PanelAction
+      icon={Link2}
       onClick={handleClick}
       disabled={disabled || busy}
       title={
@@ -95,8 +95,7 @@ export function ShareButton({
               : "Sign in to share"
       }
     >
-      {busy ? <Spinner size={24} /> : <Share2 />}
-      <span>{busy ? "Creating…" : "Share link"}</span>
-    </ToolButton>
+      {busy ? "Creating…" : "Share link"}
+    </PanelAction>
   );
 }

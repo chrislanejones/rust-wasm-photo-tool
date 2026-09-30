@@ -17,30 +17,11 @@ import {
 } from "lucide-react";
 import { fmtBytes } from "@/lib/resourceMonitor";
 import type { DiagnosticsSnapshot, ProcessRow } from "@/hooks/useDiagnostics";
-import type { LogSource } from "@/lib/diagnosticsLog";
+import { SUBSYSTEM_COLOR } from "@/components/subsystemColors";
 import {
   runThreadedBlurBench,
   type ThreadedBlurBenchResult,
 } from "@/lib/threadedBlurBench";
-
-/** Solid bar fill per subsystem, echoing the badge colors in the log table. */
-const BAR_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "bg-warning",
-  CONVEX_DB: "bg-blue-500",
-  INDEXEDDB: "bg-teal-500",
-  REPLICATE_AI: "bg-violet-500",
-  UI_THREAD: "bg-success",
-  CONSOLE: "bg-bg-elevated",
-};
-
-const TEXT_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "text-warning",
-  CONVEX_DB: "text-blue-400",
-  INDEXEDDB: "text-teal-400",
-  REPLICATE_AI: "text-violet-400",
-  UI_THREAD: "text-success",
-  CONSOLE: "text-text-secondary",
-};
 
 /** Pick a green→amber→red bar color from a 0..1 load. */
 function loadBar(load: number): string {
@@ -92,7 +73,7 @@ function ProcRow({ p, now }: { p: ProcessRow; now: number }) {
   return (
     <tr className="border-t border-border hover:bg-card/30">
       <td className="px-3 py-1">
-        <span className={`font-bold ${TEXT_CLASS[p.source]}`}>{p.source}</span>
+        <span className={`font-bold ${SUBSYSTEM_COLOR[p.source].text}`}>{p.source}</span>
       </td>
       <td className="px-3 py-1 text-right tabular-nums text-text-secondary">
         {p.events}
@@ -105,7 +86,7 @@ function ProcRow({ p, now }: { p: ProcessRow; now: number }) {
         <div className="flex items-center gap-2">
           <div className="relative h-2.5 w-24 overflow-hidden rounded-sm bg-background">
             <div
-              className={`h-full ${BAR_CLASS[p.source]} transition-[width] duration-300`}
+              className={`h-full ${SUBSYSTEM_COLOR[p.source].bar} transition-[width] duration-300`}
               style={{ width: `${Math.min(100, p.cpuPct)}%` }}
             />
           </div>

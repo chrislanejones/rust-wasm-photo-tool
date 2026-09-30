@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import { POSTS } from "../data/posts";
-import EngineInAWorker from "./engine-in-a-worker";
+import EngineInAWorker, { Topper as EngineInAWorkerTopper } from "./engine-in-a-worker";
+import EntropyIsTheDefault, { Topper as EntropyTopper } from "./entropy-is-the-default";
+import OfflineByConstruction, { Topper as OfflineByConstructionTopper } from "./offline-by-construction";
 
 /* slug → body. The only module that imports both halves of a post.
  *
@@ -9,7 +11,22 @@ import EngineInAWorker from "./engine-in-a-worker";
  * fallback into the HTML a crawler reads. A post is text. It ships as text.
  */
 export const POST_BODIES: Record<string, ComponentType> = {
+  "entropy-is-the-default": EntropyIsTheDefault,
+  "offline-by-construction": OfflineByConstruction,
   "engine-in-a-worker": EngineInAWorker,
+};
+
+/* slug → header banner, for a post that has one.
+ *
+ * Optional, and a post without an entry gets the plain header. The banner is
+ * decoration behind the shell's headline, so it renders nothing a reader or a
+ * crawler needs: prerendered, it is an empty box over the header's gradient,
+ * and the scene fades in after the page has loaded.
+ */
+export const POST_TOPPERS: Partial<Record<string, ComponentType>> = {
+  "entropy-is-the-default": EntropyTopper,
+  "offline-by-construction": OfflineByConstructionTopper,
+  "engine-in-a-worker": EngineInAWorkerTopper,
 };
 
 /* Fail the build on a post with no body.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { useThumbDevelop } from "./useThumbDevelop";
+import { BatchCropThumbShade } from "./BatchCropThumbShade";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -9,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { formatBytes } from "@/lib/format";
+import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
+import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
 export interface PhotoEntry {
   id: string;
@@ -29,7 +32,17 @@ export interface PhotoEntry {
   /** Immutable key of the *upload* original — A/B compare baseline. Never
    *  replaced by Apply Compression or Auto Compress. */
   uploadKey?: string;
+  /** Quality (1..100) the stored bytes were last LOSSY-encoded at, by Apply
+   *  Compression or Auto Compress. Undefined for an untouched upload (its
+   *  camera/encoder quality is unknown) and for a lossless PNG. Persisted with
+   *  the gallery manifest, so it survives a reload for anonymous and signed-in
+   *  sessions alike. Two readers: the Resize & Compress panel models a pending
+   *  quality change RELATIVE to it (a file already at 75 does not shrink by
+   *  25% again at 75), and "Apply Resize" re-encodes at it instead of at 100,
+   *  which used to inflate an already-compressed photo several times over. */
+  encodeQuality?: number;
 }
+
 
 interface Props {
   photos: PhotoEntry[];
@@ -118,7 +131,13 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   // that GREW (an upscale, or a quality raised past the original) showed no
   // badge at all and looked untouched. Growth is unbounded and routinely passes
   // 100%: a file 2.5x the upload reads "+150%".
-  const sizeDelta = savings?.savingsPercent ?? 0;
+  //
+  // Read from the entry's own sizes first. The separate `savings` map used to
+  // be the only source, and it drifted: Auto Compress measured against the
+  // CURRENT file rather than the upload (so a second run reset the badge), and
+  // Apply Compression flashed an area×quality guess. The map is kept only as a
+  // fallback for an entry with no recorded upload size.
+  const sizeDelta = sizeDeltaPercent(entry) ?? savings?.savingsPercent ?? 0;
   const hasSavings = sizeDelta !== 0;
   const grew = sizeDelta < 0;
 
@@ -187,6 +206,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         onLoad={develop.onImgReady}
         onError={develop.onImgReady}
       />
+      <BatchCropThumbShade entry={entry} isActive={isActive} cover={Boolean(vertical)} />
 
       <AnimatePresence>
         {isCompressing && (
@@ -266,8 +286,14 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           Shown on hover only. */}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        aria-label="Remove image"
         title="Remove"
-        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-all"
+        // focus-visible:opacity-100 — this button is opacity-0 until hover, so a
+        // keyboard user tabbing through the gallery landed on it completely
+        // INVISIBLE: opacity 0, and opacity hides an element's outline too, so
+        // the global button:focus-visible ring could not show (WCAG 2.4.7,
+        // measured in QC 09-27-2026). The Select toggle beside it gets the same.
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
       </button>
@@ -276,6 +302,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           visible for every thumb once a selection has started. */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
+        // A toggle: a stable name, with aria-pressed saying which way it is.
+        // The only name used to be this flipping title.
+        aria-label="Select image"
+        aria-pressed={selected}
         title={selected ? "Deselect" : "Select"}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
            `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
@@ -312,7 +342,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
             : "bg-black/55 border-white/80 text-white/45"
-        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>
@@ -383,7 +413,12 @@ function GalleryActions({
     : "flex items-center gap-1.5";
   const actionBtn = vertical ? "px-1.5 py-2 text-2xs" : btn;
   /** Compact stacks icon over label, so the label must not be hidden there. */
-  const label = vertical ? "inline" : "hidden sm:inline";
+  // sr-only, not hidden. `hidden` is display:none, which takes the text out of
+  // the ACCESSIBILITY tree as well as off the screen — so below 640px every one
+  // of these buttons was icon-only with a flaky `title` as its only name.
+  // sr-only looks identical (gone below sm, shown above) but a screen reader
+  // still reads the label. Seven buttons fixed by this one string.
+  const label = vertical ? "inline" : "sr-only sm:not-sr-only";
 
   const actions = (
     <>
@@ -602,10 +637,9 @@ export function GalleryBar({
       className={
         vertical
           ? // Master-bar content box: flush below the 48px chrome (top 56).
-            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] flex w-[252px] flex-col overflow-hidden rounded-b-xl border border-t-0 border-border bg-bg-secondary"
+            MASTER_BAR_CONTENT_BOX
           : "fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
       }
-      style={vertical ? { boxShadow: "var(--shadow-panel)" } : undefined}
     >
       <motion.div
         animate={
@@ -702,7 +736,8 @@ export function GalleryBar({
                 : "grid grid-cols-[auto_1fr_auto] gap-2 items-center"
             }
           >
-            <button
+            <Button
+              size="tiny"
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -711,7 +746,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollLeft}
-              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex-shrink-0"
               aria-label={vertical ? "Scroll up" : "Scroll left"}
             >
               {vertical ? (
@@ -719,7 +754,7 @@ export function GalleryBar({
               ) : (
                 <ChevronLeft className="h-4 w-4" />
               )}
-            </button>
+            </Button>
 
             <div
               ref={stripRef}
@@ -810,7 +845,8 @@ export function GalleryBar({
               ))}
             </div>
 
-            <button
+            <Button
+              size="tiny"
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -819,7 +855,7 @@ export function GalleryBar({
                 )
               }
               disabled={!canScrollRight}
-              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex-shrink-0"
               aria-label={vertical ? "Scroll down" : "Scroll right"}
             >
               {vertical ? (
@@ -827,7 +863,7 @@ export function GalleryBar({
               ) : (
                 <ChevronRight className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </div>
 
           {/* Vertical (master bar): the count readout is pinned to the bottom. */}

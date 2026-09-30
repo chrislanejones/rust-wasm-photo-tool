@@ -17,7 +17,7 @@ fn background_box_casts_a_visible_drop_shadow() {
     // Opaque GREEN rect background box; text black. (bg args: kind=1 rect,
     // r,g,b,a, padding, corner_radius, tail)
     let id = t.add_text_annotation(
-        "Hi", 32.0, 0, 0, 0, false, 40, 40, 0.0, 1, 0, 200, 0, 255, 10, 6, 0,
+        "Hi", 32.0, 0, 0, 0, false, 40, 40, 0.0, 1, 0, 200, 0, 255, 10, 6, 0, "",
     );
 
     // Box shadow only, RED, fully opaque, offset +14/+14 so it clears the box.
@@ -64,7 +64,7 @@ fn box_shadow_with_no_background_falls_back_to_the_text_silhouette() {
 
     // background_kind = 0 (None); black text.
     let id = t.add_text_annotation(
-        "Hi", 40.0, 0, 0, 0, false, 40, 40, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "Hi", 40.0, 0, 0, 0, false, 40, 40, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     );
     // shadow_box = true, shadow_text = FALSE — the exact "Box, no background" case.
     assert!(t.set_text_shadow(id, true, false, "#ff0000", 255, 14, 14, 2));

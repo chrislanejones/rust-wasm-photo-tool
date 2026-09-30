@@ -201,6 +201,19 @@ pub fn translate(data: &[u8], img_w: i32, img_h: i32, dx: i32, dy: i32) -> Vec<u
 // thin delegator so existing call sites (`transform::resize_bilinear`) are
 // unchanged.
 pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
+    // The SIMD path reads through raw pointers with no bounds check, trusting
+    // `old_w × old_h` to describe `data`. Two of this function's callers hand
+    // it caller-supplied dimensions straight from JS (`resize_pixels`,
+    // `composite_pixels`' logo path), so a short buffer would read past its
+    // end into wasm memory, and a zero dimension would hit `clamp(0, -1)`
+    // and panic. Refuse both here, once, with a transparent output of the
+    // requested size so every caller's size invariant still holds.
+    let need = (old_w as usize)
+        .saturating_mul(old_h as usize)
+        .saturating_mul(4);
+    if old_w == 0 || old_h == 0 || data.len() < need {
+        return vec![0u8; (new_w.max(1) as usize) * (new_h.max(1) as usize) * 4];
+    }
     crate::simd::resize::resize_bilinear(data, old_w, old_h, new_w, new_h)
 }
 
@@ -347,93 +360,4 @@ pub fn resize_catmull_rom(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h
 /// 1:1; the window widens proportionally when minifying. Separable two-pass.
 pub fn resize_lanczos3(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
     resize_separable(data, old_w, old_h, new_w, new_h, 3.0, lanczos3_kernel)
-}
-
-/// Apply a crop preview overlay: darkens all pixels OUTSIDE the given rectangle.
-/// `opacity` controls how dark the overlay is (0.0 = invisible, 1.0 = fully black).
-/// Call this on a copy of the buffer (or undo after) — it modifies pixels in place.
-pub fn apply_crop_overlay(
-    data: &mut [u8],
-    img_w: u32,
-    img_h: u32,
-    crop_x: u32,
-    crop_y: u32,
-    crop_w: u32,
-    crop_h: u32,
-    opacity: f64,
-) {
-    let alpha = opacity.clamp(0.0, 1.0);
-    let inv = 1.0 - alpha;
-
-    let cx_end = (crop_x + crop_w).min(img_w);
-    let cy_end = (crop_y + crop_h).min(img_h);
-
-    for y in 0..img_h {
-        for x in 0..img_w {
-            // Skip pixels inside the crop rectangle
-            if x >= crop_x && x < cx_end && y >= crop_y && y < cy_end {
-                continue;
-            }
-            let idx = ((y * img_w + x) * 4) as usize;
-            if idx + 2 < data.len() {
-                // Darken RGB channels, preserve alpha
-                data[idx] = (data[idx] as f64 * inv).round() as u8;
-                data[idx + 1] = (data[idx + 1] as f64 * inv).round() as u8;
-                data[idx + 2] = (data[idx + 2] as f64 * inv).round() as u8;
-            }
-        }
-    }
-}
-
-/// Draw a dashed rectangle border for the crop selection.
-/// `dash_len` and `gap_len` control the dash pattern.
-pub fn draw_crop_border(
-    data: &mut [u8],
-    img_w: u32,
-    img_h: u32,
-    crop_x: u32,
-    crop_y: u32,
-    crop_w: u32,
-    crop_h: u32,
-    color: [u8; 4],
-    dash_len: u32,
-    gap_len: u32,
-) {
-    let cx_end = (crop_x + crop_w).min(img_w);
-    let cy_end = (crop_y + crop_h).min(img_h);
-    let pattern = dash_len + gap_len;
-
-    // Helper: set pixel if in bounds and on a dash
-    let set_pixel = |data: &mut [u8], x: u32, y: u32, pos: u32| {
-        if x >= img_w || y >= img_h {
-            return;
-        }
-        if pos % pattern >= dash_len {
-            return;
-        } // in gap
-        let idx = ((y * img_w + x) * 4) as usize;
-        if idx + 3 < data.len() {
-            data[idx] = color[0];
-            data[idx + 1] = color[1];
-            data[idx + 2] = color[2];
-            data[idx + 3] = color[3];
-        }
-    };
-
-    // Top edge
-    for x in crop_x..cx_end {
-        set_pixel(data, x, crop_y, x - crop_x);
-    }
-    // Bottom edge
-    for x in crop_x..cx_end {
-        set_pixel(data, x, cy_end.saturating_sub(1), x - crop_x);
-    }
-    // Left edge
-    for y in crop_y..cy_end {
-        set_pixel(data, crop_x, y, y - crop_y);
-    }
-    // Right edge
-    for y in crop_y..cy_end {
-        set_pixel(data, cx_end.saturating_sub(1), y, y - crop_y);
-    }
 }

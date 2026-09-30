@@ -7,7 +7,7 @@
 ```
 src/
 ├── lib.rs          #[wasm_bindgen] coordinator (v0.9.34: the former ~4,760-line god-object was
-│                   split into the focused modules below — behaviour-identical, identical WASM API).
+│                   split into the focused modules below — behavior-identical, identical WASM API).
 │                   Holds the ImageHorseTool struct + all fields; constructor/dimensions;
 │                   load_image / get_image_data / has_transparency / data_ptr / data_len;
 │                   calculate_histogram; zoom; history wrappers (undo/redo/jump, snapshot
@@ -28,7 +28,7 @@ src/
 │                   add/remove/apply/invert/has_layer_mask; move_preview + translate_active_layer;
 │                   layer persistence get_layer_png / get_layer_*_annotations + begin/push_restored_layer/finish
 ├── annotations.rs  Live (non-destructive) overlays: TextAnnotation + ShapeAnnotation types,
-│                   build_text_annotation, JSON (de)serialise, render_shape_into / render_pin, and the
+│                   build_text_annotation, JSON (de)serialize, render_shape_into / render_pin, and the
 │                   text + shape CRUD impls (add/update/remove/get/at/restore, draw_arrow / draw_shape,
 │                   align_annotation, bézier + polyline + pin, set_editing_*, render_with_annotations,
 │                   flatten_text_annotations)
@@ -59,9 +59,24 @@ src/
 │                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles;
 │                   Bézier pen paths — flatten_cubic_path (de Casteljau) strokes the curve via
 │                   draw_polyline, fill_polygon (scanline even-odd) backs the optional path background
-├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
-│                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
-│                   annotation tiles
+├── text.rs         Renders text → pixel buffer with ab_glyph; rotate_pixels for annotation
+│                   tiles; word-wrap that the JS preview mirrors line for line. Every layout
+│                   function takes a font_id — "" is the embedded face. Also holds the
+│                   wasm-bindgen commit_text / measure_text pair (moved out of lib.rs, which
+│                   is a line ratchet)
+├── fonts.rs        The typeface registry (ADR-058). Liberation Sans Regular+Bold are embedded
+│                   at compile time and are the fallback for any id this binary has no bytes
+│                   for. They ARE subset — 430 codepoints / 460 glyphs each, against 2,620
+│                   glyphs in the stock 410,820 B face — and since 2026-09-17 also UNHINTED:
+│                   ab_glyph runs no TrueType bytecode interpreter, so hinting was 32,542 B of
+│                   Regular (52.5%) and 31,770 B of Bold (51.6%) that shipped and never ran.
+│                   The pair went 123,492 → 60,020 B, pixel-identical. ⚠️ The hinting TABLES
+│                   are the small part (fpgm+prep+cvt+gasp = 3,471 / 3,804 B); the bulk is the
+│                   per-glyph instruction streams inside glyf. Other faces arrive at RUNTIME
+│                   via register_font rather than embedded — three families do not fit the
+│                   band the deploy sentinel holds. ⚠️ Registration is MONOTONE: an id is
+│                   never re-pointed at new bytes, because textMetricsCache keys on it and
+│                   can never be invalidated
 ├── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
 │                   history snapshot serialization (get/inject undo/redo PNG blobs)
 ├── utils.rs        Shared leaf helpers — json_escape, flat_to_points, points_bbox,
@@ -153,14 +168,18 @@ app/src/
 │   │                                 when signed in; a failed Convex write falls back to local
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
+│   ├── ui/                           Shared primitives — the ONE copy of each: buttons/tiles,
+│   │                                 dialog + confirm-dialog, select-field, number-field,
+│   │                                 pane-heading, status-note, segmented-tabs, swatch, tooltip
+│   │                                 (+ HintTooltip). Repeated class strings live in lib/styles.ts
+│   ├── ParkedScreen.tsx              "This tab is parked" card behind IdleScreen + MultiTabScreen
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
 │   │                                 log + tier selector) in production builds
-│   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
 │   ├── ColorSwatchGrid.tsx           Preset swatches + the user's saved palette + a "+" that opens
 │   │                                 the ColorPickerDialog; translucent picks sit on a checkerboard
-│   ├── ColorPickerDialog.tsx         The colour dialog behind every "+": wheel / rectangle picker
+│   ├── ColorPickerDialog.tsx         The color dialog behind every "+": wheel / rectangle picker
 │   │                                 (HSV is the source of truth so hue survives black/white),
 │   │                                 hue · brightness · opacity sliders, hex / RGBA / HSL fields,
 │   │                                 and the palette row whose own "+" saves to the global list
@@ -200,8 +219,9 @@ app/src/
 │   │   │                             driven by ResizeObserver + MutationObserver on canvas style
 │   │   │                             so the overlay tracks zoom and pan transforms
 │   │   └── ReviewPanel.tsx          Animated right-side "Review" panel (was HistoryPanel).
-│   │                                 Header toggle group opens up to three stacked sections —
-│   │                                 History, Reselect, Layers — that split the body evenly
+│   │                                 Header toggle group of FIVE — History, Layers, Reselect,
+│   │                                 Histogram, Combine — of which up to three are open at once,
+│   │                                 splitting the body evenly
 │   │                                 (1 full / 2 halves / 3 thirds), each with its own header,
 │   │                                 count box, and scroll area. History = undo/redo timeline
 │   │                                 with an inline Undo button; Reselect = every live text +
@@ -210,18 +230,21 @@ app/src/
 │   │                                 inline rename, reorder, duplicate, merge-down, delete, and a
 │   │                                 per-layer opacity slider — tier-gated (locked for demo). Count
 │   │                                 box shows the live layer count; the per-tier limit is in its
-│   │                                 tooltip. Row controls use the xs TinyButton variant
+│   │                                 tooltip. Row controls use the xs TinyButton variant.
+│   │                                 Histogram = the live RGB / Luma scope (HistogramView);
+│   │                                 Combine = the New / Add / Subtract / Intersect strip that used
+│   │                                 to live on the Select panel, plus the same object list as one
+│   │                                 more selection producer (lib/objectSelection.ts). Histogram and
+│   │                                 Combine start closed
 │   ├── gallery/
 │   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails; selection row adds a
 │   │   │                             Duplicate button (content-addressed copy) beside Export /
 │   │   │                             Delete Selected; header count reads "N of N — cap max" /
 │   │   │                             "Selected: n of N" with an (i) tier-limit tooltip from TIERS
-│   │   └── PhotoThumb.tsx            Individual thumbnail component
 │   ├── tools/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
 │   │   ├── ToolGrid.tsx              Gradient icon buttons
 │   │   ├── ToolButton.tsx            Individual tool button
-│   │   ├── toolConfig.ts             Tool definitions (10 tools)
 │   │   └── settings/
 │   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
 │   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)
@@ -231,12 +254,11 @@ app/src/
 │   │       │                         auto-compress, and ONE Apply button named for what is pending
 │   │       ├── EffectsSettings.tsx   Tab-switched: Levels (brightness/contrast sliders) +
 │   │       │                         Color Picker (eyedropper, activates magnifier overlay)
-│   │       ├── ArrowSettings.tsx     Coming-soon panel (FileText icon); content moved to
-│   │       │                         ShapeSettings Arrows tab
 │   │       ├── ShapeSettings.tsx     2-tab: Shapes (4 buttons styled like Transform panel,
 │   │       │                         lucide icons, stroke/color) + Arrows (stroke, style, color);
 │   │       │                         shapesMode lifted to AppShell for correct canvas routing
-│   │       ├── BatchSettings.tsx     Coming-soon panel for Images toolbar tool (batch icon stamp)
+│   │       ├── BatchSettings.tsx     Batch tool: text, logo, resize/compress across the gallery
+│   │       │                         (throwaway engine per photo; pinned by the max-lines ratchet)
 │   │       ├── PaintSettings.tsx     Tab-switched: Paint (size/color/opacity) +
 │   │       │                         Blur Brush (radius, intensity) + Pen (Bézier vector paths:
 │   │       │                         stroke width/color + optional solid background fill)
@@ -264,6 +286,13 @@ app/src/
     │                                 shapes are two independent id spaces in the engine. Also
     │                                 `basisOfShape` — a HAND-MIRROR of `shape_basis_rect` in
     │                                 src/annotations.rs that the two must agree on to the pixel
+    ├── objectSelection.ts             What Review → Combine points AT: an ObjectRef (type, id —
+    │                                 text and shapes are two id spaces, as in perspectiveTarget)
+    │                                 plus the FOOTPRINT it contributes to the selection. A bbox,
+    │                                 padded by half the stroke, routed to whichever marquee producer
+    │                                 the engine already has: ellipse_select for a circle, rect_select
+    │                                 for everything else. Adds no geometry rule — every number is
+    │                                 read off get_shape_annotations / get_text_annotations
     ├── colors.ts                     Color utility helpers
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
     │                                 state + undo/redo history (PNG-encoded) plus the layer stack
@@ -284,8 +313,34 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
-    ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,
-    │                                 SVG rejection (staged; wire before decode)
-    ├── security/sanitizeFilename.ts  Path-traversal-safe basename for ZIP / download names (staged)
+    ├── preferences.ts                App-wide prefs (Settings → General / Appearance / Rulers &
+    │                                 Grids / Security / Layers and Canvas): the shape, the defaults,
+    │                                 the clamps, and the canonical serializer that is ALSO the sync
+    │                                 wire format. Talks to localStorage and to nothing else —
+    │                                 replication is lib/sync's job (ADR-061)
+    ├── sync/                         One value, shown the same way in every tab and on every
+    │                                 signed-in device. ADR-061
+    │   ├── keys.ts                   The three documents — prefs / ui / tools. Mirrored by SYNC_KEYS
+    │   │                             in convex/sync.ts; keys.test.ts asserts the two agree
+    │   ├── docs.ts                   What each document IS: read / adopt / serialize / validate, and
+    │   │                             the zustand bridge. ⚠️ Read the header before adding one — the
+    │   │                             photo archive is deliberately NOT here
+    │   ├── syncedDoc.ts              What a document is: its canonical value, plus the glue to the
+    │   │                             ledger. Adopting a value is never counted as an edit
+    │   ├── ledger.ts                 Per account, in localStorage, across reloads: the revision a
+    │   │                             value is based on and the value still owed to the server
+    │   ├── channel.ts                Cross-TAB transport (BroadcastChannel). Not useTabClaim's
+    │   │                             channel — that one decides who may EDIT, this one carries state
+    │   │                             to every tab including the parked ones
+    │   ├── leader.ts                 Which tab talks to the server: the useTabClaim holder
+    │   ├── useCloudSync.ts           Cross-DEVICE transport: one reactive Convex query + one mutation.
+    │   │                             Also `sendThisDevice()`, the Send button's explicit seed
+    │   ├── reconcile.ts              THE decision — adopt / push / hold / idle. Pure, import-free,
+    │   │                             enumerated in reconcile.test.ts
+    │   ├── status.ts                 What it is doing, for Settings → Sync to show (desktop + phone)
+    │   ├── enabled.ts                This device's on/off switch (localStorage, never synced). Off =
+    │   │                             signed out for sync; on again = first contact
+    │   ├── identity.ts               Tab id (echo suppression). No device id — nothing uploads one
+    │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
     └── utils.ts                      cn() utility
 ```

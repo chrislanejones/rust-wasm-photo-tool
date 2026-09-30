@@ -18,12 +18,13 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { PANEL_SECTION } from "@/lib/styles";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -142,6 +143,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Shape selector — stacked tiles (icon on top, label below). */}
                   <ToolButtonGroup
+                    aria-label="Shape"
                     stacked
                     columns={3}
                     options={SHAPES}
@@ -205,6 +207,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                         Fill
                       </label>
                       <ToolButtonGroup
+                        aria-label="Fill"
                         options={FILL_MODES}
                         value={settings.fillMode ?? "none"}
                         onChange={(id) =>
@@ -280,6 +283,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Pin label style: Numbers / Letters — first, above the size. */}
                   <ToolButtonGroup
+                    aria-label="Pin label style"
                     stacked
                     options={PIN_LABELS}
                     value={settings.pinLabel ?? "numbers"}
@@ -319,6 +323,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 <>
                   {/* Arrow style: Single / Double — first, above the size. */}
                   <ToolButtonGroup
+                    aria-label="Arrow style"
                     stacked
                     options={ARROW_STYLES}
                     value={settings.arrowStyle ?? "single"}
@@ -356,7 +361,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
       </ToolModeToggle>
 
       {onPlace && (
-        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+        <div className={PANEL_SECTION}>
           <PlacementGrid
             label="Placement"
             info={

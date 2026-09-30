@@ -6,6 +6,7 @@
 import { StaticRouter } from "react-router";
 import { renderToString } from "react-dom/server";
 import App from "./App";
+import { preloadRoute, pageRouteFor } from "./routes";
 
 /* The build-time half of the site.
  *
@@ -24,13 +25,22 @@ import App from "./App";
  * a hydration mismatch nobody sees until a crawler does.
  */
 
-export function render(url: string): string {
+/* Async because each page is its own chunk (see routes.ts). renderToString
+ * never waits for a lazy component; it writes the Suspense fallback, which is
+ * empty here. So the page is loaded first, and the render that follows finds
+ * it already resolved. */
+export async function render(url: string): Promise<string> {
+  await preloadRoute(url);
   return renderToString(
     <StaticRouter location={url}>
       <App />
     </StaticRouter>,
   );
 }
+
+/** The source file of the page a URL renders. prerender.mjs looks it up in
+ *  the client build's manifest to find the chunk it should modulepreload. */
+export const pageSourceFor = (url: string) => pageRouteFor(url).source;
 
 /* Re-exported so the prerender script has exactly one copy of the route table
  * and the <head> builders — the same module the browser bundle uses. Importing

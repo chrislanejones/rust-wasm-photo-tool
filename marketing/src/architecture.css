@@ -1,0 +1,511 @@
+/* architecture — v2 port. Owned by the architecture port; other ports must not edit this file.
+ *
+ * Everything is scoped under `.architecture` (the <main> on /architecture) or
+ * uses an `arch-` prefix, so none of it leaks onto the pages that share
+ * styles.css. The old /architecture classes in styles.css (.map, .node, .tbl,
+ * .coda, .tiers-filter, …) are no longer referenced by this page. */
+
+:root {
+  /* The v2 architecture hero caps a rung higher than --text-4xl (4.75rem vs
+   * 4.5rem); the two agree below ~1440px wide. */
+  --text-arch-hero: clamp(2.5rem, 4vw + 1rem, 4.75rem);
+  /* The schema and coda headings — between --text-section and --text-headline. */
+  --text-arch-h2: clamp(2rem, 2.5vw + 1rem, 3.25rem);
+  /* The filter tile labels scale with the viewport, from 15px to 20px. */
+  --text-arch-tile: clamp(0.9375rem, 0.5vw + 0.75rem, 1.25rem);
+}
+
+.architecture code,
+.architecture .arch-mono {
+  font-family: var(--font-outlier);
+  font-size: 0.9em;
+}
+.architecture code { color: var(--color-ink); }
+
+/* ── head ─────────────────────────────────────────────────────────────── */
+
+.arch-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  /* Same clearance expression as .page-head: the nav floats. */
+  padding: calc(var(--banner-height) + 56px) var(--page-gutter) var(--space-xl);
+}
+.arch-head__lead { display: grid; gap: 20px; min-width: 0; }
+.arch-head__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.arch-head__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 16ch;
+  font-size: var(--text-arch-hero);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.arch-head__deck {
+  margin: 0;
+  padding-bottom: 6px;
+  max-width: 36ch;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+/* ── tier filter ──────────────────────────────────────────────────────── */
+
+.arch-filter { padding: 0 var(--page-gutter) var(--space-lg); }
+.arch-filter__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-sm);
+}
+.arch-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 16px 12px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 10px;
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms, color 120ms, border-color 120ms;
+}
+.arch-tile:hover { border-color: var(--color-rule-strong); }
+.arch-tile:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.arch-tile[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 14%, var(--color-paper-2));
+  color: var(--color-ink);
+}
+.arch-tile__icon { display: block; line-height: 0; color: var(--color-ink-3); }
+.arch-tile__label {
+  font-size: var(--text-arch-tile);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.arch-tile__count {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: var(--color-ink-3);
+}
+.arch-tile[aria-pressed="true"] .arch-tile__icon,
+.arch-tile[aria-pressed="true"] .arch-tile__count { color: var(--color-accent); }
+
+.arch-filter__note {
+  margin: 0;
+  padding-block-start: var(--space-md);
+  max-width: 62ch;
+  min-height: 1lh;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* ── the map ──────────────────────────────────────────────────────────── */
+
+.arch-map {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--page-gutter) var(--space-2xl);
+}
+.arch-plane {
+  padding: var(--space-lg);
+  border-radius: 10px;
+  transition: opacity 220ms, filter 220ms;
+}
+.arch-plane--browser {
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  background: var(--color-paper-2);
+}
+.arch-plane--edge {
+  border: var(--rule-hair) dashed var(--color-rule-strong);
+  background: transparent;
+}
+.arch-plane__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding-block-end: var(--space-lg);
+}
+.arch-plane__name {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.arch-plane__note { font-size: var(--text-sm); color: var(--color-ink-2); }
+.arch-plane__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-md);
+}
+.arch-plane__row--edge { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.arch-plane__foot {
+  margin: 0;
+  padding-block-start: var(--space-lg);
+  max-width: 66ch;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.arch-seam {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-block: var(--space-md);
+}
+.arch-seam__rule { flex: 1; height: 1px; background: var(--color-rule); }
+.arch-seam__label {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  white-space: nowrap;
+}
+
+/* ── a node: one card in the map or the stack ─────────────────────────── */
+
+.arch-node {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  border-radius: 6px;
+  transition: opacity 220ms, filter 220ms;
+}
+.arch-node--ui { background: var(--color-paper-3); }
+.arch-node--compute,
+.arch-node--wasm { background: var(--color-paper-4); }
+.arch-node--net { background: var(--color-paper-2); }
+.arch-node__title {
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.arch-node__title--mono { font-family: var(--font-outlier); }
+.arch-node__sub { margin: 0; font-size: var(--text-xs); color: var(--color-ink-2); }
+.arch-node__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+.arch-node__list strong { font-weight: 500; color: var(--color-ink); }
+.arch-node__planned { color: var(--color-ink-3); }
+.arch-node__soon {
+  align-self: flex-start;
+  margin-block-start: var(--space-sm);
+  padding: 4px 12px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+
+/* The filter's argument: everything this kind of user never touches fades. */
+.architecture .is-dim {
+  opacity: 0.28;
+  filter: saturate(0.4);
+}
+
+/* ── what's in each plane ─────────────────────────────────────────────── */
+
+.arch-stack { padding: 0 var(--page-gutter) var(--space-2xl); }
+.arch-stack__head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  padding-block: var(--space-2xl) var(--space-xs);
+}
+.arch-section-title {
+  margin: 0;
+  font-size: var(--text-section);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.arch-stack__deck {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--text-md);
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+.arch-stack__deck strong { font-weight: 500; color: var(--color-ink); }
+.arch-stack__label {
+  margin: 0;
+  padding-block: var(--space-xl) var(--space-md);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.arch-stack__muted { color: var(--color-ink-2); text-transform: none; letter-spacing: 0; }
+.arch-stack__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 16rem)), 1fr));
+  gap: var(--space-md);
+}
+.arch-stack__note {
+  margin: 0;
+  padding-block-start: var(--space-lg);
+  max-width: 62ch;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* ── the schema, on cream ─────────────────────────────────────────────────
+   Local ink: every site ink token is tuned for light-on-dark and is wrong
+   here. Same surface as Home's `.board--cream`. */
+
+.arch-schema {
+  --s-ink: oklch(16% 0.02 50);
+  --s-ink-2: oklch(25% 0.022 50);
+  --s-ink-3: oklch(34% 0.022 50);
+  --s-rule: oklch(76% 0.020 70);
+  --s-card: oklch(98% 0.006 75);
+  --s-key: oklch(90% 0.02 70);
+  --s-accent: oklch(44% 0.170 45);
+
+  padding: 0 var(--page-gutter) 88px;
+  background: oklch(95% 0.012 75);
+  color: var(--s-ink);
+}
+.arch-schema code { color: var(--s-ink); }
+.arch-schema__head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  padding-block: 88px var(--space-xl);
+}
+.arch-big-title {
+  margin: 0;
+  max-width: 14ch;
+  font-size: var(--text-arch-h2);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.arch-big-title--wide { max-width: 16ch; }
+.arch-schema__deck {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--text-md);
+  color: var(--s-ink-2);
+  text-wrap: pretty;
+}
+.arch-schema__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.arch-tbl {
+  padding: var(--space-md);
+  border: var(--rule-hair) solid var(--s-rule);
+  border-radius: 6px;
+  background: var(--s-card);
+  transition: opacity 220ms, filter 220ms;
+}
+.arch-tbl__name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  padding-block-end: var(--space-sm);
+  border-block-end: 1px solid var(--s-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--s-accent);
+}
+.arch-tbl__badge { font-size: var(--text-xs); font-weight: 400; color: var(--s-ink-3); }
+.arch-tbl__fields {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 4px var(--space-sm);
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.arch-tbl__field { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
+.arch-tbl__key {
+  flex-shrink: 0;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: var(--s-key);
+  color: var(--s-accent);
+  font-size: 0.85em;
+}
+.arch-tbl__fname { color: var(--s-ink); overflow-wrap: anywhere; }
+.arch-tbl__idx { flex-shrink: 0; color: var(--s-ink-3); font-size: 0.85em; }
+.arch-tbl__type { margin: 0; min-width: 0; color: var(--s-ink-2); overflow-wrap: anywhere; }
+.arch-tbl__comment { display: block; color: var(--s-ink-3); }
+.arch-tbl__indexes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: var(--space-md) 0 0;
+  padding-block-start: var(--space-sm);
+  border-block-start: var(--rule-hair) solid var(--s-rule);
+}
+.arch-tbl__idxname {
+  padding: 1px 4px;
+  border: var(--rule-hair) solid var(--s-rule);
+  border-radius: 2px;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--s-ink-2);
+}
+.arch-tbl__note { margin: var(--space-sm) 0 0; font-size: var(--text-xs); color: var(--s-ink-3); }
+
+.arch-rels { padding-block-start: var(--space-xl); }
+.arch-rels__label {
+  margin: 0;
+  padding-block-end: var(--space-md);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--s-accent);
+}
+.arch-rels__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--s-ink-2);
+}
+.arch-rels__list li { display: flex; align-items: center; gap: var(--space-xs); }
+.arch-rels__name { font-family: var(--font-outlier); font-size: 0.95em; color: var(--s-ink); }
+.arch-rels__card { color: var(--s-accent); font-variant-numeric: tabular-nums; }
+
+.arch-schema__notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-md);
+  padding-block-start: var(--space-xl);
+}
+.arch-note {
+  padding: var(--space-md);
+  border: var(--rule-hair) solid var(--s-rule);
+  border-radius: 6px;
+  background: var(--s-card);
+}
+.arch-note__title {
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.arch-note__body { margin: 0; font-size: var(--text-xs); color: var(--s-ink-2); }
+.arch-note__body .arch-mono { font-size: 1em; }
+
+/* ── coda ─────────────────────────────────────────────────────────────── */
+
+.arch-coda {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-xl) var(--space-2xl);
+  align-items: center;
+  padding: var(--space-3xl) var(--page-gutter);
+}
+.arch-coda__text { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.arch-coda__lede {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--text-deck);
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+.arch-coda__source {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--text-ui);
+  color: var(--color-ink-3);
+  text-wrap: pretty;
+}
+.arch-coda__file { font-size: 0.95em; color: var(--color-ink-2); }
+.arch-coda__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: stretch;
+  min-width: 0;
+}
+.arch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-height: 44px;
+  padding: 18px 28px;
+  border: var(--rule-hair) solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-micro) var(--ease-out),
+              border-color var(--dur-micro) var(--ease-out);
+}
+.arch-btn:hover { border-color: var(--color-ink-2); background: var(--color-paper-2); }
+.arch-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.arch-coda__foot {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+.arch-coda__num { color: var(--color-accent); }
+
+/* Long table names and the seam label must not push a 390px page sideways. */
+@media (max-width: 30rem) {
+  .arch-plane { padding: var(--space-md); }
+  .arch-seam__label { white-space: normal; text-align: center; }
+  .arch-btn { white-space: normal; text-align: center; }
+}

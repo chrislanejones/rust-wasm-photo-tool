@@ -33,6 +33,7 @@ fn text_with_everything(t: &mut ImageHorseTool) -> u32 {
         6,   // bg_padding
         4,   // bg_corner_radius
         1,   // bg_tail
+        "",  // font_id: the embedded face
     )
 }
 

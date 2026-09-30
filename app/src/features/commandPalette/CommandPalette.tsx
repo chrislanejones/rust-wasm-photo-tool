@@ -51,6 +51,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { WINDOW_TITLE } from "@/lib/styles";
 
 /** Tab filter: the three registry groups, plus an "All" that shows every one. */
 type TabId = "all" | PaletteGroup;
@@ -125,6 +127,7 @@ export function CommandPalette() {
   const usage = useUIStore((s) => s.commandUsage);
   const pushRecentCommand = useUIStore((s) => s.pushRecentCommand);
   const photoCount = useGalleryStore((s) => s.photos.length);
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
   // Same-source prefs as AppShell — usePreferences broadcasts commits across
   // instances, so hot-toggles here update the live overlays/theme instantly.
   const [prefs, applyPrefs] = usePreferences();
@@ -146,6 +149,7 @@ export function CommandPalette() {
     () =>
       buildPaletteCommands({
         photoCount,
+        onlineFeatures,
         prefs: {
           rulers: prefs.rulers,
           grid: prefs.grid,
@@ -157,7 +161,7 @@ export function CommandPalette() {
         // opening a second dialog for a text input the palette already has.
         promptRoute: () => setQuery("#/"),
       }),
-    [photoCount, prefs, applyPrefs, actions],
+    [photoCount, onlineFeatures, prefs, applyPrefs, actions],
   );
 
   /** Typing a route into the search field (`#/settings/security`) offers a jump
@@ -222,7 +226,7 @@ export function CommandPalette() {
               Start-ish padding — this is the part you look at first. ── */}
           <div className="border-b border-border">
             <DialogHeader className="border-b-0 px-5 py-3">
-              <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+              <DialogTitle className={WINDOW_TITLE}>
                 <CommandIcon className="h-4 w-4" />
                 Command Palette
               </DialogTitle>
@@ -249,28 +253,13 @@ export function CommandPalette() {
               {/* Group tabs — the Diagnostics window's segmented rail, stretched
                   edge to edge so it lines up with the search field above it
                   (each tab takes an equal quarter via flex-1). */}
-              <div
-                role="tablist"
-                aria-label="Command groups"
-                className="flex w-full items-center gap-1 rounded-lg bg-bg-tertiary p-1"
-              >
-                {TABS.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === id}
-                    onClick={() => setTab(id)}
-                    className={`flex-1 rounded-md px-2.5 py-1.5 font-mono text-2xs uppercase tracking-wider transition-colors ${
-                      tab === id
-                        ? "bg-bg-elevated text-text-primary"
-                        : "text-text-muted hover:text-text-primary"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs
+                label="Command groups"
+                tabs={TABS}
+                value={tab}
+                onChange={setTab}
+                fill
+              />
             </div>
           </div>
 

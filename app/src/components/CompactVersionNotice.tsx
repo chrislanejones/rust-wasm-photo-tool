@@ -1,14 +1,5 @@
 import { PanelLeft } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Props {
   open: boolean;
@@ -27,28 +18,18 @@ interface Props {
  */
 export function CompactVersionNotice({ open, onOpenChange }: Props) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PanelLeft className="h-5 w-5 text-theme-accent" />
-            Compact version
-          </DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <DialogDescription>
-            At this width Image Horse switches to its compact version — the full
-            editor, laid out for a window snapped to half the screen (Win+←/→)
-            or split-screen. Widen the window any time for the full desktop
-            workspace.
-          </DialogDescription>
-        </DialogBody>
-        <DialogFooter>
-          <Button size="large" className="w-full" onClick={() => onOpenChange(false)}>
-            Continue
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Compact version"
+      titleIcon={PanelLeft}
+      confirmLabel="Continue"
+      onConfirm={() => onOpenChange(false)}
+    >
+      At this width Image Horse switches to its compact version — the full
+      editor, laid out for a window snapped to half the screen (Win+←/→)
+      or split-screen. Widen the window any time for the full desktop
+      workspace.
+    </ConfirmDialog>
   );
 }

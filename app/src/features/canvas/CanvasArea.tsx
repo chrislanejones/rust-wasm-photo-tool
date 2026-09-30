@@ -21,7 +21,6 @@ import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { PerspectiveLayer } from "./PerspectiveLayer";
 import { ShapeEditOverlay, type ShapeDrawSettings } from "./ShapeEditOverlay";
-import { ROTATE_CURSOR } from "./rotateCursor";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
@@ -31,17 +30,32 @@ import {
   textInkOffset,
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
+import { faceCss } from "@/lib/engineFonts";
+import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
+import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
-import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind, RulerUnit } from "@/lib/preferences";
-import { selectionCombineMode } from "@/lib/selectionBool";
+import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
+import { getCursorForSubTool, ROTATE_CURSOR } from "./canvasCursor";
+
+/* On-canvas ink. Neutral black/white on purpose, not theme tokens: these sit on
+   arbitrary photo pixels, so they contrast by pairing a light line with a dark
+   one rather than by hue. Named because each was a literal repeated 2–7 times. */
+/** The dim outside a marquee, and the dark underlay beneath its dashed edge. */
+const MARQUEE_SHADE = "rgba(0,0,0,0.55)";
+/** The dashed box around a shape or text being edited. */
+const EDIT_BOX_STROKE = "rgba(255,255,255,0.85)";
+/** The dark rim on every white drag handle. */
+const HANDLE_OUTLINE = "rgba(0,0,0,0.5)";
+/** The soft shadow that lifts a handle cluster off the image. */
+const HANDLE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -49,39 +63,6 @@ const EMPTY_SEGMENTS = new Float32Array(0);
  *  active kind), at or above which it's a marquee DRAG. Screen px, not canvas
  *  px, so the feel is zoom-independent. Matches the crop tool's 5px spirit. */
 const MARQUEE_THRESHOLD_PX = 4;
-
-
-// Crosshair-with-plus / crosshair-with-minus for the Select tool while a
-// Shift (add) / Alt (subtract) modifier is held — no standard CSS cursor
-// carries the intent badge, so we draw it (same data-URI approach as the
-// rotate cursor above; black-under-white double stroke for contrast on any
-// background). Falls back to plain `crosshair`.
-const combineCursor = (badge: "plus" | "minus"): string => {
-  const bar =
-    "<line x1='16' y1='20' x2='22' y2='20' stroke='black' stroke-width='3.5'/>" +
-    "<line x1='16' y1='20' x2='22' y2='20' stroke='white' stroke-width='2'/>";
-  const cross =
-    badge === "plus"
-      ? bar +
-        "<line x1='19' y1='17' x2='19' y2='23' stroke='black' stroke-width='3.5'/>" +
-        "<line x1='19' y1='17' x2='19' y2='23' stroke='white' stroke-width='2'/>"
-      : bar;
-  return (
-    "url(\"data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round'>
-        <line x1='10' y1='2' x2='10' y2='18' stroke='black' stroke-width='3'/>
-        <line x1='2' y1='10' x2='18' y2='10' stroke='black' stroke-width='3'/>
-        <line x1='10' y1='2' x2='10' y2='18' stroke='white' stroke-width='1.5'/>
-        <line x1='2' y1='10' x2='18' y2='10' stroke='white' stroke-width='1.5'/>
-        ${cross}
-      </svg>`,
-    ) +
-    "\") 10 10, crosshair"
-  );
-};
-const SELECT_ADD_CURSOR = combineCursor("plus");
-const SELECT_SUBTRACT_CURSOR = combineCursor("minus");
 
 interface TextInputState {
   screenX: number;
@@ -124,7 +105,11 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: {
     fontSize: number;
+    /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
+     *  for the recent-text chips only. */
     fontFamily?: string;
+    /** Engine typeface id; `""` = the embedded Liberation Sans. */
+    textFontId?: string;
     fontWeight: string;
     textColor: string;
     /** Background-preview fields. The open textarea renders a live preview
@@ -253,53 +238,6 @@ interface Props {
   };
 }
 
-
-/** The canvas cursor for the lit SUB-TOOL.
- *
- *  The static answer comes from the registry (`LiveSubTool.cursor`), so a
- *  sub-tool's cursor is declared on the same row as its dispatch — a sub-tool
- *  with no canvas gesture carries no cursor AND idles in useEffectiveTool, and
- *  the two can't drift apart. This function only layers on the states a static
- *  table can't see.
- *
- *  Before the five-group restructure this switched on the legacy tool id, which
- *  meant every sub-mode of a tool shared one cursor: the whole Paint tool got
- *  the default arrow, and Crop / Transform / Color Picker were indistinguishable
- *  because they are all `crop`. */
-function getCursorForSubTool(
-  subTool: ResolvedSubTool | undefined,
-  isPanning?: boolean,
-  colorPickerActive?: boolean,
-  moveActive?: boolean,
-  combineIntent?: 0 | 1 | 2,
-): string | undefined {
-  if (isPanning) return "grab";
-
-  const def = subTool && !subTool.subTool.comingSoon ? subTool.subTool : undefined;
-  const group = subTool?.group.id;
-
-  // The Color Picker toggle can be switched on from the Transform/Crop panel
-  // while a different Edit sub-tool is lit, so it wins inside that group —
-  // mirroring the identical precedence in useEffectiveTool.
-  if (colorPickerActive && group === "edit") return "crosshair";
-
-  // Select: the gesture's intent is visible before it lands — Shift (add) and
-  // Alt (subtract) badge the crosshair while held (`ih_selection_bool`; with
-  // the flag off combineIntent is always 0).
-  if (group === "select") {
-    if (combineIntent === 1) return SELECT_ADD_CURSOR;
-    if (combineIntent === 2) return SELECT_SUBTRACT_CURSOR;
-  }
-
-  // Resize Layer only drags while its Move toggle is on; idle otherwise, so the
-  // cursor must not promise a drag the canvas won't honour.
-  if (group === "edit" && def?.id === "resize-layer") {
-    return moveActive ? "move" : undefined;
-  }
-
-  return def?.cursor;
-}
-
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
@@ -418,6 +356,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // both CanvasArea call sites for one gate would be drilling for its own
     // sake.
     const eraserMode = useToolStore((s) => s.eraserMode);
+    // Layers-panel mask painting: gates the ring and the cursor exactly like
+    // `eraserMode` above, and is read from the store for the same reason.
+    const maskEditing = useToolStore((s) => s.maskEditing);
+    // 0 = black = hides, 255 = white = reveals. The ring is painted this
+    // colour while mask editing, so the cursor itself answers "what will this
+    // stroke do" — the third of the three places that read `maskEditing`, and
+    // like the other two it computes nothing of its own.
+    const maskPaintValue = useToolStore((s) => s.maskPaintValue);
     // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
     // a hook rather than threaded as a 16th prop — it changes only when the
     // sub-tool does, which already re-renders this component anyway.
@@ -587,12 +533,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Live Shift/Alt intent while the Select tool hovers — drives the +/−
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
-    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    const [combineIntent, setCombineIntent] = useState<SelectionCombineMode>(0);
     // Ref mirror so the rAF preview closure (below) and the keyboard effect
     // read the LIVE intent, not a stale render's. `setIntent` keeps both in
     // step — the state drives the cursor re-render, the ref the async reads.
-    const combineIntentRef = useRef<0 | 1 | 2>(0);
-    const setIntent = useCallback((next: 0 | 1 | 2) => {
+    const combineIntentRef = useRef<SelectionCombineMode>(0);
+    const setIntent = useCallback((next: SelectionCombineMode) => {
       combineIntentRef.current = next;
       setCombineIntent((cur) => (cur === next ? cur : next));
     }, []);
@@ -701,13 +647,21 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const primeFontSize = textInput ? (textInput.fontSize ?? textSettings?.fontSize) : undefined;
     const primeBold =
       textInput ? (textInput.fontWeight ?? textSettings?.fontWeight) === "bold" : false;
+    // Part of every key this fills — see `textMetricsCache.fontKey`.
+    const primeFontId = textSettings?.textFontId ?? "";
     useEffect(() => {
       if (!textInput || primeFontSize === undefined) return;
       const tool = hookResult.toolRef.current;
       if (!tool) return;
       let cancelled = false;
       void (async () => {
-        const filled = await primeTextMetrics(tool, primeText, primeFontSize, primeBold);
+        const filled = await primeTextMetrics(
+          tool,
+          primeText,
+          primeFontSize,
+          primeBold,
+          primeFontId,
+        );
         if (!cancelled && filled) setMetricsTick((t) => t + 1);
       })();
       return () => {
@@ -717,7 +671,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       // output, and depending on it would re-prime forever. (No
       // eslint-disable needed: the rule agrees, because the setter form of
       // `setMetricsTick` reads no state.)
-    }, [textInput, primeText, primeFontSize, primeBold, hookResult]);
+    }, [textInput, primeText, primeFontSize, primeBold, primeFontId, hookResult]);
     // Read once so the layout below re-runs after a prime; the value is unused.
     void metricsTick;
 
@@ -995,6 +949,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       colorPickerActive,
       layerMoveActive,
       selectionActive ? combineIntent : 0,
+      maskEditing,
     );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
@@ -1413,10 +1368,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               }}
             >
               {/* Dark overlay — 4 rects framing the crop selection */}
-              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill="rgba(0,0,0,0.55)" />
-              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill="rgba(0,0,0,0.55)" />
-              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill="rgba(0,0,0,0.55)" />
-              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill="rgba(0,0,0,0.55)" />
+              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill={MARQUEE_SHADE} />
+              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill={MARQUEE_SHADE} />
+              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill={MARQUEE_SHADE} />
+              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill={MARQUEE_SHADE} />
 
               {/* Dashed selection border */}
               <rect x={vx} y={vy} width={vw} height={vh}
@@ -1477,14 +1432,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               {marqueeShape === "ellipse" ? (
                 <>
                   <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
-                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                    fill="none" stroke={MARQUEE_SHADE} strokeWidth={2.5} strokeDasharray="5 5" />
                   <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
                     fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
                 </>
               ) : (
                 <>
                   <rect x={vx} y={vy} width={vw} height={vh}
-                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                    fill="none" stroke={MARQUEE_SHADE} strokeWidth={2.5} strokeDasharray="5 5" />
                   <rect x={vx} y={vy} width={vw} height={vh}
                     fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
                 </>
@@ -1597,20 +1552,31 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             The `ai` clause STAYS: those two modes are the Create-side eraser
             painting a real mask onto the canvas, sharing the `ai` tool id with
             the Enhance › AI tile that only clicks. `eraserMode` is what tells
-            them apart. */}
+            them apart.
+
+            `maskEditing` joins them (09-24): the Layers panel's mask brush
+            paints from the `arrow` tool, so the ring must show there too —
+            sized by AppShell's `effectiveBrushSize` from `maskBrushSize`. */}
         {cursorVisible &&
           (activeTool === "brush" ||
+            maskEditing ||
             (activeTool === "ai" &&
               (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&
           !isPanning && (
           <div
-            className="brush-cursor"
+            className={`brush-cursor${maskEditing ? " brush-cursor--mask" : ""}`}
             style={{
               left: cursorPos.x,
               top: cursorPos.y,
               width: brushDiameter,
               height: brushDiameter,
+              ...(maskEditing
+                ? ({
+                    "--mask-cursor-ink": maskCursorInk(maskPaintValue),
+                    "--mask-cursor-halo": maskCursorHalo(maskPaintValue),
+                  } as React.CSSProperties)
+                : null),
             }}
           />
         )}
@@ -1684,38 +1650,27 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const effFontSize = textInput.fontSize ?? textSettings.fontSize;
           const effFontWeight = textInput.fontWeight ?? textSettings.fontWeight;
           const effTextColor = textInput.textColor ?? textSettings.textColor;
+          // ⚠️ ONE FACE FOR ALL THREE SURFACES — the measuring 2D context
+          // below, the textarea, and the engine. Never hardcode a family into
+          // either consumer again; `engineFonts.ts` has the measurements.
+          const effFontId = textSettings.textFontId ?? "";
+          const effFontCss = faceCss(effFontId);
 
           // Measure the text box in screen pixels
           const offscreen = document.createElement("canvas");
           const mctx = offscreen.getContext("2d")!;
           const fs = effFontSize * scaleX;
-          mctx.font = `${effFontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
-          // ── v8.40 — the preview wraps the SAME WAY the engine does ────────
-          // Greedy, and a paragraph that already fits is kept verbatim: that
-          // mirrors `text::wrap` in Rust line for line, so what the user drags
-          // out here is what gets committed. Same font family and size on both
-          // sides, so the break points agree.
+          mctx.font = `${effFontWeight} ${fs}px ${effFontCss}`;
+          // v8.40 — the preview breaks lines where the ENGINE will. See
+          // `wrapPreviewLines`, which mirrors `src/text.rs::wrap`; the font it
+          // measures with is `effFontCss` above, which is the same face.
           const wrapContentW =
             textWrapWidth > 0
               ? textWrapWidth * scaleX - 2 * Math.ceil(effFontSize * 0.25) * scaleX
               : 0;
-          const wrapPara = (para: string): string[] => {
-            if (wrapContentW <= 0 || mctx.measureText(para).width <= wrapContentW) return [para];
-            const out: string[] = [];
-            let line = "";
-            for (const word of para.split(/\s+/).filter(Boolean)) {
-              const candidate = line ? `${line} ${word}` : word;
-              if (mctx.measureText(candidate).width <= wrapContentW || !line) {
-                line = candidate;
-              } else {
-                out.push(line);
-                line = word;
-              }
-            }
-            out.push(line);
-            return out;
-          };
-          const lines = (textInput.text || " ").split("\n").flatMap(wrapPara);
+          const lines = wrapPreviewLines(textInput.text || " ", wrapContentW, (t) =>
+            mctx.measureText(t).width,
+          );
           const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
           // A wrapped box is the width the user DRAGGED, not the width of the
           // longest line — otherwise the box would snap inwards to the text
@@ -2000,6 +1955,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 textInput.text || " ",
                 effFontSize,
                 effFontWeight === "bold",
+                effFontId,
               )
             : undefined;
           const rectLeft = inkBase
@@ -2151,11 +2107,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   fontSize: fs,
                   fontWeight: effFontWeight,
                   color: effTextColor,
-                  // THE FACE THE ENGINE WILL COMMIT, not the one the panel picked:
-                  // `render_text` takes no font, so every box becomes Liberation
-                  // Sans on commit. Previewing in another face showed glyphs a box
-                  // was not measured for (+26.3% wide in monospace, ADR-051).
-                  fontFamily: "'Liberation Sans', Arial, sans-serif",
+                  // THE FACE THE ENGINE WILL COMMIT. Same expression the box
+                  // was measured with, and the same bytes the engine was given
+                  // — so these glyphs ARE the committed glyphs (v8.76).
+                  fontFamily: effFontCss,
                   lineHeight: 1.3,
                   padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",
@@ -2189,7 +2144,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     x={ctr.left + sx} y={ctr.top + sy}
                     width={boxW} height={boxH}
                     fill="none"
-                    stroke="rgba(255,255,255,0.85)"
+                    stroke={EDIT_BOX_STROKE}
                     strokeWidth={1.5}
                     strokeDasharray="5 4"
                   />
@@ -2200,7 +2155,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemTop = topEdge - STEM_GAP;
                     const stemBot = stemTop - STEM_LEN;
                     const dotCy = stemBot - DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     return (
                       <g
                         style={{ cursor: "move", pointerEvents: "all", filter }}
@@ -2227,7 +2182,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           cy={dotCy}
                           r={DOT_R}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                         />
                       </g>
@@ -2244,7 +2199,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemTop = arcBottomY;
                     const stemBot = stemTop + STEM_LEN - ARC_R;
                     const dotCy = stemBot + DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     const arcD = `M ${cx - ARC_R} ${arcTop} A ${ARC_R} ${ARC_R} 0 1 0 ${cx + ARC_R} ${arcTop}`;
                     return (
                       <g
@@ -2278,7 +2233,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           cy={dotCy}
                           r={DOT_R}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                         />
                       </g>
@@ -2305,7 +2260,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       width={HS}
                       height={HS}
                       fill="white"
-                      stroke="rgba(0,0,0,0.5)"
+                      stroke={HANDLE_OUTLINE}
                       strokeWidth={1}
                       rx={1}
                       style={{ cursor: h.cursor, pointerEvents: "all" }}
@@ -2322,7 +2277,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     const stemRight = leftEdge - STEM_GAP;
                     const stemLeft = stemRight - STEM_LEN;
                     const sqCx = stemLeft - DOT_OFFSET;
-                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const filter = HANDLE_SHADOW;
                     return (
                       <g
                         style={{ cursor: "ew-resize", pointerEvents: "all", filter }}
@@ -2350,7 +2305,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                           width={HS}
                           height={HS}
                           fill="white"
-                          stroke="rgba(0,0,0,0.5)"
+                          stroke={HANDLE_OUTLINE}
                           strokeWidth={1}
                           rx={1}
                         />

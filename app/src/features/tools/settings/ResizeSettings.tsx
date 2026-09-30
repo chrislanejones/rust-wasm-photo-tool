@@ -1,10 +1,10 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Scaling, ChevronDown, FileArchive } from "lucide-react";
+import { Scaling, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 import {
   Tooltip,
@@ -14,7 +14,7 @@ import {
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
-import { useUIStore } from "@/stores/useUIStore";
+import { SelectField } from "@/components/ui/select-field";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -45,8 +45,6 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
 
 interface ResizeSettingsProps {
   disabled: boolean;
-  /** An immutable upload baseline exists for the active photo. */
-  hasCompareBaseline: boolean;
   imageWidth: number;
   imageHeight: number;
   /** Current on-disk size of the active photo, in bytes (PageSpeed score). */
@@ -55,6 +53,9 @@ interface ResizeSettingsProps {
   currentMime?: string;
   /** Immutable size at upload, in bytes — the performance-gain baseline. */
   originalByteSize: number;
+  /** Quality the current file was last lossy-encoded at; undefined when
+   *  unknown (an untouched upload) or lossless. */
+  currentEncodeQuality?: number;
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
@@ -69,7 +70,6 @@ interface ResizeSettingsProps {
   onResizeOnly: (w: number, h: number, filter: number) => void;
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
-  onToggleCompare: () => void;
   compressProgress: { completed: number; total: number };
 }
 
@@ -81,12 +81,12 @@ function trafficColor(score: number) {
 
 export function ResizeSettings({
   disabled,
-  hasCompareBaseline,
   imageWidth,
   imageHeight,
   currentByteSize,
   currentMime,
   originalByteSize,
+  currentEncodeQuality,
   activePhotoId,
   quality,
   onQualityChange,
@@ -95,11 +95,7 @@ export function ResizeSettings({
   onResizeOnly,
   exportFormat,
   onExportFormatChange,
-  onToggleCompare,
 }: ResizeSettingsProps) {
-  // A/B compare view lives in the UI store; the active-image dirty flag in the
-  // gallery store — both were prop-drilled from AppShell before stage 1.
-  const compareActive = useUIStore((s) => s.compareActive);
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
@@ -107,10 +103,6 @@ export function ResizeSettings({
   // Sub-mode lives in the tool store (like Paint's brushMode) so the command
   // palette's registry-derived `mode.compress.*` entries can deep-link to a
   // sub-mode. Was panel-local useState before Session 2.1.
-  // A/B Compare stays locked until the user actually applies an edit —
-  // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
-  // Pending (unapplied) changes no longer unlock it; there's nothing to
-  // compare against until something is committed. Reset per photo below.
   const baseQualityRef = useRef(quality);
   const baseFormatRef = useRef(exportFormat);
   const baseMethodRef = useRef(method);
@@ -206,9 +198,7 @@ export function ResizeSettings({
 
   /** Resize only. Deliberately does NOT touch baseQualityRef / baseFormatRef:
    *  those track what the COMPRESSION button has committed, and a resize leaves
-   *  a pending quality change still pending. It does set `appliedHere`, because
-   *  an edit really was applied to this photo — that is what unlocks A/B
-   *  compare, and a resize is exactly the kind of change worth comparing. */
+   *  a pending quality change still pending. */
   const handleApplyResizeOnly = () => {
     const w = parseInt(width, 10);
     const h = parseInt(height, 10);
@@ -255,38 +245,28 @@ export function ResizeSettings({
     : compressionChanged && !dimensionsChanged
       ? "Apply Compression"
       : "Apply Compression & Resize";
-  // A/B compare needs ONE thing: a baseline to compare against.
-  //
-  // ⚠️ IT USED TO ALSO REQUIRE `hasBeenModified || appliedHere`, and all three
-  // ways that went wrong are the same mistake — gating a durable capability on
-  // transient state:
-  //
-  //   • `appliedHere` is this component's own `useState`. Switch tools and back
-  //     and it is false again, so compare re-locked on a photo you had just
-  //     compressed.
-  //   • `hasBeenModified` is a SINGLE GLOBAL boolean, not per-photo, and it is
-  //     React state — a reload clears it. That is the same class of bug as the
-  //     v7.81 batch-export data loss, whose post-mortem sits in AppShell:
-  //     "Every one of those is TRANSIENT REACT STATE, and a page reload clears
-  //     all of them."
-  //   • Auto Compress deliberately never sets `hasBeenModified` (it must not
-  //     light the modified dot for a batch file op), so compare was locked
-  //     after it even though the comparison is perfectly meaningful.
-  //
-  // The baseline is `PhotoEntry.uploadKey` — contentAudit calls it "the
-  // immutable upload original (A/B baseline)" — falling back to `originalKey`
-  // for photos that predate it. Auto Compress repoints `originalKey` and leaves
-  // `uploadKey` alone, so the baseline survives every path.
-  //
-  // Comparing an unmodified photo now shows two identical images. That is a
-  // true answer, cheaply obtained, and far better than a button that is dark
-  // when the user knows they just changed something.
-  const compareDisabled = disabled || !hasCompareBaseline;
-
   // Web-performance indicators come from Rust (`web_perf_metrics`). The
   // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
   // scores low, and resizing or lowering quality (smaller projected delivery)
   // raises it.
+  //
+  // The model must mirror what the Apply button will ACTUALLY write, or the
+  // numbers lie in both directions:
+  //   - nothing pending, or dimensions only ("Apply Resize"): the file keeps
+  //     its own format and quality, so the projection is the current bytes
+  //     scaled by area. This used to multiply by quality/100 regardless, so an
+  //     already-compressed photo was scored as if it would shrink another 25%
+  //     at the default 75 — and then Apply Resize wrote something bigger.
+  //   - compression pending: quality is RELATIVE to the quality the file is
+  //     already at. A file stored at q=60 re-encoded at q=50 does not lose
+  //     half its bytes. Unknown (an untouched upload) counts as 100, which is
+  //     the old absolute model.
+  const modelQuality = compressionChanged
+    ? Math.min(100, Math.round((quality * 100) / (currentEncodeQuality ?? 100)))
+    : 100;
+  const modelFormat: ExportFormat | undefined = compressionChanged
+    ? effectiveFormat
+    : undefined;
   const newW = parseInt(width, 10) || imageWidth;
   const newH = parseInt(height, 10) || imageHeight;
   const [lighthouseScore, setLighthouseScore] = useState(0);
@@ -301,13 +281,14 @@ export function ResizeSettings({
       origBytes: originalByteSize,
       newW,
       newH,
-      quality,
+      quality: modelQuality,
       curMime: currentMime,
       // Model the format that will ACTUALLY land, not the one requested. AVIF
       // weights as the most efficient format in the Rust scorer, so an AVIF
       // selection the browser cannot encode would promise a large gain and then
       // write a PNG — the panel contradicting its own note one line below.
-      newFormat: effectiveFormat,
+      // Undefined with no compression pending: the file keeps its own format.
+      newFormat: modelFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -324,12 +305,13 @@ export function ResizeSettings({
     originalByteSize,
     newW,
     newH,
-    quality,
+    modelQuality,
+    modelFormat,
     // effectiveFormat, not exportFormat: the AVIF probe resolves asynchronously,
     // so the first render models AVIF and only the re-run after `avifOk` lands
     // corrects it. Depending on exportFormat alone would leave the AVIF numbers
-    // on screen permanently, since exportFormat never changed.
-    effectiveFormat,
+    // on screen permanently, since exportFormat never changed. (It reaches
+    // the call through `modelFormat`.)
   ]);
 
   return (
@@ -434,21 +416,17 @@ export function ResizeSettings({
             <label className="block text-2xs text-theme-muted-foreground">
               Method
             </label>
-            <div className="relative">
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as ResampleMethod)}
-                disabled={disabled}
-                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-              >
-                {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
-                  <option key={m} value={m}>
-                    {METHOD_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            <SelectField
+              value={method}
+              onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+              disabled={disabled}
+            >
+              {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {METHOD_LABELS[m]}
+                </option>
+              ))}
+            </SelectField>
           </div>
 
           {/* ── Format ── */}
@@ -459,23 +437,19 @@ export function ResizeSettings({
             <label className="block text-2xs text-theme-muted-foreground">
               Format
             </label>
-            <div className="relative">
-              <select
-                value={exportFormat}
-                onChange={(e) =>
-                  onExportFormatChange(e.target.value as ExportFormat)
-                }
-                disabled={disabled}
-                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-              >
-                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                  <option key={f} value={f}>
-                    {FORMAT_LABELS[f]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
+            <SelectField
+              value={exportFormat}
+              onChange={(e) =>
+                onExportFormatChange(e.target.value as ExportFormat)
+              }
+              disabled={disabled}
+            >
+              {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                <option key={f} value={f}>
+                  {FORMAT_LABELS[f]}
+                </option>
+              ))}
+            </SelectField>
             {formatNote && (
               <p className="text-2xs text-theme-muted-foreground leading-snug">
                 {formatNote}
@@ -544,38 +518,6 @@ export function ResizeSettings({
             </p>
           </TooltipContent>
         </Tooltip>
-
-        {/* A/B Compare — same Button size="large", locked until an edit is applied via
-            Apply Compression & Resize or Auto Compress. Shows the active ring
-            when the compare overlay is on. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Button size="large"
-                onClick={onToggleCompare}
-                disabled={compareDisabled}
-                aria-pressed={compareActive}
-                className={
-                  compareActive
-                    ? "w-full bg-theme-primary/15 border-theme-primary/40 text-theme-primary"
-                    : "w-full"
-                }
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
-              </Button>
-            </div>
-          </TooltipTrigger>
-          {compareDisabled && (
-            <TooltipContent side="bottom" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                A/B compare needs the photo&rsquo;s original upload, and this
-                one has none stored.
-              </p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-
       </div>
     </div>
   );

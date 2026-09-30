@@ -3,10 +3,9 @@
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
-import { DIALOG_OVERLAY } from "@/lib/styles";
+import { WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -19,6 +18,9 @@ import {
   ShieldCheck,
   FlaskConical,
   Layers,
+  RefreshCw,
+  Share2,
+  Beaker,
   Check,
   ExternalLink,
 } from "lucide-react";
@@ -36,12 +38,17 @@ import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
+import { SyncPane } from "@/components/SyncPane";
+import { SharedPane } from "@/components/SharedPane";
+import { BetaPane } from "@/components/BetaPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PAID_SIGNUP_ENABLED, PAID_SIGNUP_OFF_NOTE } from "@/lib/billing";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -64,7 +71,10 @@ export type SettingsTab =
   | "canvas"
   | "appearance"
   | "security"
+  | "sync"
+  | "shared"
   | "export"
+  | "beta"
   | "storage"
   | "billing"
   | "aiusage"
@@ -133,6 +143,12 @@ export function SubscriptionButton({
   const openSettings = useUIStore((s) => s.openSettings);
   const closeSettings = useUIStore((s) => s.closeSettings);
   const setTab = useUIStore((s) => s.setSettingsTab);
+  // Settings → Security shows the New dialog's online-features switch a second
+  // time. Same store field, so the two mirror by construction; `aiComposerOpen`
+  // carries that dialog's "locked mid-prompt" state across to this copy.
+  const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
+  const setOnlineFeatures = useUIStore((s) => s.setOnlineFeaturesEnabled);
+  const aiComposerOpen = useUIStore((s) => s.aiComposerOpen);
 
   // Labels come from the route table (features/routing) — one source, so the
   // pane the URL names and the tab the rail shows can't drift apart. Icons and
@@ -142,7 +158,10 @@ export function SubscriptionButton({
     appearance: Palette,
     canvas: Layers,
     security: Shield,
+    sync: RefreshCw,
+    shared: Share2,
     export: Package,
+    beta: Beaker,
     storage: Cloud,
     billing: CreditCard,
     aiusage: Gauge,
@@ -154,10 +173,13 @@ export function SubscriptionButton({
     "appearance",
     "canvas",
     "security",
+    "sync",
+    "shared",
     "export",
     "storage",
     "billing",
     "aiusage",
+    "beta",
     "devtests",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
@@ -262,7 +284,7 @@ export function SubscriptionButton({
           overlayClassName="z-[var(--z-modal)]"
         >
           <DialogHeader className="px-4 py-2.5">
-            <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+            <DialogTitle className={WINDOW_TITLE}>
               <Settings className="h-4 w-4" />
               Settings
             </DialogTitle>
@@ -317,13 +339,27 @@ export function SubscriptionButton({
                 onStripModeChange={(exifStripMode) =>
                   setDraft((d) => ({ ...d, exifStripMode }))
                 }
+                onlineFeatures={onlineFeatures}
+                onOnlineFeaturesChange={setOnlineFeatures}
+                onlineFeaturesLocked={aiComposerOpen}
               />
+            ) : tab === "sync" ? (
+              /* Every control here commits immediately (lib/sync), so the
+                 footer's Restore / Apply do not show for this pane. */
+              <SyncPane />
+            ) : tab === "shared" ? (
+              /* Per-link actions commit as pressed (see SharedPane), so the
+                 footer's Restore / Apply do not show for this pane either. */
+              <SharedPane />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />
             ) : tab === "storage" ? (
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (
               <AIUsagePane />
+            ) : tab === "beta" ? (
+              /* Switches commit as pressed (see BetaPane), so no Apply. */
+              <BetaPane />
             ) : tab === "devtests" ? (
               <DevTestsPane />
             ) : tab === "superuser" && superUser ? (
@@ -389,7 +425,7 @@ export function SubscriptionButton({
                           )}
                           Manage subscription
                         </button>
-                      ) : (
+                      ) : PAID_SIGNUP_ENABLED ? (
                         <button
                           type="button"
                           onClick={() => redirect("checkout")}
@@ -401,6 +437,16 @@ export function SubscriptionButton({
                           )}
                           Upgrade to Pro
                         </button>
+                      ) : (
+                        /* Signup is off (lib/billing.ts). A plain note, not a
+                           disabled "Upgrade to Pro" button: a greyed-out
+                           button invites hovering for a tooltip that explains
+                           nothing, and reads as something broken rather than
+                           something not open yet. The features above still
+                           list what Pro will include. */
+                        <p className="mt-4 rounded-md bg-bg-tertiary px-3 py-2 text-center text-2xs text-theme-muted-foreground">
+                          {PAID_SIGNUP_OFF_NOTE}
+                        </p>
                       )}
                     </div>
 
@@ -464,41 +510,33 @@ export function SubscriptionButton({
         </DialogContent>
       </Dialog>
 
-      {/* Restore confirmation — portaled above the Settings modal (z-modal). */}
-      {restoreConfirmOpen &&
-        createPortal(
-          <div
-            className={`${DIALOG_OVERLAY} z-[var(--z-idle)] flex items-center justify-center p-4`}
-            onClick={() => setRestoreConfirmOpen(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Restore settings"
-              className="w-full max-w-sm rounded-xl border border-border bg-bg-secondary p-5 text-text-primary shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold">Restore settings?</h3>
-              <p className="mt-2 text-sm text-text-muted leading-relaxed">
-                {tab === "superuser"
-                  ? "This clears the Super User tier override and returns to your real account tier."
-                  : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Button size="large"
-                  className="flex-1"
-                  onClick={() => setRestoreConfirmOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button size="large" className="flex-1" onClick={handleRestore}>
-                  Restore
-                </Button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {/* Restore confirmation, on ConfirmDialog.
+          It used to be hand-built — a portaled div with a dialog role — and
+          that one choice broke four things at once, all measured in a browser
+          (Night 5, 09-26-2026) with a real Escape keypress:
+            - Escape closed SETTINGS, not this: a raw div is not in Radix's
+              layer stack, so Settings was still the topmost layer, and the
+              confirm was left orphaned over the editor;
+            - no focus trap, so Settings' trap stayed armed and pulled focus
+              straight back out of the confirm;
+            - no Escape handler of its own;
+            - its description was text-muted, 3.65:1 on light.
+          ConfirmDialog is a Radix Dialog, so it joins the layer stack on top of
+          Settings and Escape reaches it first. `overModal` lifts it to
+          --z-over-modal (70) above Settings' --z-modal (60). */}
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        onOpenChange={setRestoreConfirmOpen}
+        title="Restore settings?"
+        cancelLabel="Cancel"
+        confirmLabel="Restore"
+        onConfirm={handleRestore}
+        overModal
+      >
+        {tab === "superuser"
+          ? "This clears the Super User tier override and returns to your real account tier."
+          : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
+      </ConfirmDialog>
     </>
   );
 }

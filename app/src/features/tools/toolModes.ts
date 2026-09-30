@@ -30,6 +30,7 @@
 import {
   ArrowUpRight,
   Copy,
+  Crop,
   Eraser,
   FileEdit,
   ImagePlus,
@@ -68,7 +69,7 @@ import type {
  *  something to show a human, an icon for the tile, and fuzzy-search terms.
  *  (The rich `ToolMode` — per-mode lightbulb info copy — stays in the registry
  *  / panel modules; this is the thin projection of it.) */
-export interface ToolModeInfo {
+interface ToolModeInfo {
   id: string;
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
@@ -105,6 +106,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   emoji: [
     { id: "logo", label: "Logo", icon: ImagePlus, keywords: ["logo", "watermark", "brand", "batch"] },
     { id: "text", label: "Text", icon: Type, keywords: ["text", "caption", "batch"] },
+    { id: "crop", label: "Crop", icon: Crop, keywords: ["crop", "carousel", "aspect ratio", "same size", "batch"] },
     { id: "rename", label: "Rename", icon: FileEdit, keywords: ["rename", "filename", "batch"] },
     {
       id: "airename",
@@ -120,7 +122,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   effects: [
     { id: "adjust", label: "Adjustments", icon: SunDim, keywords: ["brightness", "contrast", "saturation", "adjust"] },
     { id: "levels", label: "Levels", icon: Aperture, keywords: ["levels", "black point", "white point", "midtones", "gamma"] },
-    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click"] },
+    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click", "mono", "black and white", "noir", "moody", "recover"] },
   ],
 };
 
@@ -189,7 +191,7 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
 
 /** The tool's sub-modes: registry first, legacy list as the fallback. Empty
  *  array for single-mode tools (Adjust, Effects, Layer Settings). */
-export function modesFor(tool: ToolType): ToolModeInfo[] {
+function modesFor(tool: ToolType): ToolModeInfo[] {
   const registered = TOOL_MODULES[tool]?.modes;
   if (registered?.length) {
     return registered.map((m) => ({

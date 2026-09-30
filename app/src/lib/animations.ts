@@ -119,13 +119,39 @@ export const fadeIn: Variants = {
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-// Swap between two panels occupying the same slot (e.g. the upload actions ⇄
-// the New Canvas setup). A subtle horizontal slide + fade; pair with
-// <AnimatePresence mode="wait"> and a unique key per panel.
+// Swap between two panes occupying the same slot in a multi-pane dialog — New
+// → New Canvas, New → Create AI Image, and the Download dialog's Selected /
+// All panes. ONE effect for all three so stepping in and out of any of them
+// feels the same.
+//
+// DIRECTIONAL: pass `custom={1}` stepping IN (the new pane arrives from the
+// right, the old one leaves left) and `custom={-1}` stepping BACK (mirrored),
+// so Back visibly returns the way you came. The small scale + blur is what
+// makes it read as a pane sliding over rather than content jumping. Pair with
+// <AnimatePresence mode="wait" custom={direction}> — the `custom` on the
+// presence is what lets the EXITING pane read the new direction. `PaneSwap`
+// in components/ui/dialog-pane.tsx wires that up; use it instead of this.
 export const panelSwap: Variants = {
-  hidden: { opacity: 0, x: 12 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.2 } },
-  exit: { opacity: 0, x: -12, transition: { duration: 0.12 } },
+  hidden: (dir: number = 1) => ({
+    opacity: 0,
+    x: 28 * dir,
+    scale: 0.98,
+    filter: "blur(4px)",
+  }),
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { type: "spring", stiffness: 420, damping: 36, mass: 0.8 },
+  },
+  exit: (dir: number = 1) => ({
+    opacity: 0,
+    x: -28 * dir,
+    scale: 0.98,
+    filter: "blur(4px)",
+    transition: { duration: 0.14, ease: "easeIn" },
+  }),
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -148,20 +174,12 @@ export const panelSwap: Variants = {
    A variant used once is indirection, not a single source of truth.
    ────────────────────────────────────────────────────────────────────────── */
 
-// Modal / dialog entrance — the surface itself, not its backdrop.
-//
-// ⚠️ THIS EXISTED TWICE AND THE TWO HAD ALREADY DRIFTED: UploadDialog entered
-// from `scale: 0.95`, ObjectRemovalModal from `scale: 0.96`. Nobody chose
-// that difference and nobody could see it — which is the whole argument for a
-// named variant. `settingsPanelMotion` right below carries the same scar in
-// its own comment ("it had drifted into ~9 inline copies").
-//
-// Spread it — `{...dialogZoom}` — rather than copying the triple.
-export const dialogZoom = {
-  initial: { scale: 0.95, opacity: 0 },
-  animate: { scale: 1, opacity: 1, transition: springStandard },
-  exit: { scale: 0.95, opacity: 0, transition: { duration: 0.12 } },
-};
+// (`dialogZoom` lived here — the entrance for a hand-built modal surface. Its
+// last two consumers were UploadDialog and ObjectRemovalModal; the second was
+// deleted earlier and the first moved onto `ui/dialog` in Night 5, which
+// animates its own surface through Radix's data-state classes. A modal that
+// wants an entrance should be a `ui/dialog`, not a motion.div with this spread
+// on it — so it is gone rather than kept "in case".)
 
 // Settings sub-feature panel enter/exit (Paint / Text / Resize sub-panels and
 // ImageMetaPanel). Spread onto the `motion.div` — `{...settingsPanelMotion}` —

@@ -89,10 +89,13 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   appearance: "Appearance",
   canvas: "Layers and Canvas",
   security: "Security",
+  sync: "Sync",
+  shared: "Shared",
   export: "Import / Export",
   storage: "S3 / Image Hosting",
   billing: "Plan & Billing",
   aiusage: "AI Usage",
+  beta: "Beta",
   devtests: "Dev Tests",
   superuser: "Super User",
 };

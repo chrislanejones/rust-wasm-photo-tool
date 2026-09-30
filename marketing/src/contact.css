@@ -1,0 +1,330 @@
+/* contact — v2 port. Owned by the contact port; other ports must not edit this file.
+ *
+ * /contact: a topic picker, then a cream board holding what the topic is for
+ * and a form that hands a mailto: to the reader's own mail app.
+ */
+
+:root {
+  /* The v2 page-title rung: /contact and /in-the-works set their h1 here. It
+     tops out a quarter-rem above --text-4xl, which is why it is its own token. */
+  --text-page-title: clamp(2.5rem, 4vw + 1rem, 4.75rem);
+  /* Pill links and the sent-state button. */
+  --text-pill: 0.875rem;
+  /* The line above the closing CTA. */
+  --text-coda-line: clamp(1.375rem, 2vw, 1.75rem);
+}
+
+.contact-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: end;
+  padding: calc(var(--banner-height) + 3.5rem) var(--page-gutter) var(--space-xl);
+}
+.contact-head__lead { display: grid; gap: 20px; min-width: 0; }
+.contact-head__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.contact-head__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 14ch;
+  font-size: var(--text-page-title);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.contact-head__deck {
+  margin: 0;
+  padding-bottom: 6px;
+  max-width: 36ch;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+.contact-topics { padding: var(--space-xs) var(--page-gutter) var(--space-xl); }
+.contact-topics__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.75rem), 1fr));
+  gap: 10px;
+}
+.contact-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: 12px;
+  background: oklch(18% 0.020 35);
+  color: oklch(84% 0.012 65);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+}
+.contact-tile:hover { border-color: var(--color-accent); }
+.contact-tile:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.contact-tile.is-on {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 16%, oklch(18% 0.020 35));
+  color: var(--color-ink);
+}
+.contact-tile__label {
+  font-size: var(--text-ui);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.contact-tile__count {
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  line-height: 1;
+  color: var(--color-ink-3);
+}
+.contact-tile.is-on .contact-tile__count { color: var(--color-accent); }
+
+/* The cream board. Its inks are local: every site ink token is tuned for light
+   text on the dark page, and all of them are wrong here. */
+.contact-board {
+  --c-ink: oklch(20% 0.020 40);
+  --c-ink-2: oklch(30% 0.020 40);
+  --c-ink-3: oklch(38% 0.020 40);
+  --c-ink-4: oklch(44% 0.020 40);
+  --c-rule: oklch(86% 0.020 80);
+  --c-rule-2: oklch(80% 0.020 80);
+  --c-card: oklch(97.5% 0.012 80);
+  --c-accent-ink: oklch(44% 0.170 45);
+
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-xl) var(--space-2xl);
+  align-items: start;
+  margin: 0 var(--page-gutter);
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: 20px;
+  background: oklch(94% 0.020 80);
+  color: var(--c-ink);
+}
+.contact-board__about { display: grid; gap: var(--space-md); align-content: start; }
+.contact-board__title {
+  margin: 0;
+  font-size: var(--text-panel);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  color: var(--c-ink);
+}
+.contact-board__blurb {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--c-ink-3);
+  text-wrap: pretty;
+}
+.contact-board__links { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.contact-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: var(--rule-hair) solid oklch(76% 0.020 70);
+  border-radius: var(--radius-pill);
+  background: var(--c-card);
+  color: var(--c-ink);
+  font-size: var(--text-pill);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.contact-pill:hover { border-color: var(--c-accent-ink); color: var(--c-ink); }
+.contact-pill:focus-visible { outline: 2px solid var(--c-accent-ink); outline-offset: 2px; }
+.contact-board__note {
+  margin: 0;
+  max-width: 44ch;
+  padding-top: var(--space-xs);
+  border-top: var(--rule-hair) solid oklch(84% 0.020 80);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--c-ink-4);
+}
+
+.contact-form,
+.contact-sent {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: var(--rule-hair) solid var(--c-rule);
+  border-radius: 14px;
+  background: var(--c-card);
+}
+.contact-field {
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-ink-2);
+}
+.contact-field input,
+.contact-field textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: var(--rule-hair) solid var(--c-rule-2);
+  border-radius: 8px;
+  background: oklch(100% 0 0);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: 400;
+}
+.contact-field textarea { min-height: 160px; line-height: 1.5; resize: vertical; }
+.contact-field input::placeholder,
+.contact-field textarea::placeholder { color: oklch(52% 0.020 45); }
+.contact-field input:focus-visible,
+.contact-field textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-color: var(--color-accent);
+}
+.contact-form__attach {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--rule-hair) dashed oklch(76% 0.020 70);
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--c-ink-2);
+}
+/* The bot trap. Off-screen rather than display:none — some bots skip fields
+   that are not rendered. aria-hidden + tabIndex -1 keep it out of reach. */
+.contact-form__trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.contact-form__error {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--rule-hair) solid oklch(55% 0.180 30);
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: oklch(38% 0.150 30);
+  background: oklch(95% 0.030 30);
+}
+.contact-form__error a { color: inherit; }
+.contact-form__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+}
+.contact-form__fine {
+  margin: 0;
+  max-width: 30ch;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--c-ink-4);
+}
+.contact-form__send,
+.contact-coda__cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.contact-form__send:hover { background: oklch(66% 0.180 50); }
+.contact-form__send:disabled { opacity: 0.7; cursor: progress; }
+.contact-coda__cta:hover { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.contact-form__send:focus-visible,
+.contact-coda__cta:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.contact-sent { align-content: center; min-height: 320px; text-align: center; }
+.contact-sent__kicker {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-accent-ink);
+}
+.contact-sent__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.contact-sent__body {
+  margin: 0 auto;
+  max-width: 34ch;
+  font-size: var(--text-ui);
+  color: var(--c-ink-3);
+}
+.contact-sent__body a { color: var(--c-accent-ink); }
+.contact-sent__again {
+  justify-self: center;
+  margin-top: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: var(--rule-hair) solid oklch(76% 0.020 70);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: var(--text-pill);
+  font-weight: 500;
+  cursor: pointer;
+}
+.contact-sent__again:hover { border-color: var(--c-accent-ink); }
+
+.contact-coda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 40px;
+  padding: var(--space-2xl) var(--page-gutter) var(--space-3xl);
+}
+.contact-coda__text { display: grid; gap: 6px; }
+.contact-coda__line {
+  margin: 0;
+  font-size: var(--text-coda-line);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.contact-coda__sub { margin: 0; font-size: var(--text-md); color: var(--color-ink-2); }

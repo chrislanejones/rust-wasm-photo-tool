@@ -36,6 +36,16 @@
 // The mode selector is the shared ToolModeToggle (the Paint panel's template):
 // stacked icon tiles on top, the active mode's title + lightbulb info below,
 // then that mode's settings — do not fork the layout.
+//
+// COMBINE IS NO LONGER HERE. The New / Add / Subtract / Intersect strip moved
+// to the Review panel (Review → Combine, Alt+R). It decides how the next
+// REGION meets the selection you have, which was never specific to this tool:
+// a marquee, a lasso loop and — since the move — a placed shape or text box
+// all go through it, and parking it here made it unreachable while you were
+// holding any other tool. The store field (`selectionCombine`) and the engine
+// call (`set_selection_combine`) are untouched; only the control moved, so
+// every gesture path in this panel still combines exactly as it did. Each
+// mode's lightbulb says where it went.
 import {
   BoxSelect,
   SquareDashed,
@@ -46,19 +56,34 @@ import {
   Magnet,
   CopyPlus,
   Scissors,
+  Sparkles,
+  Grip,
+  CircleDot,
+  Spline,
+  Feather,
+  Maximize2,
+  Eraser,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
 import {
   PanelAction,
   PanelActionBar,
 } from "@/components/ui/panel-action-bar";
+import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SizeSlider } from "@/components/ui/size-slider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
-import { isMarqueeKind } from "@/stores/useToolStore";
+import { isMarqueeKind, useToolStore } from "@/stores/useToolStore";
+import { describeCoverage } from "@/lib/selectionCoverage";
+import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
+import { isNoopRefine, type RefineSettings } from "@/lib/selectionRefine";
+import { PANEL_SECTION } from "@/lib/styles";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
@@ -144,12 +169,36 @@ const PANEL_MODES: readonly ToolMode<SelectionKind>[] = SELECT_MODES.map(
         {isMarqueeKind(m.id)
           ? "Press, drag and release on the canvas."
           : "Click the canvas to select."}{" "}
-        <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects.
+        <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects. Whether this
+        replaces the selection or adds to it is Combine, in the Review panel
+        (<kbd>Alt+R</kbd>); <kbd>Shift</kbd> adds and <kbd>Alt</kbd> subtracts
+        for one gesture whatever it says.
       </>
     ),
   }),
 );
 
+
+/** The five refine operations, in the order the tiles show them. One tile is
+ *  "open" at a time and the single slider under the grid edits that one —
+ *  five sliders stacked two across was the version this replaced, and it
+ *  was the ugliest part of the panel. Ranges are the engine's, unchanged. */
+type RefineParam = keyof RefineSettings;
+const REFINE_PARAMS: readonly {
+  id: RefineParam;
+  label: string;
+  icon: LucideIcon;
+  min: number;
+  max: number;
+  title: string;
+}[] = [
+  { id: "islands", label: "Islands", icon: Grip, min: 0, max: 200, title: "Drop specks smaller than this" },
+  { id: "holes", label: "Holes", icon: CircleDot, min: 0, max: 200, title: "Fill pinholes smaller than this" },
+  { id: "smooth", label: "Smooth", icon: Spline, min: 0, max: 8, title: "Round off jagged edges" },
+  { id: "feather", label: "Feather", icon: Feather, min: 0, max: 8, title: "Soften the edge of a mask made from it" },
+  { id: "expand", label: "Expand", icon: Maximize2, min: -10, max: 10, title: "Grow or shrink the edge" },
+];
+const REFINE_IDS = REFINE_PARAMS.map((r) => r.id);
 
 export function SelectSettings({
   disabled,
@@ -159,6 +208,25 @@ export function SelectSettings({
   selection: SelectionControls;
 }) {
   const patchmatch = isPatchmatchEnabled();
+  const coverage = useToolStore((s) => s.selectionCoverage);
+  const refine = useToolStore((s) => s.selectionRefine);
+  const setRefine = useToolStore((s) => s.setSelectionRefine);
+  const requestRefine = useToolStore((s) => s.requestRefine);
+  const previewing = useToolStore((s) => s.refinePreviewing);
+  const setOne = (key: keyof RefineSettings) => (v: number) =>
+    setRefine((r) => ({ ...r, [key]: v }));
+  const canRefine = !disabled && selection.active;
+  // Holes first, as in the design: it's the one people reach for after a wand
+  // click leaves pinholes. Panel-local on purpose — it is only which slider is
+  // showing, not a setting, and it has no business in a persisted store.
+  const [param, setParam] = useState<RefineParam>("holes");
+  const paramRadio = useRadioGroup({
+    ids: REFINE_IDS,
+    selected: param,
+    isDisabled: () => !canRefine,
+    onSelect: setParam,
+  });
+  const open = REFINE_PARAMS.find((r) => r.id === param) ?? REFINE_PARAMS[0];
 
   return (
     <div className="space-y-4">
@@ -174,35 +242,147 @@ export function SelectSettings({
         onModeChange={selection.onKindChange}
         disabled={disabled}
       >
-        {(kind) => (
-          <>
-            {/* Tolerance drives the flood/color-match kinds only. The marquee
-                kinds sweep pure geometry, so it is hidden for them rather than
-                shown disabled — same rule as Edge sensitivity below. */}
-            {!isMarqueeKind(kind) && (
-              <SizeSlider
-                label="Tolerance"
-                value={selection.tolerance}
-                min={0}
-                max={120}
-                onChange={selection.onToleranceChange}
-              />
-            )}
-            {/* Only meaningful for the edge-aware wand — hidden otherwise
-                rather than shown disabled, so the panel doesn't grow dead
-                controls. */}
-            {kind === "edge" && (
-              <SizeSlider
-                label="Edge sensitivity"
-                value={selection.edgeThreshold}
-                min={10}
-                max={255}
-                onChange={selection.onEdgeThresholdChange}
-              />
-            )}
-          </>
-        )}
+        {(kind) => {
+          // Both sliders are ALWAYS here; a mode that doesn't use one shows it
+          // disabled with the reason underneath. They used to be hidden, which
+          // made the panel change height on every mode switch.
+          const tolReason = toleranceReason(kind);
+          const edgeReason = edgeSensitivityReason(kind);
+          return (
+            <>
+              {/* Live: moving it re-runs the last click from the same seed
+                  (useSelectionActions → selection_retune), so you watch the
+                  sky come in before the building does. */}
+              <div>
+                <SizeSlider
+                  label="Tolerance"
+                  value={selection.tolerance}
+                  min={0}
+                  max={120}
+                  onChange={selection.onToleranceChange}
+                  disabled={disabled || tolReason !== null}
+                />
+                {tolReason && (
+                  <p className="mt-1 text-2xs text-theme-muted-foreground">{tolReason}</p>
+                )}
+              </div>
+              <div>
+                <SizeSlider
+                  label="Edge sensitivity"
+                  value={selection.edgeThreshold}
+                  min={10}
+                  max={255}
+                  onChange={selection.onEdgeThresholdChange}
+                  disabled={disabled || edgeReason !== null}
+                />
+                {edgeReason && (
+                  <p className="mt-1 text-2xs text-theme-muted-foreground">{edgeReason}</p>
+                )}
+              </div>
+            </>
+          );
+        }}
       </ToolModeToggle>
+
+      {/* ── How much is selected ──────────────────────────────────────────
+          Outside the mode body so it does not re-animate on a mode switch.
+          Always present — "Nothing selected" rather than an absent line — so
+          a click that misses reads as a miss, not as nothing happening. The
+          status bar shows the same number, and only while it is non-zero. */}
+      <p
+        className="text-xs tabular-nums text-theme-muted-foreground"
+        aria-live="polite"
+        data-testid="selection-coverage"
+      >
+        {coverage ? describeCoverage(coverage) : "Nothing selected"}
+      </p>
+
+      {/* ── Refine ───────────────────────────────────────────────────────
+          Non-modal, on this panel: Clean Up is the preset, the sliders are the
+          same four operations (plus the feather a mask gets) exposed one by
+          one. Sliders PREVIEW on a copy — the ants and the readout above show
+          the refined result — and Apply commits it as one undo step. The
+          engine work is src/selection_refine.rs; the wiring is store-driven
+          (useSelectionActions answers), so AppShell gains nothing. */}
+      <div className={PANEL_SECTION}>
+        <SectionHeader
+          title="Refine"
+          info={
+            <>
+              Clean Up removes specks under 4 px, fills pinholes under 6 px,
+              smooths the edge and pulls it in 1 px, in one step. The other
+              tiles are those operations one at a time: pick one, move the
+              slider to preview it, then Apply. Feather only softens a mask made from the selection
+              (Layer Settings → Add mask). Apply is one undo step, and like any
+              selection change it keeps a full copy of the image, so on a very
+              large photo it spends one of your few undo steps — the Undo
+              readout in the status bar shows when.
+            </>
+          }
+        />
+        {/* One 3×2 grid, two kinds of tile. Clean Up is an ACTION (it runs
+            the preset) and the other five are a CHOICE (which operation the
+            slider edits), so they cannot be one ToolButtonGroup — that would
+            make a screen reader announce Clean Up as "radio, not checked, 1 of
+            6". The five get a radiogroup of their own, laid out with
+            `display: contents` so they still share the grid's cells. Same
+            ToolButton and same useRadioGroup the group primitive is built on,
+            so the look and the keyboard (one Tab stop, arrows) are its. */}
+        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+          <ToolButton
+            stacked
+            disabled={!canRefine}
+            onClick={() => requestRefine("cleanUp")}
+            title="Remove specks, fill pinholes, smooth the edge — one undo step"
+          >
+            <Sparkles />
+            Clean Up
+          </ToolButton>
+          <div
+            className="contents"
+            {...paramRadio.groupProps}
+            aria-label="Refine operation"
+          >
+            {REFINE_PARAMS.map((r, i) => {
+              const Icon = r.icon;
+              return (
+                <ToolButton
+                  key={r.id}
+                  stacked
+                  active={param === r.id}
+                  {...paramRadio.itemProps(i)}
+                  disabled={!canRefine}
+                  title={r.title}
+                  onClick={() => setParam(r.id)}
+                >
+                  <Icon />
+                  {r.label}
+                </ToolButton>
+              );
+            })}
+          </div>
+        </div>
+        <SizeSlider
+          label={open.label}
+          unit=" px"
+          value={refine[open.id]}
+          min={open.min}
+          max={open.max}
+          onChange={setOne(open.id)}
+          disabled={!canRefine}
+        />
+        {!selection.active && (
+          <p className="text-2xs text-theme-muted-foreground">Select something to refine it.</p>
+        )}
+        <PanelActionBar>
+          <PanelAction
+            disabled={!canRefine || isNoopRefine(refine)}
+            onClick={() => requestRefine("apply")}
+          >
+            {previewing ? "Apply refine" : "Apply"}
+          </PanelAction>
+        </PanelActionBar>
+      </div>
 
       {/* ── Act on the selection: one title + bulb over all five actions ──
           Two 3-column rows out of a single 5-item grid (All/Deselect/Delete,
@@ -210,7 +390,7 @@ export function SelectSettings({
           lives in this bulb now, per the no-permanent-paragraphs rule.
           Outside the ToolModeToggle body: these actions are kind-independent
           and shouldn't re-animate on every kind switch. */}
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+      <div className={PANEL_SECTION}>
         <SectionHeader
           title="Selection"
           info={
@@ -220,6 +400,15 @@ export function SelectSettings({
               pixels. Copy (<kbd>Ctrl+J</kbd>) and Cut (
               <kbd>Ctrl+Shift+J</kbd>) place the selection on a new layer
               above — Cut also removes it from this one.
+              {patchmatch && (
+                <>
+                  {" "}
+                  Remove erases the selection and rebuilds it from the rest of
+                  the image, on your device. Cover the whole object — a partial
+                  selection lets it rebuild the object from its own leftovers —
+                  and expect big areas to come out soft.
+                </>
+              )}
             </>
           }
         />
@@ -232,11 +421,11 @@ export function SelectSettings({
             Per-option `disabled` is what made this possible: All works with
             nothing selected, the other four do not, and before this the group
             only had a single group-wide flag. */}
-        <ToolButtonGroup<"all" | "deselect" | "delete" | "copy" | "cut">
+        <ToolButtonGroup<"all" | "deselect" | "delete" | "copy" | "cut" | "remove">
           // THREE ACROSS, not five. Five squeezed "Deselect" and "Delete" into
-          // a sidebar column that has no room for them; three keeps the labels
-          // readable and leaves the last cell of row two empty, which is how
-          // this section has always looked (Chris, 2026-09-11).
+          // a sidebar column that has no room for them. The sixth cell, empty
+          // since 2026-09-11, is now Remove (Object) — it had its own section
+          // and button below; the Select Panel design (09-27) folds it in.
           columns={3}
           stacked
           disabled={disabled}
@@ -246,6 +435,7 @@ export function SelectSettings({
             else if (id === "delete") selection.onDelete();
             else if (id === "copy") selection.onNewLayerCopy();
             else if (id === "cut") selection.onNewLayerCut();
+            else if (id === "remove") selection.onRemoveObject();
           }}
           options={[
             {
@@ -282,36 +472,23 @@ export function SelectSettings({
               disabled: !selection.active,
               title: "Cut selection to a new layer (Ctrl+Shift+J)",
             },
+            // Only while the PatchMatch switch is on (lib/patchmatch.ts) —
+            // the same gate its old section had.
+            ...(patchmatch
+              ? [
+                  {
+                    id: "remove" as const,
+                    label: "Remove",
+                    icon: Eraser,
+                    disabled: !selection.active,
+                    title: "Remove Object — erase the selection and rebuild it from the rest of the image",
+                  },
+                ]
+              : []),
           ]}
         />
       </div>
 
-      {/* ── Remove Object (PatchMatch) ──────────────────────────────────────
-          SHIPPED ON since v7.46 (`ih_patchmatch` is a "0" kill switch now —
-          see lib/patchmatch.ts). Its own section rather than a 4th slot in
-          the "Act on the selection" grid: it's a materially different, much
-          heavier operation than Delete. Still the single-resolution kernel —
-          large holes show soft smearing until the pyramid lands (ADR-018). */}
-      {patchmatch && (
-        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
-          <SectionHeader
-            title="Remove Object"
-            info="Erases the selection and rebuilds it from the rest of the image, on your device. Cover the whole object — a partial selection lets it rebuild the object from its own leftovers. Big areas can come out soft."
-          />
-          {/* The shared panel action bar, not a stretched ToolButton: this is
-              a commit — it rewrites pixels and costs an undo step — so it gets
-              the same weight as Apply Crop rather than the light tile weight
-              of the Selection grid above it. */}
-          <PanelActionBar>
-            <PanelAction
-              disabled={disabled || !selection.active}
-              onClick={selection.onRemoveObject}
-            >
-              Remove Object
-            </PanelAction>
-          </PanelActionBar>
-        </div>
-      )}
     </div>
   );
 }

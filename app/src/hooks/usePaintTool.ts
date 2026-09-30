@@ -18,7 +18,9 @@ interface Opts {
   erase?: boolean;
   /** Mask variant: drive `mask_paint_down/move/up` — paint the active layer's
    *  grayscale mask (non-destructive) instead of pixels. Takes precedence over
-   *  `erase`. Uses the Paint brush's size/opacity/hardness/stabilizer. */
+   *  `erase`. Uses the mask brush's OWN size and feather
+   *  (`maskBrushSize`/`maskFeather`, set in the Layers panel), always at full
+   *  opacity; only the stabilizer is shared with the Paint brush. */
   maskMode?: boolean;
   /** Gray value laid into the mask when `maskMode`: 0 = hide, 255 = reveal. */
   maskValue?: number;
@@ -82,10 +84,12 @@ export function usePaintTool({
         t.mask_paint_down(
           x,
           y,
-          settings.brushSize,
+          settings.maskBrushSize,
           maskValue,
-          settings.brushOpacity / 100,
-          settings.brushHardness / 100,
+          // Full strength always: a mask stroke either hides or reveals.
+          // Feather is the UI word; the engine wants hardness, its inverse.
+          1,
+          (100 - settings.maskFeather) / 100,
           settings.paintStabilizer,
         );
       } else if (erase) {
@@ -123,6 +127,8 @@ export function usePaintTool({
       settings.eraserSize,
       settings.eraserOpacity,
       settings.eraserHardness,
+      settings.maskBrushSize,
+      settings.maskFeather,
       settings.paintStabilizer,
       flushToCanvas,
       smartBrush,

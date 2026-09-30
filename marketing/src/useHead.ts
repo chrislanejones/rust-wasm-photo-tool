@@ -64,7 +64,7 @@ const link = (rel: string, href: string) => {
 
 const drop = (selector: string) => document.head.querySelector(selector)?.remove();
 
-export function applyHead(route: Route) {
+function applyHead(route: Route) {
   const url = abs(route.to);
   const image = abs(route.ogImage ?? DEFAULT_OG_IMAGE);
 
@@ -126,7 +126,7 @@ const dropArticleTags = () => {
  *  document that already has another page's tags on it. The prerendered HTML is
  *  what crawlers read; this is what keeps the tab title, the share sheet and the
  *  canonical honest after a client-side navigation. */
-export function applyPostHead(post: Post) {
+function applyPostHead(post: Post) {
   const url = postUrl(post);
   const image = abs(post.ogImage ?? DEFAULT_OG_IMAGE);
   const title = postTitle(post);

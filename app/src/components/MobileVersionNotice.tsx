@@ -1,14 +1,5 @@
 import { Smartphone } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Props {
   open: boolean;
@@ -28,27 +19,17 @@ interface Props {
  */
 export function MobileVersionNotice({ open, onOpenChange }: Props) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5 text-theme-accent" />
-            Mobile version
-          </DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <DialogDescription>
-            The mobile version uploads and downloads images. For the full
-            photo editing suite, open Image Horse on a desktop or a wider
-            window.
-          </DialogDescription>
-        </DialogBody>
-        <DialogFooter>
-          <Button size="large" className="w-full" onClick={() => onOpenChange(false)}>
-            Got it
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Mobile version"
+      titleIcon={Smartphone}
+      confirmLabel="Got it"
+      onConfirm={() => onOpenChange(false)}
+    >
+      The mobile version uploads and downloads images. For the full
+      photo editing suite, open Image Horse on a desktop or a wider
+      window.
+    </ConfirmDialog>
   );
 }

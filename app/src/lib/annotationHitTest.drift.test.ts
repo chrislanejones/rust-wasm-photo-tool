@@ -97,19 +97,25 @@ function hashOf(fnName: string): string {
  * strictly worse than deleting it — it would still look like protection.
  */
 const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
-  text_annotation_at: "69fa8d110af212b2",
+  // 69fa8d110af212b2 → c2ba7b68976f0549 (2026-09-30): no active layer (the
+  // stack is empty mid-restore) answers -1 instead of panicking. The port
+  // takes the annotation list, and [] already answers -1 (test "no
+  // annotations"). Rule otherwise unchanged.
+  text_annotation_at: "c2ba7b68976f0549",
   // 6769816ca3a09358 → cd6a41ce328a78b2 (2026-08-28): the ring rule for
   // unfilled rect / circle / hand-circle. Port + tests updated FIRST, per the
   // order above.
   // cd6a41ce328a78b2 → 2f58b7e76eb659d0 (2026-09-17): diamond (8) / star (9)
   // route through an outline-edges test while unfilled, padded bbox when
   // filled. Port + tests updated FIRST, per the order above.
-  // 2f58b7e76eb659d0 → ba5ac4fcb5d475f3 (2026-09-18): rotation (the query
-  // point turned by −θ about the bbox center for kinds 0/1/2/8/9/10),
-  // triangle (10) joins the unfilled-edges branch, the star takes its point
-  // count. Port + tests (triangle, 8-point star, turned rect, pin ignores θ)
-  // updated FIRST, per the order above.
-  shape_annotation_at: "ba5ac4fcb5d475f3",
+  // 2f58b7e76eb659d0 → 4b1b4abff15bd584 (2026-09-30): same empty-stack guard
+  // as text_annotation_at; port case "answers -1 with no shapes" added first.
+  // → ef6242fa495acca1 (2026-09-30, the merge of both): rotation (the query point turned by −θ about
+  // the bbox center for kinds 0/1/2/8/9/10), triangle (10) joins the
+  // unfilled-edges branch, the star takes its point count. Port + tests
+  // (triangle, 8-point star, turned rect, pin ignores θ) updated FIRST, per the
+  // order above.
+  shape_annotation_at: "ef6242fa495acca1",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

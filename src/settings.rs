@@ -53,11 +53,12 @@ pub fn photo_limit(tier: &str) -> u32 {
 
 /// The undo history's BYTE budget, for the JS side.
 ///
-/// Exported because the degradation warning has to be concrete: on a 24 MP
-/// photo a snapshot is ~96 MB, so this cap is what decides that snapshot undo
-/// gives about five steps instead of fifty (ADR-052). JS estimates the depth
-/// from the live document size and this number; hardcoding 512 MB there would
-/// be a second copy of a value that already lives here.
+/// Exported so the undo-depth readout can be concrete: a default document is
+/// Canvas + Photo, so on a 24 MP photo a snapshot is ~192 MB and this cap
+/// gives about two steps instead of fifty (ADR-052, corrected 2026-09-18).
+/// The status bar's "Undo NN%" (`app/src/lib/undoDepth.ts`) estimates the
+/// depth from the live document size and this number; hardcoding 512 MB there
+/// would be a second copy of a value that already lives here.
 #[wasm_bindgen]
 pub fn history_max_bytes() -> f64 {
     DEFAULT_MAX_HISTORY_BYTES as f64

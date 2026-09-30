@@ -114,7 +114,7 @@ fn text_annotations_are_included_in_a_composited_copy_but_not_an_active_layer_co
     let mut t = doc();
     // Opaque white text on the red photo, inside the region copied below.
     t.add_text_annotation(
-        "HELLO", 14.0, 255, 255, 255, true, 6, 6, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "HELLO", 14.0, 255, 255, 255, true, 6, 6, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     );
     t.recomposite();
 

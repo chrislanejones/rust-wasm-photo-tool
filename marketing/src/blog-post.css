@@ -1,0 +1,142 @@
+/* blog-post — v2 port. Owned by the blog-post port; other ports must not edit this file.
+ *
+ * The v2 post layout, from "Blog - Offline by Construction" and "Blog - Engine
+ * in a Worker" (one template, two posts). Everything here is scoped under
+ * `.post-head--article` and `.post--article`, because the bare `.post` block
+ * is also the prose for Contact and the legal pages. Those are ported
+ * separately, and a change here must not reach them.
+ *
+ * What the design changes from the old article:
+ *   - the headline block is centered on a 68rem track, not pinned to the gutter
+ *   - one centered 46rem reading column; figures break out to 68rem
+ *   - section headings are small uppercase labels over a rule, not 32px display
+ *   - body copy is 17px (--text-md) at 1.55, with an 18px lead paragraph
+ *   - tables are 15px (--text-ui)
+ */
+
+:root {
+  /* The reading column and the figure track, from the design's max-widths. */
+  --post-column: 46rem;
+  --post-wide: 68rem;
+  /* The headline block's foot. The design sets it at 56px, between two rungs. */
+  --post-head-foot: 3.5rem;
+}
+
+/* ── the topper ───────────────────────────────────────────────────────────── */
+
+/* The headline block centers on the wide track, so the headline sits over the
+   same edge the figures below it use, instead of hugging the page gutter. */
+.post-head--article {
+  padding-inline: max(var(--page-gutter), calc((100% - var(--post-wide)) / 2));
+  padding-block-start: calc(var(--banner-height) + var(--space-3xl));
+}
+.post-head--article.post-head--topper {
+  padding-block-end: var(--post-head-foot);
+  /* The article sets its own top padding; a margin here as well doubled it. */
+  margin-block-end: 0;
+}
+
+.post-head--article .post-head__title { line-height: 1.02; }
+
+.post-head--article .post-head__deck {
+  line-height: 1.4;
+  max-width: 58ch;
+  text-wrap: pretty;
+}
+
+/* "Blog" is the way back to the index. The design sets it in the accent with
+   no arrow, and it stays a real link. */
+.post-head--article .post-head__up { color: var(--color-accent); }
+.post-head--article .post-head__up::before { content: none; }
+
+/* ── the reading column ───────────────────────────────────────────────────── */
+
+.post--article {
+  padding-block-start: var(--space-2xl);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+}
+
+/* One centered column for everything the eye tracks line by line. Figures are
+   the exception below. Two classes, because the shared `.post > p { max-width:
+   65ch }` is a class plus an element and would outrank one class. */
+.post.post--article > * {
+  max-width: var(--post-column);
+  margin-inline: auto;
+}
+
+.post--article p { margin-block-end: 1.125rem; }
+
+/* The lead. The first paragraph after the receipts line is a step up, so the
+   argument starts at a reading size before settling into body copy. */
+.post--article > .post__sourcenote + p { font-size: var(--text-deck); }
+
+/* Section headings are labels, not display type: the design sets them small,
+   uppercase and ruled, and lets the prose carry the weight. */
+.post--article h2 {
+  margin-block: var(--space-2xl) 1.125rem;
+  padding-block-end: var(--space-xs);
+  border-block-end: var(--rule-hair) solid var(--color-rule);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: var(--leading-body);
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+.post--article code {
+  font-size: 0.875em;
+  padding: 0.1em 0.4em;
+}
+
+/* Figures break out of the column to the wide track. */
+.post--article > .post__figure {
+  max-width: var(--post-wide);
+  margin-block: var(--space-2xl) var(--space-xl);
+}
+.post--article .post__caption {
+  color: var(--color-ink-2);
+}
+/* The caption belongs to the figure, so it runs the figure's full width. */
+.post--article .post__caption--numbered { max-width: none; }
+/* "FIG 1" is set at the caption's own size in the design. */
+.post--article .post__fignum { font-size: inherit; }
+
+/* ── tables and code ──────────────────────────────────────────────────────── */
+
+.post--article .spec { font-size: var(--text-ui); line-height: 1.45; }
+.post--article .spec tbody th { font-size: var(--text-ui); }
+.post--article .spec th,
+.post--article .spec td { padding-block: var(--space-sm); }
+
+.post--article .post__code {
+  max-width: var(--post-column);
+  padding: var(--space-md) 1.25rem;
+  line-height: 1.6;
+  border-radius: var(--radius-sm);
+}
+
+/* ── the foot of the article ──────────────────────────────────────────────── */
+
+.post--article .post__sources {
+  margin-block-start: var(--space-lg);
+  padding-block-start: var(--space-md);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+  line-height: 1.6;
+}
+
+/* Older / newer. The design ends at the sources line; this row is kept for the
+   link between the two posts, on the same track as the column above it. */
+.post--article + .post-next {
+  max-width: calc(var(--post-column) + 2 * var(--page-gutter));
+  margin-inline: auto;
+  padding-block-start: var(--space-2xl);
+}
+
+/* The shared spec caption stacks a padding and a margin (32px). The design
+   sets 12px between a table's caption and its head row. */
+.post--article .spec__caption {
+  margin-block-end: 0;
+  padding-block-end: var(--space-sm);
+}

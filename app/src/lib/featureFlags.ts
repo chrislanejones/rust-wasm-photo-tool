@@ -20,9 +20,18 @@
 //   • OPT-IN       — default OFF, `"1"` enables. Used for things that have not
 //     earned trust yet.
 //
-// None of these are user preferences. There is deliberately no Settings UI —
-// they are set from DevTools and every one needs a reload to take effect,
-// because the reads happen at module init or on paths that have already run.
+// None of these is a user preference. The KILL switches have no Settings UI on
+// purpose: they exist so one profile can turn a suspect subsystem off, and a
+// person hunting for a setting must not find one.
+//
+// The OPT-IN ones do have a surface now — Settings › Beta (ADR-064), the ring
+// of invited people who see a thing before everyone. An opt-in entry carries
+// its `beta` block below and NOTHING ELSE MOVES: the key, and the module's own
+// predicate, stay here, so the pane cannot drift from the behavior the way a
+// second registry would. `lib/beta.ts` reads this list and never names a key.
+//
+// Every one of these still needs a reload to take full effect — the reads
+// happen at module init or on paths that have already run.
 
 import { isOplogPersistenceEnabled } from "@/lib/oplogPersistence";
 import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
@@ -35,6 +44,19 @@ import { engineWorkerEnabled } from "@/lib/engine/port";
 
 export type FlagKind = "kill" | "optin";
 
+/** What Settings › Beta shows for an opt-in flag. Its presence is what puts a
+ *  flag in the ring; a flag without it is DevTools-only. The key and the read
+ *  stay on the FeatureFlag itself — see the header. */
+export interface BetaListing {
+  /** URL-safe id, the spelling that goes in `?beta=`. */
+  id: string;
+  /** The name a person outside this repo would use. `label` above is the
+   *  developer's name for the same thing, and the Diagnostics panel shows it. */
+  label: string;
+  /** One sentence: what it does, and what is unfinished about it. */
+  blurb: string;
+}
+
 export interface FeatureFlag {
   /** The localStorage key, exactly as you would type it in DevTools. */
   key: string;
@@ -46,6 +68,9 @@ export interface FeatureFlag {
   effect: string;
   /** Where it is read, so the panel can send you to the source. */
   source: string;
+  /** Present ⇒ this opt-in is offered in Settings › Beta. Kill switches never
+   *  carry one: turning a shipped subsystem off is not a beta feature. */
+  beta?: BetaListing;
 }
 
 export const FEATURE_FLAGS: FeatureFlag[] = [
@@ -105,6 +130,12 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     isOn: isSmartEdgeEnabled,
     effect: "Edge-aware brush snapping. Kernels are tested and wired but the FEEL has never been signed off on a real canvas (ADR-014).",
     source: "lib/smartEdge.ts",
+    beta: {
+      id: "smart-brush",
+      label: "Smart Brush",
+      blurb:
+        "Paint strokes that stop at an edge instead of running over it. The engine side is tested; what nobody has judged is the feel — whether a stroke stops where you expect.",
+    },
   },
   {
     key: "ih_engine_worker",
@@ -119,8 +150,18 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     label: "WebGPU (Phase 0)",
     kind: "optin",
     isOn: webgpuEnabled,
-    effect: "Attaches the GPU blur correctness harness. No pixel in the app goes near the GPU yet — this only exposes window.__ihGpuBlurSelfTest() (ADR-030).",
+    // ⚠️ This line said "no pixel in the app goes near the GPU yet" until
+    // 09-22-2026. It had been true, and stopped being true when the whole-image
+    // blur grew its GPU path in `useTransforms.ts` — the registry's own comment
+    // asks for a row per flag and cannot notice a row going stale.
+    effect: "Whole-image blur runs through WebGPU when the adapter is real hardware, and falls back to the CPU on any failure (useTransforms.ts, ADR-030). Also attaches the correctness harness, window.__ihGpuBlurSelfTest(). The effects BRUSH is always CPU — its dabs are below the transfer floor.",
     source: "lib/webgpu/detect.ts",
+    beta: {
+      id: "gpu-blur",
+      label: "Blur on the graphics card",
+      blurb:
+        "Runs a whole-image blur through WebGPU when your machine has real graphics hardware, instead of the CPU. Measured faster on one image at a time; a software adapter is refused, and any failure falls back to the CPU.",
+    },
   },
 ];
 

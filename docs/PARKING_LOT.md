@@ -4,6 +4,496 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## FIXED 09-30-2026 — fast photo switching showed one photo while another was selected
+
+Fixed on `fix/photo-switch-load-token`. Two causes, both needed (30 runs each of
+e2e photo-switch-state §0.2 / §0.5 / §0.7):
+
+| Build | Failures | Engine panics |
+| --- | --- | --- |
+| master | ~4 of 6 per test | yes |
+| TypeScript fix only | 6 of 24 | yes |
+| engine fix only | 11 of 30 | 0 |
+| **both** | **0 of 30** | **0** |
+
+1. **Engine panic.** Rebuilding a saved photo empties the layer stack
+   (`begin_layer_restore`) across many worker messages; a UI poll landing in
+   that window indexed `self.layers[self.active]` and panicked, poisoning the
+   instance (black canvas, hung loads). 13 read-only getters now go through
+   `active_layer()` and answer empty.
+2. **Loads and saves interleaved.** Loads now run one at a time and skip when
+   stale; the ownership marker moves inside the load; archive saves run in the
+   same queue. The trace showed photo A's archive written with photo B's
+   pixels — the marker still said A after B's load had finished.
+
+Still open from the same work: stale engine handles reject with "engine
+document replaced" as an UNHANDLED rejection (console noise, ~140 per 30 runs).
+
+## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
+
+Netlify was retired on 09-27-2026 (see docs/Deploying.md, "Retiring Netlify").
+Everything landed except one step: the site is still connected to
+`chrislanejones/rust-wasm-photo-tool` on `master`.
+
+| Field | Value |
+|---|---|
+| `build_settings.stop_builds` | `true` — no builds run, so **no PR checks** |
+| `build_settings.cmd` | `""` — #56 closed |
+| `build_settings.repo_url` | **still `https://github.com/chrislanejones/rust-wasm-photo-tool`** |
+| Published deploy | the 301 to `edit.imagehorse.app` |
+
+**Cosmetic while builds are stopped**, which is why it did not block the
+retirement. It matters only if someone re-enables builds without noticing what
+they are re-enabling.
+
+The API will not clear it. Both of these return the site JSON with the link
+untouched — no error, no change:
+
+```
+netlify api updateSite --data '{"site_id":"<id>","body":{"repo":null}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"repo_url":null,"provider":null,"repo_path":null}}}'
+```
+
+**Fix by hand:** Netlify UI → Project configuration → Build & deploy →
+Continuous deployment → unlink the repository.
+
+**Do NOT delete the site.** It serves the 301 that `app/src/lib/legacyHost.ts`
+and the `MovedNotice` toast promised users. Deleting it frees
+`rust-wasm-photo-tool.netlify.app` for anyone to claim and 404s every old link.
+
+Two follow-ups that were deliberately left out of that session's diff:
+
+- **`app/src/features/hostMove/` and `app/src/lib/legacyHost.ts` are now dead
+  code.** Nothing serves the app on the legacy host any more, so `isLegacyHost`
+  can never return true in production and the toast can never render. Removing
+  them is a real deletion with its own tests (`legacyHost.test.ts`) and an
+  `App.tsx` mount — a separate session.
+- **The three env vars still on the Netlify site** — `REPLICATE_API_TOKEN`,
+  `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_CONVEX_URL`. The first is a real secret
+  sitting on a host nothing builds from. Confirm it is set on Vercel, then
+  delete it there; rotating it is the safer call.
+
+## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+
+CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
+| 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
+## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
+
+v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
+original. It does not touch originals already written that way, and a
+"Photo only" ZIP copies a stored original as it is — so a photo resized or
+compressed on an older build keeps shipping its frame. Seen for real: three
+ZIPs Chris downloaded at 5:19–5:30 pm on 09-28 (pre-v9.3), five JPEGs, each
+with a near-white frame measured per side:
+
+| Side lines | Frame line | Photo line |
+| --- | --- | --- |
+| mean brightness | **249–254** | 16–187 |
+| spread along the line | **≤ 4.7** | 10–76 |
+
+2–3px per side, sometimes only left/right. Cropping exactly those lines fixed
+all five (re-measured 0 on every side).
+
+**Options.** (a) Tell affected users to remove and re-add those photos from
+their files — safe, manual. (b) A one-time repair that detects the frame with
+the rule above and crops it from `originalKey`. That rewrites user data in
+IndexedDB, so it goes through the `dexie-migration` skill with fixtures, and it
+must be conservative: a photo whose real edge is a flat white line (a white
+background, a scan) would pass the same test. `uploadKey`, where present, is
+the untouched upload and gives the true aspect ratio to check against.
+
+## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
+The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
+Resize scales the whole artboard — photo plus the 10px Canvas border each side —
+to the number typed. Measured, 1600×1200 JPEG, width set to 800:
+
+| Build | Stored photo |
+| --- | --- |
+| master (pre-#260) | 796×596, with a 3px white frame baked in |
+| v9.3 | **790×590**, photo only |
+
+A 256px PNG set to 200 stores 186×186. So the number a person types is not the
+size they get, and the gap grows with the border. The fix is to scale by
+typed ÷ photo width (not ÷ artboard width) — a one-line change in the resize
+path, but it changes the output of every resize, so it wants its own PR and a
+look at the Canvas Size panel, which may lean on the current behavior.
+
+## OPEN — Auto Compress makes an already-small JPEG heavier (09-28-2026)
+
+Found the same day, identical on master. A q60 JPEG of 32,950 B through
+"Compress Image" comes back at **36,621 B** (+11%) and stores `encodeQuality: 75`
+— it re-encodes at the panel's quality, which is higher than the file's own.
+#259 added the "never hand back a bigger file for fewer pixels" step-down to
+Apply Resize only; Auto Compress has no such guard. Now that `encodeQuality`
+is on the entry, the obvious rule is: if the result is not smaller, keep the
+original bytes and say so.
+
+## OPEN — 116 · The oval is the piece of this still to build (09-30-2026)
+
+Triangle, star points and rotation are built on #187 and renumbered to **op-log v9** (ADR-059, ADR-070). What is left here is the oval.
+
+| | |
+|---|---|
+| **What** | A triangle, a star with a chosen number of points, an **oval**, and a rotation handle on every shape |
+| **Built on #187** | Triangle (kind 10), star points 3 to 12, rotation on all six shapes, `OP_FORMAT_VERSION` 9 with `ShapeRotation` 19 and `ShapeStarPoints` 20 appended after `TextFont` 18 |
+| **Not built** | The **oval**. Circle is a true circle (`drawPreview.ts` clamps to `Math.min(w, h)`; the engine's `draw_shape` kind 1 matches), so there is no free ellipse today and an oval is a new engine shape kind. It takes kind 11 on the #187 branch, after the triangle, so it cannot collide with it |
+| **Decided** | Chris, 09-28: build the oval on the #187 branch, alongside the triangle |
+| **Star point cap** | The Points slider stops at **12**. Chris asked for "as many points as you want"; a higher cap or a free number field is a one-line engine clamp plus the slider, still to decide |
+| **Also stale** | `/in-the-works` still lists this under "Being built now" |
+
+## OPEN — UI Night 3 leftovers: what the three tool panels surfaced outside themselves (09-25-2026)
+
+Night 3 normalized Paint, Eraser and Crop and stopped at three. These are the
+things it measured and did not touch, because each one reaches past those
+panels or changes a color. Counts are JSX elements by TypeScript AST, not grep
+lines.
+
+| Item | Where | Why it waits |
+|---|---|---|
+| **Light-theme lit tiles fail AA text contrast: 2.24:1.** `ToolButton`'s active state is `text-theme-primary` on `bg-theme-primary/20`; on the light panel that is `#c98f3f` on its own 20% tint. Dark is 8.05:1. Every SELECT tile in the app (Crop's "Free", Stabilizer "Off", Shapes…) | ui/tool-button.tsx `activeCls` | A color change on every tile in both panels and dialogs, which Night 3's stop conditions forbid. The same `--accent` shortfall styles.css already calls "NOT fixed here". Night 5 (color), or a token decision |
+| **20 bare `<kbd>` in 6 files still ride the legacy element rule** (3px radius): ShortcutModal ×3, StatusBar ×1, ToolGrid ×1, LayerSettings ×6, PerspectiveSettings ×1, SelectSettings ×8 | those files; styles.css `kbd {}` | Mechanical move to `ui/kbd`, 1px radius change each. Delete the CSS rule with the last one |
+| **`ToolButtonGroup`'s own `label` prop is a second spelling of `ControlRow`'s label slot**, 12 call sites in 7 files (RulersGridsPane, BatchSettings ×2, LayerSettings, ShapeSettings, TextSettings ×4, CreateAIImagePanel, NewActions ×2) | ui/tool-button-group.tsx | Same look (text-2xs muted, 8px gap), so moving them is pixel-safe; but it is 7 files outside tonight's three. Then the prop can go |
+| **`FieldLabel` is `ControlRow` without the control**, info on the right instead of beside the label; 5 uses in 3 files | ui/field-label.tsx | Folding it changes where the lightbulb sits. A look decision |
+| **The color picker dialog's saved-palette swatches are still silent** — `Swatch` takes a `radio` prop now, and only `ColorSwatchGrid` passes it | ColorPickerDialog.tsx:277 | Same fix as the grid; the dialog is not a tool panel |
+| **`aria-valuetext` on sliders could not be verified by probe.** It is in the DOM (`aria-valuetext="20"` on a track at 75), but Chromium 153's CDP `valuetext` ignores `aria-valuetext` even on a pure `role="slider"` div (control case: reports `""`), so the probe cannot see it either way | ui/size-slider.tsx | One real screen-reader pass (NVDA or VoiceOver) settles it |
+| **Paint's `erase` mode is still an orphan** (no tile, ORPHAN O-1) and was left on the old grammar on purpose | PaintSettings.tsx `case "erase"` | Reviving or deleting it is a product call, not a layout one |
+| **Stroke Stabilizer now sits in a collapsed Advanced section** in Paint, Blur and both Eraser modes. Its closed summary says the level ("Stabilizer: Med"), so ON is never hidden | StabilizerRow.tsx `AdvancedStabilizer` | Chris to confirm this is where it belongs. If not, `defaultOpen` on `AdvancedSection` is the one-word revert |
+
+## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+Found during the Select morning run (live tolerance). `pnpm run build` prints
+"Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
+{ z-index: var(--z-*); }`. Tailwind scans text, and three comments spell the
+rule out literally: `app/src/styles.css:42`, `app/src/lib/styles.ts:251`,
+`app/src/components/ui/panel-close-button.tsx:38`. The generated rule is
+invalid and applies to nothing, so it is noise, not a bug — but it is the one
+warning in an otherwise clean build, and a real CSS warning would hide behind it.
+
+**Fix:** reword the three comments (e.g. "`z-[var(--z-…)]`" or "a `--z-*`
+token in a `z-[var(…)]` class") so no complete class string appears, then
+confirm the build prints no CSS warning. Same shape as the guardrails
+comment-counted-as-code trap in CLAUDE.md.
+## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+Found while ADR-067 was drafted, left out of the release on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The cubes' dynamic `import()` has no `.catch` | `marketing/src/components/CubeLetters.tsx` | If the chunk fails to load, the label says "Starting…" forever instead of "No GPU context". Fix: catch and set the `none` backend. |
+| A comment names three 0.165's `Color.setStyle` | `marketing/src/posts/engine-in-a-worker.figures.tsx:35` | three is 0.170 now. Check whether 0.170 parses `oklch()`; update or drop the comment. |
+
+Also owed: one look at the WEBGPU cubes in a real Chrome on a real GPU. Headless
+Chromium draws WebGPU canvases blank white even for a bare three.js control, so
+only the WebGL 2 path is verified.
+
+## RESOLVED — second blog post duplicates the WebGL scene runtime verbatim (09-22-2026)
+
+> **Done 09-28-2026, on `feat/blog-entropy-post`**, when the third post — "We
+> spent a month taking the file apart" — arrived as exactly the trigger below:
+> a third copy. `SceneKit`/`stream`/`fade`/`orbit`/`createScene` are one module
+> (`marketing/src/posts/scene/kit.ts`), the React frame is one
+> (`scene/figure.tsx`, bound per post with `sceneFigure(() => import(...))`),
+> the `.scene` CSS is one (`scene/scene.css`), and the three.js subset is one
+> (`scene/three.ts`). Each post keeps only its builders. The three copies had
+> drifted by comments, one optional `stream()` size and a `lookY` default —
+> nothing a reader could see. Proven so: 28 reduced-motion stills of all three
+> posts, header and every figure, at 1200 and 320 px, 0 pixels different from
+> the pre-refactor build. Scene code across the three posts 48,477 B → 35,992 B.
+
+Found while building `offline-by-construction.scenes.ts` (the "hotel Wi-Fi"
+post). It needed the same `SceneKit` class, `stream()`/`fade()` helpers, and
+the whole `createScene()` render loop that `engine-in-a-worker.scenes.ts`
+already has — ~350 lines, copied rather than shared, matching that file's own
+stated convention (each post's scene runtime is self-contained so its chunk
+loads only on that page). Same story for the `.scene`/`.scene__*` CSS block in
+`offline-by-construction.figures.css`, copied byte-for-byte from
+`engine-in-a-worker.figures.css`.
+
+**Left alone deliberately.** With one prior post there was no established
+sharing pattern to follow, and extracting one now would mean editing the
+already-shipped post's files inside a session whose target was the new post —
+exactly what hard rule 4 says not to do.
+
+**Do it when** a third post needs a WebGL scene. Two identical copies is the
+established (if regrettable) convention here; a third copy is the signal to
+lift `SceneKit`/`stream`/`fade`/`createScene` into one shared module both
+posts' `figures.tsx` import, and the `.scene`/`.scene__*` CSS into one file
+both posts' bodies import instead of duplicating.
+
+## OPEN — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
+
+Found while adding the Sync switch on `feat/sync-settings-pane`. The group's
+buttons carry no `aria-pressed`, so a screen reader hears "Sync on, button" and
+"Sync off, button" with nothing to say which one is lit. The lit state is
+visual only (the filled pill). Same for every caller of the component: the
+Security pane's online-features switch, EXIF keep/strip, Appearance's theme and
+motion, General's reopen-last-session.
+
+Measured in the browser: `aria-pressed` is `null` on both Sync buttons, lit or
+not. `ToolButtonOption.active` already solved this for `ToolButtonGroup`
+(ADR-056: emit `aria-pressed` only for tiles that opt in), so the fix is
+probably the same one-line pattern here. It touches every pane, so it wants its
+own PR and a screen-reader check, not a ride-along.
+
+## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
+against the master build and the branch build, same machine and hour:
+
+| Build | Spec runs | Tests failed | Replays of the raw flow (paste → 1 s → Alt+E) |
+|---|---|---|---|
+| master `6b59460e` | 4 | **1 of 12** | 1 miss of 10 |
+| branch | 4 | **1 of 12** | 1 miss of 10; cold starts 8/8 on both |
+
+The failing test is whichever one hits it: `waitForEvent("download")` times out
+after Alt+E. Every miss in the replays coincided with the harness's "Failed to
+load Clerk" page error, but some runs had that error and still downloaded.
+
+Unverified suspect: `useCanvasActions.handleExport` calls `a.click()` and then
+`URL.revokeObjectURL(url)` on the very next line. Chrome starts a download
+asynchronously, so revoking synchronously can race it. The usual fix is to
+revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
+after a short delay). Reproduce the miss rate first, then change one line and
+re-measure. Isolate the fix before explaining it.
+
+## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+
+Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
+`StampSettings`' `handleModeChange` clears the highlighted preset
+(`setSelectedStampId(null)`) because "sub-mode teardown clears the armed stamp
+(useStampTeardown), so the panel's own selection highlight must not survive the
+switch either". But it only runs from `ToolModeToggle`'s `onModeChange`, which
+fires only from the in-panel icon row behind `showModeRow` — and nothing has
+passed `showModeRow` since the row moved to `SubtoolRow` (the new-ui-toolbar arc). The panel is
+not keyed on the mode, so nothing remounts it either. Expected symptom: pick a
+red stamp, switch Stamps › Clone › Stamps in the header, and the tile is still
+lit while clicks no longer place it.
+
+Paint and Shapes route through the same dead prop; their handlers only mirror
+state the store already holds, so they are harmless. Reproduce first; the fix
+is probably an effect on `activeMode` in StampSettings, after which the whole
+`onModeChange`/`showModeRow`/`columns`/`disabled` surface of ToolModeToggle can
+be deleted (the shim note there asks for exactly that).
+
+## OPEN — app SSOT leftovers that change pixels or need a call (09-22-2026)
+
+From the fallow + style/UI survey on `refactor/ssot-ui-cleanup`. That branch did
+the pixel-identical consolidations (see its three commits); these either change
+how something looks or need a decision:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| ~~`--primary` = `--accent` and `--ring` = `--border-active` in both themes~~ | styles.css | **DECIDED 09-22-2026 (Chris): keep them separate.** An accent picker may need them to differ |
+| `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
+| Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
+| ~~Plain inputs with NO focus ring (`inputCls`)~~ | BatchSettings:788, AIRenamePanel:213, SuperUserPane:110/119 | **MEASURED FALSE 09-24-2026 (UI Night 2).** They have the house ring: keyboard focus on Batch › Rename paints `outline: dashed 2px` in `--focus-ring`, from the unlayered global `input:focus-visible` rule in styles.css, and no scoped rule removes it (only `input[type=range]` opts out). AI Rename's `inputCls` is the same string byte for byte. Pinned by `e2e/ui-night2-controls.spec.ts`. Adopting FIELD_NUMERIC is now purely a look decision (Night 5), not an a11y fix |
+| Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
+| ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
+| ~~**Only 2 of 43 segmented-control call sites expose selection state; 38 are silent and should not be**~~ **RESOLVED 09-24-2026 (UI Night 2):** 36 SELECT sites are named radio groups, 4 TOGGLE sites carry `aria-pressed` (2 already did; TopBar and ReviewPanel are new), 3 ACTION rows stay silent, see docs/UI_CONSISTENCY.md §7. The `value`/`onChange` API row above still stands. (3 more are action rows, where silence is right). `ToggleButtonGroup` emits no `aria-pressed`/`aria-checked` ever (14 sites); `ToolButtonGroup` emits it only for tiles carrying their own `active` — deliberately, so a plain action is never announced "not pressed" — which leaves its SELECT mode silent (24 of its 29 sites). `ToolModeToggle` passes `value=`, so it inherits the silence. The tree holds 12 real `aria-pressed` attributes. Measured 09-23-2026 | ui/toggle-button-group.tsx, ui/tool-button-group.tsx:108; Sync switch (v8.85) and privacy switch (v8.89) both on the first | WCAG 2.1 AA, not tidiness. Coupled to the `value`/`onChange` API change above; upstream of both sits "should the settings pairs be `ui/switch` at all?". `radio-cards` and `segmented-tabs` already do it right and are the two least-used primitives. See docs/UI_INVENTORY.md Findings 1–2 |
+| **RATCHETED 09-29-2026 (UI Night 7): `ui-raw-button` baseline 37 in 28 files** (grew 34 → 37 in Night 6: `GalleryThumbMark` ×2, `StatusBar` ×1). Paying it down is still open. Original row: **Raw `<button>` baseline for Night 7's ratchet: 35 outside `components/ui/`, in 27 files** (**34 in 26 after Night 3**: `SizeSlider:97`'s preset buttons moved into `ui/preset-row`) (JSX elements counted by AST, not grep lines; was 37 in 27 files before Night 2 converted GalleryBar's two strip-scroll arrows to `Button size="tiny"`, the only two that matched a variant with zero visual change). Measured 09-24-2026 | app/src | **The primitives cannot absorb the rest without new `Button` variants**, and Night 2 added none (a variant is a design decision, not a one-off prop). By what each one needs: **ghost** small text action, 6 (DiagnosticLogOverlay:90, FeatureFlagsPanel:65, ResourceMonitor:198, PerspectiveActionBar:135, TextSettings:449, BatchSettings:656) · **link**, 2 (OnlineFeaturesOffNotice:17, TransformCropSettings:306) · **accent CTA**, 1 (ResumeContent:54) · **brand CTA on raw palette colors**, 3 (SubscriptionButton:414 `bg-zinc-800`, :428 and TextSettings:424 `bg-purple-600`; R4 violations guardrails cannot see, it counts hex) · **secondary large** (text-sm / font-medium / text-secondary), 3 (ResumeContent:61, DevTestsPane:22, StoragePane:103) · **small ghost icon**, 3 (ImageMetaPanel:66/121, CreateAIImagePanel:242) · **pill toggle** with a solid-primary on state, 3 (DimensionFields:71, NewActions:478, BatchSettings:819) · **small bordered**, 1 (ResourceMonitor:129). Bespoke and correctly not a `Button`, 13: swatch "+" circles (ColorPickerDialog:293, ColorSwatchGrid:72), SizeSlider:97 presets, info triggers that want `ui/info-tooltip` (AIUsagePane:111, GalleryCount:47), canvas/thumbnail overlays (DuplicatePadOverlay:112, GridThumbnails:130, MobileShell:67, GalleryBar:268/278), the Settings category rail (SubscriptionButton:296), HistogramView:271, StampSettings:189 |
+| **Two more silent exclusive choices, outside Night 1's 43**: HistogramView's RGB / Luma pair (raw buttons, inline styles, `mode === m`, no state exposed) and the Settings category rail (the current tab has no `aria-current` or `aria-selected`). Found 09-24-2026 during the raw-button census | features/canvas/HistogramView.tsx:271, components/SubscriptionButton.tsx:296 | HistogramView is a canvas panel (Night 3). The rail is a tab list or a nav with `aria-current`, a decision about the Settings dialog's structure |
+| **`ToggleButtonGroup`'s pill buttons compute `outline: dashed 3px`, offset 0, on keyboard focus**, where the global `button:focus-visible` rule says 2px, offset 2px. Same before and after Night 2 (measured on both builds); no matched stylesheet rule sets 3px, so it comes from somewhere the CSS-rule inspector does not show (framer-motion `motion.button` is the suspect) | ui/toggle-button-group.tsx | Harmless (still visible, still the focus color) but it is two focus-ring geometries in one app. Find the source before Night 5 touches focus |
+| **FROZEN 09-29-2026 (UI Night 7): `ui-radius` baseline 52** (26 bare `rounded`, 15 `rounded-xl`, 6 `rounded-2xl`, 2 `rounded-[inherit]`, 3 directional) — it can no longer grow; the sweep itself still changes pixels and stays parked. Original row: **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
+| **`scripts/inert-class-audit.mjs` prints "colour-utility candidates"** — British spelling in tool output, against the house rule. Found 09-23-2026 while writing docs/UI_INVENTORY.md, which quotes that line verbatim | scripts/inert-class-audit.mjs | One word. Deferred off the Night 1 docs branch because it is a script change, not a docs one — and fixing it desyncs the verbatim quote in UI_INVENTORY §1, so the two move together |
+| ~~**Three of the six `raw-colors` file exclusions in `guardrails.sh` hide zero violations**~~ **RESOLVED 09-29-2026 (UI Night 7):** dropped, count still 22. (CanvasArea, PenOverlay, colors.ts). All three files exist; the arithmetic closes (22 + 7 + 2 + 1 = 32 measured with no exclusions) | scripts/guardrails.sh:90-93 | Two-line deletion that does not move the count, but it is the blocking CI gate and a docs branch should not touch it. Also: `rust-panics` is at 46 vs baseline 47, `librs-lines` 4763 vs 4808 — two free tightenings. See docs/UI_EXCEPTIONS.md |
+| Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
+| RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
+| GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
+| The rename form (Start # / Pad / preview) is copied | AIRenamePanel:280 vs BatchSettings:845 | Its own component; the two copies have drifted slightly |
+| Label/value row x3, progress bar x4 | ImageMetaPanel, SuperUserPane, StoragePane / ResourceMonitor, AIUsagePane, ResizeSettings | New primitives, small visual unification |
+| PenOverlay hardcodes `#fcdfc2` (the DARK accent) — wrong in light theme; `#5af` vs Lasso `#4d9bff` are two selection blues | PenOverlay:694, LassoOverlay | Visible fix; needs a selection-color token |
+| The orange "grid selection" color is written 4x with no token; a `bg-black/40` scrim skips DIALOG_OVERLAY | AppShell:2684/3269/3359, GridThumbnails:128/146, CanvasArea | Token + scrim change |
+| ~8 uppercase mono labels with 3 different trackings | various | `.label-caps` was the fix once and is deleted now (unused); a new one restyles them |
+| 16 inline numeric `zIndex` values off the z ladder (guardrails only counts classes) | CanvasArea 40-52, overlays 20-29 | Mapping to `var(--z-*)` may reorder stacking |
+| Stale `var()` fallbacks that no longer match the tokens | `var(--accent, #6366f1)` x4, `var(--color-theme-accent, #b6764e)` x3 | Harmless today, misleading |
+| `--shadow-sm/md/lg` in `:root` share Tailwind's theme namespace, apparently unread | styles.css:28-30 | Could not prove them dead overnight |
+| Duplicate exports in the Dexie layer | originalsAdapter vs originalsStore (`getOriginal`, `deleteOriginal`), db.ts vs adapter (`putOriginal`) | IndexedDB — dexie-migration skill territory |
+
+## OPEN — ~14 KB of the wasm is ttf-parser variable-font code (09-22-2026)
+
+Twiggy on a name-keeping build of master `6b59460e` (same code, `wasm-opt -O -g`):
+ttf_parser is 87,213 B, and the variable-font half of it — `gvar` outlines,
+`parse_variation_data`, `ItemVariationStore` — is roughly 14 KB. `ab_glyph = "0.2"`
+pulls it in through its default `variable-fonts` feature. If every face the
+engine loads is static (no `fvar` table), `ab_glyph = { version = "0.2",
+default-features = false, features = ["std"] }` should drop it. Check the fonts
+first, then the rust-wasm-loop gates and a text pixel diff. The same run found
+only 240 B of genuinely unreachable wasm, so this is the one real lead.
+
+## OPEN — the home page's mobile LCP is bimodal: a ~2 s element render delay in some runs (09-21-2026)
+
+Observation from the speed work on `feat/marketing-speed-contact`. No cause
+found. Lighthouse 12, mobile preset, `/`, three sets of runs:
+
+| Build | Runs | Runs with element render delay ≥ 1.2 s | Their LCP | The other runs' LCP |
+|---|---|---|---|---|
+| Baseline (master) | 6 | **5** | 5.5–6.7 s (all six) | — |
+| Speed branch | 5 | **2** | 4.9 s and 5.3 s | 2.1–2.3 s (render delay 29–64 ms) |
+| Live imagehorse.app | 3 | **1** | 6.8 s | 3.2–3.3 s |
+
+The delay is the last LCP phase: the image has finished loading and the paint
+waits. The branch made the fast mode the common one (3 of 5) and made the slow
+mode faster than the baseline's normal, but did not remove it.
+
+Not tested, and only a guess at where to look: the image and the entry script
+are requested together, so whichever finishes first may decide whether hydration
+runs before the hero paints. One cheap experiment is to start hydration after
+the first `requestAnimationFrame` and compare a dozen runs each way. It defers
+interactivity by a frame or two, which is why it was not folded into the speed
+PR unasked.
+
+## OPEN — marketing design-audit leftovers (09-21-2026)
+
+From the token/consistency audit run on `feat/marketing-speed-contact`. That
+branch fixed the safe items (one tier filter, one `.coda`, one "latest" pill,
+radius/type/motion tokens, focus-ring radius, the mobile sheet's CTA, Pricing's
+phone header, two dead selectors). These change how something looks, or need
+a decision, so they wait:
+
+| Item | Where | Why it waits |
+|---|---|---|
+| "Selected" is drawn three ways: inset bar (`.seg`), accent border (Trail month tiles), border + tint + ring (home tool tiles) | styles.css `.seg[aria-pressed]`, `.month`, `.buttonset__btn` | Picking one changes two of the three |
+| The small uppercase label is written ~10 times with 0.08 / 0.1 / 0.12em tracking and mono or Geist | `.spec thead th`, `.stack__label`, `.cmdk__group`, `.foot-stmt__head`, … | One `.label` class + `--tracking-label` token; visible where the tracking differs |
+| Text links are styled 7 ways (underline vs bottom border, 3px / 0.14em / 0.2em offsets) | `.person__links a`, `.foot-stmt__links a`, `.notfound__links a`, `.postcard__title a`, … | One link style is a visible change |
+| Features and Trail Log end with no closing block (`.close` or `.coda`) | pages/Features.tsx, pages/Trail.tsx | Needs copy |
+| Blog shows date then version; Trail shows version then date, in the same meta column | `.postcard__meta`, `.release__meta` | Pick an order |
+| Top-level `.tbl` and stack `.node` cards use `--radius-sm`, other top-level cards `--radius-md` | styles.css | Visible |
+| `theme-color` is `#1b1210`; `--color-paper` is `#0d0504` (converted, verified) | marketing/index.html | May be deliberate: it tints the phone's address bar to match the hero's glow |
+| WebGPU cubes and the Canvas 2D fallback paint different oranges: the shader's "linear sRGB" accent is the sRGB value, not the linear one | components/CubeLetters.tsx WGSL `fs` | Changes the effect's color; the 2D path also hardcodes three oklch values |
+| Mobile sheet sits at `--space-md + 60px`; the pill measures 62px | `.nav-sheet` inset | A 2px move, wants a `--nav-height` token |
+| Inline code is 0.9em, 0.95em or 0.85em depending on the block | `.mono`, `.tbl__key`, `.tbl__idx`, `code` | One `--text-code` token |
+| The ⌘K palette's "Pages" group has no About entry | components/CommandPalette.tsx `ITEMS` | Hand-written list; Contact was added, About never was |
+## OPEN — a ratchet that IMPROVED and was never locked in is silent drift (09-20-2026)
+
+Found while lowering `rust-panics` 47 → 46 and `librs-lines` 4808 → 4732. Both
+counts came down in ONE commit, #131 (`2d188420`, "fonts arrive at runtime"),
+and ADR-058 records the lowering as part of that change — but the commit
+touches **zero lines of `scripts/guardrails.sh`**. The branch carried the new
+baselines; the merge did not. Measured in a clean clone:
+
+| Commit | `rust-panics` | `src/lib.rs` |
+| --- | --- | --- |
+| `6a3de6be` (before #131) | 47 | 4808 |
+| `2d188420` (#131) | **46** | **4732** |
+| `5bd73cce` (v8.80) | 46 | 4732 |
+
+For three releases the script printed `IMPROVED … lower the baseline` on every
+run and nothing acted on it, so 46 panics and 76 lines of `lib.rs` could have
+come back for free. **`IMPROVED` is an advisory line inside a blocking job** —
+the one output here that asks for work and cannot enforce it, which is the
+shape this script exists to argue against.
+
+Worth considering, NOT decided: make `IMPROVED` fail on a **pull request** that
+edits the counted files, so a lowering has to land with the change that earned
+it. Two reasons it is not obvious. Two branches can legitimately be below the
+baseline at once (the 4798 → 4808 note in the script is exactly that case), and
+a PR that merely merges master would go red through no fault of its own. Cheaper
+first step: make the release checklist read the last run's `IMPROVED` lines.
+
+Related but separate: this is the same family as the op-log version collision —
+two branches moving one counter independently, where only the merge order
+decides which value survives.
+
+## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+Noticed while checking whether any doc repeated the false "runs in CI" skip
+message. It does not — the three matched-pair checks are not documented at all
+— but the table that IS there is stale on almost every row:
+
+| Row | docs/CI.md says | `scripts/guardrails.sh` actually has |
+| --- | --- | --- |
+| Raw colors | 26 | 22 |
+| Off-scale type | 9 | 8 |
+| Rust panics / unsafe | 67 | 46 |
+| a11y `role="button"` | 5 | 4 |
+| How many checks | "six" / "only one of the six" | eleven — 8 counted + 3 matched pairs |
+
+Nothing here is wrong in a way that breaks a build; a reader just learns the
+wrong numbers, and the three co-change checks are invisible to anyone who has
+not read the script. Left out of this session's diff on purpose (hard rule 4) —
+and docs are Dara's, not a CI change. The right fix is probably to stop
+hand-copying baselines into prose at all and have the doc point at the script,
+since a number duplicated in two files drifts by default.
+
+## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+
+Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not
+investigated. Production build, demo mode, a 6000×4000 PNG (the demo downscale
+made it 2048×1365 inside a 2068×1385 artboard):
+
+| Moment | Status bar showed |
+|---|---|
+| Right after import | `Photo: 2048×1365` (the photo — correct, #81) |
+| After reload → **Resume editing** | `Photo: 2068×1385` (the document) |
+
+2068×1385 is the photo plus 2 × the 10 px padding, which is exactly what #81
+fixed. Observation only; no cause guessed. First check whether it corrects
+itself after the next edit.
+
+## OPEN — a trailing-slash URL hydrates with the 404 head (09-18-2026)
+
+Found while checking the worker post's header banner (branch
+`feat/blog-worker-topper`) against a local static server that redirects
+directories to a trailing slash.
+
+`useHead()` in `marketing/src/useHead.ts` matches the path exactly.
+`routeFor("/pricing/")` misses, and `postOnPath("/blog/engine-in-a-worker/")`
+rejects the slug because it contains a `/`. So the hook falls through to
+`applyNotFoundHead()` while React Router still renders the real page.
+
+| What the reader sees | What the live `<head>` says after hydration |
+|---|---|
+| the full post, correct h1 | `robots: noindex, follow`, and no canonical, `og:url`, `og:title`, `og:type` or `og:image` |
+
+**Production is masked, not safe.** `marketing/vercel.json` sets
+`trailingSlash: false`, so Vercel 308-redirects the slash away before the page
+loads. Any other host, and any preview that serves directory indexes, shows
+the mismatch. The prerendered HTML is correct either way, so crawlers that do
+not run JS never see it. A fix would be to strip one trailing slash before the
+lookups in `useHead()`.
+
+## OPEN — ADR-057's blast radius no longer holds: the worker post fetches three.js on arrival (09-18-2026)
+
+For Dara. `feat/blog-worker-topper` puts FIG 1's scene behind the post's
+headline as a header banner. A banner is in the viewport at load, so the post
+now requests `engine-in-a-worker.three-*.js` (118.6 KB gzipped on this build)
+on every visit. It waits for the load event plus an idle callback, and it is
+still the only page that asks for the chunk. But ADR-057 says *"The post itself
+does not request it until a figure nears the viewport"*, and its Consequences
+weigh the cost as paid only by readers who scroll to a figure. Both are now
+false for this post. The chunk boundary is unchanged: no new `from "three"`
+import, and the same 19-class re-export module.
+
+## OPEN — the worker post's header design and the live post disagree on four facts (09-18-2026)
+
+Chris's calls. Found while building the header banner from his design file
+("The engine left the main thread (4).html"). The banner went in with the
+**live** values and did not copy the design's.
+
+| Fact | Live (`marketing/src/data/posts.ts`) | Design | Note |
+|---|---|---|---|
+| Headline | "We moved the engine off the main thread. The pixels stayed put." | "The engine left the main thread. The pixels stayed put." | The post file's header comment, figures.css, figures.tsx and ADR-057 all use the design's wording. The h1 and the new share card both use the live one. |
+| Date | `published: "2026-08-13"`, which is v8.32's ship date | "16 Sep 2026" | The post went up with #159 on 09-16. `datePublished` in the BlogPosting graph says August. |
+| Reading time | not shown | "~12 minutes" | Left out. It needs a count derived from the body, not a typed number that goes stale on the next edit. |
+| Date format | "13 August 2026" (`fmtPostDate`; Trail Log's `fmtDate` matches) | "16 Sep 2026" | Neither is MM-DD-YYYY, the global rule for dates a person reads. That is site-wide, not a banner question. |
+
+## OPEN — `marketing/` has no lint gate (09-18-2026)
+
+`pnpm lint` is `eslint app/src eslint.config.mjs`, so nothing lints the
+marketing site. Pointing the root config at it works for the `.ts`/`.tsx`
+files, which come out clean. The scripts do not: `marketing/scripts/*.mjs` get
+`no-undef` for `console`, `process`, `URL` and `document`, because the root
+config only declares globals for `app/src`. That is 9 errors in
+`gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
+`marketing/**` block with node and browser globals would make this gate real.
+
 ## OPEN — a commit click can leave a stray rectangle behind (2026-09-18)
 
 **Pre-existing — reproduced on a master-based production build**, found while
@@ -26,31 +516,9 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## DECISION NEEDED — shape rotation takes the engine 4,146 B over the sentinel ceiling (2026-09-18)
-
-Branch `feat/shapes-triangle-rotate`. Not a bug; a number Chris set.
-
-| Build (tiles,patchmatch) | Bytes | vs `MAX_WASM` 860,000 |
-|---|---|---|
-| origin/master `4890bf1f` | 858,087 | 1,913 under |
-| this branch | 864,146 | **4,146 over** |
-
-What the +6,059 B is (twiggy, raw builds with names): the op-log v8 family
-(v8 decode tail, 10-tuple encode, the two new variants' (de)serializers,
-`apply`, `to_annotation`) is most of it; rotation in render and hit-test and
-the three `_full` exports are the rest; the drawing refactor nets about zero.
-Already taken out on the branch: ~2.3 KB of `fmod` soft-float (one `%`) and a
-duplicated v8 decode branch (~2.5 KB). Nothing further comes out without
-dropping v8 persistence.
-
-The deploy sentinel will go red on the first deploy that carries this. Same
-shape as #160 (840k → 860k for Presets + shape perspective): attributable,
-reviewed growth. The call — raise the ceiling, or trim something else — is
-Chris's; `scripts/deploy-sentinel.sh` is outside the engine lane.
-
 ## OPEN — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
 
-**Pre-existing since v7 (sloppiness), widened by v8.** Reproduced at engine
+**Pre-existing since v7 (sloppiness), widened by v9.** Reproduced at engine
 level by `ops_engine_parity::one_undo_removes_a_seven_point_star`, which is
 `#[ignore]`d and fails when run with `--ignored`.
 
@@ -62,8 +530,8 @@ single "Add Shape" snapshot:
 | Added with | Ops recorded for one snapshot |
 |---|---|
 | sloppiness > 0 (v7) | ShapeAdd + ShapeSloppiness |
-| a 7-point star (v8) | ShapeAdd + ShapeStarPoints |
-| a rotation (v8) | ShapeAdd + ShapeRotation |
+| a 7-point star (v9) | ShapeAdd + ShapeStarPoints |
+| a rotation (v9) | ShapeAdd + ShapeRotation |
 | a duplicate of any of those | the same, under "Duplicate Shape" |
 
 First undo: the log rewinds only the side op; in memory the ShapeAdd still
@@ -102,20 +570,6 @@ Fix is one clause (`|| s.kind == 6` in that condition), but it changes hit
 behavior and the #60 drift guard hashes this body, so it belongs with the TS
 port (`app/src/lib/annotationHitTest.ts`, which may mirror the dead arm too),
 not slipped into a rotation change. Left untouched on the shapes branch.
-
-## OPEN — `Op::TextEdit` replay wipes a text box's wrap, height and quad after a reload (2026-09-18)
-
-The text twin of the ShapeEdit bug fixed on `feat/shapes-triangle-rotate`
-(`a_decoded_shape_edit_keeps_the_side_op_fields`). `apply` does
-`*t = p.clone()`; a TextEdit read back from disk carries its
-`#[serde(skip)]` fields at their defaults, so replaying it undoes the
-TextWrap / TextBoxHeight / TextPerspective ops recorded before it.
-
-Probed, not inferred: TextAdd(wrap 240, box 90, keystone) → TextWrap →
-TextBoxHeight → TextPerspective → TextEdit(x + 7), encoded → decoded →
-replayed, came back **wrap 0, box 0, quad identity**. Same fix as the shape
-side: carry the skipped fields over in the TextEdit arm (they are owned by
-their side ops). Left out of the shapes branch to keep it one target.
 
 ## OPEN — a rotated FILLED shape is resampled on every composite (2026-09-18)
 
@@ -336,7 +790,15 @@ yet observed on a phone. The desktop export paths append `-revised` + the real
 extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
 decide first whether mobile should save the original (as now) or the edit.
 
-## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+## RESOLVED — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+
+> **RESOLVED 2026-09-18 — it was a missing wire, and it is wired.** The
+> status bar's "Undo NN%" readout (`lib/undoDepth.ts`, fed by
+> `session/useUndoDepth.ts`) divides this budget by one whole-image copy to
+> estimate undo depth, which is the job the export's doc comment described.
+> It replaced the once-per-photo toast. One correction to the numbers the
+> estimate was first sketched with: a default document is Canvas + Photo, and
+> `Snapshot::bytes` counts both, so a 24 MP photo gets ~2 steps, not ~5.
 
 Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
 is a plain `#[wasm_bindgen]` export in `src/settings.rs:62`, not feature-gated,
@@ -358,6 +820,9 @@ vacuous check #15 in `docs/vacuous-checks.md`. Fixing it is a one-line job
 change (build wasm before the script), but it turns CI **red** on the export
 above the moment it lands — so the two are one decision, not two. Sequence:
 resolve `history_max_bytes`, then make the gate able to see it.
+**First half done 2026-09-18** — `history_max_bytes` now has a caller, so this
+one-line job change no longer turns CI red on it. Re-run the audit to check
+nothing else surfaced before flipping it.
 
 ## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
 
@@ -428,9 +893,9 @@ short cache yields an all-zero map: no containment, degrades to a normal brush.
 ABOVE the active one? Everything else about the read is deliberate and
 documented at the call site.
 
-## OPEN — #56: the Netlify UI holds a stale copy of the build command (2026-09-04)
+## CLOSED — #56: the Netlify UI held a stale copy of the build command (opened 2026-09-04, closed 2026-09-27)
 
-Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
+Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI was the
 **pre-ADR-038** command:
 
 | | Netlify UI setting | `netlify.toml` |
@@ -441,27 +906,35 @@ Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
 | install | `pnpm ci` (not a pnpm command) | `pnpm install` |
 | build | `cd app && pnpm run build` | `pnpm --filter stamp-tool build` |
 
-**`netlify.toml` wins today, and production is correct.** Evidence rather than
-precedence-docs: the live wasm is **816,324 B**, a measured featureless build
-was **723,755 B**, the sentinel band is 780,000–850,000 B (ADR-037), and the
-"Deploy sentinel (live prod engine)" CI job is green.
+`netlify.toml` won every build, so production was always correct and this sat
+here as a loaded gun rather than a live fire. It would fire if `netlify.toml`
+were renamed, moved under a `base` subdirectory Netlify could not see, or edited
+in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm bug**,
+which shipped for ten releases without anyone noticing.
 
-So it is a loaded gun, not a live fire. It fires if `netlify.toml` is renamed,
-moved under a `base` subdirectory Netlify cannot see, or if anyone edits the
-command in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm
-bug**, which shipped for ten releases without anyone noticing.
+**The gun was loaded.** Retiring Netlify proved it, by accident. A
+`netlify deploy` run from a directory containing no `netlify.toml` resolved the
+build command from the UI — the log says `commandOrigin: ui` — and ran it. The
+override was the only thing that had ever stood between this setting and a
+featureless production build, and the first moment the override was absent, the
+stale command took over.
 
-**Fix: clear the UI command** so `netlify.toml` is the only source. That is a
-production build-settings change, so it wants a human hand:
+**Closed 2026-09-27** by clearing it as part of the retirement:
 
 ```
-netlify api updateSite --data '{"site_id":"<id>","build_settings":{"cmd":""}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"cmd":"","stop_builds":true}}}'
 ```
 
-Or clear it in Site configuration → Build & deploy → Build command.
+⚠️ Note the `body` wrapper. Without it the CLI accepts the call, returns the
+site JSON and changes **nothing** — a silent no-op that reads as success. The
+version written above in the original entry was the one that does nothing.
 
 Same shape as the `wasm-pack: latest` drift that cost a night: two sources of
-truth for one build, and the invisible one is the one that rots.
+truth for one build, and the invisible one is the one that rots. The lasting
+lesson is narrower than "clear the UI setting" — it is that an override hiding a
+bad default is not a fix, and you find out which one you actually had on the day
+the override goes away.
+
 ## OPEN — #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
 
 #63 has been scoped for months as "display-only, from state the rows already
@@ -708,11 +1181,11 @@ open:
 
 | Item | State |
 |---|---|
-| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app` and `imagehorse.app`. The Netlify origin was retired 2026-09-27 and now only 301s |
 | Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
 | CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
-| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
-| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now reads the hash out of each CSP header's `script-src` rather than anywhere in the file. ⚠️ Down to ONE config since `netlify.toml` was deleted 2026-09-27, so the "a config nobody added" trap is closer, not further away |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135, and `netlify.toml` no longer exists at all since 2026-09-27. Amendment owed |
 
 The table below is the state before v8.70, kept for history.
 
@@ -728,8 +1201,10 @@ the marketing site carry exactly one security header:
 | `referrer-policy` | **absent** | **absent** |
 | `permissions-policy` | **absent** | **absent** |
 
-There is no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
-this is absence rather than misconfiguration.
+There was no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
+this was absence rather than misconfiguration. (Both have since gained one in
+#135, and `netlify.toml` was deleted with the host on 2026-09-27 — this entry is
+kept as the record of the audit, not as a current reading.)
 
 **Not a midnight patch.** A CSP for this app has to allow things most templates
 forbid: `'wasm-unsafe-eval'` for the engine, `blob:` and `worker-src` for the
@@ -981,7 +1456,7 @@ mapped corners are exact and lines/arrows/polylines/pen paths are just their
 control points — but a circle becomes a conic needing polygon approximation,
 and the shape render path has no tile cache to warp the way text does.
 
-## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
+## ✅ FIXED 2026-09-20 (ADR-060) — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
 
 Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,
 and that is measured rather than assumed.**
@@ -1013,6 +1488,42 @@ session should instrument which branch fires before fixing either.
 master-written database looked like a migration fixture and was not one — with
 no op log in that origin, only the archive path was exercised. **An absent
 fixture reads exactly like a passing one.**
+
+### Closed 2026-09-20 — and the "likely mechanism" above was only half of it
+
+ADR-060. The unconfirmed guess was right about the archive path and **wrong that
+it was the only loss**. There were two, either of which loses the box on its own:
+
+| # | Where | What it did |
+|---|---|---|
+| a | `Op::TextEdit` apply (src/ops.rs) | REPLACED the annotation. `wrap_width`, `box_height`, `perspective` and `font_id` are `#[serde(skip)]`, so the payload cannot carry them and they decoded as defaults. Replaying a captured PRODUCTION log: cursor 3 = serif/299, cursor 4 (`TextEdit`) = `""`/0. `Op::ShapeEdit` had the same latent defect. |
+| b | `stripLiveAnnotations` + `restore_text_annotation` | The archive stripper was an allowlist without the three axes on it, so they had never reached disk at all — and the restore signature had nowhere to put them if they had. |
+
+So "fix the archive path" alone would still have lost the box on any origin that
+DID have an op log, and the merge alone would still have lost it on any origin
+that did not. Both halves shipped together.
+
+**No op-log version was taken** — the wire layout is unchanged, so `v9` stays
+free for #187, and every v7/v8 log already on disk replays better with no
+migration step. Measured on the v7 fixture: `wrap_width` 0 → 338.
+
+Fixed by: `TextParams::carry_skipped_from` / `ShapeParams::carry_skipped_from`,
+`stripLiveAnnotations` becoming a denylist, and three new arguments on
+`restore_text_annotation`. Pinned by `tests/oplog_v8_text_settings_replay.rs`,
+`tests/oplog_v7_v8_fixture_resume.rs` and
+`app/src/lib/textBoxSurvivesReload.test.ts`.
+
+### Still open, carried out of the same session
+
+- **A box drag before the first save stops the op log from EVER being
+  persisted.** Observed 2026-09-20, three runs: with the drag, no manifest row
+  and no chunk row for the whole session; the identical run without it persisted
+  `TextAdd + TextFont` within the debounce. One variable, contrast measured,
+  mechanism NOT isolated. It no longer loses the box (the archive path carries it
+  now), but it costs cross-reload undo depth, so it is worth chasing.
+- **The text corner quad is carried and restored now, but nothing exercises a
+  warped text through a real reload** — `perspective` rides the same three new
+  arguments on faith from a unit test, not from a browser.
 
 ## The v8.34 brush fix was never applied to the other brushes (2026-08-14) — clone stamp AND blur NOW FIXED
 
@@ -1978,11 +2489,11 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   run while `document.hasFocus()` was `true` — same conditions as Night Job IV.)
 - **DEFERRED (Chris, 2026-08-04: "Edit shape is fine for now"): history labels
   don't say WHAT changed.** `update_shape_annotation` snaps a fixed
-  `"Edit Shape"`, so a recolour, a move and a resize all write the same row.
-  Recolour a square then drag it and History shows two identical `Edit Shape`
+  `"Edit Shape"`, so a recolor, a move and a resize all write the same row.
+  Recolor a square then drag it and History shows two identical `Edit Shape`
   entries with nothing to tell them apart — in the one place you'd look for
   "the step where I changed the color". Fix is to pass the label in from the
-  call site (`Recolour Shape` / `Move Shape` / `Resize Shape`); small, but it
+  call site (`Recolor Shape` / `Move Shape` / `Resize Shape`); small, but it
   touches the Rust crate so it needs a wasm rebuild and a size note. Same
   applies to text annotations if it's done.
 - **CLOSED by a human, 2026-08-04: the start-screen "Paste (Ctrl+V)" BUTTON
@@ -2505,8 +3016,9 @@ ever been written to it.
   → `SW_MODE` (`off`/`on`/`kill`) → `__IH_SW_MODE__` via vite `define`
   (`app/vite.config.ts:52`). There is no `URLSearchParams`, no
   `location.search`, no runtime bypass anywhere in the pwa directory. A stranded
-  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in neither
-  netlify.toml, package.json, nor `.github/`, so production ships `off` and the
+  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in no deploy config
+  (`netlify.toml` then, `vercel.json` now) and no `package.json` script, so
+  production ships `off` and the
   registration code is constant-folded out — matching the v7.41 "shipped dark"
   record. `/sw.js` returns `content-type: text/html`, i.e. the SPA fallback, not
   a worker (verify by content-type, never by HTTP 200).
@@ -2606,7 +3118,8 @@ ever been written to it.
   `layer-active`**, on plain `<li>` elements with no `aria-selected` or
   `aria-pressed`. Screen readers and automation cannot tell which layer is
   active. WCAG 2.1 AA is a project invariant, so this is a real gap, not polish.
-- **OPEN — Chris wants real AVIF encoding, and it is a dependency decision.**
+- **RESOLVED 2026-09-29 by option (1), see ADR-074** (`lib/avifEncoder.ts`).
+  Kept for the record: **Chris wants real AVIF encoding, and it is a dependency decision.**
   No encoder exists anywhere today: nothing in `package.json`, no `ravif`/
   `rav1e` in `Cargo.toml`. Chrome decodes AVIF but cannot encode it from a
   canvas, and that is not a flag — there is no browser API to reach. Options:
@@ -3155,7 +3668,7 @@ Fix when someone is next in that file: strip `//` and `/* */` before matching,
 then re-baseline. Expect the count to RISE, and expect some of the new entries
 to be real.
 
-## `history_max_bytes` is exported and never called (found 2026-09-12)
+## `history_max_bytes` is exported and never called (found 2026-09-12) — RESOLVED 2026-09-18, see the entry near the top
 
 `src/settings.rs:62` exports it through `wasm_bindgen`, and its own doc comment
 says why: *"JS estimates the depth from the live document size and this number;
@@ -3210,3 +3723,129 @@ exactly the "clean up while I'm here" edit the rules forbid.
 
 **Do it when** a modal primitive consolidation happens anyway — the three-modal
 convergence onto `ui/dialog` already tracked above is the natural moment.
+
+---
+
+## Gates that report "skip" where they were built to run (found 2026-09-20)
+
+Found while building `scripts/gate-run.sh` (the shared gate-runner, #107) by
+reading the scripts and one real CI log rather than the job names. **None of
+these is fixed** — each needs a decision, and that session's target was the
+helper. Listed newest evidence first.
+
+| # | Where | What it actually does | Evidence |
+|---|---|---|---|
+| 1 | `guardrails.sh` matched pairs (×3) | **Never run in CI**, the one place their own message says they run | run 35487378044 |
+| 2 | `dead-exports-audit.mjs` wasm half | **Never runs in CI** — no `pkg/`, so the engine-export count is always 0 | same log |
+| 3 | `ci.yml` wasm sha step | an empty sha is green, and silently disarms the sentinel's tier 2 | read, not yet reproduced |
+| 4 | `docs/vacuous-checks.md` | referenced 5× in this file and in `ci.yml`; **the file does not exist** | `git ls-files` |
+
+**1 — the three matched-pair checks.** `blur-oracle-pair`,
+`rotated-anchor-pair` and `blur-shader-pair` all begin
+`git merge-base origin/master HEAD || true` and print
+`skip …: no origin/master to diff against (runs in CI)` when it fails.
+`actions/checkout@v4` defaults to `fetch-depth: 1` and fetches no
+remote-tracking `origin/master`, so in CI that merge-base always fails.
+Measured in the guardrails job of run 35487378044 (2026-09-20):
+
+```
+  skip blur-oracle-pair: no origin/master to diff against (runs in CI)
+  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)
+  skip blur-shader-pair: no origin/master to diff against (runs in CI)
+```
+
+The parenthetical is exactly backwards: they run LOCALLY, where a full clone
+has `origin/master`, and skip in CI. ADR-030's oracle/shader pairs and
+ADR-050's anchor pair have therefore never once been enforced by the blocking
+job. **Fix is two decisions, not one:** give the job the base ref
+(`fetch-depth: 0`, or an explicit `git fetch --depth=1 origin master`), and
+then decide whether an un-runnable co-change check should be fatal rather than
+a printed skip — `gate_run --forbid 'skip'` is now one flag away.
+
+**2 — the engine half of the dead-exports audit.** Same job: it prints
+`note: pkg/stamp_tool.d.ts absent — run 'pnpm run build:wasm' for the engine
+half.` and contributes 0 to TOTAL. The `dead-exports: 0` baseline is real for
+TS and vacuous for the wasm surface. That half is what found
+`oplog_keyframe_rgba`. Needs a wasm artifact in the guardrails job (cheap if
+the `rust` job uploads `pkg/`), or an honest split into two baselines.
+
+**3 — the sha that can go missing without going red.**
+`echo "sha256=$(sha256sum pkg/stamp_tool_bg.wasm | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"`
+— `cut` succeeds on empty input and `echo` succeeds on an empty value, so a
+missing or unreadable artifact writes `sha256=` and the step is GREEN. GitHub
+runs `bash -e {0}`: errexit, **no pipefail**, so nothing catches it. The
+downstream effect is worse than the blank: `EXPECTED_WASM_SHA256` arrives
+empty, `deploy-sentinel.sh` takes its `[ -n … ]` branch and prints
+`tier 2 : skipped — no CI expectation in the environment`, which reads like a
+scheduled run. Today `build-wasm.sh` exits non-zero first, so the artifact is
+there; the guard is a side effect of the previous step, not of this one.
+
+**4 — the doc that is cited but absent.** `docs/vacuous-checks.md` is named by
+`ci.yml`'s convex-deploy comment and four entries in this file ("vacuous check
+#15", "family 3"), and `git ls-files` has never had it. Either the numbering
+lives somewhere else or it was never written; the ADR on branch
+`docs/adr-vacuous-gates` is the natural place to settle it.
+
+**Do NOT "fix" push-all-remotes.sh's `| sed` pipes.** They look like the
+classic swallowed exit code and they are not: that script sets `pipefail`, so
+the pipeline reports the push. Measured 2026-09-20 against two local bare
+remotes, one deliberately broken — `pipefail` on → `CAUGHT by the if`,
+`pipefail` off → `MISSED — the if saw sed`. The hazard is real only where
+`pipefail` is absent, which is every `run:` block in `ci.yml` and every
+`$(cmd | filter)` assignment whose status nobody reads.
+## `ToggleButtonGroup` never says which button is on
+
+Every Settings pane states its choices with `ToggleButtonGroup`, and the active
+button is marked **visually only** — a raised `bg-bg-elevated` pill with
+`shadow-md`. The component sets `aria-label` on icon-only buttons and nothing
+else: no `aria-pressed`, no `role="radiogroup"`, no `aria-checked`. A screen
+reader hears two buttons and cannot tell Keep EXIF from Strip EXIF, or "In your
+browser" from "Online features".
+
+Found while adding the online-features control to Settings → Security, where
+the whole point of the control is which of the two is currently true.
+
+**Left alone deliberately.** This is a shared primitive with callers across the
+top bar, the tool rail and six panes; `aria-pressed` on a button whose group is
+really a radio set is the wrong fix, and choosing between `aria-pressed` and a
+real radiogroup is a change to every caller's semantics at once. That is a
+pass of its own, not a rider on a feature.
+
+**Do it when** the WCAG sweep happens, or the next time a pane is built around
+"which one is on" — the second occurrence is the signal. The fix belongs in
+`app/src/components/ui/toggle-button-group.tsx`, one place.
+
+## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+The v2 port moved every marketing page onto its own stylesheet
+(`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
+`legal.css`, `contact.css`, `architecture.css`, `blog-post.css`, `footer.css`,
+`shot-annotations.css`). Each page's old rules are still sitting in
+`styles.css`, unreferenced — roughly: `.fx*` (Features' old rail and list),
+`.person*` / `.people` (About), `.foot-stmt*` (the old footer, ~22 lines),
+`.tool-head*` / `.tool-badge*` / `.tool-does` / `.tool-related*` (the first
+tool-page pass), and Trail's `.ach*`, `.month__*`, `.graph*`, `.year*`,
+`.release*`, plus Architecture's `.map*`, `.plane__*`, `.stack*`, `.tbl*`,
+`.rels*`, `.coda*`, `.seg*`.
+
+**Why it is parked, not done:** the redesign was already one large diff, and a
+CSS delete that removes one selector too many fails silently — the page still
+renders, just wrong, and no gate catches it. `styles.css` is also still shared
+by the pages that were NOT reskinned, so "unused by the page I ported" is not
+the same as "unused".
+
+**Do it when** there is a session for it. Method: build, then for each candidate
+class grep all of `marketing/src` (tsx AND the other css files, since one
+stylesheet can reference another's class), delete only the ones with zero hits
+outside `styles.css`, and pixel-diff every route before and after with the
+harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.
+
+---
+
+### Source comments still cite the retired `librs-lines` ratchet (09-25-2026)
+
+`src/stabilizer.rs:46`, `src/fonts.rs:208`, `src/text.rs:519` and
+`app/src/lib/engine/textMetricsCache.contract.test.ts:58` explain code placement
+by pointing at `librs-lines`, which Chris retired on 09-25-2026. The placements
+are still fine; only the stated reason is stale. Reword them the next time each
+file is touched. Not worth an engine-gate run on its own.

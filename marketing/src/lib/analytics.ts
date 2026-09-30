@@ -52,10 +52,29 @@ export function initAnalytics(): void {
   gtag("js", new Date());
   gtag("config", GA_ID, { send_page_view: false });
 
-  const script = document.createElement("script");
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
-  document.head.appendChild(script);
+  // The loader waits for the page. gtag.js measured about 0.4 s of main-thread
+  // time in Lighthouse's throttled mobile profile, and injected at startup it
+  // ran during hydration, in the same window as the hero image's first paint.
+  // Every call above and every page_view after it queues in dataLayer, and
+  // gtag.js drains the queue when it arrives. What this can drop is the hit
+  // from a visitor who leaves before the loader runs: after `load`, and no
+  // later than the 3 s idle timeout below.
+  const inject = () => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+    document.head.appendChild(script);
+  };
+  // Safari shipped requestIdleCallback late; a short timeout stands in for it.
+  const whenIdle = () => {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(inject, { timeout: 3000 });
+    } else {
+      window.setTimeout(inject, 1500);
+    }
+  };
+  if (document.readyState === "complete") whenIdle();
+  else window.addEventListener("load", whenIdle, { once: true });
 }
 
 /** One page_view per route. Safe before the loader has finished: gtag queues

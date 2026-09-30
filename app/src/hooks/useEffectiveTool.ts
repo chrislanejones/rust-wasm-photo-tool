@@ -145,6 +145,11 @@ export function useEffectiveTool({
           // The crop-rectangle drag.
           return use(drawingTools);
         case "resize-layer":
+          // Mask editing first: the Layers panel's "Paint mask" toggle sends
+          // strokes to the active layer's mask (mask_paint_*) while the panel
+          // stays open — it outranks Move because the user just switched it
+          // on, and the cursor logic in CanvasArea mirrors this precedence.
+          if (maskEditing) return use(maskTool);
           // Move drags the layer only while its toggle is on; otherwise idle so
           // canvas clicks fall through to the Selection marker.
           return moveActive ? use(moveLayerTool) : idle;
@@ -189,8 +194,11 @@ export function useEffectiveTool({
     case "create": {
       switch (id) {
         case "brush":
-          // Mask editing borrows the paint gesture to scrub a mask instead.
-          return maskEditing ? use(maskTool) : use(paintTool);
+          // Plain painting. Mask editing no longer lives here — it belongs to
+          // Edit › resize-layer above, and AppShell clears `maskEditing` the
+          // moment the active sub-tool leaves the Layers panel, so this branch
+          // can never see it on.
+          return use(paintTool);
         case "pen":
           // Drawn via the PenOverlay; the canvas keeps the paint handlers,
           // harmless while the overlay is capturing.

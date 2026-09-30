@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useUIStore } from "@/stores/useUIStore";
+
+/** What a refused job says. */
+const ONLINE_FEATURES_OFF_ERROR =
+  "Online features are off, so nothing is sent. Turn them on in Settings › Security to use this.";
 
 export type AIJobType = "rembg" | "upscale" | "inpaint" | "ocr" | "alt";
 
@@ -9,6 +15,9 @@ export interface AIResultPixels {
   pixels: Uint8ClampedArray;
   width: number;
   height: number;
+  /** The photo the job was started on — the caller must not apply the
+   *  result to any other. */
+  photoKey?: string;
 }
 
 type Phase = "idle" | "uploading" | "running" | "done" | "error";
@@ -52,6 +61,8 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const [textResult, setTextResult] = useState<string | null>(null);
   // Guard so a re-render doesn't decode/apply the same finished job twice.
   const consumedRef = useRef<Id<"ai_jobs"> | null>(null);
+  // The photo the running job belongs to, carried onto its result.
+  const photoKeyRef = useRef<string | undefined>(undefined);
 
   const job = useQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
 
@@ -69,7 +80,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       if (job.outputUrl) {
         urlToPixels(job.outputUrl)
           .then((r) => {
-            onImageResult(r);
+            onImageResult({ ...r, photoKey: photoKeyRef.current });
             setPhase("done");
           })
           .catch((e) => {
@@ -93,8 +104,20 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       png: Uint8Array,
       maskPng?: Uint8Array,
     ) => {
+      // THE choke point. Every upload a panel can start goes through here, so
+      // this is where "Everything in your browser" is enforced rather than
+      // only drawn: a tile or button that forgot the switch still cannot send
+      // a picture. Read at call time, not captured, so a switch flipped a
+      // moment ago counts.
+      if (!isNetworkPathAllowed("ai_processing", useUIStore.getState().onlineFeaturesEnabled)) {
+        setTextResult(null);
+        setError(ONLINE_FEATURES_OFF_ERROR);
+        setPhase("error");
+        return;
+      }
       setError(null);
       setTextResult(null);
+      photoKeyRef.current = photoKey;
       setPhase("uploading");
       try {
         // Tag as image/png so the stored blob's content-type is correct —

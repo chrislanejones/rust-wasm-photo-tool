@@ -105,3 +105,65 @@ test("a hover costs no undo step, and clicking costs exactly one", async ({ page
   await page.keyboard.press("Control+z");
   expect(await pixels(page), "ONE undo puts the whole preset back").toBe(before);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// All twelve presets, against the one failure this table can have.
+//
+// A preset is five numbers in five different units, and the shadows/highlights
+// pair is ABSOLUTE 8-bit (see the header of PresetsSettings.tsx): a value that
+// looks like the others — `0.1` — is a tenth of one level out of 255 and
+// contributes exactly nothing. Nothing else in the repo would notice. tsc sees
+// a valid number, the engine skips the component at its identity, the button
+// still renders, and the preset just quietly does less than it says.
+//
+// So each one is hovered and its pixels compared: to the untouched photo (it
+// must DO something) and to every preset before it (it must do something the
+// others do not). Two presets with the same five numbers is the other silent
+// failure, and it fails here as a duplicate.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ALL_PRESETS = [
+  "Enhance",
+  "Vivid",
+  "Fade",
+  "Dark",
+  "Warm",
+  "Cool",
+  "Mono",
+  "Noir",
+  "Airy",
+  "Moody",
+  "Recover",
+  "Lift",
+] as const;
+
+test("every preset changes the photo, and no two change it the same way", async ({
+  page,
+}) => {
+  const untouched = await pixels(page);
+  expect(untouched).not.toBe("");
+
+  const seen = new Map<string, string>();
+
+  for (const label of ALL_PRESETS) {
+    await page
+      .getByRole("button", { name: new RegExp(`^Apply ${label} —`) })
+      .first()
+      .hover();
+    const shown = await pixels(page);
+
+    expect(shown, `${label} must actually move pixels`).not.toBe(untouched);
+
+    const twin = seen.get(shown);
+    expect(twin, `${label} renders identically to ${twin}`).toBeUndefined();
+    seen.set(shown, label);
+  }
+
+  expect(seen.size, "twelve presets, twelve distinct looks").toBe(
+    ALL_PRESETS.length,
+  );
+
+  // And the grid still puts the photo back when the pointer leaves it.
+  await page.locator("canvas.main-canvas").hover({ position: { x: 5, y: 5 } });
+  expect(await pixels(page), "leaving restores the photo exactly").toBe(untouched);
+});

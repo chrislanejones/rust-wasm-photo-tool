@@ -51,8 +51,29 @@ export interface ToolSettings extends StampSettings {
   eraserSize: number;       // brush footprint (px)
   eraserOpacity: number;    // erase strength (0-100%)
   eraserHardness: number;   // edge hardness (0-100%)
+
+  // Layer-mask brush (Layers panel → Paint mask) — its own size and feather,
+  // NOT the Paint brush's: masking scrubs areas in and out, so it wants a
+  // bigger default footprint and a softer edge than detail painting, and
+  // resizing one must not resize the other. Feather is the Photoshop word for
+  // the soft skirt; the engine takes hardness, so it receives (100−feather).
+  maskBrushSize: number;    // brush footprint (px)
+  maskFeather: number;      // edge softness (0-100%): 0 = crisp, 100 = fully soft
   fontSize: number;
+  /** CSS `font-family` for the TEXTAREA preview and the recent-text chips.
+   *  DERIVED from `textFontId` — see `engineFonts.faceCss`. Kept as its own
+   *  field because it is persisted in the Convex `recentTexts` table, where
+   *  rows predating fonts hold plain CSS like "sans-serif". */
   fontFamily: string;
+  /** Which typeface the ENGINE rasterises with. `""` is the embedded
+   *  Liberation Sans; anything else is an id registered through
+   *  `ensureEngineFonts`. This is the SSOT — `fontFamily` follows it.
+   *
+   *  ⚠️ Never set to a face `has_font` reports false for. `textMetricsCache`
+   *  keys on this, and a measurement taken before the face is registered
+   *  answers in the FALLBACK and is then cached against the real id forever.
+   *  `ensureEngineFonts` exists to make that impossible; await it. */
+  textFontId: string;
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: ShapeName;

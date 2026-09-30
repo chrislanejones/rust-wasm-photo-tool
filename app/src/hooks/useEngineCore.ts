@@ -36,6 +36,10 @@ import {
   sizeLiveCanvas,
 } from "@/lib/engine/port";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { setEngineDocument } from "@/lib/engineDocument";
+import { makeLoadQueue, isStale, claimEngineDocument, type LoadOpts } from "./engineLoadQueue";
+export type { LoadOpts } from "./engineLoadQueue";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
 async function decodePngToRgba(
@@ -240,14 +244,21 @@ export interface EngineCore {
   broadcastAnnotationsChanged: () => void;
   reset: () => void;
   loadImage: (file: File) => Promise<void>;
+  /** Resolves true when the load ran, false when it was skipped as stale
+   *  (see `LoadOpts`) or refused bad input. */
   loadImageFromPixels: (
     pixels: Uint8ClampedArray,
     width: number,
     height: number,
     artboard?: { pad: number; r: number; g: number; b: number; a: number },
-  ) => Promise<void>;
-  loadFromSaved: (saved: SavedEdit) => Promise<void>;
-  restoreFromOplog: (photoId: string) => Promise<boolean>;
+    opts?: LoadOpts,
+  ) => Promise<boolean>;
+  loadFromSaved: (saved: SavedEdit, opts?: LoadOpts) => Promise<boolean>;
+  restoreFromOplog: (photoId: string, opts?: LoadOpts) => Promise<boolean>;
+  /** Run `fn` in the document queue: no load starts until it settles.
+   *  Archive saves go through here, so "who holds the engine?" and the
+   *  capture that follows it see one document. */
+  serialize: <T>(fn: () => Promise<T>) => Promise<T>;
   setBrushSize: (size: number) => void;
   setHardness: (h: number) => void;
   setOpacity: (o: number) => void;
@@ -494,6 +505,9 @@ export function useEngineCore(
     [canvasRef, syncState],
   );
 
+  // One document load (or archive save) at a time — see engineLoadQueue.ts.
+  const serialLoad = useMemo(() => makeLoadQueue(), []);
+
   /**
    * Load pre-decoded RGBA pixels directly — skips a second decode and respects
    * the 2048 cap. Pass `artboard` (Settings → Canvas on import) to land the
@@ -506,7 +520,9 @@ export function useEngineCore(
       width: number,
       height: number,
       artboard?: { pad: number; r: number; g: number; b: number; a: number },
-    ) => {
+      opts?: LoadOpts,
+    ): Promise<boolean> => serialLoad(async () => {
+      if (isStale(opts)) return false;
       // A zero-size buffer must never reach the engine — it would resize the
       // canvas to 0×0 and blank the app (seen when a caller passed dimensions
       // read from a closed ImageBitmap).
@@ -514,7 +530,7 @@ export function useEngineCore(
         console.error(
           `loadImageFromPixels: rejected invalid input ${width}×${height} (${pixels.length} bytes)`,
         );
-        return;
+        return false;
       }
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
       const wasmExports = (await init()) as unknown as {
@@ -526,7 +542,9 @@ export function useEngineCore(
       // start real work silently — see lib/pwa/skew.ts.
       void checkBuildSkew("engine-init");
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) return false;
+      // Last exit before the engine is touched. Past here the load finishes.
+      if (isStale(opts)) return false;
       const src = new Uint8Array(pixels.buffer as ArrayBuffer);
       if (artboard) {
         // Two-layer artboard (Background canvas + Photo). Load the photo native,
@@ -556,6 +574,7 @@ export function useEngineCore(
         // each photo you switch past.
         tool.clear_history();
         toolRef.current = tool;
+        claimEngineDocument(opts);
         // ADR-024 Stage 3.5 (a8). The READS are awaited here; the
         // `canvas.width =` ASSIGNMENTS are a separate problem that Stage 4 owns
         // — after `transferControlToOffscreen()` they throw on the main thread
@@ -573,11 +592,14 @@ export function useEngineCore(
           height,
         );
         toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src });
+        claimEngineDocument(opts);
       }
       sourcePosRef.current = null;
       syncState();
-    },
-    [canvasRef, syncState, flushToCanvas],
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
+      return true;
+    }),
+    [canvasRef, syncState, flushToCanvas, serialLoad],
   );
 
   /**
@@ -591,7 +613,8 @@ export function useEngineCore(
    * persisted, invalid data, or a non-tiles wasm build — all inert).
    */
   const restoreFromOplog = useCallback(
-    async (photoId: string): Promise<boolean> => {
+    (photoId: string, opts?: LoadOpts): Promise<boolean> => serialLoad(async () => {
+      if (isStale(opts)) return false;
       const { isOplogPersistenceEnabled, restoreOplog } = await import(
         "@/lib/oplogPersistence"
       );
@@ -612,19 +635,23 @@ export function useEngineCore(
       // already the right one, and `oplog_restore` replaces the document
       // wholesale. Only the boot case needs a placeholder, and it goes through
       // the factory so a worker gets one too.
+      // Last exit before the engine is touched (the boot placeholder included).
+      if (isStale(opts)) return false;
       const tool =
         toolRef.current ?? (await createLiveEngine({ Tool, width: 1, height: 1 }));
       if ((await restoreOplog(tool, photoId)) !== "restored") return false;
       toolRef.current = tool;
+      setEngineDocument(opts?.photoId ?? photoId);
       sourcePosRef.current = null;
       flushToCanvas(); // resizes the canvas to the restored dimensions
       syncState();
       // Restored annotation lists differ from whatever was showing — same
       // re-sync the undo path performs.
       useAnnotationStore.getState().bumpAnnotations();
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId ?? photoId);
       return true;
-    },
-    [flushToCanvas, syncState],
+    }),
+    [flushToCanvas, syncState, serialLoad],
   );
 
   /**
@@ -636,7 +663,8 @@ export function useEngineCore(
    * refactored here (its own session, with persistence tests open).
    */
   const loadFromSaved = useCallback(
-    async (saved: SavedEdit) => {
+    (saved: SavedEdit, opts?: LoadOpts): Promise<boolean> => serialLoad(async () => {
+      if (isStale(opts)) return false;
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
       const wasmExports = (await init()) as unknown as {
         memory: WebAssembly.Memory;
@@ -649,6 +677,8 @@ export function useEngineCore(
 
       // Decode current canvas PNG → raw RGBA
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
+      // Last exit before the engine is touched. Past here the load finishes.
+      if (isStale(opts)) return false;
 
       // Construct a fresh tool at the saved dimensions and load the canvas
       // ADR-024 a12.1 — factory creates and loads (which clears history); the
@@ -702,7 +732,7 @@ export function useEngineCore(
               a.bg_a ?? 255,
               a.bg_padding ?? 8,
               a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0,
+              a.bg_tail ?? 0, a.font_id ?? "",
             );
           }
         }
@@ -735,13 +765,14 @@ export function useEngineCore(
               a.bg_a ?? 255,
               a.bg_padding ?? 8,
               a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0,
+              a.bg_tail ?? 0, a.font_id ?? "",
             );
           }
         }
       }
 
       toolRef.current = tool;
+      claimEngineDocument(opts);
       sourcePosRef.current = null;
 
       const canvas = canvasRef.current;
@@ -768,7 +799,7 @@ export function useEngineCore(
             a.bg_a ?? 255,
             a.bg_padding ?? 8,
             a.bg_corner_radius ?? 8,
-            a.bg_tail ?? 0,
+            a.bg_tail ?? 0, a.font_id ?? "",
           );
         }
       }
@@ -814,8 +845,10 @@ export function useEngineCore(
 
       flushToCanvas();
       syncState();
-    },
-    [canvasRef, flushToCanvas, syncState],
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
+      return true;
+    }),
+    [canvasRef, flushToCanvas, syncState, serialLoad],
   );
 
   // ── Basic tool setters ───────────────────────────────────────────────────
@@ -859,6 +892,7 @@ export function useEngineCore(
     () => ({
       state,
       toolRef,
+      serialize: serialLoad,
       canvasRef,
       sourcePosRef,
       sourceDisarmedRef,
@@ -881,6 +915,7 @@ export function useEngineCore(
     [
       state,
       canvasRef,
+      serialLoad,
       syncState,
       flushToCanvas,
       getCanvasCoords,

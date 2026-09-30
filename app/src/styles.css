@@ -49,6 +49,7 @@
   --z-mobile-viewer: 49; /* mobile single-photo viewer — above the mobile grid, still under dialogs */
   --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
   --z-modal: 60; /* modals layered above dialogs */
+  --z-over-modal: 70; /* a confirm opened from inside a modal (Settings › Shared › Delete) */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
@@ -67,11 +68,7 @@
   --overlay-scrim: rgb(0 0 0 / 0.65);
   --overlay-blur: 8px;
 
-  /* ── Motion — durations + shared easing. ── */
-  --dur-fast: 0.1s;
-  --dur-base: 0.15s;
-  --dur-slow: 0.2s;
-  --dur-slower: 0.3s;
+  /* ── Motion — shared easing. ── */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ── Layout heights. ── */
@@ -83,7 +80,7 @@
   /* ── LIGHT palette — warm paper counterpart to the dark earth-tone ──
      Brand accent (--accent/--primary) stays the warm cream #fcdfc2 in both
      themes (matches the accent picker). The thin-line contrast roles
-     (--ring/--border-active/--current-color) use a deeper warm tan so focus
+     (--ring/--border-active) use a deeper warm tan so focus
      and selection stay visible on light surfaces. */
   --bg-primary: #f3efe8;
   --bg-secondary: #fbf9f5;
@@ -103,27 +100,27 @@
   --accent-dim: rgba(201, 143, 63, 0.15);
   --accent-glow: rgba(201, 143, 63, 0.3);
   --success: #16a34a;
-  --success-dim: rgba(22, 163, 74, 0.15);
   --warning: #d97706;
-  --undo-color: #5c554c;
-  --redo-color: #c2bbae;
-  --current-color: #c98f3f;
 
-  /* shadcn/ui CSS variables — light */
-  --background: #f3efe8;
-  --foreground: #2a2622;
-  --card: #fbf9f5;
-  --card-foreground: #2a2622;
+  /* shadcn/ui CSS variables — light.
+     Where a shadcn name means the same thing as a brand token (page, card,
+     text on a surface) it is an ALIAS of that token, not a second copy of
+     its hex: seven of these used to repeat the brand values by hand, which
+     is two places to edit for one color. Same rule in the dark block. */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
   --popover: #ffffff;
-  --popover-foreground: #2a2622;
+  --popover-foreground: var(--text-primary);
   --primary: #c98f3f;
   --primary-foreground: #3a3128;
   --secondary: #efe7d8;
   --secondary-foreground: #5c4326;
   --muted: #ece6db;
-  --muted-foreground: #5c554c;
+  --muted-foreground: var(--text-secondary);
   --accent-ui: #ece6db;
-  --accent-ui-foreground: #2a2622;
+  --accent-ui-foreground: var(--text-primary);
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   /* Destructive TEXT on a destructive TINT — the "Remove canvas" action, and
@@ -188,27 +185,23 @@
   --accent-dim: rgba(252, 223, 194, 0.15);
   --accent-glow: rgba(252, 223, 194, 0.3);
   --success: #22c55e;
-  --success-dim: rgba(34, 197, 94, 0.15);
   --warning: #f59e0b;
-  --undo-color: #b4b4b4;
-  --redo-color: #484848;
-  --current-color: #fcdfc2;
 
   /* shadcn/ui CSS variables — dark */
-  --background: #121212;
-  --foreground: #eeeeee;
-  --card: #181818;
-  --card-foreground: #eeeeee;
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
   --popover: #181818;
-  --popover-foreground: #eeeeee;
+  --popover-foreground: var(--text-primary);
   --primary: #fcdfc2;
   --primary-foreground: #3a3128;
   --secondary: #3a3128;
   --secondary-foreground: #fcdfc2;
   --muted: #222222;
-  --muted-foreground: #b4b4b4;
+  --muted-foreground: var(--text-secondary);
   --accent-ui: #2b2b2b;
-  --accent-ui-foreground: #eeeeee;
+  --accent-ui-foreground: var(--text-primary);
   /* Dark counterpart — neutral ink, 15.3:1 against the sidebar (#181818).
      Contrast was never the dark theme's problem (the cream accent is 13.9:1
      here); the problem was that cream and "selected" were the same color. */
@@ -369,16 +362,6 @@
   --text-base: 1rem;      /* 16px */
   --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);    /* 17→20px (fluid) */
   --text-2xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.75rem);  /* 20→28px (fluid) */
-  --tracking-label: 0.06em;
-}
-
-/* Recurring uppercase mono label (panel headers / section captions). Task 1. */
-.label-caps {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -694,6 +677,82 @@ html.reduce-motion .skeleton::after {
   display: none;
 }
 
+/* ── Per-photo panels during a photo switch (features/tools/PerPhotoRegion) ──
+   The switch CUE: the photo line re-highlights on every switch (~400 ms fade).
+   A fade is motion, so reduced motion holds a steady tint for the same beat
+   instead — the cue survives, only the motion goes. `!important` + a class is
+   what beats the global `html.reduce-motion *` duration kill (as .spinner-icon
+   does); without it the tint would last 0.001 ms. */
+@keyframes per-photo-name-fade {
+  0%   { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes per-photo-name-hold {
+  0%, 99% { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100%    { background-color: transparent; }
+}
+.per-photo-name {
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+.per-photo-name-flash {
+  animation: per-photo-name-fade 400ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .per-photo-name-flash {
+    animation: per-photo-name-hold 400ms steps(1, end);
+  }
+}
+html.reduce-motion .per-photo-name-flash {
+  animation: per-photo-name-hold 400ms steps(1, end) !important;
+  animation-duration: 400ms !important;
+}
+
+/* The slow-switch SKELETON, in place: a switch that takes over 300 ms turns
+   the panel's controls into muted blocks WITHOUT replacing them, so every box
+   keeps its exact size and nothing moves when the new photo's values arrive
+   (layout shift is the bug skeletons exist to prevent). The region is `inert`
+   while this shows; the photo line stays readable. */
+[data-switch-skeleton] {
+  position: relative;
+  isolation: isolate;
+}
+[data-switch-skeleton] > :not(.per-photo-name)
+  :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
+  color: transparent !important;
+  border-color: transparent !important;
+  background: var(--muted) !important;
+  box-shadow: none !important;
+  border-radius: 4px;
+}
+[data-switch-skeleton] > :not(.per-photo-name) :is(svg, img, canvas) {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-webkit-slider-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-moz-range-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+  animation: skeleton-shimmer 1.6s var(--ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-switch-skeleton]::after {
+    display: none;
+  }
+}
+html.reduce-motion [data-switch-skeleton]::after {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SPINNER (single source of truth — components/ui/spinner.tsx)
 
@@ -736,6 +795,23 @@ html.reduce-motion .canvas-spinner {
   transform: translate(-50%, -50%);
   z-index: var(--z-cursor);
   mix-blend-mode: difference;
+}
+
+/* Mask editing: the ring wears the value the stroke will paint — black hides,
+   white reveals — so the cursor answers "what will this stroke change" without
+   anyone reading a panel. It is the third of the three places driven by
+   `maskEditing`, and it computes nothing itself.
+
+   `difference` is dropped on purpose: differencing black against a photo is a
+   no-op, so the black ring would simply vanish over dark pixels. The paired
+   light/dark outline used by the selection cursors carries it over any photo
+   instead — the halo is always the opposite of the ink. */
+.brush-cursor--mask {
+  mix-blend-mode: normal;
+  border-color: var(--mask-cursor-ink);
+  box-shadow:
+    0 0 0 1.5px var(--mask-cursor-halo),
+    inset 0 0 0 1.5px var(--mask-cursor-halo);
 }
 
 /* Source marker crosshair */
@@ -947,6 +1023,40 @@ textarea:focus-visible {
 
 .reselect-list {
   padding-top: 0;
+}
+
+/* ── Combine section (Review → Combine) ──────────────────────────────────
+   The mode strip and its readout, above the object list. `flex: 0 0 auto` is
+   the point: the object list below is the `.history-list` that takes the
+   section's leftover height and scrolls, so the controls must NOT shrink with
+   it — at thirds-height the strip would otherwise be squeezed out of reach,
+   which is the one thing a standing choice cannot afford to be. */
+.combine-mode {
+  flex: 0 0 auto;
+  padding: 0 10px 6px;
+}
+
+/* The "Selected 18.4% · 2.1 MP" line under the strip. Same words the Select
+   panel and the status-bar chip show, so the three cannot disagree. */
+.combine-coverage {
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The active mode's name, in the section head beside the lightbulb. Truncates
+   rather than overflows: "New selection" is the longest of the four and the head
+   also carries the section name, the lightbulb and the ✕ inside 260px — narrower
+   still in the compact master bar. Same three properties `.layers-summary-name`
+   uses for the same reason. */
+.combine-active {
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Layers list ─────────────────────────────────────────────────────── */
@@ -1503,10 +1613,47 @@ textarea:focus-visible {
 .status-brand-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   color: inherit;
   text-decoration: none;
   transition: color 0.15s ease;
+}
+
+/* The words after the horse. After five minutes (StatusBar's
+   BRAND_COLLAPSE_MS) they slide away left to right — the settings tiles' swap,
+   turned on its side: a short slide with a fade, then the gap closes so the
+   hints can have the room. The horse stays and is still the link.
+
+   The gap lives on this span as a margin, not on the link as `gap`, so it
+   closes with the words instead of leaving 4px of nothing after the horse. */
+.status-brand-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  max-width: 10rem;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.24s ease-out,
+    max-width 0.3s ease-in-out 0.16s,
+    margin-left 0.3s ease-in-out 0.16s;
+}
+
+.status-brand-link[data-collapsed] .status-brand-name {
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+/* The in-app toggle is covered by the global `html.reduce-motion *` rule;
+   this is the OS setting. The words still go — they just don't travel. */
+@media (prefers-reduced-motion: reduce) {
+  .status-brand-name {
+    transition: none;
+  }
 }
 
 .status-brand-link:hover {
@@ -1576,6 +1723,9 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
+/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
+   chip in token classes on the house radius. This bare rule stays only for
+   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
 kbd {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -1626,6 +1776,32 @@ kbd {
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+/* Dialog controls at phone width — 44px targets (Night 5 §6).
+ *
+ * Every dialog's close is `Button size="tiny"`, which IS `.btn-icon`: 24×24,
+ * measured on a phone. The footer buttons measured 38px tall.
+ *
+ * ⚠️ Two traps shaped this rule, both measured rather than assumed:
+ *  1. `.btn-icon` is UN-LAYERED (brace depth 0 in this file), and Tailwind v4
+ *     puts utilities in `@layer utilities`. Un-layered CSS beats ANY layered
+ *     rule whatever its specificity, so a `max-sm:size-11` on the close would
+ *     have lost silently. This rule is un-layered too, and one attribute more
+ *     specific than `.btn-icon`.
+ *  2. It sets width and height ONLY — never `position`. UploadDialog pins its
+ *     close with the `absolute` utility; a position here would out-rank that
+ *     and pull the button out of its corner.
+ * Scoped by data-slot so the zoom controls and every other `.btn-icon` keep
+ * their dense desktop size. */
+@media (max-width: 639.98px) {
+  .btn-icon[data-slot="dialog-close"] {
+    width: 44px;
+    height: 44px;
+  }
+  [data-slot="dialog-footer"] button {
+    min-height: 44px;
+  }
 }
 
 .btn-icon:hover:not(:disabled) {
@@ -2213,6 +2389,18 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 
 input[type="range"]:focus {
   outline: none;
+}
+
+/* The house focus ring, on keyboard focus only (Night 3, 09-25-2026). The
+   base `input[type="range"] { outline: none }` above sits later in the file
+   than the global `input:focus-visible` rule at equal specificity, and the
+   `:focus` rule outranks it, so a keyboard user on a slider got only the
+   thumb halo below: `--accent-dim` is 15% alpha, measured 1.14:1 against the
+   light panel and 1.47:1 against the dark one. Invisible, for practical
+   purposes. The halo stays; the dashed ink ring (14.3:1) now leads. */
+input[type="range"]:focus-visible {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: 2px;
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {

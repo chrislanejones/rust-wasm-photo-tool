@@ -43,9 +43,13 @@ const NOT_A_MODULE = new Set(["schema", "auth.config", "tsconfig", "http", "rout
 /** Modules with no callable exports of their own.
  *
  *  `crons` declares scheduled jobs; the deployment runs them but does not list
- *  them as functions. Keep this list SHORT and justified — every entry is a
- *  module this check can no longer vouch for. */
-const NO_CALLABLE_EXPORTS = new Set(["crons"]);
+ *  them as functions. `entitlement` is a pure rule module — the tier / role /
+ *  entitlement ladder, imported by `users.ts` and by the client — so it has no
+ *  function for `function-spec` to report, and a client cannot call it
+ *  directly either, which is the failure this check exists to catch (#121).
+ *  Keep this list SHORT and justified — every entry is a module this check can
+ *  no longer vouch for. */
+const NO_CALLABLE_EXPORTS = new Set(["crons", "entitlement"]);
 
 function repoModules() {
   return readdirSync(CONVEX_DIR)

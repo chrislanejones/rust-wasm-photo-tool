@@ -230,6 +230,40 @@ fn clamp_drag_rect(
     (rx0, ry0, rx1, ry1)
 }
 
+/// Everything a click-once selection needs to be re-run with a new tolerance:
+/// the seed, the kind, the combine mode it was made with, and the history
+/// generation it is valid for.
+///
+/// The re-run must NOT behave like a second click. A second click would push
+/// a second undo step per slider tick, and in Add/Subtract/Intersect mode it
+/// would combine with the PREVIOUS RUN'S result rather than with the selection
+/// that existed before the click. So the base is kept: when the click pushed a
+/// step, the base is that step's snapshot (the top of the undo stack); when the
+/// click was a no-op, the base is the live selection, and the first re-run that
+/// changes anything pushes the one step the click did not.
+///
+/// `generation` is `History::generation` after the click (or the last re-run
+/// that pushed). Any undo, redo or other edit moves it, and a stale record is
+/// refused rather than re-run against a history it no longer describes.
+pub(crate) struct SelectionRetune {
+    kind: u8,
+    x: f64,
+    y: f64,
+    mode: u8,
+    label: &'static str,
+    /// Whether the undo-stack top is this selection's own step.
+    snapped: bool,
+    generation: u64,
+}
+
+/// Selected pixels and total pixels in a mask. Returned together because the
+/// only honest percentage is one computed from a single read.
+pub(crate) fn mask_coverage(mask: Option<&[bool]>, w: u32, h: u32) -> (u32, u32) {
+    let total = w.saturating_mul(h);
+    let selected = mask.map_or(0, |m| m.iter().filter(|&&b| b).count() as u32);
+    (selected, total)
+}
+
 impl ImageHorseTool {
     /// Validate a canvas click and turn it into a composite-buffer pixel index.
     /// `None` when the image is empty, the click is out of bounds, or the
@@ -310,14 +344,16 @@ impl ImageHorseTool {
     // must not push a history step.
 
     /// The selection that results from combining `cur` with `mask` under
-    /// `mode` (0 replace, 1 union, 2 subtract). An all-false result collapses
-    /// to `None` (the canonical "no selection"). `mask` must be canvas-sized.
+    /// `mode` (0 replace, 1 union, 2 subtract, 3 intersect). An all-false
+    /// result collapses to `None` (the canonical "no selection"). `mask` must
+    /// be canvas-sized.
     fn combined_selection(cur: Option<&Vec<bool>>, mask: &[bool], mode: u8) -> Option<Vec<bool>> {
         let next: Vec<bool> = match (mode, cur) {
             (1, Some(c)) => c.iter().zip(mask).map(|(&a, &b)| a || b).collect(),
             (2, Some(c)) => c.iter().zip(mask).map(|(&a, &b)| a && !b).collect(),
-            // Subtracting from nothing is nothing.
-            (2, None) => return None,
+            (3, Some(c)) => c.iter().zip(mask).map(|(&a, &b)| a && b).collect(),
+            // Subtracting from, or intersecting with, nothing is nothing.
+            (2 | 3, None) => return None,
             // Replace — or union onto an empty selection, which is the mask.
             _ => mask.to_vec(),
         };
@@ -336,18 +372,70 @@ impl ImageHorseTool {
     /// step (`snap_selection`); a click that reproduces the current selection
     /// exactly pushes nothing. `mask` is already canvas-sized.
     fn apply_produced_selection(&mut self, mask: Vec<bool>, label: &str) -> Vec<u8> {
+        // Any producer supersedes the last click's retune record; the three
+        // click-once kinds set a fresh one after this returns.
+        self.selection_retune = None;
+        self.store_produced_selection(mask, label);
+        self.selection_overlay()
+    }
+
+    /// The storing half of `apply_produced_selection`, without the overlay.
+    /// Returns whether a history step was pushed.
+    fn store_produced_selection(&mut self, mask: Vec<bool>, label: &str) -> bool {
         let mode = self.selection_combine;
         let next = Self::combined_selection(self.selection.as_ref(), &mask, mode);
-        if next != self.selection {
-            let label = match mode {
-                1 => "Add Selection",
-                2 => "Subtract Selection",
-                _ => label,
-            };
-            self.snap_selection(label);
-            self.selection = next;
+        if next == self.selection {
+            return false;
         }
+        self.snap_selection(Self::combine_label(mode, label));
+        self.selection = next;
+        true
+    }
+
+    /// The history label for a selection step: the combine mode names it when
+    /// it is not a plain replace.
+    fn combine_label(mode: u8, label: &str) -> &str {
+        match mode {
+            1 => "Add Selection",
+            2 => "Subtract Selection",
+            3 => "Intersect Selection",
+            _ => label,
+        }
+    }
+
+    /// Run one click-once kind from `(x, y)` and remember it for
+    /// `selection_retune`. The shared body of the three click exports.
+    fn click_select(
+        &mut self,
+        kind: u8,
+        x: f64,
+        y: f64,
+        tolerance: u32,
+        edge_threshold: u32,
+        label: &'static str,
+    ) -> Vec<u8> {
+        self.selection_retune = None;
+        let Some(mask) = self.selection_mask_for(kind, x, y, tolerance, edge_threshold) else {
+            return Vec::new();
+        };
+        let snapped = self.store_produced_selection(mask, label);
+        self.selection_retune = Some(SelectionRetune {
+            kind,
+            x,
+            y,
+            mode: self.selection_combine,
+            label,
+            snapped,
+            generation: self.hist.generation,
+        });
         self.selection_overlay()
+    }
+
+    /// The retune record, only if it still describes the live history.
+    fn live_retune(&self) -> Option<&SelectionRetune> {
+        let r = self.selection_retune.as_ref()?;
+        let top_ok = !r.snapped || !self.hist.undo_stack.is_empty();
+        (r.generation == self.hist.generation && top_ok).then_some(r)
     }
 }
 
@@ -358,10 +446,7 @@ impl ImageHorseTool {
     /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
     /// JS selection layer to draw. Empty Vec if the click is out of bounds.
     pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let Some(mask) = self.selection_mask_for(0, x, y, tolerance, 0) else {
-            return Vec::new();
-        };
-        self.apply_produced_selection(mask, "Magic Wand")
+        self.click_select(0, x, y, tolerance, 0, "Magic Wand")
     }
 
     /// Edge-aware magic wand. Same 4-connected flood fill as `magic_wand_select`,
@@ -383,10 +468,7 @@ impl ImageHorseTool {
         tolerance: u32,
         edge_threshold: u32,
     ) -> Vec<u8> {
-        let Some(mask) = self.selection_mask_for(1, x, y, tolerance, edge_threshold) else {
-            return Vec::new();
-        };
-        self.apply_produced_selection(mask, "Edge Select")
+        self.click_select(1, x, y, tolerance, edge_threshold, "Edge Select")
     }
 
     /// Color-range select (Photoshop's Select → Color Range). Takes EVERY pixel
@@ -395,10 +477,54 @@ impl ImageHorseTool {
     /// one click grabs all the sky, or every instance of a logo color, without
     /// shift-clicking each island.
     pub fn color_range_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let Some(mask) = self.selection_mask_for(2, x, y, tolerance, 0) else {
+        self.click_select(2, x, y, tolerance, 0, "Color Range")
+    }
+
+    /// Whether `selection_retune` would re-run anything: a click-once
+    /// selection was made and nothing has touched the history since.
+    pub fn selection_can_retune(&self) -> bool {
+        self.live_retune().is_some()
+    }
+
+    /// Re-run the last click-once selection from the same seed with a new
+    /// `tolerance` (and edge threshold, for the edge-aware kind) — the live
+    /// Tolerance slider. Replaces that click's result in place: it combines
+    /// with the selection from BEFORE the click, and pushes no history step of
+    /// its own (except once, when the click itself was a no-op and this run
+    /// is the first to change anything). Returns the overlay RGBA, like every
+    /// producer — empty when the result selects nothing. Also empty when there
+    /// is nothing to re-run (`selection_can_retune` is false), in which case
+    /// the selection is untouched; a caller that must tell the two apart
+    /// re-reads `selection_overlay`.
+    pub fn selection_retune(&mut self, tolerance: u32, edge_threshold: u32) -> Vec<u8> {
+        let Some(r) = self.live_retune() else {
+            self.selection_retune = None;
             return Vec::new();
         };
-        self.apply_produced_selection(mask, "Color Range")
+        let (kind, x, y, mode, label, snapped) = (r.kind, r.x, r.y, r.mode, r.label, r.snapped);
+        let Some(mask) = self.selection_mask_for(kind, x, y, tolerance, edge_threshold) else {
+            return Vec::new();
+        };
+        let base = if snapped {
+            self.hist
+                .undo_stack
+                .back()
+                .and_then(|s| s.selection.as_ref())
+        } else {
+            self.selection.as_ref()
+        };
+        let next = Self::combined_selection(base, &mask, mode);
+        if next != self.selection {
+            if !snapped {
+                self.snap_selection(Self::combine_label(mode, label));
+            }
+            self.selection = next;
+        }
+        if let Some(r) = self.selection_retune.as_mut() {
+            r.snapped = snapped || r.generation != self.hist.generation;
+            r.generation = self.hist.generation;
+        }
+        self.selection_overlay()
     }
 
     /// Non-committing preview of the region a click-once selection would grab
@@ -499,6 +625,13 @@ impl ImageHorseTool {
             .is_some_and(|m| m.iter().any(|&b| b))
     }
 
+    /// `[selected, total]` pixels — the "Selected 18.4% · 2.1 MP" readout.
+    /// One count over the byte plane; `[0, w*h]` with nothing selected.
+    pub fn selection_coverage(&self) -> Vec<u32> {
+        let (sel, total) = mask_coverage(self.selection.as_deref(), self.width, self.height);
+        vec![sel, total]
+    }
+
     /// Deselect (Alt+D). One undo step when something was selected.
     pub fn clear_selection(&mut self) {
         // One undo step (Photoshop's Deselect is undoable); no-op when
@@ -510,11 +643,11 @@ impl ImageHorseTool {
     }
 
     /// Set how the NEXT tool-produced selection combines with the current one:
-    /// 0 = replace (default), 1 = add (union), 2 = subtract. Clamped to 0..=2.
-    /// JS sets this from the Shift/Alt modifier when the `ih_selection_bool`
-    /// flag is on; it stays 0 otherwise, so behavior is unchanged.
+    /// 0 = replace (default), 1 = add (union), 2 = subtract, 3 = intersect.
+    /// Clamped to 0..=3. JS sets this from the panel's Combine group, or from
+    /// the Shift/Alt modifier held during the gesture.
     pub fn set_selection_combine(&mut self, mode: u8) {
-        self.selection_combine = mode.min(2);
+        self.selection_combine = mode.min(3);
     }
 
     /// OR `mask` into the current selection (boolean add). With no current

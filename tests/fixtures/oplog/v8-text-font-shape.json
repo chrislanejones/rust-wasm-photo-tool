@@ -1,0 +1,67 @@
+{
+  "capturedFrom": "https://edit.imagehorse.app",
+  "capturedAtUtc": "2026-09-20",
+  "servingCommit": "34dd0d9 (master; OP_FORMAT_VERSION = 8, PR #131)",
+  "session": "text (Liberation Serif) + one rectangle",
+  "sourceImage": "e2e/fixtures/checker.png (256x256) imported with the default artboard -> 276x276 document",
+  "opFormatVersionInBytes": [
+    8
+  ],
+  "ops": [
+    {
+      "version": 8,
+      "variant": 5,
+      "op": "TextAdd",
+      "frameBytes": 49
+    },
+    {
+      "version": 8,
+      "variant": 18,
+      "op": "TextFont",
+      "frameBytes": 20
+    },
+    {
+      "version": 8,
+      "variant": 8,
+      "op": "ShapeAdd",
+      "frameBytes": 62
+    }
+  ],
+  "frameFraming": "[u32 LE frame length][format-version u8][postcard(Op)] repeated",
+  "baseKeyframe": {
+    "file": "base-keyframe-276x276.png",
+    "atOp": 0,
+    "width": 276,
+    "height": 276,
+    "annotationsFile": "base-annotations.v8.bin",
+    "annotationsVersionByte": 8
+  },
+  "cursor": 3,
+  "dexieManifestAsWritten": {
+    "opCount": 3,
+    "chunkCount": 2,
+    "formatVersion": 1,
+    "generation": 0,
+    "cursor": 3,
+    "stale": false
+  },
+  "dexieChunkBoundaries": [
+    {
+      "chunkSeq": 0,
+      "opCount": 2,
+      "bytes": 77,
+      "formatVersion": 1
+    },
+    {
+      "chunkSeq": 1,
+      "opCount": 1,
+      "bytes": 66,
+      "formatVersion": 1
+    }
+  ],
+  "sha256": {
+    "frames": "989961a6a5469de6c3896113d77cb91fc8e5d6fd67a0e4141916b13441c26042",
+    "baseKeyframePng": "2a32830dc17a17dd4ff25b015e6d268b5a36814ce4c1ac84850e33047978dfca",
+    "baseAnnotations": "f8f42f1fb117e75935c5db4b17e515ddb9b2d8d15fbac70aae14b6c41522aaf6"
+  }
+}

@@ -36,4 +36,35 @@ const TooltipContent = React.forwardRef<
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+/** What a toolbar-style button's hover hint says: its name and, when it has
+ *  one, the keyboard shortcut. `label` defaults to the button's own label. */
+export interface ButtonHint {
+  label?: string
+  shortcut?: string
+}
+
+/** The ONE spelling of a button's hover hint — bold name, shortcut beneath.
+ *  The top bar, the master bar and every ToggleButtonGroup used to write this
+ *  block out themselves, and the master bar's copy had drifted to a smaller
+ *  name than the other five. */
+function HintTooltip({
+  label,
+  shortcut,
+  children,
+}: {
+  label: React.ReactNode
+  shortcut?: string
+  children: React.ReactElement
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="bottom">
+        <p className="font-semibold">{label}</p>
+        {shortcut && <p className="text-muted-foreground text-xs">{shortcut}</p>}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, HintTooltip }

@@ -113,11 +113,11 @@ test("A/B compare covers the photo, not the artboard, and leaves no trace", asyn
   await page.waitForTimeout(900);
 
   const hashBefore = await compositeHash(page);
-  const show = page.getByRole("button", { name: "Show A/B Compare" });
-  const hide = page.getByRole("button", { name: "Hide A/B Compare" });
+  // The top bar's Compare toggle opens and closes the overlay.
+  const toggle = page.getByRole("toolbar", { name: "Editor controls" }).getByRole("button", { name: "Compare", exact: true });
 
   // ── 1. Enter: the overlay sits on the photo, the band is the same all round.
-  await show.click();
+  await toggle.click();
   await expect.poll(() => overlayBands(page), { timeout: 15_000 }).not.toBeNull();
   // photo_bounds answers after the blob URL; poll until the inset lands.
   await expect.poll(async () => (await overlayBands(page))?.left ?? 0).toBeGreaterThan(0);
@@ -129,17 +129,17 @@ test("A/B compare covers the photo, not the artboard, and leaves no trace", asyn
   }
 
   // ── 2. Leave: overlay gone, document byte-identical.
-  await hide.click();
+  await toggle.click();
   await expect.poll(() => overlayBands(page)).toBeNull();
   expect(await compositeHash(page), "compare changed the document").toBe(hashBefore);
 
   // ── 3. Enter again: the same geometry, not a leftover from the first round.
-  await show.click();
+  await toggle.click();
   await expect.poll(async () => (await overlayBands(page))?.left ?? 0, { timeout: 15_000 }).toBeGreaterThan(0);
   const second = (await overlayBands(page))!;
   for (const side of ["left", "right", "top", "bottom"] as const) {
     expect(second[side], `${side} band after re-entry`).toBeCloseTo(first[side], 0);
   }
-  await hide.click();
+  await toggle.click();
   await expect.poll(() => overlayBands(page)).toBeNull();
 });

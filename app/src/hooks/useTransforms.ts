@@ -12,6 +12,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { webgpuEnabled, gpuUsable } from "@/lib/webgpu/detect";
 import { gaussianBlurGpu } from "@/lib/webgpu/gpuBlur";
 import type { EngineCore } from "./useEngineCore";
+import { cropTracked } from "@/stores/useSvgSourceStore";
 
 /** Enhance › Levels, as its panel drives it (see the `levels` block below). */
 export interface LevelsControls {
@@ -171,10 +172,11 @@ export function useTransforms(engine: EngineCore) {
   }, [toolRef, sourcePosRef, flushToCanvas, syncState]);
 
   const crop = useCallback(
-    (x: number, y: number, w: number, h: number) => {
+    async (x: number, y: number, w: number, h: number) => {
       const t = toolRef.current;
       if (!t || w < 1 || h < 1) return;
-      t.crop(x, y, w, h);
+      // Tracked: an SVG image records the crop for SVG export.
+      await cropTracked(t, x, y, w, h);
       sourcePosRef.current = null;
       commitGeometryChange();
     },

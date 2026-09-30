@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { Info, Clock3 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import { PaneHeading } from "@/components/ui/pane-heading";
 
 interface Meter {
   label: string;
@@ -83,14 +84,11 @@ export function AIUsagePane() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">AI Usage</h3>
-        <p className="mt-0.5 text-2xs text-text-muted">
-          Replicate-backed jobs — background removal, object removal and reading
-          text out of an image. Everything else in the editor runs on your
-          machine and is never counted here.
-        </p>
-      </div>
+      <PaneHeading title="AI Usage" compact>
+        Replicate-backed jobs — background removal, object removal and reading
+        text out of an image. Everything else in the editor runs on your
+        machine and is never counted here.
+      </PaneHeading>
 
       {!isAuthenticated ? (
         <p className="rounded-lg bg-card p-4 text-xs leading-relaxed text-text-muted">

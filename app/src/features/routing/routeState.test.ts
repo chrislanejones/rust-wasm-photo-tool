@@ -27,7 +27,10 @@ beforeEach(() => {
     batchMode: "logo",
     colorPickerActive: false,
   });
-  useUIStore.setState({ settingsOpen: false, settingsTab: "general" });
+  // ON here: these tests pin that every sub-tool is reachable by link.
+  // Enhance › AI and OCR upload the image and are refused while the switch
+  // is off — pinned below and in features/tools/onlineGate.test.ts.
+  useUIStore.setState({ settingsOpen: false, settingsTab: "general", onlineFeaturesEnabled: true });
 });
 
 const apply = (hash: string) => {
@@ -102,6 +105,14 @@ describe("hash -> state", () => {
     apply("#/create/ocr");
     expect(useToolStore.getState().activeTool).toBe("text");
     expect(useToolStore.getState().textMode).toBe("ocr");
+  });
+
+  it("a link cannot open an upload tool while online features are off", () => {
+    useUIStore.setState({ onlineFeaturesEnabled: false });
+    apply("#/enhance/ai");
+    expect(useToolStore.getState().activeTool).toBe("compress");
+    apply("#/create/ocr");
+    expect(useToolStore.getState().activeTool).toBe("compress");
   });
 });
 

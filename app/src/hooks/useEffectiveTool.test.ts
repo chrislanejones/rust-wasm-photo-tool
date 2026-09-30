@@ -248,12 +248,34 @@ describe("useEffectiveTool — no cross-tool leakage (regression net)", () => {
     expect(pen.onMouseDown).toBe(paintTool.onMouseDown);
   });
 
-  it("Brush's mask-editing branch outranks the paint tool", () => {
+  it("Mask editing routes Resize Layer to the mask brush, outranking Move", () => {
+    // The Layers panel's Paint mask toggle: strokes scrub the mask while the
+    // panel stays open — and it wins over the Move toggle when both are on,
+    // the same precedence CanvasArea's cursor mirrors.
     const maskTool = makePaintTool();
+    const moveLayerTool = makeMoveLayerTool();
     const result = useEffectiveTool(
-      baseParams({ subTool: sub("create", "brush"), maskEditing: true, maskTool }),
+      baseParams({
+        subTool: sub("edit", "resize-layer"),
+        maskEditing: true,
+        maskTool,
+        moveActive: true,
+        moveLayerTool,
+      }),
     );
     expect(result.onMouseDown).toBe(maskTool.onMouseDown);
+  });
+
+  it("Mask editing no longer reroutes the Paint brush", () => {
+    // AppShell clears maskEditing when the sub-tool leaves the Layers panel,
+    // so Brush + maskEditing is a transient state — and it must paint pixels,
+    // not scrub whatever mask was last active.
+    const maskTool = makePaintTool();
+    const paintTool = makePaintTool();
+    const result = useEffectiveTool(
+      baseParams({ subTool: sub("create", "brush"), maskEditing: true, maskTool, paintTool }),
+    );
+    expect(result.onMouseDown).toBe(paintTool.onMouseDown);
   });
 
   it("Emoji routes to the emoji tool; Clone Stamp does not", () => {

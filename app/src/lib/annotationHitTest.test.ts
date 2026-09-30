@@ -87,6 +87,10 @@ describe("pointSegmentDistance", () => {
 });
 
 describe("shapeAnnotationAt", () => {
+  it("answers -1 with no shapes — the engine's answer mid-restore, when the stack is empty", () => {
+    expect(shapeAnnotationAt([], 10, 10)).toBe(-1);
+  });
+
   it("uses distance-to-segment for line (2) and arrow (4)", () => {
     // pad = max(2*0.5, 6) = 6, tolerance = pad + 4 = 10.
     const line = [shape({ id: 5, kind: 2, x0: 0, y0: 0, x1: 100, y1: 0 })];
