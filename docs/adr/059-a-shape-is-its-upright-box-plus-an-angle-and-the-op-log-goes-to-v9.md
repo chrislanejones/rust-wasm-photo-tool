@@ -9,7 +9,7 @@ rotated text. Branch `feat/shapes-triangle-rotate` (#187). Supersedes nothing.
 
 **Renumbered 09-30-2026: this was written as v8.** The typeface selector (#131)
 shipped v8 first, and both branches had claimed the same number, which is the
-third time that has happened (see ADR-070). The two shape variants moved from
+second time that has happened after v6 (see ADR-070). The two shape variants moved from
 indices 18 and 19 to **19 and 20**, after `TextFont`, which sits at 18 in logs
 already on users' disks. `tests/oplog_v7_v8_fixture_resume.rs` replays real
 captured v8 bytes and passes unedited; it is the tripwire. v9 here carries the
