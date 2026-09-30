@@ -11,7 +11,9 @@
 // local tools.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScanEye } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
+import { NumberField, TextField } from "@/components/ui/number-field";
+import { FieldLabel } from "@/components/ui/field-label";
 import { SectionHeader } from "@/components/ui/section-header";
 import { toast } from "@/components/ui/sonner";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
@@ -210,9 +212,6 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
     toast.success(`Renamed ${byId.size} image${byId.size === 1 ? "" : "s"}`);
   }, [targets, proposed, setPhotos]);
 
-  const inputCls =
-    "w-full rounded-md border border-border bg-bg-elevated px-2 py-1.5 text-xs text-text-primary";
-
   const preview = targets.slice(0, 5).map((p, i) => ({
     from: p.name,
     to: proposed[i] ?? "",
@@ -243,19 +242,19 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
         }
       />
 
-      <Button
-        size="large"
-        onClick={() => void scan()}
-        disabled={scanning || photos.length === 0}
-        className="w-full"
-      >
-        <ScanEye className="h-4 w-4" />
-        {scanning
-          ? `Scanning ${progress.done}/${progress.total}…`
-          : described.size > 0
-            ? `Rescan ${photos.length} image${photos.length === 1 ? "" : "s"}`
-            : `Scan ${photos.length} image${photos.length === 1 ? "" : "s"}`}
-      </Button>
+      <PanelActionBar>
+        <PanelAction
+          icon={ScanEye}
+          onClick={() => void scan()}
+          disabled={scanning || photos.length === 0}
+        >
+          {scanning
+            ? `Scanning ${progress.done}/${progress.total}…`
+            : described.size > 0
+              ? `Rescan ${photos.length} image${photos.length === 1 ? "" : "s"}`
+              : `Scan ${photos.length} image${photos.length === 1 ? "" : "s"}`}
+        </PanelAction>
+      </PanelActionBar>
 
       {described.size > 0 && unscanned.length > 0 && (
         <div
@@ -268,44 +267,36 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
 
       {described.size > 0 && (
         <>
-          <div className="space-y-1">
-            <span className="text-2xs text-theme-muted-foreground">Name pattern</span>
-            <input
-              value={pattern}
-              onChange={(e) => setPattern(e.target.value)}
-              placeholder={DEFAULT_PATTERN}
-              className={`${inputCls} font-mono`}
+          <TextField
+            label="Name pattern"
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            placeholder={DEFAULT_PATTERN}
+            inputClassName="font-mono"
+          />
+
+          <div className="flex items-end gap-2">
+            <NumberField
+              label="Start #"
+              className="min-w-0"
+              min={0}
+              value={start}
+              onChange={(e) => setStart(parseInt(e.target.value, 10) || 0)}
+            />
+            <NumberField
+              label="Pad digits"
+              className="min-w-0"
+              min={1}
+              max={6}
+              value={pad}
+              onChange={(e) =>
+                setPad(Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)))
+              }
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1">
-              <span className="text-2xs text-theme-muted-foreground">Start #</span>
-              <input
-                type="number"
-                min={0}
-                value={start}
-                onChange={(e) => setStart(parseInt(e.target.value, 10) || 0)}
-                className={`${inputCls} tabular-nums`}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-2xs text-theme-muted-foreground">Pad digits</span>
-              <input
-                type="number"
-                min={1}
-                max={6}
-                value={pad}
-                onChange={(e) =>
-                  setPad(Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)))
-                }
-                className={`${inputCls} tabular-nums`}
-              />
-            </label>
-          </div>
-
           <div className="space-y-1">
-            <span className="text-2xs text-theme-muted-foreground">Preview</span>
+            <FieldLabel title="Preview" />
             {preview.map((row, i) => (
               <div
                 key={i}
@@ -330,14 +321,11 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
             )}
           </div>
 
-          <Button
-            size="large"
-            onClick={apply}
-            disabled={scanning || proposed.length === 0}
-            className="w-full"
-          >
-            Rename {targets.length} image{targets.length === 1 ? "" : "s"}
-          </Button>
+          <PanelActionBar>
+            <PanelAction onClick={apply} disabled={scanning || proposed.length === 0}>
+              Rename {targets.length} image{targets.length === 1 ? "" : "s"}
+            </PanelAction>
+          </PanelActionBar>
         </>
       )}
 
