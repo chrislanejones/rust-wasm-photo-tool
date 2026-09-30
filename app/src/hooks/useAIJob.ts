@@ -15,6 +15,9 @@ export interface AIResultPixels {
   pixels: Uint8ClampedArray;
   width: number;
   height: number;
+  /** The photo the job was started on — the caller must not apply the
+   *  result to any other. */
+  photoKey?: string;
 }
 
 type Phase = "idle" | "uploading" | "running" | "done" | "error";
@@ -58,6 +61,8 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const [textResult, setTextResult] = useState<string | null>(null);
   // Guard so a re-render doesn't decode/apply the same finished job twice.
   const consumedRef = useRef<Id<"ai_jobs"> | null>(null);
+  // The photo the running job belongs to, carried onto its result.
+  const photoKeyRef = useRef<string | undefined>(undefined);
 
   const job = useQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
 
@@ -75,7 +80,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       if (job.outputUrl) {
         urlToPixels(job.outputUrl)
           .then((r) => {
-            onImageResult(r);
+            onImageResult({ ...r, photoKey: photoKeyRef.current });
             setPhase("done");
           })
           .catch((e) => {
@@ -112,6 +117,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       }
       setError(null);
       setTextResult(null);
+      photoKeyRef.current = photoKey;
       setPhase("uploading");
       try {
         // Tag as image/png so the stored blob's content-type is correct —

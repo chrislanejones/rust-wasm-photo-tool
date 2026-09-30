@@ -4,6 +4,31 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## FIXED 09-30-2026 — fast photo switching showed one photo while another was selected
+
+Fixed on `fix/photo-switch-load-token`. Two causes, both needed (30 runs each of
+e2e photo-switch-state §0.2 / §0.5 / §0.7):
+
+| Build | Failures | Engine panics |
+| --- | --- | --- |
+| master | ~4 of 6 per test | yes |
+| TypeScript fix only | 6 of 24 | yes |
+| engine fix only | 11 of 30 | 0 |
+| **both** | **0 of 30** | **0** |
+
+1. **Engine panic.** Rebuilding a saved photo empties the layer stack
+   (`begin_layer_restore`) across many worker messages; a UI poll landing in
+   that window indexed `self.layers[self.active]` and panicked, poisoning the
+   instance (black canvas, hung loads). 13 read-only getters now go through
+   `active_layer()` and answer empty.
+2. **Loads and saves interleaved.** Loads now run one at a time and skip when
+   stale; the ownership marker moves inside the load; archive saves run in the
+   same queue. The trace showed photo A's archive written with photo B's
+   pixels — the marker still said A after B's load had finished.
+
+Still open from the same work: stale engine handles reject with "engine
+document replaced" as an UNHANDLED rejection (console noise, ~140 per 30 runs).
+
 ## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
 
 Netlify was retired on 09-27-2026 (see docs/Deploying.md, "Retiring Netlify").
