@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * File-format glyphs for the Download dialog's Format picker — lucide's
  * `file-type-corner` with the "T" taken out of the open corner and the
- * format's name lettered in its place (JPEG, PNG, WEBP, AVIF, ORA, PSD).
+ * format's name lettered in its place (JPEG, PNG, WEBP, AVIF, ORA, SVG, PSD).
  *
  * Drawn on lucide's 24px grid with its stroke settings, so they sit in a
  * `ToolButton` tile exactly like a lucide icon and size from the same
@@ -73,4 +73,5 @@ export const FilePngIcon = makeFileTypeIcon("PNG");
 export const FileWebpIcon = makeFileTypeIcon("WEBP");
 export const FileAvifIcon = makeFileTypeIcon("AVIF");
 export const FileOraIcon = makeFileTypeIcon("ORA");
+export const FileSvgIcon = makeFileTypeIcon("SVG");
 export const FilePsdIcon = makeFileTypeIcon("PSD");

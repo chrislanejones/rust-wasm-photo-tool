@@ -25,6 +25,8 @@ import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { prepareSvgSource } from "@/lib/svgPassthrough";
+import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
@@ -453,7 +455,10 @@ export function useImageSession({
           // SVGs never enter the pipeline as vectors — rasterize to a PNG File
           // at the boundary (lib/rasterizeSvg), so the stored gallery original
           // is pixels too. Everything below sees the PNG.
-          const f = isSvgFile(raw) ? await rasterizeSvgToPng(raw) : raw;
+          // The markup itself is kept on the side (never rendered) so the
+          // image can go back out as an SVG — lib/svgPassthrough.
+          const svgText = isSvgFile(raw) ? await raw.text() : null;
+          const f = svgText !== null ? await rasterizeSvgToPng(raw) : raw;
           const t0 = performance.now();
           const working = await makeWorkingCopy(f);
           logDiagnostic(
@@ -496,6 +501,16 @@ export function useImageSession({
             uploadKey: originalKey,
           };
 
+          if (svgText !== null) {
+            const svg = prepareSvgSource(
+              svgText,
+              working.width,
+              working.height,
+              working.origWidth,
+              working.origHeight,
+            );
+            if (svg) useSvgSourceStore.getState().setSource(entry.id, svg);
+          }
           setPhotos((prev) => [...prev, entry]);
 
           if (!firstLoaded) {

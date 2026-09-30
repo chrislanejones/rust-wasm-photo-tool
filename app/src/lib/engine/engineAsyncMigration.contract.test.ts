@@ -764,7 +764,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Same buckets.
     // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
-    expect(gate.awaited, "cumulative converted sites").toBe(164); // +7: Batch › Crop (CropBatchPanel)
+    expect(gate.awaited, "cumulative converted sites").toBe(173); // +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3)
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

@@ -33,6 +33,8 @@ import {
   type BatchCropWidth,
 } from "@/lib/batchCrop";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { cropTracked, useSvgSourceStore } from "@/stores/useSvgSourceStore";
+import { rebaseOnOriginalCrop } from "@/lib/svgPassthrough";
 import {
   useBatchCropStore,
   showsOriginalFraming,
@@ -216,6 +218,20 @@ export function CropBatchPanel({
             }
           }
 
+          // An SVG's stored original just became this crop — move its
+          // vector frame the same way (lib/svgPassthrough).
+          const svg = useSvgSourceStore.getState().sources[photo.id];
+          if (svg) {
+            useSvgSourceStore.getState().setSource(
+              photo.id,
+              rebaseOnOriginalCrop(
+                svg,
+                { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+                out.width,
+                out.height,
+              ),
+            );
+          }
           setPhotos((prev) =>
             prev.map((x) =>
               x.id !== photo.id
@@ -272,7 +288,7 @@ export function CropBatchPanel({
                 : [0, 0, await tool.width(), await tool.height()];
             const rect = rectFor(active.id, bw, bh, onOriginal);
             const out = batchCropOutputSize(rect, ratio, targetWidth);
-            tool.crop(bx + rect.x, by + rect.y, rect.width, rect.height);
+            await cropTracked(tool, bx + rect.x, by + rect.y, rect.width, rect.height);
             let steps = 1;
             if (out.width !== rect.width || out.height !== rect.height) {
               tool.resize_with_filter(out.width, out.height, LANCZOS3);

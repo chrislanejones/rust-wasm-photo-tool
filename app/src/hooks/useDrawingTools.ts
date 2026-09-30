@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import type { ShapeName, ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
+import { cropTracked } from "@/stores/useSvgSourceStore"; // SVG export's crop record
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
@@ -954,11 +955,10 @@ export function useDrawingTools({
     lastPoint.current = null;
   }, [activeTool, constrainDrag, clearPreviewSurface]);
 
-  const applyCrop = useCallback(() => {
-    const tool = toolRef.current;
-    const sel = cropSelection;
+  const applyCrop = useCallback(async () => {
+    const [tool, sel] = [toolRef.current, cropSelection];
     if (!tool || !sel) return;
-    tool.crop(sel.x, sel.y, sel.width, sel.height);
+    await cropTracked(tool, sel.x, sel.y, sel.width, sel.height);
     flushToCanvas();
     // FIX (issue #3): call syncState so new dimensions + history entry
     // propagate to React. Without this, Apply Crop appears to do nothing
