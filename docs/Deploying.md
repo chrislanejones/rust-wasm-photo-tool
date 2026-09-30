@@ -93,14 +93,9 @@ The `www` → apex redirect is a 308 in `marketing/vercel.json` rather than a
 dashboard setting, so the canonical host is version-controlled next to the
 `<link rel="canonical">` that has to agree with it.
 
-Netlify is **still live** and still builds every PR preview. `netlify.toml` stays
-— see "Retiring Netlify" below. Its stated precondition is now MET: the sentinel
-passes against `edit.imagehorse.app` and defaults to it (2026-09-12). What keeps
-the file is no longer that condition but a choice — Netlify is the rollback path,
-and it is the only other builder that proves the wasm is reproducible off this
-laptop. Measured the morning after the move: same commit, Netlify and CI and this
-laptop all 823,503 B, Vercel 823,479 B. Keeping a second builder is what made that
-visible at all.
+Netlify is **retired** (2026-09-27, see "Retiring Netlify" below).
+`rust-wasm-photo-tool.netlify.app` 301s to `edit.imagehorse.app`, builds are
+stopped, and `netlify.toml` is deleted.
 
 ---
 
@@ -168,14 +163,15 @@ Playwright's browsers are not where it expects:
 
 ## Retiring Netlify
 
-Not yet done, and the order matters — none of these steps takes the editor
-offline:
+**DONE 2026-09-27.** Steps 1–3 were already met; step 4 ran that day.
+
+The order mattered, and none of it took the editor offline:
 
 1. **Confirm the project/domain mapping** in the Vercel dashboard (see the
-   warning above), and that every environment variable currently set on Netlify
-   is set on the Vercel project too — the Convex and Clerk keys in particular.
-   Missing keys do not fail the build; they produce a logged-out-only app, which
-   is a supported path and therefore a silent failure.
+   warning above), and that every environment variable set on Netlify is set on
+   the Vercel project too — the Convex and Clerk keys in particular. Missing keys
+   do not fail the build; they produce a logged-out-only app, which is a
+   supported path and therefore a silent failure.
 
 2. **Run the sentinel against the Vercel deployment**, before any DNS moves:
 
@@ -189,38 +185,61 @@ offline:
    migrated build command is precisely when it can happen again.
 
 3. **Point `edit.imagehorse.app` at the editor project**, re-run the sentinel
-   against it by hand, and only then change its default:
-
-   ```bash
-   SENTINEL_SITE=https://edit.imagehorse.app ./scripts/deploy-sentinel.sh
-   ```
-
-   **DONE 2026-09-12** (#136): the default is now `https://edit.imagehorse.app`.
-   The paragraph below is kept because the failure it describes is the reason the
-   order matters, not because the step is still pending.
+   against it by hand, and only then change its default. **DONE 2026-09-12**
+   (#136): the default is now `https://edit.imagehorse.app`.
 
    `scripts/deploy-sentinel.sh` used to default to the Netlify host on purpose —
    it has to follow whatever is actually serving users. Changing it first was
-   tried on this branch and CI rejected it in under a minute: three fetches,
-   three 404s. Note the shape of that failure, because it is informative —
-   `edit.imagehorse.app` answered with an HTTP 404 rather than failing to resolve,
-   which is what Vercel returns for a domain that resolves to it but is not
-   attached to any project. The DNS is the easy half; the domain also has to be
-   added to the project.
+   tried and CI rejected it in under a minute: three fetches, three 404s. Note
+   the shape of that failure, because it is informative — `edit.imagehorse.app`
+   answered with an HTTP 404 rather than failing to resolve, which is what Vercel
+   returns for a domain that resolves to it but is not attached to any project.
+   The DNS is the easy half; the domain also has to be added to the project.
 
    The reason to care about the ordering is not the red run. It is that a check
    which is red for a reason everyone knows about gets ignored or switched off —
    and this is the check that exists to catch a featureless wasm, which once
    shipped for ten releases without anyone noticing.
 
-4. **Only then**: delete the Netlify site, delete `netlify.toml`, and drop its
-   references from `docs/CI.md` and the sentinel's comments.
+4. **Retire the host. DONE 2026-09-27.** What was actually done, in this order:
 
-Step 4 also clears a standing hazard. `netlify.toml`'s header documents a stale
-duplicate of the build command living in the Netlify UI, missing the feature
-flags and the toolchain pins. It is harmless only because `netlify.toml`
-overrides it — which is a reason to finish the migration rather than leave
-Netlify parked "just in case".
+   | Step | Result |
+   | --- | --- |
+   | Prebuilt redirect deploy (`netlify deploy --no-build --prod`) | `/*` → `https://edit.imagehorse.app/:splat` **301**, path and query preserved |
+   | `build_settings.stop_builds = true` | no further builds, no further PR checks |
+   | `build_settings.cmd = ""` | **closes #56** — the stale UI command is gone |
+   | `netlify.toml`, `.netlify/` deleted | the repo no longer configures a host it does not use |
+   | `cspInlineHash.test.ts` | dropped its `netlify.toml` config; it would have thrown ENOENT |
+   | Unlink the GitHub repo | **NOT DONE** — the API ignores `repo: null` and `build_settings.repo_url: null`. Cosmetic only while builds are stopped; clear it in the UI under Project configuration → Build & deploy → Continuous deployment. |
+
+   The site itself was **kept, not deleted**, so the 301 keeps working. Deleting
+   it frees `rust-wasm-photo-tool.netlify.app` for anyone to claim and turns
+   every old link into a 404.
+
+### What retiring it cost
+
+Step 4 cleared a standing hazard and gave up a real check, and both are worth
+stating.
+
+Cleared: `netlify.toml` documented a stale duplicate of the build command living
+in the Netlify UI, missing the feature flags and the toolchain pins. It was
+harmless only because `netlify.toml` overrode it — and the retirement itself
+proved the gun was loaded. A `netlify deploy` run from a directory with no
+`netlify.toml` picked up that UI command (`commandOrigin: ui`) and tried to run
+it. That is exactly the failure the file's header warned about, observed live.
+
+Given up: **the third builder.** Laptop, CI and Netlify all produced 823,503 B
+for the commit after the move, and Vercel alone produced 823,479 B — which is how
+its `/rust` `CARGO_HOME` was found to miss every `--remap-path-prefix` entry in
+`.cargo/config.toml`. Three against one is what made that readable. It is now CI
+against production, one against one, and a future drift has no tie-breaker in
+automation. Reproduce locally before believing either side.
+
+In fairness to the decision: by the time it was retired Netlify had not compiled
+this tree since 2026-09-17. Every deploy from 09-22 onward — 100 consecutive,
+production and preview alike — failed with "Skipped due to account builds usage
+exceeded". The third opinion had already stopped being given; retiring the host
+only stopped the red checks that were standing in for it.
 
 ---
 

@@ -4,7 +4,7 @@
 # file the browser actually fetches), and which toolchain produced it.
 #
 # WHY. The wasm build is reproducible per commit (ADR-045, ADR-038 correction):
-# hold rustc, wasm-pack and binaryen constant and local == Netlify == CI, byte
+# hold rustc, wasm-pack and binaryen constant and local == Vercel == CI, byte
 # for byte. That makes an exact-hash assertion possible where only a size band
 # was before. But "the expected hash" cannot be a constant stored anywhere —
 # a seven-line COMMENT in ops.rs moved the binary by 5 bytes (#69: panic

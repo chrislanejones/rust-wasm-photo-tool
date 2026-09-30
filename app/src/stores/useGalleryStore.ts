@@ -44,6 +44,15 @@ interface GalleryState {
    * scheduling of a save, not anything a reload needs to remember.
    */
   layerRevision: number;
+  /** Bumps when a load has finished putting a document in the engine — AFTER
+   *  the pixels arrive, unlike `activePhotoId`, which moves before the load.
+   *  Panels that read the engine when they mount (Levels, Presets) key on
+   *  this, so they never start against the outgoing photo. Session-only. */
+  documentRevision: number;
+  /** The photo the engine's document belongs to, as of the last finished
+   *  load. `activePhotoId !== documentPhotoId` IS "a switch is in flight":
+   *  the id moves when you ask, this moves when the pixels arrive. */
+  documentPhotoId: string | null;
   /** Gallery cap for the current tier. */
   maxPhotos: number;
   /** Prior-session manifest offered on the Resume screen (null = none). */
@@ -59,6 +68,9 @@ interface GalleryState {
   setHasBeenModified: (v: SetArg<boolean>) => void;
   /** Record a layer-panel edit that carries no undo entry (#53). */
   bumpLayerRevision: () => void;
+  /** A load finished. `photoId` when it put a (possibly different) photo in
+   *  the engine; omitted when it only replaced the same photo's pixels. */
+  bumpDocumentRevision: (photoId?: string) => void;
   setMaxPhotos: (v: SetArg<number>) => void;
   setResumeManifest: (v: SetArg<GalleryManifest | null>) => void;
 }
@@ -73,6 +85,8 @@ export const useGalleryStore = create<GalleryState>()(
   modifiedPhotos: new Set(),
   hasBeenModified: false,
   layerRevision: 0,
+  documentRevision: 0,
+  documentPhotoId: null,
   maxPhotos: DEFAULT_PHOTO_LIMIT,
   resumeManifest: null,
 
@@ -87,6 +101,11 @@ export const useGalleryStore = create<GalleryState>()(
   setHasBeenModified: (v) =>
     set((s) => ({ hasBeenModified: resolveSet(v, s.hasBeenModified) })),
   bumpLayerRevision: () => set((s) => ({ layerRevision: s.layerRevision + 1 })),
+  bumpDocumentRevision: (photoId) =>
+    set((s) => ({
+      documentRevision: s.documentRevision + 1,
+      documentPhotoId: photoId === undefined ? s.documentPhotoId : photoId,
+    })),
   setMaxPhotos: (v) => set((s) => ({ maxPhotos: resolveSet(v, s.maxPhotos) })),
   setResumeManifest: (v) =>
     set((s) => ({ resumeManifest: resolveSet(v, s.resumeManifest) })),

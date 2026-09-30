@@ -94,6 +94,8 @@ import { useDownloadFormat } from "./session/useDownloadFormat";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
+import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
@@ -128,6 +130,7 @@ import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { useBatchCropStore } from "@/stores/useBatchCropStore";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -144,6 +147,8 @@ import {
 } from "@/components/ui/context-menu";
 import { ShareButton } from "@/components/ShareButton";
 import { DownloadDialog } from "@/components/DownloadDialog";
+import { downloadActiveSvg, downloadSvgZip } from "./session/svgDownload";
+import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import {
   Undo,
   Redo,
@@ -838,6 +843,8 @@ export function AppShell() {
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const activeTool = useToolStore((s) => s.activeTool);
+  // Batch › Crop's Crop All while its panel is mounted — Enter runs it.
+  const batchCropApply = useBatchCropStore((s) => s.applyAll);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
   // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
@@ -874,7 +881,14 @@ export function AppShell() {
     downloadFormat,
     setDownloadFormat,
     isOraDownload,
+    isSvgDownload,
   } = useDownloadFormat();
+  // SVG export (lib/svgPassthrough): live for the open image when it was
+  // uploaded as SVG, and for the zip when any image was.
+  const svgSources = useSvgSourceStore((s) => s.sources);
+  const svgAll = photos.filter((p) => p.id in svgSources).length;
+  const activeIsSvg = !!activePhotoId && activePhotoId in svgSources;
+  const svgSelectedDownload = isSvgDownload && activeIsSvg;
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -1122,6 +1136,18 @@ export function AppShell() {
   );
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
+    if (svgSelectedDownload && activePhotoId) {
+      void downloadActiveSvg(activePhotoId, stamp.toolRef.current, exportName.stem()).then(
+        (ok) => {
+          if (!ok) {
+            toast.error(
+              "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
+            );
+          }
+        },
+      );
+      return;
+    }
     if (isOraDownload) {
       void downloadOraWithToast({
         stampToolRef: stamp.toolRef,
@@ -1295,6 +1321,7 @@ export function AppShell() {
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
   });
+  usePhotoSwitchReset(activePhotoId, drawingTools.clearCropSelection);
 
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
@@ -1625,11 +1652,15 @@ export function AppShell() {
     `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
-  // ignorant of the pad (and inside its max-lines cap).
-  const renderDuplicatePad = useCallback(
-    (frame: OverlayFrame) =>
-      duplicatePad.canvasProps ? <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} /> : null,
-    [duplicatePad.canvasProps],
+  // ignorant of the pad and the Batch › Crop frame (and inside its max-lines cap).
+  const renderCanvasOverlays = useCallback(
+    (frame: OverlayFrame) => (
+      <>
+        {duplicatePad.canvasProps && <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} />}
+        <BatchCropOverlay {...frame} photoBounds={photoBounds} undoCount={stamp.state.undoCount} />
+      </>
+    ),
+    [duplicatePad.canvasProps, photoBounds, stamp.state.undoCount],
   );
 
   const redStampTool = useRedStampTool({
@@ -1707,6 +1738,9 @@ export function AppShell() {
     try {
       // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
       // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
+      // The gallery route gets the SVG itself: `handleAddPhotos` rasterizes it
+      // too, and keeps the markup for SVG export on the way.
+      const galleryFile = file;
       if (isSvgFile(file)) {
         file = await rasterizeSvgToPng(file);
         source = file;
@@ -1723,7 +1757,7 @@ export function AppShell() {
       // disabled by `hasActivePhoto` at the render site, so this matches
       // exactly what the dialog would have offered.
       if (activePhotoId === null) {
-        await handleAddPhotos([file]);
+        await handleAddPhotos([galleryFile]);
         return;
       }
 
@@ -1731,7 +1765,7 @@ export function AppShell() {
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
         if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-        return { pixels, w, h, file, previewUrl };
+        return { pixels, w, h, file: galleryFile, previewUrl };
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -2379,6 +2413,23 @@ export function AppShell() {
     [exportPhotosToZip, photos],
   );
 
+  const handleExportAllSvg = useCallback(async () => {
+    const { written, skipped } = await downloadSvgZip({
+      photos,
+      activePhotoId,
+      tool: stamp.toolRef.current,
+      loadPhotoEdit,
+      filename: "svgs.zip",
+    });
+    if (skipped > 0) {
+      toast.error(
+        written > 0
+          ? `${skipped} SVG${skipped === 1 ? " was" : "s were"} left out — changed beyond a crop.`
+          : "No SVG could be saved — each has been changed beyond a crop.",
+      );
+    }
+  }, [photos, activePhotoId, stamp.toolRef, loadPhotoEdit]);
+
   // The single Download button always opens the chooser dialog (Canvas Image /
   // All / Clipboard Copy). The "All" button is hidden when only one image is
   // loaded. The plural label ("JPEGs") reflects the gallery count.
@@ -2474,8 +2525,8 @@ export function AppShell() {
     onToggleMove: handleToggleMove,
     onLayerToFront: handleLayerToFront,
     onLayerToBack: handleLayerToBack,
-    onApplyCrop: drawingTools.applyCrop,
-    hasCropSelection: drawingTools.cropSelection !== null,
+    onApplyCrop: batchCropApply ?? drawingTools.applyCrop,
+    hasCropSelection: drawingTools.cropSelection !== null || batchCropApply !== null,
     onShowCelebration: () => setShowCelebration(true),
     onAdjustBrushSize: adjustBrushSize,
     setShowUpload,
@@ -2769,13 +2820,25 @@ export function AppShell() {
         format={downloadFormat}
         onFormatChange={(v) => {
           setDownloadFormat(v);
-          if (v !== "ora") setExportFormat(v); // ORA stays local-only
+          // ORA and SVG stay local-only
+          if (v !== "ora" && v !== "svg") setExportFormat(v);
         }}
         fileName={exportName}
-        ext={isOraDownload ? ".ora" : EXT[effectiveExportFormat]}
-        downloadLabel={
-          isOraDownload ? "Download ORA" : `Download ${effectiveExportFormat.toUpperCase()}`
+        ext={
+          svgSelectedDownload
+            ? ".svg"
+            : isOraDownload
+              ? ".ora"
+              : EXT[effectiveExportFormat]
         }
+        downloadLabel={
+          svgSelectedDownload
+            ? "Download SVG"
+            : isOraDownload
+              ? "Download ORA"
+              : `Download ${effectiveExportFormat.toUpperCase()}`
+        }
+        svg={{ selected: activeIsSvg, all: svgAll }}
         onDownload={downloadFromDialog}
         zipFormat={exportFormat}
         zipLabel={effectiveExportFormat.toUpperCase()}
@@ -2805,7 +2868,8 @@ export function AppShell() {
         }}
         onDownloadAll={() => {
           setExportDialogOpen(false);
-          handleExportAll();
+          if (isSvgDownload && svgAll > 0) void handleExportAllSvg();
+          else handleExportAll();
         }}
       />
 
@@ -3114,7 +3178,7 @@ export function AppShell() {
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
                           shapes={drawingTools.shapes}
-                          renderOverlay={renderDuplicatePad}
+                          renderOverlay={renderCanvasOverlays}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
                           cropSelection={drawingTools.cropSelection}
@@ -3251,7 +3315,7 @@ export function AppShell() {
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
                       shapes={drawingTools.shapes}
-                      renderOverlay={renderDuplicatePad}
+                      renderOverlay={renderCanvasOverlays}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
                       cropSelection={drawingTools.cropSelection}

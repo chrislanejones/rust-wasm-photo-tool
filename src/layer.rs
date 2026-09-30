@@ -1766,6 +1766,19 @@ impl ImageHorseTool {
     /// Begin rebuilding the layer stack from persisted data: empties the stack
     /// and clears history + id counters. Must be followed by one or more
     /// `push_restored_layer` calls and a `finish_layer_restore`.
+    /// The active layer, or `None` while the stack is empty — which it is
+    /// between `begin_layer_restore` and `finish_layer_restore`. A saved
+    /// photo is rebuilt over many separate worker messages, and the UI's own
+    /// polls (annotation lists, hit tests) share that queue, so a read can
+    /// land mid-rebuild. Indexing `self.layers[self.active]` there panicked
+    /// (annotations.rs `get_text_annotations` / `get_shape_annotations`,
+    /// measured on fast photo switching), and a panic poisons the instance
+    /// for the rest of the session: black canvas, hung loads, and saves that
+    /// captured the wrong document. Read-only getters go through this.
+    pub(crate) fn active_layer(&self) -> Option<&Layer> {
+        self.layers.get(self.active)
+    }
+
     pub fn begin_layer_restore(&mut self) {
         self.layers.clear();
         self.hist.clear();

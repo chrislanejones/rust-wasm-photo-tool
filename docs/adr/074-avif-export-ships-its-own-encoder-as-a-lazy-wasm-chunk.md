@@ -1,4 +1,4 @@
-# ADR-072: AVIF export ships its own encoder, as a lazy wasm chunk beside the engine
+# ADR-074: AVIF export ships its own encoder, as a lazy wasm chunk beside the engine
 Date: 2026-09-29   Status: draft
 
 ## Context

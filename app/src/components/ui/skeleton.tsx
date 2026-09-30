@@ -31,6 +31,14 @@ const skeletonVariants = cva(SKELETON_BASE, {
       circle: "rounded-full",
       /** A single line of text (≈ one line-height tall, full width). */
       text: "h-[0.85em] rounded",
+      /** The three shapes of the skeleton plan (§4.1). `line`: a label, a
+       *  value, a line of text. `block`: a slider track, a button, an input.
+       *  `tile`: a thumbnail, a canvas, an image. The caller still sizes it
+       *  to EXACTLY what it replaces — a skeleton that shifts layout when the
+       *  content arrives is the bug skeletons exist to prevent. */
+      line: "h-[0.85em] rounded-sm",
+      block: "rounded-md",
+      tile: "rounded-md aspect-square",
     },
   },
   defaultVariants: {
@@ -43,11 +51,24 @@ interface SkeletonProps
     VariantProps<typeof skeletonVariants> {
   /** When `false`, renders `children` instead of the placeholder (Chakra idiom). */
   loading?: boolean;
+  /** A grey block inside a `SkeletonRegion`: hidden from assistive tech, so a
+   *  screen reader hears the region's one "Loading", not a list of boxes. */
+  decorative?: boolean;
 }
 
 export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
-  ({ className, variant, loading = true, children, ...props }, ref) => {
+  ({ className, variant, loading = true, decorative = false, children, ...props }, ref) => {
     if (!loading) return <>{children}</>;
+    if (decorative) {
+      return (
+        <div
+          ref={ref}
+          aria-hidden="true"
+          className={cn(skeletonVariants({ variant }), className)}
+          {...props}
+        />
+      );
+    }
     return (
       <div
         ref={ref}
@@ -117,3 +138,4 @@ export const SkeletonText = forwardRef<HTMLDivElement, SkeletonTextProps>(
   },
 );
 SkeletonText.displayName = "SkeletonText";
+

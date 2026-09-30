@@ -12,6 +12,7 @@ import {
   type Quad,
 } from "@/lib/perspective";
 import type { PerspectiveTargetBox } from "@/lib/perspectiveTarget";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 /**
  * The Perspective tool's state and its commit paths (v8.42, vector-wide v8.76).
@@ -141,8 +142,11 @@ export function usePerspectiveTool({
    * re-rendered.
    */
   const targetKey = target ? `${target.kind}:${target.id}` : "px";
+  // The photo is part of the frame's identity: two photos of the same size
+  // have equal frames, and a dirty quad from one used to survive onto the next.
+  const photoId = useGalleryStore((s) => s.activePhotoId);
   const frameKey = frame
-    ? `${targetKey}|${frame.x}|${frame.y}|${frame.w}|${frame.h}`
+    ? `${photoId}|${targetKey}|${frame.x}|${frame.y}|${frame.w}|${frame.h}`
     : "none";
   // Read inside the effect without widening its dependency list.
   const frameRef = useRef(frame);

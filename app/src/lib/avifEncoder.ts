@@ -6,7 +6,7 @@
 // `convertToBlob({ type: "image/avif" })` hands back a PNG, silently (see
 // lib/encodeSupport.ts). So "export as AVIF" used to mean "export as PNG".
 // This wraps `@jsquash/avif` (libavif + libaom, repackaged from Squoosh) —
-// option (1) in the PARKING_LOT AVIF entry, recorded in ADR-072.
+// option (1) in the PARKING_LOT AVIF entry, recorded in ADR-074.
 //
 // The encoder is ~3.5 MB of wasm, so it is NEVER in the initial bundle: the
 // dynamic `import()` below is the only reference, and it resolves on the first

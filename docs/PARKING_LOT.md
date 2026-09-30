@@ -4,6 +4,84 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## FIXED 09-30-2026 — fast photo switching showed one photo while another was selected
+
+Fixed on `fix/photo-switch-load-token`. Two causes, both needed (30 runs each of
+e2e photo-switch-state §0.2 / §0.5 / §0.7):
+
+| Build | Failures | Engine panics |
+| --- | --- | --- |
+| master | ~4 of 6 per test | yes |
+| TypeScript fix only | 6 of 24 | yes |
+| engine fix only | 11 of 30 | 0 |
+| **both** | **0 of 30** | **0** |
+
+1. **Engine panic.** Rebuilding a saved photo empties the layer stack
+   (`begin_layer_restore`) across many worker messages; a UI poll landing in
+   that window indexed `self.layers[self.active]` and panicked, poisoning the
+   instance (black canvas, hung loads). 13 read-only getters now go through
+   `active_layer()` and answer empty.
+2. **Loads and saves interleaved.** Loads now run one at a time and skip when
+   stale; the ownership marker moves inside the load; archive saves run in the
+   same queue. The trace showed photo A's archive written with photo B's
+   pixels — the marker still said A after B's load had finished.
+
+Still open from the same work: stale engine handles reject with "engine
+document replaced" as an UNHANDLED rejection (console noise, ~140 per 30 runs).
+
+## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
+
+Netlify was retired on 09-27-2026 (see docs/Deploying.md, "Retiring Netlify").
+Everything landed except one step: the site is still connected to
+`chrislanejones/rust-wasm-photo-tool` on `master`.
+
+| Field | Value |
+|---|---|
+| `build_settings.stop_builds` | `true` — no builds run, so **no PR checks** |
+| `build_settings.cmd` | `""` — #56 closed |
+| `build_settings.repo_url` | **still `https://github.com/chrislanejones/rust-wasm-photo-tool`** |
+| Published deploy | the 301 to `edit.imagehorse.app` |
+
+**Cosmetic while builds are stopped**, which is why it did not block the
+retirement. It matters only if someone re-enables builds without noticing what
+they are re-enabling.
+
+The API will not clear it. Both of these return the site JSON with the link
+untouched — no error, no change:
+
+```
+netlify api updateSite --data '{"site_id":"<id>","body":{"repo":null}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"repo_url":null,"provider":null,"repo_path":null}}}'
+```
+
+**Fix by hand:** Netlify UI → Project configuration → Build & deploy →
+Continuous deployment → unlink the repository.
+
+**Do NOT delete the site.** It serves the 301 that `app/src/lib/legacyHost.ts`
+and the `MovedNotice` toast promised users. Deleting it frees
+`rust-wasm-photo-tool.netlify.app` for anyone to claim and 404s every old link.
+
+Two follow-ups that were deliberately left out of that session's diff:
+
+- **`app/src/features/hostMove/` and `app/src/lib/legacyHost.ts` are now dead
+  code.** Nothing serves the app on the legacy host any more, so `isLegacyHost`
+  can never return true in production and the toast can never render. Removing
+  them is a real deletion with its own tests (`legacyHost.test.ts`) and an
+  `App.tsx` mount — a separate session.
+- **The three env vars still on the Netlify site** — `REPLICATE_API_TOKEN`,
+  `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_CONVEX_URL`. The first is a real secret
+  sitting on a host nothing builds from. Confirm it is set on Vercel, then
+  delete it there; rotating it is the safer call.
+
+## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+
+CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
+| 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
 ## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
 
 v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
@@ -217,12 +295,12 @@ how something looks or need a decision:
 | Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
 | ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
 | ~~**Only 2 of 43 segmented-control call sites expose selection state; 38 are silent and should not be**~~ **RESOLVED 09-24-2026 (UI Night 2):** 36 SELECT sites are named radio groups, 4 TOGGLE sites carry `aria-pressed` (2 already did; TopBar and ReviewPanel are new), 3 ACTION rows stay silent, see docs/UI_CONSISTENCY.md §7. The `value`/`onChange` API row above still stands. (3 more are action rows, where silence is right). `ToggleButtonGroup` emits no `aria-pressed`/`aria-checked` ever (14 sites); `ToolButtonGroup` emits it only for tiles carrying their own `active` — deliberately, so a plain action is never announced "not pressed" — which leaves its SELECT mode silent (24 of its 29 sites). `ToolModeToggle` passes `value=`, so it inherits the silence. The tree holds 12 real `aria-pressed` attributes. Measured 09-23-2026 | ui/toggle-button-group.tsx, ui/tool-button-group.tsx:108; Sync switch (v8.85) and privacy switch (v8.89) both on the first | WCAG 2.1 AA, not tidiness. Coupled to the `value`/`onChange` API change above; upstream of both sits "should the settings pairs be `ui/switch` at all?". `radio-cards` and `segmented-tabs` already do it right and are the two least-used primitives. See docs/UI_INVENTORY.md Findings 1–2 |
-| **Raw `<button>` baseline for Night 7's ratchet: 35 outside `components/ui/`, in 27 files** (**34 in 26 after Night 3**: `SizeSlider:97`'s preset buttons moved into `ui/preset-row`) (JSX elements counted by AST, not grep lines; was 37 in 27 files before Night 2 converted GalleryBar's two strip-scroll arrows to `Button size="tiny"`, the only two that matched a variant with zero visual change). Measured 09-24-2026 | app/src | **The primitives cannot absorb the rest without new `Button` variants**, and Night 2 added none (a variant is a design decision, not a one-off prop). By what each one needs: **ghost** small text action, 6 (DiagnosticLogOverlay:90, FeatureFlagsPanel:65, ResourceMonitor:198, PerspectiveActionBar:135, TextSettings:449, BatchSettings:656) · **link**, 2 (OnlineFeaturesOffNotice:17, TransformCropSettings:306) · **accent CTA**, 1 (ResumeContent:54) · **brand CTA on raw palette colors**, 3 (SubscriptionButton:414 `bg-zinc-800`, :428 and TextSettings:424 `bg-purple-600`; R4 violations guardrails cannot see, it counts hex) · **secondary large** (text-sm / font-medium / text-secondary), 3 (ResumeContent:61, DevTestsPane:22, StoragePane:103) · **small ghost icon**, 3 (ImageMetaPanel:66/121, CreateAIImagePanel:242) · **pill toggle** with a solid-primary on state, 3 (DimensionFields:71, NewActions:478, BatchSettings:819) · **small bordered**, 1 (ResourceMonitor:129). Bespoke and correctly not a `Button`, 13: swatch "+" circles (ColorPickerDialog:293, ColorSwatchGrid:72), SizeSlider:97 presets, info triggers that want `ui/info-tooltip` (AIUsagePane:111, GalleryCount:47), canvas/thumbnail overlays (DuplicatePadOverlay:112, GridThumbnails:130, MobileShell:67, GalleryBar:268/278), the Settings category rail (SubscriptionButton:296), HistogramView:271, StampSettings:189 |
+| **RATCHETED 09-29-2026 (UI Night 7): `ui-raw-button` baseline 37 in 28 files** (grew 34 → 37 in Night 6: `GalleryThumbMark` ×2, `StatusBar` ×1). Paying it down is still open. Original row: **Raw `<button>` baseline for Night 7's ratchet: 35 outside `components/ui/`, in 27 files** (**34 in 26 after Night 3**: `SizeSlider:97`'s preset buttons moved into `ui/preset-row`) (JSX elements counted by AST, not grep lines; was 37 in 27 files before Night 2 converted GalleryBar's two strip-scroll arrows to `Button size="tiny"`, the only two that matched a variant with zero visual change). Measured 09-24-2026 | app/src | **The primitives cannot absorb the rest without new `Button` variants**, and Night 2 added none (a variant is a design decision, not a one-off prop). By what each one needs: **ghost** small text action, 6 (DiagnosticLogOverlay:90, FeatureFlagsPanel:65, ResourceMonitor:198, PerspectiveActionBar:135, TextSettings:449, BatchSettings:656) · **link**, 2 (OnlineFeaturesOffNotice:17, TransformCropSettings:306) · **accent CTA**, 1 (ResumeContent:54) · **brand CTA on raw palette colors**, 3 (SubscriptionButton:414 `bg-zinc-800`, :428 and TextSettings:424 `bg-purple-600`; R4 violations guardrails cannot see, it counts hex) · **secondary large** (text-sm / font-medium / text-secondary), 3 (ResumeContent:61, DevTestsPane:22, StoragePane:103) · **small ghost icon**, 3 (ImageMetaPanel:66/121, CreateAIImagePanel:242) · **pill toggle** with a solid-primary on state, 3 (DimensionFields:71, NewActions:478, BatchSettings:819) · **small bordered**, 1 (ResourceMonitor:129). Bespoke and correctly not a `Button`, 13: swatch "+" circles (ColorPickerDialog:293, ColorSwatchGrid:72), SizeSlider:97 presets, info triggers that want `ui/info-tooltip` (AIUsagePane:111, GalleryCount:47), canvas/thumbnail overlays (DuplicatePadOverlay:112, GridThumbnails:130, MobileShell:67, GalleryBar:268/278), the Settings category rail (SubscriptionButton:296), HistogramView:271, StampSettings:189 |
 | **Two more silent exclusive choices, outside Night 1's 43**: HistogramView's RGB / Luma pair (raw buttons, inline styles, `mode === m`, no state exposed) and the Settings category rail (the current tab has no `aria-current` or `aria-selected`). Found 09-24-2026 during the raw-button census | features/canvas/HistogramView.tsx:271, components/SubscriptionButton.tsx:296 | HistogramView is a canvas panel (Night 3). The rail is a tab list or a nav with `aria-current`, a decision about the Settings dialog's structure |
 | **`ToggleButtonGroup`'s pill buttons compute `outline: dashed 3px`, offset 0, on keyboard focus**, where the global `button:focus-visible` rule says 2px, offset 2px. Same before and after Night 2 (measured on both builds); no matched stylesheet rule sets 3px, so it comes from somewhere the CSS-rule inspector does not show (framer-motion `motion.button` is the suspect) | ui/toggle-button-group.tsx | Harmless (still visible, still the focus color) but it is two focus-ring geometries in one app. Find the source before Night 5 touches focus |
-| **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
+| **FROZEN 09-29-2026 (UI Night 7): `ui-radius` baseline 52** (26 bare `rounded`, 15 `rounded-xl`, 6 `rounded-2xl`, 2 `rounded-[inherit]`, 3 directional) — it can no longer grow; the sweep itself still changes pixels and stays parked. Original row: **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
 | **`scripts/inert-class-audit.mjs` prints "colour-utility candidates"** — British spelling in tool output, against the house rule. Found 09-23-2026 while writing docs/UI_INVENTORY.md, which quotes that line verbatim | scripts/inert-class-audit.mjs | One word. Deferred off the Night 1 docs branch because it is a script change, not a docs one — and fixing it desyncs the verbatim quote in UI_INVENTORY §1, so the two move together |
-| **Three of the six `raw-colors` file exclusions in `guardrails.sh` hide zero violations** (CanvasArea, PenOverlay, colors.ts). All three files exist; the arithmetic closes (22 + 7 + 2 + 1 = 32 measured with no exclusions) | scripts/guardrails.sh:90-93 | Two-line deletion that does not move the count, but it is the blocking CI gate and a docs branch should not touch it. Also: `rust-panics` is at 46 vs baseline 47, `librs-lines` 4763 vs 4808 — two free tightenings. See docs/UI_EXCEPTIONS.md |
+| ~~**Three of the six `raw-colors` file exclusions in `guardrails.sh` hide zero violations**~~ **RESOLVED 09-29-2026 (UI Night 7):** dropped, count still 22. (CanvasArea, PenOverlay, colors.ts). All three files exist; the arithmetic closes (22 + 7 + 2 + 1 = 32 measured with no exclusions) | scripts/guardrails.sh:90-93 | Two-line deletion that does not move the count, but it is the blocking CI gate and a docs branch should not touch it. Also: `rust-panics` is at 46 vs baseline 47, `librs-lines` 4763 vs 4808 — two free tightenings. See docs/UI_EXCEPTIONS.md |
 | Rail `ToolButton` and `SubtoolButton` are near-copies | features/tools/ToolButton.tsx, SubtoolRow.tsx | One `level` prop; the rail is core, wants eyes |
 | RadioCards and Switch are single-use | AppShell:2954, NewActions:698 | Folding either in drops a visual (checkbox square / track) |
 | GalleryCount hand-builds InfoTooltip's lightbulb button | GalleryCount.tsx:45 | Needs side + content-class + aria props on InfoTooltip for one caller |
@@ -692,9 +770,9 @@ short cache yields an all-zero map: no containment, degrades to a normal brush.
 ABOVE the active one? Everything else about the read is deliberate and
 documented at the call site.
 
-## OPEN — #56: the Netlify UI holds a stale copy of the build command (2026-09-04)
+## CLOSED — #56: the Netlify UI held a stale copy of the build command (opened 2026-09-04, closed 2026-09-27)
 
-Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
+Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI was the
 **pre-ADR-038** command:
 
 | | Netlify UI setting | `netlify.toml` |
@@ -705,27 +783,35 @@ Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
 | install | `pnpm ci` (not a pnpm command) | `pnpm install` |
 | build | `cd app && pnpm run build` | `pnpm --filter stamp-tool build` |
 
-**`netlify.toml` wins today, and production is correct.** Evidence rather than
-precedence-docs: the live wasm is **816,324 B**, a measured featureless build
-was **723,755 B**, the sentinel band is 780,000–850,000 B (ADR-037), and the
-"Deploy sentinel (live prod engine)" CI job is green.
+`netlify.toml` won every build, so production was always correct and this sat
+here as a loaded gun rather than a live fire. It would fire if `netlify.toml`
+were renamed, moved under a `base` subdirectory Netlify could not see, or edited
+in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm bug**,
+which shipped for ten releases without anyone noticing.
 
-So it is a loaded gun, not a live fire. It fires if `netlify.toml` is renamed,
-moved under a `base` subdirectory Netlify cannot see, or if anyone edits the
-command in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm
-bug**, which shipped for ten releases without anyone noticing.
+**The gun was loaded.** Retiring Netlify proved it, by accident. A
+`netlify deploy` run from a directory containing no `netlify.toml` resolved the
+build command from the UI — the log says `commandOrigin: ui` — and ran it. The
+override was the only thing that had ever stood between this setting and a
+featureless production build, and the first moment the override was absent, the
+stale command took over.
 
-**Fix: clear the UI command** so `netlify.toml` is the only source. That is a
-production build-settings change, so it wants a human hand:
+**Closed 2026-09-27** by clearing it as part of the retirement:
 
 ```
-netlify api updateSite --data '{"site_id":"<id>","build_settings":{"cmd":""}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"cmd":"","stop_builds":true}}}'
 ```
 
-Or clear it in Site configuration → Build & deploy → Build command.
+⚠️ Note the `body` wrapper. Without it the CLI accepts the call, returns the
+site JSON and changes **nothing** — a silent no-op that reads as success. The
+version written above in the original entry was the one that does nothing.
 
 Same shape as the `wasm-pack: latest` drift that cost a night: two sources of
-truth for one build, and the invisible one is the one that rots.
+truth for one build, and the invisible one is the one that rots. The lasting
+lesson is narrower than "clear the UI setting" — it is that an override hiding a
+bad default is not a fix, and you find out which one you actually had on the day
+the override goes away.
+
 ## OPEN — #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
 
 #63 has been scoped for months as "display-only, from state the rows already
@@ -972,11 +1058,11 @@ open:
 
 | Item | State |
 |---|---|
-| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app` and `imagehorse.app`. The Netlify origin was retired 2026-09-27 and now only 301s |
 | Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
 | CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
-| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
-| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now reads the hash out of each CSP header's `script-src` rather than anywhere in the file. ⚠️ Down to ONE config since `netlify.toml` was deleted 2026-09-27, so the "a config nobody added" trap is closer, not further away |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135, and `netlify.toml` no longer exists at all since 2026-09-27. Amendment owed |
 
 The table below is the state before v8.70, kept for history.
 
@@ -992,8 +1078,10 @@ the marketing site carry exactly one security header:
 | `referrer-policy` | **absent** | **absent** |
 | `permissions-policy` | **absent** | **absent** |
 
-There is no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
-this is absence rather than misconfiguration.
+There was no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
+this was absence rather than misconfiguration. (Both have since gained one in
+#135, and `netlify.toml` was deleted with the host on 2026-09-27 — this entry is
+kept as the record of the audit, not as a current reading.)
 
 **Not a midnight patch.** A CSP for this app has to allow things most templates
 forbid: `'wasm-unsafe-eval'` for the engine, `blob:` and `worker-src` for the
@@ -2805,8 +2893,9 @@ ever been written to it.
   → `SW_MODE` (`off`/`on`/`kill`) → `__IH_SW_MODE__` via vite `define`
   (`app/vite.config.ts:52`). There is no `URLSearchParams`, no
   `location.search`, no runtime bypass anywhere in the pwa directory. A stranded
-  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in neither
-  netlify.toml, package.json, nor `.github/`, so production ships `off` and the
+  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in no deploy config
+  (`netlify.toml` then, `vercel.json` now) and no `package.json` script, so
+  production ships `off` and the
   registration code is constant-folded out — matching the v7.41 "shipped dark"
   record. `/sw.js` returns `content-type: text/html`, i.e. the SPA fallback, not
   a worker (verify by content-type, never by HTTP 200).
@@ -2906,7 +2995,7 @@ ever been written to it.
   `layer-active`**, on plain `<li>` elements with no `aria-selected` or
   `aria-pressed`. Screen readers and automation cannot tell which layer is
   active. WCAG 2.1 AA is a project invariant, so this is a real gap, not polish.
-- **RESOLVED 2026-09-29 by option (1), see ADR-072** (`lib/avifEncoder.ts`).
+- **RESOLVED 2026-09-29 by option (1), see ADR-074** (`lib/avifEncoder.ts`).
   Kept for the record: **Chris wants real AVIF encoding, and it is a dependency decision.**
   No encoder exists anywhere today: nothing in `package.json`, no `ravif`/
   `rav1e` in `Cargo.toml`. Chrome decodes AVIF but cannot encode it from a

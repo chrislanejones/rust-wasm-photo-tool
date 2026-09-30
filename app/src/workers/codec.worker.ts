@@ -9,7 +9,7 @@
 //   - No ENGINE wasm here. The Rust engine stays out of this worker; thumbnail
 //     resize uses OffscreenCanvas drawImage instead of the Rust bilinear
 //     resizer. The one wasm this worker loads is the AVIF encoder, lazily, on
-//     the first AVIF encode (lib/avifEncoder.ts, ADR-072).
+//     the first AVIF encode (lib/avifEncoder.ts, ADR-074).
 //   - Pixel buffers arrive as transferables (see codecWorkerClient.ts). Each
 //     call builds its own OffscreenCanvas and holds no shared state, so
 //     concurrent calls are safe.

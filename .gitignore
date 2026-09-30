@@ -101,3 +101,7 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Claude Design sync working dirs (tooling + build output; rebuilt on every re-sync)
+.ds-sync/
+ds-bundle/

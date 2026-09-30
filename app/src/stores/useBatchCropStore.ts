@@ -1,0 +1,112 @@
+import { create } from "zustand";
+import type { PlacementCell } from "@/components/PlacementGrid";
+import { BATCH_CROP_RATIOS, type BatchCropRatioId, type CropFraming } from "@/lib/batchCrop";
+
+// Batch › Crop's settings, plus each photo's hand-set framing.
+//
+// WHY A STORE: same reason as usePerspectiveStore. The crop frame is edited in
+// two places, the panel (features/tools/settings) and the draggable frame on
+// the preview (features/canvas), and their only common ancestor is AppShell.
+//
+// NOT PERSISTED. Everything here was useState/useRef in CropBatchPanel before
+// the preview frame existed and lives for the session, same as before. There
+// is no IndexedDB change, so the dexie-migration gate is not triggered.
+
+export type BatchCropWidthId = "keep" | "1080" | "1440";
+
+interface BatchCropState {
+  ratioId: BatchCropRatioId;
+  /** A Shift-drag's free shape, as [w, h]. Wins over `ratioId` until a ratio
+   *  tile is picked — every photo is still cropped to this ONE shape. */
+  customRatio: [number, number] | null;
+  anchor: PlacementCell;
+  widthId: BatchCropWidthId;
+  /** Per-photo framing dragged on the preview. A photo with no entry uses the
+   *  anchor. Measured against the photo's ORIGINAL framing (see baselines). */
+  framing: Record<string, CropFraming>;
+  /** The last frame drawn on ANY photo. Photos with no framing of their own
+   *  follow it, so framing one slide frames the whole carousel. */
+  shared: CropFraming | null;
+  /** Crop All, registered by the mounted panel — Enter runs it. */
+  applyAll: (() => void) | null;
+  /** photo id → the originalKey it had before its first batch crop. Every
+   *  Apply crops from here, so a second Apply re-frames the whole photo. */
+  baselines: Record<string, string>;
+  /** Active photo only: the undo count our last live crop left behind and how
+   *  many steps it pushed. If the count still matches, re-apply rewinds them. */
+  activeCrop: Record<string, { undoCount: number; steps: number }>;
+
+  setRatioId: (id: BatchCropRatioId) => void;
+  /** Picking an anchor is "put every frame HERE" — it clears hand framings. */
+  setAnchor: (a: PlacementCell) => void;
+  setWidthId: (id: BatchCropWidthId) => void;
+  /** Also becomes `shared`; `ratio` (a Shift-drag) sets `customRatio`. */
+  setFraming: (photoId: string, f: CropFraming, ratio?: [number, number]) => void;
+  setApplyAll: (fn: (() => void) | null) => void;
+  clearFraming: (photoId: string) => void;
+  setBaseline: (photoId: string, key: string) => void;
+  setActiveCrop: (photoId: string, v: { undoCount: number; steps: number }) => void;
+}
+
+export const useBatchCropStore = create<BatchCropState>((set) => ({
+  ratioId: "1:1",
+  customRatio: null,
+  anchor: "center",
+  widthId: "1080",
+  framing: {},
+  shared: null,
+  applyAll: null,
+  baselines: {},
+  activeCrop: {},
+
+  setRatioId: (ratioId) => set({ ratioId, customRatio: null }),
+  setAnchor: (anchor) => set({ anchor, framing: {}, shared: null }),
+  setWidthId: (widthId) => set({ widthId }),
+  setFraming: (photoId, f, ratio) =>
+    set((s) => ({
+      framing: { ...s.framing, [photoId]: f },
+      shared: f,
+      ...(ratio ? { customRatio: ratio } : {}),
+    })),
+  setApplyAll: (applyAll) => set({ applyAll }),
+  clearFraming: (photoId) =>
+    set((s) => {
+      const { [photoId]: gone, ...rest } = s.framing;
+      // If this photo's frame is the one everyone follows, reset that too —
+      // otherwise "reset" would leave the same frame standing via `shared`.
+      return { framing: rest, shared: gone && gone === s.shared ? null : s.shared };
+    }),
+  setBaseline: (photoId, key) =>
+    set((s) => (s.baselines[photoId] ? s : { baselines: { ...s.baselines, [photoId]: key } })),
+  setActiveCrop: (photoId, v) => set((s) => ({ activeCrop: { ...s.activeCrop, [photoId]: v } })),
+}));
+
+/** The crop shape every photo gets: a Shift-drag's, else the ratio tile's. */
+export function cropRatioOf(s: Pick<BatchCropState, "ratioId" | "customRatio">): [number, number] {
+  return s.customRatio ?? BATCH_CROP_RATIOS.find((r) => r.id === s.ratioId)!.dims;
+}
+
+/** The frame a photo will be cropped with: its own, else the shared one
+ *  (undefined = use the anchor). */
+export function framingFor(
+  s: Pick<BatchCropState, "framing" | "shared">,
+  photoId: string,
+): CropFraming | undefined {
+  return s.framing[photoId] ?? s.shared ?? undefined;
+}
+
+/** Is the photo on screen still its ORIGINAL framing — i.e. is the preview
+ *  frame measuring the same pixels the next Apply will crop? False once a batch
+ *  crop has been baked into it (active: until undone; others: for good, since
+ *  their stored original was replaced). */
+export function showsOriginalFraming(
+  s: Pick<BatchCropState, "baselines" | "activeCrop">,
+  photoId: string,
+  originalKey: string,
+  undoCount: number,
+): boolean {
+  const live = s.activeCrop[photoId];
+  if (live && live.undoCount === undoCount) return false;
+  const base = s.baselines[photoId];
+  return !base || base === originalKey;
+}
