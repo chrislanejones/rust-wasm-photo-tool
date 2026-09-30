@@ -53,7 +53,7 @@ export function BatchCropThumbShade({
     <svg
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio={cover ? "xMidYMid slice" : "xMidYMid meet"}
-      className="pointer-events-none absolute inset-0 z-[5] h-full w-full"
+      className="pointer-events-none absolute inset-0 z-[var(--z-canvas)] h-full w-full"
       data-testid="batch-crop-thumb-shade"
       aria-hidden="true"
     >
