@@ -1896,6 +1896,14 @@ export function AppShell() {
     };
     const onDrop = (e: DragEvent) => {
       if (!isFileDrag(e)) return;
+      // A drop zone below already took this drop (the New dialog's
+      // NewActions, the Batch logo well) — every one of them calls
+      // preventDefault. Handling it again here imported the files TWICE: the
+      // New dialog's onFilesAdded closes the dialog synchronously, React
+      // flushes that discrete update (and this effect) before the event
+      // bubbles up, so this listener is attached in time to catch the very
+      // drop that closed the dialog. 11 images dropped → 22 in the gallery.
+      if (e.defaultPrevented) return;
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
