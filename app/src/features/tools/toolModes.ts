@@ -30,6 +30,7 @@
 import {
   ArrowUpRight,
   Copy,
+  Crop,
   Eraser,
   FileEdit,
   ImagePlus,
@@ -105,6 +106,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   emoji: [
     { id: "logo", label: "Logo", icon: ImagePlus, keywords: ["logo", "watermark", "brand", "batch"] },
     { id: "text", label: "Text", icon: Type, keywords: ["text", "caption", "batch"] },
+    { id: "crop", label: "Crop", icon: Crop, keywords: ["crop", "carousel", "aspect ratio", "same size", "batch"] },
     { id: "rename", label: "Rename", icon: FileEdit, keywords: ["rename", "filename", "batch"] },
     {
       id: "airename",

@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.4",
+    date: "2026-09-29",
+    headline: "Batch \u203a Crop: every photo the same shape for a carousel, and you pick what each one keeps.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Batch \u203a Crop cuts every loaded photo to one ratio at once \u2014 1:1, 4:5, 3:4, 4:3, 3:2, 16:9 or 9:16 \u2014 and to one width if you want it: 1080px, 1440px, or each photo\u2019s own size. Pick 4:5 at 1080 and every slide comes out 1080\u00d71350, so a carousel lines up.",
+      },
+      {
+        tag: "feature",
+        text: "The preview shows the crop. Drag the frame to move it, drag a corner to make it smaller (the ratio stays locked), or use the arrow keys and + / \u2212. Each photo keeps its own frame, so you can click through the gallery and frame every slide before you crop. Photos you don\u2019t touch use the nine-cell grid.",
+      },
+      {
+        tag: "fix",
+        text: "Cropping again starts from each photo\u2019s original framing, not from the last crop, so switching from 1:1 to 4:5 and cropping again gets the whole photo back. The open photo\u2019s crop is one undo.",
+      },
+      {
+        tag: "ui",
+        text: "New Canvas, Create AI Image and Download share one panel design. Download, Copy or Share now starts with a choice: this image, or all of them.",
+      },
+      {
+        tag: "fix",
+        text: "Download All wrote a photo you hadn\u2019t edited in whatever format you uploaded it in, whatever you picked. Every photo comes out in the format you choose now, and the button says which: \u201cDownload 3 as WEBP\u201d. A photo already in that format is copied as it is.",
+      },
+      {
+        tag: "infra",
+        text: "The old Netlify address sends you to edit.imagehorse.app, and Netlify no longer builds anything. One host, one build.",
+      },
+    ],
+  },
+  {
     version: "v9.3",
     date: "2026-09-28",
     headline: "A resize no longer makes a photo heavier, and a “Photo only” ZIP has no white line.",

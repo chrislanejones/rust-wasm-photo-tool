@@ -4,6 +4,59 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
+
+Netlify was retired on 09-27-2026 (see docs/Deploying.md, "Retiring Netlify").
+Everything landed except one step: the site is still connected to
+`chrislanejones/rust-wasm-photo-tool` on `master`.
+
+| Field | Value |
+|---|---|
+| `build_settings.stop_builds` | `true` — no builds run, so **no PR checks** |
+| `build_settings.cmd` | `""` — #56 closed |
+| `build_settings.repo_url` | **still `https://github.com/chrislanejones/rust-wasm-photo-tool`** |
+| Published deploy | the 301 to `edit.imagehorse.app` |
+
+**Cosmetic while builds are stopped**, which is why it did not block the
+retirement. It matters only if someone re-enables builds without noticing what
+they are re-enabling.
+
+The API will not clear it. Both of these return the site JSON with the link
+untouched — no error, no change:
+
+```
+netlify api updateSite --data '{"site_id":"<id>","body":{"repo":null}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"repo_url":null,"provider":null,"repo_path":null}}}'
+```
+
+**Fix by hand:** Netlify UI → Project configuration → Build & deploy →
+Continuous deployment → unlink the repository.
+
+**Do NOT delete the site.** It serves the 301 that `app/src/lib/legacyHost.ts`
+and the `MovedNotice` toast promised users. Deleting it frees
+`rust-wasm-photo-tool.netlify.app` for anyone to claim and 404s every old link.
+
+Two follow-ups that were deliberately left out of that session's diff:
+
+- **`app/src/features/hostMove/` and `app/src/lib/legacyHost.ts` are now dead
+  code.** Nothing serves the app on the legacy host any more, so `isLegacyHost`
+  can never return true in production and the toast can never render. Removing
+  them is a real deletion with its own tests (`legacyHost.test.ts`) and an
+  `App.tsx` mount — a separate session.
+- **The three env vars still on the Netlify site** — `REPLICATE_API_TOKEN`,
+  `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_CONVEX_URL`. The first is a real secret
+  sitting on a host nothing builds from. Confirm it is set on Vercel, then
+  delete it there; rotating it is the safer call.
+
+## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+
+CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
+| 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
 ## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
 
 v9.3 (#260) stops NEW saves from writing the Canvas border into a stored
@@ -692,9 +745,9 @@ short cache yields an all-zero map: no containment, degrades to a normal brush.
 ABOVE the active one? Everything else about the read is deliberate and
 documented at the call site.
 
-## OPEN — #56: the Netlify UI holds a stale copy of the build command (2026-09-04)
+## CLOSED — #56: the Netlify UI held a stale copy of the build command (opened 2026-09-04, closed 2026-09-27)
 
-Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
+Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI was the
 **pre-ADR-038** command:
 
 | | Netlify UI setting | `netlify.toml` |
@@ -705,27 +758,35 @@ Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
 | install | `pnpm ci` (not a pnpm command) | `pnpm install` |
 | build | `cd app && pnpm run build` | `pnpm --filter stamp-tool build` |
 
-**`netlify.toml` wins today, and production is correct.** Evidence rather than
-precedence-docs: the live wasm is **816,324 B**, a measured featureless build
-was **723,755 B**, the sentinel band is 780,000–850,000 B (ADR-037), and the
-"Deploy sentinel (live prod engine)" CI job is green.
+`netlify.toml` won every build, so production was always correct and this sat
+here as a loaded gun rather than a live fire. It would fire if `netlify.toml`
+were renamed, moved under a `base` subdirectory Netlify could not see, or edited
+in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm bug**,
+which shipped for ten releases without anyone noticing.
 
-So it is a loaded gun, not a live fire. It fires if `netlify.toml` is renamed,
-moved under a `base` subdirectory Netlify cannot see, or if anyone edits the
-command in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm
-bug**, which shipped for ten releases without anyone noticing.
+**The gun was loaded.** Retiring Netlify proved it, by accident. A
+`netlify deploy` run from a directory containing no `netlify.toml` resolved the
+build command from the UI — the log says `commandOrigin: ui` — and ran it. The
+override was the only thing that had ever stood between this setting and a
+featureless production build, and the first moment the override was absent, the
+stale command took over.
 
-**Fix: clear the UI command** so `netlify.toml` is the only source. That is a
-production build-settings change, so it wants a human hand:
+**Closed 2026-09-27** by clearing it as part of the retirement:
 
 ```
-netlify api updateSite --data '{"site_id":"<id>","build_settings":{"cmd":""}}'
+netlify api updateSite --data '{"site_id":"<id>","body":{"build_settings":{"cmd":"","stop_builds":true}}}'
 ```
 
-Or clear it in Site configuration → Build & deploy → Build command.
+⚠️ Note the `body` wrapper. Without it the CLI accepts the call, returns the
+site JSON and changes **nothing** — a silent no-op that reads as success. The
+version written above in the original entry was the one that does nothing.
 
 Same shape as the `wasm-pack: latest` drift that cost a night: two sources of
-truth for one build, and the invisible one is the one that rots.
+truth for one build, and the invisible one is the one that rots. The lasting
+lesson is narrower than "clear the UI setting" — it is that an override hiding a
+bad default is not a fix, and you find out which one you actually had on the day
+the override goes away.
+
 ## OPEN — #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
 
 #63 has been scoped for months as "display-only, from state the rows already
@@ -972,11 +1033,11 @@ open:
 
 | Item | State |
 |---|---|
-| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app` and `imagehorse.app`. The Netlify origin was retired 2026-09-27 and now only 301s |
 | Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
 | CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
-| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
-| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now reads the hash out of each CSP header's `script-src` rather than anywhere in the file. ⚠️ Down to ONE config since `netlify.toml` was deleted 2026-09-27, so the "a config nobody added" trap is closer, not further away |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135, and `netlify.toml` no longer exists at all since 2026-09-27. Amendment owed |
 
 The table below is the state before v8.70, kept for history.
 
@@ -992,8 +1053,10 @@ the marketing site carry exactly one security header:
 | `referrer-policy` | **absent** | **absent** |
 | `permissions-policy` | **absent** | **absent** |
 
-There is no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
-this is absence rather than misconfiguration.
+There was no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
+this was absence rather than misconfiguration. (Both have since gained one in
+#135, and `netlify.toml` was deleted with the host on 2026-09-27 — this entry is
+kept as the record of the audit, not as a current reading.)
 
 **Not a midnight patch.** A CSP for this app has to allow things most templates
 forbid: `'wasm-unsafe-eval'` for the engine, `blob:` and `worker-src` for the
@@ -2805,8 +2868,9 @@ ever been written to it.
   → `SW_MODE` (`off`/`on`/`kill`) → `__IH_SW_MODE__` via vite `define`
   (`app/vite.config.ts:52`). There is no `URLSearchParams`, no
   `location.search`, no runtime bypass anywhere in the pwa directory. A stranded
-  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in neither
-  netlify.toml, package.json, nor `.github/`, so production ships `off` and the
+  user CANNOT self-rescue by URL. `VITE_ENABLE_SW` appears in no deploy config
+  (`netlify.toml` then, `vercel.json` now) and no `package.json` script, so
+  production ships `off` and the
   registration code is constant-folded out — matching the v7.41 "shipped dark"
   record. `/sw.js` returns `content-type: text/html`, i.e. the SPA fallback, not
   a worker (verify by content-type, never by HTTP 200).

@@ -11090,3 +11090,20 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Gates** | tsc 0 (app + marketing), eslint **0 errors**, vitest **129 files / 1,406 tests**, guardrails at baseline, cargo fmt + clippy `--all-targets -D warnings` clean, cargo test 396 + `--features tiles` 551 passed. Engine **819,031 → 820,591 B**. CI 17/17 on all three PRs. |
 | **QC** | Production build, logged out: boots, image loads, resize + Apply on JPEG and PNG, Auto Compress, reload and reopen, 0 page errors. Signed-in checks are listed for Chris to run. |
 
+
+## v9.4 Change Summary — 2026-09-29
+
+**Batch › Crop: every photo the same shape for a carousel, and you pick what each one keeps.** Five PRs since v9.3: two parking notes (#262, #264), the multi-pane dialog and Download All formats (#263), Batch › Crop with its preview frame (#267), and the Netlify retirement (#265).
+
+| Area | Change |
+| --- | --- |
+| **Batch › Crop** (#267) | New Batch sub-tool. One ratio (1:1, 4:5, 3:4, 4:3, 3:2, 16:9, 9:16), a nine-cell anchor, and an output width (Keep, 1080, 1440). With a width set, height comes from the ratio, not the crop, so rounding can't leave one slide a pixel off. Non-active photos are cropped from their pre-crop baseline and written back to IDB; the active photo goes through the live engine (crop, then Lanczos3 resize) so it is an undo step. `workingWidth`/`workingHeight` follow the crop. |
+| **Preview frame** (#267) | `BatchCropOverlay`, mounted through CanvasArea's `renderOverlay`. Drag to move, corner to resize with the ratio locked, arrows / + / − / 0 from the keyboard, double-click to reset. Framing is stored per photo as fractions (center + scale) in `useBatchCropStore` (session-only, no IndexedDB change), so it replays on the ≤2048px working copy and survives a ratio change. The frame hides once a crop is baked into the photo on screen. |
+| **Measured** (#267) | e2e `batch-crop-frame.spec.ts`: drag moves the frame and counts "1 of 2 framed by hand", `0` resets it, Crop All at 4:5 / 1080 reports **Photo: 1080×1350**. With the overlay unmounted the spec fails (mutation killed). |
+| **CI** (#267) | The PR arrived red: `engineAsyncMigration.contract.test.ts` sat 5 lines over its max-lines cap. Ledger 157 → **164** awaited sites. |
+| **Multi-pane dialog** (#263) | `PaneSwap` + `PaneHeader` shared by New Canvas, Create AI Image and Download. Download starts with Selected Image or All Images; file-type icons for JPEG, PNG, WEBP, AVIF, ORA, PSD (PSD marked Coming soon). |
+| **Download All formats** (#263) | An untouched photo was zipped in its upload format whatever was picked. Every photo now goes out in the picked format; one already in it is copied byte-identical. Checked by magic bytes: WEBP 3 × webp, PNG and JPEG 3 each with one byte-identical to its upload. |
+| **Netlify retired** (#265) | `netlify.toml` deleted, the site kept serving a 301 to edit.imagehorse.app, builds stopped. CI, `build-wasm.sh`, `deploy-sentinel.sh` and the deploy docs no longer name it. The site is still linked to the repo (UI-only fix, parked). |
+| **Found, not fixed** | Batch › Crop re-apply knows its last crop by undo count, so undo + one new edit can rewind the wrong step; "Keep" width caps non-active photos at 2048px. Both parked. |
+| **Gates** | tsc 0, eslint **0 errors**, vitest **131 files / 1,429 tests**, guardrails at baseline, inert-class audit 0, app build 0. No Rust changed; engine **820,591 B**. CI 16/16 on #267 and 17/17 on #265; both Vercel projects built on `5de7968b`. |
+| **QC** | Production build, logged out: boots, two photos load, Batch › Crop frame drags and resets, Crop All lands 1080×1350, the frame steps off after. Live editor after the merge: renders, 0 page errors, new code in the bundle. Signed-in checks are left for Chris. |

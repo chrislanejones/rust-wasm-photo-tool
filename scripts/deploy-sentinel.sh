@@ -45,10 +45,12 @@ set -uo pipefail
 # and then the real failure it exists to catch (a featureless wasm, which once
 # shipped for ten releases) goes through unnoticed.
 #
-# The Netlify host stays alive as the rollback path and is NOT the default any
-# more. To aim this anywhere else for one run:
+# The Netlify host was retired on 2026-09-27 and is now a 301 to this default,
+# so it is no longer a rollback target — pointing the sentinel at it would just
+# follow the redirect back here and check the same deploy twice. To aim this
+# anywhere else for one run (a Vercel preview URL, say):
 #
-#   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
+#   SENTINEL_SITE=https://<deployment>.vercel.app ./scripts/deploy-sentinel.sh
 SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
 
 # ⚠️ THE FLOOR IS LOAD-BEARING IN A NEW WAY SINCE 2026-09-18, AND A RED FLOOR IS
@@ -143,7 +145,7 @@ for sym in "${REQUIRED_SYMBOLS[@]}" "${WIRED_SYMBOLS[@]}"; do
   grep -qE "${sym}\([A-Za-z0-9_\$, ]*\)[[:space:]]*\{" "$TMP/glue.js" || missing+=("$sym")
 done
 if [ ${#missing[@]} -gt 0 ]; then
-  fail "live glue is MISSING engine exports: ${missing[*]} — production is serving a featureless build (see netlify.toml --features tiles,patchmatch)"
+  fail "live glue is MISSING engine exports: ${missing[*]} — production is serving a featureless build (see FEATURES in scripts/build-wasm.sh)"
 fi
 echo "  exports    : ${REQUIRED_SYMBOLS[*]} ${WIRED_SYMBOLS[*]} all declared"
 
@@ -173,11 +175,13 @@ echo "  wasm       : $wasm ($size bytes)"
 # for its whole life and the floor was the only thing that ever caught a
 # featureless deploy. Don't remove the survivor.
 live_sha="$(sha256sum "$TMP/engine.wasm" | cut -d' ' -f1)"
-# ⚠️ A 200 IS NOT PROOF THE FILE EXISTS. Netlify's SPA fallback serves
-# index.html for ANY unknown path, so `curl -f` on a missing build-info.json
-# succeeds and hands back HTML. Checked against the real site 2026-09-05: it
-# returned the app shell, and an earlier version of this block read that as
-# "present but malformed" and failed a perfectly healthy deploy.
+# ⚠️ A 200 IS NOT PROOF THE FILE EXISTS. The SPA fallback serves index.html for
+# ANY unknown path, so `curl -f` on a missing build-info.json succeeds and hands
+# back HTML. Checked against the real site 2026-09-05: it returned the app shell,
+# and an earlier version of this block read that as "present but malformed" and
+# failed a perfectly healthy deploy. Netlify's `[[redirects]]` did this; the root
+# vercel.json's `rewrites` rule does exactly the same thing, so the hazard moved
+# hosts with the app.
 #
 # So there are THREE outcomes, not two, and they are kept apart deliberately —
 # each one means a different thing is broken and needs a different fix:
@@ -252,16 +256,16 @@ if [ "$build_info_state" = "json" ]; then
 elif [ "$build_info_state" = "notjson" ]; then
   got="$(head -c 60 "$TMP/build-info.json" | tr '\n' ' ')"
   fail "build-info.json did not come back as JSON — the server answered with
-  something else, which on Netlify means the SPA FALLBACK served index.html
-  because the file is not there.
+  something else, which means the SPA FALLBACK (vercel.json's rewrites rule)
+  served index.html because the file is not there.
   first bytes: ${got}
   The engine itself may be perfectly fine; what is broken is the deploy's
   record of what it built, so tiers 1 and 2 cannot run at all. In order:
     1. did the build run \`scripts/write-build-info.sh\`? It is the LAST step of
-       netlify.toml's command — a failure earlier in that chain skips it while
-       still publishing the site
+       vercel.json's buildCommand — a failure earlier in that chain skips it
+       while still publishing the site
     2. is it landing somewhere other than the publish dir? It writes to
-       www-dist/build-info.json and netlify.toml publishes www-dist
+       www-dist/build-info.json and vercel.json's outputDirectory is www-dist
     3. is a redirect or rewrite rule catching /build-info.json before the
        static file does?"
 else
