@@ -4448,11 +4448,11 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(4, 4);
         t.begin_paste_preview(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0, 2, 2);
         t.set_paste_preview_rotation(std::f32::consts::TAU);
-        assert_eq!(t.paste_preview.as_ref().unwrap().rotation, 0.0);
+        assert_eq!(t.paste_preview.as_ref().map(|p| p.rotation), Some(0.0));
         t.set_paste_preview_rotation(f32::NAN);
         assert_eq!(
-            t.paste_preview.as_ref().unwrap().rotation,
-            0.0,
+            t.paste_preview.as_ref().map(|p| p.rotation),
+            Some(0.0),
             "NaN ignored"
         );
     }
