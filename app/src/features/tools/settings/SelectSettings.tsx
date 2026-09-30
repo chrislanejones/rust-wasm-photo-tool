@@ -36,6 +36,16 @@
 // The mode selector is the shared ToolModeToggle (the Paint panel's template):
 // stacked icon tiles on top, the active mode's title + lightbulb info below,
 // then that mode's settings — do not fork the layout.
+//
+// COMBINE IS NO LONGER HERE. The New / Add / Subtract / Intersect strip moved
+// to the Review panel (Review → Combine, Alt+R). It decides how the next
+// REGION meets the selection you have, which was never specific to this tool:
+// a marquee, a lasso loop and — since the move — a placed shape or text box
+// all go through it, and parking it here made it unreachable while you were
+// holding any other tool. The store field (`selectionCombine`) and the engine
+// call (`set_selection_combine`) are untouched; only the control moved, so
+// every gesture path in this panel still combines exactly as it did. Each
+// mode's lightbulb says where it went.
 import {
   BoxSelect,
   SquareDashed,
@@ -46,10 +56,6 @@ import {
   Magnet,
   CopyPlus,
   Scissors,
-  Square,
-  SquaresUnite,
-  SquaresSubtract,
-  SquaresIntersect,
   Sparkles,
   Grip,
   CircleDot,
@@ -74,7 +80,6 @@ import { SizeSlider } from "@/components/ui/size-slider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
 import { isMarqueeKind, useToolStore } from "@/stores/useToolStore";
-import type { SelectionCombineMode } from "@/lib/selectionBool";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
 import { isNoopRefine, type RefineSettings } from "@/lib/selectionRefine";
@@ -152,28 +157,6 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
   },
 ];
 
-type CombineId = "new" | "add" | "subtract" | "intersect";
-const COMBINE_IDS: readonly CombineId[] = ["new", "add", "subtract", "intersect"];
-const COMBINE_OPTIONS = [
-  // "New selection", not "New": the top bar already has a "New" (a new
-  // image), and two buttons with one name that do unrelated things is what a
-  // screen reader user would hear side by side.
-  { id: "new", label: "New selection", icon: Square, title: "Each selection replaces the last" },
-  { id: "add", label: "Add", icon: SquaresUnite, title: "Add to the selection (or hold Shift)" },
-  {
-    id: "subtract",
-    label: "Subtract",
-    icon: SquaresSubtract,
-    title: "Take away from the selection (or hold Alt)",
-  },
-  {
-    id: "intersect",
-    label: "Intersect",
-    icon: SquaresIntersect,
-    title: "Keep only where the two overlap",
-  },
-] as const;
-
 /** SELECT_MODES with the panel-level how-to appended to every lightbulb (the
  *  instructions that used to live in the old "Selection Tool" header). Built
  *  once at module scope; the palette keeps consuming the pure strings above. */
@@ -186,7 +169,10 @@ const PANEL_MODES: readonly ToolMode<SelectionKind>[] = SELECT_MODES.map(
         {isMarqueeKind(m.id)
           ? "Press, drag and release on the canvas."
           : "Click the canvas to select."}{" "}
-        <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects.
+        <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects. Whether this
+        replaces the selection or adds to it is Combine, in the Review panel
+        (<kbd>Alt+R</kbd>); <kbd>Shift</kbd> adds and <kbd>Alt</kbd> subtracts
+        for one gesture whatever it says.
       </>
     ),
   }),
@@ -222,8 +208,6 @@ export function SelectSettings({
   selection: SelectionControls;
 }) {
   const patchmatch = isPatchmatchEnabled();
-  const combine = useToolStore((s) => s.selectionCombine);
-  const setCombine = useToolStore((s) => s.setSelectionCombine);
   const coverage = useToolStore((s) => s.selectionCoverage);
   const refine = useToolStore((s) => s.selectionRefine);
   const setRefine = useToolStore((s) => s.setSelectionRefine);
@@ -312,32 +296,6 @@ export function SelectSettings({
       >
         {coverage ? describeCoverage(coverage) : "Nothing selected"}
       </p>
-
-      {/* ── How the next selection combines ──────────────────────────────
-          The standing choice; Shift (add) and Alt (subtract) still override
-          it for one gesture. Applies to every mode, the lasso and marquees
-          included, so it sits outside the mode body. */}
-      <div className={PANEL_SECTION}>
-        <SectionHeader
-          title="Combine"
-          // The strip is icon-only, so the chosen mode's name lives here.
-          value={COMBINE_OPTIONS[combine]?.label}
-          info={
-            <>
-              How the next selection meets the one you have. Holding{" "}
-              <kbd>Shift</kbd> adds and <kbd>Alt</kbd> subtracts for one
-              click, whatever is chosen here.
-            </>
-          }
-        />
-        <ToolButtonGroup<CombineId>
-          segmented
-          disabled={disabled}
-          value={COMBINE_IDS[combine]}
-          onChange={(id) => setCombine(COMBINE_IDS.indexOf(id) as SelectionCombineMode)}
-          options={COMBINE_OPTIONS}
-        />
-      </div>
 
       {/* ── Refine ───────────────────────────────────────────────────────
           Non-modal, on this panel: Clean Up is the preset, the sliders are the

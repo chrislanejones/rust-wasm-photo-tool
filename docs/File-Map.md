@@ -219,8 +219,9 @@ app/src/
 │   │   │                             driven by ResizeObserver + MutationObserver on canvas style
 │   │   │                             so the overlay tracks zoom and pan transforms
 │   │   └── ReviewPanel.tsx          Animated right-side "Review" panel (was HistoryPanel).
-│   │                                 Header toggle group opens up to three stacked sections —
-│   │                                 History, Reselect, Layers — that split the body evenly
+│   │                                 Header toggle group of FIVE — History, Layers, Reselect,
+│   │                                 Histogram, Combine — of which up to three are open at once,
+│   │                                 splitting the body evenly
 │   │                                 (1 full / 2 halves / 3 thirds), each with its own header,
 │   │                                 count box, and scroll area. History = undo/redo timeline
 │   │                                 with an inline Undo button; Reselect = every live text +
@@ -229,7 +230,12 @@ app/src/
 │   │                                 inline rename, reorder, duplicate, merge-down, delete, and a
 │   │                                 per-layer opacity slider — tier-gated (locked for demo). Count
 │   │                                 box shows the live layer count; the per-tier limit is in its
-│   │                                 tooltip. Row controls use the xs TinyButton variant
+│   │                                 tooltip. Row controls use the xs TinyButton variant.
+│   │                                 Histogram = the live RGB / Luma scope (HistogramView);
+│   │                                 Combine = the New / Add / Subtract / Intersect strip that used
+│   │                                 to live on the Select panel, plus the same object list as one
+│   │                                 more selection producer (lib/objectSelection.ts). Histogram and
+│   │                                 Combine start closed
 │   ├── gallery/
 │   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails; selection row adds a
 │   │   │                             Duplicate button (content-addressed copy) beside Export /
@@ -280,6 +286,13 @@ app/src/
     │                                 shapes are two independent id spaces in the engine. Also
     │                                 `basisOfShape` — a HAND-MIRROR of `shape_basis_rect` in
     │                                 src/annotations.rs that the two must agree on to the pixel
+    ├── objectSelection.ts             What Review → Combine points AT: an ObjectRef (type, id —
+    │                                 text and shapes are two id spaces, as in perspectiveTarget)
+    │                                 plus the FOOTPRINT it contributes to the selection. A bbox,
+    │                                 padded by half the stroke, routed to whichever marquee producer
+    │                                 the engine already has: ellipse_select for a circle, rect_select
+    │                                 for everything else. Adds no geometry rule — every number is
+    │                                 read off get_shape_annotations / get_text_annotations
     ├── colors.ts                     Color utility helpers
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
     │                                 state + undo/redo history (PNG-encoded) plus the layer stack

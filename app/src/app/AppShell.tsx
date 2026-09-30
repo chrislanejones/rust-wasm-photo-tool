@@ -3256,20 +3256,10 @@ export function AppShell() {
                       selectionActive={activeTool === "select"}
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      // Gated to the tool(s) that can actually populate this
-                      // mask: the Select tool (selection's home since the
-                      // v7.44 split — was Adjust & Select), or the Magic
-                      // Eraser sub-mode of the Eraser tool, whose brush
-                      // paints the same store field (see useMagicEraserTool).
-                      // Without the second clause the mask is still written
-                      // during a Magic Eraser stroke, but this prop zeroes
-                      // it back out before <SelectionOverlay> ever sees it.
-                      selectionMask={
-                        activeTool === "select" ||
-                        (activeTool === "ai" && eraserMode === "magic")
-                          ? selectionMask
-                          : null
-                      }
+                      // Ungated (ADR-075): a selection shows whatever tool is
+                      // held. Review › Combine makes one from ANY tool, and a
+                      // selection you cannot see is one you cannot trust.
+                      selectionMask={selectionMask}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       // Drag = marquee for the two marquee modes ONLY. The

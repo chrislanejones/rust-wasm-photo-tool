@@ -1025,6 +1025,40 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
+/* ── Combine section (Review → Combine) ──────────────────────────────────
+   The mode strip and its readout, above the object list. `flex: 0 0 auto` is
+   the point: the object list below is the `.history-list` that takes the
+   section's leftover height and scrolls, so the controls must NOT shrink with
+   it — at thirds-height the strip would otherwise be squeezed out of reach,
+   which is the one thing a standing choice cannot afford to be. */
+.combine-mode {
+  flex: 0 0 auto;
+  padding: 0 10px 6px;
+}
+
+/* The "Selected 18.4% · 2.1 MP" line under the strip. Same words the Select
+   panel and the status-bar chip show, so the three cannot disagree. */
+.combine-coverage {
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The active mode's name, in the section head beside the lightbulb. Truncates
+   rather than overflows: "New selection" is the longest of the four and the head
+   also carries the section name, the lightbulb and the ✕ inside 260px — narrower
+   still in the compact master bar. Same three properties `.layers-summary-name`
+   uses for the same reason. */
+.combine-active {
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Layers list ─────────────────────────────────────────────────────── */
 .layers-list {
   padding-top: 0;
