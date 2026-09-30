@@ -341,8 +341,8 @@ test.describe("imagehorse-qc v8.41", () => {
       };
     });
 
-    // Two steps, not one: the top bar's Export button opens a "Download, Copy,
-    // or Share" dialog, and the export only happens on that dialog's own
+    // Two steps, not one: the top bar's Export button opens the "Export"
+    // dialog, and the export only happens on that dialog's own
     // primary action. (It was a "Download & Share" footer in the tool panel
     // until v8.59; this spec kept clicking the old one for six weeks.)
     await page.getByRole("button", { name: "Export", exact: true }).first().click();

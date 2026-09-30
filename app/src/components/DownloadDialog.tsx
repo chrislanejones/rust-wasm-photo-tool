@@ -1,4 +1,4 @@
-// The Download, Copy, or Share dialog — a MULTI-PANE dialog, in the same frame
+// The Export dialog (Download, Copy, Share) — a MULTI-PANE dialog, in the same frame
 // as the New dialog's New Canvas and Create AI Image panes (PaneSwap +
 // PaneHeader, components/ui/dialog-pane.tsx).
 //
@@ -6,8 +6,9 @@
 //                   panels' icon-on-top buttons, as in Magic Wand → Selection /
 //                   Refine). Skipped when only one image is open: there is
 //                   nothing to choose between.
-//   2a. Selected  — Format (tiles, not radio cards), File name, and three
-//                   actions in a row: Download, Share link, Clipboard.
+//   2a. Selected  — Image format (tiles, not radio cards), Layered file (ORA,
+//                   PSD), File name, and three actions in a row, each with a
+//                   glyph: Download, Share link, Clipboard.
 //   2b. All       — one full-width Download (N) that zips every image.
 //
 // SVG sits in both Format pickers and is disabled until an SVG is open: on
@@ -23,7 +24,12 @@
 // back on the first pane with no reset effect to keep in sync.
 import type { ExportFormat } from "@/lib/exportImage";
 import * as React from "react";
-import { FolderArchive, Image as ImageIcon } from "lucide-react";
+import {
+  ClipboardCopy,
+  Download,
+  FolderArchive,
+  Image as ImageIcon,
+} from "lucide-react";
 import {
   Dialog,
   DialogBody,
@@ -55,6 +61,9 @@ import type {
  *  shown disabled ("Activate with plugin") and can never be picked here. PSD
  *  export ships as a separate plugin (its own repo), added from Settings. */
 type FormatTileId = DownloadFormat | "psd";
+
+/** The whole-project files, shown in their own "Layered file" group. */
+const LAYERED_IDS: FormatTileId[] = ["ora", "psd"];
 
 const SVG_HINT = "Vector · keeps crop";
 const SVG_OFF_HINT = "SVG uploads only";
@@ -113,7 +122,7 @@ export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Download, Copy, or Share</DialogTitle>
+          <DialogTitle>Export</DialogTitle>
         </DialogHeader>
         <DownloadPanes {...rest} />
       </DialogContent>
@@ -189,8 +198,7 @@ function DownloadPanes({
         {pane === "choose" ? (
           <>
             <DialogDescription>
-              Download the image you are working on — and copy or share it —
-              or download all {photoCount} as a{" "}
+              One image, or all {photoCount} as a{" "}
               <span className="font-mono">.zip</span>.
             </DialogDescription>
             <div className="grid grid-cols-2 gap-3">
@@ -212,14 +220,26 @@ function DownloadPanes({
           <>
             <PaneHeader title="Selected Image" onBack={back} />
             <ToolButtonGroup<FormatTileId>
-              label="Format"
+              label="Image format"
               stacked
               columns={3}
-              value={selectedValue}
+              value={LAYERED_IDS.includes(selectedValue) ? undefined : selectedValue}
               onChange={(id) => {
                 if (id !== "psd") onFormatChange(id);
               }}
-              options={formatOptions}
+              options={formatOptions.filter((o) => !LAYERED_IDS.includes(o.id))}
+            />
+            {/* ORA and PSD hold every layer of the project, not one flattened
+                picture, so they get their own group. */}
+            <ToolButtonGroup<FormatTileId>
+              label="Layered file"
+              stacked
+              columns={3}
+              value={LAYERED_IDS.includes(selectedValue) ? selectedValue : undefined}
+              onChange={(id) => {
+                if (id !== "psd") onFormatChange(id);
+              }}
+              options={formatOptions.filter((o) => LAYERED_IDS.includes(o.id))}
             />
             {/* File name only here: a zip of every image keeps each image's
                 own name. */}
@@ -231,9 +251,13 @@ function DownloadPanes({
               onSubmit={onDownload}
             />
             <PanelActionBar layout="thirds">
-              <PanelAction onClick={onDownload}>{downloadLabel}</PanelAction>
+              <PanelAction icon={Download} onClick={onDownload}>
+                {downloadLabel}
+              </PanelAction>
               {shareAction}
-              <PanelAction onClick={onCopy}>Clipboard</PanelAction>
+              <PanelAction icon={ClipboardCopy} onClick={onCopy}>
+                Clipboard
+              </PanelAction>
             </PanelActionBar>
           </>
         ) : (
@@ -245,7 +269,7 @@ function DownloadPanes({
                 in it goes in untouched (lib/zipEntry.ts). SVG is live here
                 when ANY open image is an SVG, and zips just those. */}
             <ToolButtonGroup<FormatTileId>
-              label="Format"
+              label="Image format"
               stacked
               columns={3}
               value={allSvg ? "svg" : zipFormat}
@@ -271,8 +295,7 @@ function DownloadPanes({
               )}
             </DialogDescription>
             <PanelActionBar>
-              <PanelAction onClick={onDownloadAll}>
-                <FolderArchive className="h-4 w-4" />
+              <PanelAction icon={FolderArchive} onClick={onDownloadAll}>
                 {allSvg
                   ? `Download ${svg.all} as SVG`
                   : `Download ${photoCount} as ${zipLabel}`}
