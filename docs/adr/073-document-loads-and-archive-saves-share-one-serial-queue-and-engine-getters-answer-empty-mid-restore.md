@@ -1,5 +1,5 @@
 # ADR-073: Document loads and archive saves share one serial queue, and engine getters answer empty mid-restore
-Date: 2026-09-30   Status: draft
+Date: 2026-09-30   Status: accepted
 
 ## Context
 Fast PgDn/PgUp with an edited photo (`e2e/photo-switch-state.spec.ts`) left the
