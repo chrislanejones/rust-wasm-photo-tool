@@ -328,3 +328,28 @@ house dashed ring on `:focus-visible` (styles.css).
 **390px has no tool panels.** Phone width is the "Mobile version" (upload and
 download only). The panel's small-window surface is 960px dock mode, which the
 Night 3 screenshots add.
+
+## 9. Whose value is it? Per-photo, per-tool, app (09-30-2026)
+
+"When I switch photos I can't tell whether the numbers belong to this photo or
+are left over from the last one." Every panel control is one of these kinds,
+and the kind decides what a photo switch does to it. The panels that are
+per-photo render inside `features/tools/PerPhotoRegion`, which names the photo
+("3 of 12 · IMG_2041"), re-highlights on every switch, and locks (with in-place
+skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
+
+| Kind | On a switch | Examples |
+| --- | --- | --- |
+| **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Crop framing |
+| **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset), Presets, Flip/Rotate, Apply buttons |
+| **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
+| **App** | Stays | Rulers & grid preferences, theme |
+
+Per-photo panels (`PER_PHOTO_TOOLS` in ToolsSidebar): Resize & Compress, Crop &
+Transform, Perspective, Adjustments / Levels / Presets, Layers / Canvas Size /
+Guides. Select is per-tool at the panel level; its per-photo part (the
+selection) is cleared on a switch by `usePhotoSwitchReset`.
+
+Known exception: export quality is seeded from the previous photo until edit
+archives carry it (AppShell quality seed). Guides are cleared rather than
+reloaded until they are persisted per photo (`useGuidesStore` TODO).

@@ -14,6 +14,7 @@ import { useToolStore } from "@/stores/useToolStore";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { useSaveStatus } from "@/lib/saveStatus";
 import { retrySync, useSyncStatus } from "@/lib/sync/status";
+import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
 
 export interface ShortcutHint {
@@ -179,6 +180,7 @@ export function StatusBar({
   const hints: ShortcutHint[] = [...dynamic.slice(0, fillTo), ...locked];
   return (
     <footer className="status-bar">
+      <PhotoSwitchAnnouncer />
       <div className="status-section">
         {/* The name is spelled out in aria-label because after five minutes
             the visible words are gone and a bare 🐴 would be announced as

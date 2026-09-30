@@ -596,7 +596,7 @@ export function useEngineCore(
       }
       sourcePosRef.current = null;
       syncState();
-      useGalleryStore.getState().bumpDocumentRevision();
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),
     [canvasRef, syncState, flushToCanvas, serialLoad],
@@ -648,7 +648,7 @@ export function useEngineCore(
       // Restored annotation lists differ from whatever was showing — same
       // re-sync the undo path performs.
       useAnnotationStore.getState().bumpAnnotations();
-      useGalleryStore.getState().bumpDocumentRevision();
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId ?? photoId);
       return true;
     }),
     [flushToCanvas, syncState, serialLoad],
@@ -845,7 +845,7 @@ export function useEngineCore(
 
       flushToCanvas();
       syncState();
-      useGalleryStore.getState().bumpDocumentRevision();
+      useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),
     [canvasRef, flushToCanvas, syncState, serialLoad],

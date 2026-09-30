@@ -677,6 +677,82 @@ html.reduce-motion .skeleton::after {
   display: none;
 }
 
+/* ── Per-photo panels during a photo switch (features/tools/PerPhotoRegion) ──
+   The switch CUE: the photo line re-highlights on every switch (~400 ms fade).
+   A fade is motion, so reduced motion holds a steady tint for the same beat
+   instead — the cue survives, only the motion goes. `!important` + a class is
+   what beats the global `html.reduce-motion *` duration kill (as .spinner-icon
+   does); without it the tint would last 0.001 ms. */
+@keyframes per-photo-name-fade {
+  0%   { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes per-photo-name-hold {
+  0%, 99% { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+  100%    { background-color: transparent; }
+}
+.per-photo-name {
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+.per-photo-name-flash {
+  animation: per-photo-name-fade 400ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .per-photo-name-flash {
+    animation: per-photo-name-hold 400ms steps(1, end);
+  }
+}
+html.reduce-motion .per-photo-name-flash {
+  animation: per-photo-name-hold 400ms steps(1, end) !important;
+  animation-duration: 400ms !important;
+}
+
+/* The slow-switch SKELETON, in place: a switch that takes over 300 ms turns
+   the panel's controls into muted blocks WITHOUT replacing them, so every box
+   keeps its exact size and nothing moves when the new photo's values arrive
+   (layout shift is the bug skeletons exist to prevent). The region is `inert`
+   while this shows; the photo line stays readable. */
+[data-switch-skeleton] {
+  position: relative;
+  isolation: isolate;
+}
+[data-switch-skeleton] > :not(.per-photo-name)
+  :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
+  color: transparent !important;
+  border-color: transparent !important;
+  background: var(--muted) !important;
+  box-shadow: none !important;
+  border-radius: 4px;
+}
+[data-switch-skeleton] > :not(.per-photo-name) :is(svg, img, canvas) {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-webkit-slider-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton] input[type="range"]::-moz-range-thumb {
+  opacity: 0;
+}
+[data-switch-skeleton]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+  animation: skeleton-shimmer 1.6s var(--ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-switch-skeleton]::after {
+    display: none;
+  }
+}
+html.reduce-motion [data-switch-skeleton]::after {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SPINNER (single source of truth — components/ui/spinner.tsx)
 

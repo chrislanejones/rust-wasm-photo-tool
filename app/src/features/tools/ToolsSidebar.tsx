@@ -44,6 +44,18 @@ import { RulersGridsPane } from "@/components/RulersGridsPane";
 import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { PerPhotoRegion } from "./PerPhotoRegion";
+
+/** Panels whose values belong to the open photo (skeleton plan §1): the rest —
+ *  brush, stamp, shapes, text, select, AI, batch — are per-tool settings and
+ *  must not change, lock or carry a photo name when the photo does. */
+const PER_PHOTO_TOOLS: ReadonlySet<string> = new Set([
+  "compress", // Resize & Compress — W/H, quality
+  "crop", // Crop & Transform — the crop box
+  "perspective",
+  "effects", // Adjustments, Levels, Presets
+  "arrow", // Layers, Canvas Size, Guides (not Rulers)
+]);
 
 interface ToolsSidebarProps {
   /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
@@ -341,6 +353,9 @@ export function ToolsSidebar({
         // anything.
         className="flex-1 overflow-y-auto px-panel pt-panel pb-1.5 space-y-5 scrollbar-thin"
       >
+        {/* Per-photo panels name their photo, cue every switch and lock while
+            one is in flight (PerPhotoRegion). Per-tool panels don't. */}
+        <PerPhotoRegion enabled={PER_PHOTO_TOOLS.has(activeTool) && !(activeTool === "arrow" && showRulersPanel)}>
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
@@ -527,6 +542,7 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
           />
         )}
+        </PerPhotoRegion>
       </motion.div>
 
       {/* The "Download & Share {FORMAT}" footer used to live here — a
