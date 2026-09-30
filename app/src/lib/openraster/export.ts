@@ -18,7 +18,7 @@ const THUMBNAIL_MAX_PX = 256;
  * untouched. Returns true if anything was actually flattened, so the caller
  * can surface a notice.
  */
-async function flattenAllLayersInPlace(tool: ImageHorseTool): Promise<boolean> {
+export async function flattenAllLayersInPlace(tool: ImageHorseTool): Promise<boolean> {
   // ATOMIC CAPTURE (ADR-024, a7). Was `active_layer_id()` + `layer_count()` +
   // `get_layers()` — three reads describing one layer stack, consumed together:
   // the list and count pick the layers to visit, the id says which layer to put

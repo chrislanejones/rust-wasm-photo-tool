@@ -90,7 +90,8 @@ import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { usePenActions } from "./session/usePenActions";
 import { useEffectBrush } from "./session/useEffectBrush";
-import { useDownloadFormat } from "./session/useDownloadFormat";
+import { isExportFormat, useDownloadFormat } from "./session/useDownloadFormat";
+import { usePluginDownload } from "./session/usePluginDownload";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
@@ -147,7 +148,7 @@ import {
 } from "@/components/ui/context-menu";
 import { ShareButton } from "@/components/ShareButton";
 import { DownloadDialog } from "@/components/DownloadDialog";
-import { downloadActiveSvg, downloadSvgZip } from "./session/svgDownload";
+import { downloadActiveSvgWithToast, downloadSvgZip } from "./session/svgDownload";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import {
   Undo,
@@ -883,6 +884,7 @@ export function AppShell() {
     isOraDownload,
     isSvgDownload,
   } = useDownloadFormat();
+  const plugin = usePluginDownload(downloadFormat, stamp);
   // SVG export (lib/svgPassthrough): live for the open image when it was
   // uploaded as SVG, and for the zip when any image was.
   const svgSources = useSvgSourceStore((s) => s.sources);
@@ -1137,15 +1139,7 @@ export function AppShell() {
   const downloadFromDialog = () => {
     setExportDialogOpen(false);
     if (svgSelectedDownload && activePhotoId) {
-      void downloadActiveSvg(activePhotoId, stamp.toolRef.current, exportName.stem()).then(
-        (ok) => {
-          if (!ok) {
-            toast.error(
-              "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
-            );
-          }
-        },
-      );
+      void downloadActiveSvgWithToast(activePhotoId, stamp.toolRef.current, exportName.stem());
       return;
     }
     if (isOraDownload) {
@@ -1155,6 +1149,10 @@ export function AppShell() {
         syncState: stamp.syncState,
         imageName: activeEntry?.name,
       });
+      return;
+    }
+    if (plugin.ext) {
+      plugin.download(exportName.stem());
       return;
     }
     void handleExportAs(exportName.stem());
@@ -2817,11 +2815,12 @@ export function AppShell() {
         onOpenChange={setExportDialogOpen}
         photoCount={photos.length}
         formats={downloadFormats}
+        pluginFormats={plugin.formats}
         format={downloadFormat}
         onFormatChange={(v) => {
           setDownloadFormat(v);
-          // ORA and SVG stay local-only
-          if (v !== "ora" && v !== "svg") setExportFormat(v);
+          // ORA, SVG and plugin formats stay local-only
+          if (isExportFormat(v)) setExportFormat(v);
         }}
         fileName={exportName}
         ext={
@@ -2829,14 +2828,14 @@ export function AppShell() {
             ? ".svg"
             : isOraDownload
               ? ".ora"
-              : EXT[effectiveExportFormat]
+              : (plugin.ext ?? EXT[effectiveExportFormat])
         }
         downloadLabel={
           svgSelectedDownload
             ? "Download SVG"
             : isOraDownload
               ? "Download ORA"
-              : `Download ${effectiveExportFormat.toUpperCase()}`
+              : (plugin.label ?? `Download ${effectiveExportFormat.toUpperCase()}`)
         }
         svg={{ selected: activeIsSvg, all: svgAll }}
         onDownload={downloadFromDialog}

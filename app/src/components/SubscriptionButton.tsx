@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Share2,
   Beaker,
+  Puzzle,
   Check,
   ExternalLink,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import { SharedPane } from "@/components/SharedPane";
 import { BetaPane } from "@/components/BetaPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
+import { PluginsPane } from "@/components/PluginsPane";
 import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
@@ -74,6 +76,7 @@ export type SettingsTab =
   | "sync"
   | "shared"
   | "export"
+  | "plugins"
   | "beta"
   | "storage"
   | "billing"
@@ -161,6 +164,7 @@ export function SubscriptionButton({
     sync: RefreshCw,
     shared: Share2,
     export: Package,
+    plugins: Puzzle,
     beta: Beaker,
     storage: Cloud,
     billing: CreditCard,
@@ -176,6 +180,7 @@ export function SubscriptionButton({
     "sync",
     "shared",
     "export",
+    "plugins",
     "storage",
     "billing",
     "aiusage",
@@ -353,6 +358,9 @@ export function SubscriptionButton({
               <SharedPane />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />
+            ) : tab === "plugins" ? (
+              /* Switches commit as pressed (see PluginsPane), so no Apply. */
+              <PluginsPane />
             ) : tab === "storage" ? (
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (
