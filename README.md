@@ -85,6 +85,40 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v9.5 — 2026-09-30
+
+**Switching photos fast no longer loses or mixes up your edits, SVGs come back out as SVGs, and AVIF is a real AVIF.**
+
+Edit a photo, then page through the gallery fast. Before, the gallery could light
+one photo while the canvas showed another, and the saved copy of the first photo
+could end up with the second one's pixels. An edit you let go of an instant before
+a switch is kept now. A crop box or selection from the last photo no longer
+follows you to the next one.
+
+The panels that belong to one photo (Resize, Crop & Transform, Perspective,
+Adjustments, Layers, Canvas Size) now say which photo they are for, like
+"1 of 2 · checker". The line lights up on every switch. While the next photo
+loads the controls lock, and on a slow switch they turn into skeletons.
+
+Upload an SVG, crop it, and download it as an SVG, alone or zipped with the
+others. Only the frame changes, so the drawing stays a vector. The SVG is kept
+for the session; reload and the SVG tile turns off until you upload it again.
+
+AVIF export writes a real AVIF. Asking for one used to hand you a PNG. The
+encoder is about 3.5 MB and loads the first time you export an AVIF, not before.
+
+Batch › Crop: let go of the frame and the other photos shade what they will lose.
+Hold Shift while you drag to break the ratio. Enter crops all of them.
+
+Combine (New, Add, Subtract, Intersect) moved from Select to Review. Click a text
+box or a shape in the list and its outline becomes the selection.
+
+Download, Copy or Share is called Export now. The formats sit under "Image
+format", ORA and PSD under "Layered file", and Download, Share link and Clipboard
+have icons. The PSD tile says "Activate with plugin".
+
+Dropping several photos on the New dialog imported each one twice. Once now.
+
 ### v9.4 — 2026-09-29
 
 **Batch › Crop: every photo the same shape for a carousel, and you pick what each one keeps.**
