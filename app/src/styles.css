@@ -52,7 +52,6 @@
   --z-over-modal: 70; /* a confirm opened from inside a modal (Settings › Shared › Delete) */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
-  --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
 
   /* ── Dialog scrim — the single source for every modal backdrop. ──
