@@ -3,19 +3,38 @@ Date: 2026-10-01   Status: accepted (10-01-2026)
 
 ## Context
 
-Nothing in this repo had ever rendered a React component in a test. **139 test
-files, every one in the `node` environment** — Dexie, the engine, pure logic —
-so Night 2's ARIA work and Plan A's thumbnail rule had no watcher of any kind.
+⚠️ **An earlier draft of this ADR opened by saying nothing in the repo had ever
+rendered a React component in a test. That was false, and the correction is the
+reason this decision is scoped the way it is.**
 
-Two things blocked it, and the second is the one worth knowing:
+`app/src/components/ui/segmented-modes.test.ts` has been rendering **both**
+group primitives under jsdom since Night 1, with `createRoot` + `act` from
+`react-dom/client` and a `// @vitest-environment jsdom` docblock, and asserting
+rendered DOM attributes — its own header says *"asserted on RENDERED
+attributes, never on source text"*. It already pins the entire four-mode
+contract (SELECT / TOGGLE / ACTION / naming) plus roving tabindex, arrow keys,
+wrapping, Home/End and disabled-skipping: **19 tests.**
 
-1. `@testing-library/react` was not installed. `vitest` 5 and `jsdom` 29
-   already were; the renderer was the only missing piece.
-2. `app/vitest.config.ts` globbed `include: ["src/**/*.{test,spec}.ts"]` —
+So component rendering was never blocked, and `@testing-library/react` is
+**not an enabler**. Two things are true instead:
+
+1. `app/vitest.config.ts` globbed `include: ["src/**/*.{test,spec}.ts"]` —
    **`.ts` only**, so a `*.test.tsx` was never COLLECTED. It produced no
    failure and no pass; it simply did not run. Verified by reverting the glob:
    **140 files / 1,547 tests** with the new file sitting on disk, a green run
-   that could not see it.
+   that could not see it. That is a genuine defect regardless of which renderer
+   is used, and fixing it is most of this ADR's value.
+2. Plan B §1 asked for Testing Library **by name**, and it earns its place on
+   one axis: every assertion worth making here is about an ACCESSIBLE NAME and
+   role, which `getByRole(role, { name, pressed })` asks directly while a
+   manual attribute query only approximates it. That is an **ergonomics**
+   decision, taken knowingly, not a capability we lacked.
+
+The cost of getting this wrong was paid once already: 19 duplicate tests were
+written against the existing file's coverage and **deleted rather than
+shipped**. The surviving new coverage is the part `segmented-modes.test.ts`
+does not reach — `ControlRow`'s slots and id contract, Plan A's thumbnail, and
+a short file of naming-precedence and keyboard-reach gaps.
 
 ## Decision
 
@@ -68,6 +87,17 @@ Each of the four new files was broken once on purpose, per ADR-071 rule 4:
    `no-sw-default.spec.ts` and `test:e2e:sw`; the other **70** e2e tests are a
    local-only gate (`6b0e587a`) — so the slower, less-watched tool would have
    owned the fastest assertions.
+3. **Add no dependency and keep writing `createRoot` + `act` by hand, the way
+   `segmented-modes.test.ts` already does.** This was the serious alternative
+   and it very nearly won, because it is the house pattern and it demonstrably
+   works — 19 tests of it are in the repo today. It lost on one point only:
+   every assertion in this area is about an accessible name and role, and
+   `getByRole("button", { name: "Export", pressed: true })` states that in one
+   line where the hand-rolled form queries `[aria-pressed]` and then matches
+   `textContent`, which is a different and weaker claim (text content is not
+   the accessible name). Plan B also asked for Testing Library by name.
+   **If this dependency ever becomes a liability, this is the way back** — the
+   pattern is already proven in-repo and needs no new work to adopt.
 
 ## Pre-mortem
 

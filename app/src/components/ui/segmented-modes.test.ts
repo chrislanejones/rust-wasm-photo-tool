@@ -130,9 +130,10 @@ describe("TOGGLE mode", () => {
     expect(q('[role="radiogroup"]')).toHaveLength(0);
   });
 
-  it("toggle-button-group by default emits aria-pressed on every button, and no radios", () => {
+  it('toggle-button-group with mode="toggle" emits aria-pressed on every button, and no radios', () => {
     render(
       h(ToggleButtonGroup, {
+        mode: "toggle",
         items: [
           { key: "t", icon: Circle, label: "Tools", active: true, onToggle: () => {} },
           { key: "g", icon: Square, label: "Gallery", active: true, onToggle: () => {} },

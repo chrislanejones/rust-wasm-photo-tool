@@ -267,6 +267,7 @@ export function TopBar({
             <div className={compact ? "contents" : "flex items-center gap-3"}>
               {!compact && <div className="w-px h-6 bg-border shrink-0" />}
               <ToggleButtonGroup
+                mode="toggle"
                 items={toggleButtons}
                 compact={compact}
                 bare={compact}
