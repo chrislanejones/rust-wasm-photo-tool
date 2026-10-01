@@ -100,12 +100,19 @@ function MobileThumb({
           be arriving, which reads as a failed load. */}
       {thumb.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
 
-      {/* ⚠️ Every branch is in flow at the same size. This grid is
-          `content-start items-start`, so a tile's row height comes from its
-          in-flow child; an absolutely-positioned placeholder collapses the row
-          and every tile below it jumps when the photo lands. The old
-          `absolute inset-0` placeholder got away with it only because the
-          `<img>` underneath kept its `aspect-ratio: 1` box even with no src. */}
+      {/* Every branch is in flow at the same size, matching `Thumb` — this
+          grid is `content-start items-start`, so a tile's row height comes
+          from its in-flow child.
+
+          ⚠️ THE OLD MARKUP DID NOT ACTUALLY SHIFT LAYOUT, and the reason is
+          worth keeping: it asked for `absolute inset-0` on the placeholder and
+          never got it. `.skeleton` sets `position: relative` in plain,
+          unlayered CSS (styles.css), which a Tailwind utility does not
+          reliably beat — the same trap as `.btn-icon-ghost`. Measured with the
+          delay harness: computed `position: relative`, tile 117x117 while
+          waiting and 117x117 settled, on master as well as here. So this is
+          not a layout fix; `absolute` on a `Skeleton` is simply a thing that
+          does not work, and there is now no caller that tries. */}
       {thumb.src ? (
         <img src={thumb.src} alt={entry.name} draggable={false} decoding="async" />
       ) : thumb.failed ? (

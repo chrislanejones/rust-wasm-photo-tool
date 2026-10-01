@@ -194,3 +194,49 @@ test("a placeholder occupies exactly the box its photo will take — zero shift"
     waiting.tiles.map((t) => [t.w, t.h, t.top, t.left]),
   );
 });
+
+test("an ordinary open flashes no placeholder at all — watched every frame", async ({ page }) => {
+  // The defect this change actually removes, and the one worth a permanent
+  // test: master's `MobileThumb` started at `useState(true)`, so every tile
+  // drew a placeholder on every open and then threw it away milliseconds
+  // later. Measured at 390px with nine photos, unthrottled, watching from
+  // inside the page every frame:
+  //
+  //   master  peak 9 of 9 placeholders across 226 frames
+  //   now     peak 0          across 223 frames
+  //
+  // ⚠️ Polled from a rAF loop INSIDE the page, not by round-tripping. A flash
+  // that lasts two frames is invisible to a polling test driver, and "I did
+  // not see one" would then be the same answer whether or not there was one.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await blockExternalNetwork(page);
+  await page.goto("/");
+
+  await page.evaluate(() => {
+    const w = window as unknown as { __peak: number; __frames: number };
+    w.__peak = 0;
+    w.__frames = 0;
+    const tick = () => {
+      w.__peak = Math.max(w.__peak, document.querySelectorAll(".skeleton").length);
+      w.__frames++;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  const input = page.locator('input[type="file"]').first();
+  await input.waitFor({ state: "attached" });
+  await input.setInputFiles(ALL);
+  await expect(page.locator("button.photo-thumb-grid")).toHaveCount(9, { timeout: 60_000 });
+  await page.waitForTimeout(2500);
+
+  const r = await page.evaluate(() => {
+    const w = window as unknown as { __peak: number; __frames: number };
+    return { peak: w.__peak, frames: w.__frames };
+  });
+  console.log("flash watch: " + JSON.stringify(r));
+
+  // The control: a watcher that never ran would also report a peak of 0.
+  expect(r.frames, "the frame watcher actually ran").toBeGreaterThan(60);
+  expect(r.peak, "no placeholder is drawn on an ordinary open").toBe(0);
+});
