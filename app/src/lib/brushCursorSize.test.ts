@@ -42,7 +42,16 @@ describe("brushCursorSize", () => {
 
   it("Paint's sub-modes each bring their own size", () => {
     expect(size("brush", { brushMode: "blur" })).toBe(40);
-    expect(size("brush", { brushMode: "erase" })).toBe(30);
+  });
+
+  it('a stale "erase" rings at the PAINT size, not the eraser size', () => {
+    // Paint's `erase` mode was deleted 10-01-2026. The store's validator turns
+    // a persisted "erase" into "paint" before it ever reaches here, so this is
+    // belt and braces for the one frame where a stale value could still be in
+    // flight: it must fall through to the plain brush rather than read a size
+    // no mode owns any more. 30 — eraserSize / 2 — is what the deleted branch
+    // returned, so that number is the regression.
+    expect(size("brush", { brushMode: "erase" })).toBe(20);
   });
 
   it("the mask brush owns the ring while Layer Settings is editing a mask", () => {

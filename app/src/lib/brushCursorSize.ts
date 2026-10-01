@@ -3,7 +3,7 @@ import type { StampSettings, ToolSettings, ToolType } from "@/lib/types";
 /** Which brush the cursor ring is currently sized to. */
 export interface BrushCursorInput {
   activeTool: ToolType;
-  /** Paint's sub-mode: "blur", "erase", "pen" or the plain brush. */
+  /** Paint's sub-mode: "blur", "pen" or the plain brush. */
   brushMode: string;
   /** Stamp's sub-mode; "emojis" sizes the ring to the emoji, not the brush. */
   stampSubMode: string;
@@ -41,7 +41,6 @@ export function brushCursorSize({
   switch (activeTool) {
     case "brush":
       if (brushMode === "blur") return toolSettings.blurSize / 2;
-      if (brushMode === "erase") return toolSettings.eraserSize / 2;
       return toolSettings.brushSize / 2;
     case "arrow":
       // The Layers panel's mask brush — its own size, not the Paint brush's.

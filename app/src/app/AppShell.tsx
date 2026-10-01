@@ -2440,8 +2440,6 @@ export function AppShell() {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
           setToolSettings((p) => ({ ...p, blurSize: clamp(p.blurSize + step, 4, 128) }));
-        } else if (brushMode === "erase") {
-          setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
         }
         // pen mode draws vector paths — no brush size
       } else if (activeTool === "ai") {
