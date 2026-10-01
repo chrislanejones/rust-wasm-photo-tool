@@ -86,155 +86,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.6 — 2026-09-30
+### v9.7 — 2026-10-01
 
-**A triangle, a star with as many points as you want, a handle to turn any shape, and a door for plugins.**
+**The photo's name sits under its controls, History can be closed, and the Stroke Stabilizer is out where you can see it.**
 
-Shapes gained a triangle and a star whose point count you pick, from 3 to 12.
-Every shape now has a hook under its box: drag it to turn the shape, and hold
-Shift to snap to 15°. A line turns by its endpoints instead. A turned shape
-stays crisp and keeps its fill, because the angle is stored beside the upright
-box rather than baked into pixels.
+Every per-photo panel used to shout its photo across the top — "1 of 12 · ZRG0M",
+in bold. It moved underneath the controls as a quiet footer, the same one Layers
+has had all along.
 
-A pasted region turns too, before it lands — move it, resize it, turn it, then
-commit.
+History was the only section in Review you could not close. It has the same ✕ as
+Reselect, Layers, Histogram and Combine now. The Stroke Stabilizer was hidden
+inside Advanced, which is no place for something you want to reach while you
+paint, so it is out in the open; Advanced holds Placement instead, at the foot of
+Shapes and Text.
 
-**Settings → Plugins** is new. A plugin is one file from outside Image Horse
-that you add yourself, from a file or a link, and it stays in that browser on
-that device. Nothing is fetched on its own, and everything is off until you
-switch it on. The first plugin adds Photoshop PSD, in and out, and lives in its
-own repository.
+Seven buttons in the gallery bar were a size that existed nowhere else in the
+app. They are the standard size now. The narrow three-up tile grid keeps its
+tighter padding, because a narrow column is a real constraint.
 
-The Batch and Edit panels use one button, one field and one tile grid
-throughout, instead of each panel's own. The Dev Tests tab is gone.
+The website had fallen behind the app, and caught up: Batch Crop, plugins and
+SVG-to-SVG sat on the features page as raw documentation lines filed under the
+internals, the architecture page still said saved work was at format v8, and the
+annotate page listed arrows, boxes, circles and lines — no diamonds, no
+triangles, no stars, and no word that any shape turns.
 
-⚠️ **Saved work now uses op-log v9.** A build older than this one cannot read a
-document saved by it.
+Engine unchanged at 828,248 bytes.
 
-### v9.5 — 2026-09-30
-
-**Switching photos fast no longer loses or mixes up your edits, SVGs come back out as SVGs, and AVIF is a real AVIF.**
-
-Edit a photo, then page through the gallery fast. Before, the gallery could light
-one photo while the canvas showed another, and the saved copy of the first photo
-could end up with the second one's pixels. An edit you let go of an instant before
-a switch is kept now. A crop box or selection from the last photo no longer
-follows you to the next one.
-
-The panels that belong to one photo (Resize, Crop & Transform, Perspective,
-Adjustments, Layers, Canvas Size) now say which photo they are for, like
-"1 of 2 · checker". The line lights up on every switch. While the next photo
-loads the controls lock, and on a slow switch they turn into skeletons.
-
-Upload an SVG, crop it, and download it as an SVG, alone or zipped with the
-others. Only the frame changes, so the drawing stays a vector. The SVG is kept
-for the session; reload and the SVG tile turns off until you upload it again.
-
-AVIF export writes a real AVIF. Asking for one used to hand you a PNG. The
-encoder is about 3.5 MB and loads the first time you export an AVIF, not before.
-
-Batch › Crop: let go of the frame and the other photos shade what they will lose.
-Hold Shift while you drag to break the ratio. Enter crops all of them.
-
-Combine (New, Add, Subtract, Intersect) moved from Select to Review. Click a text
-box or a shape in the list and its outline becomes the selection.
-
-Download, Copy or Share is called Export now. The formats sit under "Image
-format", ORA and PSD under "Layered file", and Download, Share link and Clipboard
-have icons. The PSD tile says "Activate with plugin".
-
-Dropping several photos on the New dialog imported each one twice. Once now.
-
-### v9.4 — 2026-09-29
-
-**Batch › Crop: every photo the same shape for a carousel, and you pick what each one keeps.**
-
-Batch › Crop cuts every loaded photo to one ratio at once, and to one width if
-you want it. Pick 4:5 at 1080 and every slide comes out 1080×1350.
-
-The preview shows the crop. Drag the frame to move it, drag a corner to make it
-smaller, or use the arrow keys. Each photo keeps its own frame, so you can click
-through the gallery and frame every slide before you crop. Photos you don't
-touch use the nine-cell grid. Cropping again starts from the original photo, and
-the open photo's crop is one undo.
-
-Download, Copy or Share starts with a choice now: this image, or all of them.
-Download All used to write an unedited photo in whatever format you uploaded
-it in. Every photo comes out in the format you pick now.
-
-The old Netlify address redirects to edit.imagehorse.app, and Netlify builds
-nothing.
-
-### v9.3 — 2026-09-28
-
-**A resize no longer makes a photo heavier, and a “Photo only” ZIP has no white line.**
-
-A “Photo only” ZIP came out with every photo framed in a thin white line.
-Saving a photo after a resize or a compression was writing the Canvas border
-into the stored file, and the ZIP copies that file as it is. The stored file is
-just the photo now, and the border is added only when you ask for it.
-
-Apply Resize made photos heavier. It re-encoded at full quality, so a 33 KB
-JPEG cut to half its width came back at 154 KB and its PageSpeed score fell
-from 99 to 88. It keeps the quality the file was last saved at now, and a resize
-that removes pixels never hands back a bigger file — the same photo comes back
-at 32 KB. The score and the gallery's size badges read the real file, too.
-
-Everything that can reach a server is one list: Settings › Security, the
-online switch, the home page's table and the privacy policy all read it. Sync
-reports in the status line, failures included, with a Retry. On a phone, 27
-invisible desktop controls are out of the tab order.
-
-A third blog post, “We spent a month taking the file apart. It got 556 lines
-longer.” The blog reads on a 320px phone now, and the menu bar's name no
-longer gets cut to “Image Ho”.
-
-Engine 819,031 → 820,591 bytes.
-
-### v9.2 — 2026-09-28
-
-**The Select panel's Refine section is readable, and Pro signups are closed.**
-
-Refine was one button and five sliders stacked two across — ten rows of label,
-number and track in a narrow column, all live at once, with nothing to say
-which one to touch. It is six tiles now and a single slider that edits whichever
-tile is open. Same five operations, same ranges. Remove Object moves into the
-Selection grid as its sixth tile, filling a cell that had been empty since
-September 11th and taking a whole section with it.
-
-Pro signups are off. Nobody can start a subscription: the button is gone and
-the server refuses the call behind it. Anyone who already has one can still
-open the billing portal and cancel — that path is deliberately untouched.
-
-Every push used to build both halves of the site, so a marketing typo ran the
-editor's three-minute Rust build and an editor change rebuilt the marketing
-site. Each now skips what it cannot affect: a third fewer builds, measured
-across September.
-
-Under that, AppShell lost another 152 lines to three extractions, and the
-marketing site's tokens, class names and components are now a design system
-Claude Design can build with.
-
-Engine unchanged at 819,031 bytes.
-
-### v9.1 — 2026-09-26
-
-**The app tells you when a stroke will change a mask.**
-
-Until now one tile label was the only thing that said a brush stroke would
-change the mask instead of the pixels. Three things say it now, all reading the
-same value: the tile, a line in the status bar, and the brush ring itself,
-which turns the colour it is about to paint. Black hides, white reveals.
-
-Every tool panel is laid out the same way — one header, one kind of row, and
-the settings most strokes never need folded into an Advanced section at the
-foot.
-
-Under that, a large clean-up: eleven engine exports nothing called are gone,
-and the drawing, cursor and preview code moved out of two very large files into
-modules of their own. Nothing on screen changed.
-
-Engine 819,031 bytes (was 824,286 — 5,255 smaller).
 
 ## License
 

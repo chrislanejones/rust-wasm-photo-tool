@@ -180,6 +180,12 @@ interface Props {
  * with a few highlighted icons. Pure fun; the confetti regenerates each open
  * because the dialog body only mounts while open.
  */
+// On the 1st of a month the generated stats are genuinely 1 release and 1 fix,
+// so "across 1 releases, 1 fixes" is copy a month boundary really produces.
+function plural(n: number, one: string, many = `${one}s`) {
+  return n === 1 ? one : many;
+}
+
 export function CelebrationDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,8 +216,11 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              across {CELEBRATION_STATS.releases} releases &middot;{" "}
-              {CELEBRATION_STATS.features} features, {CELEBRATION_STATS.fixes} fixes
+              across {CELEBRATION_STATS.releases}{" "}
+              {plural(CELEBRATION_STATS.releases, "release")} &middot;{" "}
+              {CELEBRATION_STATS.features}{" "}
+              {plural(CELEBRATION_STATS.features, "feature")}, {CELEBRATION_STATS.fixes}{" "}
+              {plural(CELEBRATION_STATS.fixes, "fix", "fixes")}
             </span>
           </motion.div>
 

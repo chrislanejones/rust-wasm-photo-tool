@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.7",
+    date: "2026-10-01",
+    headline: "The photo\u2019s name sits under its controls, History can be closed, and the Stroke Stabilizer is out where you can see it.",
+    entries: [
+      {
+        tag: "ui",
+        text: "Every per-photo panel used to shout its photo across the top \u2014 \u201c1 of 12 \u00b7 ZRG0M\u201d, in bold. It moved underneath the controls as a quiet footer, the same one Layers has had all along.",
+      },
+      {
+        tag: "ui",
+        text: "History was the only section in Review you could not close. It has the same \u2715 as Reselect, Layers, Histogram and Combine now.",
+      },
+      {
+        tag: "ui",
+        text: "The Stroke Stabilizer was hidden inside Advanced, which is no place for something you want to reach while you paint. It is out in the open. Advanced holds Placement instead, at the foot of Shapes and Text.",
+      },
+      {
+        tag: "ui",
+        text: "Seven buttons in the gallery bar were a size that existed nowhere else in the app. They are the standard size now. The narrow three-up tile grid keeps its tighter padding, because a narrow column is a real constraint.",
+      },
+      {
+        tag: "fix",
+        text: "The website had fallen behind the app. Batch Crop, plugins and SVG-to-SVG sat on the features page as raw documentation lines filed under the internals, the architecture page still said saved work was at format v8, and the annotate page listed arrows, boxes, circles and lines \u2014 no diamonds, no triangles, no stars, and no word that any shape turns.",
+      },
+    ],
+  },
+  {
     version: "v9.6",
     date: "2026-09-30",
     headline: "A triangle, a star with as many points as you want, a handle to turn any shape, and a door for plugins.",

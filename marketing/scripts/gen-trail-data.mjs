@@ -218,6 +218,12 @@ const monthEntries = monthRels.reduce((n, r) => n + r.tags.length, 0);
 const monthTags = {};
 for (const r of monthRels) for (const t of r.tags) monthTags[t] = (monthTags[t] ?? 0) + 1;
 
+// On the 1st of a month a plain Math.round sends this to a flat "0%", which
+// reads as "nothing shipped" rather than "the month just started". Under one
+// percent keeps one decimal; at or above one percent a whole number is fine.
+const rawPct = (monthEntries / allTime) * 100;
+const pctOfAllTime = rawPct < 1 ? Math.round(rawPct * 10) / 10 : Math.round(rawPct);
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -262,7 +268,7 @@ export const CELEBRATION_STATS: CelebrationStats = {
   monthShipped: ${monthEntries},
   releases: ${monthRels.length},
   allTime: ${allTime},
-  monthPct: ${Math.round((monthEntries / allTime) * 100)},
+  monthPct: ${pctOfAllTime},
   features: ${monthTags.feature ?? 0},
   fixes: ${monthTags.fix ?? 0},
   latestVersion: ${q(latest.version)},
