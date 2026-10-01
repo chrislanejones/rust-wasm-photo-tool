@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, instantTransition } from "@/lib/animations";
 import { Thumb } from "./Thumb";
+import { usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Button } from "@/components/ui/button";
@@ -365,6 +366,11 @@ export function GalleryBar({
     };
   }, [updateScrollState, photos.length, showTools, showHistory]);
 
+  // True from the click until the requested photo's pixels are in the engine.
+  // The gallery is the one surface that can show the gap, because it lights the
+  // photo you asked for while the canvas still holds the previous one.
+  const switching = usePhotoSwitching();
+
   // ONE busy flag for the gallery. Thirty tiles each announcing "Loading" is a
   // screen reader reading out a list of boxes, which is why the tile
   // placeholders are `decorative` and this is the only thing that speaks.
@@ -574,6 +580,7 @@ export function GalleryBar({
                   key={entry.id}
                   entry={entry}
                   onPendingChange={reportPending}
+                  loading={switching && entry.id === activeId}
                   index={i}
                   isActive={entry.id === activeId}
                   onSelect={() => onSelect(entry)}

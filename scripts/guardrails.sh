@@ -169,8 +169,19 @@ check "as-any" 0 "import real types (R7)" "$n_any"
 # paragraph names the filter it greps for, and a gate that goes red on prose
 # explaining it is the failure documented in CLAUDE.md.
 #
+# ⚠️ SCOPE, stated exactly: this bans the CSS FUNCTION form, `grayscale(`, which
+# is what the develop used (`filter: "grayscale(1)"` in an animation token). It
+# does NOT ban Tailwind's bare `grayscale` utility, which is legitimately in use
+# at lib/styles.ts for the DISABLED tile style (`opacity-40 grayscale`) — one
+# element in a running app carries it, measured in the browser.
+#
+# So the gap is real and named: a develop rebuilt with the utility class rather
+# than the function would slip past. Banning the utility outright would turn the
+# disabled style red, which is the wrong trade; if a gray thumbnail ever comes
+# back, the test to add is the one in useThumbImage.test.ts, not a wider grep.
+#
 # Baseline 0. Verified by planting `filter: "grayscale(1)"` in a tile and
-# watching the count go to 1.
+# watching the count go to 1, then removing it and watching it return to 0.
 n_gray=$(rg -n 'grayscale\(' app/src -g '*.ts' -g '*.tsx' -g '*.css' \
   | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
 check "no-gray-photos" 0 "a thumbnail is a placeholder or the photo — never a gray photo" "$n_gray"

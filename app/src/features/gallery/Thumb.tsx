@@ -4,6 +4,7 @@ import { Check, Zap, Trash2, ImageOff } from "lucide-react";
 import { springPop, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusMark } from "@/components/ui/status-mark";
 import { formatBytes } from "@/lib/format";
 import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { useThumbImage } from "./useThumbImage";
@@ -29,9 +30,15 @@ export interface ThumbProps {
   vertical?: boolean;
   /** Report whether this tile still has no pixels, for the gallery's one `aria-busy`. */
   onPendingChange: (id: string, pending: boolean) => void;
+  /**
+   * This is the photo you asked for, and its pixels are not in the engine yet.
+   * Distinct from `isActive`, which goes true the instant you click: the ring
+   * says "this is the one", the mark says "it is still coming".
+   */
+  loading?: boolean;
 }
 
-export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical, onPendingChange }: ThumbProps) {
+export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical, onPendingChange, loading = false }: ThumbProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   // A thumbnail is either a placeholder or the photo — never a gray photo.
   // The object URL, the decode and the grace period all live in the hook.
@@ -155,6 +162,20 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         </Skeleton>
       )}
       <BatchCropThumbShade entry={entry} isActive={isActive} cover={Boolean(vertical)} />
+
+      {/* Selected vs still-loading. The ring alone cannot tell them apart, and
+          on a slow switch the gallery otherwise lights a photo the canvas is
+          not showing yet — which is the thing that reads as a bug.
+
+          top-right is the one free corner: top-left carries the size badge and
+          both bottom corners are Remove and Select. The pill is there so the ↻
+          survives a light photo underneath it. `StatusMark` spins only under
+          motion-safe, so Reduce Motion gets a still mark rather than nothing. */}
+      {loading && (
+        <span className="absolute top-1 right-1 z-20 flex items-center rounded-md bg-black/70 p-0.5 pointer-events-none">
+          <StatusMark kind="working" label={`Loading ${entry.name}`} className="text-white" />
+        </span>
+      )}
 
       <AnimatePresence>
         {isCompressing && (
