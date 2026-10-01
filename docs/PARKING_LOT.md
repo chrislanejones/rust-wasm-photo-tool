@@ -3852,7 +3852,7 @@ file is touched. Not worth an engine-gate run on its own.
 
 ---
 
-### Two e2e specs went red when #283 moved the Stabilizer (10-01-2026)
+### Three e2e reds in the full suite (10-01-2026) — two from #283, one order-dependent
 
 Found running the full Playwright suite on `feat/gallery-skeletons-switch`:
 **68 passed, 2 failed, and both failures reproduce on master `2d7d17d4`** — they
@@ -3897,3 +3897,73 @@ opening whatever now holds Expand. The xpath-by-nearby-text helper should go.
 
 **Do it when** there is a session for #283 follow-ups. Left out of the Plan A
 PR on purpose — different target, and mixing them would hide both.
+
+**3. `batch-crop-frame.spec.ts:87` — "thumbnails shade on release, Shift-drag
+breaks the ratio, Enter crops all."** Found on the second full-suite run of
+`feat/gallery-skeletons-switch`. **It passes when run alone** (both tests in
+that file green, 6.3 s), so it is order-dependent rather than a regression —
+and it was green in the first full-suite run of the same commit range, so it is
+intermittent in the suite as well.
+
+Not diagnosed. The suite is `fullyParallel: false, workers: 1`, so the usual
+suspects are a leaked `localStorage`/IndexedDB preference from an earlier spec
+or a timing dependency on the preview server being warm. Worth characterising
+before anyone trusts a "the suite is green" claim: with three reds of three
+different kinds, the suite's signal is weak in exactly the way
+[[feedback_red_test_row_is_a_harness_claim]] describes.
+
+---
+
+### The phone downloads the whole editor, and the engine arrives five times (10-01-2026)
+
+Plan C §2 step 1 says "measure first". Measured on a production build at 390
+and 1280, requests counted from inside Playwright, external hosts blocked:
+
+| | Phone 390 | Desktop 1280 |
+|---|---|---|
+| Responses | 13 | 13 |
+| Unique files | 9 | 9 |
+| **Unique bytes** | **4,356 KB** | **4,356 KB** |
+| **Total response bytes** | **7,592 KB** | **7,592 KB** |
+| `stamp_tool_bg.wasm` responses | **5** × 809 KB | **5** × 809 KB |
+| …of those, 304s | **0** | 0 |
+| Time to a usable file input | 949 ms | 2,130 ms |
+| `canvas.main-canvas` mounted | **yes** | yes |
+| Editor inert under the phone layer | yes | n/a |
+
+**Two findings, and they are separate.**
+
+**1. §2's premise is confirmed.** A phone downloads byte-for-byte what a
+desktop does, the 809 KB engine included, and `canvas.main-canvas` is mounted
+underneath `MobileShell` — exactly what `MobileShell`'s own comment says does
+not happen ("No editing here at all"). That is §2's job and is not parked.
+
+**2. One 809 KB file is fetched FIVE times per load, none of them a 304.**
+Roughly **4 MB of waste on every cold load, at every width** — bigger than
+anything §2 can save by splitting the phone off, and it was not in any plan.
+Cause NOT diagnosed; the candidates are the main thread plus
+`engine.worker.ts` plus `codec.worker.ts`, and ADR-024's build-both-then-
+terminate-the-loser path, each instantiating independently.
+
+⚠️ **The 5× was measured on `vite preview`, NOT against production.** What
+makes it likely to reproduce there is that production's cache policy is no
+better:
+
+```
+$ curl -sI https://edit.imagehorse.app/assets/index-Dg5w1Eui.js
+cache-control: public, max-age=0, must-revalidate
+x-vercel-cache: HIT
+content-length: 3365230
+```
+
+**`max-age=0, must-revalidate` on a content-hashed asset**, so the browser
+cannot satisfy a second request for the same file without going back to the
+network. `vercel.json` sets security headers for `/(.*)` and **no
+`Cache-Control` for `/assets/*` at all**, so this is Vercel's default rather
+than a decision. Hashed filenames are what `immutable` exists for.
+
+**Do it as its own session,** and measure against production first — a Lighthouse
+or WebPageTest run on `edit.imagehorse.app` settles whether the 5× is real
+there before anyone changes worker code. The header fix and the 5× fetch are
+independently shippable; the header is a one-line `vercel.json` change and
+needs no app code.
