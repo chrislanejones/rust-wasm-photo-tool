@@ -11,7 +11,7 @@ tonal adjustments are v10**. What changed and why:
 |---|---|---|
 | v9 | shapes (19, 20) **and** six tonal ops (21 to 26) | shapes (19, 20) only |
 | Tonal ops | in v9 | **v10**, reserved here, not built |
-| #187 | waits for the tonal work, or the tonal work lands on its branch | built and renumbered to v9 (merge `df3ef360`), no wait |
+| #187 | waits for the tonal work, or the tonal work lands on its branch | built and renumbered to v9 (#187, squash-merged as `0ef95437`), no wait |
 
 The reason is the first draft's own pre-mortem. It named "bundling held #187
 hostage to the tonal work, it went stale a third time" as the most likely way
@@ -62,7 +62,7 @@ element (rotations) was master's 9th (fonts).
    come from plan #37: the tonal setters in `lib.rs` call `snap()` and record
    nothing, so the first nudge breaks the log. **No other branch may claim v10**;
    a branch that needs a number takes v11.
-5. **#187 is on v9 (done, merge `df3ef360`).** Its two variants are at 19 and
+5. **#187 is on v9 (done: #187, squash-merged as `0ef95437`).** Its two variants are at 19 and
    20, its tuple elements at 10 and 11, the constant is 9, and decode tests
    cover a v7 and a v8 blob under v9. `tests/oplog_v7_v8_fixture_resume.rs`
    passes **unedited**. It replays real captured bytes:
