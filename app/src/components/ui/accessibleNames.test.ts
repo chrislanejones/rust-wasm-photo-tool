@@ -34,7 +34,8 @@ function elementWithTitle(src: string, title: string): string {
 
 describe("icon-only controls carry a real name", () => {
   const review = read("features/canvas/ReviewPanel.tsx");
-  const gallery = read("features/gallery/GalleryBar.tsx");
+  // Remove and Select are the TILE's buttons, so they live in Thumb.tsx.
+  const gallery = read("features/gallery/Thumb.tsx");
 
   it.each([
     ["Undo", 'title="Undo"'],
@@ -78,7 +79,7 @@ describe("toggles have a stable name and say which way they are", () => {
   });
 
   it("gallery select", () => {
-    const el = elementWithTitle(read("features/gallery/GalleryBar.tsx"), 'title={selected ? "Deselect" : "Select"}');
+    const el = elementWithTitle(read("features/gallery/Thumb.tsx"), 'title={selected ? "Deselect" : "Select"}');
     expect(el).toContain('aria-label="Select image"');
     expect(el).toContain("aria-pressed={selected}");
   });
@@ -99,7 +100,7 @@ describe("hover-only controls still show on keyboard focus (WCAG 2.4.7)", () => 
   // keyboard user tabbing through landed on them INVISIBLE — and opacity hides
   // an element's outline too, so the global button:focus-visible ring could
   // not show. Measured in QC with a real Tab: opacity 0 -> 1, ring visible.
-  const gallery = read("features/gallery/GalleryBar.tsx");
+  const gallery = read("features/gallery/Thumb.tsx");
 
   it("Remove reveals itself on keyboard focus", () => {
     expect(gallery).toMatch(/opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"/);
