@@ -4,7 +4,9 @@
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
+import { NumberField, TextField } from "@/components/ui/number-field";
+import { FieldLabel } from "@/components/ui/field-label";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -707,15 +709,16 @@ export function BatchSettings({
         disabled={position === "center"}
       />
 
-      <Button size="large"
-        onClick={applyToAll}
-        disabled={!logo || running || photos.length === 0}
-        className="w-full"
-      >
-        {running
-          ? `Processing ${progress.done}/${progress.total}…`
-          : "Apply Logo to All Images"}
-      </Button>
+      <PanelActionBar>
+        <PanelAction
+          onClick={applyToAll}
+          disabled={!logo || running || photos.length === 0}
+        >
+          {running
+            ? `Processing ${progress.done}/${progress.total}…`
+            : "Apply Logo to All Images"}
+        </PanelAction>
+      </PanelActionBar>
 
       {appliedCount !== null && !running && (
         <SuccessCallout>
@@ -784,9 +787,6 @@ function RenameBatchPanel({
     );
   };
 
-  const inputCls =
-    "w-full rounded-md border border-border bg-bg-elevated px-2 py-1.5 text-xs text-text-primary";
-
   return (
     <div className="space-y-3 pt-1">
       <SectionHeader
@@ -800,79 +800,60 @@ function RenameBatchPanel({
         }
       />
 
-      <div className="space-y-1">
-        <span className="text-2xs text-theme-muted-foreground">Name pattern</span>
-        <input
-          value={pattern}
-          onChange={(e) => setPattern(e.target.value)}
-          placeholder="{name}"
-          className={`${inputCls} font-mono`}
+      <TextField
+        label="Name pattern"
+        value={pattern}
+        onChange={(e) => setPattern(e.target.value)}
+        placeholder="{name}"
+        inputClassName="font-mono"
+      />
+
+      <div className="space-y-2">
+        <div className="flex items-end gap-2">
+          <TextField
+            label="Find"
+            className="min-w-0"
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            placeholder="Find"
+          />
+          <TextField
+            label="Replace"
+            className="min-w-0"
+            value={replace}
+            onChange={(e) => setReplace(e.target.value)}
+            placeholder="Replace"
+          />
+        </div>
+        <ToolButtonGroup
+          options={[{ id: "regex", label: ".* Regex", active: useRegex, title: "Treat Find as a regular expression" }]}
+          onChange={() => setUseRegex((v) => !v)}
+          columns={2}
+        />
+      </div>
+
+      <div className="flex items-end gap-2">
+        <NumberField
+          label="Start #"
+          className="min-w-0"
+          min={0}
+          value={start}
+          onChange={(e) => setStart(parseInt(e.target.value, 10) || 0)}
+        />
+        <NumberField
+          label="Pad digits"
+          className="min-w-0"
+          min={1}
+          max={6}
+          value={pad}
+          onChange={(e) =>
+            setPad(Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)))
+          }
         />
       </div>
 
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-2xs text-theme-muted-foreground">
-            Find &amp; replace
-          </span>
-          <button
-            type="button"
-            onClick={() => setUseRegex((v) => !v)}
-            aria-pressed={useRegex}
-            title="Treat Find as a regular expression"
-            className={`rounded px-1.5 py-0.5 font-mono text-2xs transition-colors ${
-              useRegex
-                ? "bg-theme-primary/20 text-theme-primary"
-                : "bg-theme-muted/30 text-theme-muted-foreground hover:text-theme-foreground"
-            }`}
-          >
-            .* regex
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-            placeholder="Find"
-            className={inputCls}
-          />
-          <input
-            value={replace}
-            onChange={(e) => setReplace(e.target.value)}
-            placeholder="Replace"
-            className={inputCls}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="space-y-1">
-          <span className="text-2xs text-theme-muted-foreground">Start #</span>
-          <input
-            type="number"
-            min={0}
-            value={start}
-            onChange={(e) => setStart(parseInt(e.target.value, 10) || 0)}
-            className={`${inputCls} tabular-nums`}
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-2xs text-theme-muted-foreground">Pad digits</span>
-          <input
-            type="number"
-            min={1}
-            max={6}
-            value={pad}
-            onChange={(e) =>
-              setPad(Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)))
-            }
-            className={`${inputCls} tabular-nums`}
-          />
-        </label>
-      </div>
-
-      <div className="space-y-1">
-        <span className="text-2xs text-theme-muted-foreground">Preview</span>
+        <FieldLabel title="Preview" />
         {preview.length === 0 ? (
           <p className="text-2xs text-theme-muted-foreground">No images.</p>
         ) : (
@@ -895,13 +876,11 @@ function RenameBatchPanel({
         )}
       </div>
 
-      <Button size="large"
-        onClick={apply}
-        disabled={photos.length === 0}
-        className="w-full"
-      >
-        Rename {photos.length} image{photos.length !== 1 ? "s" : ""}
-      </Button>
+      <PanelActionBar>
+        <PanelAction onClick={apply} disabled={photos.length === 0}>
+          Rename {photos.length} image{photos.length !== 1 ? "s" : ""}
+        </PanelAction>
+      </PanelActionBar>
     </div>
   );
 }
@@ -1403,15 +1382,16 @@ function TextBatchPanel({
         disabled={position === "center"}
       />
 
-      <Button size="large"
-        onClick={applyToAll}
-        disabled={!text.trim() || running || photos.length === 0}
-        className="w-full"
-      >
-        {running
-          ? `Processing ${progress.done}/${progress.total}…`
-          : "Apply Text to All Images"}
-      </Button>
+      <PanelActionBar>
+        <PanelAction
+          onClick={applyToAll}
+          disabled={!text.trim() || running || photos.length === 0}
+        >
+          {running
+            ? `Processing ${progress.done}/${progress.total}…`
+            : "Apply Text to All Images"}
+        </PanelAction>
+      </PanelActionBar>
 
       {appliedCount !== null && !running && (
         <SuccessCallout>

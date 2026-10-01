@@ -16,6 +16,7 @@ import {
 } from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
 import { applyBetaFromUrl } from "@/lib/beta";
+import { hydrateInstalledPlugins } from "@/lib/plugins/state";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 
 // `?beta=<id>` — an invite link opting this DEVICE into an experiment. Applied
@@ -24,6 +25,12 @@ import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 // See lib/beta.ts: it writes the same localStorage keys the features already
 // read, then takes the parameter out of the URL.
 applyBetaFromUrl();
+
+// The plugins this device has added (Settings → Plugins) come out of
+// IndexedDB once, here, so the Download dialog's picker has them on the first
+// open rather than the second. Async and off the render path; a pane that
+// mounts before this resolves subscribes and fills when it does.
+void hydrateInstalledPlugins();
 
 // GPU blur correctness harness (Phase 0, ADR-030). Installs a
 // `window.__ihGpuBlurSelfTest()` that compares the WGSL blur against the CPU

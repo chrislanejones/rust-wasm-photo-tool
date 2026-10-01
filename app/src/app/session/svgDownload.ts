@@ -9,6 +9,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { resolveDocFrame, writeCroppedSvg, type SvgSource } from "@/lib/svgPassthrough";
+import { toast } from "@/components/ui/sonner";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 
 const SVG_MIME = "image/svg+xml";
@@ -49,7 +50,7 @@ async function activeSvgText(
 }
 
 /** Download the open photo as `<stem>.svg`. False when it cannot be written. */
-export async function downloadActiveSvg(
+async function downloadActiveSvg(
   photoId: string,
   tool: ImageHorseTool | null,
   stem: string,
@@ -107,4 +108,19 @@ export async function downloadSvgZip(opts: {
 
   if (written > 0) saveBlob(await zip.generateAsync({ type: "blob" }), filename);
   return { written, skipped };
+}
+
+/** `downloadActiveSvg` plus the refusal toast, so the Download handler in
+ *  AppShell is one call (like `downloadOraWithToast`) and stays under its cap. */
+export async function downloadActiveSvgWithToast(
+  photoId: string,
+  tool: ImageHorseTool | null,
+  fileStem: string,
+): Promise<void> {
+  const ok = await downloadActiveSvg(photoId, tool, fileStem);
+  if (!ok) {
+    toast.error(
+      "This image can't be saved as SVG — it has been changed beyond a crop (rotated or resized unevenly).",
+    );
+  }
 }

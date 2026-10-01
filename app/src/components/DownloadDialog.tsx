@@ -51,15 +51,19 @@ import {
   FilePsdIcon,
   FileSvgIcon,
   FileWebpIcon,
+  makeFileTypeIcon,
 } from "@/components/icons/FileTypeIcons";
 import type {
   DownloadFormat,
   DownloadFormatOption,
 } from "@/app/session/useDownloadFormat";
+import type { ActiveFormat } from "@/lib/plugins";
 
-/** The format picker's ids: every real download format, plus PSD, which is
- *  shown disabled ("Activate with plugin") and can never be picked here. PSD
- *  export ships as a separate plugin (its own repo), added from Settings. */
+/** The format picker's ids: every real download format, the formats the
+ *  active plugins add (Settings → Plugins, lib/plugins — their manifest ids,
+ *  "psd" for the PSD plugin), plus PSD as a placeholder while NO plugin
+ *  provides it: shown disabled ("Activate with plugin") and never pickable.
+ *  PSD export ships as a separate plugin (its own repo), added from Settings. */
 type FormatTileId = DownloadFormat | "psd";
 
 /** The whole-project files, shown in their own "Layered file" group. */
@@ -73,7 +77,7 @@ const SVG_OFF_HINT = "SVG uploads only";
  *  `[&_svg]:h-6` is a descendant selector and would outrank a plain `h-8`.
  *  Module scope so each tile keeps one component identity across renders. */
 const BIG = { width: 32, height: 32 };
-const FORMAT_TILE_ICONS: Record<FormatTileId, React.ComponentType> = {
+const FORMAT_TILE_ICONS: Record<string, React.ComponentType> = {
   jpeg: () => <FileJpegIcon style={BIG} />,
   png: () => <FilePngIcon style={BIG} />,
   webp: () => <FileWebpIcon style={BIG} />,
@@ -83,12 +87,28 @@ const FORMAT_TILE_ICONS: Record<FormatTileId, React.ComponentType> = {
   psd: () => <FilePsdIcon style={BIG} />,
 };
 
+/** A plugin format's glyph: the same lettered file icon, made once per label
+ *  and kept, so the tile's component identity is stable across renders. */
+const PLUGIN_TILE_ICONS = new Map<string, React.ComponentType>();
+function pluginTileIcon(label: string): React.ComponentType {
+  let icon = PLUGIN_TILE_ICONS.get(label);
+  if (!icon) {
+    const Glyph = makeFileTypeIcon(label.slice(0, 4).toUpperCase());
+    icon = () => <Glyph style={BIG} />;
+    PLUGIN_TILE_ICONS.set(label, icon);
+  }
+  return icon;
+}
+
 interface DownloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** How many images are open — decides whether the Choose pane shows. */
   photoCount: number;
   formats: DownloadFormatOption[];
+  /** Formats the active plugins add, after the built-ins. Whole-project
+   *  files like ORA, so they sit on Selected only, never on All. */
+  pluginFormats: ActiveFormat[];
   format: DownloadFormat;
   onFormatChange: (format: DownloadFormat) => void;
   fileName: {
@@ -135,6 +155,7 @@ type Pane = "choose" | "selected" | "all";
 function DownloadPanes({
   photoCount,
   formats,
+  pluginFormats,
   format,
   onFormatChange,
   fileName,
@@ -175,6 +196,7 @@ function DownloadPanes({
   const selectedValue: FormatTileId = format === "svg" && !svg.selected ? zipFormat : format;
   const allSvg = format === "svg" && svg.all > 0;
 
+  const pluginIds = new Set(pluginFormats.map((p) => p.format.id));
   const formatOptions = [
     ...formats.map((f) => ({
       id: f.value as FormatTileId,
@@ -183,14 +205,26 @@ function DownloadPanes({
       title: `${f.label} — ${f.hint}`,
     })),
     svgTile(svg.selected),
-    {
-      id: "psd" as const,
-      label: "Activate with plugin",
-      icon: FORMAT_TILE_ICONS.psd,
-      title: "PSD — layered Photoshop file. Activate with the PSD plugin in Settings.",
-      disabled: true,
-    },
+    ...pluginFormats.map(({ plugin, format: f }) => ({
+      id: f.id as FormatTileId,
+      label: f.hint,
+      icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
+      title: `${f.label} — ${f.hint} (${plugin.name} plugin)`,
+    })),
+    // The placeholder, only while no plugin provides PSD.
+    ...(pluginIds.has("psd")
+      ? []
+      : [
+          {
+            id: "psd" as const,
+            label: "Activate with plugin",
+            icon: FORMAT_TILE_ICONS.psd,
+            title: "PSD — layered Photoshop file. Activate with the PSD plugin in Settings.",
+            disabled: true,
+          },
+        ]),
   ];
+  const isPlaceholder = (id: string) => id === "psd" && !pluginIds.has("psd");
 
   return (
     <DialogBody>
@@ -225,7 +259,7 @@ function DownloadPanes({
               columns={3}
               value={LAYERED_IDS.includes(selectedValue) ? undefined : selectedValue}
               onChange={(id) => {
-                if (id !== "psd") onFormatChange(id);
+                if (!isPlaceholder(id)) onFormatChange(id);
               }}
               options={formatOptions.filter((o) => !LAYERED_IDS.includes(o.id))}
             />
@@ -237,7 +271,7 @@ function DownloadPanes({
               columns={3}
               value={LAYERED_IDS.includes(selectedValue) ? selectedValue : undefined}
               onChange={(id) => {
-                if (id !== "psd") onFormatChange(id);
+                if (!isPlaceholder(id)) onFormatChange(id);
               }}
               options={formatOptions.filter((o) => LAYERED_IDS.includes(o.id))}
             />
@@ -274,10 +308,10 @@ function DownloadPanes({
               columns={3}
               value={allSvg ? "svg" : zipFormat}
               onChange={(id) => {
-                if (id !== "psd" && id !== "ora") onFormatChange(id);
+                if (!isPlaceholder(id) && id !== "ora" && !pluginIds.has(id)) onFormatChange(id);
               }}
               options={formatOptions
-                .filter((o) => o.id !== "ora" && o.id !== "psd")
+                .filter((o) => o.id !== "ora" && o.id !== "psd" && !pluginIds.has(o.id))
                 .map((o) => (o.id === "svg" ? svgTile(svg.all > 0) : o))}
             />
             <DialogDescription>

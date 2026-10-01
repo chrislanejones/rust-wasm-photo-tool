@@ -92,11 +92,11 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   sync: "Sync",
   shared: "Shared",
   export: "Import / Export",
+  plugins: "Plugins",
   storage: "S3 / Image Hosting",
   billing: "Plan & Billing",
   aiusage: "AI Usage",
   beta: "Beta",
-  devtests: "Dev Tests",
   superuser: "Super User",
 };
 
