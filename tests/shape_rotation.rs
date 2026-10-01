@@ -282,6 +282,42 @@ fn every_fill_kind_turns_with_the_rect() {
     }
 }
 
+/// A filled triangle takes the rect's route when it turns: the fill has to turn
+/// with the outline, so the shape is rastered upright in a tile and the tile is
+/// resampled through its rotation. 180° flips the apex to the bottom, which is
+/// the cheapest way to see that the FILL moved and not just the stroke.
+#[test]
+fn a_filled_triangle_turns_fill_and_all() {
+    let mut t = white_tool();
+    add(&mut t, 10, BOX, 1, 0, 0, 0, 180.0);
+    let buf = t.get_image_data();
+    let is_fill = |x: u32, y: u32| {
+        let p = px(&buf, x, y);
+        p[2] > 150 && p[0] < 120 // the blue fill, not white, not the red stroke
+    };
+    // (20, 60) is in the upright triangle's wide bottom-left; (20, 16) is the
+    // bbox corner it misses. Turned 180° about the bbox center, the two swap.
+    let mut upright = white_tool();
+    add(&mut upright, 10, BOX, 1, 0, 0, 0, 0.0);
+    let up = upright.get_image_data();
+    assert_eq!(
+        px(&up, 20, 16),
+        [255, 255, 255, 255],
+        "upright: corner is empty"
+    );
+    assert!(px(&up, 20, 60)[2] > 150, "upright: bottom-left is filled");
+
+    assert!(
+        is_fill(20, 16),
+        "turned: the fill is in the upper corner now"
+    );
+    assert_eq!(
+        px(&buf, 20, 60),
+        [255, 255, 255, 255],
+        "turned: the bottom-left the upright fill covered is empty"
+    );
+}
+
 // ── 4. circles ──────────────────────────────────────────────────────────────
 
 #[test]
@@ -356,10 +392,77 @@ fn the_triangle_strokes_its_three_edges_and_nothing_else() {
     // The bbox's top corners are outside an apex-up triangle.
     assert_eq!(px(&buf, 15, 11), [255, 255, 255, 255]);
     assert_eq!(px(&buf, 77, 11), [255, 255, 255, 255]);
-    // And it is not filled, even when asked (fills stay rect/circle only).
-    let mut f = white_tool();
-    add(&mut f, 10, BOX, 1, 0, 0, 0, 0.0);
-    assert_eq!(px(&f.get_image_data(), 46, 50), [255, 255, 255, 255]);
+}
+
+/// Fill reaches every shape that encloses an area, and it is clipped to that
+/// shape rather than to the bbox: the inside takes the colour, the corners the
+/// outline leaves out stay untouched. The line is the one shape with no
+/// interior, so it has no fill to test.
+#[test]
+fn the_diamond_the_star_and_the_triangle_fill_their_insides_and_not_their_bbox_corners() {
+    // kind, a point inside the outline (ix, iy), and a bbox corner the outline
+    // misses (ox, oy) — the top-left one for all three, since none of them has
+    // a vertex there.
+    for (kind, ix, iy, ox, oy) in [
+        (8u8, 46, 38, 15, 11), // diamond — center in
+        (9, 46, 38, 15, 11),   // star — center in
+        (10, 46, 50, 15, 11),  // triangle — low-middle in
+    ] {
+        let mut t = white_tool();
+        add(&mut t, kind, BOX, 1, 0, 0, 0, 0.0);
+        let buf = t.get_image_data();
+        assert_eq!(
+            px(&buf, ix, iy),
+            [32, 64, 224, 255],
+            "kind {kind}: ({ix}, {iy}) is the solid fill"
+        );
+        assert_eq!(
+            px(&buf, ox, oy),
+            [255, 255, 255, 255],
+            "kind {kind}: ({ox}, {oy}) is outside the outline, so the fill misses it"
+        );
+    }
+}
+
+/// The gradient and the mosaic reach the three polygons too, and both are
+/// clipped the same way the solid is.
+#[test]
+fn a_polygon_fill_can_also_be_a_gradient_or_a_mosaic() {
+    for kind in [8u8, 9, 10] {
+        // Gradient, left→right: #2040e0 → #20e040, so green climbs with x.
+        let mut g = white_tool();
+        add(&mut g, kind, BOX, 2, 0, 0, 0, 0.0);
+        let buf = g.get_image_data();
+        // Both samples sit on the bbox's center row, 12 px either side of the
+        // center — inside all three outlines, and clear of every stroke.
+        let (left, right) = (px(&buf, 34, 38), px(&buf, 58, 38));
+        assert!(
+            right[1] > left[1] + 30,
+            "kind {kind}: the gradient runs left→right ({left:?} → {right:?})"
+        );
+        assert_eq!(
+            px(&buf, 15, 11),
+            [255, 255, 255, 255],
+            "kind {kind}: the gradient stops at the outline"
+        );
+
+        // Mosaic over the gradient background: the block holding (46, 38) comes
+        // back flat, while the corner the outline misses keeps its own pixel.
+        let mut m = tool_on(&gradient());
+        let before = px(&m.get_image_data(), 15, 11);
+        add(&mut m, kind, BOX, 3, 0, 0, 0, 0.0);
+        let buf = m.get_image_data();
+        assert_eq!(
+            px(&buf, 41, 33),
+            px(&buf, 46, 38),
+            "kind {kind}: the 8 px block around (46, 38) is one flat colour"
+        );
+        assert_eq!(
+            px(&buf, 15, 11),
+            before,
+            "kind {kind}: the mosaic stops at the outline"
+        );
+    }
 }
 
 #[test]

@@ -25,6 +25,7 @@ import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { shapeCanFill } from "@/lib/drawEditState";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -199,9 +200,10 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     onChange={(color) => onChange({ ...settings, strokeColor: color })}
                   />
 
-                  {/* Fill — rect + circle only (line/diamond/star/triangle have
-                      no fill in the engine: `fill_shape` handles kinds 0/1 only) */}
-                  {(currentShape === "rect" || currentShape === "circle") && (
+                  {/* Fill — every shape that encloses an area: rect, circle,
+                      diamond, star, triangle. The line is the one shape with no
+                      interior, so it is the one without this section. */}
+                  {shapeCanFill(currentShape) && (
                     <div className="space-y-4">
                       <label className="text-2xs font-bold text-theme-muted-foreground">
                         Fill
@@ -266,8 +268,8 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                             onChange={(v) => onChange({ ...settings, fillBlock: v })}
                           />
                           <p className="text-2xs leading-relaxed text-theme-muted-foreground">
-                            Mosaics whatever is beneath the box — a re-selectable redaction
-                            box you can move, resize, and undo from the Review panel.
+                            Mosaics whatever is beneath the shape — a re-selectable redaction
+                            you can move, resize, and undo from the Review panel.
                           </p>
                         </div>
                       )}

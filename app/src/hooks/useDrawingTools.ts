@@ -12,6 +12,8 @@ import type { Point } from "@/lib/shapeSloppiness";
 import { drawArrowPreview, drawShapePreview } from "@/lib/drawPreview";
 import {
   editStateFromShape,
+  FILL_MODE_KIND,
+  FILLABLE_KINDS,
   panelStylePatch,
   pendingShapeType,
   SHAPE_NAME_KIND,
@@ -246,25 +248,17 @@ export function useDrawingTools({
       es.style?.kindByte ??
       (es.kind === "arrow" ? 4 : (SHAPE_NAME_KIND[shapeName] ?? 0));
     const arrowByte = arrowStyle === "double" ? 1 : 0;
-    // Interior fill — only rect (0) / circle (1) accept it; everything else
-    // commits with fill_kind 0. Existing-shape edits keep the shape's captured
-    // fill (so move/resize doesn't swap it to the panel's current fill); new
-    // shapes read the live panel settings — mirrors strokeColor above.
+    // Interior fill — every shape with an interior takes it (FILLABLE_KINDS);
+    // the line and the arrow/pin kinds commit fill_kind 0. Existing-shape edits
+    // keep the shape's captured fill (so move/resize doesn't swap it to the
+    // panel's current fill); new shapes read the live panel — like strokeColor.
     const fillMode = es.style?.fillMode ?? s.fillMode;
     const fillColor = es.style?.fillColor ?? s.fillColor;
     const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
     const gradientAngle = es.style?.gradientAngle ?? s.gradientAngle;
     const fillBlock = es.style?.fillBlock ?? s.fillBlock;
-    const canFill = kind === 0 || kind === 1;
-    const fillKind = canFill
-      ? fillMode === "solid"
-        ? 1
-        : fillMode === "gradient"
-          ? 2
-          : fillMode === "pixelate"
-            ? 3
-            : 0
-      : 0;
+    // FILLABLE_KINDS mirrors `annotations::is_fillable_kind` — change both.
+    const fillKind = FILLABLE_KINDS.has(kind) ? FILL_MODE_KIND[fillMode] : 0;
     const fillHex = fillColor ?? "#000000";
     const fill2Hex = fillColor2 ?? "#000000";
     const fillAngle = gradientAngle ?? 0;

@@ -476,6 +476,14 @@ fn rotation_applies(kind: u8) -> bool {
     matches!(kind, 0 | 1 | 2 | 8 | 9 | 10)
 }
 
+/// The kinds that accept an interior fill (`fill_kind` 1/2/3 through
+/// `drawing::fill_shape`): every bbox shape that encloses an area. The line (2)
+/// encloses nothing, and the pen path (7) is filled by `fill_polygon` against
+/// its own points rather than a bbox, so neither is here.
+pub(crate) fn is_fillable_kind(kind: u8) -> bool {
+    matches!(kind, 0 | 1 | 8 | 9 | 10)
+}
+
 /// Serialize a list of shape annotations to JSON for the JS overlay /
 /// Reselect list. Geometry is the raw endpoint pair; the JS side derives
 /// bounding boxes the same way Rust's `draw_shape` does.
@@ -729,9 +737,9 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 /// | shape | route |
 /// |---|---|
 /// | warped (any rotatable kind) | warp path, rotation composed onto the quad |
-/// | rect (0) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
+/// | rect (0), diamond (8), star (9), triangle (10) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
 /// | circle (1) with a gradient | warp path, same reason (the gradient has a direction) |
-/// | rect (0) unfilled, line (2), diamond (8), star (9), triangle (10) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
+/// | rect (0), diamond (8), star (9), triangle (10) unfilled, line (2) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
 /// | circle (1) otherwise | flat, θ ignored — a circle is rotation-invariant |
 /// | 3, 4, 5, 6, 7 | θ ignored |
 ///
@@ -740,7 +748,8 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let warped = !crate::perspective::is_identity(&s.perspective.0);
     let rotated_fill = s.rotation_deg != 0.0
-        && ((s.kind == 0 && s.fill_kind != 0) || (s.kind == 1 && s.fill_kind == 2));
+        && ((s.kind != 1 && is_fillable_kind(s.kind) && s.fill_kind != 0)
+            || (s.kind == 1 && s.fill_kind == 2));
     if (warped || rotated_fill) && render_shape_warped(data, w, h, s) {
         return;
     }
@@ -751,9 +760,12 @@ pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnota
 /// straight onto the canvas or into the tile a warp resamples.
 fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let color = [s.r, s.g, s.b, 255];
-    // Interior fill (rect=0, circle=1 only), painted BEFORE the stroke so the
-    // outline sits on top. fill_kind: 1 = solid, 2 = linear gradient.
-    if (s.kind == 0 || s.kind == 1) && s.fill_kind != 0 {
+    // Interior fill, painted BEFORE the stroke so the outline sits on top.
+    // fill_kind: 1 = solid, 2 = linear gradient, 3 = pixelate. Every bbox shape
+    // with an interior takes one — rect (0), circle (1), diamond (8), star (9),
+    // triangle (10); the line (2) has no interior and the pen path (7) fills
+    // itself through `fill_polygon` below.
+    if is_fillable_kind(s.kind) && s.fill_kind != 0 {
         crate::drawing::fill_shape(
             data,
             w,
@@ -768,6 +780,7 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             [s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a],
             s.fill_angle,
             s.fill_block,
+            effective_star_points(s.star_points),
         );
     }
     match s.kind {

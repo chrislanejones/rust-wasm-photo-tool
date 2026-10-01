@@ -185,9 +185,10 @@ describe("shapeAnnotationAt", () => {
 
   it("a FILLED diamond/star falls back to its padded bounding box", () => {
     // The engine only routes 8/9 through the edge test while UNFILLED;
-    // filled, it uses the same in_outer box rule as a pin (never actually
-    // painted — the fill renderer handles kinds 0/1 — but the hit test
-    // answers the same way).
+    // filled, it uses the same in_outer box rule as a pin. The fill itself is
+    // clipped to the outline (so a star's notches are see-through ink), but the
+    // hit box is the padded bbox — the same deliberate looseness a filled rect
+    // gets, and what makes a thin star tip grabbable at all.
     const dia = [
       shape({ id: 33, kind: 8, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
       shape({ id: 34, kind: 9, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 }),
