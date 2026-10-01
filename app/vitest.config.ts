@@ -30,6 +30,15 @@ export default defineConfig({
     environment: "node",
     globals: false,
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.{test,spec}.ts"],
+    // ⚠️ `.tsx` AS WELL AS `.ts`, and this was the real blocker for component
+    // tests: a `*.test.tsx` was never COLLECTED, so writing one produced no
+    // failures and no passes — it simply did not run. Checked by adding a
+    // deliberately-failing .tsx and watching the file count stay put.
+    //
+    // The environment stays `node` globally on purpose. Flipping it to jsdom
+    // for the whole suite would put 139 Dexie/engine files through a DOM they
+    // do not need; component files opt in per file with
+    // `// @vitest-environment jsdom` instead.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });
