@@ -373,6 +373,29 @@ export const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB.",
   },
+  "Batch Crop": {
+    group: "edit",
+    title: "Batch Crop",
+    plain:
+      "Crop every open photo to the same shape at once — pick a ratio, and a width if you want every slide the same size.",
+    detail:
+      "Batch › Crop. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all.",
+  },
+  "SVG → SVG": {
+    group: "export",
+    title: "SVG in, SVG out",
+    plain: "An SVG you uploaded can be downloaded as an SVG again, cropped the way you cropped it.",
+    detail:
+      "Only the root viewBox is rewritten, so the drawing stays a vector. One image, or a .zip of every SVG. Kept for the session, not across a reload.",
+  },
+  Plugins: {
+    group: "export",
+    title: "Plugins",
+    plain:
+      "Add a file format the app doesn't ship, from a file or a link you choose. It stays in your browser on that device, and nothing switches on until you say so.",
+    detail:
+      "Settings → Plugins, with a master switch and one per plugin. A format plugin adds a Download tile and an Import / Export pair; importing always makes a new photo. The first one is Photoshop PSD, in its own repository.",
+  },
   Export: {
     group: "export",
     title: "Export",
