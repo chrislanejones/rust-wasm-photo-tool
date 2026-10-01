@@ -3,11 +3,10 @@
 import type { Point } from "@/lib/shapeSloppiness";
 import type { ShapeName } from "@/lib/types";
 import {
-  diamondVertices,
+  closedOutline,
   shapeWobbleSeed,
   sloppyCirclePoints,
   sloppyPolylinePoints,
-  starVertices,
 } from "@/lib/shapeSloppiness";
 
 /**
@@ -69,45 +68,19 @@ export function sloppyShapePath(
   strokeWidth: number,
   toSX: (x: number) => number,
   toSY: (y: number) => number,
+  starPoints?: number,
 ): string {
-  const x = Math.min(from.x, to.x);
-  const y = Math.min(from.y, to.y);
-  const w = Math.abs(to.x - from.x);
-  const h = Math.abs(to.y - from.y);
   const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
+  // rect / diamond / star / triangle share one outline source with the
+  // canvas rubber band (`closedOutline`), so a new polygon is one case there.
+  const outline = closedOutline(shape, from, to, starPoints);
   let pts;
   switch (shape) {
     case "rect":
-      pts = sloppyPolylinePoints(
-        [
-          { x, y },
-          { x: x + w, y },
-          { x: x + w, y: y + h },
-          { x, y: y + h },
-        ],
-        seed,
-        sloppiness,
-        strokeWidth,
-        true,
-      );
-      break;
     case "diamond":
-      pts = sloppyPolylinePoints(
-        diamondVertices(from.x, from.y, to.x, to.y),
-        seed,
-        sloppiness,
-        strokeWidth,
-        true,
-      );
-      break;
     case "star":
-      pts = sloppyPolylinePoints(
-        starVertices(from.x, from.y, to.x, to.y),
-        seed,
-        sloppiness,
-        strokeWidth,
-        true,
-      );
+    case "triangle":
+      pts = outline ? sloppyPolylinePoints(outline, seed, sloppiness, strokeWidth, true) : [];
       break;
     case "line":
       pts = sloppyPolylinePoints(

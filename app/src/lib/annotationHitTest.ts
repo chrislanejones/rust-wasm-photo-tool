@@ -31,7 +31,8 @@
 // `.rev()`, newest-added wins on overlap — because a disagreement about WHICH
 // annotation was hit is as wrong as disagreeing about whether one was.
 
-import { starVertices } from "./shapeSloppiness";
+import { starVertices, triangleVertices } from "./shapeSloppiness";
+import { rotatePoint } from "./shapeRotation";
 
 /** The geometry subset of a text annotation this module needs. */
 export interface TextHitGeometry {
@@ -56,7 +57,14 @@ export interface ShapeHitGeometry {
   /** 0 = outline only. Decides ring-vs-box for rect/circle — see below. */
   fill_kind?: number;
   points?: number[][];
+  /** Degrees clockwise about the box center (absent = 0). */
+  rotation?: number;
+  /** Star point count (absent/0 = 5). */
+  starPoints?: number;
 }
+
+/** The kinds the engine turns: rect, circle, line, diamond, star, triangle. */
+const TURNED_KINDS = new Set([0, 1, 2, 8, 9, 10]);
 
 /**
  * Port of `text_annotation_at` (annotations.rs:1792).
@@ -105,9 +113,13 @@ export function pointSegmentDistance(
  * Port of `shape_annotation_at` (annotations.rs).
  *
  * Kind codes: 2 = line, 4 = arrow (distance to segment); 6 = polyline
- * (distance to any segment); 8 = diamond, 9 = star — the outline edges only
- * while unfilled (a click inside an empty diamond selects whatever is behind
- * it), padded bbox once filled, matching the engine. Closed kinds split on
+ * (distance to any segment); 8 = diamond, 9 = star, 10 = triangle — the
+ * outline edges only while unfilled (a click inside an empty diamond selects
+ * whatever is behind it), padded bbox once filled, matching the engine.
+ *
+ * A TURNED shape is tested in its own frame: the click is turned back by the
+ * shape's rotation about its box center first, then every rule below applies
+ * to the upright box — the engine does exactly this. Closed kinds split on
  * whether they are ink all the way through (2026-08-28):
  *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) is a RING — the
  *     padded outline minus the interior shrunk by the same pad, so a click in
@@ -118,11 +130,19 @@ export function pointSegmentDistance(
  */
 export function shapeAnnotationAt(
   shapes: readonly ShapeHitGeometry[],
-  x: number,
-  y: number,
+  clickX: number,
+  clickY: number,
 ): number {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
+    const turned = s.rotation && TURNED_KINDS.has(s.kind);
+    const { x, y } = turned
+      ? rotatePoint(
+          { x: clickX, y: clickY },
+          { x: (s.x0 + s.x1) * 0.5, y: (s.y0 + s.y1) * 0.5 },
+          -s.rotation!,
+        )
+      : { x: clickX, y: clickY };
     const pad = Math.max(s.stroke_width * 0.5, 6);
     let hit: boolean;
     if (s.kind === 2 || s.kind === 4) {
@@ -138,7 +158,7 @@ export function shapeAnnotationAt(
           break;
         }
       }
-    } else if ((s.fill_kind ?? 0) === 0 && (s.kind === 8 || s.kind === 9)) {
+    } else if ((s.fill_kind ?? 0) === 0 && (s.kind === 8 || s.kind === 9 || s.kind === 10)) {
       if (s.kind === 8) {
         const minx = Math.min(s.x0, s.x1);
         const maxx = Math.max(s.x0, s.x1);
@@ -158,7 +178,10 @@ export function shapeAnnotationAt(
       } else {
         // Close the loop so the last→first edge is hit-testable too (same as
         // the engine pushing the first vertex onto the end).
-        const verts = starVertices(s.x0, s.y0, s.x1, s.y1);
+        const verts =
+          s.kind === 9
+            ? starVertices(s.x0, s.y0, s.x1, s.y1, s.starPoints)
+            : triangleVertices(s.x0, s.y0, s.x1, s.y1);
         if (verts.length === 0) {
           hit = false;
         } else {

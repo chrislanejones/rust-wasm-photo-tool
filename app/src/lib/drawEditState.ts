@@ -3,7 +3,7 @@
 // what a pending edit IS. Moved out of useDrawingTools.ts (which re-exports
 // every name here, so no import changed) so the hook file holds the hook.
 import type { ShapeName, ToolSettings } from "@/lib/types";
-import type { Point } from "@/lib/shapeSloppiness";
+import { effectiveStarPoints, type Point } from "@/lib/shapeSloppiness";
 
 // One `Point` for the drawing stack: defined in lib/shapeSloppiness.ts,
 // re-exported here so canvas code can keep importing it beside CropSelection.
@@ -46,6 +46,12 @@ export interface DrawEditState {
    *  the two paths finally agree. Unset for reselected shapes, which carry
    *  their own type in `style.shape`. */
   drawnShape?: ShapeName;
+  /** Degrees, clockwise on screen, about the box center — the rotate
+   *  handle's value. GEOMETRY, not style: it lives beside `start`/`end`
+   *  because a handle drag changes it, and it is never read from the panel.
+   *  Absent = 0. A line never carries one — turning a line moves its
+   *  endpoints instead (see lib/shapeRotation.ts). */
+  rotation?: number;
   /** When set, we're editing an EXISTING live shape annotation (this id)
    *  rather than creating a new one. Commit calls update_shape_annotation. */
   editId?: number;
@@ -72,6 +78,9 @@ export interface DrawEditState {
     gradientAngle: number;
     /** Mosaic block size (px) for fillMode "pixelate". */
     fillBlock: number;
+    /** Star point count (3–12), captured on reselect so a 7-point star
+     *  stays a 7-point star. Ignored by every other shape. */
+    starPoints: number;
   };
 }
 
@@ -141,6 +150,7 @@ export function panelStylePatch(
   if (next.gradientAngle !== prev.gradientAngle)
     patch.gradientAngle = next.gradientAngle;
   if (next.fillBlock !== prev.fillBlock) patch.fillBlock = next.fillBlock;
+  if (next.starPoints !== prev.starPoints) patch.starPoints = next.starPoints;
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
@@ -148,7 +158,7 @@ export function panelStylePatch(
 export interface ShapeMeta {
   id: number;
   kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
-                // 6=polyline,7=bezier,8=diamond,9=star
+                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle
   x0: number;
   y0: number;
   x1: number;
@@ -175,6 +185,11 @@ export interface ShapeMeta {
   fill_block: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points: number[][];
+  /** Degrees clockwise about the box center. Absent on shapes written
+   *  before rotation shipped (they meant 0). */
+  rotation?: number;
+  /** Star point count; 0 or absent = the classic 5. */
+  starPoints?: number;
 }
 
 /** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). Kind 3
@@ -188,6 +203,7 @@ export const SHAPE_KIND_NAME: Record<number, ShapeName> = {
   3: "circle",
   8: "diamond",
   9: "star",
+  10: "triangle",
 };
 
 /** ToolSettings shape name → Rust `kind` byte. */
@@ -197,9 +213,60 @@ export const SHAPE_NAME_KIND: Record<string, number> = {
   line: 2,
   diamond: 8,
   star: 9,
+  triangle: 10,
 };
 
 export function rgbToHex(r: number, g: number, b: number): string {
   const h = (n: number) => n.toString(16).padStart(2, "0");
   return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/**
+ * The pending edit a saved shape opens as when it is reselected. Pure: the hook
+ * keeps the engine calls (`set_editing_shape`, the flush) and this keeps the
+ * mapping, so the mapping is one place to read and the hook stays under its
+ * line cap. Callers have already refused the kinds with no bbox-handle
+ * representation (polyline 6, Bézier 7).
+ */
+export function editStateFromShape(sh: ShapeMeta): DrawEditState {
+  // Pins (kind 5) edit as a circle handle but keep their pin kind on commit.
+  // Kind 3 (legacy hand-drawn circle) rewrote itself into a CIRCLE at
+  // render-time the moment this feature shipped, and re-edits as a sloppy
+  // circle: its sloppiness field was never written, so seed 100 — the look
+  // it was baked with — whenever a kind-3 shape is dropped on the overlay.
+  const shapeName: ShapeName =
+    sh.kind === 4 || sh.kind === 5
+      ? sh.kind === 5
+        ? "circle"
+        : "line"
+      : (SHAPE_KIND_NAME[sh.kind] ?? "rect");
+  const sloppiness = sh.sloppiness ?? (sh.kind === 3 ? 100 : 0);
+  return {
+    kind: sh.kind === 4 ? "arrow" : "shape",
+    start: { x: sh.x0, y: sh.y0 },
+    end: { x: sh.x1, y: sh.y1 },
+    rotation: sh.rotation ?? 0,
+    editId: sh.id,
+    style: {
+      shape: shapeName,
+      strokeColor: rgbToHex(sh.r, sh.g, sh.b),
+      strokeWidth: sh.stroke_width,
+      arrowStyle: sh.arrow_style === 1 ? "double" : "single",
+      kindByte: sh.kind,
+      sloppiness,
+      fillMode:
+        sh.fill_kind === 1
+          ? "solid"
+          : sh.fill_kind === 2
+            ? "gradient"
+            : sh.fill_kind === 3
+              ? "pixelate"
+              : "none",
+      fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
+      fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
+      gradientAngle: sh.fill_angle,
+      fillBlock: sh.fill_block ?? 16,
+      starPoints: effectiveStarPoints(sh.starPoints),
+    },
+  };
 }

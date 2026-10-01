@@ -211,8 +211,10 @@ export default tseslint.config(
     // ratchet follows the file down in the same commit.
     // 3540 -> 3539 (plugins, ADR-076): the plugin half of Download is a session
     // hook, and the SVG refusal toast moved into svgDownload.ts beside ORA's.
+    // 3539 -> 3528 (shapes v9): the local shape-label table became the shared
+    // `shapeKindLabel` (perspectiveTarget.ts), which also names the triangle.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3539 }] },
+    rules: { "max-lines": ["error", { max: 3528 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -221,10 +223,14 @@ export default tseslint.config(
     // 2909 -> 2802 (2026-09-26): the file had crept to 3025. The two cursor
     // glyphs + getCursorForSubTool moved to canvasCursor.ts, arrowGeometry +
     // sloppyShapePath to shapeOverlayPath.ts — pure functions, no React.
-    // 2823 -> 2665: the paste-placement bounding box (drag + SVG, now with a
-    // rotate knob) moved out to features/canvas/PastePlacementOverlay.tsx.
+    // 2823 -> 2665 (#279): the paste-placement bounding box (drag + SVG, now with
+    // a rotate knob) moved out to features/canvas/PastePlacementOverlay.tsx.
+    // 2665 -> 2166 (shapes v9): the Shapes edit overlay (preview, bbox,
+    // move/resize/rotate handles, and its drag state) moved out to
+    // features/canvas/ShapeEditOverlay.tsx when rotation landed. It imports the
+    // shared helpers above rather than keeping a second copy.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2665 }] },
+    rules: { "max-lines": ["error", { max: 2166 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],
@@ -236,8 +242,11 @@ export default tseslint.config(
     // pendingShapeType, panelStylePatch) moved to lib/drawEditState.ts and
     // the Canvas2D rubber-band previews to lib/drawPreview.ts; the hook
     // re-exports the types so no importer changed.
+    // 991 -> 976 (shapes v9): rotation and star points added ~25 lines, and the
+    // reselect mapping (saved shape -> pending edit) moved to
+    // drawEditState.editStateFromShape to pay for them and then some.
     files: ["app/src/hooks/useDrawingTools.ts"],
-    rules: { "max-lines": ["error", { max: 991 }] },
+    rules: { "max-lines": ["error", { max: 976 }] },
   },
   {
     // A test file, not a god object — it is long because it enumerates 166

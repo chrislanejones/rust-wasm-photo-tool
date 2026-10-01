@@ -153,15 +153,15 @@ class RecordingTool {
       : undefined;
   }
 
-  /** The shape control: `sloppiness` is the last argument of the shape call.
-   *  Indexed by call order, NOT by the engine id — the ids are handed out
-   *  across both kinds, so the first shape is id 2 in a document whose first
-   *  restore was a text. */
+  /** The shape control: `sloppiness` is third from the end of the shape call —
+   *  v9 (ADR-070) appended `starPoints` and `rotation` after it, so it is no
+   *  longer the last argument. Indexed by call order, NOT by the engine id —
+   *  the ids are handed out across both kinds, so the first shape is id 2 in a
+   *  document whose first restore was a text. */
   sloppinessOfShape(nth: number): number | undefined {
     const call = this.shapeCalls[nth];
-    return typeof call?.[call.length - 1] === "number"
-      ? (call[call.length - 1] as number)
-      : undefined;
+    const at = call ? call.length - 3 : -1;
+    return typeof call?.[at] === "number" ? (call[at] as number) : undefined;
   }
 }
 

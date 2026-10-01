@@ -2,11 +2,10 @@
 // useDrawingTools.ts unchanged: pure functions of a context and two points.
 import type { ShapeName } from "@/lib/types";
 import {
-  diamondVertices,
+  closedOutline,
   shapeWobbleSeed,
   sloppyCirclePoints,
   sloppyPolylinePoints,
-  starVertices,
 } from "@/lib/shapeSloppiness";
 
 /* ------------------------------------------------------------------ */
@@ -73,6 +72,7 @@ export function drawShapePreview(
   color: string,
   width: number,
   sloppiness: number,
+  starPoints: number,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -83,63 +83,28 @@ export function drawShapePreview(
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
+  // rect / diamond / star / triangle — the exact vertex list Rust strokes.
+  const outline = closedOutline(shape, from, to, starPoints);
 
   if (sloppiness > 0) {
     // Mirrors Rust: at sloppiness > 0 EVERY shape routes through the
     // sketchy path generator so the preview and the committed pixels match
     // (draw_shape, drawing.rs). Firm shapes (0) take the clean branches below.
-    let verts: { x: number; y: number }[];
-    let pts;
-    switch (shape) {
-      case "rect":
-        verts = [
-          { x, y },
-          { x: x + w, y },
-          { x: x + w, y: y + h },
-          { x, y: y + h },
-        ];
-        pts = sloppyPolylinePoints(
-          verts,
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "circle":
-        pts = sloppyCirclePoints(from, to, sloppiness, width);
-        break;
-      case "diamond":
-        pts = sloppyPolylinePoints(
-          diamondVertices(from.x, from.y, to.x, to.y),
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "star":
-        pts = sloppyPolylinePoints(
-          starVertices(from.x, from.y, to.x, to.y),
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          true,
-        );
-        break;
-      case "line":
-        pts = sloppyPolylinePoints(
-          [
-            { x: from.x, y: from.y },
-            { x: to.x, y: to.y },
-          ],
-          shapeWobbleSeed(from.x, from.y, to.x, to.y),
-          sloppiness,
-          width,
-          false,
-        );
-        break;
-    }
+    const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
+    const pts = outline
+      ? sloppyPolylinePoints(outline, seed, sloppiness, width, true)
+      : shape === "circle"
+        ? sloppyCirclePoints(from, to, sloppiness, width)
+        : sloppyPolylinePoints(
+            [
+              { x: from.x, y: from.y },
+              { x: to.x, y: to.y },
+            ],
+            seed,
+            sloppiness,
+            width,
+            false,
+          );
     if (pts && pts.length > 1) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
@@ -152,41 +117,18 @@ export function drawShapePreview(
   }
 
   ctx.beginPath();
-
-  switch (shape) {
-    case "rect":
-      ctx.strokeRect(x, y, w, h);
-      break;
-
-    case "circle": {
-      const r = Math.min(w, h) / 2;
-      ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
-      ctx.stroke();
-      break;
-    }
-
-    case "diamond": {
-      const pts = diamondVertices(from.x, from.y, to.x, to.y);
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    }
-
-    case "star": {
-      const pts = starVertices(from.x, from.y, to.x, to.y);
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    }
-
-    case "line":
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-      break;
+  if (outline) {
+    ctx.moveTo(outline[0].x, outline[0].y);
+    for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (shape === "circle") {
+    const r = Math.min(w, h) / 2;
+    ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
   }
 }

@@ -104,6 +104,10 @@ describe("sameTarget — two id spaces, not one", () => {
 });
 
 describe("shapeKindLabel", () => {
+  it("names the triangle — the one map AppShell's Reselect list now reads too", () => {
+    expect(shapeKindLabel(10)).toBe("Triangle");
+  });
+
   it("names the two kinds the report actually asked for", () => {
     expect(shapeKindLabel(0)).toBe("Square");
     expect(shapeKindLabel(1)).toBe("Circle");

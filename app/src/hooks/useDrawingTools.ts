@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
-import type { ShapeName, ToolType, ToolSettings } from "@/lib/types";
+import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { cropTracked } from "@/stores/useSvgSourceStore"; // SVG export's crop record
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
+import { effectiveStarPoints } from "@/lib/shapeSloppiness";
+import { normalizeDeg } from "@/lib/shapeRotation";
 import type { Point } from "@/lib/shapeSloppiness";
 import { drawArrowPreview, drawShapePreview } from "@/lib/drawPreview";
 import {
+  editStateFromShape,
   panelStylePatch,
   pendingShapeType,
-  rgbToHex,
-  SHAPE_KIND_NAME,
   SHAPE_NAME_KIND,
   type CropSelection,
   type DrawEditState,
@@ -273,6 +274,11 @@ export function useDrawingTools({
     // just-drawn shape has sloppiness, but would also pick any unsaved panel
     // change (like strokeColor).
     const sloppiness = es.style?.sloppiness ?? s.sloppiness ?? 0;
+    // Star points ride only on a star; every other kind stores 0 ("unset"),
+    // so a triangle or square never carries a stray count into the log.
+    const starPoints =
+      kind === 9 ? effectiveStarPoints(es.style?.starPoints ?? s.starPoints) : 0;
+    const rotation = normalizeDeg(es.rotation ?? 0);
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -297,6 +303,8 @@ export function useDrawingTools({
         fillAngle,
         fillBlockVal,
         sloppiness,
+        starPoints,
+        rotation,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -315,6 +323,8 @@ export function useDrawingTools({
         fillAngle,
         fillBlockVal,
         sloppiness,
+        starPoints,
+        rotation,
       );
       // The just-drawn shape becomes the Align/Placement target, so the
       // grid (and numpad 1-9) can place it immediately after drawing.
@@ -374,44 +384,7 @@ export function useDrawingTools({
       // reselecting a path made it VANISH. AppShell routes kind 7 to the pen
       // overlay instead (see handleSelectObject).
       if (sh.kind === 7) return;
-      // Pins (kind 5) edit as a circle handle but keep their pin kind on commit.
-      // Kind 3 (legacy hand-drawn circle) rewrote itself into a CIRCLE at
-      // render-time the moment this feature shipped, and re-edits as a sloppy
-      // circle: its sloppiness field was never written, so seed 100 — the look
-      // it was baked with — whenever a kind-3 shape is dropped on the overlay.
-      const shapeName: ShapeName =
-        sh.kind === 4 || sh.kind === 5
-          ? sh.kind === 5
-            ? "circle"
-            : "line"
-          : (SHAPE_KIND_NAME[sh.kind] ?? "rect");
-      const sloppiness = sh.sloppiness ?? (sh.kind === 3 ? 100 : 0);
-      const next: DrawEditState = {
-        kind: sh.kind === 4 ? "arrow" : "shape",
-        start: { x: sh.x0, y: sh.y0 },
-        end: { x: sh.x1, y: sh.y1 },
-        editId: id,
-        style: {
-          shape: shapeName,
-          strokeColor: rgbToHex(sh.r, sh.g, sh.b),
-          strokeWidth: sh.stroke_width,
-          arrowStyle: sh.arrow_style === 1 ? "double" : "single",
-          kindByte: sh.kind,
-          sloppiness,
-          fillMode:
-            sh.fill_kind === 1
-              ? "solid"
-              : sh.fill_kind === 2
-                ? "gradient"
-                : sh.fill_kind === 3
-                  ? "pixelate"
-                  : "none",
-          fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
-          fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
-          gradientAngle: sh.fill_angle,
-          fillBlock: sh.fill_block ?? 16,
-        },
-      };
+      const next = editStateFromShape(sh);
       tool.set_editing_shape(id);
       flushToCanvas();
       editDirtyRef.current = false;
@@ -441,6 +414,7 @@ export function useDrawingTools({
         fillColor2: next.style!.fillColor2,
         gradientAngle: next.style!.gradientAngle,
         fillBlock: next.style!.fillBlock,
+        starPoints: next.style!.starPoints,
       };
       prevStyleSettingsRef.current = synced;
       useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
@@ -452,7 +426,7 @@ export function useDrawingTools({
         key: `s${id}`,
         type: "shape",
         id,
-        label: shapeName,
+        label: next.style?.shape ?? "rect",
       });
     },
     [toolRef, commitEdit, flushToCanvas],
@@ -588,12 +562,22 @@ export function useDrawingTools({
     };
   }, [annotationsRevision, refreshShapes, toolRef]);
 
-  /** Overlay handle drags push new geometry here (canvas coords). */
-  const updateEditGeometry = useCallback((start: Point, end: Point) => {
+  // Publish which RESELECTED shape the edit box holds (see the store field).
+  // Derived here, from the one piece of state that knows, so every path that
+  // opens or clears the box — select, commit, cancel, undo removing it — is
+  // covered without each remembering to write it.
+  const editingKind = editState?.editId != null ? (editState.style?.kindByte ?? null) : null;
+  useEffect(() => {
+    useAnnotationStore.getState().setEditingShapeKind(editingKind);
+  }, [editingKind]);
+
+  /** Overlay handle drags push new geometry here (canvas coords). `rotation`
+   *  is passed only by the rotate handle; every other drag leaves it as is. */
+  const updateEditGeometry = useCallback((start: Point, end: Point, rotation?: number) => {
     editDirtyRef.current = true;
     setEditState((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, start, end };
+      const next = rotation === undefined ? { ...prev, start, end } : { ...prev, start, end, rotation };
       editStateRef.current = next;
       return next;
     });
@@ -887,6 +871,7 @@ export function useDrawingTools({
           settings.strokeColor,
           settings.strokeWidth,
           settings.sloppiness ?? 0,
+          settings.starPoints ?? 5,
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
