@@ -114,6 +114,23 @@
   --popover-foreground: var(--text-primary);
   --primary: #c98f3f;
   --primary-foreground: #3a3128;
+
+  /* Lit-tile ink. A SELECTED tile draws its label and border from this rather
+     than from --primary, because --primary is a brand colour chosen to look
+     right as a fill and it is too light to be read as text on its own 20% tint:
+     #c98f3f on rgb(241,228,209) measures 2.24:1, and its border against a panel
+     is 2.67:1. Both fail AA, on every selected tile in the app.
+
+     Darkening the fill instead cannot work — swept k = 1.00 to 0.30 and no
+     value clears both gates at once, because a darker fill helps its own edge
+     and ruins the dark label sitting on it.
+
+     Measured, light theme: label 5.02:1 on the unchanged tint, border 6.00:1
+     against a panel and 6.31:1 against an elevated surface.
+     DARK IS DELIBERATELY THE SAME VALUE AS --primary below: dark already
+     measures 8.05:1 and 13.93:1, so it needs no darkening and gets none. */
+  --primary-strong: #7d5927;
+
   --secondary: #efe7d8;
   --secondary-foreground: #5c4326;
   --muted: #ece6db;
@@ -195,6 +212,9 @@
   --popover-foreground: var(--text-primary);
   --primary: #fcdfc2;
   --primary-foreground: #3a3128;
+  /* Same as --primary on purpose — see the light-theme note. Dark already
+     passes, so a lit tile reads exactly as it did. */
+  --primary-strong: #fcdfc2;
   --secondary: #3a3128;
   --secondary-foreground: #fcdfc2;
   --muted: #222222;
@@ -269,6 +289,7 @@
   --color-theme-foreground: var(--foreground);
   --color-theme-primary: var(--primary);
   --color-theme-primary-foreground: var(--primary-foreground);
+  --color-theme-primary-strong: var(--primary-strong);
   --color-theme-secondary: var(--secondary-foreground);
   --color-theme-muted: var(--bg-elevated);
   --color-theme-muted-foreground: var(--muted-foreground);

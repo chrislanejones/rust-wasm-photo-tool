@@ -41,8 +41,14 @@ const stackedCls = "flex-col gap-1.5 py-3 [&_svg]:h-6 [&_svg]:w-6";
 const inactive =
   "border-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:bg-theme-muted/30";
 
+// The FILL stays --primary at 20%; the label and border come from
+// --primary-strong, which is a darker amber in light theme and identical to
+// --primary in dark. Light went from 2.24:1 text / 2.67:1 border (both failing
+// AA on every selected tile) to 5.02:1 and 6.00:1; dark is byte-identical to
+// before. The reasoning and the rejected alternative live on the token in
+// styles.css.
 const activeCls =
-  "border-theme-primary bg-theme-primary/20 text-theme-primary";
+  "border-theme-primary-strong bg-theme-primary/20 text-theme-primary-strong";
 
 export const ToolButton = React.forwardRef<HTMLButtonElement, ToolButtonProps>(
   (
