@@ -86,10 +86,14 @@ check() {
   fi
 }
 
+# ⚠️ NO FILE EXEMPTIONS ANY MORE. This used to skip CompareSlider,
+# MagnifierOverlay, GalleryBar and Thumb, because each drew white ON TOP OF A
+# PHOTO and had nowhere to put it. They have somewhere now — `--on-photo`, one
+# value in both themes, because a photo is underneath rather than a theme
+# surface. All four were measured at ZERO after the conversion and the baseline
+# did not move, so the check simply covers four more files than it did.
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
-    -g '!**/CompareSlider.tsx' -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' \
-    -g '!**/Thumb.tsx' \
   | rg -v 'allow: raw-color' | wc -l)
 check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 

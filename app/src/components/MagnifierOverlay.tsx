@@ -47,7 +47,7 @@ export function MagnifierOverlay({ magnifier }: Props) {
 
   return (
     <div
-      className="pointer-events-none absolute z-[var(--z-dialog)] rounded-xl overflow-hidden shadow-2xl border border-white/20"
+      className="pointer-events-none absolute z-[var(--z-dialog)] rounded-xl overflow-hidden shadow-2xl border border-on-photo/20"
       style={{
         left: magnifier.screenX + offsetX,
         top: magnifier.screenY + offsetY,
@@ -55,7 +55,7 @@ export function MagnifierOverlay({ magnifier }: Props) {
       }}
     >
       <canvas ref={canvasRef} width={SIZE} height={SIZE} />
-      <div className="bg-black/80 px-2 py-1 text-center font-mono text-2xs text-white tracking-widest">
+      <div className="bg-black/80 px-2 py-1 text-center font-mono text-2xs text-on-photo tracking-widest">
         {magnifier.centerColor.toUpperCase()}
       </div>
     </div>

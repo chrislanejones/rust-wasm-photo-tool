@@ -160,6 +160,17 @@
      is 12.7:1. It is the palette's existing on-accent ink (`--primary-
      foreground`) promoted to a fill, so it introduces no new hue.
      Not defined again under `.dark` — a single value is the point. */
+  /* Ink drawn ON TOP OF A PHOTO — the gallery tile's badges and checkbox, the
+     compare slider's handle and labels, the magnifier's readout. Deliberately
+     ONE value for both themes, like --confirm above: a photo is underneath,
+     not a theme surface, so "white" here is not a light-theme choice that a
+     dark theme should answer. Naming it is the whole point — these were 15
+     anonymous `text-white`/`bg-white` classes, indistinguishable from a
+     theme-able white, and a future theme pass "fixing" them would make them
+     invisible over a pale photo. Every one of them already sits on a dark
+     scrim or a drop shadow for exactly that reason. */
+  --on-photo: #ffffff;
+
   --confirm: #3a3128;
   --confirm-foreground: #ffffff;
 
@@ -290,6 +301,7 @@
   --color-theme-primary: var(--primary);
   --color-theme-primary-foreground: var(--primary-foreground);
   --color-theme-primary-strong: var(--primary-strong);
+  --color-on-photo: var(--on-photo);
   --color-theme-secondary: var(--secondary-foreground);
   --color-theme-muted: var(--bg-elevated);
   --color-theme-muted-foreground: var(--muted-foreground);
