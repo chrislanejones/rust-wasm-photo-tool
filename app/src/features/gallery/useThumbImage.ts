@@ -25,6 +25,43 @@ export interface ThumbImage {
   pending: boolean;
 }
 
+export interface ThumbViewInput {
+  /** The object URL for the CURRENT blob. "" before the first effect runs. */
+  url: string;
+  /** The last URL that finished decoding. Only ever moves forward. */
+  shownUrl: string | null;
+  /** The last URL that failed to decode. */
+  failedUrl: string | null;
+}
+
+/**
+ * The whole decision, as a pure function of three strings — extracted so the
+ * truth table can be tested without a renderer, which this repo has no
+ * dependency for.
+ *
+ * ⚠️ `shownUrl` is deliberately NOT compared against `url`. That is the point.
+ * A tile mid-edit has `shownUrl` = the previous URL and `url` = the new one,
+ * and it must keep painting the previous picture rather than fall back to a
+ * placeholder — so "do I have something to paint?" asks only whether
+ * `shownUrl` exists. Requiring the two to match is exactly the bug the old
+ * develop had: it made a freshly-changed blob indistinguishable from a tile
+ * that had never loaded at all.
+ */
+export function thumbViewState({ url, shownUrl, failedUrl }: ThumbViewInput): {
+  src: string;
+  failed: boolean;
+  pending: boolean;
+} {
+  // Only the CURRENT url's failure counts. A stale failure from a blob that
+  // has since been replaced must not condemn the tile for ever.
+  const failed = failedUrl !== null && failedUrl === url;
+  return {
+    src: shownUrl ?? "",
+    failed,
+    pending: shownUrl === null && !failed,
+  };
+}
+
 /**
  * WHICH pixels a thumbnail paints, and whether it has any yet.
  *
@@ -83,23 +120,17 @@ export function useThumbImage(thumbBlob: Blob): ThumbImage {
     };
   }, [url]);
 
-  const failed = failedUrl !== null && failedUrl === url;
-  const pending = shownUrl === null && !failed;
+  const view = thumbViewState({ url, shownUrl, failedUrl });
 
   // Armed only while there is nothing to show, and never re-armed for a later
   // edit — the previous thumbnail covers that wait, so an edit must not be
   // able to flash a placeholder over a picture that is already on screen.
   const [graceOver, setGraceOver] = useState(false);
   useEffect(() => {
-    if (!pending) return;
+    if (!view.pending) return;
     const t = window.setTimeout(() => setGraceOver(true), THUMB_SKELETON_DELAY_MS);
     return () => window.clearTimeout(t);
-  }, [pending]);
+  }, [view.pending]);
 
-  return {
-    src: shownUrl ?? "",
-    showSkeleton: pending && graceOver,
-    failed,
-    pending,
-  };
+  return { ...view, showSkeleton: view.pending && graceOver };
 }

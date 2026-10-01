@@ -89,14 +89,21 @@ check() {
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
     -g '!**/CompareSlider.tsx' -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' \
+    -g '!**/Thumb.tsx' \
   | rg -v 'allow: raw-color' | wc -l)
 check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 7 "off-scale type / faux weights (§4)" "$n_type"
 
+# Thumb.tsx carries GalleryBar's exclusion because it carries GalleryBar's
+# code: the gallery tile was extracted out of that file, and the 7 raw-colour
+# and 7 z-index lines these two checks exempt went with it unchanged (22 + 7 =
+# 29 and 4 + 7 = 11 were the counts before the globs followed). Neither count
+# grew — a file boundary moved. This is the "it greps TEXT" property CLAUDE.md
+# warns about, read from the other direction.
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
-      -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx' | wc -l)
+      -g '!**/GalleryBar.tsx' -g '!**/Thumb.tsx' -g '!**/AppShell.tsx' | wc -l)
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
 # ── UI rules R1, R3 and raw <button> (UI Night 7, docs/UI_CONSISTENCY.md §6) ──
@@ -145,6 +152,28 @@ check "ui-raw-button" 35 "raw <button> outside components/ui/ — use ui/button"
 n_any=$(rg -n '\bas any\b' app/src -g '*.ts' -g '*.tsx' -g '!*.d.ts' \
   | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
 check "as-any" 0 "import real types (R7)" "$n_any"
+
+# NO GRAY PHOTOS. A thumbnail is a placeholder or the photo, and the
+# black-and-white "develop" that used to sit between them is deleted, not
+# disabled — `useThumbDevelop`, `thumbDevelop` and their constants are gone.
+#
+# It was removed because it could not be made to work: its effect reset the
+# loaded flag AFTER mount, so a cached blob that decoded first had its load
+# erased and the tile stayed gray for good; `loading="lazy"` left off-screen
+# tiles gray until scrolled; and one module-level turn queue was shared by the
+# strip and the grid. A tile stuck half-developed reads as a broken image, and
+# the rule that prevents it is the absence of a gray state, not a better
+# scheduler.
+#
+# Comment lines are excluded the same way as `as-any` above: this very
+# paragraph names the filter it greps for, and a gate that goes red on prose
+# explaining it is the failure documented in CLAUDE.md.
+#
+# Baseline 0. Verified by planting `filter: "grayscale(1)"` in a tile and
+# watching the count go to 1.
+n_gray=$(rg -n 'grayscale\(' app/src -g '*.ts' -g '*.tsx' -g '*.css' \
+  | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
+check "no-gray-photos" 0 "a thumbnail is a placeholder or the photo — never a gray photo" "$n_gray"
 
 # SIMD unsafe is expected here; the count keeps it from growing unnoticed.
 #
