@@ -271,7 +271,7 @@ function DownloadPanes({
               columns={3}
               value={LAYERED_IDS.includes(selectedValue) ? selectedValue : undefined}
               onChange={(id) => {
-                if (id !== "psd") onFormatChange(id);
+                if (!isPlaceholder(id)) onFormatChange(id);
               }}
               options={formatOptions.filter((o) => LAYERED_IDS.includes(o.id))}
             />
