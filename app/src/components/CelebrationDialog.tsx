@@ -3,16 +3,16 @@ import { motion } from "framer-motion";
 import {
   PartyPopper,
   Sparkles,
-  Eraser,
-  Aperture,
-  Layers,
-  LayoutGrid,
-  Palette,
-  MousePointerClick,
-  RotateCcw,
-  ScanEye,
-  Brush,
-  Gauge,
+  Star,
+  RotateCw,
+  Crop,
+  Plug,
+  FileImage,
+  Images,
+  Combine,
+  Type,
+  Wand2,
+  Download,
 } from "lucide-react";
 import {
   Dialog,
@@ -57,7 +57,9 @@ import { CELEBRATION_STATS } from "@/lib/celebrationStats";
  *  release headlines, newest first, and each one checked against
  *  `releases.ts` before it went in: worker v8.32, perspective v8.44–v8.49,
  *  reproducible builds v8.53, layer limit v8.54, cross-layer clicks v8.55,
- *  the mask tile and the upload bar v8.59.
+ *  the mask tile and the upload bar v8.59. Rewritten for September 2026
+ *  (v9.0–v9.6) on 09-30-2026; the v8-era chips above it had scrolled out of
+ *  living memory.
  *
  *  KEEP THE COUNT EVEN — they render in a `grid-cols-2`, so an odd number
  *  orphans the last chip in a half-empty row.
@@ -70,16 +72,16 @@ import { CELEBRATION_STATS } from "@/lib/celebrationStats";
  *  marketing site too, but a chip in the editor for something that only exists
  *  on the website reads as a feature the user cannot find. */
 const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-  { icon: Layers, label: "The engine moved into a worker" },
-  { icon: LayoutGrid, label: "Layers went from three to eight" },
-  { icon: ScanEye, label: "Perspective transform" },
-  { icon: MousePointerClick, label: "Clicking another layer stopped inventing one" },
-  { icon: Aperture, label: "Color Overlay on any layer" },
-  { icon: RotateCcw, label: "One Ctrl+Z is one step again" },
-  { icon: Eraser, label: "Delete removes the shape you picked" },
-  { icon: Palette, label: "Same binary three releases running" },
-  { icon: Brush, label: "Add mask tells you it picks up the brush" },
-  { icon: Gauge, label: "The upload bar stopped inventing progress" },
+  { icon: Star, label: "A triangle, and a star with 3 to 12 points" },
+  { icon: RotateCw, label: "A handle to turn any shape" },
+  { icon: Plug, label: "Plugins, added from a file you pick" },
+  { icon: Crop, label: "Batch Crop: every photo the same shape" },
+  { icon: FileImage, label: "An SVG comes back out as an SVG" },
+  { icon: Download, label: "AVIF export writes a real AVIF" },
+  { icon: Images, label: "Fast photo switching stopped losing edits" },
+  { icon: Combine, label: "Combine moved to Review, and takes objects" },
+  { icon: Wand2, label: "Select, then Refine, then a mask" },
+  { icon: Type, label: "The typeface you pick survives a reload" },
 ];
 
 const CONFETTI_COLORS = [

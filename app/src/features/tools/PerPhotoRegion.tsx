@@ -63,20 +63,25 @@ export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean
       data-switch-skeleton={(locked && slow) || undefined}
       className="per-photo-region"
     >
-      <p
-        key={flash}
-        className={`per-photo-name mb-4 truncate text-2xs text-theme-muted-foreground ${flash ? "per-photo-name-flash" : ""}`}
-        title={name}
-      >
-        {`${index + 1} of ${photos.length} · `}
-        <span className="text-theme-foreground">{name}</span>
-      </p>
       {locked && slow && (
         <span role="status" className="sr-only">
           {`Loading ${name}…`}
         </span>
       )}
       {children}
+      {/* The name sits UNDER the controls, in the same footer treatment as the
+          Layers panel's "Photo · no shapes or text" (Chris, 09-30-2026): a
+          rule, then muted text, nothing bold. It answers "whose values are
+          these" when you go looking, instead of taking the top of every panel.
+          The switch highlight still plays here — it is the cue that a photo
+          changed, and it reads the same at the bottom. */}
+      <p
+        key={flash}
+        className={`per-photo-name truncate ${flash ? "per-photo-name-flash" : ""}`}
+        title={name}
+      >
+        {`${index + 1} of ${photos.length} · ${name}`}
+      </p>
     </div>
   );
 }

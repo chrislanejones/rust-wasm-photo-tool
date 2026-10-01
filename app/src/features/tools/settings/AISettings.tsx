@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Scissors, Eraser, BroomSparkles, Trash2, Lock, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { AdvancedStabilizer } from "./StabilizerRow";
+import { StabilizerRow } from "./StabilizerRow";
 import { Kbd } from "@/components/ui/kbd";
 import { ToolPanel } from "@/components/ui/tool-panel";
 import { SizeSlider } from "@/components/ui/size-slider";
@@ -302,7 +302,7 @@ export function AISettings({
               Paint brush and the Eraser". There was simply no control, so a
               working feature was unreachable from this panel. It sits in
               Advanced, exactly as in Paint; the closed summary says the level. */}
-          <AdvancedStabilizer
+          <StabilizerRow
             value={settings.paintStabilizer}
             onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
           />
@@ -337,7 +337,7 @@ export function AISettings({
             />
             {/* Last in the row, matching Brush Eraser above. The mask drag is
                 the same paint stroke engine, so the same leash applies. */}
-            <AdvancedStabilizer
+            <StabilizerRow
               value={settings.paintStabilizer}
               onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
             />
