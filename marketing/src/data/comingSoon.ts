@@ -27,8 +27,8 @@ export const GROUPS: Group[] = [
     blurb: "Real work, already in the repo, with a branch or a decision behind it.",
     items: [
       {
-        name: "More shapes, and shapes you can turn",
-        body: "A triangle, a star with as many points as you want, and a handle on every shape so you can rotate it. Hold Shift and it snaps.",
+        name: "Photoshop files, in and out",
+        body: "Open a .psd with its layers, and save your work as one. It is a plugin, built and working, with nowhere to download it from yet.",
       },
       {
         name: "Send a photo to your other device",
@@ -69,7 +69,7 @@ export const GROUPS: Group[] = [
       { name: "Talk to it", body: "Say what you want changed instead of finding the tool." },
       {
         name: "Your own tools, plugged in",
-        body: "A plugin door, so a tool someone else writes can sit in the toolbar beside the built-in ones.",
+        body: "The door is open for file formats: add a plugin in Settings and its format joins the Download dialog. A plugin that adds a tool to the toolbar is the half still to come.",
       },
     ],
   },
@@ -92,7 +92,6 @@ export const GROUPS: Group[] = [
         name: "Two people, one photo, at the same time",
         body: "The furthest thing on the list, and the one everything else is quietly building toward.",
       },
-      { name: "Photoshop files, in and out" },
       { name: "Color-blind-safe previews" },
     ],
   },

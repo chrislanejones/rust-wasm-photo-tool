@@ -125,8 +125,10 @@ export const CARD_COPY: Record<string, CardCopy> = {
   Shapes: {
     group: "annotate",
     title: "Shapes",
-    plain: "Rectangles, circles and lines — firm, or hand-drawn with the Sloppiness slider.",
-    detail: "Rendered in WASM; Create → Shapes, with Arrow and Pins as their own sub-tools.",
+    plain:
+      "Rectangles, circles, lines, diamonds, triangles and stars — firm, or hand-drawn with the Sloppiness slider. Pick how many points the star has, and turn any shape by its handle.",
+    detail:
+      "Rendered in WASM; Create → Shapes, with Arrow and Pins as their own sub-tools. Rotation is an angle beside the upright box, so a turned shape stays crisp and keeps its fill; Shift snaps to 15°.",
   },
   Text: {
     group: "annotate",
@@ -224,8 +226,10 @@ export const CARD_COPY: Record<string, CardCopy> = {
   "Copy/Paste Regions": {
     group: "select",
     title: "Copy / Paste regions",
-    plain: "Copy a region from one photo and paste it into another, or paste from your clipboard.",
-    detail: "Cross-photo pixel compositing with alpha blending.",
+    plain:
+      "Copy a region from one photo and paste it into another, or paste from your clipboard — then move, resize and turn it before it lands.",
+    detail:
+      "Cross-photo pixel compositing with alpha blending. The placement box has a rotate handle (Shift snaps to 15°); the preview samples nearest-neighbour and the commit resamples smoothly.",
   },
   "Color Picker": {
     group: "select",
@@ -372,8 +376,10 @@ export const CARD_COPY: Record<string, CardCopy> = {
   Export: {
     group: "export",
     title: "Export",
-    plain: "Save the finished photo losslessly or compressed.",
-    detail: "Lossless PNG via the Rust encoder; JPEG/WebP/AVIF via the browser.",
+    plain:
+      "Save the finished photo losslessly or compressed — and an SVG you uploaded comes back out as an SVG.",
+    detail:
+      "Lossless PNG via the Rust encoder; JPEG and WebP via the browser; AVIF through an encoder that loads on first use. An uploaded SVG is rewritten with its crop, so it stays a vector.",
   },
   "Export Dropdown": {
     group: "export",

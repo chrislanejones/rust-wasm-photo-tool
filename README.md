@@ -86,6 +86,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v9.6 — 2026-09-30
+
+**A triangle, a star with as many points as you want, a handle to turn any shape, and a door for plugins.**
+
+Shapes gained a triangle and a star whose point count you pick, from 3 to 12.
+Every shape now has a hook under its box: drag it to turn the shape, and hold
+Shift to snap to 15°. A line turns by its endpoints instead. A turned shape
+stays crisp and keeps its fill, because the angle is stored beside the upright
+box rather than baked into pixels.
+
+A pasted region turns too, before it lands — move it, resize it, turn it, then
+commit.
+
+**Settings → Plugins** is new. A plugin is one file from outside Image Horse
+that you add yourself, from a file or a link, and it stays in that browser on
+that device. Nothing is fetched on its own, and everything is off until you
+switch it on. The first plugin adds Photoshop PSD, in and out, and lives in its
+own repository.
+
+The Batch and Edit panels use one button, one field and one tile grid
+throughout, instead of each panel's own. The Dev Tests tab is gone.
+
+⚠️ **Saved work now uses op-log v9.** A build older than this one cannot read a
+document saved by it.
+
 ### v9.5 — 2026-09-30
 
 **Switching photos fast no longer loses or mixes up your edits, SVGs come back out as SVGs, and AVIF is a real AVIF.**

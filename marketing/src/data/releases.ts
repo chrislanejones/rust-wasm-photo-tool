@@ -24,6 +24,53 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.6",
+    date: "2026-09-30",
+    headline: "A triangle, a star with as many points as you want, a handle to turn any shape, and a door for plugins.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Shapes gained a triangle, and a star whose point count you pick \u2014 anywhere from 3 to 12.",
+      },
+      {
+        tag: "feature",
+        text: "Every shape now has a hook under its box. Drag it to turn the shape, and hold Shift to snap to 15\u00b0. A line turns by its endpoints instead. A turned shape stays crisp and keeps its fill, because the angle is kept beside the upright box rather than baked into the pixels.",
+      },
+      {
+        tag: "feature",
+        text: "A pasted region turns too, before it lands. Move it, resize it, turn it, then commit \u2014 and it comes out smooth, not jagged.",
+      },
+      {
+        tag: "feature",
+        text: "Settings \u203a Plugins. A plugin is one file from outside Image Horse that you add yourself, from a file or a link. It stays in that browser on that device, nothing is fetched on its own, and everything is off until you switch it on. A plugin that adds a file format puts its format in the Download dialog and in Import / Export; opening a file always makes a new photo, never replacing the one you have open.",
+      },
+      {
+        tag: "feature",
+        text: "The first plugin is Photoshop PSD, in and out, and it lives in its own repository. It is built and working, with nowhere to download it from yet.",
+      },
+      {
+        tag: "ui",
+        text: "The Batch and Edit panels use one button, one field and one tile grid throughout, instead of each panel having its own.",
+      },
+      {
+        tag: "ui",
+        text: "The Dev Tests tab is gone from Settings. It opened dialogs in isolation for development and had no reason to be there.",
+      },
+      {
+        tag: "fix",
+        text: "With a plugin added, its tile in the Download dialog lit up but clicking it did nothing. Nobody could have hit this \u2014 no plugin had been released \u2014 but it would have been the first thing anyone tried.",
+      },
+      {
+        tag: "rust",
+        text: "The engine turns a shape by rotating its outline points rather than its pixels, so a turned shape has the same crisp edges as an upright one. Rotated pastes resample properly on commit. The engine is 828,248 bytes, 31,752 under its ceiling.",
+      },
+      {
+        tag: "infra",
+        text: "Saved work moved to op-log v9. Documents saved by older builds still open; a build older than this one cannot read what this one saves.",
+      },
+    ],
+  },
+  {
     version: "v9.5",
     date: "2026-09-30",
     headline: "Switching photos fast no longer loses or mixes up your edits, SVGs come back out as SVGs, and AVIF is a real AVIF.",
