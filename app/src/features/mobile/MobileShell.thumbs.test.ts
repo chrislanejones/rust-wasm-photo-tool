@@ -182,9 +182,16 @@ describe("the phone grid draws a photo or a placeholder, never both and never gr
       vi.advanceTimersByTime(THUMB_SKELETON_DELAY_MS * 4);
     });
     // Still the OLD picture, and no placeholder — even well past the grace
-    // period, because the grace timer is never re-armed once a tile has pixels.
+    // period, because `src` is whatever last DECODED, not whatever the current
+    // blob is. ⚠️ Asserting the placeholder alone is not enough and a mutation
+    // run proved it: the markup only reaches the placeholder branch when there
+    // is no `src` at all, so "no placeholder" here is true however `pending`
+    // is computed. The src assertion is the one that bites.
     expect(placeholders()).toHaveLength(0);
     expect(tiles()[0]!.querySelector("img")!.getAttribute("src")).toBe("blob:fake/1");
+    // And the grid must not re-announce itself busy for a photo that is
+    // already on screen — the other half of `pending`, invisible on its own.
+    expect(grid().getAttribute("aria-busy")).toBe("false");
 
     decodeLatest();
     expect(tiles()[0]!.querySelector("img")!.getAttribute("src")).toBe("blob:fake/2");
