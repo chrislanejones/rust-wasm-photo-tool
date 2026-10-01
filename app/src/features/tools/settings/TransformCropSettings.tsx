@@ -21,6 +21,7 @@ import { useToolStore } from "@/stores/useToolStore";
 import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
 import { PANEL_DIVIDER } from "@/lib/styles";
+import { Button } from "@/components/ui/button";
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
  * "free" leaves the user dragging without constraint; everything else
@@ -318,13 +319,13 @@ export function TransformCropSettings({
                 <span className="text-2xs font-semibold font-mono text-theme-muted-foreground">
                   Recent Colors
                 </span>
-                <button
-                  type="button"
-                  className="text-2xs text-theme-muted-foreground hover:text-theme-foreground underline underline-offset-2"
+                <Button
+                  variant="link"
+                  className="text-2xs text-theme-muted-foreground hover:text-theme-foreground"
                   onClick={clearPickedColors}
                 >
                   Clear
-                </button>
+                </Button>
               </div>
               <div className="history-list max-h-40">
                 {pickedColorHistory.map((hex) => (

@@ -5,6 +5,7 @@
 // full; the New dialog carries the same switch.
 import { CloudOff } from "lucide-react";
 import { navigateTo } from "@/features/routing";
+import { Button } from "@/components/ui/button";
 
 export function OnlineFeaturesOffNotice({ what }: { what: string }) {
   return (
@@ -14,13 +15,13 @@ export function OnlineFeaturesOffNotice({ what }: { what: string }) {
         <p className="text-2xs leading-relaxed text-text-secondary">
           Online features are off, so nothing leaves this tab. {what}
         </p>
-        <button
-          type="button"
+        <Button
+          variant="link"
           onClick={() => navigateTo({ kind: "settings", tab: "security" })}
-          className="text-2xs font-semibold text-text-primary underline underline-offset-2 hover:text-theme-primary"
+          className="text-2xs font-semibold text-text-primary hover:text-theme-primary"
         >
           Turn them on in Settings › Security
-        </button>
+        </Button>
       </div>
     </div>
   );

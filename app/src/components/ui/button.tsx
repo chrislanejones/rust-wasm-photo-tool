@@ -50,11 +50,17 @@ const SECONDARY =
   "hover:brightness-110 hover:border-border " +
   "disabled:cursor-not-allowed disabled:bg-bg-tertiary disabled:text-text-muted disabled:hover:brightness-100";
 
-// Reads as a link, not a button: no box, no padding, underline on hover.
+// Reads as a link, not a button: no box, no padding, underlined.
+//
+// Deliberately carries NO colour and NO size. The two call sites want
+// different ones — one is `text-text-primary` hovering to the accent, the other
+// `text-theme-muted-foreground` hovering to the foreground — so a colour here
+// would be overridden at both of them and would only be a third opinion. It
+// does set `font-normal`, because the shared text geometry is `font-semibold`
+// and a link that inherited that would be bolder than the one it replaced.
 const LINK =
-  "border-0 bg-transparent px-0 py-0 text-text-secondary underline-offset-2 " +
-  "hover:text-text-primary hover:underline " +
-  "disabled:cursor-not-allowed disabled:text-text-muted disabled:hover:no-underline";
+  "border-0 bg-transparent px-0 py-0 font-normal underline underline-offset-2 " +
+  "disabled:cursor-not-allowed disabled:text-text-muted disabled:no-underline";
 
 const buttonVariants = cva("", {
   variants: {
