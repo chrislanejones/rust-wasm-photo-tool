@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ImageOff,
   ImagePlus,
   Settings,
   Trash2,
@@ -31,6 +32,7 @@ import { formatBytes } from "@/lib/format";
 import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { useThumbImage } from "@/features/gallery/useThumbImage";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -46,23 +48,45 @@ interface Props {
 }
 
 /** Gallery tile — the vertical GalleryBar's square thumb, minus everything
- *  editorial (selection, compression overlays, hover chrome). */
+ *  editorial (selection, compression overlays, hover chrome).
+ *
+ *  ⚠️ IT SHARES THE DECODE, NOT THE COMPONENT. `Thumb` carries the whole
+ *  editorial surface this file's first comment exists to exclude, so what is
+ *  shared is `useThumbImage` — the rule and the race fix — while the markup
+ *  stays the phone's own. The hook is the part that was wrong here.
+ *
+ *  What this had instead, and why each was a bug:
+ *
+ *    · `useState(true)` for `loading`, so EVERY tile drew a placeholder on
+ *      every open, including the cached ones that decode in single-digit
+ *      milliseconds. A twelve-photo grid flashed twelve grey boxes. The hook's
+ *      300 ms of grace means an ordinary open shows only photos.
+ *    · `setLoading(true)` inside the blob effect, so an edit blanked the tile
+ *      and covered it with a placeholder. The hook decodes off-DOM and swaps,
+ *      so the previous picture stays up until the new one is ready.
+ *    · `onError` set `loading = false` with nothing to show for it, leaving a
+ *      bare checkerboard square and no reason. There is an error state now.
+ *    · The placeholder carried its own `aria-label`, so a screen reader on a
+ *      100-photo grid heard "Loading <name>" a hundred times. One `aria-busy`
+ *      on the grid, tiles `decorative`. */
 function MobileThumb({
   entry,
   onOpen,
+  onPendingChange,
 }: {
   entry: PhotoEntry;
   onOpen: () => void;
+  /** Report whether this tile still has no pixels, for the grid's one `aria-busy`. */
+  onPendingChange: (id: string, pending: boolean) => void;
 }) {
-  const [loading, setLoading] = useState(true);
-  const [thumbUrl, setThumbUrl] = useState("");
+  const thumb = useThumbImage(entry.thumbBlob);
 
+  // Cleared on unmount as well, or a tile deleted mid-decode leaves the grid
+  // busy for ever — and the phone is where tiles get deleted.
   useEffect(() => {
-    const url = URL.createObjectURL(entry.thumbBlob);
-    setThumbUrl(url);
-    setLoading(true);
-    return () => URL.revokeObjectURL(url);
-  }, [entry.thumbBlob]);
+    onPendingChange(entry.id, thumb.pending);
+  }, [onPendingChange, entry.id, thumb.pending]);
+  useEffect(() => () => onPendingChange(entry.id, false), [onPendingChange, entry.id]);
 
   return (
     <button
@@ -71,21 +95,35 @@ function MobileThumb({
       className="photo-thumb photo-thumb-grid relative"
       onClick={onOpen}
     >
-      <div className="absolute inset-0 checkerboard rounded-lg" />
-      <img
-        src={thumbUrl || undefined}
-        alt={entry.name}
-        draggable={false}
-        decoding="async"
-        loading="lazy"
-        onLoad={() => setLoading(false)}
-        onError={() => setLoading(false)}
-      />
-      {loading && (
-        <Skeleton
-          className="absolute inset-0 z-[var(--z-canvas-overlay)] rounded-lg"
-          aria-label={`Loading ${entry.name}`}
-        />
+      {/* Only once there is a picture. Rendered unconditionally it shows
+          through the placeholder — a checkerboard where a photo is supposed to
+          be arriving, which reads as a failed load. */}
+      {thumb.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
+
+      {/* ⚠️ Every branch is in flow at the same size. This grid is
+          `content-start items-start`, so a tile's row height comes from its
+          in-flow child; an absolutely-positioned placeholder collapses the row
+          and every tile below it jumps when the photo lands. The old
+          `absolute inset-0` placeholder got away with it only because the
+          `<img>` underneath kept its `aspect-ratio: 1` box even with no src. */}
+      {thumb.src ? (
+        <img src={thumb.src} alt={entry.name} draggable={false} decoding="async" />
+      ) : thumb.failed ? (
+        <div
+          className="flex w-full aspect-square flex-col items-center justify-center gap-1 rounded-md bg-bg-elevated px-1 text-center"
+          role="img"
+          aria-label={`${entry.name} could not be displayed`}
+        >
+          <ImageOff className="h-5 w-5 text-text-muted" aria-hidden="true" />
+          <span className="line-clamp-2 break-all text-2xs text-text-muted">{entry.name}</span>
+        </div>
+      ) : (
+        /* Inside the grace period `loading={false}` renders the child instead —
+           an invisible box of the same size, so a fast decode shows nothing at
+           all and the tile never changes size on the way. */
+        <Skeleton variant="tile" decorative loading={thumb.showSkeleton} className="w-full">
+          <div className="w-full aspect-square" aria-hidden="true" />
+        </Skeleton>
       )}
     </button>
   );
@@ -289,6 +327,21 @@ export function MobileShell({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
+
+  // Which tiles have no pixels yet, summed into the grid's one `aria-busy`.
+  // A Set of ids rather than a count because a tile can report the same value
+  // twice (React may re-run the effect) and a counter would drift; the id is
+  // idempotent.
+  const [pendingThumbs, setPendingThumbs] = useState<ReadonlySet<string>>(() => new Set());
+  const reportThumbPending = useCallback((id: string, pending: boolean) => {
+    setPendingThumbs((prev) => {
+      if (prev.has(id) === pending) return prev;
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   // Store flag, not a local useState: dialog visibility is UI-chrome state and
   // every other dialog in the app already lives in useUIStore. It also means a
   // future entry point (a palette command, a `#/settings` deep link) can open
@@ -412,12 +465,20 @@ export function MobileShell({
       ) : (
         <>
           <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-24">
-            <div className="grid grid-cols-3 content-start items-start gap-2">
+            {/* ONE `aria-busy` for the grid, not one per tile. Thirty tiles
+                each announcing their own "Loading" is a worse experience than
+                silence; the grid says it once while any tile is still
+                decoding, and the tile placeholders are `decorative`. */}
+            <div
+              className="grid grid-cols-3 content-start items-start gap-2"
+              aria-busy={pendingThumbs.size > 0}
+            >
               {photos.map((entry) => (
                 <MobileThumb
                   key={entry.id}
                   entry={entry}
                   onOpen={() => setViewerId(entry.id)}
+                  onPendingChange={reportThumbPending}
                 />
               ))}
             </div>
