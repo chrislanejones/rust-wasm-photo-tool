@@ -82,7 +82,7 @@ const GROUPS: Group[] = [
       ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust", "demo free pro"],
       ["describe", "Local image description — names a photo from its content, no account", "demo free pro"],
       // The design said "format v6". OP_FORMAT_VERSION in src/ops.rs is 8.
-      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v8", "demo free pro"],
+      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v9", "demo free pro"],
       ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill", "demo free pro"],
       ["simd", "v128/f32x4 kernels · scalar fallback", "demo free pro"],
     ],
@@ -194,7 +194,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v8.90, 09-22-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.6, 09-30-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -301,7 +301,7 @@ export default function Architecture() {
                 <p className="arch-node__sub">IndexedDB · Dexie</p>
                 <ul className="arch-node__list">
                   <li>originals — content-addressed (SHA-256), immutable</li>
-                  <li>opLogs + keyframes — the op format is at v8</li>
+                  <li>opLogs + keyframes — the op format is at v9</li>
                   <li>gallery manifest</li>
                   <li>renderCache — disposable</li>
                 </ul>
