@@ -68,7 +68,14 @@ export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean
           {`Loading ${name}…`}
         </span>
       )}
-      {children}
+      {/* A GROWING body, so the footer below is pushed to the bottom of the
+          column rather than sitting wherever the controls happen to end
+          (Chris, 10-01-2026: "# of # always at the bottom of the column — in
+          the footer"). A `margin-top: auto` on the line itself would do the
+          same push but would eat its 6px gap whenever a panel is tall enough
+          to fill the column, leaving the rule flush against the last control.
+          A spacer keeps one rule for both cases. */}
+      <div className="per-photo-body">{children}</div>
       {/* The name sits UNDER the controls, in the same footer treatment as the
           Layers panel's "Photo · no shapes or text" (Chris, 09-30-2026): a
           rule, then muted text, nothing bold. It answers "whose values are

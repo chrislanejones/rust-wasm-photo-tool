@@ -717,6 +717,19 @@ html.reduce-motion .skeleton::after {
    bold text"). Same rule, same muted colour, same size; deliberately NOT
    .layers-summary-name's font-weight 600. The flash below tints the whole
    line, so it needs the radius and a little padding to tint. */
+/* The region fills the tool column so its footer can sit on the floor of the
+   panel. `flex: 1 0 auto` grows into the spare height but never shrinks below
+   its content, so a panel taller than the column still scrolls instead of
+   being squashed. */
+.per-photo-region {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+.per-photo-body {
+  flex: 1 0 auto;
+}
+
 .per-photo-name {
   margin-top: 6px;
   padding: 6px 8px 2px;
