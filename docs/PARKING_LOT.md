@@ -3849,3 +3849,51 @@ harness in `~/ai-repo/_preserved/visual-diff/`. Not a rider on a feature.
 by pointing at `librs-lines`, which Chris retired on 09-25-2026. The placements
 are still fine; only the stated reason is stale. Reword them the next time each
 file is touched. Not worth an engine-gate run on its own.
+
+---
+
+### Two e2e specs went red when #283 moved the Stabilizer (10-01-2026)
+
+Found running the full Playwright suite on `feat/gallery-skeletons-switch`:
+**68 passed, 2 failed, and both failures reproduce on master `2d7d17d4`** — they
+are not the branch's. Both are tests encoding the panel layout #283
+deliberately changed, and **neither is a product bug.**
+
+**They shipped in v9.7 unnoticed because CI does not run this suite.**
+`.github/workflows/ci.yml` runs only `e2e/no-sw-default.spec.ts` and
+`pnpm run test:e2e:sw`; the other 70 tests are a local-only gate. #283 was
+green on 16 checks with one of these already red. (Mirror image of the
+`guardrails.sh` note in CLAUDE.md: there, a blocking CI job no local gate runs;
+here, a local gate no CI job runs.)
+
+**1. `ui-night3-panels.spec.ts:110` — "Eraser: the stabilizer is in Advanced,
+collapsed, and its summary says the level."** It asserts the Stroke Stabilizer
+is *inside* Advanced and that Advanced's summary reads "Stabilizer: Off". #283
+moved the Stabilizer *out* into the open and gave Advanced to Placement, so the
+test states the old intent. Rewrite it to the new one: the Stabilizer radiogroup
+is visible without opening anything.
+
+**2. `select-refine-mask.spec.ts:124` — "a Refine slider previews on a copy;
+Apply is one undo step."** Fails on `applied.selected > before.selected`:
+94,380 → **92,778**, i.e. the selection SHRANK after an Expand of +8.
+
+It is not Expand that ran. Probed in the browser: at that point in the test the
+panel has exactly three sliders — **Tolerance, Edge sensitivity, Holes** — and
+**no Expand slider at all.** `setSlider`'s xpath
+
+```
+//*[normalize-space(text())="Expand"]/ancestor::*[.//input[@type="range"]][1]//input[@type="range"]
+```
+
+still matches exactly **one** element, and it is the **Holes** slider
+(`aria-label="Holes"`). So the test sets Holes = 8, filling holes shrinks the
+count in this fixture, and the assertion fails against a control it never meant
+to touch.
+
+Worse than a timeout: the selector did not fail, it **silently rebound**, and
+the assertion ran anyway. Fix by addressing the slider by its accessible name
+(`getByRole("slider", { name: "Expand" })`) and asserting it exists, and by
+opening whatever now holds Expand. The xpath-by-nearby-text helper should go.
+
+**Do it when** there is a session for #283 follow-ups. Left out of the Plan A
+PR on purpose — different target, and mixing them would hide both.
