@@ -3852,7 +3852,7 @@ file is touched. Not worth an engine-gate run on its own.
 
 ---
 
-### Three e2e reds in the full suite (10-01-2026) — two from #283, one order-dependent
+### Three e2e reds in the full suite (10-01-2026) — two from #283, one flaky
 
 Found running the full Playwright suite on `feat/gallery-skeletons-switch`:
 **68 passed, 2 failed, and both failures reproduce on master `2d7d17d4`** — they
@@ -3899,15 +3899,23 @@ opening whatever now holds Expand. The xpath-by-nearby-text helper should go.
 PR on purpose — different target, and mixing them would hide both.
 
 **3. `batch-crop-frame.spec.ts:87` — "thumbnails shade on release, Shift-drag
-breaks the ratio, Enter crops all."** Found on the second full-suite run of
-`feat/gallery-skeletons-switch`. **It passes when run alone** (both tests in
-that file green, 6.3 s), so it is order-dependent rather than a regression —
-and it was green in the first full-suite run of the same commit range, so it is
-intermittent in the suite as well.
+breaks the ratio, Enter crops all."** **FLAKY, and measured as flaky rather
+than assumed:**
+
+| Run | Result |
+|---|---|
+| Full suite, run 1 | **failed** (6.0 s) |
+| That file alone | passed (6.3 s) |
+| Full suite, run 2 | **passed** (6.8 s) |
+
+Same commit, same machine, no code change between them. So it is neither a
+regression from this branch nor deterministically order-dependent — it is
+intermittent, and a single green suite run does not clear it.
 
 Not diagnosed. The suite is `fullyParallel: false, workers: 1`, so the usual
-suspects are a leaked `localStorage`/IndexedDB preference from an earlier spec
-or a timing dependency on the preview server being warm. Worth characterising
+suspects are a timing dependency (the test drags a frame and asserts on
+release) or a leaked `localStorage`/IndexedDB preference from an earlier spec.
+Being timing-shaped, the drag is the first place to look. Worth characterising
 before anyone trusts a "the suite is green" claim: with three reds of three
 different kinds, the suite's signal is weak in exactly the way
 [[feedback_red_test_row_is_a_harness_claim]] describes.
