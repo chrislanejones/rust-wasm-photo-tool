@@ -16,7 +16,6 @@ import {
   Gauge,
   Shield,
   ShieldCheck,
-  FlaskConical,
   Layers,
   RefreshCw,
   Share2,
@@ -46,7 +45,6 @@ import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { PluginsPane } from "@/components/PluginsPane";
 import { AIUsagePane } from "@/components/AIUsagePane";
-import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -81,7 +79,6 @@ export type SettingsTab =
   | "storage"
   | "billing"
   | "aiusage"
-  | "devtests"
   | "superuser";
 
 /** Human-readable summary of what changed, for the Apply toast. */
@@ -169,7 +166,6 @@ export function SubscriptionButton({
     storage: Cloud,
     billing: CreditCard,
     aiusage: Gauge,
-    devtests: FlaskConical,
     superuser: ShieldCheck,
   };
   const TAB_ORDER: SettingsTab[] = [
@@ -185,7 +181,6 @@ export function SubscriptionButton({
     "billing",
     "aiusage",
     "beta",
-    "devtests",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] =
@@ -368,8 +363,6 @@ export function SubscriptionButton({
             ) : tab === "beta" ? (
               /* Switches commit as pressed (see BetaPane), so no Apply. */
               <BetaPane />
-            ) : tab === "devtests" ? (
-              <DevTestsPane />
             ) : tab === "superuser" && superUser ? (
               <SuperUserPane {...superUser} />
             ) : (

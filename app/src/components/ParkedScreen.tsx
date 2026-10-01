@@ -4,8 +4,7 @@
 // dialog.
 //
 // The two screens mean the same thing to the user, so they are the same
-// component — they used to be two byte-identical cards, plus a third wrapper
-// (IdleScreenDialog) that boxed the idle card again for the Dev Tests preview.
+// component — they used to be two byte-identical cards.
 //
 // Not dismissable in the app. Esc and click-outside do nothing; the button is
 // the only exit. For the idle screen that keeps the editor covered while the
@@ -29,9 +28,6 @@ export interface ParkedScreenProps {
   children: React.ReactNode;
   actionLabel: string;
   onAction: () => void;
-  /** Settings → Dev Tests preview: X / Esc / click-outside close it (as the
-   *  action), and it stacks above the Settings modal instead of at --z-idle. */
-  preview?: boolean;
 }
 
 export function ParkedScreen({
@@ -41,21 +37,15 @@ export function ParkedScreen({
   children,
   actionLabel,
   onAction,
-  preview = false,
 }: ParkedScreenProps) {
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o && preview) onAction();
-      }}
-    >
+    <Dialog open={open}>
       {/* `size="sm"` is ui/dialog's notice card — this used to be a
           transparent DialogContent wrapping a hand-built copy of it. */}
       <DialogContent
         size="sm"
-        overlayClassName={preview ? undefined : "z-[var(--z-idle)]"}
-        className={preview ? "z-[var(--z-devpreview)]" : "z-[var(--z-idle)]"}
+        overlayClassName="z-[var(--z-idle)]"
+        className="z-[var(--z-idle)]"
       >
         <Icon className="mx-auto h-8 w-8 text-text-muted" aria-hidden />
         <DialogTitle className="mt-3 text-base font-semibold leading-normal tracking-normal text-text-primary">
