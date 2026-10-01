@@ -1858,6 +1858,20 @@ kbd {
   }
 }
 
+/* An icon button with no surface until you touch it — `Button variant="ghost"`
+   at size tiny/xs. It has to be a CSS modifier rather than Tailwind utilities
+   because `.btn-icon` above sets background, border and colour as plain CSS
+   properties, and an unlayered rule like that is not reliably beaten by a
+   utility. Same shape as `.btn-icon-xs`, which modifies the same base. */
+.btn-icon-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn-icon-ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: transparent;
+}
+
 .btn-icon:hover:not(:disabled) {
   background: var(--bg-tertiary);
   border-color: var(--border-active);
