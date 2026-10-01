@@ -45,13 +45,15 @@ describe("icon-only controls carry a real name", () => {
   });
 
   it("every ReviewPanel 'Close section' button", () => {
-    // One per closable section: Reselect, Layers, Histogram and — since the
-    // Combine strip moved here out of the Select panel — Combine. History is
-    // the exception: its header slot is spent on Undo / Redo / the step count.
+    // One per closable section: Reselect, Layers, Histogram, Combine (which
+    // moved here out of the Select panel) and History. History was the
+    // exception while its header slot was spent on Undo / Redo / the step
+    // count; Chris asked for the ✕ there too on 09-30-2026, so every section
+    // closes from its own head now.
     // A number, not a floor, so a section that ships WITHOUT the ✕ (or with an
     // unnamed one) is the failure this catches.
     const n = review.split('aria-label="Close section"').length - 1;
-    expect(n).toBe(4);
+    expect(n).toBe(5);
   });
 
   it("Add layer is named for what it does, not for why it is disabled", () => {

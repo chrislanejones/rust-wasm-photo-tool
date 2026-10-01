@@ -9,6 +9,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
+import { AdvancedSection } from "@/components/ui/advanced-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
@@ -21,7 +22,6 @@ import { useUIStore } from "@/stores/useUIStore";
 import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 import { SelectField } from "@/components/ui/select-field";
 import { ErrorNote } from "@/components/ui/status-note";
-import { PANEL_SECTION } from "@/lib/styles";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -476,9 +476,10 @@ export function TextSettings({
     })()}
 
     {/* Placement only applies to the Text mode — Background/OCR aren't
-        placing a new object on the canvas. */}
+        placing a new object on the canvas. In an Advanced section since
+        09-30-2026; see the note in ShapeSettings. */}
     {mode === "text" && onPlace && (
-      <div className={PANEL_SECTION}>
+      <AdvancedSection summary="Placement">
         <PlacementGrid
           label="Placement"
           info={
@@ -490,7 +491,7 @@ export function TextSettings({
           numpadKeys={canPlace}
           onChange={onPlace}
         />
-      </div>
+      </AdvancedSection>
     )}
     </div>
   );

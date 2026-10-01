@@ -9,7 +9,7 @@ import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { AdvancedStabilizer } from "./StabilizerRow";
+import { StabilizerRow } from "./StabilizerRow";
 import { ControlRow } from "@/components/ui/control-row";
 import { Kbd } from "@/components/ui/kbd";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -212,7 +212,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     dial, so it is the Advanced section. The closed summary
                     still says the level, so ON is never hidden. The level
                     table lives in StabilizerRow, the single copy. */}
-                <AdvancedStabilizer
+                <StabilizerRow
                   value={settings.paintStabilizer}
                   onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
                 />
@@ -279,7 +279,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     not the effect, so blur, pixelate and redact all steady
                     the same way. Same field the Paint brush and Eraser read:
                     one dial, on everywhere. Last, in Advanced, as in Paint. */}
-                <AdvancedStabilizer
+                <StabilizerRow
                   value={settings.paintStabilizer}
                   onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
                 />

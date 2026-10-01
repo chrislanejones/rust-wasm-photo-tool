@@ -368,6 +368,18 @@ export function ReviewPanel({
                   <Redo2 className="h-3.5 w-3.5" />
                 </Button>
                 <TinyNumberBox>{history.length}</TinyNumberBox>
+                {/* History was the one section you could not close from its own
+                    head — Reselect, Layers, Histogram and Combine all could
+                    (Chris, 09-30-2026). Same control, same place: last in the
+                    row, after the count. */}
+                <Button
+                  size="tiny"
+                  onClick={() => toggle("history")}
+                  aria-label="Close section"
+                  title="Close section"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             <div className="history-list">

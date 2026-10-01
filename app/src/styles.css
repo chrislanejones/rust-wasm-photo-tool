@@ -690,10 +690,19 @@ html.reduce-motion .skeleton::after {
   0%, 99% { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
   100%    { background-color: transparent; }
 }
+/* The per-photo panel's name line — a FOOTER under the controls, matching
+   .layers-summary above it (Chris, 09-30-2026: "put it at the bottom of the
+   footer - like how layers has Photo · no shapes or text ... and take away the
+   bold text"). Same rule, same muted colour, same size; deliberately NOT
+   .layers-summary-name's font-weight 600. The flash below tints the whole
+   line, so it needs the radius and a little padding to tint. */
 .per-photo-name {
+  margin-top: 6px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--border);
   border-radius: 4px;
-  padding: 1px 4px;
-  margin-left: -4px;
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
 }
 .per-photo-name-flash {
   animation: per-photo-name-fade 400ms ease-out;

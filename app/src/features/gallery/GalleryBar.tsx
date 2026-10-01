@@ -400,7 +400,11 @@ function GalleryActions({
 }) {
   const some = selectedCount > 0;
   const many = selectedCount > 1;
-  const btn = "px-2.5 py-1.5 text-xs";
+  // The WIDE row is a plain `Button size="default"` with nothing overridden
+  // (Chris, 09-30-2026: "fix if not the standard ui buttons"). It used to be
+  // size="large" with `px-2.5 py-1.5` pasted over it — a third size that is
+  // neither `default` (px-3 py-2) nor `large` (px-4 py-2.5), so these seven
+  // buttons were the only ones in the app at that measurement.
 
   /**
    * COMPACT USES THE SELECTION PANEL'S SHAPE: an equal-height grid of tiles,
@@ -411,7 +415,10 @@ function GalleryActions({
   const actionRow = vertical
     ? "grid grid-cols-3 gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1"
     : "flex items-center gap-1.5";
-  const actionBtn = vertical ? "px-1.5 py-2 text-2xs" : btn;
+  // COMPACT is the exception that stays: a 3-up tile grid in a narrow column,
+  // icon over label, where `default`'s horizontal padding would wrap every
+  // label. It overrides padding on purpose and says so.
+  const actionBtn = vertical ? "px-1.5 py-2 text-2xs" : undefined;
   /** Compact stacks icon over label, so the label must not be hidden there. */
   // sr-only, not hidden. `hidden` is display:none, which takes the text out of
   // the ACCESSIBILITY tree as well as off the screen — so below 640px every one
@@ -425,7 +432,7 @@ function GalleryActions({
       {/* ── selection / delete / export ── */}
       <div className={actionRow}>
         {some && onClearSelection && (
-          <Button size="large" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
+          <Button size="default" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
             <SquareX className="h-3.5 w-3.5" />
             <span className={label}>Unselect</span>
           </Button>
@@ -433,20 +440,20 @@ function GalleryActions({
 
         {some
           ? onDeleteSelected && (
-              <Button size="large" onClick={onDeleteSelected} title={many ? "Delete selected images" : "Delete this image"} className={actionBtn}>
+              <Button size="default" onClick={onDeleteSelected} title={many ? "Delete selected images" : "Delete this image"} className={actionBtn}>
                 <Trash2 className="h-3.5 w-3.5" />
                 <span className={label}>{many ? "Delete Selected" : vertical ? "Delete" : "Delete Image"}</span>
               </Button>
             )
           : onDeleteAll && (
-              <Button size="large" onClick={onDeleteAll} title="Delete all images" className={actionBtn}>
+              <Button size="default" onClick={onDeleteAll} title="Delete all images" className={actionBtn}>
                 <Trash2 className="h-3.5 w-3.5" />
                 <span className={label}>Delete All</span>
               </Button>
             )}
 
         {onExportSelected && (
-          <Button size="large" onClick={onExportSelected} title={many ? "Export or share images" : "Export or share image"} className={actionBtn}>
+          <Button size="default" onClick={onExportSelected} title={many ? "Export or share images" : "Export or share image"} className={actionBtn}>
             <Download className="h-3.5 w-3.5" />
             <span className={label}>
               {vertical ? "Export" : many ? "Export or Share Images" : "Export or Share Image"}
@@ -503,13 +510,13 @@ function GalleryActions({
             }
           >
             {some ? (
-              <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the selected photos" className={btn}>
+              <Button size="default" onClick={() => onAutoCompress("selected")} title="Compress the selected photos">
                 <Zap className="h-3.5 w-3.5" />
                 <span className={label}>Compress Selected</span>
               </Button>
             ) : (
               <>
-                <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the photo on the canvas" className={btn}>
+                <Button size="default" onClick={() => onAutoCompress("selected")} title="Compress the photo on the canvas">
                   <Zap className="h-3.5 w-3.5" />
                   <span className={label}>Compress Image</span>
                 </Button>
@@ -519,7 +526,7 @@ function GalleryActions({
                     made Compress All read as a different kind of action than
                     the button beside it. */}
                 {totalCount > 1 && (
-                  <Button size="large" onClick={() => onAutoCompress("all")} title="Compress every photo in the gallery" className={btn}>
+                  <Button size="default" onClick={() => onAutoCompress("all")} title="Compress every photo in the gallery">
                     <Zap className="h-3.5 w-3.5" />
                     <span className={label}>Compress All</span>
                   </Button>
