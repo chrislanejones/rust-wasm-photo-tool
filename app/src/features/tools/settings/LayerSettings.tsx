@@ -653,14 +653,24 @@ export function LayerSettings({
             one-shot actions and the fourth is an independent on/off, which a
             single-select `value` cannot say. */}
         <ToolButtonGroup<"h" | "v" | "clear" | "lock">
-          // FOUR ACROSS, matching the Wand → Selection grid's stacked tiles.
-          // Measured at the real 226px sidebar column: 51×71 tiles, nothing
-          // clipped (scrollWidth == width on all four), and one clean row
-          // instead of two — 79px of sidebar back for the color grid and the
-          // guide list below. Three across reproduces the Wand tile size
-          // exactly (70×71) but strands Lock alone on a row with two dead
-          // cells; two across doubles the tile width for four small jobs.
-          columns={4}
+          // TWO ACROSS — 2×2, asked for directly (Chris, 10-01-2026: "two on
+          // one row and two on the next … icons should be at the same place on
+          // each button — makes me think it is not using the common button ui").
+          //
+          // ⚠️ THE SECOND HALF OF THAT DID NOT REPRODUCE, and the note is here
+          // so nobody re-derives a cause that was measured false. It already
+          // WAS the common primitive, and at four across the icons were already
+          // aligned: measured in the real 226px sidebar, all four tiles 51×71
+          // with the icon 13px from the top and 0px off centre on every one —
+          // the same numbers 2×2 gives. No label wrapped, nothing was clipped.
+          //
+          // So this is a layout change he asked for, not a bug fix, and what it
+          // actually buys is width: 51×71 → 109×71, which is what makes four
+          // small jobs look like a deliberate pair of rows instead of a cramped
+          // strip. The earlier note defended four across on space (79px of
+          // sidebar back for the colour grid and guide list below); that
+          // trade-off was real and has simply been decided the other way.
+          columns={2}
           stacked
           disabled={disabled}
           onChange={(id) => {
