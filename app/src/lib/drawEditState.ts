@@ -70,9 +70,10 @@ export interface DrawEditState {
     /** The shape's real Rust `kind` byte, preserved across an edit so a pin
      *  (kind 5) re-rendered as a circle handle still commits as a pin. */
     kindByte?: number;
-    /** Interior fill, captured on reselect so it round-trips (rect/circle).
-     *  Treated exactly like strokeColor: preserved across move/resize. */
-    fillMode: "none" | "solid" | "gradient" | "pixelate";
+    /** Interior fill, captured on reselect so it round-trips (every shape in
+     *  `FILLABLE_KINDS`). Treated exactly like strokeColor: preserved across
+     *  move/resize. */
+    fillMode: FillMode;
     fillColor: string;
     fillColor2: string;
     gradientAngle: number;
@@ -216,6 +217,42 @@ export const SHAPE_NAME_KIND: Record<string, number> = {
   triangle: 10,
 };
 
+/** The four interior fills the Shapes panel offers. */
+export type FillMode = "none" | "solid" | "gradient" | "pixelate";
+
+/** `fillMode` → Rust `fill_kind` byte, and the inverse. The mapping lives here
+ *  beside `SHAPE_NAME_KIND`/`SHAPE_KIND_NAME` rather than as a ladder of
+ *  ternaries at the commit site, for the same reason: one place to read, and
+ *  `commitEdit` stays under its line cap. */
+export const FILL_MODE_KIND: Record<FillMode, number> = {
+  none: 0,
+  solid: 1,
+  gradient: 2,
+  pixelate: 3,
+};
+
+/** Rust `fill_kind` byte → `fillMode`. An unknown byte reads as "none", which
+ *  is what an older save with no fill at all already means. */
+export const FILL_KIND_MODE: Record<number, FillMode> = {
+  0: "none",
+  1: "solid",
+  2: "gradient",
+  3: "pixelate",
+};
+
+/** The `kind` bytes that accept an interior fill — rect, circle, diamond, star,
+ *  triangle: every drawn shape that encloses an area. The line (2) is the one
+ *  that does not, and the arrow (4) / pin (5) / polyline (6) / pen path (7)
+ *  kinds are not bbox shapes. Mirrors `annotations::is_fillable_kind` (Rust);
+ *  change both together or a committed fill and the preview disagree. */
+export const FILLABLE_KINDS: ReadonlySet<number> = new Set([0, 1, 8, 9, 10]);
+
+/** Does this shape NAME take a Fill section in the Shapes panel? The name twin
+ *  of `FILLABLE_KINDS`, for the panel and the overlay, which work in names. */
+export function shapeCanFill(shape: ShapeName): boolean {
+  return FILLABLE_KINDS.has(SHAPE_NAME_KIND[shape] ?? -1);
+}
+
 export function rgbToHex(r: number, g: number, b: number): string {
   const h = (n: number) => n.toString(16).padStart(2, "0");
   return `#${h(r)}${h(g)}${h(b)}`;
@@ -254,14 +291,7 @@ export function editStateFromShape(sh: ShapeMeta): DrawEditState {
       arrowStyle: sh.arrow_style === 1 ? "double" : "single",
       kindByte: sh.kind,
       sloppiness,
-      fillMode:
-        sh.fill_kind === 1
-          ? "solid"
-          : sh.fill_kind === 2
-            ? "gradient"
-            : sh.fill_kind === 3
-              ? "pixelate"
-              : "none",
+      fillMode: FILL_KIND_MODE[sh.fill_kind] ?? "none",
       fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
       fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
       gradientAngle: sh.fill_angle,

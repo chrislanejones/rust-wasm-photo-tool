@@ -1,10 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
-// Skeleton plan §1–§3, §5: a per-photo panel names its photo, cues every
-// switch, locks while one is in flight (skeletons in place when it is slow),
-// and per-tool settings are untouched. Each check here goes red if its piece
-// is removed.
+// Skeleton plan §1–§3, §5: the Tools card names its photo and cues every
+// switch, a per-photo panel locks while one is in flight (skeletons in place
+// when it is slow), and per-tool settings are untouched. Each check here goes
+// red if its piece is removed.
+//
+// The name line is the CARD's footer as of 10-02-2026, not a line inside each
+// per-photo panel, so two of these changed with it: C2 asserts the footer is
+// on a per-TOOL panel too (it used to assert the opposite), and C3 compares
+// every child of the region rather than skipping the first, because the region
+// is now nothing but controls.
 
 const FIXTURES = [
   join(__dirname, "fixtures", "checker.png"),
@@ -76,7 +82,7 @@ async function watchRegion(page: Page) {
 
 test.setTimeout(150_000);
 
-test("C1 a per-photo panel names its photo, and the name follows the switch", async ({ page }) => {
+test("C1 the Tools card names its photo, and the name follows the switch", async ({ page }) => {
   await setup(page);
   await open(page, "Enhance", "Adjustments");
   const line = page.locator(".per-photo-name");
@@ -87,10 +93,30 @@ test("C1 a per-photo panel names its photo, and the name follows the switch", as
   await expect(line).toHaveClass(/per-photo-name-flash/);
 });
 
-test("C2 a per-TOOL panel carries no photo name", async ({ page }) => {
+test("C2 a per-TOOL panel carries the footer too, and it is not inside the lock region", async ({ page }) => {
   await setup(page);
   await open(page, "Create", "Brush");
-  await expect(page.locator(".per-photo-name")).toHaveCount(0);
+  // The footer belongs to the CARD, so a brush panel has it even though the
+  // brush itself belongs to no photo (Chris, 10-02-2026). Before that it was
+  // per-photo-panels only and this asserted toHaveCount(0).
+  const line = page.locator(".per-photo-name");
+  await expect(line).toHaveCount(1);
+  await expect(line).toHaveText(/^1 of 2 · checker$/);
+  // Brush is a per-TOOL panel, so there is no lock region at all here — and
+  // on the panels that have one, the footer is outside it rather than carved
+  // out of the skeleton CSS by name.
+  await expect(page.locator(".per-photo-region .per-photo-name")).toHaveCount(0);
+});
+
+test("C2b the footer is a 20px strip, same as the Layers summary, and neither is bold", async ({ page }) => {
+  await setup(page);
+  await open(page, "Create", "Brush");
+  const strip = await page.locator(".per-photo-name").evaluate((e) => {
+    const cs = getComputedStyle(e);
+    return { h: Math.round(e.getBoundingClientRect().height), weight: cs.fontWeight };
+  });
+  expect(strip.h, "the card footer is the bottom 20px").toBe(20);
+  expect(Number(strip.weight), "nothing in the footer is bold").toBeLessThan(600);
 });
 
 test("C3 a slow switch locks the panel, shows skeletons in place, one aria-busy, no layout shift", async ({ page }) => {
@@ -110,12 +136,15 @@ test("C3 a slow switch locks the panel, shows skeletons in place, one aria-busy,
   const rec = await page.evaluate(() => (window as unknown as { __rec: { busy: number; busyCount: number; boxes: string } }).__rec);
   expect(rec.busy, "the panel was locked (aria-busy + inert) during the switch").toBeGreaterThan(0);
   expect(rec.busyCount, "one aria-busy region, not a list of grey boxes").toBe(1);
-  // Same boxes before, during (skeleton) and after — the line text changes
-  // width, so compare the controls (every child but the first, the name line).
+  // Same boxes before, during (skeleton) and after. Every child of the region
+  // is a control now that the name line has moved out to the card footer, so
+  // this compares all of them — it used to drop the first entry to skip the
+  // line, whose text width changed on every switch.
   const after = await region.evaluate((r) =>
     [...r.children].filter((c) => !c.classList.contains("sr-only")).map((c) => { const b = c.getBoundingClientRect(); return `${Math.round(b.width)}x${Math.round(b.height)}`; }).join(","),
   );
-  const controls = (s: string) => s.split(",").slice(1).filter((x) => x !== "0x0");
+  const controls = (s: string) => s.split(",").filter((x) => x !== "0x0");
+  expect(controls(before).length, "the region has controls to compare").toBeGreaterThan(0);
   expect(controls(rec.boxes), "skeleton boxes match the controls exactly").toEqual(controls(before));
   expect(controls(after), "nothing moved when the values returned").toEqual(controls(before));
 });

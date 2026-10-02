@@ -78,6 +78,33 @@ pub fn fill_circle(data: &mut [u8], w: u32, h: u32, cx: f64, cy: f64, radius: f6
     }
 }
 
+/// Is `(x, y)` inside the closed polygon `verts`? The even-odd crossing-number
+/// test, with `fill_polygon`'s half-open edge rule (`yi <= y < yj`) so a point
+/// exactly on a horizontal scanline belongs to one edge, not two — a star's
+/// valleys and a diamond's left/right tips otherwise flicker in and out.
+///
+/// This is the per-pixel twin of `fill_polygon`'s scanline: it is what
+/// `fill_shape` clips a gradient or a mosaic cell against, where a span fill
+/// cannot help because the colour varies within the span.
+fn point_in_polygon(verts: &[(f64, f64)], x: f64, y: f64) -> bool {
+    let n = verts.len();
+    if n < 3 {
+        return false;
+    }
+    let mut inside = false;
+    for i in 0..n {
+        let (xi, yi) = verts[i];
+        let (xj, yj) = verts[(i + 1) % n];
+        if (yi <= y && yj > y) || (yj <= y && yi > y) {
+            let t = (y - yi) / (yj - yi);
+            if xi + t * (xj - xi) > x {
+                inside = !inside;
+            }
+        }
+    }
+    inside
+}
+
 /// Scanline even-odd fill of an arbitrary (possibly concave) closed polygon
 /// given as a point list — used to fill the interior of a flattened Bézier pen
 /// path. Source-over blended; the boundary is left to the stroke on top.
@@ -499,12 +526,23 @@ fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
     [l(a[0], b[0]), l(a[1], b[1]), l(a[2], b[2]), l(a[3], b[3])]
 }
 
-/// Fill the interior of a rectangle (`shape == 0`) or circle (`shape == 1`)
-/// defined by the bbox (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear
-/// gradient `c0`→`c1` along `angle_deg` (0 = left→right, 90 = top→bottom),
-/// 3 = pixelate/mosaic the underlying pixels in `block`×`block` cells.
-/// Composited source-over (1/2) or overwritten (3); the caller draws the stroke
-/// on top afterwards.
+/// Fill the interior of one of the fillable bbox shapes — rectangle (0),
+/// circle (1), diamond (8), star (9), triangle (10) — defined by the bbox
+/// (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear gradient `c0`→`c1`
+/// along `angle_deg` (0 = left→right, 90 = top→bottom), 3 = pixelate/mosaic the
+/// underlying pixels in `block`×`block` cells. Composited source-over (1/2) or
+/// overwritten (3); the caller draws the stroke on top afterwards.
+///
+/// The line (2) is the one drawn shape with no interior to fill, so it is not
+/// in the list; the pen path (7) has its own `fill_polygon` route.
+///
+/// Rect and circle are clipped by the bbox and the inscribed circle as they
+/// always were; the three polygons are clipped by an even-odd test against the
+/// SAME vertex list `draw_shape` strokes (`star_points` is the effective count,
+/// which the caller maps from the stored "0 = classic"). The clip is the CLEAN
+/// outline for all of them: sloppiness wobbles the stroke, not the fill, so a
+/// hand-drawn star is a firm fill under a roaming outline — exactly how
+/// sloppiness has always met a filled rect.
 pub fn fill_shape(
     data: &mut [u8],
     w: u32,
@@ -519,6 +557,7 @@ pub fn fill_shape(
     c1: [u8; 4],
     angle_deg: u16,
     fill_block: u32,
+    star_points: u32,
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -530,6 +569,14 @@ pub fn fill_shape(
     let cy = (miny + maxy) * 0.5;
     // Circle radius matches draw_shape's clean circle: min of the half-extents.
     let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
+    // The polygon kinds' clip outline — the same vertices `draw_shape` strokes.
+    // `None` for rect/circle, which clip by bbox/radius instead.
+    let poly: Option<Vec<(f64, f64)>> = match shape {
+        8 => Some(diamond_vertices(x0, y0, x1, y1)),
+        9 => Some(star_vertices_n(x0, y0, x1, y1, star_points)),
+        10 => Some(triangle_vertices(x0, y0, x1, y1)),
+        _ => None,
+    };
 
     let px0 = (minx.floor() as i32).max(0);
     let py0 = (miny.floor() as i32).max(0);
@@ -587,6 +634,10 @@ pub fn fill_shape(
                                 if (dx * dx + dy * dy).sqrt() > radius {
                                     continue;
                                 }
+                            } else if let Some(verts) = poly.as_deref() {
+                                if !point_in_polygon(verts, xx as f64 + 0.5, yy as f64 + 0.5) {
+                                    continue;
+                                }
                             }
                             let i = ((yy * wi + xx) * 4) as usize;
                             data[i..i + 4].copy_from_slice(&avg);
@@ -623,6 +674,10 @@ pub fn fill_shape(
                 let dx = fx - cx;
                 let dy = fy - cy;
                 if (dx * dx + dy * dy).sqrt() > radius {
+                    continue;
+                }
+            } else if let Some(verts) = poly.as_deref() {
+                if !point_in_polygon(verts, fx, fy) {
                     continue;
                 }
             }
@@ -805,7 +860,8 @@ pub fn draw_shape(
             );
         }
         // 8 = Diamond, 9 = Star, 10 = Triangle — closed polygons, stroked
-        // alike (no fill: fills stay rect/circle only).
+        // alike. Their interiors are `fill_shape`'s business, same as rect's
+        // and circle's: the caller paints the fill first, then this stroke.
         8..=10 => {
             let verts = match shape {
                 8 => diamond_vertices(from_x, from_y, to_x, to_y),
