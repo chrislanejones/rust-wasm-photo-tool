@@ -24,6 +24,49 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.8",
+    date: "2026-10-01",
+    headline: "The star fills in, and the photo’s name is the footer of the whole Tools card.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Fill was a rectangle-and-circle feature. The diamond, the triangle and the star drew their outlines and stopped, so a star was always hollow and the Fill section hid itself when you picked one. All five shapes with an inside take all four fills now — None, Solid, Gradient, Pixelate. The line is the one shape without the section, because it has no inside.",
+      },
+      {
+        tag: "rust",
+        text: "A polygon’s fill is clipped by its own outline rather than its box, using the same vertex list the engine strokes — so the corners a star’s points miss stay empty, and the fill and the outline cannot disagree. A 7-point star fills seven points.",
+      },
+      {
+        tag: "rust",
+        text: "Turn a filled shape and the fill turns with it, gradient direction and pixelate grid included. It rides the same warp route the filled rectangle already used instead of getting rotation code of its own.",
+      },
+      {
+        tag: "ui",
+        text: "The photo’s name moved again, and further. Last release it sat under the controls, but only on the five panels that belong to a photo, and it scrolled away with them. It is the Tools card’s own footer now — one 20px line on the bottom edge, on every tool, outside the scroller. It cannot scroll out of sight, and it stays readable while a photo is switching.",
+      },
+      {
+        tag: "ui",
+        text: "The Layers summary next to it dropped its bold, so two footers that are the same kind of thing finally read like it. Both are one shared 20px strip now instead of two copies of the same rules.",
+      },
+      {
+        tag: "ui",
+        text: "Buttons have two settings instead of one crowded one: what they look like, and how big they are. Seventy places that use a button could not say “ghost” without also saying how big — now they can.",
+      },
+      {
+        tag: "ui",
+        text: "Guides’ H, V, Clear and Lock sit two-by-two instead of in a row, which buys each one real width — 51px to 109px.",
+      },
+      {
+        tag: "fix",
+        text: "The features page never documented shape fill at all — not even the rectangle-and-circle version that shipped long ago. It does now.",
+      },
+      {
+        tag: "fix",
+        text: "What’s coming said the Photoshop plugin had nowhere to download it from. That stopped being true when it went public, so the page says where it is.",
+      },
+    ],
+  },
+  {
     version: "v9.7",
     date: "2026-10-01",
     headline: "The photo\u2019s name sits under its controls, History can be closed, and the Stroke Stabilizer is out where you can see it.",

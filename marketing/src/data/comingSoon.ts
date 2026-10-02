@@ -28,7 +28,7 @@ export const GROUPS: Group[] = [
     items: [
       {
         name: "Photoshop files, in and out",
-        body: "Open a .psd with its layers, and save your work as one. It is a plugin, built and working, with nowhere to download it from yet.",
+        body: "Open a .psd with its layers, and save your work as one. The plugin is built and public, and Settings → Plugins takes it from a file or a link. What is left is a real place to get it, instead of a raw file in a repo.",
       },
       {
         name: "Send a photo to your other device",

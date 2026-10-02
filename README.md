@@ -86,31 +86,34 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.7 — 2026-10-01
+### v9.8 — 2026-10-01
 
-**The photo's name sits under its controls, History can be closed, and the Stroke Stabilizer is out where you can see it.**
+**The star fills in, and the photo's name is the footer of the whole Tools card.**
 
-Every per-photo panel used to shout its photo across the top — "1 of 12 · ZRG0M",
-in bold. It moved underneath the controls as a quiet footer, the same one Layers
-has had all along.
+Fill was a rectangle-and-circle feature. The diamond, the triangle and the star
+drew their outlines and stopped, so a star was always hollow and the Fill section
+hid itself when you picked one. All five shapes that enclose an area take all
+four fills now — None, Solid, Gradient, Pixelate. The line is the one shape
+without the section, because it has no inside. A polygon is clipped by its own
+outline rather than its box, so the corners a star's points miss stay empty, and
+a filled shape you turn takes its fill with it.
 
-History was the only section in Review you could not close. It has the same ✕ as
-Reselect, Layers, Histogram and Combine now. The Stroke Stabilizer was hidden
-inside Advanced, which is no place for something you want to reach while you
-paint, so it is out in the open; Advanced holds Placement instead, at the foot of
-Shapes and Text.
+The photo's name moved again, and further. In v9.7 it became a footer under the
+controls, but only on the five panels that belong to a photo, and it scrolled
+away with them. It is the Tools card's own footer now: one 20px line on the
+bottom edge, on every tool, outside the scroller. It cannot scroll out of sight,
+and it stays readable while a photo is switching. The Layers summary beside it
+dropped its bold, so two footers that are the same kind of thing finally read
+like it.
 
-Seven buttons in the gallery bar were a size that existed nowhere else in the
-app. They are the standard size now. The narrow three-up tile grid keeps its
-tighter padding, because a narrow column is a real constraint.
+Buttons have two axes instead of one. `variant` (default, ghost, secondary,
+link) and `size` (xs, tiny, default, large) used to be the same crowded setting,
+which is why seventy call sites could not say "ghost" without also saying how
+big. Guides' H / V / Clear / Lock sit 2×2 instead of 4×1, which buys each one
+real width.
 
-The website had fallen behind the app, and caught up: Batch Crop, plugins and
-SVG-to-SVG sat on the features page as raw documentation lines filed under the
-internals, the architecture page still said saved work was at format v8, and the
-annotate page listed arrows, boxes, circles and lines — no diamonds, no
-triangles, no stars, and no word that any shape turns.
-
-Engine unchanged at 828,248 bytes.
+Engine 829,721 bytes, up 1,473 for the polygon fill clip, 30,279 under the
+sentinel ceiling.
 
 
 ## License

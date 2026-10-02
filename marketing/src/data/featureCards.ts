@@ -130,6 +130,14 @@ export const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Rendered in WASM; Create → Shapes, with Arrow and Pins as their own sub-tools. Rotation is an angle beside the upright box, so a turned shape stays crisp and keeps its fill; Shift snaps to 15°.",
   },
+  Fill: {
+    group: "annotate",
+    title: "Fill",
+    plain:
+      "Every shape with an inside can be filled — rectangle, circle, diamond, triangle, star — as a solid color, a gradient, or the photo underneath pixelated. The line is the one shape without it.",
+    detail:
+      "An even-odd point-in-polygon clip against the same vertex list the engine strokes, so the fill and the outline cannot disagree; a star's missed corners stay empty. A filled shape rotates on the warp route, so gradient direction and pixelate grid turn with it.",
+  },
   Text: {
     group: "annotate",
     title: "Text",
