@@ -65,9 +65,11 @@ have.
 **R9 — the native `title` attribute is not a tooltip.** Use `ui/tooltip`, or
 `ui/info-tooltip` when it is a hint behind a lightbulb. `title` does not appear
 on touch, which is most of the phone surface, and it cannot be styled or
-positioned. About **47** of these exist today (see Inventory §6 for how that
-number was arrived at, because the obvious count is wrong): a backlog to work
-down, not a precedent to copy.
+positioned. **180** exist today (2026-10-02, `rg -c 'title='` over
+`app/src/**/*.tsx`, summed) — see Inventory §6 for why the obvious count is
+wrong. The two densest files are `ReviewPanel.tsx` (18) and
+`LayerSettings.tsx` (16), which are the densest panels in the app. A backlog to
+work down, not a precedent to copy.
 
 **R10 — Every exception is registered.** Prefer a same-line `// allow: …`
 annotation over a file exclusion in `guardrails.sh`, and add the row to
@@ -86,7 +88,7 @@ those are wrong for this codebase, and one thing it omitted is in heavy use:
 | 1 | 4 | 103 | ✅ | ✅ | |
 | 1.5 | 6 | 75 | ✅ | ✅ | |
 | 2 | 8 | **185** | ✅ | ✅ | The most used value in the app. |
-| 2.5 | 10 | 27 | ✗ | ✗ | Real, but retire it — `py-2.5` ×13 is the bulk. |
+| 2.5 | 10 | 27 | ✗ | ✗ | Real, but retire it — `py-2.5` ×13 is the bulk. **Still not retired 2026-10-02: now ×16, and one of them is inside `ui/button.tsx`.** |
 | 3 | 12 | 149 | ✅ | ✅ | |
 | 4 | 16 | 86 | ✅ | ✅ | |
 | 5 | 20 | 19 | ✅ | ✗ | Proposed, but thinner than 2px. Retire. |
@@ -101,22 +103,32 @@ at all:
 
 | Class | Uses | Resolves to | Where that comes from |
 | --- | ---: | --- | --- |
-| `rounded` | 60 | `0.25rem` | **Tailwind default, hardcoded.** No token. |
-| `rounded-lg` | 59 | `var(--radius-lg)` → 10px | House token, `styles.css:25`. |
-| `rounded-md` | 37 | `var(--radius)` → 6px | House token, `styles.css:24`. |
-| `rounded-full` | 35 | pill | Tailwind default, and correct. |
-| `rounded-xl` | 18 | `var(--radius-xl)` → `.75rem` | **Tailwind's own theme**, not ours. |
-| `rounded-sm` | 4 | `calc(var(--radius) - 2px)` → 4px | House token. |
+| `rounded` | 62 | `0.25rem` | **Tailwind default, hardcoded.** No token. |
+| `rounded-lg` | 61 | `var(--radius-lg)` → 10px | House token, `styles.css:25`. |
+| `rounded-md` | 43 | `var(--radius)` → 6px | House token, `styles.css:24`. |
+| `rounded-full` | 40 | pill | Tailwind default, and correct. |
+| `rounded-xl` | 17 | `var(--radius-xl)` → `.75rem` | **Tailwind's own theme**, not ours. |
+| `rounded-sm` | 9 | `calc(var(--radius) - 2px)` → 4px | House token. |
+
+Re-measured 2026-10-02 (`node scripts/ui-inventory.mjs`, 240 uses / 11 distinct
+/ 87 files). The house tokens have grown (`rounded-sm` 4 → 9, `-md` 37 → 43,
+`-lg` 59 → 61) but the bare `rounded` has grown with them, so the 4px duplicate
+is now **62 uses against 9** — worse than the 60-to-4 it was when this was
+first written, and the wrong spelling is the majority. `rounded-xl` is the one
+that is finally going down (18 → 17).
 
 Two things fall out of that table:
 
 - **`rounded` and `rounded-sm` produce the identical 4px** by two different
-  routes — 64 uses split across two spellings of one number, and the
-  64-use-strong one is the one that ignores the tokens.
-- **78 of 221 radius uses bypass the house token system entirely**
+  routes — **71 uses** split across two spellings of one number, and the
+  62-use-strong one is the one that ignores the tokens.
+- **79 of 240 radius uses bypass the house token system entirely**
   (`rounded` + `rounded-xl`), which no check currently notices, because
   `guardrails.sh` greps for *raw colors*, not for utilities that quietly
-  resolve to a framework default.
+  resolve to a framework default. (`ui-radius` ratchets the bare `rounded` and
+  `rounded-xl` counts — 50 today, and that is the same 79 counted a different
+  way: only the classes that route around the tokens, not the directional
+  `rounded-b`/`rounded-t` forms, which inherit from a token.)
 
 R3 therefore reads the way it does: the fix is not "pick `rounded` or
 `rounded-lg`", it is "stop using the two that are not ours".
@@ -137,6 +149,16 @@ class-based audit. One more for Night 3.
 | Icon button | 30px with an 18px glyph | `ui/icon-button`, and the reference the rest was matched to. |
 | Color | token classes only | R4. |
 | Z | `z-[var(--z-*)]` | R7. |
+| Muted text | `text-theme-muted-foreground` | Not a rule yet — see below. |
+
+**`text-muted-foreground` and `text-theme-muted-foreground` are the same token by
+two spellings.** `styles.css` aliases them (`--color-theme-muted-foreground:
+var(--muted-foreground)`), so this is not a bug — it is the same defect class as
+`rounded` vs `rounded-sm`: one number, two routes, and the house route is the
+minority. Measured 2026-10-02: **6** uses of the bare spelling
+(`SubtoolRow`, `ToolGrid` ×2, `PresetsSettings`, `TopBar`, `tooltip`) against
+~200 of the prefixed one. Worth a line here next to the radius finding, and
+worth a rule if the count ever rises.
 
 ## 4. The primitive of record, per pattern
 
@@ -150,7 +172,7 @@ Import these. Do not re-implement them.
 | Independent toggles | `ui/toggle-button-group` |
 | Tool mode switch | `ui/tool-mode-toggle` (wraps `tool-button-group`) |
 | Overlay tabs | `ui/segmented-tabs` |
-| Cards as a radio group | `ui/radio-cards` |
+| ~~Cards as a radio group~~ | **DELETED.** `ui/radio-cards` had one consumer (the Download dialog's format picker) until that picker became `ToolButtonGroup` tiles. Zero importers now; removed 2026-10-02 rather than left as an entry in this table that hands out a dead import path. |
 | On/off switch | `ui/switch` |
 | Modal | `ui/dialog` |
 | Confirm | `ui/confirm-dialog` |
@@ -165,7 +187,7 @@ Import these. Do not re-implement them.
 | A tool panel's body rhythm | `ui/tool-panel` |
 | Settings most strokes do not need | `ui/advanced-section` |
 | "Why is this off" line | `ReasonNote` in `ui/status-note` (both `reason` slots use it) |
-| Keyboard chip | `ui/kbd`. The bare `kbd` CSS rule is legacy, kept for 6 unmoved files |
+| Keyboard chip | `ui/kbd`. The bare `kbd` CSS rule is legacy, kept for **8** unmoved files (measured 2026-10-02, 21 elements: SelectSettings 6, LayerSettings 5, ShortcutModal 3, ReviewPanel 2, `ui/kbd.tsx` 2, ToolGrid 1, PerspectiveSettings 1, StatusBar 1). `ui/kbd.tsx` holding 2 of them is the odd one — it is the primitive meant to replace the others |
 
 `ui/dialog` is the modal survivor; `Modal` and `SmallDialog` are being
 retired, which was already decided and is tracked in `PARKING_LOT.md`.
@@ -176,7 +198,8 @@ retired, which was already decided and is tracked in `PARKING_LOT.md`.
 importers, 29 call sites, the clearest contract of the family (SELECT / ACTION
 / TOGGLE, each written down) and the only `aria-pressed` in the group.
 `tool-mode-toggle` wraps it and stays. `segmented-tabs` (`role="tab"`) and
-`radio-cards` (native inputs) are different controls doing different jobs
+`radio-cards` (native inputs, now deleted — see the table above) were different
+controls doing different jobs
 correctly, and stay.
 
 Surviving is not the same as being right. `tool-button-group` emits
@@ -228,9 +251,17 @@ is a class list. It self-tests on a planted snippet before it touches the repo.
 
 | Ratchet | Rule | Baseline |
 | --- | --- | ---: |
-| `ui-spacing` | R1 — padding/gap/space off the scale | **53** |
-| `ui-radius` | R3 — bare `rounded`, `rounded-xl`/`2xl`, arbitrary | **52** |
-| `ui-raw-button` | a raw `<button>` outside `components/ui/` | **37** |
+| `ui-spacing` | R1 — padding/gap/space off the scale | **51** |
+| `ui-radius` | R3 — bare `rounded`, `rounded-xl`/`2xl`, arbitrary | **50** |
+| `ui-raw-button` | a raw `<button>` outside `components/ui/` | **33** |
+
+Reconciled 2026-10-02: this table said 53 / 52 / 37 while `guardrails.sh` held
+52 / 51 / 33, so the doc was one release behind on all three. Correcting it
+surfaced that `ui-raw-button` had fallen 37 → 33 with nobody watching — the count
+the report itself notes had grown "while nothing was watching it" was in fact
+being paid down quietly. Baselines are now the measured values: 51 and 50 came
+down with this work (two `SelectField`s in Resize became tile groups, and a
+deleted primitive took its `rounded` with it).
 
 Every baseline was reconciled against the text inventory line by line: each
 hit the text finds and the parser does not is a comment, a test, a JS
@@ -345,10 +376,27 @@ skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
 | **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
 | **App** | Stays | Rulers & grid preferences, theme |
 
-Per-photo panels (`PER_PHOTO_TOOLS` in ToolsSidebar): Resize & Compress, Crop &
-Transform, Perspective, Adjustments / Levels / Presets, Layers / Canvas Size /
-Guides. Select is per-tool at the panel level; its per-photo part (the
-selection) is cleared on a switch by `usePhotoSwitchReset`.
+Per-photo panels (`PER_PHOTO_SUB_TOOLS` in ToolsSidebar): Resize & Compress,
+Levels, Crop, Perspective / Distort / Skew, Layers, Canvas Size, Guides.
+
+**It is keyed on the SUB-TOOL, not the tool** — corrected 2026-10-02. It was a
+set of tool ids (`compress`, `crop`, `perspective`, `effects`, `arrow`), which
+stopped meaning what it said the moment the five-group restructure moved panels
+onto sub-tools: `crop` also hosts Transform and Color Picker, `arrow` also hosts
+Rulers and Grid, `perspective` is three tiles, and `effects` no longer names a
+panel at all. The symptom was already visible as a `showRulersPanel` carve-out
+at the call site — a special case bolted on because the set said "tool" where it
+meant "sub-tool".
+
+Deliberately left OUT of the set, and why:
+
+| Left out | Why |
+|---|---|
+| `rulers` | an app preference, not a per-photo value |
+| `guides` | cleared on a switch rather than reloaded, until persisted per photo |
+| `select` | per-tool at the panel level; the selection itself is cleared by `usePhotoSwitchReset` |
+| `batch` › `crop` | its frame IS per-photo and should probably lock — open question |
+| every Create sub-tool | a brush size does not change because the photo did |
 
 Known exception: export quality is seeded from the previous photo until edit
 archives carry it (AppShell quality seed). Guides are cleared rather than

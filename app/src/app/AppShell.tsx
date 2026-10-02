@@ -932,10 +932,12 @@ export function AppShell() {
   //
   // So the split is: the panel's slider is pending state, exactly like its
   // width/height fields, and the engine holds what has actually been APPLIED.
-  const handleQualityChange = useCallback((q: number) => {
-    setQuality(q);
-    setHasBeenModified(true);
-  }, []);
+  //
+  // NOT `setHasBeenModified(true)`: it used to fire on the first pixel of a drag,
+  // before any Apply, so the gallery lit the photo's modified dot while the
+  // panel's own button was still dark. The apply handlers mark it modified once
+  // bytes actually change.
+  const handleQualityChange = useCallback((q: number) => setQuality(q), []);
 
   // Slider RELEASE. One drag is one undo step, whatever the drag emitted along
   // the way — the same contract EffectsSettings gives brightness and contrast.

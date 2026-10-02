@@ -50,12 +50,37 @@ import { PhotoFooter } from "./PhotoFooter";
 /** Panels whose values belong to the open photo (skeleton plan §1): the rest —
  *  brush, stamp, shapes, text, select, AI, batch — are per-tool settings and
  *  must not change, lock or carry a photo name when the photo does. */
-const PER_PHOTO_TOOLS: ReadonlySet<string> = new Set([
+/**
+ * SUB-TOOL ids whose panel holds values belonging to ONE photo, and must lock
+ * through a switch rather than keep showing the last photo's numbers.
+ *
+ * KEYED ON THE SUB-TOOL, NOT THE TOOL. This used to be a set of tool ids, which
+ * stopped meaning what it said the moment the five-group restructure moved
+ * panels onto sub-tools: `crop` also hosts Transform and Color Picker, `arrow`
+ * also hosts Rulers and Grid, and `perspective` is three tiles. The symptom was
+ * already visible as the `showRulersPanel` carve-out at the call site — a
+ * special case bolted on because the set said "tool" where it meant "sub-tool".
+ *
+ * Per-photo is decided from `docs/UI_CONSISTENCY.md` §9, whose table lists the
+ * panels in each kind. The ones left OUT deliberately:
+ *   - `rulers` — an app preference, not a per-photo value
+ *   - `guides` — cleared on a switch rather than reloaded until persisted
+ *   - `select`, `batch` — the selection is cleared by `usePhotoSwitchReset`, and
+ *     Batch › Crop's frame is the one batch value that is per-photo
+ *   - every Create sub-tool — a brush size does not change because the photo did
+ */
+const PER_PHOTO_SUB_TOOLS: ReadonlySet<string> = new Set([
+  // Enhance
   "compress", // Resize & Compress — W/H, quality
-  "crop", // Crop & Transform — the crop box
+  "levels", // the curve
+  // Edit
+  "crop", // the crop box
   "perspective",
-  "effects", // Adjustments, Levels, Presets
-  "arrow", // Layers, Canvas Size, Guides (not Rulers)
+  "distort",
+  "skew",
+  "resize-layer", // the layer list
+  "canvas-size", // W/H
+  "guides",
 ]);
 
 interface ToolsSidebarProps {
@@ -363,7 +388,7 @@ export function ToolsSidebar({
       >
         {/* Per-photo panels name their photo, cue every switch and lock while
             one is in flight (PerPhotoRegion). Per-tool panels don't. */}
-        <PerPhotoRegion enabled={PER_PHOTO_TOOLS.has(activeTool) && !(activeTool === "arrow" && showRulersPanel)}>
+        <PerPhotoRegion enabled={!!subToolId && PER_PHOTO_SUB_TOOLS.has(subToolId)}>
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
