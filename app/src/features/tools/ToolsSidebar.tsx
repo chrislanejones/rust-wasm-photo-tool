@@ -45,6 +45,7 @@ import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PerPhotoRegion } from "./PerPhotoRegion";
+import { PhotoFooter } from "./PhotoFooter";
 
 /** Panels whose values belong to the open photo (skeleton plan §1): the rest —
  *  brush, stamp, shapes, text, select, AI, batch — are per-tool settings and
@@ -317,14 +318,21 @@ export function ToolsSidebar({
       {closable && <PanelCloseButton label="Close Tools" onClose={onClose} />}
       {/* The clip lives HERE, not on the fixed shell: the shell must let the
           corner close button hang half outside it, and this wrapper keeps the
-          rounded corners trimming the scrolling content exactly as before. */}
+          rounded corners trimming the content. It holds the card's two rows —
+          the floor-padded body, then the footer flush on the bottom edge — so
+          BOTH are trimmed by those corners; the footer's switch-flash tint
+          would otherwise paint square corners outside the curve. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       {/* ⚠️ THE BOTTOM FLOOR LIVES HERE, not on the scrolling body. A scroll
           container's `padding-bottom` is not honoured at the end of its
           overflow content, and neither is an `::after` spacer — measured both:
           with 32px set, the last button's bottom and the card's bottom edge
           were 1px apart. This wrapper does not scroll, so its padding always
-          renders, and the buttons get the same inset the header has. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit] pb-panel">
+          renders, and the buttons get the same inset the header has. Since
+          10-02-2026 that inset is the gap to the FOOTER rather than to the
+          card edge, which is what a floor becomes once a card has a footer —
+          the number is unchanged. */}
+      <div className="flex min-h-0 flex-1 flex-col pb-panel">
       {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
           the body below slide rather than jump when the sub-row row-count
           changes (0 -> 1 -> 2 rows). */}
@@ -545,12 +553,24 @@ export function ToolsSidebar({
         </PerPhotoRegion>
       </motion.div>
 
-      {/* The "Download & Share {FORMAT}" footer used to live here — a
+      </div>
+
+      {/* THE CARD'S FOOTER — "3 of 12 · IMG_2041.jpg", on every tool, in the
+          card's bottom 20px. Outside the scrolling body, so it cannot scroll
+          away: the question it answers ("whose photo am I looking at") is one
+          you ask mid-panel, not after reading to the end. Outside
+          PerPhotoRegion's `inert` lock too, so it stays readable through a
+          switch — the one moment the line matters most. Same 20px strip, rule
+          and muted text as the Layers panel's "Background · 1 shape" (Chris,
+          10-02-2026: "bottom 20px - like layers"), and neither is bold now.
+
+          NOT the "Download & Share {FORMAT}" footer that used to be here — a
           full-width `size="large"` Button under a top border, so a 252px panel
-          spent an entire row plus its padding on one action. Export is now the
-          fifth item in the bar's New · Tools · Gallery · Review run, in both
-          the top bar and the compact master bar, which is where the other
-          whole-app actions already are. Same handler, no footer. */}
+          spent an entire row plus its padding on one action. Export is the
+          fifth item in the bar's New · Tools · Gallery · Review run now, in
+          both the top bar and the compact master bar, which is where the other
+          whole-app actions already are. This one is a 20px line, not a row. */}
+      <PhotoFooter />
       </div>
     </motion.div>
   );
