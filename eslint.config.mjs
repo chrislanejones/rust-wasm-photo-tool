@@ -245,8 +245,12 @@ export default tseslint.config(
     // 991 -> 976 (shapes v9): rotation and star points added ~25 lines, and the
     // reselect mapping (saved shape -> pending edit) moved to
     // drawEditState.editStateFromShape to pay for them and then some.
+    // 976 -> 970 (fill for five shapes): the fillMode <-> fill_kind ladder that
+    // commitEdit carried became drawEditState.FILL_MODE_KIND / FILL_KIND_MODE,
+    // beside the shape-name tables it belongs with — and the inverse ladder in
+    // editStateFromShape collapsed onto it too.
     files: ["app/src/hooks/useDrawingTools.ts"],
-    rules: { "max-lines": ["error", { max: 976 }] },
+    rules: { "max-lines": ["error", { max: 970 }] },
   },
   {
     // A test file, not a god object — it is long because it enumerates 166

@@ -19,6 +19,7 @@ import type { DrawEditState, Point } from "@/hooks/useDrawingTools";
 import { lockAxisDelta, lockPointToAxis, lockScaleFactors } from "@/lib/aspectLock";
 import type { ShapeName } from "@/lib/types";
 import { closedOutline } from "@/lib/shapeSloppiness";
+import { shapeCanFill } from "@/lib/drawEditState";
 import {
   boxCenter,
   pinAfterResize,
@@ -303,12 +304,13 @@ export function ShapeEditOverlay({
   const sloppy = sloppyAmt > 0;
 
   // Live interior-fill preview. `eff` is the shape's captured style on
-  // reselect, or the live panel for a new shape — both carry fill, so
-  // reselected rect/circles preview their fill too.
+  // reselect, or the live panel for a new shape — both carry fill, so a
+  // reselected shape previews its fill too. Every shape that encloses an area
+  // gets one (`shapeCanFill`); the line is the one that does not.
   const fillCfg = eff;
   let fillAttr = "none";
   let gradientDef: React.ReactNode = null;
-  if (fillCfg && (shape === "rect" || shape === "circle")) {
+  if (fillCfg && shapeCanFill(shape)) {
     if (fillCfg.fillMode === "solid") {
       fillAttr = fillCfg.fillColor;
     } else if (fillCfg.fillMode === "gradient") {
@@ -464,11 +466,16 @@ export function ShapeEditOverlay({
       <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
     );
   } else if (shape === "diamond" || shape === "star" || shape === "triangle") {
-    // Outline-only (the engine fills only kinds 0/1). Firm → clean
-    // polygon over the exact vertex list Rust rasterises; sketchy →
-    // the same vertices pushed through the wobble path generator.
+    // Firm → clean polygon over the exact vertex list Rust rasterises;
+    // sketchy → the same vertices pushed through the wobble path generator.
     const verts = closedOutline(shape, start, end, starPoints) ?? [];
     const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
+    // The fill is its own clean polygon, on the SAME vertices — sloppiness
+    // roams the stroke only, which is what `fill_shape` does on the Rust side
+    // (it clips the fill to the clean outline whatever the wobble).
+    const fillLayer = (
+      <polygon points={pts} fill={fillAttr} />
+    );
     const strokeLayer = sloppy ? (
       <path
         d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY, starPoints)}
@@ -481,7 +488,13 @@ export function ShapeEditOverlay({
         fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
       />
     );
-    preview = strokeLayer;
+    preview = (
+      <>
+        {gradientDef}
+        {fillLayer}
+        {strokeLayer}
+      </>
+    );
     bodyHit = (
       <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
     );

@@ -18,6 +18,12 @@
 import { describe, it, expect } from "vitest";
 import { panelStylePatch, pendingShapeType } from "./useDrawingTools";
 import type { DrawEditState } from "./useDrawingTools";
+import {
+  FILL_KIND_MODE,
+  FILL_MODE_KIND,
+  FILLABLE_KINDS,
+  shapeCanFill,
+} from "@/lib/drawEditState";
 import type { ToolSettings } from "@/lib/types";
 
 /** A settings object shaped like the Shapes panel's defaults. */
@@ -186,5 +192,38 @@ describe("pendingShapeType", () => {
 
   it("defaults to rect when neither the edit nor the panel names a shape", () => {
     expect(pendingShapeType(null, undefined)).toBe("rect");
+  });
+});
+
+// ── Which shapes take a Fill, and what byte each mode commits ───────────────
+// `FILLABLE_KINDS` and `FILL_MODE_KIND` are the two tables `commitEdit` reads
+// to turn the panel's Fill section into `add_shape_annotation`'s `fill_kind`
+// argument. Both are mirrored on the Rust side (`annotations::is_fillable_kind`
+// and the `fill_kind` match in `drawing::fill_shape`), so they are pinned here
+// against the shape NAMES the panel actually offers rather than a copy of the
+// list — a new shape added to the panel with no engine fill shows up as a
+// failure in this file.
+describe("the fill tables", () => {
+  it("every shape that encloses an area can be filled — the line cannot", () => {
+    for (const shape of ["rect", "circle", "diamond", "star", "triangle"] as const) {
+      expect(shapeCanFill(shape), shape).toBe(true);
+    }
+    expect(shapeCanFill("line")).toBe(false);
+  });
+
+  it("the arrow, pin, polyline and pen-path kinds are not fillable bbox shapes", () => {
+    // 4 = arrow, 5 = pin, 6 = polyline, 7 = Bézier pen path. The pen path DOES
+    // get an interior, but through `fill_polygon` over its own points, not
+    // through the bbox route `FILLABLE_KINDS` gates.
+    for (const kind of [2, 4, 5, 6, 7]) {
+      expect(FILLABLE_KINDS.has(kind), `kind ${kind}`).toBe(false);
+    }
+  });
+
+  it("each fill mode maps to the engine byte, and back again", () => {
+    expect(FILL_MODE_KIND).toEqual({ none: 0, solid: 1, gradient: 2, pixelate: 3 });
+    for (const mode of ["none", "solid", "gradient", "pixelate"] as const) {
+      expect(FILL_KIND_MODE[FILL_MODE_KIND[mode]], mode).toBe(mode);
+    }
   });
 });

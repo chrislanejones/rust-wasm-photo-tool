@@ -75,6 +75,10 @@
   --statusbar-gap: 12px; /* gutter between floating panels and the status bar */
   /* Bottom offset for floating side panels (clears the status bar + gutter). */
   --panel-bottom: calc(var(--statusbar-h) + var(--statusbar-gap)); /* = 48px */
+  /* The panel-card footer strip — the one line at the foot of Tools and of
+     Layers saying what that card is looking at. See `.layers-summary,
+     .per-photo-name`, which is where the 20 is made to come out exact. */
+  --panel-footer-h: 20px;
 
   /* ── LIGHT palette — warm paper counterpart to the dark earth-tone ──
      Brand accent (--accent/--primary) stays the warm cream #fcdfc2 in both
@@ -723,33 +727,9 @@ html.reduce-motion .skeleton::after {
   0%, 99% { background-color: color-mix(in srgb, var(--accent) 34%, transparent); }
   100%    { background-color: transparent; }
 }
-/* The per-photo panel's name line — a FOOTER under the controls, matching
-   .layers-summary above it (Chris, 09-30-2026: "put it at the bottom of the
-   footer - like how layers has Photo · no shapes or text ... and take away the
-   bold text"). Same rule, same muted colour, same size; deliberately NOT
-   .layers-summary-name's font-weight 600. The flash below tints the whole
-   line, so it needs the radius and a little padding to tint. */
-/* The region fills the tool column so its footer can sit on the floor of the
-   panel. `flex: 1 0 auto` grows into the spare height but never shrinks below
-   its content, so a panel taller than the column still scrolls instead of
-   being squashed. */
-.per-photo-region {
-  display: flex;
-  flex-direction: column;
-  flex: 1 0 auto;
-}
-.per-photo-body {
-  flex: 1 0 auto;
-}
-
-.per-photo-name {
-  margin-top: 6px;
-  padding: 6px 8px 2px;
-  border-top: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: var(--text-2xs);
-  color: var(--text-secondary);
-}
+/* Only the CUE lives here. `.per-photo-name`'s box — the 20px strip it shares
+   with the Layers summary — is down in "The panel-card footer strip", so the
+   two footers are defined together and cannot drift apart. */
 .per-photo-name-flash {
   animation: per-photo-name-fade 400ms ease-out;
 }
@@ -767,20 +747,26 @@ html.reduce-motion .per-photo-name-flash {
    the panel's controls into muted blocks WITHOUT replacing them, so every box
    keeps its exact size and nothing moves when the new photo's values arrive
    (layout shift is the bug skeletons exist to prevent). The region is `inert`
-   while this shows; the photo line stays readable. */
+   while this shows.
+
+   The photo line used to need carving back out of this by name
+   (`> :not(.per-photo-name)`), because it lived inside the region and had to
+   stay readable through the switch it was announcing. It is the CARD's footer
+   now, outside the region entirely, so the exception is gone rather than
+   merely unused — structure doing what a `:not()` was doing. */
 [data-switch-skeleton] {
   position: relative;
   isolation: isolate;
 }
-[data-switch-skeleton] > :not(.per-photo-name)
-  :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
+[data-switch-skeleton]
+  > * :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
   color: transparent !important;
   border-color: transparent !important;
   background: var(--muted) !important;
   box-shadow: none !important;
   border-radius: 4px;
 }
-[data-switch-skeleton] > :not(.per-photo-name) :is(svg, img, canvas) {
+[data-switch-skeleton] > * :is(svg, img, canvas) {
   opacity: 0;
 }
 [data-switch-skeleton] input[type="range"]::-webkit-slider-thumb {
@@ -1237,29 +1223,66 @@ textarea:focus-visible {
   text-align: right;
 }
 
+/* ── The panel-card footer strip ──────────────────────────────────────────
+   ONE 20px line at the foot of a card, saying what that card is looking at:
+   the photo for Tools ("3 of 12 · IMG_2041.jpg"), the selected layer for
+   Layers ("Background · 1 shape"). Chris, 10-02-2026: "bottom 20px - like
+   layers - but no strong".
+
+   20px is spelled out rather than left to fall out of the font metrics,
+   because the two strips sit one above the other when both panels are open
+   and a 1px disagreement between them is visible. `line-height: 12px` makes
+   the sum exact: 4 top + 12 text + 3 bottom + 1 border = 20.
+
+   NOTHING IN HERE IS BOLD. The Layers name carried `font-weight: 600` and
+   `--text-primary` while the photo line next to it was muted and regular, so
+   the two footers read as different kinds of thing when they are the same
+   kind of thing. The name keeps `min-width: 0` + truncation: a long layer
+   name must shorten rather than push the counts off the edge — the counts
+   are the point of the bar. */
+.layers-summary,
+.per-photo-name {
+  min-height: var(--panel-footer-h);
+  margin-top: 6px;
+  padding: 4px 8px 3px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-2xs);
+  line-height: 12px;
+  color: var(--text-secondary);
+}
+
+/* The Tools card's footer (features/tools/PhotoFooter) adds two things to the
+   strip. Its horizontal inset is the panel's own 16px rather than the strip's
+   8px, so the rule spans the card edge to edge — what makes it read as the
+   CARD's footer rather than a line under the last control — while the text
+   stays in the column the controls above it are in. The Layers summary keeps
+   the 8px because it is already nested inside an inset section. And it takes
+   the radius, because the switch flash above tints the whole line and a square
+   tint inside a rounded card corner reads as a mistake.
+
+   No `margin-top`: the Tools body already ends in the panel floor (`pb-panel`
+   on its wrapper), so the strip's own 6px would be a second gap stacked on the
+   first. The Layers summary keeps the 6px because it butts straight onto the
+   layer list with nothing between them. */
+.per-photo-name {
+  margin-top: 0;
+  padding-inline: var(--spacing-panel);
+  border-radius: 4px;
+}
+
 /* The layer summary bar — one line under the list saying what is on the
    SELECTED layer. It replaced per-row count chips: the rows already carry a
    name, an eye, five buttons, a mask badge and an opacity slider, and at 260px
-   two more numbers per row was six things competing.
-
-   Separated from the list by a top border rather than a gap, so it reads as a
-   footer belonging to the list rather than a floating sixth row. `min-width: 0`
-   + `truncate` on the name half: a long layer name must shorten rather than
-   push the counts off the edge — the counts are the point of the bar. */
+   two more numbers per row was six things competing. Separated from the list
+   by a top border rather than a gap, so it reads as a footer belonging to the
+   list rather than a floating sixth row. */
 .layers-summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
-  padding: 6px 8px 2px;
-  border-top: 1px solid var(--border);
-  font-size: var(--text-2xs);
-  color: var(--text-secondary);
 }
 
 .layers-summary-name {
-  font-weight: 600;
-  color: var(--text-primary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
