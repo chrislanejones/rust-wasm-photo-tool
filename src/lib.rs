@@ -235,26 +235,49 @@ pub fn grid_lines(width: u32, height: u32, kind: u8, param_a: f32, param_b: f32)
 
 /// Web-performance indicators for the Resize &amp; Compress panel.
 ///
-/// Returns `[lighthouse_score, web_performance_gain]`, both in `0..=100`:
+/// Returns `[delivery_score, web_performance_gain]`.
 ///
-/// - **Web Performance Gain** — how much smaller the delivered image will be
-///   vs. the *original upload* (`orig_bytes`), accounting for everything done so
-///   far plus the pending resize + quality: `1 - projected_bytes / orig_bytes`.
-///   A freshly uploaded, untouched photo reads `+0%`; resizing, lowering
-///   quality, or running Auto Compress (which shrinks `cur_bytes`) all push it
-///   up.
-/// - **PageSpeed Insights Score** — a Google-PSI-style score derived from the
-///   *projected delivered byte size*, mapped through a log-normal curve (the
-///   same curve family Lighthouse uses to score its metrics), then adjusted
-///   for the three image audits PSI actually runs:
-///   - "Efficiently encode images" — the byte projection scales with quality.
-///   - "Serve images in next-gen formats" — `cur_format`/`new_format` fold the
-///     typical compression ratio of the target codec into the projection
-///     (PNG photos ≈ 2.6× JPEG, WebP ≈ 0.8×, AVIF ≈ 0.6×), so switching the
-///     Format dropdown to WebP/AVIF raises the score like PSI's audit would.
-///   - "Properly size images" — output wider than 1920 px (the widest common
-///     desktop display) accrues a linear penalty: those pixels can't be seen
-///     and PSI flags them as pure waste.
+/// # WHAT THE AUDIT ACTUALLY MEASURES
+///
+/// This used to score **absolute bytes** against a fabricated log-normal curve
+/// (`GOOD = 100 KB`, `MEDIAN = 500 KB`) and penalise anything wider than
+/// 1920 px. Lighthouse measures neither of those things. From
+/// `ImageDelivery.js` in `@paulirish/trace_engine`, which backs the current
+/// `image-delivery-insight` — it has since replaced `modern-image-formats`,
+/// `uses-optimized-images` and `uses-responsive-images`:
+///
+/// ```js
+/// const TARGET_BYTES_PER_PIXEL_AVIF = 2 * 1 / 12;   // 0.1667 bytes/px
+/// const bytesPerPixel = imageBytes / imageFilePixels;
+/// // listed when bytesPerPixel > TARGET_BYTES_PER_PIXEL_AVIF
+/// ```
+///
+/// So the rule is **bytes per pixel** — `bytes <= pixels / 6` — and there is no
+/// 0–100 image score anywhere in it. 1920 px is not in it either: "properly
+/// size images" is now a comparison of the file's pixel count against the
+/// *displayed* size corrected for DPR, which this function cannot know.
+///
+/// The two models disagree in BOTH directions, which is what made the old one
+/// actively misleading rather than merely imprecise:
+///
+/// | Image | Bytes | B/px | Real verdict | Old score |
+/// |---|---|---|---|---|
+/// | 1600×1200 JPEG q60 | 32,950 | 0.017 | passes, 10× margin | ~90 |
+/// | 6000×4000 JPEG | 10,000,000 | 0.417 | **fails** | ~50 |
+///
+/// A small clean photo scored well; a large heavy one — the case users actually
+/// bring — scored middling.
+///
+/// # THE TWO NUMBERS
+///
+/// - **PageSpeed Insights Score** — now the real ratio, expressed as a
+///   percentage of the budget USED, so it keeps the 0–100 shape the panel and
+///   its bar already have. `100` means at or under the budget; `250` means two
+///   and a half times over. It is not a Lighthouse score and does not claim to
+///   be — the label in the panel says what it is. A value over 100 is the
+///   useful case: it says *this image is flagged, by this much*.
+/// - **Web Performance Gain** — unchanged, and still the honest one: how much
+///   smaller the delivered image will be vs. the *original upload*.
 ///
 /// Format codes: 0 = PNG, 1 = JPEG, 2 = WebP, 3 = AVIF, other = unknown (1.0).
 ///
@@ -301,15 +324,11 @@ pub fn web_perf_metrics(
     // whatever the current file already is (e.g. after Auto Compress).
     let projected_bytes = (cur_bytes * area_ratio * quality_ratio * format_ratio).max(0.0);
 
-    // "Properly size images": pixels beyond a 1920px-wide display are waste.
-    // Score-only penalty (the bytes still ship, so savings stays honest).
-    // Linear (not quadratic) so 4K originals are nudged, not cliffed.
-    const MAX_USEFUL_WIDTH: f64 = 1920.0;
-    let scored_bytes = if (new_w as f64) > MAX_USEFUL_WIDTH {
-        projected_bytes * (new_w as f64 / MAX_USEFUL_WIDTH)
-    } else {
-        projected_bytes
-    };
+    // THE BUDGET: pixels / 6. `TARGET_BYTES_PER_PIXEL_AVIF` in Lighthouse is
+    // `2 * 1 / 12`, which is the same number written the way it is written
+    // there (two bits of budget per pixel, converted to bytes).
+    const TARGET_BYTES_PER_PIXEL: f64 = 1.0 / 6.0;
+    let budget = (new_area * TARGET_BYTES_PER_PIXEL).max(1.0);
 
     // Byte savings vs. the *original upload*, so progress accumulates across
     // resize, quality and Auto Compress instead of resetting to the current file.
@@ -319,53 +338,34 @@ pub fn web_perf_metrics(
         0.0
     };
 
+    // Budget USED, as a percentage. 100 or less clears the audit. Above 100 is
+    // the flagged case and the number that says how far over it is — which the
+    // old curve could not express, because it compressed "twice over" and
+    // "thirty times over" into the same low band.
     let score = if cur_bytes > 0.0 {
-        // Unknown source size → don't pretend the image is perfectly optimized.
-        lighthouse_score(scored_bytes)
+        (projected_bytes / budget) * 100.0
     } else {
+        // Unknown source size → don't pretend the image is perfectly optimized.
         0.0
     };
 
     vec![score, savings]
 }
 
-/// Map a projected transfer size (bytes) to a 0..=100 Lighthouse-style score
-/// using a log-normal curve, the way Lighthouse scores its metrics. `GOOD` is
-/// the size that earns ~90 and `MEDIAN` the size that earns 50; heavier images
-/// fall off smoothly toward 0.
-fn lighthouse_score(bytes: f64) -> f64 {
-    // Control points: a well-optimized web image vs. a heavy one.
-    const GOOD: f64 = 100_000.0; // ~100 KB → score ~90
-    const MEDIAN: f64 = 500_000.0; // ~500 KB → score 50
-                                   // erfc(-Z_P90)/2 = 0.9, i.e. Z_P90 = -erfc⁻¹(1.8); sigma is chosen so that
-                                   // score(GOOD) lands on 0.9 and score(MEDIAN) on 0.5.
-    const Z_P90: f64 = 0.906_193_802_436_823_2;
-
-    if bytes <= 0.0 {
-        return 100.0;
-    }
-    let sqrt2 = std::f64::consts::SQRT_2;
-    let sigma = (MEDIAN.ln() - GOOD.ln()) / (sqrt2 * Z_P90);
-    let z = (bytes.ln() - MEDIAN.ln()) / (sqrt2 * sigma);
-    (0.5 * erfc(z) * 100.0).clamp(0.0, 100.0)
-}
-
-/// Complementary error function via the Abramowitz &amp; Stegun 7.1.26
-/// rational approximation (|error| &lt; 1.5e-7) — enough for UI scoring.
-fn erfc(x: f64) -> f64 {
-    1.0 - erf(x)
-}
-
-fn erf(x: f64) -> f64 {
-    let sign = if x < 0.0 { -1.0 } else { 1.0 };
-    let x = x.abs();
-    let t = 1.0 / (1.0 + 0.327_591_1 * x);
-    let y = 1.0
-        - (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t
-            + 0.254_829_592)
-            * t
-            * (-x * x).exp();
-    sign * y
+/// Bytes per pixel the budget loop iterates toward for an image of `w × h`.
+/// One definition shared with `lib/webPerf.ts`'s `webTargetBytes`, which is
+/// what the UI calls; this is the engine-side half so a caller holding only
+/// the engine can ask the same question.
+#[wasm_bindgen]
+pub fn web_image_budget(w: u32, h: u32) -> f64 {
+    // Lighthouse does not list an image saving fewer bytes than this.
+    const BYTE_SAVINGS_THRESHOLD: f64 = 4096.0;
+    // Reachable clamps: an ideal below the floor has no smaller encode to find,
+    // and an unbounded ceiling lets a huge image run the loop for minutes.
+    const MIN: f64 = 24.0 * 1024.0 + BYTE_SAVINGS_THRESHOLD;
+    const MAX: f64 = 1024.0 * 1024.0;
+    let ideal = (w as f64) * (h as f64) / 6.0;
+    ideal.clamp(MIN, MAX)
 }
 
 /// Live, non-destructive "placing" preview for a pasted image: holds the
@@ -4799,5 +4799,111 @@ mod layer_persistence_tests {
         assert_eq!(t.export_quality(), 60);
         t.undo();
         assert_eq!(t.export_quality(), 75);
+    }
+}
+
+#[cfg(test)]
+mod web_perf_tests {
+    use super::*;
+
+    /// `web_perf_metrics` with no pending change, so `projected_bytes ==
+    /// cur_bytes` and the score is purely "current bytes against the budget for
+    /// new_w × new_h".
+    fn budget_used(cur_w: u32, cur_h: u32, cur_bytes: f64) -> f64 {
+        let out = web_perf_metrics(cur_w, cur_h, cur_bytes, cur_bytes, cur_w, cur_h, 100, 1, 1);
+        out[0]
+    }
+
+    #[test]
+    fn budget_is_pixels_over_six() {
+        // 2000×1333 → 2,666,000 px / 6 = 444,333 B. At exactly that size the
+        // score is 100 — at budget, which clears the audit.
+        assert!((web_image_budget(2000, 1333) - 444_333.0).abs() < 1.0);
+        let used = budget_used(2000, 1333, 444_333.0);
+        assert!((used - 100.0).abs() < 0.01, "at budget is 100%, got {used}");
+    }
+
+    #[test]
+    fn small_clean_photo_is_well_under_budget() {
+        // The measured q60 JPEG from the Auto Compress bug: 1600×1200 at
+        // 32,950 B is 0.017 B/px against a 1/6 budget — 14% used. The old
+        // fabricated curve called this ~90 on a 0–100 scale, which read as
+        // "nearly perfect" and said nothing about whether it passes.
+        let used = budget_used(1600, 1200, 32_950.0);
+        assert!(
+            used < 20.0,
+            "a q60 1600×1200 should be a small fraction of budget, got {used}"
+        );
+    }
+
+    #[test]
+    fn large_heavy_photo_is_over_budget_and_says_by_how_much() {
+        // 24 MP at 10 MB is 0.417 B/px. This is the case the old model scored
+        // ~50 — middling, indistinguishable from "fine". It should read as
+        // clearly failed, with a number attached.
+        let used = budget_used(6000, 4000, 10_000_000.0);
+        assert!(
+            used > 200.0,
+            "10 MB at 24 MP is over twice the budget, got {used}"
+        );
+        // And the number is the real ratio, not a curve output: budget is 4 MB,
+        // so 10 MB is 2.5×.
+        assert!(
+            (used - 250.0).abs() < 0.01,
+            "expected 250% of budget, got {used}"
+        );
+    }
+
+    #[test]
+    fn unknown_size_scores_zero_rather_than_a_good_number() {
+        // A photo whose byte size is not known yet must not read as optimized.
+        assert_eq!(budget_used(1600, 1200, 0.0), 0.0);
+    }
+
+    #[test]
+    fn budget_clamps_but_never_below_the_minimum_savings_threshold() {
+        // Lighthouse does not list an image saving fewer bytes than 4096.
+        assert!(web_image_budget(1, 1) >= 4096.0);
+        assert!(web_image_budget(64, 64) >= 4096.0);
+        // And the top is bounded so a huge image cannot run the loop for minutes.
+        assert_eq!(web_image_budget(40_000, 30_000), 1024.0 * 1024.0);
+    }
+
+    #[test]
+    fn a_downscale_alone_does_not_improve_the_ratio() {
+        // Quartering the pixels quarters the projected bytes AND quarters the
+        // budget, so the ratio is unchanged — 62.5% either way.
+        //
+        // This is the most useful thing the real rule says, and it is the
+        // opposite of what the panel taught. "Resize it smaller" does NOT fix a
+        // photo that is simply too dense for its dimensions: it moves the
+        // target and the file by the same factor. What fixes it is lowering the
+        // quality or moving to a next-gen format, because those change the BYTES
+        // without changing the budget.
+        let half = web_perf_metrics(1600, 1200, 200_000.0, 400_000.0, 800, 600, 100, 1, 1)[0];
+        let full = web_perf_metrics(1600, 1200, 200_000.0, 400_000.0, 1600, 1200, 100, 1, 1)[0];
+        assert!((half - full).abs() < 0.01, "{half} vs {full}");
+        assert!((full - 62.5).abs() < 0.01, "expected 62.5%, got {full}");
+    }
+
+    #[test]
+    fn lowering_quality_improves_the_ratio() {
+        // The lever that actually works: same pixels, q100 → q50. `quality`
+        // is RELATIVE to the source quality here, so passing 50 against a file
+        // already at 100 halves the projected bytes and halves the budget used.
+        let high = web_perf_metrics(1600, 1200, 200_000.0, 400_000.0, 1600, 1200, 100, 1, 1)[0];
+        let low = web_perf_metrics(1600, 1200, 200_000.0, 400_000.0, 1600, 1200, 50, 1, 1)[0];
+        assert!(low < high, "q50 should beat q100: {low} vs {high}");
+        assert!((low - 31.25).abs() < 0.01, "expected 31.25%, got {low}");
+    }
+
+    #[test]
+    fn a_next_gen_format_lowers_the_projection() {
+        // Same pixels, JPEG → WebP at the same quality. `format_weight` is
+        // 1.0 for JPEG and 0.8 for WebP, so the projection drops 20%.
+        let jpeg = web_perf_metrics(2000, 1333, 500_000.0, 900_000.0, 2000, 1333, 100, 1, 1)[0];
+        let webp = web_perf_metrics(2000, 1333, 500_000.0, 900_000.0, 2000, 1333, 100, 1, 2)[0];
+        assert!(webp < jpeg, "WebP should project smaller: {webp} vs {jpeg}");
+        assert!((jpeg - webp - jpeg * 0.2).abs() < 0.01);
     }
 }

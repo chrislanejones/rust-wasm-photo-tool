@@ -29,6 +29,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
+import { extFromMime } from "@/lib/exportImage";
 import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -223,7 +224,13 @@ function MobileViewer({
       );
       const a = document.createElement("a");
       a.href = url;
-      a.download = photo.name;
+      // The extension comes from the BYTES, never from the name: gallery names
+      // are stored with theirs stripped (`useImageSession`: `f.name.replace(...)`),
+      // so `photo.name` is "beach", not "beach.jpg" — and every download landed
+      // with no extension at all, which is the form the OS cannot open.
+      // `extFromMime` is the same helper the desktop export paths use, which is
+      // why those were unaffected.
+      a.download = `${photo.name}${extFromMime(stored.mimeType)}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

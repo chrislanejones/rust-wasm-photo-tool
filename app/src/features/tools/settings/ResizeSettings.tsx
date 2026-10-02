@@ -12,9 +12,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { getWebPerfMetrics } from "@/lib/webPerf";
+import { getWebPerfMetrics, webTargetBytes } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
-import { SelectField } from "@/components/ui/select-field";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -35,6 +35,17 @@ const METHOD_LABELS: Record<ResampleMethod, string> = {
   "catmull-rom": "Catmull-Rom",
   nearest: "Nearest",
 };
+
+/** What each kernel is FOR — a tooltip, since the label alone does not say. */
+const METHOD_TITLES: Record<ResampleMethod, string> = {
+  lanczos3: "Sharpest. The best downscale, and the default.",
+  "catmull-rom": "Slightly softer than Lanczos3, a little faster.",
+  nearest: "Hard pixel edges. For pixel art and flat colour.",
+};
+
+/** The four quick values above the Quality track — the same preset row Paint's
+ *  Opacity and Hardness use. 100 is not among them; see the SizeSlider below. */
+const QUALITY_PRESETS = [50, 70, 80, 90] as const;
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
   png: "PNG",
@@ -132,7 +143,7 @@ export function ResizeSettings({
   // bar shows the SOURCE size while a lossless re-encode lands on disk.
   const formatNote =
     exportFormat === "png"
-      ? "Lossless — the largest file, and larger than the source for photos."
+      ? "Lossless — the largest file, and larger than the source for photos. Quality does not apply, so the slider below is off."
       : exportFormat === "avif" && avifOk === false
         ? "This browser can't encode AVIF — the file will be saved as PNG."
         : null;
@@ -213,9 +224,23 @@ export function ResizeSettings({
     onQualityChange(val);
   };
 
-  const qualityChanged = quality < baseQualityRef.current;
+  // Was `<`, so only LOWERING quality counted as a pending change: dragging
+  // 75 → 90 left the apply button dark, recorded nothing, and moved neither
+  // score. Raising the quality is a compression exactly as much as lowering it
+  // is, so this is a plain inequality.
+  const qualityChanged = quality !== baseQualityRef.current;
   const formatChanged = exportFormat !== baseFormatRef.current;
   const methodChanged = method !== baseMethodRef.current;
+  /** PNG is lossless, so `encodeQuality` is not consulted at all on the write
+   *  path (`usePersistActiveCanvas`: `const lossy = encodeFormat !== "png"`).
+   *  Method has no resample to choose between unless the dimensions moved, so
+   *  neither of those two can change the bytes when they are what changed.
+   *
+   *  Both used to feed `compressionChanged` anyway, which lit the apply button
+   *  and let it claim a compression that did not happen. */
+  const methodCounts =
+    methodChanged && (parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight);
+  const formatCounts = formatChanged && exportFormat !== "png";
   /** Dimensions alone — what "Apply Resize" acts on. Separate from
    *  `resizeChanged` below, which also counts quality/format/method, because a
    *  resize-only button must stay dark when the only pending change is one it
@@ -226,10 +251,10 @@ export function ResizeSettings({
     parseInt(width, 10) !== imageWidth ||
     parseInt(height, 10) !== imageHeight ||
     qualityChanged ||
-    formatChanged ||
-    methodChanged;
+    formatCounts ||
+    methodCounts;
   /** Compression alone — the mirror of `dimensionsChanged`. */
-  const compressionChanged = qualityChanged || formatChanged || methodChanged;
+  const compressionChanged = qualityChanged || formatCounts || methodCounts;
   /** ONE apply button that names what it will actually do. Two buttons became
    *  wrong the moment the tiles merged: "Apply Resize" and "Apply Compression &
    *  Resize" sat next to each other, one of them almost always dark, and
@@ -261,7 +286,8 @@ export function ResizeSettings({
   //     already at. A file stored at q=60 re-encoded at q=50 does not lose
   //     half its bytes. Unknown (an untouched upload) counts as 100, which is
   //     the old absolute model.
-  const modelQuality = compressionChanged
+  const qualityApplies = qualityChanged && exportFormat !== "png";
+  const modelQuality = qualityApplies
     ? Math.min(100, Math.round((quality * 100) / (currentEncodeQuality ?? 100)))
     : 100;
   const modelFormat: ExportFormat | undefined = compressionChanged
@@ -269,7 +295,7 @@ export function ResizeSettings({
     : undefined;
   const newW = parseInt(width, 10) || imageWidth;
   const newH = parseInt(height, 10) || imageHeight;
-  const [lighthouseScore, setLighthouseScore] = useState(0);
+  const [budgetUsed, setBudgetUsed] = useState(0);
   const [savingsPercent, setSavingsPercent] = useState(0);
 
   useEffect(() => {
@@ -291,7 +317,7 @@ export function ResizeSettings({
       newFormat: modelFormat,
     }).then((m) => {
       if (!alive) return;
-      setLighthouseScore(m.lighthouseScore);
+      setBudgetUsed(m.budgetUsed);
       setSavingsPercent(m.performanceGain);
     });
     return () => {
@@ -354,26 +380,44 @@ export function ResizeSettings({
           </div>
         </div>
 
-        {/* ── PageSpeed Insights Score ── */}
+        {/* ── PageSpeed budget, as a percentage USED ──
+            This is Lighthouse's actual rule (`bytes <= pixels / 6`) expressed
+            as a share of the budget, so it keeps the 0–100 shape while meaning
+            something true. It is not a Lighthouse score — that does not exist
+            for a single image — so the label says what it is.
+
+            OVER 100 is the useful case, and the bar has to show it: a
+            percentage of budget used has no ceiling to normalise against, so
+            anything above 100 draws full and the number carries the rest.
+            Clamping the bar's width at 100 is why the label matters. */}
         <div className="space-y-4">
           <div className="flex items-center justify-between text-2xs">
             <span className="flex items-center gap-1 text-theme-muted-foreground">
-              PageSpeed Insights Score
+              PageSpeed budget used
               <InfoTooltip
-                info="Estimated Lighthouse score (0–100) for the pending output — weighs dimensions, format, and quality the way the real audit does."
-                label="PageSpeed Insights Score"
+                info={`The pending output against the size Google PageSpeed stops flagging: ${Math.round(webTargetBytes(newW, newH) / 1024)} KB for ${newW}×${newH}. At 100% or less it passes; above that it is over by this much.`}
+                label="PageSpeed budget used"
               />
             </span>
             <span className="text-theme-foreground tabular-nums">
-              {lighthouseScore}%
+              {budgetUsed}%
             </span>
           </div>
           <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
-              style={{ width: `${lighthouseScore}%` }}
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(budgetUsed)}`}
+              // Clamped: over budget is the failure state and draws the bar
+              // full; the percentage beside it carries how far over. A bar
+              // that overflowed its own track would read as a broken width.
+              style={{ width: `${Math.min(100, budgetUsed)}%` }}
             />
           </div>
+          {budgetUsed > 100 && (
+            <p className="text-2xs leading-snug text-destructive">
+              Over what Google PageSpeed allows for this size — pick a smaller
+              size, a lower quality, or WebP or AVIF.
+            </p>
+          )}
         </div>
         </div>
 
@@ -406,68 +450,95 @@ export function ResizeSettings({
           title="Compress"
           info="Shrinks the file size: pick a resample Method and output Format, then drag Quality. The two scores above preview the pending output — Apply Compression &amp; Resize commits it."
         />
-        {/* ── Method / Format side by side to save vertical space ── */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* ── Method ── */}
-          <div className="space-y-4">
-            {/* `block`, or this floats ~7px: a bare inline <label> with
-                line-height 15 inside a block inheriting 24 sits low in the
-                strut's line box. SizeSlider's label row is flex and never had it. */}
-            <label className="block text-2xs text-theme-muted-foreground">
-              Method
-            </label>
-            <SelectField
-              value={method}
-              onChange={(e) => setMethod(e.target.value as ResampleMethod)}
-              disabled={disabled}
-            >
-              {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
-                <option key={m} value={m}>
-                  {METHOD_LABELS[m]}
-                </option>
-              ))}
-            </SelectField>
-          </div>
-
-          {/* ── Format ── */}
-          <div className="space-y-4">
-            {/* `block`, or this floats ~7px: a bare inline <label> with
-                line-height 15 inside a block inheriting 24 sits low in the
-                strut's line box. SizeSlider's label row is flex and never had it. */}
-            <label className="block text-2xs text-theme-muted-foreground">
-              Format
-            </label>
-            <SelectField
-              value={exportFormat}
-              onChange={(e) =>
-                onExportFormatChange(e.target.value as ExportFormat)
-              }
-              disabled={disabled}
-            >
-              {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                <option key={f} value={f}>
-                  {FORMAT_LABELS[f]}
-                </option>
-              ))}
-            </SelectField>
-            {formatNote && (
-              <p className="text-2xs text-theme-muted-foreground leading-snug">
-                {formatNote}
-              </p>
-            )}
-          </div>
+        {/* ── Method / Format as tile groups ──
+            Both were <SelectField>s, which cannot say why a control is off.
+            Method is only meaningful on a click that also resamples — the
+            resize-only path (`keepSourceEncoding`) never calls
+            `resize_with_filter` at all — so it now states that in place of
+            choosing a resample kernel that will not run. And Format is four
+            exclusive choices, which is what `ToolButtonGroup`'s SELECT mode
+            exists for; as a native <select> it announced nothing about which
+            one was lit. */}
+        <div className="space-y-4">
+          <ToolButtonGroup<ResampleMethod>
+            label="Method"
+            columns={3}
+            value={method}
+            onChange={setMethod}
+            aria-describedby="method-note"
+            options={(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => ({
+              id: m,
+              label: METHOD_LABELS[m],
+              title: METHOD_TITLES[m],
+              // Only a resample reads this. With the dimensions unchanged the
+              // filter code is passed in and never used, so offering a choice
+              // here was offering a control that does nothing.
+              disabled: !dimensionsChanged,
+            }))}
+          />
+          <p
+            id="method-note"
+            className="text-2xs leading-relaxed text-theme-muted-foreground"
+          >
+            {dimensionsChanged
+              ? "Applied by resampling the pixels on the way out."
+              : "The filter the resample will use. Change the dimensions above to turn this on."}
+          </p>
         </div>
 
-        {/* ── Quality ── */}
+        <div className="space-y-4">
+          <ToolButtonGroup<ExportFormat>
+            label="Format"
+            columns={4}
+            value={exportFormat}
+            onChange={onExportFormatChange}
+            aria-describedby="format-note"
+            options={(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => ({
+              id: f,
+              label: FORMAT_LABELS[f],
+              disabled: f === "avif" && avifOk === false,
+            }))}
+          />
+          <p
+            id="format-note"
+            className="text-2xs leading-relaxed text-theme-muted-foreground"
+          >
+            {formatNote ??
+              "WebP and AVIF are what the web-performance check below is measured against."}
+          </p>
+        </div>
+
+        {/* ── Quality ──
+            The preset row is the same primitive Paint's Opacity and Hardness
+            use (`variant="numbers"`), so the four quick values are a named
+            radio group above the track rather than four unlabelled buttons.
+
+            Presets turn the input's own value into a TRACK POSITION (0–100,
+            each preset an equal segment), which `SizeSlider` maps both ways and
+            `aria-valuetext` carries the real number. 80 therefore sits at
+            position 67 — visible in the knob, but announced as 80.
+
+            100 is deliberately not a preset: on this panel it is the setting
+            that made a resize-only re-encode heavier than the file it replaced
+            (see `usePersistActiveCanvas`, which keeps the source quality for
+            exactly that reason). */}
         <SizeSlider
           label="Quality"
           labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
           value={quality}
           onChange={handleQualityChange}
           onCommit={onQualityCommit}
+          presets={QUALITY_PRESETS}
+          variant="numbers"
           min={10}
           max={100}
           unit="%"
+          disabled={disabled || exportFormat === "png"}
+          reason={
+            exportFormat === "png"
+              ? "PNG is lossless — quality does not apply to it. Pick JPEG, WebP or AVIF to compress."
+              : undefined
+          }
         />
 
         {/* EXIF keep/strip moved to Settings → Security. */}
