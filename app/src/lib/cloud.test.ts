@@ -1,5 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { CLOUD_CONFIGURED, useCloudAuth, useCloudQuery, useCloudMutation, useCloudAction, useCloudClient } from "./cloud";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
+// Keys set EMPTY before a fresh import, so a developer's .env.local cannot turn
+// this into a configured build and send the calls below to the real hooks.
+let cloud: typeof import("./cloud");
+beforeAll(async () => {
+  vi.stubEnv("VITE_CONVEX_URL", "");
+  vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
+  vi.resetModules();
+  cloud = await import("./cloud");
+});
+afterAll(() => vi.unstubAllEnvs());
 
 // vitest runs with no VITE_CONVEX_URL / VITE_CLERK_PUBLISHABLE_KEY — the same
 // situation as a build with no env vars. These are called outside React on
@@ -9,20 +19,20 @@ import { CLOUD_CONFIGURED, useCloudAuth, useCloudQuery, useCloudMutation, useClo
 // the browser half of the same guarantee.
 describe("cloud hooks without keys", () => {
   it("is not configured", () => {
-    expect(CLOUD_CONFIGURED).toBe(false);
+    expect(cloud.CLOUD_CONFIGURED).toBe(false);
   });
 
   it("reads as signed out and finished loading", () => {
-    expect(useCloudAuth()).toEqual({ isLoading: false, isAuthenticated: false });
+    expect(cloud.useCloudAuth()).toEqual({ isLoading: false, isAuthenticated: false });
   });
 
   it("a query never has data", () => {
-    expect(useCloudQuery({} as never, "skip" as never)).toBeUndefined();
+    expect(cloud.useCloudQuery({} as never, "skip" as never)).toBeUndefined();
   });
 
   it("mutations, actions and the client refuse instead of throwing at render", async () => {
-    await expect(useCloudMutation({} as never)({} as never)).rejects.toThrow(/not configured/);
-    await expect(useCloudAction({} as never)({} as never)).rejects.toThrow(/not configured/);
-    await expect(useCloudClient().query({} as never, {} as never)).rejects.toThrow(/not configured/);
+    await expect(cloud.useCloudMutation({} as never)({} as never)).rejects.toThrow(/not configured/);
+    await expect(cloud.useCloudAction({} as never)({} as never)).rejects.toThrow(/not configured/);
+    await expect(cloud.useCloudClient().query({} as never, {} as never)).rejects.toThrow(/not configured/);
   });
 });

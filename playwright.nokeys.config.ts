@@ -3,7 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Keyless boot harness. A SEPARATE config because the other harnesses bake in
 // placeholder Convex/Clerk keys (see playwright.config.ts) — the very thing
 // that hid the "Could not find ConvexProviderWithAuth" crash of a build with no
-// env vars. This one builds with both keys UNSET, into its own outDir
+// env vars. This one builds with both keys set EMPTY (not just unset: Vite would re-read them from an
+// .env file), into its own outDir
 // (../www-dist-nokeys, gitignored) so it can never clobber a default build.
 //
 // Run with: pnpm run test:e2e:nokeys
@@ -25,10 +26,11 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command:
-      `env -u VITE_CONVEX_URL -u VITE_CLERK_PUBLISHABLE_KEY pnpm --filter stamp-tool exec vite build --outDir ../www-dist-nokeys && ` +
+      `VITE_CONVEX_URL= VITE_CLERK_PUBLISHABLE_KEY= pnpm --filter stamp-tool exec vite build --outDir ../www-dist-nokeys && ` +
       `pnpm --filter stamp-tool exec vite preview --outDir ../www-dist-nokeys --port ${PORT} --strictPort`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a server already on this port could be a configured build.
+    reuseExistingServer: false,
     timeout: 240_000,
   },
 });

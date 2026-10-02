@@ -23,9 +23,10 @@ for (const [name, size] of [
     const errors = await bootErrors(page);
     await page.setViewportSize(size);
     await page.goto("/");
-    await expect(page.locator("#root > *").first()).toBeAttached({ timeout: 30_000 });
-    await page.waitForTimeout(2000);
+    // The upload input exists only once boot has finished and the first-run
+    // surface (desktop) or the phone's gallery surface is up — the splash alone
+    // would leave #root non-empty and prove nothing.
+    await expect(page.locator('input[type="file"]').first()).toBeAttached({ timeout: 30_000 });
     expect(errors.filter((e) => /Convex|Clerk/.test(e))).toEqual([]);
-    expect(await page.locator("#root").innerHTML()).not.toBe("");
   });
 }
