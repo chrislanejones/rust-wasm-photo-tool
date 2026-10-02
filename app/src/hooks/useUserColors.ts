@@ -12,7 +12,7 @@
 // A failed Convex write falls back to the local list so the click is never
 // silently lost.
 import { useSyncExternalStore, useCallback } from "react";
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useCloudAuth, useCloudMutation, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 
 const LS_KEY = "image-horse-user-colors";
@@ -98,15 +98,15 @@ export function useUserColors() {
   // useConvexAuth.isAuthenticated is true only after Convex completes the JWT
   // handshake — unlike Clerk's isSignedIn which stays true even when the
   // Convex auth provider rejects the token (e.g. dev keys vs prod deployment).
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useCloudAuth();
 
   const localColors = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const convexColors = useQuery(
+  const convexColors = useCloudQuery(
     api.userColors.listUserColors,
     isAuthenticated ? {} : "skip",
   );
-  const addMutation = useMutation(api.userColors.addUserColor);
-  const removeMutation = useMutation(api.userColors.removeUserColor);
+  const addMutation = useCloudMutation(api.userColors.addUserColor);
+  const removeMutation = useCloudMutation(api.userColors.removeUserColor);
 
   // While the first Convex result is still in flight (`undefined`) show the
   // local list rather than an empty row, so the "+" swatches don't blink out

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useCloudAuth, useCloudMutation, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 
@@ -23,14 +23,14 @@ export function useRecentTexts() {
   // useConvexAuth.isAuthenticated is true only after Convex completes the JWT
   // handshake — unlike Clerk's isSignedIn which stays true even when the
   // Convex auth provider rejects the token (e.g. dev keys vs prod deployment).
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useCloudAuth();
 
-  const convexTexts = useQuery(
+  const convexTexts = useCloudQuery(
     api.textHistory.getRecentTexts,
     isAuthenticated ? {} : "skip",
   );
 
-  const addRecentTextMutation = useMutation(api.textHistory.addRecentText);
+  const addRecentTextMutation = useCloudMutation(api.textHistory.addRecentText);
 
   const [localTexts, setLocalTexts] = useState<TextMemory[]>(() => lsLoad());
 

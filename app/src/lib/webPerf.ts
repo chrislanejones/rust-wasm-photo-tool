@@ -4,6 +4,7 @@
 // Rust (`web_perf_metrics` in src/lib.rs) so the WASM layer stays the single
 // source of truth — this module just initializes the wasm module (same pattern
 // as photoLimits.ts) and forwards the call.
+import { importEngine } from "@/lib/engineGate";
 
 export interface WebPerfInput {
   /** Current working width of the active photo, in px. */
@@ -62,8 +63,7 @@ function formatCode(value?: string): number {
 export async function getWebPerfMetrics(
   input: WebPerfInput,
 ): Promise<WebPerfResult> {
-  const mod = await import("stamp_tool");
-  await mod.default();
+  const mod = await importEngine();
   const [score, gain] = mod.web_perf_metrics(
     input.curW,
     input.curH,

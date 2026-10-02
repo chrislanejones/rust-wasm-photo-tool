@@ -8,6 +8,7 @@ import {
 import { User } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { MediaTile } from "@/components/MediaTile";
+import { CLOUD_CONFIGURED } from "@/lib/cloud";
 
 /** `large` → a welcome-back-sized avatar / sign-in tile (the small icon was hard
  *  to see on the full-page surfaces); default is the compact top-bar size.
@@ -24,6 +25,9 @@ export function UserMenu({
   large?: boolean;
   grouped?: boolean;
 }) {
+  // No ClerkProvider in a keyless build, and Clerk's components throw without
+  // one — there is nothing to sign in to, so there is nothing to draw.
+  if (!CLOUD_CONFIGURED) return null;
   return (
     <>
       <SignedIn>

@@ -482,3 +482,9 @@ jobs:
         run: pnpm exec playwright test e2e/no-sw-default.spec.ts
       - name: Precache lifecycle + build-skew guard (VITE_ENABLE_SW=1 build)
         run: pnpm run test:e2e:sw
+      # Not a service-worker check — it rides here because this job already has
+      # wasm built and a browser installed. Every other harness bakes in
+      # placeholder keys; this one builds with NONE (a keyless build once
+      # crashed to a blank page and nothing could tell).
+      - name: Keyless build boots (no Convex/Clerk env)
+        run: pnpm run test:e2e:nokeys

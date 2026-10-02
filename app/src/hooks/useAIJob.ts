@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isNetworkPathAllowed } from "@/lib/networkPaths";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useCloudAction, useCloudMutation, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useUIStore } from "@/stores/useUIStore";
@@ -52,8 +52,8 @@ async function urlToPixels(url: string): Promise<AIResultPixels> {
  * inpaint); text models surface via the returned `textResult`.
  */
 export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
-  const generateUploadUrl = useMutation(api.ai.generateUploadUrl);
-  const dispatch = useAction(api.ai.dispatch);
+  const generateUploadUrl = useCloudMutation(api.ai.generateUploadUrl);
+  const dispatch = useCloudAction(api.ai.dispatch);
 
   const [jobId, setJobId] = useState<Id<"ai_jobs"> | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -64,7 +64,7 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   // The photo the running job belongs to, carried onto its result.
   const photoKeyRef = useRef<string | undefined>(undefined);
 
-  const job = useQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
+  const job = useCloudQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
 
   useEffect(() => {
     if (!job || !jobId || consumedRef.current === jobId) return;

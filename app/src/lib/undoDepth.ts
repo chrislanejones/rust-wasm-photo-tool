@@ -11,6 +11,8 @@
 // go", not "how many have I spent" — the engine evicts the oldest copy rather
 // than refusing a new edit, so there is nothing to run out of, only a depth.
 
+import { importEngine } from "@/lib/engineGate";
+
 /** One whole-image copy per step, counted the way the engine counts it
  *  (`Snapshot::bytes` in src/history.rs): every layer's pixel buffer, Canvas
  *  included — the artboard fill is a full W×H×4 buffer like any other layer —
@@ -87,7 +89,6 @@ export function describeUndoDepth(d: UndoDepth): string {
 /** The engine's byte budget, read from Rust so 512 MB has one home. Not
  *  feature-gated, unlike the op-log exports. */
 export async function getHistoryMaxBytes(): Promise<number> {
-  const mod = await import("stamp_tool");
-  await mod.default();
+  const mod = await importEngine();
   return mod.history_max_bytes();
 }

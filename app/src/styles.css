@@ -39,7 +39,7 @@
   --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
 
   /* ── Z-index ladder — the single source for stacking order. Use
-     var(--z-*) in CSS and z-[var(--z-*)] in JSX; no more "+1 to win". ── */
+     the --z- custom properties in CSS and as arbitrary z-index values in JSX; no more "+1 to win". ── */
   --z-canvas: 1; /* canvas-wrapper / pen overlay base */
   --z-canvas-overlay: 10; /* loaders, in-canvas badges */
   --z-compare: 20; /* compare slider handle, NEW pill */

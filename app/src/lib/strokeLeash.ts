@@ -5,6 +5,7 @@
 // languages must agree on crosses the boundary rather than being written down
 // twice. The pen has no dabs to lag, so it cannot use the engine's stroke
 // engines; it needs the number itself.
+import { importEngine } from "@/lib/engineGate";
 
 /** Off, used until the wasm module resolves. Zero = no smoothing, which is
  *  also the setting's default, so nothing changes for anyone who never turns
@@ -12,8 +13,7 @@
 export const NO_LEASH = 0;
 
 export async function getStrokeLeash(level: string): Promise<number> {
-  const mod = await import("stamp_tool");
-  await mod.default();
+  const mod = await importEngine();
   return mod.stabilizer_leash(level);
 }
 

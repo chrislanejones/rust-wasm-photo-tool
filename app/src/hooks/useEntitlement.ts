@@ -11,7 +11,7 @@
 // "signed out" to check those views; nobody can look at a rung above their own.
 // That is what keeps the UI honest: what you see is always something the server
 // would allow (`previewOf`).
-import { useConvexAuth, useQuery } from "convex/react";
+import { useCloudAuth, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import {
   entitlementOf,
@@ -36,8 +36,8 @@ export interface Session {
 
 /** Role + entitlement, live. Re-renders when a grant lands, no reload. */
 export function useSession(): Session {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
+  const { isAuthenticated, isLoading } = useCloudAuth();
+  const me = useCloudQuery(api.users.me, isAuthenticated ? {} : "skip");
 
   if (!isAuthenticated) {
     return {

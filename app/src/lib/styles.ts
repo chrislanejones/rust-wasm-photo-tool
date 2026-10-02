@@ -252,7 +252,7 @@ export const SKELETON_BASE = "skeleton block bg-muted";
    applied by the `.dialog-scrim` class. Tune the look there; this constant only
    decides WHERE the scrim sits. Note it carries no z-index — dialogs stack on
    different rungs of the ladder, so each overlay still supplies its own
-   `z-[var(--z-*)]`.
+   a rung from the z-index ladder (the `--z-` custom properties).
    ──────────────────────────────────────────────────────────────────────────── */
 export const DIALOG_OVERLAY = "fixed inset-0 dialog-scrim";
 

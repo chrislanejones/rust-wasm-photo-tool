@@ -122,6 +122,15 @@ export async function makeThumbnail(
   return oc.convertToBlob({ type: "image/webp", quality: 0.78 });
 }
 
+/** The engine's `resize_pixels`. */
+type ResizePixels = (
+  pixels: Uint8Array,
+  oldW: number,
+  oldH: number,
+  newW: number,
+  newH: number,
+) => Uint8Array;
+
 /**
  * Build a small WebP thumbnail directly from raw RGBA pixels using the
  * Rust bilinear resizer. Use this when the caller already has the composited
@@ -131,18 +140,17 @@ export async function makeThumbnail(
  * WebP encoding still happens via `OffscreenCanvas.convertToBlob` because the
  * WASM binary deliberately omits the `image` crate's WebP encoder per the
  * project's size-budget architecture docs.
+ *
+ * `resizePixels` may be `{ load }` instead of the function itself: the Rust
+ * resize is only the FALLBACK for a missing worker, so a caller that has not
+ * loaded the engine (the phone) hands over a loader and pays for the engine
+ * only if the fallback is actually taken.
  */
 export async function makeThumbnailFromPixels(
   pixels: Uint8Array | Uint8ClampedArray,
   width: number,
   height: number,
-  resizePixels: (
-    pixels: Uint8Array,
-    oldW: number,
-    oldH: number,
-    newW: number,
-    newH: number,
-  ) => Uint8Array,
+  resizePixels: ResizePixels | { load: () => Promise<ResizePixels> },
   maxEdge = THUMB_MAX_EDGE,
 ): Promise<Blob> {
   // Off-thread path: the worker resizes (OffscreenCanvas) + encodes WebP.
@@ -171,7 +179,13 @@ export async function makeThumbnailFromPixels(
   const scaledBytes =
     tw === width && th === height
       ? srcBytes
-      : resizePixels(srcBytes, width, height, tw, th);
+      : (typeof resizePixels === "function" ? resizePixels : await resizePixels.load())(
+          srcBytes,
+          width,
+          height,
+          tw,
+          th,
+        );
 
   // Wrap as ImageData → OffscreenCanvas → WebP blob.
   const clamped = new Uint8ClampedArray(
