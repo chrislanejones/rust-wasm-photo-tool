@@ -401,12 +401,14 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["blur", "soften", "smudge", "brush"],
     },
     {
-      // AMBIGUOUS-1. Two live features are called Eraser; this is the one in
-      // AISettings, sitting directly beside Magic Eraser exactly as the brief
-      // lists them. Paint's `brushMode: "erase"` is the other, and it was
-      // ALREADY unreachable before this job (ORPHAN O-1) — it is absent from
-      // PAINT_MODES, so it has no tile, no palette entry, and setModeOf
-      // refuses it. Left exactly as found: not deleted, not revived.
+      // This is the ONLY Eraser now, and it is the one in AISettings, sitting
+      // directly beside Magic Eraser exactly as the brief lists them.
+      //
+      // There used to be a second: Paint's `brushMode: "erase"`, unreachable
+      // since its tile left PAINT_MODES (ORPHAN O-1) and kept dormant on the
+      // chance a persisted value still named it. **Deleted 10-01-2026 (Chris).**
+      // A stored "erase" now falls back to "paint" through the validator that
+      // exists for exactly that, so the name is unambiguous again.
       id: "eraser",
       label: "Eraser",
       description: "Rub pixels out by hand",

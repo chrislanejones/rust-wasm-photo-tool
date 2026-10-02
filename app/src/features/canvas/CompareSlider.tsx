@@ -199,7 +199,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
 
       {/* Divider line */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-white pointer-events-none"
+        className="absolute top-0 bottom-0 w-0.5 bg-on-photo pointer-events-none"
         style={{
           left: `${clipPercent}%`,
           transform: "translateX(-50%)",
@@ -229,7 +229,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
           style={{ width: `${clipPercent}%`, opacity: originalRoom ? 1 : 0 }}
         >
           <span
-            className="flex items-center gap-1 py-1 pl-2 pr-1.5 rounded-l-md border-r-2 border-white bg-black/75 text-2xs text-white font-mono whitespace-nowrap"
+            className="flex items-center gap-1 py-1 pl-2 pr-1.5 rounded-l-md border-r-2 border-on-photo bg-black/75 text-2xs text-on-photo font-mono whitespace-nowrap"
             style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
           >
             <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
@@ -241,7 +241,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
           style={{ width: `${100 - clipPercent}%`, opacity: editedRoom ? 1 : 0 }}
         >
           <span
-            className="flex items-center gap-1 py-1 pl-1.5 pr-2 rounded-r-md border-l-2 border-white bg-black/75 text-2xs text-theme-primary font-mono whitespace-nowrap"
+            className="flex items-center gap-1 py-1 pl-1.5 pr-2 rounded-r-md border-l-2 border-on-photo bg-black/75 text-2xs text-theme-primary font-mono whitespace-nowrap"
             style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
           >
             Edited

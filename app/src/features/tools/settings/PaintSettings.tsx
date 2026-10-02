@@ -21,7 +21,6 @@ const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
 const BLUR_SIZE_PRESETS = [8, 16, 32, 64] as const;
 const PIXEL_SIZE_PRESETS = [8, 16, 32, 48] as const;
-const ERASER_SIZE_PRESETS = [8, 16, 32, 64] as const;
 
 // Blur-brush modes — gaussian (soften), pixelate (mosaic), solid (redact).
 const BLUR_MODES = [
@@ -332,37 +331,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               </>
             );
 
-          case "erase":
-            return (
-              <>
-                <SizeSlider
-                  label="Brush Size"
-                  value={settings.eraserSize}
-                  min={1}
-                  max={100}
-                  onChange={(v) => onChange({ ...settings, eraserSize: v })}
-                  presets={ERASER_SIZE_PRESETS}
-                />
-
-                <SizeSlider
-                  label="Opacity"
-                  value={settings.eraserOpacity}
-                  onChange={(v) => onChange({ ...settings, eraserOpacity: v })}
-                  presets={OPACITY_PRESETS}
-                  variant="numbers"
-                  unit="%"
-                />
-
-                <SizeSlider
-                  label="Hardness"
-                  value={settings.eraserHardness}
-                  onChange={(v) => onChange({ ...settings, eraserHardness: v })}
-                  presets={HARDNESS_PRESETS}
-                  variant="numbers"
-                  unit="%"
-                />
-              </>
-            );
         }
       }}
     </ToolModeToggle>

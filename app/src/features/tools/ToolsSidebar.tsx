@@ -149,8 +149,8 @@ interface ToolsSidebarProps {
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
   // Paint sub-mode (paint / blur / pen / erase)
-  brushMode?: "paint" | "blur" | "pen" | "erase";
-  onBrushModeChange?: (mode: "paint" | "blur" | "pen" | "erase") => void;
+  brushMode?: "paint" | "blur" | "pen";
+  onBrushModeChange?: (mode: "paint" | "blur" | "pen") => void;
   // Color Picker — Edit & Transform tool (bottom of the panel).
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;

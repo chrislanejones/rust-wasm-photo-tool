@@ -20,34 +20,87 @@ import { cn } from "@/lib/utils";
  * Width/padding are overridable via `className` (cn + tailwind-merge): pass
  * `flex-1` for side-by-side, `w-full` for stacked.
  */
+// Geometry shared by the two TEXT sizes. Padding is the only thing that
+// differs between them, so it stays on the size.
+const TEXT_BOX =
+  "inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all [&_svg]:size-[1em]";
+
+// The elevated surface every text button has worn until now. It moved OUT of
+// the size axis so a second axis could exist at all — but it is applied back to
+// exactly the two size/variant pairs that had it (see compoundVariants), so the
+// four combinations that existed before render the same class set they always
+// did. `button-variants.test.tsx` pins that, set-wise.
+const ELEVATED =
+  "text-text-primary bg-bg-elevated border border-border " +
+  "hover:border-border-active hover:brightness-110 " +
+  "disabled:cursor-not-allowed disabled:bg-bg-tertiary disabled:text-text-muted " +
+  "disabled:border-transparent disabled:hover:brightness-100 disabled:hover:border-transparent";
+
+// No surface until you touch it. For the quiet actions that were hand-rolled
+// as bare <button>s: a diagnostic row's "Clear", a panel's "Reset".
+const GHOST =
+  "text-text-secondary bg-transparent border border-transparent " +
+  "hover:bg-bg-elevated hover:text-text-primary " +
+  "disabled:cursor-not-allowed disabled:text-text-muted disabled:hover:bg-transparent";
+
+// A filled but quieter surface — the companion to a `default`-variant primary
+// in the same row, where two elevated buttons read as equally important.
+const SECONDARY =
+  "text-text-primary bg-bg-tertiary border border-transparent " +
+  "hover:brightness-110 hover:border-border " +
+  "disabled:cursor-not-allowed disabled:bg-bg-tertiary disabled:text-text-muted disabled:hover:brightness-100";
+
+// Reads as a link, not a button: no box, no padding, underlined.
+//
+// Deliberately carries NO colour and NO size. The two call sites want
+// different ones — one is `text-text-primary` hovering to the accent, the other
+// `text-theme-muted-foreground` hovering to the foreground — so a colour here
+// would be overridden at both of them and would only be a third opinion. It
+// does set `font-normal`, because the shared text geometry is `font-semibold`
+// and a link that inherited that would be bolder than the one it replaced.
+const LINK =
+  "border-0 bg-transparent px-0 py-0 font-normal underline underline-offset-2 " +
+  "disabled:cursor-not-allowed disabled:text-text-muted disabled:no-underline";
+
 const buttonVariants = cva("", {
   variants: {
     size: {
       xs: "btn-icon btn-icon-xs",
       tiny: "btn-icon",
-      default: [
-        "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2",
-        "text-xs font-semibold text-text-primary transition-all",
-        "[&_svg]:size-[1em]",
-        "bg-bg-elevated border border-border",
-        "hover:border-border-active hover:brightness-110",
-        "disabled:cursor-not-allowed disabled:bg-bg-tertiary disabled:text-text-muted",
-        "disabled:border-transparent disabled:hover:brightness-100 disabled:hover:border-transparent",
-      ].join(" "),
-      large: [
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5",
-        "text-xs font-semibold text-text-primary transition-all",
-        // Match icon size to the font size (like the JPEG/PNG format dropdown).
-        "[&_svg]:size-[1em]",
-        "bg-bg-elevated border border-border",
-        "hover:border-border-active hover:brightness-110",
-        "disabled:cursor-not-allowed disabled:bg-bg-tertiary disabled:text-text-muted",
-        "disabled:border-transparent disabled:hover:brightness-100 disabled:hover:border-transparent",
-      ].join(" "),
+      default: `${TEXT_BOX} px-3 py-2`,
+      large: `${TEXT_BOX} px-4 py-2.5`,
+    },
+    variant: {
+      // Empty on purpose: the surface for `default` arrives through
+      // compoundVariants, because the two ICON sizes take theirs from
+      // `.btn-icon` in CSS and must not get a second one on top.
+      default: "",
+      ghost: "",
+      secondary: "",
+      link: "",
     },
   },
+  compoundVariants: [
+    { size: "default", variant: "default", class: ELEVATED },
+    { size: "large", variant: "default", class: ELEVATED },
+
+    { size: "default", variant: "ghost", class: GHOST },
+    { size: "large", variant: "ghost", class: GHOST },
+    // An icon ghost cannot be done with utilities: `.btn-icon` sets its
+    // background, border and colour in CSS, so the override has to live beside
+    // it. Same shape as the existing `.btn-icon-xs` modifier.
+    { size: "tiny", variant: "ghost", class: "btn-icon-ghost" },
+    { size: "xs", variant: "ghost", class: "btn-icon-ghost" },
+
+    { size: "default", variant: "secondary", class: SECONDARY },
+    { size: "large", variant: "secondary", class: SECONDARY },
+
+    { size: "default", variant: "link", class: LINK },
+    { size: "large", variant: "link", class: LINK },
+  ],
   defaultVariants: {
     size: "default",
+    variant: "default",
   },
 });
 
@@ -58,12 +111,12 @@ export interface ButtonProps
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, size, asChild = false, ...props }, ref) => {
+  ({ className, size, variant, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
         ref={ref}
-        className={cn(buttonVariants({ size }), className)}
+        className={cn(buttonVariants({ size, variant }), className)}
         {...props}
       />
     );

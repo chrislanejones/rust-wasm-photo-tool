@@ -334,6 +334,7 @@ export function ReviewPanel({
           uses for Upload / Tools / Gallery. ───────────────────────────── */}
       <div className="review-toggles">
         <ToggleButtonGroup
+          mode="toggle"
           fill
           compact
           items={TOGGLES.map(({ key, icon, label, tooltip }) => ({

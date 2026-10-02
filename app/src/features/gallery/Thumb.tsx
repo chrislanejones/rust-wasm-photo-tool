@@ -173,7 +173,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           motion-safe, so Reduce Motion gets a still mark rather than nothing. */}
       {loading && (
         <span className="absolute top-1 right-1 z-20 flex items-center rounded-md bg-black/70 p-0.5 pointer-events-none">
-          <StatusMark kind="working" label={`Loading ${entry.name}`} className="text-white" />
+          <StatusMark kind="working" label={`Loading ${entry.name}`} className="text-on-photo" />
         </span>
       )}
 
@@ -195,7 +195,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
               className="absolute inset-0 bg-emerald-500/20 transition-all duration-300 ease-out"
               style={{ clipPath: `inset(0 0 ${100 - (progress ?? 0)}% 0)` }}
             />
-            <span className="relative z-20 text-white text-lg font-bold font-mono drop-shadow-lg tabular-nums">
+            <span className="relative z-20 text-on-photo text-lg font-bold font-mono drop-shadow-lg tabular-nums">
               {progress}%
             </span>
           </motion.div>
@@ -211,7 +211,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
           >
             <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
-              <Check className="h-3.5 w-3.5 text-white" />
+              <Check className="h-3.5 w-3.5 text-on-photo" />
             </div>
           </motion.div>
         )}
@@ -225,14 +225,14 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
             exit="exit"
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-red-500/30"
           >
-            <span className="text-white text-xs font-bold">!</span>
+            <span className="text-on-photo text-xs font-bold">!</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {hasSavings && (
         <div
-          className={`absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-white text-2xs font-bold font-mono shadow-lg pointer-events-none ${
+          className={`absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-on-photo text-2xs font-bold font-mono shadow-lg pointer-events-none ${
             grew ? "bg-amber-500/90" : "bg-emerald-500/90"
           }`}
           title={
@@ -262,7 +262,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         // INVISIBLE: opacity 0, and opacity hides an element's outline too, so
         // the global button:focus-visible ring could not show (WCAG 2.4.7,
         // measured in QC 09-27-2026). The Select toggle beside it gets the same.
-        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-on-photo opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
       </button>
@@ -309,8 +309,8 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
            the control reads as a checkbox before you hover it. */
         className={`absolute bottom-1 right-1 z-30 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
-            ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
-            : "bg-black/55 border-white/80 text-white/45"
+            ? "bg-theme-primary-foreground border-theme-primary text-on-photo opacity-100"
+            : "bg-black/55 border-on-photo/80 text-on-photo/45"
         } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />

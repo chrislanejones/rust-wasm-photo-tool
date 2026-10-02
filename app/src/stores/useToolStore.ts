@@ -28,7 +28,18 @@ import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
  *  the eraser (scrubs the active layer's alpha). */
-const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
+// "erase" was removed 10-01-2026 (Chris). It had been unreachable for a
+// while — no tile in PAINT_MODES, no palette entry, and setModeOf refused
+// it — but it stayed a legal PERSISTED value, so browsers that saved it
+// before the tile went still hold it. Dropping it here is all that is
+// needed: `TOOL_PERSISTED_FIELDS.brushMode` runs `validated(v, BRUSH_MODES,
+// fallback)`, so a stored "erase" now fails the check and falls back to
+// "paint" — exactly the case the validator block below says it exists for
+// ("a build that dropped or renamed one falls back instead of landing in
+// state as a value the running code cannot switch on"). No version bump and
+// no migration: this store is a zustand-persist JSON blob in its own
+// key/value database, not a Dexie table with a schema.
+const BRUSH_MODES = ["paint", "blur", "pen"] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
 const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;

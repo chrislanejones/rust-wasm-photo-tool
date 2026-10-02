@@ -58,8 +58,18 @@ interface ToggleButtonGroupProps {
    *
    *  Declared rather than inferred, unlike `tool-button-group`'s mode: every
    *  item here carries `active` either way, and "one is on right now" does
-   *  not prove "only one can be". docs/UI_CONSISTENCY.md §7. */
-  mode?: "toggle" | "select";
+   *  not prove "only one can be". docs/UI_CONSISTENCY.md §7.
+   *
+   *  ⚠️ REQUIRED, and it used to default to `"toggle"`. Counted before
+   *  changing it: of 16 call sites, **14 pass `"select"`** and 2 rely on the
+   *  default — so the default was the wrong answer seven times out of eight,
+   *  and getting it wrong is silent, because the two modes render identically.
+   *  Defaulting to `"select"` instead would only move the trap, and move it
+   *  somewhere worse: a SELECT group has ONE tab stop, so a mis-defaulted
+   *  cluster of independent toggles loses every button but one to the
+   *  keyboard. There is no safe default for a question only the caller can
+   *  answer, so the caller answers it and tsc asks. */
+  mode: "toggle" | "select";
   /** The group's accessible name. Required in practice for `mode="select"`
    *  (a radio group must have one); prefer `aria-labelledby` pointing at the
    *  heading that is already on screen. */
@@ -97,7 +107,7 @@ export function ToggleButtonGroup({
   equalWidth = false,
   bare = false,
   className,
-  mode = "toggle",
+  mode,
   ...aria
 }: ToggleButtonGroupProps) {
   const isSelect = mode === "select";
