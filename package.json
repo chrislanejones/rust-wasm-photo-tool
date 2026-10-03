@@ -13,7 +13,8 @@
     "lint": "eslint app/src eslint.config.mjs",
     "lint:fix": "eslint app/src eslint.config.mjs --fix",
     "test:e2e": "playwright test",
-    "test:e2e:sw": "playwright test --config playwright.sw.config.ts"
+    "test:e2e:sw": "playwright test --config playwright.sw.config.ts",
+    "test:e2e:nokeys": "playwright test --config playwright.nokeys.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -28,7 +28,7 @@ import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadB
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
-import { MobileShell } from "@/features/mobile/MobileShell";
+import { MobileShell } from "@/features/mobile/MobileShellLazy";
 import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
 // Code-split: the compact-mode master bar only loads the first time the window
 // goes ≤1000px, so desktop sessions never download its chunk.
@@ -79,7 +79,8 @@ import {
   saveGalleryManifest,
   clearGalleryManifest,
 } from "@/lib/galleryManifest";
-import { getPhotoLimit } from "@/lib/photoLimits";
+import { loadEngineIfWanted } from "@/lib/engineGate";
+import { usePhotoLimit } from "./session/useEngineGate";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
@@ -514,16 +515,7 @@ export function AppShell() {
   // so the WASM layer is the single source of truth. Starts at the most
   // restrictive limit until the wasm lookup resolves.
   const maxPhotos = useGalleryStore((s) => s.maxPhotos);
-  const setMaxPhotos = useGalleryStore((s) => s.setMaxPhotos);
-  useEffect(() => {
-    let alive = true;
-    void getPhotoLimit(effectiveUserMode).then((n) => {
-      if (alive) setMaxPhotos(n);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [effectiveUserMode]);
+  usePhotoLimit(effectiveUserMode);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -1047,9 +1039,9 @@ export function AppShell() {
     const startedAt = performance.now();
     void (async () => {
       // 1) WASM ready — the biggest boot cost; idempotent if already loaded.
+      // Not on a phone: it permits no editing (see lib/engineGate).
       try {
-        const mod = await import("stamp_tool");
-        await mod.default();
+        await loadEngineIfWanted();
       } catch (e) {
         console.error("WASM init failed during boot:", e);
       }

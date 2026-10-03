@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { isNetworkPathAllowed } from "@/lib/networkPaths";
-import { useConvexAuth, useConvex, useMutation } from "convex/react";
+import { useCloudAuth, useCloudClient, useCloudMutation } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { RefObject } from "react";
@@ -330,18 +330,18 @@ export function cloudPhotosAllowed(
 export function useEditPersistence() {
   // isAuthenticated stays false until the JWT handshake with Convex succeeds,
   // so mismatched keys keep the app on the local IDB path rather than crashing.
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useCloudAuth();
   // The consent switch, the same store field Settings › Security and the New
   // dialog share. Read as state (not a ref) so a change re-creates the
   // callbacks below and the next save sees it.
   const onlineFeatures = useUIStore((s) => s.onlineFeaturesEnabled);
   const cloudAllowed = cloudPhotosAllowed(isAuthenticated, onlineFeatures);
-  const convex = useConvex();
-  const generateUploadUrl = useMutation(api.photoEdits.generateUploadUrl);
-  const saveEdit = useMutation(api.photoEdits.save);
-  const removeEdit = useMutation(api.photoEdits.remove);
-  const discardFailedUpload = useMutation(api.photoEdits.discardFailedUpload);
-  const clearAllConvex = useMutation(api.photoEdits.clearAll);
+  const convex = useCloudClient();
+  const generateUploadUrl = useCloudMutation(api.photoEdits.generateUploadUrl);
+  const saveEdit = useCloudMutation(api.photoEdits.save);
+  const removeEdit = useCloudMutation(api.photoEdits.remove);
+  const discardFailedUpload = useCloudMutation(api.photoEdits.discardFailedUpload);
+  const clearAllConvex = useCloudMutation(api.photoEdits.clearAll);
 
   // photoId → hash of the archive last successfully synced to Convex. Session
   // -lived on purpose: a reload re-uploads once per photo, which is the cheap

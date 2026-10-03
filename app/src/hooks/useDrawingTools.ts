@@ -1,3 +1,4 @@
+import { importEngine } from "@/lib/engineGate";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import type { ToolType, ToolSettings } from "@/lib/types";
@@ -100,12 +101,8 @@ export function useDrawingTools({
   // phase, which a discarded/replayed render would fire spuriously.
   useEffect(() => {
     if (constrainRef.current) return;
-    void import("stamp_tool")
-      .then(async (mod) => {
-        await mod.default();
-        constrainRef.current = mod.constrain_crop_to_ratio;
-      })
-      .catch(() => {});
+    // importEngine waits until the engine is wanted: a phone never loads it.
+    void importEngine().then((mod) => { constrainRef.current = mod.constrain_crop_to_ratio; }).catch(() => {});
   }, []);
 
   /** Apply the locked-ratio constraint to a raw drag rect. Returns null

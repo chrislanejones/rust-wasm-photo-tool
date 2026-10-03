@@ -105,8 +105,10 @@ export function useActiveSubTool(): ResolvedSubTool | undefined {
 }
 
 /** The lit sub-tool for a given store state — the one derivation behind the
- *  reactive read above and the imperative switch-off handler below. */
-function litSubTool(s: ToolState): ResolvedSubTool | undefined {
+ *  reactive read above, the imperative switch-off handler below, and the
+ *  router's `readRoute` (which kept its own copy, and its own mode switch, until
+ *  that copy lost Perspective and Effects the way this file's once did). */
+export function litSubTool(s: ToolState): ResolvedSubTool | undefined {
   const stored = subToolByKey(s.activeSubTool);
   const mode = modeOfTool(s);
   if (

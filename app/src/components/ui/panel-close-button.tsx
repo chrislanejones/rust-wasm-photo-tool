@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
  *
  * Half-outside is why Tools and Review no longer clip at their fixed shell;
  * each moved `overflow-hidden` to an inner wrapper. No z-index: the guardrail
- * admits only `z-[var(--z-*)]` tokens and an absolute first child paints above
+ * admits only the z-index ladder tokens (the `--z-` custom properties) and an absolute first child paints above
  * its static siblings anyway — the click test proves it, not a number.
  */
 interface PanelCloseButtonProps {

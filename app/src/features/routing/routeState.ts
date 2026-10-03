@@ -19,48 +19,8 @@ import {
   SETTINGS_TAB_LABELS,
   type Route,
 } from "./routes";
-import {
-  resolveSubTool,
-  subToolByKey,
-  subToolForToolMode,
-} from "@/features/tools/toolGroups";
-import { activateSubTool } from "@/features/tools/activateSubTool";
-
-/** The lit sub-tool, read imperatively (the router is not a component).
- *  Mirrors `useActiveSubTool`'s fallback rule: the stored key wins while it
- *  still agrees with the live (tool, mode) pair, otherwise re-derive. */
-function activeSubToolResolved() {
-  const s = useToolStore.getState();
-  const stored = subToolByKey(s.activeSubTool);
-  const mode = modeOfActiveTool(s);
-  if (
-    stored &&
-    !stored.subTool.comingSoon &&
-    stored.subTool.tool === s.activeTool &&
-    (stored.subTool.mode === undefined || stored.subTool.mode === mode)
-  ) {
-    return stored;
-  }
-  return subToolForToolMode(s.activeTool, mode);
-}
-
-/** The mode field the active tool's sub-mode lives in. */
-function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
-  switch (s.activeTool) {
-    case "brush": return s.brushMode;
-    case "select": return s.selectionKind;
-    case "stamp": return s.stampSubMode;
-    case "shapes": return s.shapesMode;
-    case "ai": return s.eraserMode;
-    case "text": return s.textMode;
-    case "emoji": return s.batchMode;
-    case "perspective": return s.perspectiveMode;
-    // Two tiles on one tool id: Adjustments and Levels. Without this case a
-    // Levels link reloaded as Adjustments (routeState.test.ts round-trip).
-    case "effects": return s.effectsMode;
-    default: return undefined; // single-mode: crop, arrow, compress
-  }
-}
+import { resolveSubTool } from "@/features/tools/toolGroups";
+import { activateSubTool, litSubTool } from "@/features/tools/activateSubTool";
 
 export const parseHash = (hash: string): Route | null => parseRoute(hash);
 export const parseSearch = (search: string): Route | null =>
@@ -79,7 +39,7 @@ export function readRoute(): Route {
   // The URL names the lit SUB-TOOL. `activeSubTool` is the store's own answer
   // when it agrees with (activeTool, mode); the registry re-derives when it
   // doesn't (a reload, a legacy link, a panel's own mode toggle).
-  const sub = activeSubToolResolved();
+  const sub = litSubTool(useToolStore.getState());
   return sub
     ? { kind: "tool", group: sub.group.id, subTool: sub.subTool.id }
     : { kind: "tool", group: "enhance", subTool: "compress" };

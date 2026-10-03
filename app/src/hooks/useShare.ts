@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useCloudAuth, useCloudMutation } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -42,9 +42,9 @@ function clerkSessionPresent(): boolean {
  *  storage, mint a token, and hand back a ready-to-copy public URL.
  *  Requires a signed-in user (the upload URL is auth-gated). */
 export function useShare() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const generateUploadUrl = useMutation(api.shares.generateUploadUrl);
-  const createShareMutation = useMutation(api.shares.create);
+  const { isAuthenticated, isLoading } = useCloudAuth();
+  const generateUploadUrl = useCloudMutation(api.shares.generateUploadUrl);
+  const createShareMutation = useCloudMutation(api.shares.create);
 
   const createShare = useCallback(
     async (input: CreateShareInput): Promise<{ url: string; token: string }> => {

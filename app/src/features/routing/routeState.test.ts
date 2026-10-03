@@ -140,6 +140,27 @@ describe("state -> hash", () => {
   });
 });
 
+describe("sub-mode axis", () => {
+  // The router reads the lit sub-tool from the (tool, mode) pair when the stored
+  // key is stale (a reload — the key is not persisted). That read must cover
+  // EVERY tool that has a mode: the router once kept its own switch over the
+  // axis and lost a tool to it (Perspective, then Effects). Pinned for all
+  // live sub-tools so a tool added to the axis in one place cannot be missed
+  // in another.
+  it("a stale stored key still reads back every mode-carrying sub-tool's own route", () => {
+    useGalleryStore.setState({ photos: [{ id: "a" }, { id: "b" }] as never });
+    for (const { group, subTool } of LIVE_SUB_TOOLS) {
+      // Only sub-tools told apart BY MODE can be recovered from the pair; the
+      // Edit tiles that share `crop` carry no mode and live on the stored key.
+      if (subTool.mode === undefined) continue;
+      const hash = `#/${group.id}/${subTool.id}`;
+      apply(hash);
+      useToolStore.setState({ activeSubTool: "no-such/key" });
+      expect(currentHash(), hash).toBe(hash);
+    }
+  });
+});
+
 describe("round-trip", () => {
   it("hash -> state -> hash is identity for every live sub-tool", () => {
     useGalleryStore.setState({ photos: [{ id: "a" }, { id: "b" }] as never });

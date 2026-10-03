@@ -32,6 +32,8 @@ import { setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
 import { whenStrokeIdle } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
+import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
+import { useEngineWanted } from "./useEngineGate";
 
 /**
  * How long the idle debounce waits before archiving — v8.35, and the number is
@@ -157,6 +159,10 @@ export function useImageSession({
   const setLoadProgress = useUIStore((s) => s.setLoadProgress);
   const setShowUpload = useUIStore((s) => s.setShowUpload);
 
+  // Set when a phone selected/added a photo without loading it into the engine;
+  // the widening effect below loads the active photo then.
+  const engineDeferredRef = useRef(false);
+
   // ── Pixel-based loading (downscaled working copy) ──────────────────────────
   const loadImageFromPixels = useCallback(
     (
@@ -166,6 +172,11 @@ export function useImageSession({
       artboard?: { pad: number; r: number; g: number; b: number; a: number },
       opts?: LoadOpts,
     ): Promise<boolean> => {
+      // Phone: the photo is in the gallery, not in an engine. Widening loads it.
+      if (!engineWanted()) {
+        engineDeferredRef.current = true;
+        return Promise.resolve(false);
+      }
       startImageLoad();
       return stamp.loadImageFromPixels(pixels, width, height, artboard, opts);
     },
@@ -381,6 +392,11 @@ export function useImageSession({
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
+      // Phone: nothing to decode for — see loadImageFromPixels above.
+      if (!engineWanted()) {
+        engineDeferredRef.current = true;
+        return;
+      }
       // Fast path: a previously-decoded working copy. Keyed by the original's
       // content hash (immutable → always valid), so revisiting a photo skips the
       // IndexedDB read AND both createImageBitmap decodes — the slow part of a
@@ -469,8 +485,6 @@ export function useImageSession({
           // Build the gallery thumbnail from the already-decoded working pixels
           // (downscaled in Rust via resize_pixels) instead of decoding the
           // source file a second time.
-          const mod = await import("stamp_tool");
-          await mod.default();
           const [originalKey, thumbBlob] = await Promise.all([
             putOriginal(f, working.origWidth, working.origHeight),
             // Copy: the codec worker transfers (detaches) the buffer it's given,
@@ -480,7 +494,15 @@ export function useImageSession({
               working.pixels.slice(),
               working.width,
               working.height,
-              mod.resize_pixels,
+              // Lazy: the worker makes the thumbnail; the engine is only the
+              // fallback, and a phone has not loaded it.
+              {
+                load: async () => {
+                  const mod = await import("stamp_tool");
+                  await mod.default();
+                  return mod.resize_pixels;
+                },
+              },
             ),
           ]);
           // Seed the decode cache so re-selecting this photo later is instant
@@ -571,6 +593,76 @@ export function useImageSession({
     [activePhotoId, hasBeenModified, layerRevision, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
+  // ── Put a photo INTO the engine ────────────────────────────────────────────
+  // The tail of a selection, shared with the phone→editor catch-up below: op-log
+  // restore, else the saved edit archive, else the original. Extracted verbatim.
+  const loadIntoEngine = useCallback(
+    async (entry: PhotoEntry, isCurrent: () => boolean) => {
+      // ── Op-log resume (ADR-006) ─────────────────────────────────────────
+      // Preferred path when USE_OPLOG_PERSISTENCE / ih_oplog_persist is on:
+      // rebuild the exact document + replayable undo history from the
+      // persisted log (restoreFromOplog owns the engine lifecycle, so this
+      // works on page boot before any tool exists). A false return — flag
+      // off, nothing persisted, or invalid data — falls through to the
+      // existing archive/original paths unchanged; the working copy remains
+      // the safety net for one release.
+      setActiveOplogPhoto(entry.id);
+      const restored = await stamp.restoreFromOplog(entry.id, { isCurrent, photoId: entry.id });
+      // Ownership tracks the ENGINE, not the UI, so it is recorded BEFORE the
+      // supersession check: a switch that gets superseded still replaced the
+      // document. Recording it after the `isCurrent` bail would leave the
+      // marker naming the PREVIOUS photo while the engine holds this one, and
+      // the next entirely legitimate save would be refused. False refusals lose
+      // real work — the one outcome this guard must never produce.
+      // (Ownership is set inside the load when it restores — LoadOpts.photoId.)
+      if (!isCurrent()) return;
+      if (restored) {
+        setLoadProgress(100);
+        setTimeout(() => {
+          if (!isCurrent()) return;
+          setIsImageLoading(false);
+          setLoadProgress(0);
+        }, 400);
+        return;
+      }
+
+      const saved = await loadPhotoEdit(entry.id);
+      if (!isCurrent()) return;
+      if (saved) {
+        setLoadProgress(20);
+        await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
+        if (!isCurrent()) return;
+        setLoadProgress(100);
+        setTimeout(() => {
+          if (!isCurrent()) return;
+          setIsImageLoading(false);
+          setLoadProgress(0);
+        }, 400);
+      } else {
+        void loadPhotoFromEntry(entry, isCurrent);
+      }
+    },
+    [stamp, loadPhotoEdit, loadPhotoFromEntry],
+  );
+
+  // Widening a phone-width window past BP_MOBILE: the engine was never loaded, so
+  // the photo the phone was looking at is not in it. Load both now, through the
+  // same path a gallery click takes.
+  const editing = useEngineWanted();
+  useEffect(() => {
+    if (!editing || !engineDeferredRef.current) return;
+    engineDeferredRef.current = false;
+    const entry = useGalleryStore.getState().photos.find((p) => p.id === activeIdRef.current);
+    if (!entry) return;
+    const seq = ++selectSeqRef.current;
+    const isCurrent = () => seq === selectSeqRef.current;
+    setIsImageLoading(true);
+    setLoadProgress(8);
+    void loadEngineIfWanted()
+      .catch((e) => console.error("WASM init failed after widening:", e))
+      .then(() => loadIntoEngine(entry, isCurrent));
+  }, [editing, loadIntoEngine]);
+
   // ── Select photo ───────────────────────────────────────────────────────────
   const handleSelectPhoto = useCallback(
     async (entry: PhotoEntry) => {
@@ -585,6 +677,16 @@ export function useImageSession({
       const seq = ++selectSeqRef.current;
       const isCurrent = () => seq === selectSeqRef.current;
       activeIdRef.current = entry.id; // advance synchronously so cycling sees it
+
+      // Phone: record the selection, skip the engine. No save either — nothing
+      // can have been edited. Widening loads this photo (effect below).
+      if (!engineWanted()) {
+        engineDeferredRef.current = true;
+        setHasBeenModified(false);
+        setActivePhotoId(entry.id);
+        setCompareActive(false);
+        return;
+      }
 
       // Acknowledge the click NOW, before the save below. Saving a modified
       // outgoing photo uploads its whole edit archive when signed in, which
@@ -661,51 +763,9 @@ export function useImageSession({
       // points at the incoming one, and the modified-dot effect gates on this so
       // it doesn't falsely dot the newly-selected photo mid-transition.
 
-      // ── Op-log resume (ADR-006) ─────────────────────────────────────────
-      // Preferred path when USE_OPLOG_PERSISTENCE / ih_oplog_persist is on:
-      // rebuild the exact document + replayable undo history from the
-      // persisted log (restoreFromOplog owns the engine lifecycle, so this
-      // works on page boot before any tool exists). A false return — flag
-      // off, nothing persisted, or invalid data — falls through to the
-      // existing archive/original paths unchanged; the working copy remains
-      // the safety net for one release.
-      setActiveOplogPhoto(entry.id);
-      const restored = await stamp.restoreFromOplog(entry.id, { isCurrent, photoId: entry.id });
-      // Ownership tracks the ENGINE, not the UI, so it is recorded BEFORE the
-      // supersession check: a switch that gets superseded still replaced the
-      // document. Recording it after the `isCurrent` bail would leave the
-      // marker naming the PREVIOUS photo while the engine holds this one, and
-      // the next entirely legitimate save would be refused. False refusals lose
-      // real work — the one outcome this guard must never produce.
-      // (Ownership is set inside the load when it restores — LoadOpts.photoId.)
-      if (!isCurrent()) return;
-      if (restored) {
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
-        return;
-      }
-
-      const saved = await loadPhotoEdit(entry.id);
-      if (!isCurrent()) return;
-      if (saved) {
-        setLoadProgress(20);
-        await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
-        if (!isCurrent()) return;
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
-      } else {
-        void loadPhotoFromEntry(entry, isCurrent);
-      }
+      await loadIntoEngine(entry, isCurrent);
     },
-    [activePhotoId, hasBeenModified, layerRevision, stamp, loadPhotoFromEntry, flushEditArchive, loadPhotoEdit],
+    [activePhotoId, hasBeenModified, layerRevision, stamp, loadIntoEngine, flushEditArchive],
   );
 
   // Item 4: PgUp/PgDn gallery cycling

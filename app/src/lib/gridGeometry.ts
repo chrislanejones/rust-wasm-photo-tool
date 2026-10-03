@@ -4,6 +4,7 @@
 // once it resolves so the canvas render loop can compute geometry without an
 // await. Returns image-space segments [x1, y1, x2, y2, …]; the canvas projects
 // them to screen space.
+import { importEngine } from "@/lib/engineGate";
 import type { GridKind } from "@/lib/preferences";
 
 type GridFn = (
@@ -18,8 +19,7 @@ let promise: Promise<GridFn> | null = null;
 let syncGrid: GridFn | null = null;
 
 async function load(): Promise<GridFn> {
-  const mod = await import("stamp_tool");
-  await mod.default();
+  const mod = await importEngine();
   syncGrid = mod.grid_lines;
   return mod.grid_lines;
 }

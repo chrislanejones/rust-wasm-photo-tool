@@ -31,6 +31,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
+import { extFromMime } from "@/lib/mimeExt";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { useThumbImage } from "@/features/gallery/useThumbImage";
 
@@ -223,7 +224,9 @@ function MobileViewer({
       );
       const a = document.createElement("a");
       a.href = url;
-      a.download = photo.name;
+      // The stored name has its extension stripped on import, so the saved
+      // file gets it back from the stored MIME — otherwise it has no type.
+      a.download = `${photo.name}${extFromMime(stored.mimeType)}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

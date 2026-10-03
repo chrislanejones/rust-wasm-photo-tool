@@ -1,5 +1,6 @@
 // Thin wrapper around the Rust `parse_color` WASM export. Memoizes the WASM
 // init so subsequent parses are sync after the first await.
+import { importEngine } from "@/lib/engineGate";
 
 let parserPromise: Promise<(input: string) => Uint8Array> | null = null;
 /** Cached sync handle, set as soon as the async load resolves. Other parts
@@ -8,8 +9,7 @@ let parserPromise: Promise<(input: string) => Uint8Array> | null = null;
 let syncParser: ((input: string) => Uint8Array) | null = null;
 
 async function loadParser(): Promise<(input: string) => Uint8Array> {
-  const mod = await import("stamp_tool");
-  await mod.default();
+  const mod = await importEngine();
   syncParser = mod.parse_color;
   return mod.parse_color;
 }
