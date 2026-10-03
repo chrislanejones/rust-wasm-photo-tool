@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.10",
+    date: "2026-10-03",
+    headline: "Batch's first tile is now Bulk: hold a photo out of the pass, and the Command Palette moves down the right-click menu.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Batch's first tile is now called Bulk, and its panel opens with a picker of your own thumbnails, numbered in gallery order. Click one and it's held out of the pass — not cropped, not resized, not touched — while the rest of the gallery still gets the same crop.",
+      },
+      {
+        tag: "ui",
+        text: "The crop button and the progress count stop claiming “All” the moment anything is held out. “Crop All Images to 1:1” becomes “Crop 4 of 6 to 1:1,” and a held photo shows no crop frame and no shading, because a frame you can't apply is a broken control.",
+      },
+      {
+        tag: "ui",
+        text: "The right-click menu's Command Palette entry moved from the top of the menu down to just above Delete image.",
+      },
+      {
+        tag: "fix",
+        text: "A shape-stacking menu was drawing either a doubled separator line or none at all next to a right-clicked shape. It now draws exactly one.",
+      },
+      {
+        tag: "infra",
+        text: "Both new test suites were mutation-killed before they shipped — written to fail if the hold-out logic silently did nothing, not just to pass it.",
+      },
+    ],
+  },
+  {
     version: "v9.9",
     date: "2026-10-02",
     headline: "A phone stops downloading the engine, and a build with no keys boots.",

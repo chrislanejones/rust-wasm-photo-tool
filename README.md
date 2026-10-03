@@ -86,39 +86,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.9 — 2026-10-02
+### v9.10 — 2026-10-03
 
-**A phone stops downloading the engine, and a build with no keys boots.**
+**Batch's first tile is now Bulk: hold a photo out of the pass, and the Command Palette moves down the right-click menu.**
 
-Below 600px the WASM engine is not imported at boot. A phone can open the app,
-pick photos, add and delete them, see thumbnails and download one without ever
-fetching 829,721 bytes of Rust it has nothing to do with. The one Rust value a
-phone actually needed — the photo cap — comes from `lib/tiers.ts` instead. The
-decision is made from the window width once, at load, and it latches: narrowing
-a desktop window later never unloads an engine that is already there. Widen past
-600px and the engine loads, then the active photo goes in through the same path
-a gallery click takes. `MobileShell` is its own chunk now.
+Crop ten photos to one ratio and two of them shouldn't have been touched — until
+now the only way to keep a photo out was to delete it from the gallery first, or
+run the whole batch again without it. Bulk's panel opens with a picker of your
+own thumbnails, numbered in gallery order. Click one and it's held out — not
+cropped, not resized, not re-encoded — while everyone else still gets the same
+crop. The button stops claiming "All" the moment anything is held: "Crop All
+Images to 1:1" becomes "Crop 4 of 6 to 1:1", and the progress count follows it.
+A held photo shows no crop frame and no shading, because a frame you can drag
+but can't apply is a broken control.
 
-A build with no cloud keys crashed on load. Six hooks called `convex/react` with
-no provider in the tree, and those hooks throw without one — "Could not find
-ConvexProviderWithAuth", which reaches the user as a blank screen rather than an
-error. Logged-out is supposed to be a supported path, so that was the whole app
-gone for anyone building without keys. They go through `lib/cloud.ts` now, which
-takes the real hooks when `VITE_CONVEX_URL` and `VITE_CLERK_PUBLISHABLE_KEY` are
-both set and inert signed-out ones when they are not, chosen once at module load
-because a hook cannot be called conditionally. `UserMenu` renders nothing without
-Clerk, since Clerk's own components throw too. A new harness builds with both
-keys empty and boots it at two widths — the existing harnesses all baked in
-placeholder keys, which is exactly what hid this.
+The picker is its own thing, separate from the gallery's checkboxes — those
+still drive Delete All, Duplicate and Export ZIP. The one place they meet is a
+shortcut: hold out whatever's already selected.
 
-Three smaller ones. A photo downloaded on a phone gets the extension its stored
-mime type says, from a 20-line `lib/mimeExt.ts` so the phone chunk does not pull
-in the whole export pipeline. Three comments quoting the class `z-[var(--z-*)]`
-were being scanned by Tailwind and made the build print `Unexpected token
-Delim('*')`; they are reworded. And `routeState.ts` kept its own stale copy of
-which sub-tool is lit, so it calls the one exported implementation instead.
+The right-click menu's Command Palette entry moved from the top of the menu
+down to just above Delete image, and a shape-stacking menu that was drawing a
+doubled or missing separator line now draws exactly one.
 
-Engine unchanged at 829,721 bytes — no Rust in this release.
+No Rust, no IndexedDB — engine unchanged at 829,721 bytes.
 
 
 ## License
