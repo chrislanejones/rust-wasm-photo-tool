@@ -1,4 +1,4 @@
-// Batch › Crop — the geometry behind "crop every photo the same", for
+// Batch › Bulk — the geometry behind "crop every photo the same", for
 // carousels: one aspect ratio, one anchor, and (optionally) one output width,
 // so every slide comes out the same shape AND the same pixel size.
 //

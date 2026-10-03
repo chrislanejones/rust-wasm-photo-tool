@@ -55,8 +55,20 @@ const MOVES: {
  * Renders NOTHING when the right-click did not land on a shape on the active
  * layer. That is deliberate: four permanently-dead items on empty canvas read
  * as a broken menu, where their absence reads as "not applicable here".
+ *
+ * It carries its own LEADING separator and, with `trailingSeparator`, its own
+ * trailing one — so the caller never has to know whether this block rendered,
+ * which is the only way to avoid a leading rule on empty canvas or a doubled
+ * one beside a shape.
  */
-export function ShapeZOrderMenuItems({ menu }: { menu: ShapeZOrderMenu }) {
+export function ShapeZOrderMenuItems({
+  menu,
+  trailingSeparator = false,
+}: {
+  menu: ShapeZOrderMenu;
+  /** Draw a separator AFTER the block, so what follows reads as its own group. */
+  trailingSeparator?: boolean;
+}) {
   if (menu.targetId === null) return null;
   return (
     <>
@@ -75,6 +87,7 @@ export function ShapeZOrderMenuItems({ menu }: { menu: ShapeZOrderMenu }) {
           </ContextMenuItem>
         );
       })}
+      {trailingSeparator && <ContextMenuSeparator />}
     </>
   );
 }

@@ -50,10 +50,12 @@ const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
  *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
  *  own components), so ToolModeToggle only contributes the icon-row selector
  *  and stays silent on the header row rather than duplicating it. */
+// Labels mirror toolGroups.ts's Batch sub-tools — the tile says "Bulk", so the
+// panel must not say "Crop". The ids are the load-bearing half and never move.
 const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "logo", label: "Logo", icon: ImagePlus },
   { id: "text", label: "Text", icon: Type },
-  { id: "crop", label: "Crop", icon: Crop },
+  { id: "crop", label: "Bulk", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
 ];
