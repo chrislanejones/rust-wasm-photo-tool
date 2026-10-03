@@ -86,34 +86,39 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.8 — 2026-10-01
+### v9.9 — 2026-10-02
 
-**The star fills in, and the photo's name is the footer of the whole Tools card.**
+**A phone stops downloading the engine, and a build with no keys boots.**
 
-Fill was a rectangle-and-circle feature. The diamond, the triangle and the star
-drew their outlines and stopped, so a star was always hollow and the Fill section
-hid itself when you picked one. All five shapes that enclose an area take all
-four fills now — None, Solid, Gradient, Pixelate. The line is the one shape
-without the section, because it has no inside. A polygon is clipped by its own
-outline rather than its box, so the corners a star's points miss stay empty, and
-a filled shape you turn takes its fill with it.
+Below 600px the WASM engine is not imported at boot. A phone can open the app,
+pick photos, add and delete them, see thumbnails and download one without ever
+fetching 829,721 bytes of Rust it has nothing to do with. The one Rust value a
+phone actually needed — the photo cap — comes from `lib/tiers.ts` instead. The
+decision is made from the window width once, at load, and it latches: narrowing
+a desktop window later never unloads an engine that is already there. Widen past
+600px and the engine loads, then the active photo goes in through the same path
+a gallery click takes. `MobileShell` is its own chunk now.
 
-The photo's name moved again, and further. In v9.7 it became a footer under the
-controls, but only on the five panels that belong to a photo, and it scrolled
-away with them. It is the Tools card's own footer now: one 20px line on the
-bottom edge, on every tool, outside the scroller. It cannot scroll out of sight,
-and it stays readable while a photo is switching. The Layers summary beside it
-dropped its bold, so two footers that are the same kind of thing finally read
-like it.
+A build with no cloud keys crashed on load. Six hooks called `convex/react` with
+no provider in the tree, and those hooks throw without one — "Could not find
+ConvexProviderWithAuth", which reaches the user as a blank screen rather than an
+error. Logged-out is supposed to be a supported path, so that was the whole app
+gone for anyone building without keys. They go through `lib/cloud.ts` now, which
+takes the real hooks when `VITE_CONVEX_URL` and `VITE_CLERK_PUBLISHABLE_KEY` are
+both set and inert signed-out ones when they are not, chosen once at module load
+because a hook cannot be called conditionally. `UserMenu` renders nothing without
+Clerk, since Clerk's own components throw too. A new harness builds with both
+keys empty and boots it at two widths — the existing harnesses all baked in
+placeholder keys, which is exactly what hid this.
 
-Buttons have two axes instead of one. `variant` (default, ghost, secondary,
-link) and `size` (xs, tiny, default, large) used to be the same crowded setting,
-which is why seventy call sites could not say "ghost" without also saying how
-big. Guides' H / V / Clear / Lock sit 2×2 instead of 4×1, which buys each one
-real width.
+Three smaller ones. A photo downloaded on a phone gets the extension its stored
+mime type says, from a 20-line `lib/mimeExt.ts` so the phone chunk does not pull
+in the whole export pipeline. Three comments quoting the class `z-[var(--z-*)]`
+were being scanned by Tailwind and made the build print `Unexpected token
+Delim('*')`; they are reworded. And `routeState.ts` kept its own stale copy of
+which sub-tool is lit, so it calls the one exported implementation instead.
 
-Engine 829,721 bytes, up 1,473 for the polygon fill clip, 30,279 under the
-sentinel ceiling.
+Engine unchanged at 829,721 bytes — no Rust in this release.
 
 
 ## License

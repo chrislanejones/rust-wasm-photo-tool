@@ -18,6 +18,10 @@ const h = vi.hoisted(() => ({
   remove: vi.fn(async () => {}),
 }));
 
+const notUsedHere = (name: string) => () => {
+  throw new Error(`SharedPane does not use ${name}; the mock exists only for module load.`);
+};
+
 vi.mock("convex/react", () => ({
   useConvexAuth: () => h.auth,
   useQuery: (_ref: unknown, args: unknown) => (args === "skip" ? undefined : h.links),
@@ -30,6 +34,11 @@ vi.mock("convex/react", () => ({
     if (name.includes("resume")) return h.resume;
     return h.remove;
   },
+  // `useShare` reaches convex through `lib/cloud.ts` now, and that module
+  // imports all five hooks at load. A factory mock replaces the whole module,
+  // so the two this pane never calls still have to exist or collection throws.
+  useAction: () => notUsedHere("useAction"),
+  useConvex: () => notUsedHere("useConvex"),
 }));
 
 // The generated api object is a proxy over function paths; a plain stand-in

@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.9",
+    date: "2026-10-02",
+    headline: "A phone stops downloading the engine, and a build with no keys boots.",
+    entries: [
+      {
+        tag: "perf",
+        text: "On a screen under 600px wide, the Rust engine is no longer downloaded at all. A phone can open the app, pick photos, add and delete them, see thumbnails and download one without ever fetching 829,721 bytes of WebAssembly it has nothing to do with. The one value a phone actually needed from Rust — how many photos it may hold — now comes from the tier table instead.",
+      },
+      {
+        tag: "perf",
+        text: "Widen the window past 600px and the engine loads, then the photo you had open goes into the editor through exactly the path a gallery click has always taken. The decision is made once when the page loads and only ever goes one way: narrowing a desktop window later never throws away an engine that is already there.",
+      },
+      {
+        tag: "fix",
+        text: "A build with no cloud keys crashed on load and showed a blank screen. Six hooks asked for Convex with nothing to answer them, and that throws rather than returning empty. Working logged-out is a supported path, not a degraded one, so this was the whole app missing for anyone running it without an account set up. The hooks now read as signed-out with nothing to fetch when there are no keys.",
+      },
+      {
+        tag: "fix",
+        text: "A photo downloaded on a phone now gets the file extension its format actually says — .jpg, .png, .webp — instead of whatever it had before.",
+      },
+      {
+        tag: "infra",
+        text: "There is a test harness that builds the app with no keys at all and boots it at phone and desktop width, which is what was missing: every other harness filled in placeholder keys, and that is precisely what hid the crash above.",
+      },
+      {
+        tag: "fix",
+        text: "The build stopped printing an \u201CUnexpected token\u201D warning. Three code comments happened to quote a class name, and the stylesheet scanner cannot tell a comment from the real thing.",
+      },
+    ],
+  },
+  {
     version: "v9.8",
     date: "2026-10-01",
     headline: "The star fills in, and the photo’s name is the footer of the whole Tools card.",
