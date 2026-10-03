@@ -381,13 +381,16 @@ export const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB.",
   },
-  "Batch Crop": {
+  // Keyed by the generated feature name in features.ts, which is now "Bulk"
+  // (docs/Features.md) — a key that no longer matches drops the card's group and
+  // plain line back to the raw repo line, so the two move together.
+  Bulk: {
     group: "edit",
-    title: "Batch Crop",
+    title: "Bulk, minus the odd ones",
     plain:
-      "Crop every open photo to the same shape at once — pick a ratio, and a width if you want every slide the same size.",
+      "One setting over a whole gallery, and the odd photo can step aside — click a thumbnail to hold it out of the pass.",
     detail:
-      "Batch › Crop. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all.",
+      "Batch › Bulk. Click a photo to hold it out of the pass and it is left alone — the rest still land on one ratio. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all.",
   },
   "SVG → SVG": {
     group: "export",

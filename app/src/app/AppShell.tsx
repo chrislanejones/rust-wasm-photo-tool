@@ -837,7 +837,7 @@ export function AppShell() {
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const activeTool = useToolStore((s) => s.activeTool);
-  // Batch › Crop's Crop All while its panel is mounted — Enter runs it.
+  // Batch › Bulk's pass while its panel is mounted — Enter runs it.
   const batchCropApply = useBatchCropStore((s) => s.applyAll);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
@@ -1631,7 +1631,7 @@ export function AppShell() {
     `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
-  // ignorant of the pad and the Batch › Crop frame (and inside its max-lines cap).
+  // ignorant of the pad and the Batch › Bulk frame (and inside its max-lines cap).
   const renderCanvasOverlays = useCallback(
     (frame: OverlayFrame) => (
       <>
@@ -3326,19 +3326,12 @@ export function AppShell() {
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-72">
-          {/* Top of the menu: the "do anything" entry point — every tool,
-              sub-mode, setting and action is reachable from here, so it
-              outranks the specific items below it. */}
-          <ContextMenuItem onClick={() => setShowCommandPalette(true)}>
-            <CommandIcon className="h-4 w-4 mr-2" /> Command Palette
-            <ContextMenuShortcut>Alt+,</ContextMenuShortcut>
-          </ContextMenuItem>
           {/* Shape stacking. Renders only when the right-click landed on a
               shape on the active layer, so it sits above the general actions
               the way object actions do in other editors -- and is simply
-              absent on empty canvas. */}
-          <ShapeZOrderMenuItems menu={shapeZMenu} />
-          <ContextMenuSeparator />
+              absent on empty canvas. It brings its own separators, so this
+              block reads correctly whether or not it draws anything. */}
+          <ShapeZOrderMenuItems menu={shapeZMenu} trailingSeparator />
           <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
             <Undo className="h-4 w-4 mr-2" /> Undo
             <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
@@ -3389,6 +3382,16 @@ export function AppShell() {
             <RotateCcw className="h-4 w-4 mr-2" /> Flip Horizontal
           </ContextMenuItem>
           <ContextMenuSeparator />
+          {/* The "do anything" entry point used to sit at the very top of this
+              menu, which put the least-used item on a destructive screen: the
+              finger that lands here by habit is usually reaching for something
+              below, and the top row was never where it was. It lives here
+              instead — the last thing above Delete, which is where a catch-all
+              belongs when the row under it removes the photo. */}
+          <ContextMenuItem onClick={() => setShowCommandPalette(true)}>
+            <CommandIcon className="h-4 w-4 mr-2" /> Command Palette
+            <ContextMenuShortcut>Alt+,</ContextMenuShortcut>
+          </ContextMenuItem>
           <ContextMenuItem
             onClick={() => activePhotoId && setDeletePhotoId(activePhotoId)}
             disabled={!activePhotoId}

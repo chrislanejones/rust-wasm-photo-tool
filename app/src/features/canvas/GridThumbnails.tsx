@@ -140,7 +140,7 @@ export function GridThumbnails({
                   alt={p.name}
                   draggable={false}
                   // Fills the tile (letterboxed) rather than sitting at its
-                  // natural size, so the Batch › Crop shade below — sized to
+                  // natural size, so the Batch › Bulk shade below — sized to
                   // the tile — lands on the same pixels.
                   className="h-full w-full object-contain"
                 />

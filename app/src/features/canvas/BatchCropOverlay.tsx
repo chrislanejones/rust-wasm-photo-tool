@@ -1,4 +1,5 @@
-// Batch › Crop — the crop frame on the preview. Drag inside it to move, drag a
+// Batch › Bulk (the mode id is still `crop`) — the crop frame on the preview.
+// Drag inside it to move, drag a
 // corner to resize (ratio locked; hold Shift to break it), or drag anywhere
 // else on the photo to draw a new frame. Nothing is committed until the mouse
 // is let go: THEN the frame is stored, the other photos' gallery thumbnails
@@ -98,8 +99,11 @@ export function BatchCropOverlay({
   const onOriginal = useBatchCropStore((s) =>
     photoId && originalKey ? showsOriginalFraming(s, photoId, originalKey, undoCount) : false,
   );
+  // A held-out photo is not in the pass, so a frame on it would be a lie about
+  // what Enter does. It goes the way the frame goes once a crop is baked in.
+  const held = useBatchCropStore((s) => (photoId ? s.held[photoId] === true : false));
 
-  if (!on || !photoId || !onOriginal || width <= 0 || height <= 0) return null;
+  if (!on || !photoId || held || !onOriginal || width <= 0 || height <= 0) return null;
   const b = photoBounds ?? { x: 0, y: 0, width, height };
   if (b.width < 2 || b.height < 2) return null;
 
@@ -294,7 +298,7 @@ export function BatchCropOverlay({
         ref={frameRef}
         tabIndex={0}
         role="group"
-        aria-label={`Crop frame, ${label}. Drag to move, drag a corner to resize, Shift-drag to break the ratio. Enter crops every photo. Arrow keys move, plus and minus resize, 0 resets.`}
+        aria-label={`Crop frame, ${label}. Drag to move, drag a corner to resize, Shift-drag to break the ratio. Enter crops every photo in the bulk. Arrow keys move, plus and minus resize, 0 resets.`}
         onPointerDown={(e) => startDrag(e, "move")}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

@@ -4,7 +4,7 @@
 // how far along its history the document is — and hand them to
 // `resolveDocFrame`. The live engine answers for the open photo; every other
 // photo answers from its saved edit, and a photo with no saved edit is its
-// original (a Batch › Crop on it already moved the source's base frame).
+// original (a Bulk crop on it already moved the source's base frame).
 import type { ImageHorseTool } from "stamp_tool";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { SavedEdit } from "@/lib/editPersistence";

@@ -50,7 +50,7 @@ export interface SvgSource {
   imageW: number;
   imageH: number;
   /** The user-unit region the photo's CURRENT stored pixels cover. Starts as
-   *  `imageFrame`; Batch › Crop on a non-active photo replaces the stored
+   *  `imageFrame`; Batch › Bulk on a non-active photo replaces the stored
    *  original, and moves this with it. */
   baseFrame: Frame;
   /** Photo pixel size `baseFrame` maps onto (the working copy's size). */
@@ -325,7 +325,7 @@ export function recordCrop(
   };
 }
 
-/** Batch › Crop on a photo that is not open: it re-crops the photo's ORIGINAL
+/** Batch › Bulk on a photo that is not open: it re-crops the photo's ORIGINAL
  *  and stores the result as the new original, with no undo history. So the
  *  base itself moves, measured on the uncropped image. */
 export function rebaseOnOriginalCrop(

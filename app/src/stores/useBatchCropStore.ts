@@ -2,7 +2,9 @@ import { create } from "zustand";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { BATCH_CROP_RATIOS, type BatchCropRatioId, type CropFraming } from "@/lib/batchCrop";
 
-// Batch › Crop's settings, plus each photo's hand-set framing.
+// Batch › Bulk (the tile used to say Crop, and the mode id is still `crop`):
+// the settings for one attribute applied to a whole gallery, plus each photo's
+// hand-set framing AND the photos held OUT of the pass.
 //
 // WHY A STORE: same reason as usePerspectiveStore. The crop frame is edited in
 // two places, the panel (features/tools/settings) and the draggable frame on
@@ -27,6 +29,18 @@ interface BatchCropState {
   /** The last frame drawn on ANY photo. Photos with no framing of their own
    *  follow it, so framing one slide frames the whole carousel. */
   shared: CropFraming | null;
+  /** THE ODD ONES OUT — photos held back from the pass, keyed by photo id.
+   *
+   *  Everything else here changes what the bulk LOOKS like (its shape, its
+   *  anchor, its size). This changes WHO it lands on: a held photo is not
+   *  cropped, resized or re-encoded at all, so it can be given a different
+   *  attribute afterwards instead of this one. It is why the tile is called
+   *  Bulk and not Crop.
+   *
+   *  Absent key = in the bulk, so a gallery nobody has touched behaves exactly
+   *  as it did before this existed. Keys for deleted photos are harmless: every
+   *  reader filters the live `photos` list. */
+  held: Record<string, true>;
   /** Crop All, registered by the mounted panel — Enter runs it. */
   applyAll: (() => void) | null;
   /** photo id → the originalKey it had before its first batch crop. Every
@@ -44,6 +58,10 @@ interface BatchCropState {
   setFraming: (photoId: string, f: CropFraming, ratio?: [number, number]) => void;
   setApplyAll: (fn: (() => void) | null) => void;
   clearFraming: (photoId: string) => void;
+  /** Hold a photo out of the bulk, or put it back. */
+  toggleHeld: (photoId: string) => void;
+  /** Put every photo back in the bulk. */
+  clearHeld: () => void;
   setBaseline: (photoId: string, key: string) => void;
   setActiveCrop: (photoId: string, v: { undoCount: number; steps: number }) => void;
 }
@@ -55,6 +73,7 @@ export const useBatchCropStore = create<BatchCropState>((set) => ({
   widthId: "1080",
   framing: {},
   shared: null,
+  held: {},
   applyAll: null,
   baselines: {},
   activeCrop: {},
@@ -69,6 +88,15 @@ export const useBatchCropStore = create<BatchCropState>((set) => ({
       ...(ratio ? { customRatio: ratio } : {}),
     })),
   setApplyAll: (applyAll) => set({ applyAll }),
+  toggleHeld: (photoId) =>
+    set((s) => {
+      if (s.held[photoId]) {
+        const { [photoId]: gone, ...rest } = s.held;
+        return { held: rest };
+      }
+      return { held: { ...s.held, [photoId]: true } };
+    }),
+  clearHeld: () => set({ held: {} }),
   clearFraming: (photoId) =>
     set((s) => {
       const { [photoId]: gone, ...rest } = s.framing;
@@ -80,6 +108,35 @@ export const useBatchCropStore = create<BatchCropState>((set) => ({
     set((s) => (s.baselines[photoId] ? s : { baselines: { ...s.baselines, [photoId]: key } })),
   setActiveCrop: (photoId, v) => set((s) => ({ activeCrop: { ...s.activeCrop, [photoId]: v } })),
 }));
+
+/** Is this photo the odd one out — held back from the pass? */
+export function isHeld(
+  s: Pick<BatchCropState, "held">,
+  photoId: string,
+): boolean {
+  return s.held[photoId] === true;
+}
+
+/**
+ * The photos the pass will actually touch, in gallery order — everything that
+ * is not held out. This is the ONE list the panel, the shade and the progress
+ * counter agree on; a pass that skipped photos by a second rule could disagree
+ * with the button that started it.
+ */
+export function bulkPhotos<T extends { id: string }>(
+  s: Pick<BatchCropState, "held">,
+  photos: readonly T[],
+): T[] {
+  return photos.filter((p) => !isHeld(s, p.id));
+}
+
+/** How many of these photos are held out. */
+export function heldCount(
+  s: Pick<BatchCropState, "held">,
+  photos: readonly { id: string }[],
+): number {
+  return photos.length - bulkPhotos(s, photos).length;
+}
 
 /** The crop shape every photo gets: a Shift-drag's, else the ratio tile's. */
 export function cropRatioOf(s: Pick<BatchCropState, "ratioId" | "customRatio">): [number, number] {

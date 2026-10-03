@@ -1,4 +1,4 @@
-// Batch › Crop — the "shadow" on the OTHER photos' gallery thumbnails: the part
+// Batch › Bulk — the "shadow" on the OTHER photos' gallery thumbnails: the part
 // Enter / "Crop All" will cut off, shaded, with no frame or handles (those are
 // only on the photo being edited, BatchCropOverlay). It reads the stored frame,
 // which the preview writes on mouse-up, so the shadows move when you let go —
@@ -34,6 +34,10 @@ export function BatchCropThumbShade({
   const ratioH = useBatchCropStore((s) => cropRatioOf(s)[1]);
   const anchor = useBatchCropStore((s) => s.anchor);
   const framing = useBatchCropStore((s) => framingFor(s, entry.id));
+  // Held out of the bulk = nothing will be cut from this one, so there is
+  // nothing to shade. A shade on a photo the pass skips is a promise the
+  // button does not keep.
+  const held = useBatchCropStore((s) => s.held[entry.id] === true);
   // Already batch-cropped: its stored original IS the crop — nothing to shade.
   const cropped = useBatchCropStore((s) => {
     const base = s.baselines[entry.id];
@@ -42,7 +46,7 @@ export function BatchCropThumbShade({
 
   const w = entry.workingWidth || entry.origWidth;
   const h = entry.workingHeight || entry.origHeight;
-  if (!on || isActive || cropped || !w || !h) return null;
+  if (!on || isActive || cropped || held || !w || !h) return null;
 
   const r = framing
     ? framedCropRect(w, h, ratioW, ratioH, framing)
