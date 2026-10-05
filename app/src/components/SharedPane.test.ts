@@ -132,6 +132,15 @@ describe("Settings › Shared", () => {
     expect(document.body.textContent).toContain("Sign in to see your share links.");
   });
 
+  it("while Convex answers, shows skeleton rows in the list's frame, not a spinner", async () => {
+    h.links = undefined;
+    await render();
+    const busy = document.body.querySelector('ul[aria-busy="true"]');
+    expect(busy?.getAttribute("aria-label")).toBe("Loading your share links");
+    expect(busy?.querySelectorAll("li")).toHaveLength(3);
+    expect(document.body.querySelector('[role="status"] svg.animate-spin')).toBeNull();
+  });
+
   it("totals the links and shows each one's status and numbers", async () => {
     h.links = [
       link(),

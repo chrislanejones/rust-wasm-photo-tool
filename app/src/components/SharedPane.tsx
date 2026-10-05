@@ -39,7 +39,7 @@ import { NumberField } from "@/components/ui/number-field";
 import { PaneHeading } from "@/components/ui/pane-heading";
 import { RowAction } from "@/components/ui/row-actions";
 import { ErrorNote } from "@/components/ui/status-note";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { shareUrlFor } from "@/hooks/useShare";
 import { FIELD_NUMERIC } from "@/lib/styles";
@@ -307,9 +307,21 @@ export function SharedPane() {
           {isLoading ? "Connecting to your account…" : "Sign in to see your share links."}
         </p>
       ) : links === undefined ? (
-        <div className="flex justify-center py-6">
-          <Spinner className="size-6" aria-label="Loading your share links" />
-        </div>
+        // Rows in the list's own frame while Convex answers, so the pane does
+        // not jump from a spinner to a list. One announcement for the region;
+        // the bars inside are decorative.
+        <ul
+          aria-busy="true"
+          aria-label="Loading your share links"
+          className="divide-y divide-border rounded-lg border border-border bg-bg-elevated"
+        >
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="space-y-2 px-3 py-3">
+              <Skeleton variant="line" decorative className="w-1/2" />
+              <Skeleton variant="line" decorative className="w-1/3" />
+            </li>
+          ))}
+        </ul>
       ) : links.length === 0 ? (
         <p className="text-xs text-text-muted">
           No share links yet. Export › Share link makes one and copies it.
