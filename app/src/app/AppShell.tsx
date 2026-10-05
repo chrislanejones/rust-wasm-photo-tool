@@ -115,18 +115,12 @@ import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/orig
 import { collectDeletedPhotoOriginals, deleteReplacedOriginal } from "@/lib/originalRefs";
 import { collectExtraRoots } from "@/lib/extraRoots";
 import {
-  compositeSavedEdit,
   encodeRgba,
   EXT,
   includeCanvasInExport,
 } from "@/lib/exportImage";
-import { resolveExportSource } from "@/lib/batchExportPlan";
-import { untouchedZipEntry } from "@/lib/zipEntry";
+import { useZipExport } from "./session/useZipExport";
 import { useExportFileName } from "@/hooks/useExportFileName";
-import {
-  readExifTiff,
-  applyExifToReencoded,
-} from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
@@ -2253,139 +2247,20 @@ export function AppShell() {
     }
   }, [compressProgress]);
 
-  const exportPhotosToZip = useCallback(
-    async (list: PhotoEntry[], filename: string) => {
-    if (list.length === 0) return;
-
-    // Persist the active photo's in-progress edits so every photo reads
-    // uniformly from the edit store below.
-    const activeChanged =
-      !!activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified);
-    if (activeChanged && activePhotoId && stamp.toolRef.current) {
-      await savePhotoEdit(activePhotoId, stamp.toolRef);
-    }
-
-    // THERE IS NO `isChanged` GATE ANY MORE, and its absence is the fix.
-    //
-    // It used to decide whether a photo was worth looking up:
-    //
-    //   modifiedPhotos.has(id) || imageSavings[id] != null
-    //     || (id === activePhotoId && (undoCount > 0 || hasBeenModified))
-    //
-    // Every one of those is TRANSIENT REACT STATE, and a page reload clears all
-    // of them. The saved edit is in IndexedDB and survives; the gate that
-    // decides whether to read it does not. So: edit a photo, reload, choose
-    // "Resume editing" — the stroke is right there on the canvas, `undoCount`
-    // is back to 0, `modifiedPhotos` is empty, the gate says "untouched", and
-    // the ZIP ships the untouched ORIGINAL. `loadPhotoEdit` was never called.
-    // Reproduced 2026-08-09 on v7.80; first reported v7.68. It looked
-    // intermittent because edit-then-export-immediately is correct — only a
-    // reload in between breaks it.
-    //
-    // The gate was never load-bearing, only an optimization: BOTH of its
-    // "ship the original" branches were byte-identical, so all it ever decided
-    // was whether to spend one IndexedDB read. The presence of a saved edit is
-    // the real question, and `loadPhotoEdit` answers it directly from storage
-    // that outlives the session. One `get` per photo, against a composite and a
-    // re-encode — not a cost worth being wrong for.
-
-    const { default: JSZip } = await import("jszip");
-    const zip = new JSZip();
-    const usedNames = new Set<string>();
-
-    // EXIF padlock: keep metadata (transplant onto re-encodes) or strip it.
-    const mode = exifKeep ? "keep" : "strip";
-
-    for (const photo of list) {
-      let bytes: Uint8Array<ArrayBuffer>;
-      let mime: string;
-      let ext: string;
-
-      // The decision lives in `lib/batchExportPlan.ts` so it can be tested.
-      // Its signature takes storage and nothing else, which is the guarantee —
-      // see that file's header and `batchExportPlan.contract.test.ts`.
-      const { source, edit } = await resolveExportSource(photo.id, loadPhotoEdit);
-      if (source === "edit" && edit) {
-          // Canvas edits (draw / text / crop / resize / transform) →
-          // composite via Rust + re-encode at the chosen format/quality.
-          // Honour Settings → Layers and Canvas → "Photo only" here too. This
-          // was the one export surface that ignored it: Share, Copy and the
-          // single Download all consulted `exportCanvasBackground`, the ZIP
-          // never read it at all, so a batch export always shipped the padded
-          // artboard even when every other path cropped to the photo.
-          const { pixels, w, h } = await compositeSavedEdit(edit, {
-            excludeBackground: !includeCanvasInExport({
-              exportCanvasBackground,
-              format: exportFormat,
-              canvasBgTransparent,
-            }),
-          });
-          const enc = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
-          bytes = new Uint8Array(await enc.arrayBuffer());
-          mime = enc.type || "application/octet-stream";
-          ext = EXT[exportFormat];
-          // The re-encode carries no EXIF; keep → transplant the true
-          // original's metadata (JPEG/WebP), strip → already clean.
-          let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-          if (mode === "keep" && (exportFormat === "jpeg" || exportFormat === "webp")) {
-            const src = await getOriginal(photo.uploadKey ?? photo.originalKey);
-            if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
-          }
-          bytes = applyExifToReencoded(bytes, exportFormat, mode, sourceTiff, w, h);
-      } else {
-        // No saved edit. Two cases land here and both want the same bytes,
-        // which is why the old gate's two "original" branches were identical:
-        //   - never edited      -> originalKey holds the untouched upload
-        //   - compressed only   -> originalKey ALREADY holds the processed
-        //                          bytes, so verbatim is the processed result
-        // Both go out in the chosen format: as-is when they already are,
-        // re-encoded when not (lib/zipEntry.ts).
-        const orig = await getOriginal(photo.originalKey);
-        if (!orig) continue;
-        ({ bytes, mime, ext } = await untouchedZipEntry(orig, exportFormat, quality / 100, {
-          mode,
-          stripMode: exifStripMode,
-        }));
-      }
-
-      // De-dupe filenames within the archive.
-      const base = photo.name || "image";
-      let name = `${base}${ext}`;
-      for (let n = 2; usedNames.has(name); n++) name = `${base}-${n}${ext}`;
-      usedNames.add(name);
-      zip.file(name, new Blob([bytes], { type: mime }));
-    }
-
-    const out = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(out);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    // Tiny confirmation so the user knows the scrub actually happened —
-    // matches the strip scope chosen in Settings → Security.
-    if (mode === "strip") {
-      toast.success(
-        exifStripMode === "location" ? "GPS removed — camera info kept" : "EXIF + GPS removed",
-      );
-    }
-    },
-    [
-      activePhotoId,
-      hasBeenModified,
-      stamp,
-      exportFormat,
-      quality,
-      canvasBgTransparent,
-      loadPhotoEdit,
-      savePhotoEdit,
-      exifKeep,
-      exifStripMode,
-      exportCanvasBackground,
-    ],
-  );
+  // Download All / ZIP: progress, skips, timeout and Error live in the hook.
+  const { exportZip: exportPhotosToZip } = useZipExport({
+    activePhotoId,
+    activeChanged: !!activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified),
+    toolRef: stamp.toolRef,
+    exportFormat,
+    quality,
+    canvasBgTransparent,
+    exportCanvasBackground,
+    exifKeep,
+    exifStripMode,
+    loadPhotoEdit,
+    savePhotoEdit,
+  });
 
   const handleExportAll = useCallback(
     () => exportPhotosToZip(photos, "photos.zip"),

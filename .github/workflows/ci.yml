@@ -507,3 +507,4 @@ jobs:
           e2e/batch-crop-frame.spec.ts
           e2e/import-skeleton.spec.ts
           e2e/async-dropped.spec.ts
+          e2e/zip-export.spec.ts
