@@ -97,6 +97,13 @@ export interface ToolSettings extends StampSettings {
    *  with 5 points is a pentagon, and the button would be lying. */
   starPoints: number;
 
+  /** Corner radii in px for the rect, diamond, star and triangle (Figma's
+   *  corner radius): TL, TR, BR, BL on the rect, top/right/bottom/left on the
+   *  diamond, apex/right/left on the triangle; the star uses the first for
+   *  every corner. The panel slider sets all four; Shift-dragging a corner
+   *  dot on the canvas sets one. */
+  cornerRadii: readonly [number, number, number, number];
+
   // Effects (was Blur) — the Paint tool's Blur Brush + the Levels panel.
   /** Blur-brush effect: "gaussian" softens, "pixelate" mosaics, "solid" redacts. */
   blurMode: "gaussian" | "pixelate" | "solid";

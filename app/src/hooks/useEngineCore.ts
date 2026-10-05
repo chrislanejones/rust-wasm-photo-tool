@@ -848,6 +848,7 @@ export function useEngineCore(
               s.fill_angle ?? 0,
               s.fill_block ?? 0,
               s.sloppiness ?? 0, s.starPoints ?? 0, s.rotation ?? 0, // see PersistedShape
+              Uint16Array.from(s.cornerRadii ?? []),
             );
           }
         }

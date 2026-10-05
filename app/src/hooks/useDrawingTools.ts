@@ -7,7 +7,7 @@ import { cropTracked } from "@/stores/useSvgSourceStore"; // SVG export's crop r
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
-import { effectiveStarPoints } from "@/lib/shapeSloppiness";
+import { canonicalCornerRadii } from "@/lib/shapeSloppiness";
 import { normalizeDeg } from "@/lib/shapeRotation";
 import type { Point } from "@/lib/shapeSloppiness";
 import { drawArrowPreview, drawShapePreview } from "@/lib/drawPreview";
@@ -16,6 +16,7 @@ import {
   FILL_MODE_KIND,
   FILLABLE_KINDS,
   panelStylePatch,
+  pendingStarAndCorners,
   pendingShapeType,
   SHAPE_NAME_KIND,
   type CropSelection,
@@ -265,10 +266,7 @@ export function useDrawingTools({
     // just-drawn shape has sloppiness, but would also pick any unsaved panel
     // change (like strokeColor).
     const sloppiness = es.style?.sloppiness ?? s.sloppiness ?? 0;
-    // Star points ride only on a star; every other kind stores 0 ("unset"),
-    // so a triangle or square never carries a stray count into the log.
-    const starPoints =
-      kind === 9 ? effectiveStarPoints(es.style?.starPoints ?? s.starPoints) : 0;
+    const { starPoints, cornerRadii } = pendingStarAndCorners(es, s, kind, shapeName);
     const rotation = normalizeDeg(es.rotation ?? 0);
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
@@ -296,6 +294,7 @@ export function useDrawingTools({
         sloppiness,
         starPoints,
         rotation,
+        cornerRadii,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -316,6 +315,7 @@ export function useDrawingTools({
         sloppiness,
         starPoints,
         rotation,
+        cornerRadii,
       );
       // The just-drawn shape becomes the Align/Placement target, so the
       // grid (and numpad 1-9) can place it immediately after drawing.
@@ -406,6 +406,7 @@ export function useDrawingTools({
         gradientAngle: next.style!.gradientAngle,
         fillBlock: next.style!.fillBlock,
         starPoints: next.style!.starPoints,
+        cornerRadii: next.style!.cornerRadii,
       };
       prevStyleSettingsRef.current = synced;
       useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
@@ -863,6 +864,7 @@ export function useDrawingTools({
           settings.strokeWidth,
           settings.sloppiness ?? 0,
           settings.starPoints ?? 5,
+          canonicalCornerRadii(settings.shape ?? "rect", settings.cornerRadii),
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.

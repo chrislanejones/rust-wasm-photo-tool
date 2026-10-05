@@ -88,6 +88,7 @@ fn tool_with_shapes(rotation_deg: f64) -> ImageHorseTool {
                 slop,
                 0,
                 rotation_deg,
+                &[],
             );
         }
     }
@@ -143,6 +144,7 @@ fn tool_with_one(kind: u8, fill: u8, rotation_deg: f64) -> ImageHorseTool {
         0,
         0,
         rotation_deg,
+        &[],
     );
     t
 }

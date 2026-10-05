@@ -3,7 +3,12 @@
 // what a pending edit IS. Moved out of useDrawingTools.ts (which re-exports
 // every name here, so no import changed) so the hook file holds the hook.
 import type { ShapeName, ToolSettings } from "@/lib/types";
-import { effectiveStarPoints, type Point } from "@/lib/shapeSloppiness";
+import {
+  canonicalCornerRadii,
+  effectiveStarPoints,
+  type CornerRadii,
+  type Point,
+} from "@/lib/shapeSloppiness";
 
 // One `Point` for the drawing stack: defined in lib/shapeSloppiness.ts,
 // re-exported here so canvas code can keep importing it beside CropSelection.
@@ -82,6 +87,9 @@ export interface DrawEditState {
     /** Star point count (3–12), captured on reselect so a 7-point star
      *  stays a 7-point star. Ignored by every other shape. */
     starPoints: number;
+    /** Corner radii (px), captured on reselect so a rounded square stays
+     *  rounded. Canonical per shape — see `canonicalCornerRadii`. */
+    cornerRadii: CornerRadii;
   };
 }
 
@@ -107,6 +115,28 @@ export function pendingShapeType(
 ): ShapeName {
   const fromPanel = panelShape as ShapeName | undefined;
   return es?.style?.shape ?? es?.drawnShape ?? fromPanel ?? "rect";
+}
+
+/**
+ * The star point count and corner radii a pending edit commits. A reselected
+ * shape keeps its own, a new one reads the panel. Both are canonical for the
+ * shape: star points ride only on a star (every other kind stores 0, "unset"),
+ * and radii only on a rect / diamond / star / triangle — a circle, line, arrow
+ * or pin (re-edited as a circle) commits zeros — so nothing carries a stray
+ * value into the op log. Radii come back as the `Uint16Array` the engine's
+ * `&[u16]` takes.
+ */
+export function pendingStarAndCorners(
+  es: Pick<DrawEditState, "style">,
+  panel: Pick<ToolSettings, "starPoints" | "cornerRadii">,
+  kind: number,
+  shapeName: ShapeName,
+): { starPoints: number; cornerRadii: Uint16Array } {
+  const starPoints =
+    kind === 9 ? effectiveStarPoints(es.style?.starPoints ?? panel.starPoints) : 0;
+  const name = es.style?.kindByte === 5 ? "circle" : shapeName;
+  const radii = canonicalCornerRadii(name, es.style?.cornerRadii ?? panel.cornerRadii);
+  return { starPoints, cornerRadii: Uint16Array.from(radii) };
 }
 
 /**
@@ -152,7 +182,16 @@ export function panelStylePatch(
     patch.gradientAngle = next.gradientAngle;
   if (next.fillBlock !== prev.fillBlock) patch.fillBlock = next.fillBlock;
   if (next.starPoints !== prev.starPoints) patch.starPoints = next.starPoints;
+  // Element-wise: the canvas corner dots write a fresh array every move, and
+  // a new array holding the same four numbers is not an edit.
+  if (!sameRadii(next.cornerRadii, prev.cornerRadii)) patch.cornerRadii = next.cornerRadii;
   return Object.keys(patch).length === 0 ? null : patch;
+}
+
+function sameRadii(a: CornerRadii | undefined, b: CornerRadii | undefined): boolean {
+  const x = a ?? [0, 0, 0, 0];
+  const y = b ?? [0, 0, 0, 0];
+  return x[0] === y[0] && x[1] === y[1] && x[2] === y[2] && x[3] === y[3];
 }
 
 /** One entry from `tool.get_shape_annotations()`. */
@@ -191,6 +230,9 @@ export interface ShapeMeta {
   rotation?: number;
   /** Star point count; 0 or absent = the classic 5. */
   starPoints?: number;
+  /** Corner radii in px (TL, TR, BR, BL on a rect). Absent on shapes written
+   *  before corner radius shipped (they meant square corners). */
+  cornerRadii?: number[];
 }
 
 /** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). Kind 3
@@ -297,6 +339,7 @@ export function editStateFromShape(sh: ShapeMeta): DrawEditState {
       gradientAngle: sh.fill_angle,
       fillBlock: sh.fill_block ?? 16,
       starPoints: effectiveStarPoints(sh.starPoints),
+      cornerRadii: canonicalCornerRadii(shapeName, sh.cornerRadii),
     },
   };
 }

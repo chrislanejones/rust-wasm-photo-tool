@@ -1,6 +1,14 @@
 # ADR-070: Op-log v9 is the shape fields alone, the tonal adjustments are v10, and `Op` variants are append-only
 Date: 2026-09-24   Amended: 09-30-2026   Status: proposed   Relates to: ADR-060, ADR-066, ADR-069, ADR-059 (#187)
 
+## Amendment, 10-05-2026 (ADR-082, draft)
+
+Shape corner radii took **v11** as decision 4 directs, and appended
+`Op::ShapeCornerRadii` at **index 21**. The tonal ops were unbuilt, so nothing
+on disk moved, but decision 4's indices are now **22 to 27**, and since format
+numbers only rise the tonal bump ships as the next number after 11, not as a
+literal 10. `op_variant_indices_are_append_only` pins 21.
+
 ## Amendment, 09-30-2026 (Chris)
 
 The first draft of this ADR put the shape fields and six tonal-adjustment ops

@@ -160,7 +160,8 @@ class RecordingTool {
    *  document whose first restore was a text. */
   sloppinessOfShape(nth: number): number | undefined {
     const call = this.shapeCalls[nth];
-    const at = call ? call.length - 3 : -1;
+    // Sloppiness sits before star points, rotation and (ADR-082) corner radii.
+    const at = call ? call.length - 4 : -1;
     return typeof call?.[at] === "number" ? (call[at] as number) : undefined;
   }
 }

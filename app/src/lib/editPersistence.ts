@@ -197,6 +197,9 @@ export interface PersistedShape {
   rotation?: number;
   /** Star point count; absent or 0 = the classic 5. */
   starPoints?: number;
+  /** Corner radii in px. Absent on saves before corner radius shipped —
+   *  restore passes none (square corners). Additive, like `rotation`. */
+  cornerRadii?: number[];
 }
 
 /** Parse the JSON emitted by `get_shape_annotations`. */

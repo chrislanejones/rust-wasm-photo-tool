@@ -159,6 +159,8 @@ export async function restoreLayerStack(
           // classic 5-point star and an upright shape, which is what they meant.
           s.starPoints ?? 0,
           s.rotation ?? 0,
+          // Absent before corner radius shipped: square corners.
+          Uint16Array.from(s.cornerRadii ?? []),
         );
       }
     }

@@ -15,6 +15,7 @@ export const defaultToolSettings: ToolSettings = {
   fillBlock: 16,
   sloppiness: 0,
   starPoints: 5,
+  cornerRadii: [0, 0, 0, 0],
   brushColor: "#ef4444",
   brushOpacity: 100,
   brushHardness: 80,

@@ -25,7 +25,8 @@ import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
-import { shapeCanFill } from "@/lib/drawEditState";
+import { shapeCanFill, SHAPE_KIND_NAME } from "@/lib/drawEditState";
+import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -53,6 +54,10 @@ const ARROW_STYLES = [
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
+
+// Corner radius presets, px — numbers variant like Points. Square, a soft
+// round, a card, and a pill on most shapes (the engine clamps to what fits).
+const CORNER_RADIUS_PRESETS = [0, 8, 24, 64] as const;
 
 // Sloppiness presets — numbers variant, same 4-above-the-track layout as the
 // Eraser's Opacity slider. 0 (firm) is a real preset, then 25/50/100, so the
@@ -87,7 +92,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
     id: "shapes",
     label: "Shapes",
     icon: ShapesIcon,
-    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°).",
+    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°), and the dots inside the corners to round them (Shift rounds one corner only).",
   },
   {
     id: "pens",
@@ -122,6 +127,16 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   // A reselected star needs its Points slider even when the panel's tile says
   // something else — the tile is what you draw NEXT, not what is selected.
   const starSelected = useAnnotationStore((s) => s.editingShapeKind === 9);
+  // Same for corners: a reselected rounded square shows its radius even when
+  // the tile says Circle. Pins (5) re-edit as circles and have none.
+  const editingKind = useAnnotationStore((s) => s.editingShapeKind);
+  const editingShape = editingKind == null ? undefined : SHAPE_KIND_NAME[editingKind];
+  const radiusOf = (name: string | undefined) =>
+    name && cornerCount(name) > 0 ? name : null;
+  const radiusShape = editingKind == null ? radiusOf(currentShape) : radiusOf(editingShape);
+  const radii = canonicalCornerRadii(radiusShape ?? "rect", settings.cornerRadii);
+  const cornersUsed = radiusShape === "triangle" ? 3 : radiusShape === "star" ? 1 : 4;
+  const mixed = radii.slice(0, cornersUsed).some((r) => r !== radii[0]);
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
@@ -162,6 +177,22 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       onChange={(v) => onChange({ ...settings, starPoints: v })}
                       presets={STAR_POINT_PRESETS}
                       variant="numbers"
+                    />
+                  )}
+
+                  {/* Corner Radius — every shape with corners (not the circle
+                      or the line). Sets all corners at once; the dots inside
+                      the corners on the canvas do the same, and Shift-drag on
+                      one rounds that corner only, which reads here as Mixed. */}
+                  {radiusShape && (
+                    <SizeSlider
+                      label="Corner Radius"
+                      value={Math.max(...radii.slice(0, cornersUsed))}
+                      valueDisplay={mixed ? "Mixed" : undefined}
+                      onChange={(v) => onChange({ ...settings, cornerRadii: [v, v, v, v] })}
+                      presets={CORNER_RADIUS_PRESETS}
+                      variant="numbers"
+                      unit="px"
                     />
                   )}
 
