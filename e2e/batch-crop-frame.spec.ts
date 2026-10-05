@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
-// Batch › Bulk (the tile used to say Crop, and the mode id still does): the
+// Batch › Crop: the
 // preview carries a ratio-locked crop frame. Dragging it
 // records a hand framing for THAT photo (the panel counts it), and Crop All
 // then lands the active photo on the chosen output size. A refactor that
@@ -44,7 +44,7 @@ test("the batch preview frame can be dragged, and Crop All uses it", async ({ pa
 
   await page.getByRole("button", { name: "Batch", exact: true }).first().click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Bulk", exact: true }).first().click();
+  await page.getByRole("button", { name: "Crop", exact: true }).first().click();
   await page.waitForTimeout(800);
 
   // 4:5 on the square checker fixture leaves the frame room to slide sideways.
@@ -97,7 +97,7 @@ test("thumbnails shade on release, Shift-drag breaks the ratio, Enter crops all"
 
   await page.getByRole("button", { name: "Batch", exact: true }).first().click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Bulk", exact: true }).first().click();
+  await page.getByRole("button", { name: "Crop", exact: true }).first().click();
   await page.waitForTimeout(800);
   await page.getByRole("radio", { name: "1:1", exact: true }).click();
 

@@ -56,10 +56,9 @@ const MOVES: {
  * layer. That is deliberate: four permanently-dead items on empty canvas read
  * as a broken menu, where their absence reads as "not applicable here".
  *
- * It carries its own LEADING separator and, with `trailingSeparator`, its own
- * trailing one — so the caller never has to know whether this block rendered,
- * which is the only way to avoid a leading rule on empty canvas or a doubled
- * one beside a shape.
+ * It is the FIRST block in the canvas menu, so it draws no leading separator
+ * (a menu must not open on a bare rule). With `trailingSeparator` it draws the
+ * one after itself, so the caller never has to know whether it rendered.
  */
 export function ShapeZOrderMenuItems({
   menu,
@@ -72,7 +71,6 @@ export function ShapeZOrderMenuItems({
   if (menu.targetId === null) return null;
   return (
     <>
-      <ContextMenuSeparator />
       {MOVES.map(({ dir, label, shortcut, Icon, why }) => {
         const enabled = menu.can(dir);
         return (

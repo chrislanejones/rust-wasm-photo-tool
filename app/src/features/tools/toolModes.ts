@@ -106,9 +106,8 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   emoji: [
     { id: "logo", label: "Logo", icon: ImagePlus, keywords: ["logo", "watermark", "brand", "batch"] },
     { id: "text", label: "Text", icon: Type, keywords: ["text", "caption", "batch"] },
-    // Label matches toolGroups.ts's Batch › "Bulk" tile — same sub-tool, so the
-    // palette must not answer to a second name. See the note there.
-    { id: "crop", label: "Bulk", icon: Crop, keywords: ["crop", "carousel", "aspect ratio", "same size", "batch", "odd one out", "hold out", "except"] },
+    // Label matches toolGroups.ts's Batch › "Crop" tile.
+    { id: "crop", label: "Crop", icon: Crop, keywords: ["crop", "carousel", "aspect ratio", "same size", "batch", "exception", "odd one out", "except"] },
     { id: "rename", label: "Rename", icon: FileEdit, keywords: ["rename", "filename", "batch"] },
     {
       id: "airename",

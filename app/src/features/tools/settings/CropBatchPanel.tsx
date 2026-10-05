@@ -1,19 +1,15 @@
-// Batch › Bulk — one attribute, applied to a whole gallery. The tile says Bulk
-// and the mode id is still `crop`, because crop is the attribute it ships with
-// today; the part that is new is that the pass no longer has to be all-or-
-// nothing (see BulkHeldPicker). Same two-pass shape as the Logo and Text panels
-// in BatchSettings.tsx: every non-active photo is re-encoded and written back to
-// IDB; the active photo goes through the live engine so the crop is a normal
-// undo step.
+// Batch › Crop — one crop for the Main photos and one for the Exceptions (the
+// photos ticked in the gallery, or with "Exception" ticked on the canvas). The
+// Main | Exceptions switch above the panel (BatchGroupToggle) picks which crop
+// you are editing; ONE pass crops every photo with its own group's settings.
+// The mode id is `crop`. Same two-pass shape as the Logo and Text panels: every
+// non-active photo is re-encoded and written back to IDB; the active photo goes
+// through the live engine so the crop is a normal undo step.
 //
-// The BULK: every photo is in it until you hold one out. Drag the frame on the
-// preview (BatchCropOverlay) and, on release, that framing becomes the one every
-// photo follows (the gallery thumbnails shade what will be cut); frame another
-// photo to give it its own. Shift-drag breaks the ratio — the free shape
-// becomes the custom ratio for every photo. Enter runs the pass over whoever is
-// still in it; a held photo is skipped whole — not cropped, not resized, not
-// re-encoded — so it can be given a different attribute afterwards.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// Drag the frame on the preview (BatchCropOverlay) and, on release, that
+// framing becomes the one every photo IN THE SAME GROUP follows; frame another
+// photo to give it its own. Shift-drag breaks the ratio. Enter runs the pass.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
@@ -45,12 +41,12 @@ import { rebaseOnOriginalCrop } from "@/lib/svgPassthrough";
 import {
   useBatchCropStore,
   showsOriginalFraming,
-  bulkPhotos,
   cropRatioOf,
   framingFor,
   type BatchCropWidthId,
 } from "@/stores/useBatchCropStore";
-import { BulkHeldPicker } from "./BulkHeldPicker";
+import { groupOf } from "@/stores/useBatchGroupStore";
+import { useBatchGroups } from "./useBatchGroups";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 
@@ -94,26 +90,28 @@ export function CropBatchPanel({
   flushToCanvas,
   syncState,
 }: CropBatchPanelProps) {
-  const ratioId = useBatchCropStore((s) => s.ratioId);
-  const custom = useBatchCropStore((s) => s.customRatio);
-  // The shape every photo gets — a Shift-drag's custom one, else the tile's.
-  const label = useBatchCropStore((s) => ratioLabel(cropRatioOf(s)));
+  // The exceptions ARE the gallery's ticked photos; the switch above the panel
+  // picks which group's crop is showing.
+  const {
+    exceptionIds,
+    groups,
+    hasExceptions,
+    group: editing,
+    activeGroup,
+  } = useBatchGroups(photos, activePhotoId);
+  const looks = useBatchCropStore((s) => s.looks);
+  const look = looks[editing];
+  const members = groups[editing];
+  const custom = look.customRatio;
+  const label = ratioLabel(cropRatioOf(look));
   const setRatioId = useBatchCropStore((s) => s.setRatioId);
-  const anchor = useBatchCropStore((s) => s.anchor);
   const setAnchor = useBatchCropStore((s) => s.setAnchor);
-  const widthId = useBatchCropStore((s) => s.widthId);
   const setWidthId = useBatchCropStore((s) => s.setWidthId);
   const framing = useBatchCropStore((s) => s.framing);
   const clearFraming = useBatchCropStore((s) => s.clearFraming);
-  const shared = useBatchCropStore((s) => s.shared);
   const setApplyAll = useBatchCropStore((s) => s.setApplyAll);
-  const held = useBatchCropStore((s) => s.held);
-  // WHO the pass lands on: everyone still in the bulk, in gallery order. One
-  // list, so the count on the button, the progress total and the photos that
-  // actually move cannot disagree.
-  const members = useMemo(() => bulkPhotos({ held }, photos), [held, photos]);
-  const heldOut = photos.length - members.length;
   const framedCount = members.filter((p) => framing[p.id]).length;
+
   const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
@@ -150,33 +148,35 @@ export function CropBatchPanel({
   }, [appliedCount]);
 
   const sizeNote = (() => {
-    const targetWidth = widthOf(widthId);
-    // "Every photo" is only true while nobody is held out — a held photo keeps
-    // whatever size it arrived with, so the note counts the bulk instead.
-    const many = heldOut > 0 ? `Each of the ${members.length}` : "Every photo";
-    if (targetWidth === null) return `Each photo keeps its own resolution at ${label}.`;
-    const dims = cropRatioOf(useBatchCropStore.getState());
-    const s = batchCropOutputSize({ width: 1, height: 1 }, dims, targetWidth);
-    return `${many} comes out ${s.width}×${s.height}.`;
+    const targetWidth = widthOf(look.widthId);
+    const n = members.length;
+    const [who, verb] = !hasExceptions ? ["Every photo", "s"] : n === 1 ? ["This photo", "s"] : [`These ${n}`, ""];
+    if (targetWidth === null) return `${who} keep${verb} ${n === 1 ? "its" : "their"} own resolution at ${label}.`;
+    const s = batchCropOutputSize({ width: 1, height: 1 }, cropRatioOf(look), targetWidth);
+    return `${who} come${verb} out ${s.width}×${s.height}.`;
   })();
 
   const applyToAll = useCallback(async () => {
-    // Enter can arrive while a pass is still running; the button can't. A bulk
-    // with nothing left in it is a no-op, not an error.
-    if (members.length === 0 || runningRef.current) return;
+    // Enter can arrive while a pass is still running; the button can't.
+    if (photos.length === 0 || runningRef.current) return;
     runningRef.current = true;
     setRunning(true);
     setErrorMsg(null);
-    setProgress({ done: 0, total: members.length });
-    const targetWidth = widthOf(widthId);
+    setProgress({ done: 0, total: photos.length });
     const crops = useBatchCropStore.getState();
-    const ratio = cropRatioOf(crops);
-    // The photo's own frame, else the shared one, else the anchor.
+    // Each photo gets ITS group's look: shape, anchor, width, shared frame.
+    const lookOf = (id: string) => {
+      const g = groupOf(exceptionIds, id);
+      const l = crops.looks[g];
+      return { g, l, ratio: cropRatioOf(l), targetWidth: widthOf(l.widthId) };
+    };
+    // The photo's own frame, else its group's shared one, else the anchor.
     const rectFor = (id: string, w: number, h: number, useFraming: boolean) => {
-      const f = useFraming ? framingFor(crops, id) : undefined;
+      const { g, l, ratio } = lookOf(id);
+      const f = useFraming ? framingFor(crops, g, id) : undefined;
       return f
         ? framedCropRect(w, h, ratio[0], ratio[1], f)
-        : anchoredCropRect(w, h, ratio[0], ratio[1], anchor);
+        : anchoredCropRect(w, h, ratio[0], ratio[1], l.anchor);
     };
 
     try {
@@ -190,7 +190,7 @@ export function CropBatchPanel({
 
       // First pass: every non-active photo — crop in JS, scale + encode in
       // Rust, write back to IDB.
-      const others = members.filter((p) => p.id !== activePhotoId);
+      const others = photos.filter((p) => p.id !== activePhotoId);
       for (const photo of others) {
         try {
           crops.setBaseline(photo.id, photo.originalKey);
@@ -198,7 +198,7 @@ export function CropBatchPanel({
           const original = await getOriginal(baselineKey);
           if (!original) {
             done++;
-            setProgress({ done, total: members.length });
+            setProgress({ done, total: photos.length });
             continue;
           }
           const file = new File([original.bytes], original.name, {
@@ -208,6 +208,7 @@ export function CropBatchPanel({
 
           // Always the baseline's pixels, so a framing always applies.
           const rect = rectFor(photo.id, working.width, working.height, true);
+          const { ratio, targetWidth } = lookOf(photo.id);
           const out = batchCropOutputSize(rect, ratio, targetWidth);
           let pixels = cropRgba(working.pixels, working.width, rect);
           if (out.width !== rect.width || out.height !== rect.height) {
@@ -288,11 +289,11 @@ export function CropBatchPanel({
           console.error("Bulk-crop: failed on photo", photo.id, err);
         }
         done++;
-        setProgress({ done, total: members.length });
+        setProgress({ done, total: photos.length });
       }
 
       // Second pass: the active photo, via the live tool so it gets undo.
-      const active = members.find((p) => p.id === activePhotoId);
+      const active = photos.find((p) => p.id === activePhotoId);
       if (active) {
         try {
           const tool = stampToolRef.current;
@@ -315,6 +316,7 @@ export function CropBatchPanel({
                 ? [b[0]!, b[1]!, b[2]!, b[3]!]
                 : [0, 0, await tool.width(), await tool.height()];
             const rect = rectFor(active.id, bw, bh, onOriginal);
+            const { ratio, targetWidth } = lookOf(active.id);
             const out = batchCropOutputSize(rect, ratio, targetWidth);
             await cropTracked(tool, bx + rect.x, by + rect.y, rect.width, rect.height);
             let steps = 1;
@@ -334,12 +336,16 @@ export function CropBatchPanel({
           console.error("Bulk-crop: failed on active photo", err);
         }
         done++;
-        setProgress({ done, total: members.length });
+        setProgress({ done, total: photos.length });
       }
 
       setAppliedCount(succeeded);
+      const mainLabel = ratioLabel(cropRatioOf(crops.looks.main));
+      const exceptionsLabel = ratioLabel(cropRatioOf(crops.looks.exceptions));
       toast.success(
-        `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${ratioLabel(ratio)}`,
+        hasExceptions
+          ? `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} — Main to ${mainLabel}, Exceptions to ${exceptionsLabel}`
+          : `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${mainLabel}`,
       );
     } catch (err) {
       console.error("Bulk-crop: fatal error", err);
@@ -350,10 +356,10 @@ export function CropBatchPanel({
       setRunning(false);
     }
   }, [
-    members,
+    photos,
+    exceptionIds,
+    hasExceptions,
     activePhotoId,
-    widthId,
-    anchor,
     setPhotos,
     stampToolRef,
     flushToCanvas,
@@ -369,35 +375,17 @@ export function CropBatchPanel({
 
   return (
     <div className="space-y-6">
-      {/* WHO, before WHAT. Holding a photo back is the decision that changes the
-          pass; the crop below is only what the pass happens to do today. */}
-      <div>
-        <SectionHeader
-          title="The bulk"
-          info={
-            <>
-              One setting, applied to the whole gallery — and the odd ones can
-              step aside. Click a photo to hold it out: the pass skips it whole,
-              so you can give it something else instead. Frame a photo on the
-              preview and it keeps that frame while the rest follow the last
-              one.
-            </>
-          }
-          className="mb-2"
-        />
-        <BulkHeldPicker photos={photos} />
-      </div>
-
       <div>
         <SectionHeader
           title="Crop"
           info={
             <>
-              Every photo in the bulk is cropped to the same shape, so a
-              carousel&apos;s slides all line up. Drag on the preview to frame
-              the crop; let go and every photo follows it — the gallery shades
-              what each one loses. Hold Shift to break the ratio. Frame another
-              photo to give it its own. Enter crops them all.
+              Every photo is cropped to the same shape, so a carousel&apos;s
+              slides all line up. Need a few to be different? Tick them in the
+              gallery (or &ldquo;Exception&rdquo; on the canvas) and give
+              Exceptions its own crop. Drag on the preview to frame; let go
+              and the rest of that group follows. Hold Shift to break the
+              ratio. Enter crops them all.
             </>
           }
           className="mb-2"
@@ -409,8 +397,8 @@ export function CropBatchPanel({
           aria-label="Ratio"
           options={RATIO_OPTIONS}
           // A Shift-drag's custom shape lights no tile; picking one ends it.
-          value={custom ? undefined : ratioId}
-          onChange={setRatioId}
+          value={custom ? undefined : look.ratioId}
+          onChange={(id) => setRatioId(editing, id)}
           columns={4}
         />
         {custom && (
@@ -423,18 +411,18 @@ export function CropBatchPanel({
       <PlacementGrid
         label="Keep"
         info="Which part of each photo survives the crop — center trims evenly, top keeps the top of a tall photo. Picking one resets any frames you dragged."
-        value={anchor}
-        onChange={setAnchor}
+        value={look.anchor}
+        onChange={(a) => setAnchor(editing, a, members.map((p) => p.id))}
       />
 
       {framedCount > 0 && (
         <div className="flex items-center justify-between gap-2">
           <span className="text-2xs text-theme-muted-foreground">
             {`${framedCount} of ${members.length} framed by hand`}
-            {shared && framedCount < members.length ? " · the rest follow the last frame" : ""}
+            {look.shared && framedCount < members.length ? " · the rest follow the last frame" : ""}
           </span>
-          {activePhotoId && framing[activePhotoId] && (
-            <Button onClick={() => clearFraming(activePhotoId)}>Reset this frame</Button>
+          {activePhotoId && activeGroup === editing && framing[activePhotoId] && (
+            <Button onClick={() => clearFraming(editing, activePhotoId)}>Reset this frame</Button>
           )}
         </div>
       )}
@@ -443,22 +431,23 @@ export function CropBatchPanel({
         <ToolButtonGroup
           label="Output width"
           options={WIDTH_OPTIONS}
-          value={widthId}
-          onChange={setWidthId}
+          value={look.widthId}
+          onChange={(id) => setWidthId(editing, id)}
           columns={3}
         />
         <p className="mt-2 text-2xs text-theme-muted-foreground">{sizeNote}</p>
       </div>
 
       <PanelActionBar>
-        {/* Same button, same place, same shape as before — it just stops
-            claiming "All" the moment somebody is held out. "Crop 8 of 10 to
-            1:1" is the truth about what pressing it will do. */}
-        <PanelAction onClick={applyToAll} disabled={running || members.length === 0}>
+        {/* One pass, both groups — the label says what each one gets. */}
+        <PanelAction onClick={applyToAll} disabled={running || photos.length === 0}>
           {running
             ? `Processing ${progress.done}/${progress.total}…`
-            : heldOut > 0
-              ? `Crop ${members.length} of ${photos.length} to ${label}`
+            : hasExceptions
+              ? `Crop ${(["main", "exceptions"] as const)
+                  .filter((g) => groups[g].length > 0)
+                  .map((g) => `${groups[g].length} to ${ratioLabel(cropRatioOf(looks[g]))}`)
+                  .join(" · ")}`
               : `Crop All Images to ${label}`}
         </PanelAction>
       </PanelActionBar>

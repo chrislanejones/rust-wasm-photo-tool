@@ -287,24 +287,30 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     slug: "/batch-image-editor",
     group: "Batch",
     label: "Batch image editor",
-    blurb: "Resize, compress, stamp a logo, rename by content — one pass.",
+    blurb: "Resize, compress, crop to one shape, stamp a logo, rename — one pass.",
     title: "Batch image editor — do one thing to a whole folder",
     description:
-      "Resize, compress, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
+      "Resize, compress, crop, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
     h1: "Edit a whole folder of photos at once",
-    lede: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, stamp a logo or text, rename by what's in the picture. One pass, on your own machine, then export the lot.",
+    lede: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, crop to one shape, stamp a logo or text, rename by pattern or by what the engine sees. One pass, on your own machine, then export the lot.",
     runsOn: "both",
     does: [
       "Resize or compress every photo to the same target",
+      "Crop every photo to the same ratio, for a carousel that lines up",
       "Stamp a logo, a watermark or text across the set",
+      "Tick the odd few as Exceptions and give them their own settings",
       "Rename by pattern, with a counter and the date",
-      "Or name each file from what is actually in the picture",
+      "Or name each file from its colors, tone and subject",
       "Export the whole set as a ZIP",
     ],
     sections: [
       {
         h2: "Naming files from what is in them",
-        p: "A local describer looks at each photo and writes a filename from what it sees — so a folder of DSC_0431.JPG becomes something you can search. The describing runs on your machine and needs no account and no per-image cost. It is a small model and it is occasionally wrong, so the names are editable before you export.",
+        p: "AI Rename measures each photo — its main color, light or dark, photo or screenshot, a rough subject like portrait, nature or sky — and builds a filename from that. So a folder of DSC_0431.JPG becomes dark-blue-portrait and bright-white-screenshot, which you can at least search. It runs in the engine on your machine, with no account and no per-image cost. It describes; it does not recognize. It will never tell you the photo is a golden retriever.",
+      },
+      {
+        h2: "The few that need something different",
+        p: "Every Batch tool — Logo, Text, Crop, Rename and AI Rename — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop gives them a crop of their own and one button crops both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
       },
       {
         h2: "One pass over the whole set",
@@ -333,7 +339,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     sections: [
       {
         h2: "What runs on your machine",
-        p: "Everything in Edit, Mark up, Hide and most of Batch. The engine is Rust compiled to WebAssembly running in a worker thread, and your originals and edits live in the browser's own database on your disk. Pull the network cable and all of it keeps working, including export.",
+        p: "Everything in Edit, Mark up, Hide and all of Batch. The engine is Rust compiled to WebAssembly running in a worker thread, and your originals and edits live in the browser's own database on your disk. Pull the network cable and all of it keeps working, including export.",
       },
       {
         h2: "What does not, and why",

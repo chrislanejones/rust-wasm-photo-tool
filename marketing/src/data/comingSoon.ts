@@ -55,15 +55,11 @@ export const GROUPS: Group[] = [
     items: [
       {
         name: "Bring your own typeface",
-        body: "Upload a font and use it on your text. The editor learned to load fonts at runtime this month; this is the half that lets you choose one.",
-      },
-      {
-        name: "Camera data, handled properly",
-        body: "Read and write the information your camera embeds — keep it, strip it, or drop just the location — without leaving the tab.",
+        body: "Upload a font and use it on your text. The editor already loads its fonts at runtime; this is the half that lets you choose one.",
       },
       {
         name: "Rename a batch with a look at each photo",
-        body: "The AI rename pass, finished: it looks at the image, not just the filename.",
+        body: "AI Rename names a photo from its colors, tone and a rough subject today. This is the version that can say what is actually in it.",
       },
       { name: "Photoshop's blend modes", body: "Multiply, screen, overlay and the rest, on real layer stacks." },
       { name: "Talk to it", body: "Say what you want changed instead of finding the tool." },

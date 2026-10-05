@@ -35,6 +35,8 @@ import { ensureEngineFonts, faceCss } from "@/lib/engineFonts";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { SelectField } from "@/components/ui/select-field";
+import { BatchGroupToggle } from "./BatchGroupToggle";
+import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
 
 /** Batch › Text weight — a two-tile pick, the same group every other
  *  pick-one-of-N control in the panels uses. */
@@ -50,12 +52,11 @@ const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
  *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
  *  own components), so ToolModeToggle only contributes the icon-row selector
  *  and stays silent on the header row rather than duplicating it. */
-// Labels mirror toolGroups.ts's Batch sub-tools — the tile says "Bulk", so the
-// panel must not say "Crop". The ids are the load-bearing half and never move.
+// Labels mirror toolGroups.ts's Batch sub-tools. The ids never move.
 const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "logo", label: "Logo", icon: ImagePlus },
   { id: "text", label: "Text", icon: Type },
-  { id: "crop", label: "Bulk", icon: Crop },
+  { id: "crop", label: "Crop", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
 ];
@@ -196,14 +197,30 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function BatchSettings({
-  photos,
+/** The Main | Exceptions switch, then the tool. Every tool but Crop runs on
+ *  the group that is showing; Crop keeps a crop per group and runs both. */
+export function BatchSettings(props: BatchSettingsProps) {
+  const { groups, group } = useBatchGroups(props.photos, props.activePhotoId);
+  return (
+    <div className="space-y-4">
+      <BatchGroupToggle photos={props.photos} activePhotoId={props.activePhotoId} />
+      <BatchToolPanel {...props} scoped={groups[group]} />
+    </div>
+  );
+}
+
+function BatchToolPanel({
+  // Every tool below runs on `photos` = the group that is showing. Crop alone
+  // takes the whole gallery, because it crops both groups in one pass.
+  photos: allPhotos,
+  scoped: photos,
   activePhotoId,
   setPhotos,
   stampToolRef,
   flushToCanvas,
   syncState,
-}: BatchSettingsProps) {
+}: BatchSettingsProps & { scoped: PhotoEntry[] }) {
+  const whoLabel = useWhoLabel();
   const [logo, setLogo] = useState<LogoState | null>(null);
   const [position, setPosition] = useState<LogoPosition>("bottom-right");
   const [sizePercent, setSizePercent] = useState(15);
@@ -598,7 +615,7 @@ export function BatchSettings({
         m === "text" ? (
         <TextBatchPanel {...panelProps} />
       ) : m === "crop" ? (
-        <CropBatchPanel {...panelProps} />
+        <CropBatchPanel {...panelProps} photos={allPhotos} />
       ) : m === "rename" ? (
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
@@ -718,7 +735,7 @@ export function BatchSettings({
         >
           {running
             ? `Processing ${progress.done}/${progress.total}…`
-            : "Apply Logo to All Images"}
+            : `Apply Logo to ${whoLabel(photos.length)}`}
         </PanelAction>
       </PanelActionBar>
 
@@ -781,9 +798,9 @@ function RenameBatchPanel({
 
   const apply = () => {
     if (photos.length === 0) return;
-    setPhotos((prev) =>
-      prev.map((p, i) => ({ ...p, name: computeName(p.name, i) })),
-    );
+    // By id, not index: `photos` may be one group, not the whole gallery.
+    const next = new Map(photos.map((p, i) => [p.id, computeName(p.name, i)]));
+    setPhotos((prev) => prev.map((p) => (next.has(p.id) ? { ...p, name: next.get(p.id)! } : p)));
     toast.success(
       `Renamed ${photos.length} image${photos.length !== 1 ? "s" : ""}`,
     );
@@ -927,6 +944,7 @@ function TextBatchPanel({
   flushToCanvas,
   syncState,
 }: BatchSettingsProps) {
+  const whoLabel = useWhoLabel();
   const [text, setText] = useState("");
   const [fontSize, setFontSize] = useState(32);
   const [bold, setBold] = useState(false);
@@ -1391,7 +1409,7 @@ function TextBatchPanel({
         >
           {running
             ? `Processing ${progress.done}/${progress.total}…`
-            : "Apply Text to All Images"}
+            : `Apply Text to ${whoLabel(photos.length)}`}
         </PanelAction>
       </PanelActionBar>
 

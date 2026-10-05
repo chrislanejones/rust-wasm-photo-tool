@@ -680,7 +680,7 @@ const batchGroup: ToolGroupDefinition = {
   id: "batch",
   label: "Batch",
   icon: PackageOpen,
-  description: "Stamp a logo, add text, crop or rename every loaded photo at once — or hold the odd one out",
+  description: "Stamp a logo, add text, crop or rename every loaded photo at once — tick exceptions to treat a few differently",
   shortcutKey: "5",
   subTools: [
     {
@@ -702,16 +702,12 @@ const batchGroup: ToolGroupDefinition = {
       keywords: ["text", "caption", "bulk", "overlay"],
     },
     {
-      // Label is "Bulk", id stays "crop": the id is load-bearing (routes,
-      // BATCH_MODES, the persisted batchMode), and the pass this tile runs is
-      // still a crop. What makes it a BULK is the picker in the panel — you
-      // can hold the odd photo out of it. `toolModes.ts`'s legacy emoji row and
-      // `BATCH_TOOL_MODES` in BatchSettings carry the same label; three copies
-      // is the pre-existing arrangement, so all three move together.
+      // `toolModes.ts`'s legacy emoji row and `BATCH_TOOL_MODES` in
+      // BatchSettings carry the same label; all three move together.
       id: "crop",
-      label: "Bulk",
+      label: "Crop",
       description:
-        "One setting across the whole gallery — hold the odd photo out of it",
+        "Crop every loaded photo to the same ratio and size — exceptions get their own crop",
       icon: Crop,
       tool: "emoji",
       mode: "crop",
@@ -722,8 +718,8 @@ const batchGroup: ToolGroupDefinition = {
         "same size",
         "bulk",
         "batch",
+        "exception",
         "odd one out",
-        "hold out",
         "except",
         "exclude",
         "skip",

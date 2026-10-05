@@ -93,7 +93,7 @@ const AUDIENCES = [
     n: "02",
     who: "You run a shop or a brand",
     title: "Forty product photos, one pass.",
-    body: "Resize and compress a whole folder at once, stamp your logo on every frame, rename the files by what's actually in them, and export to WebP or AVIF for a faster page.",
+    body: "Resize and compress a whole folder at once, crop them all to one shape, stamp your logo on every frame, rename the files by what the engine sees in them, and export to WebP or AVIF for a faster page.",
     tags: ["Batch resize", "Logo stamp", "Twelve presets", "WebP · AVIF"],
   },
   {
@@ -219,7 +219,7 @@ export default function Home() {
               Crop · Resize · Brightness and contrast · Twelve presets · Blur · Arrows, boxes and
               pins · Text bubbles in three typefaces · Emoji · Blur, pixelate and black-box
               redaction · Magic-wand select · Magic eraser · Layers · Undo to a thousand steps ·
-              Batch logo stamping · Export to PNG, JPEG, WebP or AVIF
+              Batch crop and logo stamping · Export to PNG, JPEG, WebP or AVIF
             </p>
             <p className="lede editor__lede">
               All of it is free and works offline. Your edits are kept in this browser between

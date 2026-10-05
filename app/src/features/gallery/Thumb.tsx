@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/format";
 import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { useThumbImage } from "./useThumbImage";
 import { BatchCropThumbShade } from "./BatchCropThumbShade";
+import { useToolStore } from "@/stores/useToolStore";
 import type { PhotoEntry } from "./GalleryBar";
 
 export interface ThumbProps {
@@ -43,6 +44,16 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
   // A thumbnail is either a placeholder or the photo — never a gray photo.
   // The object URL, the decode and the grace period all live in the hook.
   const thumb = useThumbImage(entry.thumbBlob);
+  // Batch: the checkbox means "exception — treat this one differently". Same
+  // checkbox, same selection; only its name and badge change.
+  const batchMode = useToolStore((s) => s.activeTool === "emoji");
+  const checkTitle = batchMode
+    ? selected
+      ? "Back to Main"
+      : "Exception — treat this photo differently"
+    : selected
+      ? "Deselect"
+      : "Select";
 
   // One `aria-busy` belongs to the gallery, not to thirty tiles, so each tile
   // reports whether it has pixels yet and the container sums them. Cleared on
@@ -171,6 +182,12 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           both bottom corners are Remove and Select. The pill is there so the ↻
           survives a light photo underneath it. `StatusMark` spins only under
           motion-safe, so Reduce Motion gets a still mark rather than nothing. */}
+      {batchMode && selected && !loading && (
+        <span className="pointer-events-none absolute top-1 right-1 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-semibold text-on-photo">
+          Exception
+        </span>
+      )}
+
       {loading && (
         <span className="absolute top-1 right-1 z-20 flex items-center rounded-md bg-black/70 p-0.5 pointer-events-none">
           <StatusMark kind="working" label={`Loading ${entry.name}`} className="text-on-photo" />
@@ -273,9 +290,9 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         // A toggle: a stable name, with aria-pressed saying which way it is.
         // The only name used to be this flipping title.
-        aria-label="Select image"
+        aria-label={batchMode ? "Exception" : "Select image"}
         aria-pressed={selected}
-        title={selected ? "Deselect" : "Select"}
+        title={checkTitle}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
            `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
            #2b2b2b dark) — while the brand brown is `--accent` / `--primary`,
@@ -311,7 +328,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-on-photo opacity-100"
             : "bg-black/55 border-on-photo/80 text-on-photo/45"
-        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+        } ${selectionActive || batchMode ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>

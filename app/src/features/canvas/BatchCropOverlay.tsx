@@ -1,4 +1,4 @@
-// Batch › Bulk (the mode id is still `crop`) — the crop frame on the preview.
+// Batch › Crop — the crop frame on the preview.
 // Drag inside it to move, drag a
 // corner to resize (ratio locked; hold Shift to break it), or drag anywhere
 // else on the photo to draw a new frame. Nothing is committed until the mouse
@@ -24,6 +24,7 @@ import {
   cornerToward,
   ratioLabel,
   type CropCorner,
+  type CropFraming,
   type CropRect,
 } from "@/lib/batchCrop";
 import {
@@ -32,9 +33,11 @@ import {
   cropRatioOf,
   framingFor,
 } from "@/stores/useBatchCropStore";
+import { groupOf } from "@/stores/useBatchGroupStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
+import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
 
 // On-photo colors are inline, not theme tokens: they sit on the user's
 // picture, where only a black shade and a white line read on anything — the
@@ -58,7 +61,17 @@ interface Props extends OverlayFrame {
   undoCount: number;
 }
 
-export function BatchCropOverlay({
+/** The preview frame plus the "Exception" checkbox for the photo on screen. */
+export function BatchCropOverlay(props: Props) {
+  return (
+    <>
+      <BatchExceptionCheckbox />
+      <BatchCropFrame {...props} />
+    </>
+  );
+}
+
+function BatchCropFrame({
   width,
   height,
   cssWidth,
@@ -89,21 +102,23 @@ export function BatchCropOverlay({
   const originalKey = useGalleryStore(
     (s) => s.photos.find((p) => p.id === s.activePhotoId)?.originalKey,
   );
+  // The photo on screen shows ITS group's crop: ticked in the gallery = an exception.
+  const group = useGalleryStore((s) => (photoId ? groupOf(s.selectedIds, photoId) : "main"));
   // A Shift-drag's custom shape, else the ratio tile's.
-  const rw = useBatchCropStore((s) => cropRatioOf(s)[0]);
-  const rh = useBatchCropStore((s) => cropRatioOf(s)[1]);
-  const anchor = useBatchCropStore((s) => s.anchor);
-  const framing = useBatchCropStore((s) => (photoId ? framingFor(s, photoId) : undefined));
-  const setFraming = useBatchCropStore((s) => s.setFraming);
-  const clearFraming = useBatchCropStore((s) => s.clearFraming);
+  const rw = useBatchCropStore((s) => cropRatioOf(s.looks[group])[0]);
+  const rh = useBatchCropStore((s) => cropRatioOf(s.looks[group])[1]);
+  const anchor = useBatchCropStore((s) => s.looks[group].anchor);
+  const framing = useBatchCropStore((s) => (photoId ? framingFor(s, group, photoId) : undefined));
+  const storeSetFraming = useBatchCropStore((s) => s.setFraming);
+  const storeClearFraming = useBatchCropStore((s) => s.clearFraming);
   const onOriginal = useBatchCropStore((s) =>
     photoId && originalKey ? showsOriginalFraming(s, photoId, originalKey, undoCount) : false,
   );
-  // A held-out photo is not in the pass, so a frame on it would be a lie about
-  // what Enter does. It goes the way the frame goes once a crop is baked in.
-  const held = useBatchCropStore((s) => (photoId ? s.held[photoId] === true : false));
 
-  if (!on || !photoId || held || !onOriginal || width <= 0 || height <= 0) return null;
+  if (!on || !photoId || !onOriginal || width <= 0 || height <= 0) return null;
+  const setFraming = (id: string, f: CropFraming, ratio?: [number, number]) =>
+    storeSetFraming(group, id, f, ratio);
+  const clearFraming = (id: string) => storeClearFraming(group, id);
   const b = photoBounds ?? { x: 0, y: 0, width, height };
   if (b.width < 2 || b.height < 2) return null;
 
@@ -298,7 +313,7 @@ export function BatchCropOverlay({
         ref={frameRef}
         tabIndex={0}
         role="group"
-        aria-label={`Crop frame, ${label}. Drag to move, drag a corner to resize, Shift-drag to break the ratio. Enter crops every photo in the bulk. Arrow keys move, plus and minus resize, 0 resets.`}
+        aria-label={`Crop frame, ${label}. Drag to move, drag a corner to resize, Shift-drag to break the ratio. Enter crops every photo. Arrow keys move, plus and minus resize, 0 resets.`}
         onPointerDown={(e) => startDrag(e, "move")}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
