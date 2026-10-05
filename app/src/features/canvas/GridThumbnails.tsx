@@ -1,10 +1,18 @@
-// Grid thumbnails (active when the Images tool is selected). Renders only the
-// 11 non-active thumbnail tiles around the hero. The hero (active photo's live
-// canvas) is rendered by AppShell at a stable position in the React tree so
-// the canvas DOM/WASM pixels survive tool switches.
-import { useEffect, useMemo, useRef, useState } from "react";
+// Grid thumbnails (Batch's canvas). Renders the 11 non-active tiles around the
+// hero, each with its own Exception checkbox, and the bar under the grid that
+// pages through a gallery bigger than one grid. The hero (the open photo's live
+// canvas) is rendered by AppShell.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { BatchCropThumbShade } from "@/features/gallery/BatchCropThumbShade";
+import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
+import {
+  CanvasActionBar,
+  CanvasActionBarButton,
+  CanvasActionBarText,
+} from "@/components/ui/canvas-action-bar";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 interface Props {
   photos: PhotoEntry[];
@@ -96,26 +104,51 @@ export function GridThumbnails({
   onSelectPhoto,
 }: Props) {
   const thumbUrls = useThumbUrls(photos);
-
-  // Intentional cap: the grid spec defines exactly 12 cells (1 hero + 11
-  // thumbnails). Photos beyond that are surfaced via a "+N more" badge on
-  // the final tile rather than being silently dropped.
-  const others = useMemo(
-    () => photos.filter((p) => p.id !== activePhotoId).slice(0, 11),
-    [photos, activePhotoId],
+  const exceptionCount = useGalleryStore(
+    (s) => photos.filter((p) => s.selectedIds.has(p.id)).length,
   );
 
-  const overflowCount = Math.max(0, photos.length - 12);
+  // The grid has 12 cells: the hero and 11 tiles. A bigger gallery is paged,
+  // 11 tiles at a time, with « » in the bar under the grid.
+  const rest = useMemo(
+    () => photos.filter((p) => p.id !== activePhotoId),
+    [photos, activePhotoId],
+  );
+  const pages = Math.max(1, Math.ceil(rest.length / TILE_AREAS.length));
+  const [page, setPage] = useState(0);
+  const current = Math.min(page, pages - 1);
+  const others = rest.slice(current * TILE_AREAS.length, (current + 1) * TILE_AREAS.length);
+
+  // The bar hangs under the grid. The grid's box is AppShell's; we find it from
+  // our own first tile rather than adding a ref there.
+  const firstTileRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    const grid = firstTileRef.current?.parentElement;
+    if (!grid) return;
+    const measure = () => {
+      const r = grid.getBoundingClientRect();
+      setAnchor({ x: r.left + r.width / 2, y: r.bottom + 8 });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(grid);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   return (
     <>
       {TILE_AREAS.map((area, i) => {
         const p = others[i];
-        const isLastTile = i === TILE_AREAS.length - 1;
         if (!p) {
           return (
             <div
               key={`empty-${i}`}
+              ref={i === 0 ? firstTileRef : undefined}
               style={{ gridArea: area }}
               className="overflow-hidden rounded-md border border-border bg-bg-secondary/40"
             />
@@ -125,6 +158,7 @@ export function GridThumbnails({
         return (
           <div
             key={p.id}
+            ref={i === 0 ? firstTileRef : undefined}
             style={{ gridArea: area }}
             className="relative overflow-hidden rounded-md border border-border bg-background hover:ring-2 hover:ring-orange-400"
           >
@@ -147,14 +181,34 @@ export function GridThumbnails({
               )}
             </button>
             <BatchCropThumbShade entry={p} isActive={false} cover={false} />
-            {isLastTile && overflowCount > 0 && (
-              <span className="absolute bottom-1 right-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-2xs text-zinc-100">
-                +{overflowCount} more
-              </span>
-            )}
+            <BatchExceptionCheckbox photoId={p.id} name={p.name} />
           </div>
         );
       })}
+      {anchor && photos.length > 0 && (
+        <CanvasActionBar x={anchor.x} y={anchor.y} label="Batch photos" data-testid="batch-grid-bar">
+          <CanvasActionBarButton
+            onClick={() => setPage(current - 1)}
+            disabled={current === 0}
+            title="Previous photos"
+          >
+            <ChevronLeft aria-hidden className="size-4" />
+          </CanvasActionBarButton>
+          <CanvasActionBarText>
+            {pages > 1
+              ? `Page ${current + 1} of ${pages} · ${photos.length} photos`
+              : `${photos.length} photo${photos.length === 1 ? "" : "s"}`}
+            {exceptionCount > 0 ? ` · ${exceptionCount} exception${exceptionCount === 1 ? "" : "s"}` : ""}
+          </CanvasActionBarText>
+          <CanvasActionBarButton
+            onClick={() => setPage(current + 1)}
+            disabled={current >= pages - 1}
+            title="Next photos"
+          >
+            <ChevronRight aria-hidden className="size-4" />
+          </CanvasActionBarButton>
+        </CanvasActionBar>
+      )}
     </>
   );
 }

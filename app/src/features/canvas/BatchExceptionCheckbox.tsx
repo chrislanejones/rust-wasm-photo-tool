@@ -1,20 +1,30 @@
-// Batch — "Exception" for the photo on screen, in every Batch tool. The same
-// mark as the gallery checkbox on its thumbnail (useGalleryStore.selectedIds),
-// just closer to where you are looking: tick it and this photo moves to the
-// Exceptions group. Mounted by BatchCropOverlay, which is always on the canvas.
+// Batch — "Exception" on a photo in the canvas grid, in every Batch tool. The
+// same mark as the gallery checkbox on its thumbnail (useGalleryStore.selectedIds),
+// just where you are looking: tick it and that photo moves to the Exceptions
+// group. The hero (the open photo) gets one from BatchCropOverlay; every other
+// grid tile gets one from GridThumbnails.
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 
-export function BatchExceptionCheckbox() {
+export function BatchExceptionCheckbox({
+  photoId: forPhoto,
+  name,
+}: {
+  /** The photo it marks. Omitted = the open photo. */
+  photoId?: string;
+  /** The photo's name, so each tile's checkbox has its own accessible name. */
+  name?: string;
+} = {}) {
   const on = useToolStore((s) => s.activeTool === "emoji");
-  const photoId = useGalleryStore((s) => s.activePhotoId);
+  const activeId = useGalleryStore((s) => s.activePhotoId);
+  const photoId = forPhoto ?? activeId;
   const ticked = useGalleryStore((s) => (photoId ? s.selectedIds.has(photoId) : false));
   const setSelectedIds = useGalleryStore((s) => s.setSelectedIds);
   if (!on || !photoId) return null;
 
   return (
     <label
-      // Bottom-left of the canvas viewport (top-left carries the grid's badge), outside the pan/zoom transform, so it
+      // Bottom-left of its tile (top-left carries the grid's badge), outside the pan/zoom transform, so it
       // stays put and never lands on the crop frame's handles.
       // One above the frame's own inline zIndex (24, BatchCropOverlay), so
       // the photo's draw area under it cannot swallow the click.
@@ -33,6 +43,7 @@ export function BatchExceptionCheckbox() {
             return next;
           });
         }}
+        aria-label={name ? `Exception: ${name}` : undefined}
         className="h-4 w-4 cursor-pointer accent-theme-primary"
       />
       Exception
