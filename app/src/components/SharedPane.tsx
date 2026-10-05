@@ -29,7 +29,9 @@
 // days it drew a lone block at the right edge that read as a stray box, not a
 // chart. The view count and "last opened" beside the thumbnail say it.
 import { useEffect, useState } from "react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+// Through lib/cloud, not convex/react: a keyless build must open this pane
+// without "Could not find ConvexProviderWithAuth".
+import { useCloudAuth as useConvexAuth, useCloudMutation as useMutation, useCloudQuery as useQuery } from "@/lib/cloud";
 import type { FunctionReturnType } from "convex/server";
 import { ImageOff, Link2, Pause, Play, Timer, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";

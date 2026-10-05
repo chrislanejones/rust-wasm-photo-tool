@@ -37,3 +37,23 @@ test("the static boot shell is gone once React mounts", async ({ page }) => {
   await expect(page.locator('input[type="file"]').first()).toBeAttached({ timeout: 30_000 });
   await expect(page.locator(".boot-shell")).toHaveCount(0);
 });
+
+test("with no keys, a photo loads and Settings › Sync and Shared open without a Convex error", async ({ page }) => {
+  const errors = await bootErrors(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  const input = page.locator('input[type="file"]').first();
+  await expect(input).toBeAttached({ timeout: 30_000 });
+  await input.setInputFiles(["e2e/fixtures/checker.png"]);
+  // The top bar, and with it SubscriptionButton, mounts once a photo is open.
+  await expect(page.locator("canvas.main-canvas")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^Settings/ }).first().click();
+  for (const pane of ["Sync", "Shared"]) {
+    await page.getByRole("tab", { name: pane, exact: true }).or(page.getByRole("button", { name: pane, exact: true })).first().click();
+    await expect(page.getByRole("heading", { name: pane, exact: true }).first()).toBeVisible();
+  }
+  // AI usage is a Settings pane too; open it when this build lists it.
+  const ai = page.getByRole("tab", { name: /AI usage/i }).or(page.getByRole("button", { name: /AI usage/i })).first();
+  if (await ai.count()) await ai.click();
+  expect(errors.filter((e) => /Convex|Clerk|ConvexProvider/.test(e))).toEqual([]);
+});

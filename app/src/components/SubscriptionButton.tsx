@@ -3,7 +3,8 @@
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
 import { useState, useEffect } from "react";
-import { useAction, useQuery, useMutation } from "convex/react";
+// Through lib/cloud, not convex/react: a keyless build must render this.
+import { useCloudAction as useAction, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
 import { toast } from "sonner";
 import { WINDOW_TITLE } from "@/lib/styles";
 import {
