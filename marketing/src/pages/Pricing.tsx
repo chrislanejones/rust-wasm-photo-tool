@@ -118,7 +118,7 @@ const MATRIX: { name: string; rows: Row[] }[] = [
       row("Undo / redo", [Y, Y, Y]),
       row("Export PNG · JPEG · WebP · AVIF", [Y, Y, Y]),
       row("OpenRaster export and import", [Y, Y, Y], "layers intact, opens in Krita"),
-      row("Batch", [Y, Y, Y], "logo, text, rename, AI rename — all local"),
+      row("Batch", [Y, Y, Y], "logo, text, crop, rename, AI rename — all local"),
     ],
   },
   {

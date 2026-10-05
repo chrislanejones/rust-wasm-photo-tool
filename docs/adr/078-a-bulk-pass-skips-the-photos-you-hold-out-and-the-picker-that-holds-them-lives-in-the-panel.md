@@ -1,6 +1,8 @@
 # ADR-078: A bulk pass skips the photos you hold out, and the picker that holds them lives in the panel
 
-Date: 2026-10-03   Status: draft
+Date: 2026-10-03   Status: superseded by 079
+
+Superseded by [ADR-079](079-batch-exceptions-are-the-gallery-selection-and-every-batch-tool-switches-main-and-exceptions.md).
 
 ## Context
 

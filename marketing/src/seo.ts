@@ -345,7 +345,7 @@ export const ROUTES: readonly Route[] = [
     label: "Batch image editor",
     title: "Batch image editor — do one thing to a whole folder",
     description:
-      "Resize, compress, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
+      "Resize, compress, crop, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
     sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
     toolPage: true,
   },
