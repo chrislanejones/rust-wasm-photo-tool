@@ -488,3 +488,20 @@ jobs:
       # crashed to a blank page and nothing could tell).
       - name: Keyless build boots (no Convex/Clerk env)
         run: pnpm run test:e2e:nokeys
+      # The specs that prove the plans' promises and used to run only on a
+      # laptop: the phone never fetches the engine, lit tiles pass AA, a photo
+      # switch never moves an edit or a stroke onto the wrong photo, the gallery
+      # and footer say Loading, and Batch's Exceptions and crop frame work.
+      # ~4 min of tests against the default (placeholder-key) build.
+      - name: Phone, contrast, photo-switch and Batch e2e
+        run: >-
+          pnpm exec playwright test
+          e2e/phone-no-engine.spec.ts
+          e2e/lit-tile-contrast.spec.ts
+          e2e/photo-switch-state.spec.ts
+          e2e/photo-switch-paint.spec.ts
+          e2e/photo-switch-leftovers.spec.ts
+          e2e/photo-switch-cue.spec.ts
+          e2e/gallery-loading-state.spec.ts
+          e2e/batch-exceptions.spec.ts
+          e2e/batch-crop-frame.spec.ts
