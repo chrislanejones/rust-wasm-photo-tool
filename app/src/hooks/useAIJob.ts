@@ -51,6 +51,15 @@ async function urlToPixels(url: string): Promise<AIResultPixels> {
  * `onImageResult` receives decoded pixels for image models (rembg/upscale/
  * inpaint); text models surface via the returned `textResult`.
  */
+/** A job the backend never settles becomes an Error after this long, instead
+ *  of a spinner that runs for ever (Plan C §3). Replicate's own runs finish in
+ *  well under a minute; three is generous. */
+export const AI_JOB_TIMEOUT_MS = 180_000;
+/** Upload + dispatch, before the job exists. */
+const AI_UPLOAD_TIMEOUT_MS = 60_000;
+export const AI_TIMEOUT_MESSAGE =
+  "The AI service didn't answer in time. Your photo is unchanged.";
+
 export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const generateUploadUrl = useCloudMutation(api.ai.generateUploadUrl);
   const dispatch = useCloudAction(api.ai.dispatch);
@@ -65,6 +74,21 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const photoKeyRef = useRef<string | undefined>(undefined);
 
   const job = useCloudQuery(api.aiJobs.getJob, jobId ? { jobId } : "skip");
+  // The last request, so an Error can offer "Try again".
+  const lastArgsRef = useRef<Parameters<typeof run> | null>(null);
+
+  // Running with no answer for AI_JOB_TIMEOUT_MS → Error. consumedRef makes a
+  // late answer for this job a no-op rather than a surprise.
+  useEffect(() => {
+    if (phase !== "running" || !jobId) return;
+    const t = window.setTimeout(() => {
+      if (consumedRef.current === jobId) return;
+      consumedRef.current = jobId;
+      setError(AI_TIMEOUT_MESSAGE);
+      setPhase("error");
+    }, AI_JOB_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [phase, jobId]);
 
   useEffect(() => {
     if (!job || !jobId || consumedRef.current === jobId) return;
@@ -115,11 +139,16 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
         setPhase("error");
         return;
       }
+      lastArgsRef.current = [type, photoKey, png, maskPng];
       setError(null);
       setTextResult(null);
       photoKeyRef.current = photoKey;
       setPhase("uploading");
+      let uploadTimer: number | undefined;
       try {
+        const timedOut = new Promise<never>((_, reject) => {
+          uploadTimer = window.setTimeout(() => reject(new Error(AI_TIMEOUT_MESSAGE)), AI_UPLOAD_TIMEOUT_MS);
+        });
         // Tag as image/png so the stored blob's content-type is correct —
         // Replicate fetches this URL and some models reject octet-stream.
         const uploadPng = async (bytes: Uint8Array) => {
@@ -132,24 +161,32 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
           const { storageId } = (await resp.json()) as { storageId: string };
           return storageId as Id<"_storage">;
         };
-        const inputStorageId = await uploadPng(png);
-        const maskStorageId = maskPng ? await uploadPng(maskPng) : undefined;
-        const { jobId: newJobId } = await dispatch({
-          photoKey,
-          type,
-          inputStorageId,
-          maskStorageId,
-        });
+        const { jobId: newJobId } = await Promise.race([
+          (async () => {
+            const inputStorageId = await uploadPng(png);
+            const maskStorageId = maskPng ? await uploadPng(maskPng) : undefined;
+            return dispatch({ photoKey, type, inputStorageId, maskStorageId });
+          })(),
+          timedOut,
+        ]);
         consumedRef.current = null;
         setJobId(newJobId);
         setPhase("running");
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setPhase("error");
+      } finally {
+        window.clearTimeout(uploadTimer);
       }
     },
     [generateUploadUrl, dispatch],
   );
+
+  /** Run the last request again — the Error state's action. */
+  const retry = useCallback(() => {
+    const args = lastArgsRef.current;
+    if (args) void run(...args);
+  }, [run]);
 
   const reset = useCallback(() => {
     setJobId(null);
@@ -160,5 +197,5 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   }, []);
 
   const busy = phase === "uploading" || phase === "running";
-  return { run, reset, phase, busy, error, textResult };
+  return { run, retry, reset, phase, busy, error, textResult };
 }
