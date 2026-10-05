@@ -113,8 +113,9 @@ export const NETWORK_PATHS: readonly NetworkPath[] = [
     id: "share_links",
     label: "Share links",
     sends: "a flattened copy of the photo is stored so anyone with the link can view it",
-    // NOT the online switch — QC F2 (#234) is the fix and has not landed.
-    gate: "signed-in",
+    // The online switch since QC F2 (#234): useShare refuses before it asks
+    // for an upload URL.
+    gate: "online-switch",
     disclosedAs: "share links",
     homeRow: "Sync and share links",
   },

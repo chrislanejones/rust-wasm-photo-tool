@@ -57,9 +57,9 @@ describe("equality with the gates as they were", () => {
 });
 
 describe("the switch gates exactly what it gated before", () => {
-  it("SWITCHED_PATHS is the three the switch always covered", () => {
+  it("SWITCHED_PATHS is the three the switch always covered, plus share links (QC F2)", () => {
     expect(SWITCHED_PATHS.map((p) => p.id).sort()).toEqual(
-      ["ai_generation", "ai_processing", "photo_backup"].sort(),
+      ["ai_generation", "ai_processing", "photo_backup", "share_links"].sort(),
     );
   });
 
@@ -81,7 +81,6 @@ describe("it records what IS, not what should be", () => {
   // ever put behind the switch, this test is where that shows up, and the
   // Security page changes with it.
   it.each([
-    ["share_links", "signed-in"], // QC F2 (#234) not landed
     ["user_colors", "signed-in"],
     ["settings_sync", "own-toggle"],
   ])("%s is %s, not online-switch", (id, gate) => {
