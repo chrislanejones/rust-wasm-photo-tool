@@ -1,4 +1,4 @@
-// Batch › Bulk (the mode id is still `crop`) — the crop frame on the preview.
+// Batch › Crop — the crop frame on the preview.
 // Drag inside it to move, drag a
 // corner to resize (ratio locked; hold Shift to break it), or drag anywhere
 // else on the photo to draw a new frame. Nothing is committed until the mouse
@@ -32,12 +32,12 @@ import {
   showsOriginalFraming,
   cropRatioOf,
   framingFor,
-  groupOf,
 } from "@/stores/useBatchCropStore";
+import { groupOf } from "@/stores/useBatchGroupStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { BulkOddCheckbox } from "./BulkOddCheckbox";
+import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
 
 // On-photo colors are inline, not theme tokens: they sit on the user's
 // picture, where only a black shade and a white line read on anything — the
@@ -61,11 +61,11 @@ interface Props extends OverlayFrame {
   undoCount: number;
 }
 
-/** The preview frame plus the "Odd one out" checkbox for the photo on screen. */
+/** The preview frame plus the "Exception" checkbox for the photo on screen. */
 export function BatchCropOverlay(props: Props) {
   return (
     <>
-      <BulkOddCheckbox />
+      <BatchExceptionCheckbox />
       <BatchCropFrame {...props} />
     </>
   );
@@ -102,8 +102,8 @@ function BatchCropFrame({
   const originalKey = useGalleryStore(
     (s) => s.photos.find((p) => p.id === s.activePhotoId)?.originalKey,
   );
-  // The photo on screen shows ITS group's crop: ticked in the gallery = odd.
-  const group = useGalleryStore((s) => (photoId ? groupOf(s.selectedIds, photoId) : "bulk"));
+  // The photo on screen shows ITS group's crop: ticked in the gallery = an exception.
+  const group = useGalleryStore((s) => (photoId ? groupOf(s.selectedIds, photoId) : "main"));
   // A Shift-drag's custom shape, else the ratio tile's.
   const rw = useBatchCropStore((s) => cropRatioOf(s.looks[group])[0]);
   const rh = useBatchCropStore((s) => cropRatioOf(s.looks[group])[1]);

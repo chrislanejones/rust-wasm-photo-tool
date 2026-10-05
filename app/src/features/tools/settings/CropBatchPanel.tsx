@@ -1,25 +1,20 @@
-// Batch › Bulk — one crop for the whole gallery, and a second crop for the odd
-// ones out. The mode id is still `crop`. Same two-pass shape as the Logo and
-// Text panels in BatchSettings.tsx: every non-active photo is re-encoded and
-// written back to IDB; the active photo goes through the live engine so the
-// crop is a normal undo step.
-//
-// THE ODD ONES are the photos ticked in the gallery (or with "Odd one out" on
-// the canvas) — the gallery's own checkboxes, no second picker. The panel has a
-// tab per group, each with its own ratio, anchor and width, and ONE pass crops
-// every photo with its own group's settings.
+// Batch › Crop — one crop for the Main photos and one for the Exceptions (the
+// photos ticked in the gallery, or with "Exception" ticked on the canvas). The
+// Main | Exceptions switch above the panel (BatchGroupToggle) picks which crop
+// you are editing; ONE pass crops every photo with its own group's settings.
+// The mode id is `crop`. Same two-pass shape as the Logo and Text panels: every
+// non-active photo is re-encoded and written back to IDB; the active photo goes
+// through the live engine so the crop is a normal undo step.
 //
 // Drag the frame on the preview (BatchCropOverlay) and, on release, that
-// framing becomes the one every photo IN THE SAME GROUP follows (the gallery
-// thumbnails shade what will be cut); frame another photo to give it its own.
-// Shift-drag breaks the ratio. Enter runs the pass.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// framing becomes the one every photo IN THE SAME GROUP follows; frame another
+// photo to give it its own. Shift-drag breaks the ratio. Enter runs the pass.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { PlacementGrid } from "@/components/PlacementGrid";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { toast } from "@/components/ui/sonner";
@@ -46,13 +41,12 @@ import { rebaseOnOriginalCrop } from "@/lib/svgPassthrough";
 import {
   useBatchCropStore,
   showsOriginalFraming,
-  splitBulk,
-  groupOf,
   cropRatioOf,
   framingFor,
   type BatchCropWidthId,
-  type BulkGroup,
 } from "@/stores/useBatchCropStore";
+import { groupOf } from "@/stores/useBatchGroupStore";
+import { useBatchGroups } from "./useBatchGroups";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 
@@ -96,15 +90,16 @@ export function CropBatchPanel({
   flushToCanvas,
   syncState,
 }: CropBatchPanelProps) {
-  // The odd ones ARE the gallery's ticked photos.
-  const oddIds = useGalleryStore((s) => s.selectedIds);
-  const groups = useMemo(() => splitBulk(oddIds, photos), [oddIds, photos]);
-  const hasOdd = groups.odd.length > 0;
+  // The exceptions ARE the gallery's ticked photos; the switch above the panel
+  // picks which group's crop is showing.
+  const {
+    exceptionIds,
+    groups,
+    hasExceptions,
+    group: editing,
+    activeGroup,
+  } = useBatchGroups(photos, activePhotoId);
   const looks = useBatchCropStore((s) => s.looks);
-  const storedEditing = useBatchCropStore((s) => s.editing);
-  const setEditing = useBatchCropStore((s) => s.setEditing);
-  // With nothing ticked there is no Odd group to edit.
-  const editing: BulkGroup = hasOdd ? storedEditing : "bulk";
   const look = looks[editing];
   const members = groups[editing];
   const custom = look.customRatio;
@@ -117,12 +112,6 @@ export function CropBatchPanel({
   const setApplyAll = useBatchCropStore((s) => s.setApplyAll);
   const framedCount = members.filter((p) => framing[p.id]).length;
 
-  // Switching photos shows the tab of the group the photo on screen is in, so
-  // the settings you see are the ones its preview frame is drawn with.
-  const activeGroup = activePhotoId ? groupOf(oddIds, activePhotoId) : "bulk";
-  useEffect(() => {
-    setEditing(activeGroup);
-  }, [activePhotoId, activeGroup, setEditing]);
   const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
@@ -161,7 +150,7 @@ export function CropBatchPanel({
   const sizeNote = (() => {
     const targetWidth = widthOf(look.widthId);
     const n = members.length;
-    const [who, verb] = !hasOdd ? ["Every photo", "s"] : n === 1 ? ["This photo", "s"] : [`These ${n}`, ""];
+    const [who, verb] = !hasExceptions ? ["Every photo", "s"] : n === 1 ? ["This photo", "s"] : [`These ${n}`, ""];
     if (targetWidth === null) return `${who} keep${verb} ${n === 1 ? "its" : "their"} own resolution at ${label}.`;
     const s = batchCropOutputSize({ width: 1, height: 1 }, cropRatioOf(look), targetWidth);
     return `${who} come${verb} out ${s.width}×${s.height}.`;
@@ -177,7 +166,7 @@ export function CropBatchPanel({
     const crops = useBatchCropStore.getState();
     // Each photo gets ITS group's look: shape, anchor, width, shared frame.
     const lookOf = (id: string) => {
-      const g = groupOf(oddIds, id);
+      const g = groupOf(exceptionIds, id);
       const l = crops.looks[g];
       return { g, l, ratio: cropRatioOf(l), targetWidth: widthOf(l.widthId) };
     };
@@ -351,12 +340,12 @@ export function CropBatchPanel({
       }
 
       setAppliedCount(succeeded);
-      const bulkLabel = ratioLabel(cropRatioOf(crops.looks.bulk));
-      const oddLabel = ratioLabel(cropRatioOf(crops.looks.odd));
+      const mainLabel = ratioLabel(cropRatioOf(crops.looks.main));
+      const exceptionsLabel = ratioLabel(cropRatioOf(crops.looks.exceptions));
       toast.success(
-        hasOdd
-          ? `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} — the bulk to ${bulkLabel}, the odd ones to ${oddLabel}`
-          : `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${bulkLabel}`,
+        hasExceptions
+          ? `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} — Main to ${mainLabel}, Exceptions to ${exceptionsLabel}`
+          : `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${mainLabel}`,
       );
     } catch (err) {
       console.error("Bulk-crop: fatal error", err);
@@ -368,8 +357,8 @@ export function CropBatchPanel({
     }
   }, [
     photos,
-    oddIds,
-    hasOdd,
+    exceptionIds,
+    hasExceptions,
     activePhotoId,
     setPhotos,
     stampToolRef,
@@ -393,31 +382,14 @@ export function CropBatchPanel({
             <>
               Every photo is cropped to the same shape, so a carousel&apos;s
               slides all line up. Need a few to be different? Tick them in the
-              gallery (or &ldquo;Odd one out&rdquo; on the canvas) and give the
-              Odd ones tab its own crop. Drag on the preview to frame; let go
+              gallery (or &ldquo;Exception&rdquo; on the canvas) and give
+              Exceptions its own crop. Drag on the preview to frame; let go
               and the rest of that group follows. Hold Shift to break the
               ratio. Enter crops them all.
             </>
           }
           className="mb-2"
         />
-        <div className="mb-3">
-          <SegmentedTabs
-            label="Which crop you are editing"
-            fill
-            tabs={[
-              { id: "bulk", label: "Bulk", count: groups.bulk.length },
-              { id: "odd", label: "Odd ones", count: groups.odd.length },
-            ]}
-            value={editing}
-            onChange={setEditing}
-          />
-          {!hasOdd && storedEditing === "odd" && (
-            <p className="mt-2 text-2xs text-theme-muted-foreground">
-              Tick the odd ones out in the gallery to give them their own crop.
-            </p>
-          )}
-        </div>
         {/* Stacked tiles, the same grid as Select → Refine / Selection and
             Edit → Crop's ratios. */}
         <ToolButtonGroup
@@ -471,8 +443,8 @@ export function CropBatchPanel({
         <PanelAction onClick={applyToAll} disabled={running || photos.length === 0}>
           {running
             ? `Processing ${progress.done}/${progress.total}…`
-            : hasOdd
-              ? `Crop ${(["bulk", "odd"] as const)
+            : hasExceptions
+              ? `Crop ${(["main", "exceptions"] as const)
                   .filter((g) => groups[g].length > 0)
                   .map((g) => `${groups[g].length} to ${ratioLabel(cropRatioOf(looks[g]))}`)
                   .join(" · ")}`

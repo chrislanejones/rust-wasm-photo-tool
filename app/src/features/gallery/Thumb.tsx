@@ -44,13 +44,13 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
   // A thumbnail is either a placeholder or the photo — never a gray photo.
   // The object URL, the decode and the grace period all live in the hook.
   const thumb = useThumbImage(entry.thumbBlob);
-  // Batch › Bulk: the checkbox means "odd one out — give this one the other
-  // crop". Same checkbox, same selection; only its name and badge change.
-  const bulkMode = useToolStore((s) => s.activeTool === "emoji" && s.batchMode === "crop");
-  const checkTitle = bulkMode
+  // Batch: the checkbox means "exception — treat this one differently". Same
+  // checkbox, same selection; only its name and badge change.
+  const batchMode = useToolStore((s) => s.activeTool === "emoji");
+  const checkTitle = batchMode
     ? selected
-      ? "Back in the bulk"
-      : "Odd one out — give this photo its own crop"
+      ? "Back to Main"
+      : "Exception — treat this photo differently"
     : selected
       ? "Deselect"
       : "Select";
@@ -182,9 +182,9 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           both bottom corners are Remove and Select. The pill is there so the ↻
           survives a light photo underneath it. `StatusMark` spins only under
           motion-safe, so Reduce Motion gets a still mark rather than nothing. */}
-      {bulkMode && selected && !loading && (
+      {batchMode && selected && !loading && (
         <span className="pointer-events-none absolute top-1 right-1 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-semibold text-on-photo">
-          Odd
+          Exception
         </span>
       )}
 
@@ -290,7 +290,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         // A toggle: a stable name, with aria-pressed saying which way it is.
         // The only name used to be this flipping title.
-        aria-label={bulkMode ? "Odd one out" : "Select image"}
+        aria-label={batchMode ? "Exception" : "Select image"}
         aria-pressed={selected}
         title={checkTitle}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
@@ -328,7 +328,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-on-photo opacity-100"
             : "bg-black/55 border-on-photo/80 text-on-photo/45"
-        } ${selectionActive || bulkMode ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+        } ${selectionActive || batchMode ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>

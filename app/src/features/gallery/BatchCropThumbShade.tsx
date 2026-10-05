@@ -1,4 +1,4 @@
-// Batch › Bulk — the "shadow" on the OTHER photos' gallery thumbnails: the part
+// Batch › Crop — the "shadow" on the OTHER photos' gallery thumbnails: the part
 // Enter / "Crop All" will cut off, shaded, with no frame or handles (those are
 // only on the photo being edited, BatchCropOverlay). It reads the stored frame,
 // which the preview writes on mouse-up, so the shadows move when you let go —
@@ -12,7 +12,8 @@ import {
   anchoredCropRect,
   framedCropRect,
 } from "@/lib/batchCrop";
-import { useBatchCropStore, cropRatioOf, framingFor, groupOf } from "@/stores/useBatchCropStore";
+import { useBatchCropStore, cropRatioOf, framingFor } from "@/stores/useBatchCropStore";
+import { groupOf } from "@/stores/useBatchGroupStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import type { PhotoEntry } from "./GalleryBar";
@@ -31,7 +32,7 @@ export function BatchCropThumbShade({
   cover: boolean;
 }) {
   const on = useToolStore((s) => s.activeTool === "emoji" && s.batchMode === "crop");
-  // Ticked in the gallery = an odd one out, shaded with the ODD group's crop.
+  // Ticked in the gallery = an exception, shaded with the Exceptions crop.
   const group = useGalleryStore((s) => groupOf(s.selectedIds, entry.id));
   const ratioW = useBatchCropStore((s) => cropRatioOf(s.looks[group])[0]);
   const ratioH = useBatchCropStore((s) => cropRatioOf(s.looks[group])[1]);

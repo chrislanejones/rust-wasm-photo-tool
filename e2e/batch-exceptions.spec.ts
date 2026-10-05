@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
-// Batch › Bulk — the odd ones out. Tick a photo's gallery checkbox (or "Odd
-// one out" on the canvas) and it gets the Odd ones crop instead of the bulk's.
-// One pass crops both groups.
+// Batch — Main and Exceptions. Tick a photo's gallery checkbox (or "Exception"
+// on the canvas) and it moves to the Exceptions group. Crop keeps a crop per
+// group and runs both; the other Batch tools run on the group that is showing.
 //
 // checker.png is 256×256 and sky-building.png is 1200×800, so the result is
 // readable off the status bar: 1:1 at 1080 → 1080×1080, 16:9 at 1080 → 1080×608.
@@ -27,8 +27,8 @@ async function blockExternalNetwork(page: Page): Promise<void> {
   });
 }
 
-/** Two photos in, canvas up, Batch → Bulk. Returns once the panel is there. */
-async function openBulk(page: Page): Promise<void> {
+/** Two photos in, canvas up, Batch → `tool`. Returns once the switch is there. */
+async function openBatch(page: Page, tool: string): Promise<void> {
   await blockExternalNetwork(page);
   await page.goto("/");
   const fileInput = page.locator('input[type="file"]').first();
@@ -44,27 +44,27 @@ async function openBulk(page: Page): Promise<void> {
 
   await page.getByRole("button", { name: "Batch", exact: true }).first().click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Bulk", exact: true }).first().click();
+  await page.getByRole("button", { name: tool, exact: true }).first().click();
   await page.waitForTimeout(800);
-  await expect(page.getByRole("tablist", { name: "Which crop you are editing" })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Which photos" })).toBeVisible();
 }
 
-const oddBoxes = (page: Page) => page.getByRole("button", { name: "Odd one out", exact: true });
+const exceptionBoxes = (page: Page) => page.getByRole("button", { name: "Exception", exact: true });
+const tab = (page: Page, name: RegExp) => page.getByRole("radio", { name });
 
-test("a ticked photo gets the odd crop, the rest get the bulk's", async ({ page }) => {
-  await openBulk(page);
+test("Crop: an exception gets its own crop, Main gets the other", async ({ page }) => {
+  await openBatch(page, "Crop");
 
-  // Bulk: 1:1. Nothing ticked yet, so the button still says All.
   await page.getByRole("radio", { name: "1:1", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Crop All Images to 1:1$/ })).toBeVisible();
 
-  // Tick photo 2 in the gallery. Its checkbox is the odd-one-out mark here.
-  await oddBoxes(page).nth(1).click();
-  await expect(oddBoxes(page).nth(1)).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("tab", { name: /Odd ones/ })).toContainText("1");
+  // Tick photo 2 in the gallery.
+  await exceptionBoxes(page).nth(1).click();
+  await expect(exceptionBoxes(page).nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(tab(page, /^Exceptions · 1$/)).toBeVisible();
 
-  // Give the odd ones 16:9. The bulk keeps its 1:1.
-  await page.getByRole("tab", { name: /Odd ones/ }).click();
+  // Exceptions get 16:9. Main keeps its 1:1.
+  await tab(page, /^Exceptions/).click();
   await page.getByRole("radio", { name: "16:9", exact: true }).click();
   const run = page.getByRole("button", { name: "Crop 1 to 1:1 · 1 to 16:9" });
   await expect(run).toBeVisible();
@@ -72,7 +72,6 @@ test("a ticked photo gets the odd crop, the rest get the bulk's", async ({ page 
   await run.click();
   await expect(page.getByText(/Cropped 2 images/).first()).toBeVisible({ timeout: 30_000 });
 
-  // Photo 1 (bulk) is square; photo 2 (odd) is 16:9.
   await page.locator('[aria-label^="Select photo"]').nth(0).click();
   await expect(page.getByText("Photo: 1080×1080")).toBeVisible({ timeout: 30_000 });
   await page.locator('[aria-label^="Select photo"]').nth(1).click();
@@ -80,18 +79,30 @@ test("a ticked photo gets the odd crop, the rest get the bulk's", async ({ page 
 });
 
 test("the canvas checkbox and the gallery checkbox are the same mark", async ({ page }) => {
-  await openBulk(page);
-  const onCanvas = page.getByRole("checkbox", { name: "Odd one out" });
+  await openBatch(page, "Crop");
+  const onCanvas = page.getByRole("checkbox", { name: "Exception" });
   await expect(onCanvas).not.toBeChecked();
 
   await onCanvas.check();
-  // The photo on screen is now odd: one gallery checkbox is pressed, and the
-  // panel shows the Odd ones tab, because that is the crop its frame uses.
-  await expect(page.locator('[aria-label="Odd one out"][aria-pressed="true"]')).toHaveCount(1);
-  await expect(page.getByRole("tab", { name: /Odd ones/ })).toHaveAttribute("aria-selected", "true");
+  // The photo on screen is an exception now: its gallery checkbox is pressed,
+  // and the switch moves to Exceptions, because that is the crop its frame uses.
+  await expect(page.locator('[aria-label="Exception"][aria-pressed="true"]')).toHaveCount(1);
+  await expect(tab(page, /^Exceptions/)).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("group", { name: /^Crop frame, 4:5/ })).toBeVisible();
 
   await onCanvas.uncheck();
-  await expect(page.locator('[aria-label="Odd one out"][aria-pressed="true"]')).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: /Bulk/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('[aria-label="Exception"][aria-pressed="true"]')).toHaveCount(0);
+  await expect(tab(page, /^Main/)).toHaveAttribute("aria-checked", "true");
+});
+
+test("Rename runs on Main and leaves the exception's name alone", async ({ page }) => {
+  await openBatch(page, "Rename");
+  await exceptionBoxes(page).nth(1).click();
+  await expect(tab(page, /^Main · 1$/)).toHaveAttribute("aria-checked", "true");
+
+  await page.getByLabel("Name pattern").fill("slide-{n}");
+  await page.getByRole("button", { name: "Rename 1 image" }).click();
+
+  await expect(page.locator('[aria-label="Select photo slide-1"]')).toHaveCount(1);
+  await expect(page.locator('[aria-label="Select photo sky-building"]')).toHaveCount(1);
 });

@@ -120,10 +120,8 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Directional duplicate pad": CopyPlus,
   "Duplicate from the Reselect row": Copy,
   "Stroke Stabilizer, everywhere": Magnet,
-  // The Batch › Bulk tile, renamed from "Batch Crop" in docs/Features.md.
-  // Without this it renders the fallback dot, which is how the last eight
-  // entries above all did.
-  Bulk: PackageOpen,
+  // Without this the Batch › Crop card renders the fallback dot.
+  "Batch Crop": PackageOpen,
 };
 
 // A DOT, not a square — deliberately. `Square` was the fallback, and "Blank

@@ -1,14 +1,14 @@
-// Batch › Bulk — "Odd one out" for the photo on screen. The same mark as the
-// gallery checkbox on its thumbnail (useGalleryStore.selectedIds), just closer
-// to where you are looking: tick it and this photo gets the Odd ones crop
-// instead of the bulk's. Mounted beside the preview frame by BatchCropOverlay.
+// Batch — "Exception" for the photo on screen, in every Batch tool. The same
+// mark as the gallery checkbox on its thumbnail (useGalleryStore.selectedIds),
+// just closer to where you are looking: tick it and this photo moves to the
+// Exceptions group. Mounted by BatchCropOverlay, which is always on the canvas.
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 
-export function BulkOddCheckbox() {
-  const on = useToolStore((s) => s.activeTool === "emoji" && s.batchMode === "crop");
+export function BatchExceptionCheckbox() {
+  const on = useToolStore((s) => s.activeTool === "emoji");
   const photoId = useGalleryStore((s) => s.activePhotoId);
-  const odd = useGalleryStore((s) => (photoId ? s.selectedIds.has(photoId) : false));
+  const ticked = useGalleryStore((s) => (photoId ? s.selectedIds.has(photoId) : false));
   const setSelectedIds = useGalleryStore((s) => s.setSelectedIds);
   if (!on || !photoId) return null;
 
@@ -23,7 +23,7 @@ export function BulkOddCheckbox() {
     >
       <input
         type="checkbox"
-        checked={odd}
+        checked={ticked}
         onChange={(e) => {
           const tick = e.target.checked;
           setSelectedIds((prev) => {
@@ -35,7 +35,7 @@ export function BulkOddCheckbox() {
         }}
         className="h-4 w-4 cursor-pointer accent-theme-primary"
       />
-      Odd one out
+      Exception
     </label>
   );
 }
