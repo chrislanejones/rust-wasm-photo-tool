@@ -257,7 +257,8 @@ export const CARD_COPY: Record<string, CardCopy> = {
     group: "enhance",
     title: "Adjustments",
     plain: "Brightness, contrast, saturation, shadows, highlights, blur and sharpen.",
-    detail: "Enhance → Adjustments; each adjustment is its own undo snapshot.",
+    detail:
+      "Enhance → Adjustments; each adjustment is its own undo snapshot. Change Brightness, Contrast or Saturation and a dot marks it on this photo, with a reset beside it.",
   },
   Levels: {
     group: "enhance",
@@ -379,7 +380,7 @@ export const CARD_COPY: Record<string, CardCopy> = {
     title: "Multi-photo gallery",
     plain: "Work on many photos at once: add, switch, duplicate, multi-select and export together.",
     detail:
-      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB.",
+      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read.",
   },
   // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
   "Batch Crop": {
