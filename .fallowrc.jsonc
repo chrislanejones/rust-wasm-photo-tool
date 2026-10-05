@@ -13,7 +13,14 @@
     "scripts/*.mjs",
     "scripts/*.js",
     // Produces the op-log fixtures under tests/fixtures/oplog/.
-    "tests/fixtures/**/*.mjs"
+    "tests/fixtures/**/*.mjs",
+    // Spawned by name from gen-trail-data.mjs and prerender.mjs (sitemap
+    // lastmod), never imported.
+    "marketing/scripts/*.mjs",
+    // The DESIGN-SYNC build's entry (.design-sync/config.json), which fallow
+    // does not read because hidden directories are not traversed. ds-shim is
+    // imported by ds-entry.
+    "marketing/src/ds-entry.ts"
   ],
 
   "ignoreExports": [

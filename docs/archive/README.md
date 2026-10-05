@@ -14,6 +14,7 @@ Kept, not deleted. Everything here was accurate when it was written and is not a
 | [toolbar-migration-map.md](toolbar-migration-map.md) | 2026-08-04 | Working map for the five-group toolbar migration, shipped across v7.51–v7.53. |
 | [Tool-Arc-Plan.md](Tool-Arc-Plan.md) | 2026-08-04 | Planning doc for the tool-registry arc. |
 | [vector-tool-verdict-2026-08-01.md](vector-tool-verdict-2026-08-01.md) | 2026-08-04 | The merge-or-delete verdict on `feat/vector-tool`. Still the best worked example in this repo of deciding a decaying branch with measurements rather than vibes. The branch was deleted and preserved as the annotated tag `abandoned/vector-tool` on both remotes — see its Outcome section. |
+| [FINDINGS-oplog-and-text-0919.md](FINDINGS-oplog-and-text-0919.md) | 10-05-2026 | The 09-19 overnight diagnosis of "a text edit loses its settings after a reload", plus the v7/v8 op-log fixture capture. It stopped at a format decision and left red tests behind for an attended session. That session happened: ADR-060 records the decision and #195 shipped the repair, so the red tests are green and its "next session" list is done. Still the best account of why the archive allowlist alone could not fix the bug. Moved from the repo root. |
 
 ## Two files that were merged rather than archived
 

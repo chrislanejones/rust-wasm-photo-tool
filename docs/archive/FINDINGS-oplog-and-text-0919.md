@@ -1,5 +1,7 @@
 # Op-log fixtures + the text-settings bug — 2026-09-19/20 overnight
 
+> **ARCHIVED 10-05-2026.** An overnight diagnosis that stopped at a format decision on purpose. That decision is recorded in ADR-060 and shipped in #195 (`c24d8dca`): the red rows in `oplog_v8_text_settings_replay` and `textBoxSurvivesReload.test.ts` are green and now pin the repair. §5 ("consequences of leaving red tests") and §6 ("what the next session should pick up") describe a state that no longer exists. Moved from the repo root.
+
 Branch `test/oplog-v8-fixtures`, worktree `~/ai-repo/oplog-fixtures`.
 Two jobs: capture v7/v8 op-log bytes while v8 is still what ships, and
 reproduce + diagnose (not fix) "text edits lose settings after a reload".

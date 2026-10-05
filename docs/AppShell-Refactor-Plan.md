@@ -333,8 +333,9 @@ document; the rest are the queue, cheapest first.
   test `convex/`; `lib/autosaveDelay.test.ts`, `lib/dirtyRule.test.ts` test
   `useImageSession`; `hooks/cloudPhotosAllowed.test.ts` tests
   `useEditPersistence`; `lib/exif.test.ts` belongs in `lib/exif/`.
-- `FINDINGS-oplog-and-text-0919.md` sits at the repo root → `docs/archive/`
-  (update the citation in `lib/textBoxSurvivesReload.test.ts`).
+- ~~`FINDINGS-oplog-and-text-0919.md` sits at the repo root → `docs/archive/`~~
+  **Moved 10-05-2026.** The citations in `lib/textBoxSurvivesReload.test.ts`
+  and the root `Cargo.toml` still name it without a path.
 - `docs/File-Map.md` covers 75 of 332 non-test files (none of `app/session/`,
   `lib/engine`, `lib/sync`, four of six stores). Regenerate it from the tree
   or shrink it to directory level; a hand-kept file map of 332 files will
