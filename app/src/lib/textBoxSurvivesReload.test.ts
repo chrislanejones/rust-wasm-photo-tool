@@ -10,7 +10,7 @@
 //   two lines, press Enter, reload, click "Resume editing"
 //     → the text came back on ONE unwrapped line, running off the canvas.
 //
-// Screenshots and the raw IndexedDB dumps are in FINDINGS-oplog-and-text-0919.md.
+// Screenshots and the raw IndexedDB dumps are in docs/archive/FINDINGS-oplog-and-text-0919.md.
 //
 // ── WHY THE EXISTING GUARD DID NOT CATCH IT ─────────────────────────────────
 //

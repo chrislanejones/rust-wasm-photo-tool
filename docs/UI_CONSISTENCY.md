@@ -150,7 +150,7 @@ Import these. Do not re-implement them.
 | Independent toggles | `ui/toggle-button-group` |
 | Tool mode switch | `ui/tool-mode-toggle` (wraps `tool-button-group`) |
 | Overlay tabs | `ui/segmented-tabs` |
-| Cards as a radio group | `ui/radio-cards` |
+| Cards as a radio group | none — `ui/radio-cards` lost its last caller and was deleted 10-05-2026 (fallow: unused file) |
 | On/off switch | `ui/switch` |
 | Modal | `ui/dialog` |
 | Confirm | `ui/confirm-dialog` |
@@ -175,9 +175,9 @@ retired, which was already decided and is tracked in `PARKING_LOT.md`.
 **Which segmented control survives?** `tool-button-group`. It has 15
 importers, 29 call sites, the clearest contract of the family (SELECT / ACTION
 / TOGGLE, each written down) and the only `aria-pressed` in the group.
-`tool-mode-toggle` wraps it and stays. `segmented-tabs` (`role="tab"`) and
-`radio-cards` (native inputs) are different controls doing different jobs
-correctly, and stay.
+`tool-mode-toggle` wraps it and stays. `segmented-tabs` (`role="tab"`) is a
+different control doing a different job correctly, and stays. (`radio-cards`
+stayed too, until its one caller went; it was deleted 10-05-2026.)
 
 Surviving is not the same as being right. `tool-button-group` emits
 `aria-pressed` for TOGGLE tiles **and deliberately for no others**, so that a
