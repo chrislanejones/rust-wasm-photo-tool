@@ -2,7 +2,7 @@
 // selected pane on the right). General (app preferences), Plan & Billing (Stripe
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 // Through lib/cloud, not convex/react: a keyless build must render this.
 import { useCloudAction as useAction, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
 import { toast } from "sonner";
@@ -214,6 +214,14 @@ export function SubscriptionButton({
   const setMyTier = useMutation(api.users.setMyTier);
   const [granting, setGranting] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  // Mirrors `restoreConfirmOpen` for Settings' onEscapeKeyDown, which must
+  // know about the confirm at the moment of the keypress (see below). It lags
+  // by one commit on purpose: if the confirm closes itself on the same press,
+  // Settings still sees "open" and does not close too.
+  const restoreConfirmOpenRef = useRef(false);
+  useEffect(() => {
+    restoreConfirmOpenRef.current = restoreConfirmOpen;
+  }, [restoreConfirmOpen]);
 
   const handleApplyTier = async () => {
     if (!superUser) return;
@@ -283,6 +291,16 @@ export function SubscriptionButton({
           aria-describedby={undefined}
           className="z-[var(--z-modal)] flex h-[80vh] flex-col"
           overlayClassName="z-[var(--z-modal)]"
+          onEscapeKeyDown={(e) => {
+            // Route Escape explicitly while the confirm is open: it closes the
+            // CONFIRM and Settings stays. Being in Radix's layer stack was not
+            // enough on its own — e2e/settings-restore-confirm.spec.ts pressed a
+            // real Escape and the confirm stayed open (QC F1, #234).
+            if (restoreConfirmOpenRef.current) {
+              e.preventDefault();
+              setRestoreConfirmOpen(false);
+            }
+          }}
         >
           <DialogHeader className="px-4 py-2.5">
             <DialogTitle className={WINDOW_TITLE}>

@@ -4,6 +4,20 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — five main-suite e2e specs are red on master (10-05-2026)
+
+Found running the full main suite (104 tests) for v9.16. All five fail the same
+way on master `c13e8622`, so they predate v9.16. The main suite is not in CI,
+which is how they went unnoticed.
+
+| Spec | Failure |
+| --- | --- |
+| `phone-grid-thumbs.spec.ts:67` | `.grid.grid-cols-3` matches 2 elements (strict mode) |
+| `phone-grid-thumbs.spec.ts:108` | "the grid announces once" — 2 busy regions, expected 1 |
+| `plugins.spec.ts:66` | click times out after the format appears in Download |
+| `select-refine-mask.spec.ts:124` | Refine preview changes fewer pixels than the threshold (92,778 vs > 94,380) |
+| `ui-night3-panels.spec.ts:110` | Eraser stabilizer summary element not found |
+
 ## OPEN — two tables whose files the app never deletes (09-25-2026)
 
 Found while surveying file-owning tables for the test-account wipe

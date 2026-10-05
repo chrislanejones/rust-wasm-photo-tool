@@ -54,7 +54,8 @@ test("Restore settings: Cancel and Escape back out, Restore restores", async ({ 
   const restoreSettings = page.getByRole("button", { name: "Restore Settings" });
   const confirm = page.getByRole("dialog", { name: /Restore settings/ });
 
-  await page.getByRole("button", { name: "Keep EXIF" }).first().click(); // off the default
+  // A select-mode ToggleButtonGroup: its options are radios, not buttons.
+  await page.getByRole("radio", { name: "Keep EXIF" }).first().click(); // off the default
   await expect(apply).toBeEnabled();
 
   // Cancel
