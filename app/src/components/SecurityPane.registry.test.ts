@@ -83,19 +83,19 @@ describe("Security renders the network registry", () => {
     }
   });
 
-  it("share links are disclosed as NOT covered by the switch", () => {
-    // The one that matters most: a share link uploads a flattened photo, and
-    // until QC F2 lands it ignores the switch. The page must say so.
+  it("share links are listed under what the switch turns on (QC F2)", () => {
+    // A share link uploads a flattened photo. Since QC F2 (#234) it obeys the
+    // switch, so it belongs in the switched list and not the unswitched one.
     render();
-    const off = items("security-unswitched").find((li) => li.dataset.path === "share_links");
-    expect(off).toBeTruthy();
-    expect(off?.textContent).toMatch(/signed in/i);
+    expect(items("security-switched").some((li) => li.dataset.path === "share_links")).toBe(true);
+    expect(items("security-unswitched").some((li) => li.dataset.path === "share_links")).toBe(false);
   });
 
-  it("the headline no longer promises photos 'never leave this tab'", () => {
-    // It was false: a share link ignores the switch. It now names the exception.
+  it("the headline makes no share-link exception any more", () => {
+    // Before QC F2 a share link ignored the switch and the headline named that
+    // exception. Share links obey the switch now, so the exception is gone.
     render();
-    expect(container.textContent).not.toContain("never leave this tab");
-    expect(container.textContent).toMatch(/unless you make\s+a share link/);
+    expect(container.textContent).toMatch(/your photos stay in this tab\./);
+    expect(container.textContent).not.toMatch(/unless you make\s+a share link/);
   });
 });

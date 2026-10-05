@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
 // Skeleton plan §1–§3, §5: the Tools card names its photo and cues every

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import Footer from "./Footer";
 import OraFaq from "./OraFaq";
 import OraViewer, { type OraViewerMode } from "./OraViewer";

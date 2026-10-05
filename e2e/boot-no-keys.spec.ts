@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 
 // A build with NO env vars (no Convex URL, no Clerk key) must still boot.
 //

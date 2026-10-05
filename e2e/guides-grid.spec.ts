@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
 // Chris, 10-01-2026: "make these buttons two on one row and two on the next —

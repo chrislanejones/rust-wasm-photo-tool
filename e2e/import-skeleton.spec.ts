@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./guard/test";
 import { join } from "node:path";
 
 // Plan A §5 — a photo import shows a skeleton tile for each file still being

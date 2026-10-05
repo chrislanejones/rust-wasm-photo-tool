@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import Footer from "../components/Footer";
 import { PAGES } from "../config";
 

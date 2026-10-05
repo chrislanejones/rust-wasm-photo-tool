@@ -73,8 +73,7 @@ export function SecurityPane({
             Everything in your browser
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Off — the default — your photos stay in this tab unless you make
-            a share link (see below). Opening,
+            Off — the default — your photos stay in this tab. Opening,
             editing, compressing and exporting all run on your own machine in
             WebAssembly, and your images, edits and gallery are stored in this
             browser. On adds the features whose job is to send something out.

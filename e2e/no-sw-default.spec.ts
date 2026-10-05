@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The service worker ships DARK (ADR-019): this harness builds WITHOUT

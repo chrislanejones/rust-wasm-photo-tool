@@ -8,6 +8,10 @@
 // (marketing/src/sections/Pricing.tsx). The gallery photo cap ALSO lives in
 // Rust (`photo_limit` in src/lib.rs) for the WASM layer — keep the two in sync;
 // `galleryLimit` here must equal what `photo_limit` returns.
+// The storage caps are the SERVER's numbers — convex/storageQuota.ts enforces
+// them from this same table, so the matrix and the refusal cannot disagree.
+import { formatBytes, STORAGE_QUOTA_BYTES } from "../../../convex/entitlement";
+
 /** Tier of the current user. Defined here — the tier table is the thing that
  *  gives the three values their meaning — and re-exported from
  *  `components/StatusBar` where it used to live, so no importer changed. */
@@ -34,9 +38,6 @@ interface TierConfig {
   replicateAI: boolean;
 }
 
-const MB = 1024 * 1024;
-const GB = 1024 * MB;
-
 export const TIERS: Record<UserMode, TierConfig> = {
   demo: {
     label: "No Login",
@@ -62,8 +63,8 @@ export const TIERS: Record<UserMode, TierConfig> = {
     label: "Logged In",
     tag: "free",
     galleryLimit: 24,
-    storageQuotaBytes: 100 * MB,
-    storageLabel: "100 MB",
+    storageQuotaBytes: STORAGE_QUOTA_BYTES.free,
+    storageLabel: formatBytes(STORAGE_QUOTA_BYTES.free),
     layersPerImage: 8,
     layersShort: "8",
     layersLabel: "8 per image",
@@ -73,8 +74,8 @@ export const TIERS: Record<UserMode, TierConfig> = {
     label: "Paid",
     tag: "$10/mo",
     galleryLimit: 100,
-    storageQuotaBytes: 5 * GB,
-    storageLabel: "5 GB",
+    storageQuotaBytes: STORAGE_QUOTA_BYTES.paid,
+    storageLabel: formatBytes(STORAGE_QUOTA_BYTES.paid),
     // 16, NOT Infinity (changed 2026-08-18). Unlimited was never really
     // unlimited: an .ora export holds every layer's pixels at once, and wasm
     // memory never shrinks, so the tail of that promise landed on the paying

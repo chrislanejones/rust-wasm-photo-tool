@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { NextCard } from "../data/nextCards";
 
 /* The "Next" card grid that closes every page.

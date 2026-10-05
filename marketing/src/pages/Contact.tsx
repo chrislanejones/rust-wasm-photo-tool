@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import Footer from "../components/Footer";
 import { CODEBERG_URL, EDITOR_URL, GITHUB_URL, WEB3FORMS_KEY, external } from "../config";
 

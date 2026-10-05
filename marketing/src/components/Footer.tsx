@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { GITHUB_URL, CODEBERG_URL, PAGES, LEGAL_PAGES, external, repoFile } from "../config";
 import { CodebergIcon, GitHubIcon } from "./Icons";
 import HorseTrot from "./HorseTrot";

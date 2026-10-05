@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router";
 import Nav from "./components/Nav";
 import NajiBanner from "./components/NajiBanner";
 import useHead from "./useHead";

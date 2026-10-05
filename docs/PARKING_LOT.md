@@ -4,6 +4,57 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — five main-suite e2e specs are red on master (10-05-2026)
+
+Found running the full main suite (104 tests) for v9.16. All five fail the same
+way on master `c13e8622`, so they predate v9.16. The main suite is not in CI,
+which is how they went unnoticed.
+
+| Spec | Failure |
+| --- | --- |
+| `phone-grid-thumbs.spec.ts:67` | `.grid.grid-cols-3` matches 2 elements (strict mode) |
+| `phone-grid-thumbs.spec.ts:108` | "the grid announces once" — 2 busy regions, expected 1 |
+| `plugins.spec.ts:66` | click times out after the format appears in Download |
+| `select-refine-mask.spec.ts:124` | Refine preview changes fewer pixels than the threshold (92,778 vs > 94,380) |
+| `ui-night3-panels.spec.ts:110` | Eraser stabilizer summary element not found |
+
+## OPEN — two tables whose files the app never deletes (09-25-2026)
+
+Found while surveying file-owning tables for the test-account wipe
+(`feat/retention-phase0`). Not fixed there; the wipe handles both for the test
+account only.
+
+| Table | What happens | Effect |
+| --- | --- | --- |
+| `images` | `images.remove` deletes the ROW and never `storageId`'s file | Any file an `images` row owned becomes an orphan on Remove. The table looks unused by the editor today (`aiJobs.ts` calls it "the unused `images` table"), so this may be zero bytes; measure before fixing. |
+| `ai_jobs` | Nothing ever deletes a job, so its input, mask and output frames stay forever | Every AI run keeps up to 3 files. A retention rule for jobs is owed (Phase 1). |
+
+## OPEN — storage leaks the orphan sweep will mop up but does not fix (09-24-2026)
+
+Found on `fix/orphan-storage-and-quota`, which adds the server-side sweep
+(`convex/storageSweep.ts`, dry run by default, NOT scheduled) and the storage
+quota. These are the holes that feed the sweep, left out of that diff:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch` | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
+| `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
+| The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
+| `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
+| CI's Convex "typecheck" is vacuous | `.github/workflows/*.yml` `convex` job | `convex codegen` prints "No `tsc` binary found, so skipping typecheck" — `typescript` is an app-level dep, the root has none. Local stand-in: `pnpm -C app exec tsc --noEmit -p ../convex/tsconfig.json` (11 known `process` false positives). |
+| Eight tables exist on brave-ant-608 that `schema.ts` does not declare | `authAccounts`, `authRateLimits`, `authRefreshTokens`, `authSessions`, `authVerificationCodes`, `authVerifiers`, `userProfiles`, `session_edits` | All empty and unwritten by any function; the sweep walks declared tables only. Harmless while empty. |
+
+## OPEN — three stale backend descriptions left after the dead-table removal (09-24-2026)
+
+Found while deleting `projects`/`images`/`layers`/`annotations`/`history`
+(branch `chore/delete-dead-backend`). Left out of that diff on purpose:
+
+| What | Where | Effect |
+| --- | --- | --- |
+| "`crons.ts` — scheduled cleanup" | `convex/README.md` Functions list | `crons.ts` registers NO jobs. The line describes cleanup that does not exist (see the orphaned-storage finding). |
+| Tables list lacks `sync_docs` and `share_views` | `convex/README.md` Tables section | README lists 7 of the 9 tables in `convex/schema.ts`. |
+| Comment names a "Convex `images` row" as the future upload target | `app/src/components/StoragePane.tsx:6` | That table no longer exists. The pipeline it describes was never built; reword when it is designed. |
+
 ## FIXED 09-30-2026 — fast photo switching showed one photo while another was selected
 
 Fixed on `fix/photo-switch-load-token`. Two causes, both needed (30 runs each of

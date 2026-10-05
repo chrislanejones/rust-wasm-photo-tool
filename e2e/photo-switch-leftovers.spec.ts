@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page, Locator } from "@playwright/test";
 import { join } from "node:path";
 
 // Per-photo state must not survive a photo switch. Two photos; make a
