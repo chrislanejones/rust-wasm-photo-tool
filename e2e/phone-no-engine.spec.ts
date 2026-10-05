@@ -83,7 +83,9 @@ test("above 600px the editor boots as it always has", async ({ page }) => {
   await page.goto("/");
   await addPhotos(page, FIXTURES);
   await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 30_000 });
-  expect(engine.length).toBeGreaterThan(0);
+  // Polled, not read once: a visible canvas does not mean the engine request
+  // has gone out yet (the race that turned PR #294's CI red next door).
+  await expect.poll(() => engine.length, { timeout: 30_000 }).toBeGreaterThan(0);
 });
 
 test("widening 390 → 1280 loads the engine and puts the photo in the editor", async ({ page }) => {
@@ -98,13 +100,17 @@ test("widening 390 → 1280 loads the engine and puts the photo in the editor", 
 
   await page.setViewportSize(DESKTOP);
   await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 30_000 });
+  // Wait for the engine REQUEST, not a canvas size: an unsized <canvas> is
+  // 300×150 by default, so "width × height > 0" passed before the engine was
+  // even asked for and the assertion after it raced (red on PR #294's CI).
+  await expect.poll(() => engine.length, { timeout: 30_000 }).toBeGreaterThan(0);
+  // …and the photo really is in the editor: a canvas sized to it, not 300×150.
   await expect
     .poll(() => page.evaluate(() => {
       const c = document.querySelector<HTMLCanvasElement>("canvas.main-canvas");
-      return c ? c.width * c.height : 0;
+      return c ? `${c.width}x${c.height}` : "none";
     }), { timeout: 30_000 })
-    .toBeGreaterThan(0);
-  expect(engine.length).toBeGreaterThan(0);
+    .not.toMatch(/^(none|300x150|0x0)$/);
 });
 
 test("demo mode (logged out) boots at both widths", async ({ page }) => {
