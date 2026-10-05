@@ -16,6 +16,7 @@ import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import { cornerDelta } from "@/lib/aspectLock";
 import { CompareSlider } from "./CompareSlider";
+import { SwitchLoadingVeil } from "./SwitchLoadingVeil";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
@@ -839,7 +840,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     );
 
 
-
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -1102,7 +1102,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         )}
 
         <CompareSlider canvasEl={canvasRef.current} toolRef={hookResult.toolRef} revision={hookResult.state.undoCount} />
-
+        <SwitchLoadingVeil />
         {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}
         {(lassoCommitted || lassoPreview) && (
           <LassoOverlay

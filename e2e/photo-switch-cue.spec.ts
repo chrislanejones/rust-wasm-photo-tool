@@ -186,3 +186,17 @@ test("C6 reduced motion: the cue holds a static tint, the skeleton does not shim
   expect(shimmer, "no shimmer under reduced motion").toBe("none");
 });
 
+
+test("C7 a slow switch dims the canvas and names the photo it is loading, then clears", async ({ page }) => {
+  await setup(page);
+  const veil = page.getByTestId("switch-loading-veil");
+  await expect(veil).toHaveCount(0);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+  await pgDn(page);
+  // The OLD photo is still drawn underneath; the veil says which one is coming.
+  await expect(veil).toHaveText(/Loading sky-building/, { timeout: 60_000 });
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  await expect(veil).toHaveCount(0, { timeout: 60_000 });
+  await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
+});
