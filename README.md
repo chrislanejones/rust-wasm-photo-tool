@@ -86,32 +86,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.14 — 2026-10-05
+### v9.15 — 2026-10-05
 
-**Round corners on any shape, two new things to try in Beta, and Auto Compress stops making files bigger.**
+**The contact form sends your message itself now.**
 
-Rectangles, diamonds, triangles and stars can have rounded corners now. Drag
-the Corner radius slider to round them all, or drag a corner dot on the shape's
-edit box; hold Shift to round just that corner. Sketchy shapes keep their
-wobble around the curve, and the rounding survives a reload, a duplicate and a
-resize.
+Before this, the form at imagehorse.app/contact handed your message to your
+own mail app — and if you didn't have one set up, which is most people on
+Windows or webmail, it went nowhere. It now goes straight to my inbox, and if
+that ever fails it says so and offers the email address instead.
 
-Settings › Beta has two new switches. **Photo info, handled by the engine**
-reads, strips and keeps your photos' camera info with the Rust engine, checks
-it against the old way on every photo, and keeps the old result if they ever
-disagree. **PageSpeed budget** measures each photo against the size Google
-actually allows for it — bytes per pixel — instead of the old made-up score.
-Both are off unless you switch them on, and the In the Works page links
-straight to each one.
+The site's footer says where it's made: Made with ♥ from Florida.
 
-For everyone: Auto Compress no longer writes a compressed file back over your
-original when the "compressed" one came out bigger, the Quality slider moves
-both ways again, and Quality and Method say when they can't do anything.
-Under the hood, vite, Tailwind and zustand are up to date.
-
-Engine 829,721 → 854,542 bytes: the EXIF module, the old scorer kept for the
-Beta switch, and corner radius. The saved edit format moves to v11; older
-saves still open.
+Under the hood, every `npx` in the docs and configs is `pnpm exec` now.
 
 
 ## License

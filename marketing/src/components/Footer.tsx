@@ -102,7 +102,11 @@ export default function Footer({ line, horse = false }: FooterProps) {
       </div>
 
       <p className="sfoot__legal">
-        &copy; {YEAR} Chris Lane Jones. The source code is{" "}
+        &copy; {YEAR} Chris Lane Jones. Made with{" "}
+        <span role="img" aria-label="love">
+          ♥
+        </span>{" "}
+        from Florida. The source code is{" "}
         <a href={repoFile("LICENSE")} {...external}>
           MIT licensed
         </a>

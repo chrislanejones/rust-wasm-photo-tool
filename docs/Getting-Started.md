@@ -28,7 +28,7 @@ pnpm dev:marketing     # → pnpm --filter photo-horse-marketing dev
 
 ```bash
 # In a separate terminal from the app/ directory
-npx convex dev
+pnpm exec convex dev
 ```
 
 Set up `app/.env.local` (never committed — see `.gitignore`):

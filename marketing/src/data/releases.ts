@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.15",
+    date: "2026-10-05",
+    headline: "The contact form sends your message itself now.",
+    entries: [
+      { tag: "fix", text: "The contact form used to hand your message to your own mail app — and if you didn't have one set up, it went nowhere. It now goes straight to my inbox, and says so if it can't." },
+      { tag: "ui", text: "The footer says where it's made: Made with ♥ from Florida." },
+      { tag: "infra", text: "Every npx in the docs and configs is pnpm exec now." },
+    ],
+  },
+  {
     version: "v9.14",
     date: "2026-10-05",
     headline: "Round corners on any shape, two new things to try in Beta, and Auto Compress stops making files bigger.",

@@ -11315,3 +11315,13 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **829,721 → 854,542 B** (+24,821): the EXIF module (+11,670), the old scorer kept for switch-off (+721), corner radius (+12,430). |
 | **Gates** | Per PR: tsc 0, lint 0 errors / 56 warnings, unit 1,672, guardrails OK, cargo test 620+, CI 17 pass on each of #296–#299 (45 e2e in the CI step). |
 
+## v9.15 Change Summary — 2026-10-05
+
+**The contact form sends your message itself now.** Marketing and docs only — no app or engine change.
+
+| Area | Change |
+| --- | --- |
+| **Contact form** | The live build had no Web3Forms key, so Vite dropped the POST branch and "Send" only opened a `mailto:` — nothing arrived from a visitor without a mail app. The key is now set on `image-horse-marketing` as `WEB3FORMS_KEY` (no `VITE_` prefix: Vercel will not store a `VITE_` Secret), and `vite.config.ts` stamps it in with a `define` (`__WEB3FORMS_KEY__`). `config.ts` reads it through a `typeof` guard for the design-sync bundle, which esbuild builds without Vite's defines. Proven by building with a dummy key (key + `api.web3forms.com` in the Contact chunk) and without one (neither — same as before). |
+| **Footer** | "Made with ♥ from Florida." between the copyright and the MIT line; the heart is `role="img"` with `aria-label="love"`. |
+| **pnpm** | Every live `npx` → `pnpm exec`: convex/README, Getting-Started, two open PARKING_LOT items, the CI codegen-drift error text, and comments in `convex/users.ts`, `eslint.config.compiler.mjs`, `playwright.config.ts`. History (this file, ADR-020), Convex's own error string in a test, and `convex/_generated` keep theirs. |
+| **Gates** | marketing tsc 0, lint 0 errors, guardrails OK, marketing build OK. |

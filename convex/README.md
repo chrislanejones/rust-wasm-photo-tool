@@ -36,12 +36,12 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 Read **`_generated/ai/guidelines.md` first** — it overrides general Convex knowledge with the rules this deployment actually follows.
 
 ```bash
-npx convex dev          # watch + push to your dev deployment
-npx convex dev --once   # push once
-npx convex codegen      # regenerate _generated/ (CI checks this for drift)
+pnpm exec convex dev          # watch + push to your dev deployment
+pnpm exec convex dev --once   # push once
+pnpm exec convex codegen      # regenerate _generated/ (CI checks this for drift)
 ```
 
-⚠️ **Never run `npx convex env list` — it prints every secret in the deployment to your terminal.** Use `npx convex env get <NAME>` for a single value. This has already caused one credential exposure.
+⚠️ **Never run `pnpm exec convex env list` — it prints every secret in the deployment to your terminal.** Use `pnpm exec convex env get <NAME>` for a single value. This has already caused one credential exposure.
 
 ⚠️ **`convex deploy` targets a different deployment than the one production talks to.** Confirm which deployment you are pointed at before running it; the prod app and local dev do not share a Clerk instance either, so "signed in locally" proves nothing about prod.
 

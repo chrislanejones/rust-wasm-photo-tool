@@ -151,7 +151,7 @@ export const saveSettings = mutation({
 });
 
 /** DEV/ADMIN: set a user's tier by email. internalMutation -> NOT callable
- *  from the client; only via `npx convex run users:devGrantTier`. */
+ *  from the client; only via `pnpm exec convex run users:devGrantTier`. */
 export const devGrantTier = internalMutation({
   args: {
     email: v.string(),

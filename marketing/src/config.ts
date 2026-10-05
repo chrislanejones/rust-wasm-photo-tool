@@ -8,8 +8,11 @@ export const EDITOR_URL = APP_URL;
  *  a form deliver to the inbox it was created for, and it ships in the page
  *  either way. Empty means the form falls back to opening the reader's mail app
  *  (the pre-Web3Forms behavior). Set it on the Vercel marketing project as
- *  VITE_WEB3FORMS_KEY; it is read at build time. */
-export const WEB3FORMS_KEY: string = import.meta.env.VITE_WEB3FORMS_KEY ?? "";
+ *  WEB3FORMS_KEY (no `VITE_` prefix: the dashboard will not store a `VITE_`
+ *  Secret); vite.config.ts stamps it in at build time. The `typeof` guard is for
+ *  the design-sync bundle, which esbuild builds without Vite's defines. */
+export const WEB3FORMS_KEY: string =
+  typeof __WEB3FORMS_KEY__ === "string" ? __WEB3FORMS_KEY__ : "";
 
 export const GITHUB_URL = "https://github.com/chrislanejones/rust-wasm-photo-tool";
 export const CODEBERG_URL = "https://codeberg.org/chrislanejones/rust-wasm-photo-tool";

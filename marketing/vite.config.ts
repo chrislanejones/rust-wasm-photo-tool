@@ -57,6 +57,11 @@ export default defineConfig({
     // The footer's copyright year. Stamped once per build so the client and
     // SSR bundles (built by the same `pnpm build`) print the same year.
     __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
+    // The contact form's Web3Forms key, read from the UNPREFIXED name. Vercel's
+    // dashboard refuses a `VITE_` variable stored as a Secret ("public prefixes
+    // expose values to the browser"), and this key is public by design anyway
+    // (see config.ts), so the build reads `WEB3FORMS_KEY` and stamps it in.
+    __WEB3FORMS_KEY__: JSON.stringify(process.env.WEB3FORMS_KEY ?? process.env.VITE_WEB3FORMS_KEY ?? ""),
   },
   resolve: {
     alias: {

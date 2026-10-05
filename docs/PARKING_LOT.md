@@ -2863,7 +2863,7 @@ ever been written to it.
   `images` table, defaults `dryRun: true`, batches at 200, and REFUSES outright
   if the reference scan returns zero against non-empty storage — that is a
   failed scan, not a clean sweep, and proceeding would delete everything.
-  Push with `npx convex dev --once`, NOT `convex deploy`.
+  Push with `pnpm exec convex dev --once`, NOT `convex deploy`.
 
 ## Phase 1a — scalar mirror (2026-08-05, `refactor/scalar-mirror`) — STOPPED
 
@@ -2940,7 +2940,7 @@ ever been written to it.
 - **⚠️ DEPLOYMENT ORDER — `discardFailedUpload` is NOT on `brave-ant-608` yet.**
   Verified against `functionSpec`; `convex codegen` generated bindings but
   pushed nothing. Push the Convex function BEFORE or WITH the client
-  (`npx convex dev --once`, not `convex deploy`). Shipping the client alone is
+  (`pnpm exec convex dev --once`, not `convex deploy`). Shipping the client alone is
   not dangerous — the call sits inside the swallowing catch — but it collects
   nothing until the function exists.
 - **OPEN — the 3.45 GB pile is already gone**, cleared during the outage, so

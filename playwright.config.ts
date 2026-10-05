@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // the original v7.12 harness was removed in the v7.14 repo cleanup — this
 // config restores only what e2e/oplog-canvas-restore.spec.ts needs). Runs
 // against the PRODUCTION build served by `vite preview` (the same surface QC
-// targets). One command — `npx playwright test` — builds nothing but boots the
+// targets). One command — `pnpm exec playwright test` — builds nothing but boots the
 // preview server via `webServer` below, so the gate is self-contained.
 //
 // Port 4310+ per session rules (4200 is the user's own dev port).
@@ -54,7 +54,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Build (with the demo env baked in) then serve — makes `npx playwright test`
+    // Build (with the demo env baked in) then serve — makes `pnpm exec playwright test`
     // a single self-contained gate that produces a bootable production surface.
     command: `${DEMO_ENV} pnpm run build && pnpm --filter stamp-tool exec vite preview --port ${PORT} --strictPort`,
     url: BASE_URL,

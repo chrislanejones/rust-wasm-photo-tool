@@ -204,7 +204,7 @@ jobs:
         run: |
           pnpm exec convex codegen
           git diff --exit-code convex/_generated \
-            || { echo "::error::convex/_generated is stale — run 'npx convex codegen' and commit"; exit 1; }
+            || { echo "::error::convex/_generated is stale — run 'pnpm exec convex codegen' and commit"; exit 1; }
       - name: Skipped (no CONVEX_DEPLOY_KEY)
         if: env.CONVEX_DEPLOY_KEY == ''
         run: echo "Skipping Convex checks — add the CONVEX_DEPLOY_KEY repo secret to enable."
