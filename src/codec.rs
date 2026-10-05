@@ -25,14 +25,20 @@ pub fn export_png(buf: &ImageBuffer) -> Vec<u8> {
 /// only work here is expanding every other color type up to 4 channels.
 /// Returns `(pixels, width, height)`.
 pub fn decode_png(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), png::DecodingError> {
-    let mut decoder = png::Decoder::new(bytes);
+    // png 0.18 reads through `BufRead + Seek`; a Cursor over the slice is both.
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     // EXPAND resolves palette/tRNS/sub-8-bit-grayscale up to plain 8-bit
     // channels; STRIP_16 folds 16-bit samples down to 8. After this, the only
     // color types `next_frame` can report are Grayscale, GrayscaleAlpha, Rgb,
     // Rgba — never Indexed.
     decoder.set_transformations(png::Transformations::normalize_to_color8());
     let mut reader = decoder.read_info()?;
-    let mut buf = vec![0u8; reader.output_buffer_size()];
+    // None when width × height × channels would overflow usize: refuse it as
+    // a decode error instead of panicking on an impossible allocation.
+    let size = reader
+        .output_buffer_size()
+        .ok_or(png::DecodingError::LimitsExceeded)?;
+    let mut buf = vec![0u8; size];
     let info = reader.next_frame(&mut buf)?;
     buf.truncate(info.buffer_size());
     let rgba = to_straight_rgba8(&buf, info.width, info.height, info.color_type);

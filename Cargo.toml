@@ -47,7 +47,7 @@ patchmatch = []
 
 [dependencies]
 wasm-bindgen = "0.2.108"
-png = "0.17"
+png = "0.18"
 ab_glyph = "0.2"
 # Routes Rust panics to console.error with a readable message + stack instead of
 # the opaque "unreachable executed" RuntimeError. Installed once on module init
@@ -67,7 +67,7 @@ rayon = { version = "1.12", optional = true }
 wasm-bindgen-rayon = { version = "1.3", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.5", default-features = false }
+criterion = { version = "0.8", default-features = false }
 
 [[bench]]
 name = "tiles"
