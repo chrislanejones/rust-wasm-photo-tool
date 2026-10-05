@@ -8,6 +8,7 @@
 // handleDuplicateSelected + selectedIds/clearSelection) intentionally stay in
 // AppShell — see PARKING_LOT.md. `loadPhotoFromEntry` + `activeIdRef` are
 // returned because the AppShell-resident handleDeleteSelected still uses them.
+import { beginPendingImports, reportSwitchFailure } from "./sessionFeedback";
 import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -466,16 +467,8 @@ export function useImageSession({
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
 
-      // A skeleton tile per accepted file until it lands (Plan A §5), so a
-      // large import is visibly arriving instead of the gallery sitting still.
-      const pendingFor = accepted.map((f) => ({
-        id: `import-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: f.name,
-      }));
-      const { setPendingImports } = useGalleryStore.getState();
-      setPendingImports((prev) => [...prev, ...pendingFor]);
-      const settle = (i: number) =>
-        setPendingImports((prev) => prev.filter((p) => p.id !== pendingFor[i]!.id));
+      // A skeleton tile per accepted file until it lands (Plan A §5).
+      const settle = beginPendingImports(accepted);
 
       let firstLoaded = false;
       for (const [index, raw] of accepted.entries()) {
@@ -780,25 +773,16 @@ export function useImageSession({
 
       await loadIntoEngine(entry, isCurrent);
       } catch (err) {
-        // Superseded — a newer switch replaced the document under this one's
-        // awaits — is "dropped": the newer switch owns the screen now.
+        // Superseded (a newer switch replaced the document) is "dropped".
         if (isSuperseded(err) || !isCurrent()) return;
-        // A real failure gets the Error state: what failed, and a way out.
-        // Every caller fires this and forgets, so without this catch it was
-        // an unhandled rejection and a progress bar left up.
-        logDiagnostic("UI_THREAD", `switch to ${entry.name} failed: ${String(err)}`);
         setIsImageLoading(false);
-        toast.error(`Couldn't open ${entry.name}.`, {
-          action: { label: "Try again", onClick: () => void handleSelectPhotoRef.current?.(entry) },
-        });
+        reportSwitchFailure(entry.name, err, () => void handleSelectPhotoRef.current?.(entry));
       }
     },
     [activePhotoId, hasBeenModified, layerRevision, stamp, loadIntoEngine, flushEditArchive],
   );
 
-  // The Error toast's "Try again" calls the LATEST handleSelectPhoto, not the
-  // closure that failed.
-  const handleSelectPhotoRef = useRef<typeof handleSelectPhoto | null>(null);
+  const handleSelectPhotoRef = useRef<typeof handleSelectPhoto | null>(null); // "Try again" → latest
   handleSelectPhotoRef.current = handleSelectPhoto;
 
   // Item 4: PgUp/PgDn gallery cycling

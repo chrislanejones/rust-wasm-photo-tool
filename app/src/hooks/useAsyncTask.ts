@@ -60,11 +60,16 @@ export function useAsyncTask() {
   const savedTimer = useRef<number | undefined>(undefined);
   const mounted = useRef(true);
   useEffect(() => {
-    mounted.current = true;
+    // Copied for the cleanup: these refs hold counters, not DOM nodes, but
+    // reading them through locals keeps the rule (and the intent) plain.
+    const live = mounted;
+    const runs = seq;
+    const saved = savedTimer;
+    live.current = true;
     return () => {
-      mounted.current = false;
-      seq.current++; // anything in flight is dropped on unmount
-      window.clearTimeout(savedTimer.current);
+      live.current = false;
+      runs.current++; // anything in flight is dropped on unmount
+      window.clearTimeout(saved.current);
     };
   }, []);
 

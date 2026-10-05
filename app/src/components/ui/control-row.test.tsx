@@ -163,4 +163,15 @@ describe("ControlRow — edited", () => {
     );
     expect(container.querySelector('[data-slot="label"]')?.textContent).toBe("Contrast");
   });
+
+  it("an edited row keeps the value as the header's last child", () => {
+    const { container } = render(
+      <ControlRow label="Brightness" value="+40" edited={{ isEdited: true, onReset: () => {} }}>
+        <input aria-label="Brightness" type="range" />
+      </ControlRow>,
+    );
+    const value = container.querySelector('[data-slot="value"]')!;
+    expect(value.parentElement!.lastElementChild).toBe(value);
+    expect(value.parentElement!.contains(container.querySelector('[data-slot="reset"]'))).toBe(true);
+  });
 });

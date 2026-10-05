@@ -85,8 +85,8 @@ export function ControlRow({ label, info, value, reason, edited, children, class
               className="size-1.5 rounded-full bg-theme-primary"
             />
           )}
-        </span>
-        <span className="flex items-center gap-1">
+          {/* On the label side, so the value stays the header's last child
+              (the panel grammar pins that). */}
           {edited?.isEdited && (
             <button
               type="button"
@@ -100,12 +100,12 @@ export function ControlRow({ label, info, value, reason, edited, children, class
               <RotateCcw aria-hidden className="size-3" />
             </button>
           )}
-          {value != null && (
-            <span data-slot="value" className="tabular-nums text-theme-foreground">
-              {value}
-            </span>
-          )}
         </span>
+        {value != null && (
+          <span data-slot="value" className="tabular-nums text-theme-foreground">
+            {value}
+          </span>
+        )}
       </div>
       <div data-slot="control">
         {typeof children === "function" ? children({ labelId, reasonId }) : children}
