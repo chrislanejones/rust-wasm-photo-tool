@@ -190,6 +190,23 @@ n_gray=$(rg -n 'grayscale\(' app/src -g '*.ts' -g '*.tsx' -g '*.css' \
   | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
 check "no-gray-photos" 0 "a thumbnail is a placeholder or the photo — never a gray photo" "$n_gray"
 
+# DOCUMENT STATE THROUGH THE ACCESSOR (Plan C §3). During a photo switch the
+# engine mirror (`stamp.state`) still describes the OUTGOING photo while every
+# label already names the incoming one, so a component that reads its
+# width/height/undo depth directly shows the wrong photo's numbers.
+# Components read it through hooks/useLoadedDocument.ts instead, which is null
+# mid-switch. Scope: app/src/components + app/src/features (the session hooks
+# own the engine and read it directly by design). Comment lines excluded.
+#
+# Baseline 8, all in CanvasArea.tsx, which SIZES the canvas to the document
+# the engine holds — the one reader for whom the engine's own numbers are
+# right even mid-switch. May only go down. StatusBar was migrated when this
+# was added (10 → 8).
+n_docreads=$(rg -n '\bstate\.(width|height|undoCount|redoCount)\b' app/src/components app/src/features \
+  -g '*.ts' -g '*.tsx' -g '!*.test.*' \
+  | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
+check "direct-document-reads" 8 "read document state via hooks/useLoadedDocument" "$n_docreads"
+
 # SIMD unsafe is expected here; the count keeps it from growing unnoticed.
 #
 # `// allow: rust-panic` skips a reviewed site. The docs have promised this

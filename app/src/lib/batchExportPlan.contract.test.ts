@@ -131,7 +131,8 @@ describe("no session-state gate has been re-added upstream", () => {
 // passes VACUOUSLY. Verified by planting a real violation: from the repo root
 // the guard stayed green; from `app/` it caught it.
 const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
-  const source = readFileSync(join(APP_ROOT, "src/app/AppShell.tsx"), "utf8")
+  // The ZIP export moved out of AppShell into its session hook (Plan C §3).
+  const source = readFileSync(join(APP_ROOT, "src/app/session/useZipExport.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
 
@@ -139,10 +140,10 @@ const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
    *  `modifiedPhotos` is legitimate elsewhere in AppShell, so a whole-file scan
    *  would be permanently red. */
   function exportBody(): string {
-    const start = source.indexOf("const exportPhotosToZip");
-    expect(start, "exportPhotosToZip not found — did it move or get renamed?").toBeGreaterThan(-1);
-    const end = source.indexOf("const handleExportAll", start);
-    expect(end, "could not find the end of exportPhotosToZip").toBeGreaterThan(start);
+    const start = source.indexOf("const exportZip = useCallback(");
+    expect(start, "exportZip not found — did it move or get renamed?").toBeGreaterThan(-1);
+    const end = source.indexOf("return { exportZip", start);
+    expect(end, "could not find the end of exportZip").toBeGreaterThan(start);
     return source.slice(start, end);
   }
 
@@ -163,14 +164,14 @@ const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
    *  use anywhere here — are banned across the whole function. */
   function exportLoopBody(): string {
     const body = exportBody();
-    const loop = body.indexOf("for (const photo of list)");
+    const loop = body.indexOf("for (const [i, photo] of list.entries())");
     expect(loop, "the per-photo export loop was not found").toBeGreaterThan(-1);
     // Stop before the useCallback dependency array. It lists `hasBeenModified`
     // and `stamp` because the PRE-loop flush genuinely depends on them, and
     // React requires that — a dep entry is bookkeeping, not a decision. Left
     // in, this test would be permanently red for the one reason that is
     // correct.
-    const deps = body.lastIndexOf("\n    },\n    [");
+    const deps = body.lastIndexOf("[run],");
     expect(deps, "could not find the useCallback dependency array").toBeGreaterThan(loop);
     return body.slice(loop, deps);
   }

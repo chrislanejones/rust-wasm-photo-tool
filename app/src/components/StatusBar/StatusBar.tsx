@@ -2,6 +2,7 @@
 // Item 8: Architecture link opens in new tab
 // Item 2: Added spacebar hint
 // Item 4: Added PgUp/PgDn hint
+import { useLoadedDocument } from "@/hooks/useLoadedDocument";
 import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
@@ -129,8 +130,11 @@ export function StatusBar({
   // one hook answers both and they cannot disagree. `state.width/height` is
   // the DOCUMENT, which on a default artboard import is photo + 2 ×
   // canvasPadding — a number 20px bigger than the file that was opened.
-  const photoW = photoWidth ?? state.width;
-  const photoH = photoHeight ?? state.height;
+  // Through the loaded-document accessor: mid-switch the engine still holds
+  // the OUTGOING photo, so its size reads "—" rather than the wrong numbers.
+  const doc = useLoadedDocument(state);
+  const photoW = doc ? (photoWidth ?? doc.width) : 0;
+  const photoH = doc ? (photoHeight ?? doc.height) : 0;
 
   // TWO things vary here, and they are independent:
   //   • the TOOL — `activeToolHint` / `activeToolHint2` change the moment the
