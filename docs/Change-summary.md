@@ -11237,3 +11237,23 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **829,721 bytes — unchanged.** No Rust changed in this release; confirmed with a fresh `build:wasm` run (`sha256 09326072e909f051…`, `features=tiles,patchmatch`), matching v9.9 to the byte rather than carrying the number forward. |
 | **QC** | Bulk's picker, the held-state shading and frame suppression, and the moved Command Palette entry are all visual and interactive surfaces a headless gate can't judge — `imagehorse-qc` is owed before the next release. |
 | **Found, not fixed** | ADR-078 (draft) names the risk directly: the per-photo crop frame already served "give 2 and 5 their own" before this shipped, and if the hold-out count stays at zero for two more releases, the picker may be decoration worth deleting rather than keeping warm. The star's Points slider still stops at 12, the oval is still unbuilt, and test files remain typechecked by nothing. |
+
+## v9.11 Change Summary — 2026-10-04
+
+**Batch gets Exceptions on every tool, Crop is called Crop again, and the shape menu stops opening on a line.** One PR since v9.10: #291.
+
+| Area | Change |
+| --- | --- |
+| **Exceptions** (#291) | The photos ticked in the gallery are the **Exceptions**. In Batch the gallery checkbox reads "Exception" and a ticked thumb shows an Exception badge; the canvas gets a matching **Exception** checkbox. Both write `useGalleryStore.selectedIds` — no second picker state. |
+| **Main \| Exceptions on all five tools** (#291) | Logo, Text, Crop, Rename and AI Rename open with the same toggle as the top bar's Tools \| Gallery \| Review (`BatchGroupToggle`, `useBatchGroupStore`). The switch follows the photo on screen. |
+| **Crop does both groups** (#291) | `useBatchCropStore.looks` is keyed `main` / `exceptions`, each with its own ratio, anchor, width and shared frame. One pass crops every photo with its own group's settings: "Crop 8 to 1:1 · 2 to 4:5". Thumbnail shade and preview frame read the photo's group. |
+| **The others run on the group showing** (#291) | Logo and Text count it ("Apply Logo to 8 Images") instead of claiming All. |
+| **Rename by id** (#291) | Rename mapped new names by gallery INDEX; on a subset that renamed the wrong photos. It maps by id now. |
+| **Bulk is Crop again** (#291) | The v9.10 picker (`BulkHeldPicker`) and the `held` / `bulkPhotos` API are removed. The tile is **Crop** in all three label tables, and its hover reads "Crop every loaded photo to the same ratio and size — exceptions get their own crop". ADR-079 (draft) supersedes ADR-078. |
+| **Shape menu** (#291) | Right-clicking a shape opened the canvas menu on a bare separator: v9.10 moved Command Palette out from above `ShapeZOrderMenuItems`, which still drew a leading rule. The block is first, so it draws none. |
+| **Marketing** (#291) | The batch page, Home, Pricing and `seo.ts` name Crop and Exceptions; AI Rename is described as colors, tone and a rough subject, not a model; two shipped items come off In the Works. The v9.10 trail entry's "first tile" is corrected — Bulk was the third. |
+| **Tests** | `batchGroups.test.ts` (6) replaces the hold-out tests. `e2e/batch-exceptions.spec.ts` 3/3: Main 1080×1080 and an exception at 16:9 → 1080×608 in one pass; the canvas checkbox and the gallery checkbox are the same mark; Rename on Main leaves the exception's name alone. `batch-crop-frame` 2/2. |
+| **Gates** | tsc **0**, eslint **0 errors** / 56 warnings, vitest **151 files / 1,629 tests**, `guardrails.sh` at baseline, inert-class audit **0**, marketing build **0**, PR CI **17 pass / 1 skipped** (prod Convex deploy). |
+| **Engine** | **829,721 bytes — unchanged.** No Rust in this release. |
+| **QC** | `imagehorse-qc` still owed — the Exception marks, the toggle and the per-group shading are visual. |
+| **Found, not fixed** | Ticking exceptions also lights the gallery's Delete Selected / Export bar, because it is the same selection. The Exceptions crop settings reset on reload (session-only store). |

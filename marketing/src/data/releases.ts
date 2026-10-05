@@ -24,13 +24,48 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
-    version: "v9.10",
-    date: "2026-10-03",
-    headline: "Batch's first tile is now Bulk: hold a photo out of the pass, and the Command Palette moves down the right-click menu.",
+    version: "v9.11",
+    date: "2026-10-04",
+    headline: "Batch gets Exceptions on every tool, Crop is called Crop again, and the shape menu stops opening on a line.",
     entries: [
       {
         tag: "feature",
-        text: "Batch's first tile is now called Bulk, and its panel opens with a picker of your own thumbnails, numbered in gallery order. Click one and it's held out of the pass — not cropped, not resized, not touched — while the rest of the gallery still gets the same crop.",
+        text: "Tick photos in the gallery and they're Exceptions — the checkbox says so while Batch is open, and there's a matching Exception checkbox on the canvas. Every Batch tool, Logo, Text, Crop, Rename and AI Rename, has a Main | Exceptions switch, the same toggle as Tools | Gallery | Review.",
+      },
+      {
+        tag: "feature",
+        text: "Crop keeps a crop for each group and one button does both: “Crop 8 to 1:1 · 2 to 4:5.” Photos 4 and 6 can be 4:5 while the rest of the carousel is square.",
+      },
+      {
+        tag: "ui",
+        text: "Bulk is gone. The tile is called Crop again, its hover says what it does, and the second grid of thumbnails in the Tools panel is deleted — the gallery you already have is where you pick.",
+      },
+      {
+        tag: "ui",
+        text: "Logo and Text count the group they're about to change — “Apply Logo to 8 Images” — instead of claiming All.",
+      },
+      {
+        tag: "fix",
+        text: "Rename matched new names by position across the whole gallery, which would have renamed the wrong photos on a subset. It matches by photo now.",
+      },
+      {
+        tag: "fix",
+        text: "Right-clicking a shape opened the canvas menu on a bare separator line. It opens on Bring to Front now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing pages catch up with Batch: Crop and Exceptions are named, and AI Rename is described as what it is — colors, tone and a rough subject, not a model.",
+      },
+    ],
+  },
+  {
+    version: "v9.10",
+    date: "2026-10-03",
+    headline: "Batch's crop tile is now Bulk: hold a photo out of the pass, and the Command Palette moves down the right-click menu.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Batch's crop tile is now called Bulk, and its panel opens with a picker of your own thumbnails, numbered in gallery order. Click one and it's held out of the pass — not cropped, not resized, not touched — while the rest of the gallery still gets the same crop.",
       },
       {
         tag: "ui",

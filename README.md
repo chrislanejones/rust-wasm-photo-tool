@@ -86,27 +86,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.10 — 2026-10-03
+### v9.11 — 2026-10-04
 
-**Batch's first tile is now Bulk: hold a photo out of the pass, and the Command Palette moves down the right-click menu.**
+**Batch gets Exceptions on every tool, Crop is called Crop again, and the shape menu stops opening on a line.**
 
-Crop ten photos to one ratio and two of them shouldn't have been touched — until
-now the only way to keep a photo out was to delete it from the gallery first, or
-run the whole batch again without it. Bulk's panel opens with a picker of your
-own thumbnails, numbered in gallery order. Click one and it's held out — not
-cropped, not resized, not re-encoded — while everyone else still gets the same
-crop. The button stops claiming "All" the moment anything is held: "Crop All
-Images to 1:1" becomes "Crop 4 of 6 to 1:1", and the progress count follows it.
-A held photo shows no crop frame and no shading, because a frame you can drag
-but can't apply is a broken control.
+Ten photos, one crop, but 4 and 6 need a different one. v9.10 answered with a
+second grid of thumbnails in the Tools panel that just skipped the held photos.
+That grid is gone. Tick photos in the gallery (the checkbox reads **Exception**
+while Batch is open) or tick **Exception** on the canvas, and they move to the
+Exceptions group.
 
-The picker is its own thing, separate from the gallery's checkboxes — those
-still drive Delete All, Duplicate and Export ZIP. The one place they meet is a
-shortcut: hold out whatever's already selected.
+Every Batch tool — Logo, Text, Crop, Rename, AI Rename — now has a
+**Main | Exceptions** switch, the same toggle as Tools | Gallery | Review. Crop
+keeps a crop for each group and one button does both: "Crop 8 to 1:1 · 2 to
+4:5". The other four run on the group that's showing, and Logo and Text stop
+saying "All Images" when they aren't. Rename was matching new names by position
+across the whole gallery, which would have renamed the wrong photos on a subset;
+it matches by photo now.
 
-The right-click menu's Command Palette entry moved from the top of the menu
-down to just above Delete image, and a shape-stacking menu that was drawing a
-doubled or missing separator line now draws exactly one.
+Right-clicking a shape opened the canvas menu on a bare separator line. Fixed.
+The marketing pages catch up with Batch: Crop and Exceptions are named, and AI
+Rename is described as what it is.
 
 No Rust, no IndexedDB — engine unchanged at 829,721 bytes.
 
