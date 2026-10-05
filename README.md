@@ -86,18 +86,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.15 — 2026-10-05
+### v9.16 — 2026-10-05
 
-**The contact form sends your message itself now.**
+**Share links obey the online switch, cloud storage has a real limit, and everything underneath is up to date.**
 
-Before this, the form at imagehorse.app/contact handed your message to your
-own mail app — and if you didn't have one set up, which is most people on
-Windows or webmail, it went nowhere. It now goes straight to my inbox, and if
-that ever fails it says so and offers the email address instead.
+Share links now follow Settings › Security like every other upload: with
+"Everything in your browser" on, the Share link button says why it can't make
+one and nothing leaves the tab. Escape closes the Restore Settings question
+instead of doing nothing, and an admin is never shown AI tools that the server
+then refuses.
 
-The site's footer says where it's made: Made with ♥ from Florida.
+Cloud storage has a limit the server actually enforces — 100 MB signed in,
+5 GB on Pro — and there's a tool that finds files nobody's edits point at any
+more. It only reports for now; nothing is deleted until I've read what it
+found.
 
-Under the hood, every `npx` in the docs and configs is `pnpm exec` now.
+Package night: React 19.3, Convex 1.46, framer-motion 14, react-router 8 on
+the site, vite-plugin-pwa 2, png 0.18 and 45 Rust crates. Engine 854,542 →
+858,808 bytes. Five old database tables that nothing used are gone.
 
 
 ## License

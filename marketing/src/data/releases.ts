@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.16",
+    date: "2026-10-05",
+    headline: "Share links obey the online switch, cloud storage has a real limit, and everything underneath is up to date.",
+    entries: [
+      { tag: "fix", text: "With “Everything in your browser” on, the Share link button now says why it can't make a link, and nothing is uploaded. Before, a share link was the one upload that ignored the switch." },
+      { tag: "fix", text: "Escape closes the Restore Settings question instead of doing nothing." },
+      { tag: "fix", text: "An admin is never shown AI tools as unlocked and then refused by the server." },
+      { tag: "feature", text: "Cloud storage has a limit the server enforces: 100 MB signed in, 5 GB on Pro." },
+      { tag: "infra", text: "A tool that finds stored files nobody's edits point at any more. It only reports for now; nothing is deleted until I've read what it found." },
+      { tag: "infra", text: "Five old database tables from before the Rust engine are gone. Nothing used them." },
+      { tag: "rust", text: "45 Rust crates updated, and the PNG decoder moves to png 0.18." },
+      { tag: "infra", text: "Package night: React 19.3, Convex 1.46, framer-motion 14, react-router 8 on this site, and the service-worker plugin 2.0." },
+    ],
+  },
+  {
     version: "v9.15",
     date: "2026-10-05",
     headline: "The contact form sends your message itself now.",

@@ -11325,3 +11325,24 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Footer** | "Made with ♥ from Florida." between the copyright and the MIT line; the heart is `role="img"` with `aria-label="love"`. |
 | **pnpm** | Every live `npx` → `pnpm exec`: convex/README, Getting-Started, two open PARKING_LOT items, the CI codegen-drift error text, and comments in `convex/users.ts`, `eslint.config.compiler.mjs`, `playwright.config.ts`. History (this file, ADR-020), Convex's own error string in a test, and `convex/_generated` keep theirs. |
 | **Gates** | marketing tsc 0, lint 0 errors, guardrails OK, marketing build OK. |
+
+## v9.16 Change Summary — 2026-10-05
+
+**Share links obey the online switch, cloud storage has a real limit, and everything underneath is up to date.** Four backend PRs from 09-24/25 (#234, #235, #236, #241), fitted to today's master, plus a package night. #205 (TypeScript 7) is not in it.
+
+| Area | Change |
+| --- | --- |
+| **QC F2** (#234) | `useShare` refuses before it asks for an upload URL when online features are off; ShareButton says why and links to Settings › Security. `share_links` moves to the `online-switch` gate in `shared/networkPaths.ts`, so the Security page lists it under what the switch turns on and its headline drops the share-link exception. |
+| **QC F1** (#234) | Master's ConfirmDialog fix (Night 5) was kept, but a real Escape left the Restore confirm open; Settings' `onEscapeKeyDown` now routes Escape to the confirm while it is open. |
+| **QC F3** (#234) | `convex/aiCaps.ts`: AI caps come from `entitlementOf`, so an admin on a free row gets paid caps on the server as the UI already showed. |
+| **Storage quota** (#235, ADR-083) | 100 MiB free / 5 GiB paid, enforced in `photoEdits.save` and `shares.create` from the same table `tiers.ts` reads. Every live account is under its cap (largest: 563.7 MiB on Pro). |
+| **Orphan sweep** (#235, ADR-083) | `storageSweep:sweep` — dry run unless `apply: true`, 24 h grace, ≤ 200 deletes a run; the cron line stays commented out. |
+| **Dead tables** (#236, ADR-084) | `projects`, `images`, `layers`, `annotations`, `history` and their functions removed — 0 rows on both deployments. |
+| **Test-account wipe + e2e guard** (#241) | `pnpm wipe:test-account` (dry run by default, refuses `--apply` until `TEST_CLERK_ID` is pinned). The wipe dropped the five tables above. Every e2e spec now imports `test` from `e2e/guard/test`, which aborts any request to a real Convex host — the 25 specs written since #241 branched were converted. |
+| **npm** | react/react-dom 19.3, convex 1.46, framer-motion 14, jsdom 30, vite-plugin-pwa 2, react-router 8 (marketing; `react-router-dom` dropped — v8 folds it in), eslint 10.12, typescript-eslint 8.71, vitest 5.0.3, lucide-react 1.52, dexie 4.4.6 and smaller. `@types/jszip` removed. |
+| **Rust** | `cargo update` (45 crates, wasm-bindgen 0.2.129); png 0.18 (`decode_png` reads through a `Cursor`, and an overflowing buffer size is a decode error, not a panic); criterion 0.8. |
+| **Not taken** | TypeScript 7 typechecks clean but ships no JS API, so typescript-eslint crashes — waits for typescript-eslint. three stays 0.170 (ADR-067; WebGPU scenes can't be checked headless). |
+| **Engine** | **854,542 → 858,808 B** (+4,266): wasm-bindgen 0.2.129 and png 0.18. |
+| **Workers** | Probed on production builds of this and master: engine worker and codec worker both start, no main-thread fallback, the AVIF encoder loads in the worker, and JPEG / WebP / AVIF exports are byte-identical between the two (9,511 / 6,526 / 11,075 B). |
+| **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,741/1,741, cargo test 634/634, clippy both ways, guardrails OK, SW e2e 5/5, main e2e 97/104 — the 5 failing also fail on master (parked), 2 skipped. |
+
