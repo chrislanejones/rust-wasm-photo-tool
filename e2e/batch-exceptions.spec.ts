@@ -80,7 +80,7 @@ test("Crop: an exception gets its own crop, Main gets the other", async ({ page 
 
 test("the canvas checkbox and the gallery checkbox are the same mark", async ({ page }) => {
   await openBatch(page, "Crop");
-  const onCanvas = page.getByRole("checkbox", { name: "Exception" });
+  const onCanvas = page.getByRole("checkbox", { name: "Exception", exact: true });
   await expect(onCanvas).not.toBeChecked();
 
   await onCanvas.check();
@@ -105,4 +105,21 @@ test("Rename runs on Main and leaves the exception's name alone", async ({ page 
 
   await expect(page.locator('[aria-label="Select photo slide-1"]')).toHaveCount(1);
   await expect(page.locator('[aria-label="Select photo sky-building"]')).toHaveCount(1);
+});
+
+test("every photo in the grid has its own Exception checkbox, and the bar under the grid counts them", async ({ page }) => {
+  await openBatch(page, "Crop");
+  // The tile's checkbox is named after its photo, so each one is reachable.
+  const tileBox = page.getByRole("checkbox", { name: /^Exception: / });
+  await expect(tileBox).toHaveCount(1);
+  const bar = page.getByTestId("batch-grid-bar");
+  await expect(bar).toContainText("2 photos");
+
+  await tileBox.check();
+  // Same mark as the gallery checkbox.
+  await expect(page.locator('[aria-label="Exception"][aria-pressed="true"]')).toHaveCount(1);
+  await expect(bar).toContainText("1 exception");
+  // One page: nothing to step through.
+  await expect(page.getByRole("button", { name: "Previous photos" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Next photos" })).toBeDisabled();
 });
