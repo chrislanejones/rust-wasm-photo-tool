@@ -3,45 +3,57 @@ import type { PlacementCell } from "@/components/PlacementGrid";
 import { BATCH_CROP_RATIOS, type BatchCropRatioId, type CropFraming } from "@/lib/batchCrop";
 
 // Batch › Bulk (the tile used to say Crop, and the mode id is still `crop`):
-// the settings for one attribute applied to a whole gallery, plus each photo's
-// hand-set framing AND the photos held OUT of the pass.
+// one crop applied to a whole gallery — and a SECOND crop for the odd ones out.
 //
-// WHY A STORE: same reason as usePerspectiveStore. The crop frame is edited in
-// two places, the panel (features/tools/settings) and the draggable frame on
-// the preview (features/canvas), and their only common ancestor is AppShell.
+// WHO IS ODD is not stored here. It is the gallery's own checkboxes
+// (useGalleryStore.selectedIds): tick photos 4 and 6 in the gallery and they
+// are the odd ones. One set of marks, in the place the photos already are,
+// instead of a second grid of thumbnails inside the panel. Every reader takes
+// that set as an argument, so this store never has to know the gallery.
 //
-// NOT PERSISTED. Everything here was useState/useRef in CropBatchPanel before
-// the preview frame existed and lives for the session, same as before. There
-// is no IndexedDB change, so the dexie-migration gate is not triggered.
+// WHY A STORE: the crop is edited in two places, the panel
+// (features/tools/settings) and the draggable frame on the preview
+// (features/canvas), and their only common ancestor is AppShell.
+//
+// NOT PERSISTED. Lives for the session; no IndexedDB change, so the
+// dexie-migration gate is not triggered.
 
 export type BatchCropWidthId = "keep" | "1080" | "1440";
 
-interface BatchCropState {
+/** The two groups a pass crops: everyone, and the photos ticked in the gallery. */
+export type BulkGroup = "bulk" | "odd";
+
+/** What ONE group's crop looks like. Each group has its own. */
+export interface BulkLook {
   ratioId: BatchCropRatioId;
   /** A Shift-drag's free shape, as [w, h]. Wins over `ratioId` until a ratio
-   *  tile is picked — every photo is still cropped to this ONE shape. */
+   *  tile is picked — every photo in the group is still cropped to this ONE shape. */
   customRatio: [number, number] | null;
   anchor: PlacementCell;
   widthId: BatchCropWidthId;
-  /** Per-photo framing dragged on the preview. A photo with no entry uses the
-   *  anchor. Measured against the photo's ORIGINAL framing (see baselines). */
-  framing: Record<string, CropFraming>;
-  /** The last frame drawn on ANY photo. Photos with no framing of their own
-   *  follow it, so framing one slide frames the whole carousel. */
+  /** The last frame drawn on any photo IN THIS GROUP. Photos of the group with
+   *  no framing of their own follow it. */
   shared: CropFraming | null;
-  /** THE ODD ONES OUT — photos held back from the pass, keyed by photo id.
-   *
-   *  Everything else here changes what the bulk LOOKS like (its shape, its
-   *  anchor, its size). This changes WHO it lands on: a held photo is not
-   *  cropped, resized or re-encoded at all, so it can be given a different
-   *  attribute afterwards instead of this one. It is why the tile is called
-   *  Bulk and not Crop.
-   *
-   *  Absent key = in the bulk, so a gallery nobody has touched behaves exactly
-   *  as it did before this existed. Keys for deleted photos are harmless: every
-   *  reader filters the live `photos` list. */
-  held: Record<string, true>;
-  /** Crop All, registered by the mounted panel — Enter runs it. */
+}
+
+const DEFAULT_LOOK: BulkLook = {
+  ratioId: "1:1",
+  customRatio: null,
+  anchor: "center",
+  widthId: "1080",
+  shared: null,
+};
+
+interface BatchCropState {
+  looks: Record<BulkGroup, BulkLook>;
+  /** Which group's settings the panel is showing. */
+  editing: BulkGroup;
+  /** Per-photo framing dragged on the preview. A photo with no entry uses its
+   *  group's shared frame, else the anchor. Measured against the photo's
+   *  ORIGINAL framing (see baselines). Fractions, so it survives a group's
+   *  ratio change — and a photo moving between groups. */
+  framing: Record<string, CropFraming>;
+  /** The pass, registered by the mounted panel — Enter runs it. */
   applyAll: (() => void) | null;
   /** photo id → the originalKey it had before its first batch crop. Every
    *  Apply crops from here, so a second Apply re-frames the whole photo. */
@@ -50,106 +62,95 @@ interface BatchCropState {
    *  many steps it pushed. If the count still matches, re-apply rewinds them. */
   activeCrop: Record<string, { undoCount: number; steps: number }>;
 
-  setRatioId: (id: BatchCropRatioId) => void;
-  /** Picking an anchor is "put every frame HERE" — it clears hand framings. */
-  setAnchor: (a: PlacementCell) => void;
-  setWidthId: (id: BatchCropWidthId) => void;
-  /** Also becomes `shared`; `ratio` (a Shift-drag) sets `customRatio`. */
-  setFraming: (photoId: string, f: CropFraming, ratio?: [number, number]) => void;
+  setEditing: (g: BulkGroup) => void;
+  setRatioId: (g: BulkGroup, id: BatchCropRatioId) => void;
+  /** Picking an anchor is "put every frame in this group HERE" — it clears the
+   *  group's hand framings. `ids` = the photos in that group. */
+  setAnchor: (g: BulkGroup, a: PlacementCell, ids: readonly string[]) => void;
+  setWidthId: (g: BulkGroup, id: BatchCropWidthId) => void;
+  /** Also becomes the group's `shared`; `ratio` (a Shift-drag) sets its `customRatio`. */
+  setFraming: (g: BulkGroup, photoId: string, f: CropFraming, ratio?: [number, number]) => void;
+  clearFraming: (g: BulkGroup, photoId: string) => void;
   setApplyAll: (fn: (() => void) | null) => void;
-  clearFraming: (photoId: string) => void;
-  /** Hold a photo out of the bulk, or put it back. */
-  toggleHeld: (photoId: string) => void;
-  /** Put every photo back in the bulk. */
-  clearHeld: () => void;
   setBaseline: (photoId: string, key: string) => void;
   setActiveCrop: (photoId: string, v: { undoCount: number; steps: number }) => void;
 }
 
+const patchLook = (s: BatchCropState, g: BulkGroup, p: Partial<BulkLook>) => ({
+  looks: { ...s.looks, [g]: { ...s.looks[g], ...p } },
+});
+
 export const useBatchCropStore = create<BatchCropState>((set) => ({
-  ratioId: "1:1",
-  customRatio: null,
-  anchor: "center",
-  widthId: "1080",
+  looks: { bulk: { ...DEFAULT_LOOK }, odd: { ...DEFAULT_LOOK, ratioId: "4:5" } },
+  editing: "bulk",
   framing: {},
-  shared: null,
-  held: {},
   applyAll: null,
   baselines: {},
   activeCrop: {},
 
-  setRatioId: (ratioId) => set({ ratioId, customRatio: null }),
-  setAnchor: (anchor) => set({ anchor, framing: {}, shared: null }),
-  setWidthId: (widthId) => set({ widthId }),
-  setFraming: (photoId, f, ratio) =>
+  setEditing: (editing) => set({ editing }),
+  setRatioId: (g, ratioId) => set((s) => patchLook(s, g, { ratioId, customRatio: null })),
+  setAnchor: (g, anchor, ids) =>
+    set((s) => {
+      const framing = { ...s.framing };
+      for (const id of ids) delete framing[id];
+      return { framing, ...patchLook(s, g, { anchor, shared: null }) };
+    }),
+  setWidthId: (g, widthId) => set((s) => patchLook(s, g, { widthId })),
+  setFraming: (g, photoId, f, ratio) =>
     set((s) => ({
       framing: { ...s.framing, [photoId]: f },
-      shared: f,
-      ...(ratio ? { customRatio: ratio } : {}),
+      ...patchLook(s, g, { shared: f, ...(ratio ? { customRatio: ratio } : {}) }),
     })),
-  setApplyAll: (applyAll) => set({ applyAll }),
-  toggleHeld: (photoId) =>
-    set((s) => {
-      if (s.held[photoId]) {
-        const { [photoId]: gone, ...rest } = s.held;
-        return { held: rest };
-      }
-      return { held: { ...s.held, [photoId]: true } };
-    }),
-  clearHeld: () => set({ held: {} }),
-  clearFraming: (photoId) =>
+  clearFraming: (g, photoId) =>
     set((s) => {
       const { [photoId]: gone, ...rest } = s.framing;
-      // If this photo's frame is the one everyone follows, reset that too —
+      // If this photo's frame is the one its group follows, reset that too —
       // otherwise "reset" would leave the same frame standing via `shared`.
-      return { framing: rest, shared: gone && gone === s.shared ? null : s.shared };
+      const shared = s.looks[g].shared;
+      return {
+        framing: rest,
+        ...patchLook(s, g, { shared: gone && gone === shared ? null : shared }),
+      };
     }),
+  setApplyAll: (applyAll) => set({ applyAll }),
   setBaseline: (photoId, key) =>
     set((s) => (s.baselines[photoId] ? s : { baselines: { ...s.baselines, [photoId]: key } })),
   setActiveCrop: (photoId, v) => set((s) => ({ activeCrop: { ...s.activeCrop, [photoId]: v } })),
 }));
 
-/** Is this photo the odd one out — held back from the pass? */
-export function isHeld(
-  s: Pick<BatchCropState, "held">,
-  photoId: string,
-): boolean {
-  return s.held[photoId] === true;
+/** Which group a photo is in: ticked in the gallery = odd. */
+export function groupOf(oddIds: ReadonlySet<string>, photoId: string): BulkGroup {
+  return oddIds.has(photoId) ? "odd" : "bulk";
 }
 
 /**
- * The photos the pass will actually touch, in gallery order — everything that
- * is not held out. This is the ONE list the panel, the shade and the progress
- * counter agree on; a pass that skipped photos by a second rule could disagree
- * with the button that started it.
+ * The gallery split in two, each in gallery order. This is the ONE split the
+ * panel, the shade, the preview frame and the pass agree on. Ids in `oddIds`
+ * that are no longer in the gallery are ignored.
  */
-export function bulkPhotos<T extends { id: string }>(
-  s: Pick<BatchCropState, "held">,
+export function splitBulk<T extends { id: string }>(
+  oddIds: ReadonlySet<string>,
   photos: readonly T[],
-): T[] {
-  return photos.filter((p) => !isHeld(s, p.id));
+): Record<BulkGroup, T[]> {
+  const out: Record<BulkGroup, T[]> = { bulk: [], odd: [] };
+  for (const p of photos) out[groupOf(oddIds, p.id)].push(p);
+  return out;
 }
 
-/** How many of these photos are held out. */
-export function heldCount(
-  s: Pick<BatchCropState, "held">,
-  photos: readonly { id: string }[],
-): number {
-  return photos.length - bulkPhotos(s, photos).length;
+/** The crop shape a group gets: a Shift-drag's, else the ratio tile's. */
+export function cropRatioOf(look: Pick<BulkLook, "ratioId" | "customRatio">): [number, number] {
+  return look.customRatio ?? BATCH_CROP_RATIOS.find((r) => r.id === look.ratioId)!.dims;
 }
 
-/** The crop shape every photo gets: a Shift-drag's, else the ratio tile's. */
-export function cropRatioOf(s: Pick<BatchCropState, "ratioId" | "customRatio">): [number, number] {
-  return s.customRatio ?? BATCH_CROP_RATIOS.find((r) => r.id === s.ratioId)!.dims;
-}
-
-/** The frame a photo will be cropped with: its own, else the shared one
- *  (undefined = use the anchor). */
+/** The frame a photo will be cropped with: its own, else its group's shared
+ *  one (undefined = use the group's anchor). */
 export function framingFor(
-  s: Pick<BatchCropState, "framing" | "shared">,
+  s: Pick<BatchCropState, "framing" | "looks">,
+  g: BulkGroup,
   photoId: string,
 ): CropFraming | undefined {
-  return s.framing[photoId] ?? s.shared ?? undefined;
+  return s.framing[photoId] ?? s.looks[g].shared ?? undefined;
 }
 
 /** Is the photo on screen still its ORIGINAL framing — i.e. is the preview

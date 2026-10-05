@@ -79,8 +79,10 @@ describe("toggles have a stable name and say which way they are", () => {
   });
 
   it("gallery select", () => {
-    const el = elementWithTitle(read("features/gallery/Thumb.tsx"), 'title={selected ? "Deselect" : "Select"}');
-    expect(el).toContain('aria-label="Select image"');
+    // Bulk mode renames the same checkbox "Odd one out"; the name is stable
+    // within a mode and aria-pressed says which way it is.
+    const el = elementWithTitle(read("features/gallery/Thumb.tsx"), "title={checkTitle}");
+    expect(el).toContain('aria-label={bulkMode ? "Odd one out" : "Select image"}');
     expect(el).toContain("aria-pressed={selected}");
   });
 });

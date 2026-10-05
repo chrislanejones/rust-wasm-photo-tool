@@ -12,7 +12,8 @@ import {
   anchoredCropRect,
   framedCropRect,
 } from "@/lib/batchCrop";
-import { useBatchCropStore, cropRatioOf, framingFor } from "@/stores/useBatchCropStore";
+import { useBatchCropStore, cropRatioOf, framingFor, groupOf } from "@/stores/useBatchCropStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import type { PhotoEntry } from "./GalleryBar";
 
@@ -30,14 +31,12 @@ export function BatchCropThumbShade({
   cover: boolean;
 }) {
   const on = useToolStore((s) => s.activeTool === "emoji" && s.batchMode === "crop");
-  const ratioW = useBatchCropStore((s) => cropRatioOf(s)[0]);
-  const ratioH = useBatchCropStore((s) => cropRatioOf(s)[1]);
-  const anchor = useBatchCropStore((s) => s.anchor);
-  const framing = useBatchCropStore((s) => framingFor(s, entry.id));
-  // Held out of the bulk = nothing will be cut from this one, so there is
-  // nothing to shade. A shade on a photo the pass skips is a promise the
-  // button does not keep.
-  const held = useBatchCropStore((s) => s.held[entry.id] === true);
+  // Ticked in the gallery = an odd one out, shaded with the ODD group's crop.
+  const group = useGalleryStore((s) => groupOf(s.selectedIds, entry.id));
+  const ratioW = useBatchCropStore((s) => cropRatioOf(s.looks[group])[0]);
+  const ratioH = useBatchCropStore((s) => cropRatioOf(s.looks[group])[1]);
+  const anchor = useBatchCropStore((s) => s.looks[group].anchor);
+  const framing = useBatchCropStore((s) => framingFor(s, group, entry.id));
   // Already batch-cropped: its stored original IS the crop — nothing to shade.
   const cropped = useBatchCropStore((s) => {
     const base = s.baselines[entry.id];
@@ -46,7 +45,7 @@ export function BatchCropThumbShade({
 
   const w = entry.workingWidth || entry.origWidth;
   const h = entry.workingHeight || entry.origHeight;
-  if (!on || isActive || cropped || held || !w || !h) return null;
+  if (!on || isActive || cropped || !w || !h) return null;
 
   const r = framing
     ? framedCropRect(w, h, ratioW, ratioH, framing)
