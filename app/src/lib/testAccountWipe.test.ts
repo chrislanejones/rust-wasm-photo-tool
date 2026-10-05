@@ -30,8 +30,8 @@ interface Registered {
 }
 
 const TABLES = [
-  "users", "photo_edits", "shares", "share_views", "ai_jobs", "images", "layers",
-  "annotations", "history", "projects", "sync_docs", "subscriptions", "recent_texts", "user_colors",
+  "users", "photo_edits", "shares", "share_views", "ai_jobs",
+  "sync_docs", "subscriptions", "recent_texts", "user_colors",
 ];
 
 function createFakeConvex() {

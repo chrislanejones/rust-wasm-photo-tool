@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
 // Batch — Main and Exceptions. Tick a photo's gallery checkbox (or "Exception"

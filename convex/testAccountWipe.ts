@@ -51,7 +51,7 @@ async function resolve(ctx: QueryCtx, email: string, mode: WipeMode) {
 
 // ── Rows owned by one account ─────────────────────────────────────────────────
 
-async function ownedParents(ctx: QueryCtx, userId: Id<"users">, table: FileTable | "projects", limit: number) {
+async function ownedParents(ctx: QueryCtx, userId: Id<"users">, table: FileTable, limit: number) {
   switch (table) {
     case "photo_edits":
       return await ctx.db
@@ -62,10 +62,6 @@ async function ownedParents(ctx: QueryCtx, userId: Id<"users">, table: FileTable
       return await ctx.db.query("shares").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
     case "ai_jobs":
       return await ctx.db.query("ai_jobs").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
-    case "images":
-      return await ctx.db.query("images").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
-    case "projects":
-      return await ctx.db.query("projects").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
   }
 }
 
@@ -82,23 +78,6 @@ async function listOwned(ctx: QueryCtx, userId: Id<"users">, table: WipeTable, l
           .withIndex("by_shareId", (q) => q.eq("shareId", share._id as Id<"shares">))
           .take(limit - out.length);
         out.push(...views);
-        if (out.length >= limit) break;
-      }
-      return out;
-    }
-    case "annotations":
-    case "layers":
-    case "history": {
-      const out: AnyRow[] = [];
-      for (const image of await ownedParents(ctx, userId, "images", PLAN_LIMIT)) {
-        const imageId = image._id as Id<"images">;
-        const rows =
-          table === "annotations"
-            ? await ctx.db.query("annotations").withIndex("by_imageId", (q) => q.eq("imageId", imageId)).take(limit - out.length)
-            : table === "layers"
-              ? await ctx.db.query("layers").withIndex("by_imageId", (q) => q.eq("imageId", imageId)).take(limit - out.length)
-              : await ctx.db.query("history").withIndex("by_imageId", (q) => q.eq("imageId", imageId)).take(limit - out.length);
-        out.push(...rows);
         if (out.length >= limit) break;
       }
       return out;
@@ -167,15 +146,6 @@ async function deleteAiJobRecord(ctx: MutationCtx, job: Doc<"ai_jobs">): Promise
   return freed;
 }
 
-/** An image's file (when it has one), then the row. `images.remove` deletes
- *  the row only and is NOT changed here — see PARKING_LOT. Its layers,
- *  annotations and history are already gone by WIPE_ORDER. */
-async function deleteImageRecord(ctx: MutationCtx, image: Doc<"images">): Promise<DeletedFiles> {
-  const freed = await deleteStoredFiles(ctx, [image.storageId]);
-  await ctx.db.delete(image._id);
-  return freed;
-}
-
 const NO_FILES: DeletedFiles = { files: 0, bytes: 0 };
 
 function convexWipeStore(ctx: MutationCtx, userId: Id<"users">): WipeStore {
@@ -189,13 +159,7 @@ function convexWipeStore(ctx: MutationCtx, userId: Id<"users">): WipeStore {
           return await deleteShareRecord(ctx, row as unknown as Doc<"shares">);
         case "ai_jobs":
           return await deleteAiJobRecord(ctx, row as unknown as Doc<"ai_jobs">);
-        case "images":
-          return await deleteImageRecord(ctx, row as unknown as Doc<"images">);
         case "share_views":
-        case "annotations":
-        case "layers":
-        case "history":
-        case "projects":
           // No file fields (FILE_FIELDS is the whole list), so the row is all
           // there is to delete.
           await ctx.db.delete(row._id as Id<typeof table>);

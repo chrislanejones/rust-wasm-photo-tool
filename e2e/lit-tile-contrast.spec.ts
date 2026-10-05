@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 
 // Plan A §2 — a lit tile must be readable in BOTH themes.
 //

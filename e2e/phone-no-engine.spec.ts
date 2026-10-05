@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
 // Plan C §2 — a phone does not load the engine.

@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
 // Plan C §3 — a superseded engine request resolves as "dropped". Rapid photo

@@ -115,8 +115,8 @@ describe("fileIdsOf", () => {
   it("reads only the declared fields, skips absent ones, and ignores file-less tables", () => {
     expect(fileIdsOf("ai_jobs", { inputStorageId: "a", outputStorageId: "c", other: "zzz" })).toEqual(["a", "c"]);
     expect(fileIdsOf("photo_edits", { storageId: "s" })).toEqual(["s"]);
-    expect(fileIdsOf("images", {})).toEqual([]);
-    expect(fileIdsOf("projects", { storageId: "looks-like-one" })).toEqual([]);
+    expect(fileIdsOf("shares", {})).toEqual([]);
+    expect(fileIdsOf("share_views", { storageId: "looks-like-one" })).toEqual([]);
   });
 });
 
@@ -132,9 +132,6 @@ function emptyTables(): Tables {
  *  their parent, exactly as convex/testAccountWipe.ts reaches them. */
 function ownerOf(db: Tables, table: WipeTable, row: AnyRow): unknown {
   if (table === "share_views") return db.shares.find((s) => s._id === row.shareId)?.userId;
-  if (table === "annotations" || table === "layers" || table === "history") {
-    return db.images.find((i) => i._id === row.imageId)?.userId;
-  }
   return row.userId;
 }
 
@@ -236,16 +233,11 @@ describe("wipeBatch against an in-memory backend", () => {
 
   it("drains children before their parent, so no child is left unreachable", async () => {
     const db = emptyTables();
-    const files = new Map<string, number>([["kg2img0000000000000000000000000a", 10]]);
-    db.images.push({ _id: "im1", userId: TEST_USER, projectId: "pr1", storageId: "kg2img0000000000000000000000000a" });
-    db.projects.push({ _id: "pr1", userId: TEST_USER });
-    for (let i = 0; i < 4; i++) {
-      db.layers.push({ _id: `ly${i}`, imageId: "im1" });
-      db.annotations.push({ _id: `an${i}`, imageId: "im1", layerId: `ly${i}` });
-      db.history.push({ _id: `hi${i}`, imageId: "im1" });
-    }
-    db.shares.push({ _id: "sh1", userId: TEST_USER, storageId: undefined as unknown as string });
-    for (let i = 0; i < 3; i++) db.share_views.push({ _id: `sv${i}`, shareId: "sh1", at: i });
+    const files = new Map<string, number>([["kg2shr0000000000000000000000000a", 10]]);
+    // share_views hang off their share: a batch budget of 2 must still drain
+    // every view before the share they are found through.
+    db.shares.push({ _id: "sh1", userId: TEST_USER, storageId: "kg2shr0000000000000000000000000a" });
+    for (let i = 0; i < 5; i++) db.share_views.push({ _id: `sv${i}`, shareId: "sh1", at: i });
 
     await runToCompletion(memoryStore(db, files, TEST_USER, { list: 0 }), 2);
 
