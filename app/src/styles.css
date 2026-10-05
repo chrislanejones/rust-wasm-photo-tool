@@ -2801,3 +2801,49 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
     0 0 0 1.5px rgba(0, 0, 0, 0.55),
     0 0 0 4px var(--ring);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT SHELL (index.html) — a static copy of the first thing React draws, the
+   BrandRevealScreen splash (horse, "Image Horse", "Loading your workspace…"),
+   at the same sizes, so the hand-over is invisible. Measured 10-05-2026 on
+   Fast 3G + 4x CPU: #root sat EMPTY for 6.1 s with nothing painted; with this
+   the splash is up by ~1.9 s. React replaces #root's children on mount, so it
+   costs nothing after boot. Desktop only, per Plan A §5: below 600px the phone
+   grid is its own surface.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.boot-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  color: var(--text-primary);
+}
+.boot-shell img {
+  width: 144px;
+  height: 144px;
+  filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1));
+}
+.boot-shell h1 {
+  margin-top: 0.5rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+/* The spinner's 24px slot, held empty so the line below sits where React's does. */
+.boot-shell-gap {
+  margin-top: 1.5rem;
+  height: 24px;
+}
+.boot-shell p {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--text-muted);
+}
+@media (max-width: 599px) {
+  .boot-shell { display: none; }
+}

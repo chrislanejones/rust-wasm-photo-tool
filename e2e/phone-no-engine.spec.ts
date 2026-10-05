@@ -112,7 +112,10 @@ test("demo mode (logged out) boots at both widths", async ({ page }) => {
   for (const size of [PHONE, DESKTOP]) {
     await page.setViewportSize(size);
     await page.goto("/");
-    await expect(page.locator("#root")).not.toBeEmpty();
+    // Not "#root is non-empty": index.html ships a static boot shell inside
+    // #root, so that would pass on a crashed app. The upload input exists
+    // only once React has mounted the real surface.
+    await expect(page.locator('input[type="file"]').first()).toBeAttached({ timeout: 30_000 });
     await expect(page.getByText("Could not find")).toHaveCount(0);
   }
 });

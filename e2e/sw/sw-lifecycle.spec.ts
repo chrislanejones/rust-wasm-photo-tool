@@ -75,7 +75,9 @@ test.describe("precache service worker (VITE_ENABLE_SW=1 build)", () => {
       // cache, not just that a navigation "succeeded". (External fonts and
       // the placeholder Convex/Clerk hosts fail offline by design; the
       // logged-out demo boots without them.)
-      await expect(page.locator("#root > *").first()).toBeVisible({
+      // Not "#root has a child": index.html's static boot shell is one. The
+      // upload input exists only once React has mounted.
+      await expect(page.locator('input[type="file"]').first()).toBeAttached({
         timeout: 30_000,
       });
     } finally {

@@ -30,3 +30,10 @@ for (const [name, size] of [
     expect(errors.filter((e) => /Convex|Clerk/.test(e))).toEqual([]);
   });
 }
+
+test("the static boot shell is gone once React mounts", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await expect(page.locator('input[type="file"]').first()).toBeAttached({ timeout: 30_000 });
+  await expect(page.locator(".boot-shell")).toHaveCount(0);
+});
