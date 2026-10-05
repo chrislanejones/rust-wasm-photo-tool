@@ -39,3 +39,18 @@ test("a slow import shows skeleton tiles that turn into photos", async ({ page }
   await expect(pending).toHaveCount(0, { timeout: 120_000 });
   await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(5);
 });
+
+test("the phone grid shows the same skeleton tiles during an import", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const input = page.locator('input[type="file"]').first();
+  await input.waitFor({ state: "attached" });
+  const cdp = await page.context().newCDPSession(page);
+  await input.setInputFiles([FIX[0]!, FIX[1]!, FIX[0]!, FIX[1]!, FIX[0]!]);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 });
+  const pending = page.locator('[data-testid="pending-import"]:visible');
+  await expect(pending.first()).toBeVisible({ timeout: 60_000 });
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  await expect(pending).toHaveCount(0, { timeout: 120_000 });
+  await expect(page.locator('[aria-label^="View photo"]:visible')).toHaveCount(5);
+});

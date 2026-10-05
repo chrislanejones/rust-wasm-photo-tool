@@ -7,6 +7,8 @@
 // pipeline as the desktop dialogs — originals into IndexedDB, thumbnails,
 // tier caps, the persisted gallery manifest — so photos added on a phone are
 // waiting in the gallery when the same browser profile opens the editor wide.
+import { PendingImportTile } from "@/features/gallery/PendingImportTile";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -338,6 +340,7 @@ export function MobileShell({
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
 
+  const pendingImports = useGalleryStore((s) => s.pendingImports);
   // Which tiles have no pixels yet, summed into the grid's one `aria-busy`.
   // A Set of ids rather than a count because a tile can report the same value
   // twice (React may re-run the effect) and a counter would drift; the id is
@@ -481,7 +484,7 @@ export function MobileShell({
                 decoding, and the tile placeholders are `decorative`. */}
             <div
               className="grid grid-cols-3 content-start items-start gap-2"
-              aria-busy={pendingThumbs.size > 0}
+              aria-busy={pendingThumbs.size > 0 || pendingImports.length > 0}
             >
               {photos.map((entry) => (
                 <MobileThumb
@@ -490,6 +493,10 @@ export function MobileShell({
                   onOpen={() => setViewerId(entry.id)}
                   onPendingChange={reportThumbPending}
                 />
+              ))}
+              {/* Files an import is still opening — same tile as the desktop. */}
+              {pendingImports.map((p) => (
+                <PendingImportTile key={p.id} name={p.name} vertical />
               ))}
             </div>
           </div>
