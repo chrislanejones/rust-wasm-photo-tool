@@ -11297,3 +11297,21 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **829,721 bytes — unchanged.** |
 | **Not done** | The edited dot on Levels / Resize / Layers; a real screen-reader pass; the backup chip unseen in a browser (needs a signed-in failing upload). |
 
+## v9.14 Change Summary — 2026-10-05
+
+**Round corners on any shape, two new things to try in Beta, and Auto Compress stops making files bigger.** Four PRs since v9.13: #296, #297, #298, #299.
+
+| Area | Change |
+| --- | --- |
+| **Corner radius** (#299) | Rect, diamond, triangle and star round their corners: a panel slider (presets 0/8/16/24 px) for all of them, or corner dots on the edit box (Shift-drag rounds one). `round_corners()` fillets each vertex tangent to both edges and clamps so corners never cross; sketchy outlines wobble around the loop. Radius 0 renders byte-identical to before. |
+| **Op-log v11** (#299) | `Op::ShapeCornerRadii`, stored in one canonical form per shape kind. v10 stays reserved for tonal ops (ADR-070); v9 logs still open. ADR-082. |
+| **Beta: EXIF in Rust** (#297, from #240) | `ih_exif_rust` / `?beta=exif-rust`. Every EXIF call runs the Rust port beside the TypeScript; agree → Rust bytes, disagree → TypeScript bytes + a MISMATCH in Diagnostics and the console. |
+| **Beta: PageSpeed budget** (#297, from #289) | `ih_web_budget` / `?beta=pagespeed-budget`. "Budget used" (bytes vs width × height ÷ 6) instead of the old score, and Auto Compress aims for it. The engine keeps both models (`web_perf_metrics_score` is the old one, for switch-off). The Beta bar has its own colors — #289's would have shown a failing 120% green. |
+| **For everyone** (#297, from #289) | Auto Compress never writes back a bigger file; Quality moves both ways; Quality is disabled at PNG and Method says when it is a no-op; the Download dialog's split radio group; the photo-switch lock keyed on sub-tools (Adjustments kept in it). |
+| **Dependencies** (#298) | zustand 5.0.15, vite 8.3.2, tailwindcss 4.3.3, @vitejs/plugin-react 6.1.2, codeql-action 4.38.2 — one fresh lockfile change in place of five stale Dependabot PRs. |
+| **Small fixes** (#298) | `vite preview` answers URLs the way Vercel does (the local React #418); the Next-card grid pads both sides alike; Architecture.md no longer says no pixel goes near the GPU. |
+| **Cleanup** (#296) | fallow unused exports 56 → 26; `unmatchedCardKeys` became a contract test that every /features card key still matches a feature name. Two flaky e2e waits fixed (a 300×150 default canvas; a status bar read once). |
+| **Marketing** | In the Works lists both new Beta features, and every "try it" opens the editor with that switch already on (`?beta=<id>`). The ⌘K button in the site's nav wears a ring. |
+| **Engine** | **829,721 → 854,542 B** (+24,821): the EXIF module (+11,670), the old scorer kept for switch-off (+721), corner radius (+12,430). |
+| **Gates** | Per PR: tsc 0, lint 0 errors / 56 warnings, unit 1,672, guardrails OK, cargo test 620+, CI 17 pass on each of #296–#299 (45 e2e in the CI step). |
+

@@ -86,34 +86,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.13 — 2026-10-05
+### v9.14 — 2026-10-05
 
-**Switching photos says it's loading, a big import shows its tiles arriving, the app opens on a splash instead of a blank page, and nothing waits for ever.**
+**Round corners on any shape, two new things to try in Beta, and Auto Compress stops making files bigger.**
 
-Switch to a photo that takes a moment and the canvas dims under "Loading
-IMG_0427", the Tools footer says the same, and the panel's numbers wait until
-they belong to the photo you asked for. Change Brightness, Contrast or
-Saturation and a dot sits beside it with a reset button, so you can see what
-this photo has had done to it.
+Rectangles, diamonds, triangles and stars can have rounded corners now. Drag
+the Corner radius slider to round them all, or drag a corner dot on the shape's
+edit box; hold Shift to round just that corner. Sketchy shapes keep their
+wobble around the curve, and the rounding survives a reload, a duplicate and a
+resize.
 
-Import a pile of photos and each one gets a placeholder tile in the gallery
-until it's ready, on the phone too. On a slow connection the editor used to
-sit on a blank page for six seconds; the splash is up in about one and a half
-now.
+Settings › Beta has two new switches. **Photo info, handled by the engine**
+reads, strips and keeps your photos' camera info with the Rust engine, checks
+it against the old way on every photo, and keeps the old result if they ever
+disagree. **PageSpeed budget** measures each photo against the size Google
+actually allows for it — bytes per pixel — instead of the old made-up score.
+Both are off unless you switch them on, and the In the Works page links
+straight to each one.
 
-Every flow that waits now either finishes, fails with a reason and a Try
-again, or times out — the AI tools, Download, Download All, .ora import and
-the Batch tools. Download All shows its progress, skips a photo it can't read
-instead of failing the whole ZIP, and tells you how many it skipped. A failed
-cloud backup says so in the status bar. A build with no keys can open
-Settings › Sync and Shared without crashing.
+For everyone: Auto Compress no longer writes a compressed file back over your
+original when the "compressed" one came out bigger, the Quality slider moves
+both ways again, and Quality and Method say when they can't do anything.
+Under the hood, vite, Tailwind and zustand are up to date.
 
-Under the hood: a stray "engine document replaced" error that rapid switching
-used to throw is gone, fourteen end-to-end tests that only ran on a laptop now
-run on every PR, and the repo lost 17.6 MB of unreferenced screenshots and two
-dead files. QC passed against the production build.
-
-No Rust, no IndexedDB — engine unchanged at 829,721 bytes.
+Engine 829,721 → 854,542 bytes: the EXIF module, the old scorer kept for the
+Beta switch, and corner radius. The saved edit format moves to v11; older
+saves still open.
 
 
 ## License

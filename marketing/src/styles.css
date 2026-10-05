@@ -416,7 +416,15 @@ a { color: inherit; }
 /* ⌘K search trigger — desktop only, hidden on mobile with the items list.
    `border: 0` is load-bearing: it is a <button> without .nav-item--btn, so the
    browser's own 2px outset border drew a white ring round the pill. */
-.nav-pill__search { flex-shrink: 0; border: 0; font-family: inherit; }
+/* The ⌘K button carries a ring: beside the nav's words a bare "⌘K" read as
+   stray text, not a button. Inset, so the 44px circle and the row do not move. */
+.nav-pill__search {
+  flex-shrink: 0;
+  border: 0;
+  font-family: inherit;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-ink-3);
+}
 
 /* CTA label variants: full text on desktop, short on very narrow phones */
 .nav-pill__cta-short { display: none; }

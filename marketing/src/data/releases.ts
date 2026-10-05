@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.14",
+    date: "2026-10-05",
+    headline: "Round corners on any shape, two new things to try in Beta, and Auto Compress stops making files bigger.",
+    entries: [
+      { tag: "feature", text: "Rectangles, diamonds, triangles and stars can have rounded corners. Drag the Corner radius slider to round them all, or drag a corner dot on the shape — hold Shift to round just that one." },
+      { tag: "rust", text: "Rounding is done in the engine and saved in the edit history, so it survives a reload, a duplicate and a resize. Sketchy shapes keep their wobble around the curve." },
+      { tag: "feature", text: "New in Settings › Beta: Photo info, handled by the engine. Your photos' camera info is read, stripped and kept by the Rust engine and checked against the old way on every photo — if they ever disagree, you get the old result." },
+      { tag: "feature", text: "New in Settings › Beta: PageSpeed budget. Each photo is measured against the size Google actually allows for it, bytes per pixel, instead of a made-up score." },
+      { tag: "fix", text: "Auto Compress no longer writes a “compressed” file back over your original when it came out bigger. It happened to a q60 JPEG, quietly, 11% heavier." },
+      { tag: "fix", text: "The Quality slider moves both ways again, and Quality and Method say when they can't change anything instead of pretending to." },
+      { tag: "ui", text: "The In the Works page's “try it” links open the editor with that Beta feature already switched on, and the ⌘K button in the site's nav finally looks like a button." },
+      { tag: "infra", text: "vite, Tailwind and zustand are up to date, and a few dozen dead exports are gone." },
+    ],
+  },
+  {
     version: "v9.13",
     date: "2026-10-05",
     headline: "Switching photos says it's loading, a big import shows its tiles arriving, the app opens on a splash instead of a blank page, and nothing waits for ever.",

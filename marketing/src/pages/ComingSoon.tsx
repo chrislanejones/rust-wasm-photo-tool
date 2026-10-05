@@ -100,7 +100,7 @@ export default function ComingSoon() {
                         {g.stateLabel}
                       </span>
                       {f.beta && (
-                        <a className="soon-card__beta" href={EDITOR_URL} {...external}>
+                        <a className="soon-card__beta" href={`${EDITOR_URL}/?beta=${f.beta}`} {...external}>
                           try it in Beta &rarr;
                         </a>
                       )}

@@ -345,7 +345,7 @@ export default function Home() {
                   {f.beta && (
                     <div className="soon-card__top">
                       <span className="building__badge">Beta</span>
-                      <a className="soon-card__beta" href={EDITOR_URL} {...external}>
+                      <a className="soon-card__beta" href={`${EDITOR_URL}/?beta=${f.beta}`} {...external}>
                         try it &rarr;
                       </a>
                     </div>

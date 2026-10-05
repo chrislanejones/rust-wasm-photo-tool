@@ -5,8 +5,10 @@
 export interface Entry {
   name: string;
   body?: string;
-  /** Already behind a flag in the editor's Beta ring — you can switch it on. */
-  beta?: boolean;
+  /** Already behind a flag in the editor's Beta ring — you can switch it on.
+   *  The value is the feature's Beta id (lib/featureFlags.ts), so "try it"
+   *  opens the editor with it already on: `?beta=<id>`. */
+  beta?: string;
 }
 
 export interface Group {
@@ -38,11 +40,21 @@ export const GROUPS: Group[] = [
         name: "Offline",
         body: "Open the editor with no connection at all and keep working. The engine already runs on your machine; this is the last piece that doesn't.",
       },
-      { name: "Smart Brush", body: "Strokes that stop at an edge. Already behind a flag.", beta: true },
+      { name: "Smart Brush", body: "Strokes that stop at an edge. Already behind a flag.", beta: "smart-brush" },
       {
         name: "Blur on the graphics card",
         body: "The same blur, on the GPU where there is one. Already behind a flag.",
-        beta: true,
+        beta: "gpu-blur",
+      },
+      {
+        name: "Photo info, handled by the engine",
+        body: "Camera info read, stripped and kept by the Rust engine, checked against the old way on every photo. Already behind a flag.",
+        beta: "exif-rust",
+      },
+      {
+        name: "PageSpeed budget",
+        body: "Each photo measured against the size Google actually allows for it, instead of a made-up score. Already behind a flag.",
+        beta: "pagespeed-budget",
       },
     ],
   },
