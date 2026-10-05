@@ -509,3 +509,4 @@ jobs:
           e2e/async-dropped.spec.ts
           e2e/zip-export.spec.ts
           e2e/ora-import-status.spec.ts
+          e2e/beta-switches.spec.ts

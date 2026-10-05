@@ -148,14 +148,22 @@ Plus **64 more values, 195 uses, 27 of them used exactly once.**
 | `row-actions` | 2 | 85 | **KEEP** |
 | `context-menu` | 2 | 80 | **KEEP** |
 | `switch` | 1 | 46 | **REVIEW Night 2** — see Finding 2. |
-| `radio-cards` | 1 | 95 | **KEEP** — native radio inputs, semantics for free. |
+| ~~`radio-cards`~~ | **0** | 95 | **DELETED 2026-10-02** — the row below argued KEEP on a count of 1 importer, which was the Download dialog's format picker. That picker became `ToolButtonGroup` tiles ("tiles, not radio cards", per the dialog's own header) and the count went to 0. |
 | `command` | 1 | 122 | **KEEP** — one palette, one consumer, correct. |
 
-**Nothing is marked DEPRECATE.** A single importer is not evidence of a
-duplicate: `command`, `radio-cards` and `switch` each have one consumer and
-each is the only thing in the tree doing its job. What a low count *does* buy
-is a cheap change later — `switch` can be reconsidered for the price of one
-call site.
+**One row is now marked DELETED, and it is the row this section's reasoning
+missed.** `radio-cards` was argued KEEP on the strength of "1 importer… the only
+thing in the tree doing its job". It was doing its job in ONE place — the
+Download dialog's format picker — and that picker was later rebuilt as
+`ToolButtonGroup` tiles, which took the count to 0. The argument above is
+otherwise right and still stands: a single importer is not evidence of a
+duplicate, `command` and `switch` each have one consumer and each is the only
+thing doing its job, and a low count buys a cheap change later. What it does not
+buy is permanence — one consumer is one consumer *until that one moves*, and a
+primitive's importer count can reach zero without anything about the primitive
+changing. A count is a snapshot, not a promise.
+
+`command` and `switch` remain.
 
 ### The two families the plan asked about
 
@@ -168,10 +176,12 @@ candidates and only two of them are actually the same thing:
 | `toggle-button-group` | Documented as independent toggles | none ❌ |
 | `tool-mode-toggle` | Wrapper over `tool-button-group` | inherits the same gap ⚠️ |
 | `segmented-tabs` | Overlay tabs | `role="tab"` ✅ |
-| `radio-cards` | Cards over native `<input type=radio>` | native ✅ |
+| ~~`radio-cards`~~ | Cards over native `<input type=radio>` | native ✅ — **deleted 2026-10-02, 0 importers** |
 
-`tool-mode-toggle` is a layer, not a rival. `segmented-tabs` and `radio-cards`
-are different controls with correct semantics. That leaves `tool-button-group`
+`tool-mode-toggle` is a layer, not a rival. `segmented-tabs` was a different
+control with correct semantics, and `radio-cards` was too — which is exactly why
+it could be deleted rather than folded: its one consumer wanted tiles, not cards,
+and `tool-button-group` already provides tiles with correct semantics. That leaves `tool-button-group`
 and `toggle-button-group`, and the difference between them is the finding
 below.
 
@@ -356,9 +366,12 @@ Put the two together:
 `RulersGridsPane` and `LayerSettings`. Three more are action rows where silence
 is correct. **38 are silent and should not be.** `tool-mode-toggle` passes
 `value={activeMode}` (line 101), so the wrapper inherits the silence rather
-than the attribute. The two primitives that get it right — `radio-cards`
-(native inputs) and `segmented-tabs` (`role="tab"`) — are the two least used in
-the whole table, with one and two importers.
+than the attribute. The two primitives that got it right — `radio-cards`
+(native inputs) and `segmented-tabs` (`role="tab"`) — were the two least used in
+the whole table, with one and two importers. **Resolved 2026-09-24 (Night 2):**
+36 SELECT sites are now named radio groups and 4 TOGGLE sites carry
+`aria-pressed`. `radio-cards` was subsequently deleted (0 importers) and its role
+is served by `tool-button-group`'s SELECT mode.
 
 So the app's entire settings surface, including the Sync switch shipped in
 v8.85 and the privacy switch shipped in v8.89, reads to a screen reader as rows

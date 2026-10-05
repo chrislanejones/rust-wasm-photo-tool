@@ -33,6 +33,8 @@
 // Every one of these still needs a reload to take full effect — the reads
 // happen at module init or on paths that have already run.
 
+import { isWebBudgetEnabled } from "@/lib/webPerf";
+import { isExifRustEnabled } from "@/lib/exif/rust";
 import { isOplogPersistenceEnabled } from "@/lib/oplogPersistence";
 import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
@@ -135,6 +137,34 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
       label: "Smart Brush",
       blurb:
         "Paint strokes that stop at an edge instead of running over it. The engine side is tested; what nobody has judged is the feel — whether a stroke stops where you expect.",
+    },
+  },
+  {
+    key: "ih_exif_rust",
+    label: "EXIF in Rust (PR #240)",
+    kind: "optin",
+    isOn: isExifRustEnabled,
+    effect: "EXIF read / strip / transplant runs the Rust port (src/exif.rs) beside the TypeScript one; when they agree byte for byte the Rust bytes are used, when they differ the TypeScript bytes are used and the mismatch goes to Diagnostics.",
+    source: "lib/exif/rust.ts",
+    beta: {
+      id: "exif-rust",
+      label: "Photo info, handled by the engine",
+      blurb:
+        "Reads, strips and keeps your photos' camera info (EXIF and location) with the app's Rust engine instead of JavaScript. It is checked against the old way on every photo; if the two ever disagree you get the old result, and the difference is noted in Diagnostics.",
+    },
+  },
+  {
+    key: "ih_web_budget",
+    label: "PageSpeed budget (PR #289)",
+    kind: "optin",
+    isOn: isWebBudgetEnabled,
+    effect: "Resize & Compress reads 'PageSpeed budget used' (bytes against width × height ÷ 6, Lighthouse's own rule) instead of the old 0–100 score, and Auto Compress aims for that budget instead of a flat 200 KB. The never-grows guard is on for everyone either way.",
+    source: "lib/webPerf.ts",
+    beta: {
+      id: "pagespeed-budget",
+      label: "PageSpeed budget",
+      blurb:
+        "Resize & Compress measures each photo against the size Google PageSpeed actually allows for it — bytes against pixels — instead of the old score, and Auto Compress aims for that. The number reads differently: lower is better, and 100% or less passes.",
     },
   },
   {

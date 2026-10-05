@@ -125,15 +125,78 @@ typed ÷ photo width (not ÷ artboard width) — a one-line change in the resize
 path, but it changes the output of every resize, so it wants its own PR and a
 look at the Canvas Size panel, which may lean on the current behavior.
 
-## OPEN — Auto Compress makes an already-small JPEG heavier (09-28-2026)
+## FIXED 2026-10-02 — Auto Compress made an already-small JPEG heavier
 
-Found the same day, identical on master. A q60 JPEG of 32,950 B through
-"Compress Image" comes back at **36,621 B** (+11%) and stores `encodeQuality: 75`
-— it re-encodes at the panel's quality, which is higher than the file's own.
-#259 added the "never hand back a bigger file for fewer pixels" step-down to
-Apply Resize only; Auto Compress has no such guard. Now that `encodeQuality`
-is on the entry, the obvious rule is: if the result is not smaller, keep the
-original bytes and say so.
+Fixed on `fix/pagespeed-truth-and-panel-honesty`. A q60 JPEG of 32,950 B through
+"Compress Image" came back at **36,621 B** (+11%) and stored `encodeQuality: 75`.
+
+Three causes, all in the same twenty lines of `useAutoCompress.ts`:
+
+1. **No floor.** The budget loop was `while blob.size > targetBytes` — it
+   optimised for a CEILING and had no branch for "under budget but bigger than
+   what you gave me". 36,621 is well under the 200 KB target, so the loop never
+   ran a single pass and the first encode at q75 was taken unconditionally.
+   Apply Resize already had this guard from #259; this is the same rule in the
+   file that lacked it, and both numbers were already in scope.
+2. **The wrong target.** 200 KB flat is not what the web cares about —
+   Lighthouse measures bytes PER PIXEL. See the model fix below.
+3. **`q = 0.7` on the dimension step**, so a photo that tripped the loop came
+   back encoded at a HIGHER quality than the slider asked for. Which also made
+   any size comparison unpredictable if the guard landed first.
+
+The kept-original path reports the ORIGINAL's dimensions and a null quality
+rather than the discarded encode's, because `autoCompressedPatch` writes those
+onto the PhotoEntry and every later panel reads them as "the file on disk".
+
+Still open from the same work: the signed badge does show a negative number, so
+the growth was visible — but as `-11%` on a thumbnail, three seconds after a run
+reported success.
+
+## OPEN — the PageSpeed model was not Lighthouse's model (FIXED 2026-10-02)
+
+> **FIXED 2026-10-02** on `fix/pagespeed-truth-and-panel-honesty`. Resolved
+> while fixing the Auto Compress guard above, which is why the two were one
+> session: the guard needs a correct target to be worth having.
+
+`web_perf_metrics` scored **absolute bytes** against a fabricated log-normal
+curve (`GOOD = 100 KB`, `MEDIAN = 500 KB`) and penalised anything wider than
+1920 px. Lighthouse measures neither. From `ImageDelivery.js` in
+`@paulirish/trace_engine` (backing the current `image-delivery-insight`, which
+replaced `modern-image-formats`, `uses-optimized-images` and
+`uses-responsive-images`):
+
+```js
+const TARGET_BYTES_PER_PIXEL_AVIF = 2 * 1 / 12;   // 0.1667 bytes/px
+const bytesPerPixel = imageBytes / imageFilePixels;
+if (bytesPerPixel > TARGET_BYTES_PER_PIXEL_AVIF) { /* flagged */ }
+```
+
+So the rule is **bytes ≤ pixels / 6**, and there is no 0–100 image score
+anywhere in it. 1920 px is not in it either: "properly size images" is now a
+comparison against DISPLAYED size corrected for DPR, which the panel
+structurally cannot know.
+
+The two models disagreed in BOTH directions, which is what made the old one
+actively misleading rather than merely imprecise:
+
+| Image | Bytes | B/px | Real verdict | Old score |
+|---|---|---|---|---|
+| 1600×1200 JPEG q60 | 32,950 | 0.017 | passes, 10× margin | ~90 |
+| 6000×4000 JPEG | 10,000,000 | 0.417 | **fails** | ~50 |
+
+Shipped: the score is now the budget USED as a percentage (`≤100` passes, above
+says by how much), `lighthouse_score`/`erf`/`erfc` are deleted, Auto Compress
+iterates toward `pixels / 6`, and the flat 200 KB is gone from the whole path.
+
+**Still open, and it is the interesting half:** the label says "budget used",
+not "Lighthouse score", because no such score exists. Chris may still want the
+0–100 shape with the real rule feeding it — a product call, not a bug.
+
+⚠️ **A consequence worth knowing before anyone proposes "just resize it
+smaller":** halving the pixels halves the file AND halves the budget, so the
+ratio does not move (pinned by `a_downscale_alone_does_not_improve_the_ratio`).
+What fixes a dense photo is a lower quality or a next-gen format. The panel
+taught the opposite for years.
 
 ## OPEN — 116 · The oval is the piece of this still to build (09-30-2026)
 
@@ -779,16 +842,24 @@ vacuous-checks family 3, "the observation was never taken".
 at a time to find the call that desyncs the log, then an e2e that paints and
 undoes through the UI and asserts `oplog_is_broken() === false`.
 
-## OPEN — mobile Download saves a file with no extension (2026-09-15)
+## FIXED 2026-10-02 — mobile Download saved a file with no extension
 
-Noticed while fixing the pasted-export name (`fix/pasted-export-name`), not
-touched by it. `MobileShell.tsx:176` downloads the stored ORIGINAL as
-`a.download = photo.name`, and gallery names are stored with the extension
-stripped (`useImageSession.ts:401`). So a pasted image would save as `pasted`
-and `beach.jpg` as `beach` — no `.png` / `.jpg`. Read from the code only; not
-yet observed on a phone. The desktop export paths append `-revised` + the real
-extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
-decide first whether mobile should save the original (as now) or the edit.
+Found 2026-09-15, fixed 2026-10-02 on `fix/pagespeed-truth-and-panel-honesty`.
+`MobileShell.tsx` downloaded the stored ORIGINAL as `a.download = photo.name`,
+and gallery names are stored with the extension stripped
+(`useImageSession.ts:491`) — so a pasted image saved as `pasted` and `beach.jpg`
+as `beach`, with no extension at all. The extension now comes from the bytes
+via `extFromMime(stored.mimeType)`, the same helper the desktop export paths
+already used, which is why those were unaffected.
+
+⚠️ It sat open 17 days because it is invisible to every gate: no CI job runs on
+a phone, and `a.download` is a single line no test touched. Worth remembering as
+the shape of bug this repo's gates cannot see — the same class as the op-log
+undo bug below, which survived because the parity tests never ran the app's own
+flush path.
+
+Not yet observed on a real phone either way. It is read from the code and the
+helper's own tests.
 
 ## RESOLVED — `history_max_bytes` is exported and nothing calls it (2026-09-12)
 
@@ -3975,3 +4046,81 @@ or WebPageTest run on `edit.imagehorse.app` settles whether the 5× is real
 there before anyone changes worker code. The header fix and the 5× fetch are
 independently shippable; the header is a one-line `vercel.json` change and
 needs no app code.
+
+---
+
+### Four more from the 2026-10-02 sweep (fix/pagespeed-truth-and-panel-honesty)
+
+All four were found reading the code and running the repo's own instruments
+(`ui-ratchet-counts.mjs`, `ui-inventory.mjs`, `fallow dead-code`). One is FIXED
+in that PR; the other three are recorded here rather than fixed, because each
+wants its own session and two of them are deletions.
+
+#### FIXED — the Download dialog had TWO radio groups for ONE format choice
+
+`DownloadDialog.tsx` split the Selected pane's formats into "Image format" and
+"Layered file", as two separate `ToolButtonGroup`s, and **both passed `value`** —
+which is exactly what makes a `ToolButtonGroup` a SELECT (a named radiogroup,
+one Tab stop, arrows between its own tiles). So one exclusive choice
+(JPEG/PNG/WebP/AVIF/SVG/ORA/PSD) was two radio groups, and arrow keys inside
+"Image format" could not reach ORA or PSD.
+
+It *looked* right: the code passed `undefined` to whichever group did not own the
+current value, so the visible state was correct and only the announcement was
+wrong — which is why nothing caught it. Now one group; ORA and PSD sort to the
+end of the same grid and say so in their tooltip.
+
+#### OPEN — three duplicated ToolButton components, disagreeing on radius
+
+`components/ui/tool-button.tsx` (105 lines), `features/tools/ToolButton.tsx`
+(64 lines, exactly one importer: `ToolGrid.tsx`), and a third copy inlined in
+`SubtoolRow.tsx`. Three implementations of one tile — R5 says one primitive per
+pattern.
+
+They also disagree visually. `ui/icon-button.tsx` documents that the tool rail
+was deliberately matched to `ToggleButtonGroup`'s `rounded-md` (6px), while
+`features/tools/ToolButton.tsx:41` uses `rounded-2xl` and `SubtoolRow.tsx:96`
+uses `rounded-xl`. The rail and the sub-tool row do not match each other.
+
+Collapsing this is a visible change to the two most-seen surfaces in the app,
+so it wants screenshots, not a drive-by.
+
+#### OPEN — `useMediaQuery.ts` is dead on the marketing site
+
+`marketing/src/useMediaQuery.ts`, 39 lines, zero references anywhere in
+`marketing/`. A one-file deletion.
+
+`fallow` also reports `marketing/src/ds-entry.ts` + `ds-shim.ts` as unused, and
+`marketing/scripts/gen-sitemap-dates.mjs`. **All three are false positives** and
+are recorded so the next run is not re-investigated:
+
+| File | Why it looks dead | Why it is not |
+|---|---|---|
+| `gen-sitemap-dates.mjs` | nothing imports it | `gen-trail-data.mjs:287` `execFileSync`s it. Deleting it would silently drop sitemap `lastmod` on the next release |
+| `ds-entry.ts` | zero importers | exists ONLY for `/design-sync`, which needs an entry because the marketing site is a Vite app with no `main`/`exports` |
+| `ds-shim.ts` | zero importers | imported by `ds-entry.ts`, which the converter reads |
+
+They want an `ignorePatterns` row in `.fallowrc.jsonc`, which already carries
+hand-written entries for exactly this reason.
+
+#### OPEN — the measured counts in UI_CONSISTENCY.md were wrong in five places
+
+Found while fixing the ratchet baselines. `guardrails.sh` was RIGHT on all three
+UI ratchets; the DOC was a release behind (53/52/37 in §6 against 52/51/33 in the
+script). That is the inverse of the standing "a ratchet that IMPROVED and was
+never locked in is silent drift" entry — here the gate held and the document
+drifted, which is worse, because the document is what work is decided from.
+
+Correcting it also showed `ui-raw-button` had fallen 37 → 33 with nobody
+watching, and two other numbers had moved:
+
+| Claim in the doc | Was | Measured 2026-10-02 |
+|---|---:|---:|
+| R9 `title=` uses | ~47 | **180** |
+| bare `rounded` vs `rounded-sm` | 60 vs 4 | **62 vs 9** |
+| bare-`kbd` files | 6 | **8** (21 elements) |
+| `py-2.5` (retired, "×13 is the bulk") | 13 | **16**, one inside `ui/button.tsx` |
+
+All fixed in this PR. The R9 one is the serious number: `title` does not appear
+on touch, which is most of the phone surface, and the two densest files
+(`ReviewPanel` 18, `LayerSettings` 16) are the densest panels in the app.

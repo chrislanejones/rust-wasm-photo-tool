@@ -133,8 +133,8 @@ ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
   exit 1
 }
 ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
-check "ui-spacing" 52 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
-check "ui-radius" 51 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-spacing" 51 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-radius" 50 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
 check "ui-raw-button" 33 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
