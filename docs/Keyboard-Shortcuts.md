@@ -82,6 +82,14 @@ the arrows.
 The same four live on each shape row in Review → Reselect as ▲ / ▼
 (Shift-click for all the way). Each is one undo step.
 
+On the edit box itself:
+
+| Gesture                              | Action |
+|--------------------------------------|--------|
+| Drag a corner dot                    | Round every corner (rect, diamond, triangle, star) |
+| `Shift` + drag a corner dot          | Round only that corner — the others keep their radius |
+| `Shift` + drag the rotate hook       | Snap the rotation to 15° |
+
 ## Layers
 
 | Shortcut               | Action |

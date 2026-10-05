@@ -1394,15 +1394,47 @@ fn a_rotated_warped_star_survives_persist_restore_byte_identical() {
     let (mut t, _px) = seeded_tool(96, 80);
     t.set_oplog_undo(true);
     let id = t.add_shape_annotation_full(
-        9, 14.0, 10.0, 70.0, 60.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 40, 7, 30.0,
+        9,
+        14.0,
+        10.0,
+        70.0,
+        60.0,
+        "#e02020",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        0,
+        40,
+        7,
+        30.0,
+        &[6],
     );
     t.recomposite();
     assert!(t.set_shape_perspective(id, &[0.2, 0.0, 0.8, 0.0, 1.0, 1.0, 0.0, 1.0]));
     t.recomposite();
     let h_before_move = composite_hash(&mut t);
     assert!(t.update_shape_annotation_full(
-        id, 9, 20.0, 14.0, 76.0, 64.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 40, 7,
+        id,
+        9,
+        20.0,
+        14.0,
+        76.0,
+        64.0,
+        "#e02020",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        0,
+        40,
+        7,
         30.0,
+        &[6],
     ));
     t.recomposite();
     let h_full = composite_hash(&mut t);
@@ -1421,12 +1453,14 @@ fn a_rotated_warped_star_survives_persist_restore_byte_identical() {
     assert_eq!(
         composite_hash(&mut t2),
         h_full,
-        "restored == pre-reload, byte-exact: rotation, points, sketch and warp all crossed the codec"
+        "restored == pre-reload, byte-exact: rotation, points, radii, sketch and warp all crossed the codec"
     );
     assert!(!t2.oplog_is_broken());
     let json = t2.get_shape_annotations();
     assert!(
-        json.contains("\"rotation\":30,") && json.contains("\"starPoints\":7,"),
+        json.contains("\"rotation\":30,")
+            && json.contains("\"starPoints\":7,")
+            && json.contains("\"cornerRadii\":[6,6,6,6],"),
         "{json}"
     );
 
@@ -1458,7 +1492,23 @@ fn one_undo_removes_a_seven_point_star() {
     t.set_oplog_undo(true);
     let h0 = composite_hash(&mut t);
     t.add_shape_annotation_full(
-        9, 14.0, 10.0, 70.0, 60.0, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 0, 0, 7, 0.0,
+        9,
+        14.0,
+        10.0,
+        70.0,
+        60.0,
+        "#e02020",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        0,
+        0,
+        7,
+        0.0,
+        &[],
     );
     t.recomposite();
     assert!(t.undo());

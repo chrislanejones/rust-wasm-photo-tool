@@ -3,9 +3,12 @@
 import type { ShapeName } from "@/lib/types";
 import {
   closedOutline,
+  hasRadius,
   shapeWobbleSeed,
   sloppyCirclePoints,
+  sloppyOutlinePoints,
   sloppyPolylinePoints,
+  type CornerRadii,
 } from "@/lib/shapeSloppiness";
 
 /* ------------------------------------------------------------------ */
@@ -73,6 +76,7 @@ export function drawShapePreview(
   width: number,
   sloppiness: number,
   starPoints: number,
+  cornerRadii?: CornerRadii,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -84,7 +88,8 @@ export function drawShapePreview(
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
   // rect / diamond / star / triangle — the exact vertex list Rust strokes.
-  const outline = closedOutline(shape, from, to, starPoints);
+  const outline = closedOutline(shape, from, to, starPoints, cornerRadii);
+  const rounded = hasRadius(cornerRadii);
 
   if (sloppiness > 0) {
     // Mirrors Rust: at sloppiness > 0 EVERY shape routes through the
@@ -92,7 +97,7 @@ export function drawShapePreview(
     // (draw_shape, drawing.rs). Firm shapes (0) take the clean branches below.
     const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
     const pts = outline
-      ? sloppyPolylinePoints(outline, seed, sloppiness, width, true)
+      ? sloppyOutlinePoints(outline, rounded, seed, sloppiness, width)
       : shape === "circle"
         ? sloppyCirclePoints(from, to, sloppiness, width)
         : sloppyPolylinePoints(

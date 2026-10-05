@@ -141,6 +141,15 @@ pub struct ShapeAnnotation {
     /// 3..=12 and never 5. Always 0 on every other kind. Read it through
     /// [`effective_star_points`].
     pub star_points: u8,
+    /// Corner radii in px (Figma's corner radius), stored canonical by
+    /// [`canonical_corner_radii`]. Corner `i` is TL, TR, BR, BL on the rect;
+    /// top, right, bottom, left on the diamond; apex, bottom-right,
+    /// bottom-left on the triangle (index 3 always 0); the star rounds every
+    /// tip and valley alike and stores that one radius in all four. All zero
+    /// — square corners — on every other kind, and in every document written
+    /// before radii existed. Measured in the shape's own unrotated frame, like
+    /// the box.
+    pub corner_radii: [u16; 4],
     /// Numbered callout pins (kind 5): the 1-based sequence index. 0 otherwise.
     pub number: u32,
     /// Pin label style (kind 5): 0 = number (1, 2, 3…), 1 = letter (A, B, C…).
@@ -470,6 +479,35 @@ pub(crate) fn effective_star_points(stored: u8) -> u32 {
     }
 }
 
+/// The kinds that have corners to round: rect (0), diamond (8), star (9),
+/// triangle (10). The circle has none, and the line, arrow, pin and pen paths
+/// are not closed shapes.
+pub(crate) fn has_corners(kind: u8) -> bool {
+    matches!(kind, 0 | 8 | 9 | 10)
+}
+
+/// The ONE stored form of a shape's corner radii — the `canonical_star_points`
+/// rule, for the same reason (one value per meaning, so the op-log diff only
+/// sees real changes): all zero on a kind with no corners, the triangle's
+/// missing fourth corner 0, and the star's single radius copied into all four
+/// slots (its first entry wins). A short slice reads as zeros past its end.
+pub(crate) fn canonical_corner_radii(kind: u8, radii: &[u16]) -> [u16; 4] {
+    if !has_corners(kind) {
+        return [0; 4];
+    }
+    let at = |i: usize| radii.get(i).copied().unwrap_or(0);
+    match kind {
+        9 => [at(0); 4],
+        10 => [at(0), at(1), at(2), 0],
+        _ => [at(0), at(1), at(2), at(3)],
+    }
+}
+
+/// The radii as the geometry takes them.
+pub(crate) fn radii_f64(r: [u16; 4]) -> [f64; 4] {
+    [r[0] as f64, r[1] as f64, r[2] as f64, r[3] as f64]
+}
+
 /// The kinds whose geometry turns with `rotation_deg`. Arrow, pin, polyline,
 /// bézier and the legacy hand-circle keep their stored geometry as-is.
 fn rotation_applies(kind: u8) -> bool {
@@ -502,7 +540,7 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"sloppiness\":{},\"starPoints\":{},\"rotation\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"sloppiness\":{},\"starPoints\":{},\"cornerRadii\":[{},{},{},{}],\"rotation\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
@@ -510,6 +548,7 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
             s.arrow_style,
             s.sloppiness,
             s.star_points,
+            s.corner_radii[0], s.corner_radii[1], s.corner_radii[2], s.corner_radii[3],
             s.rotation_deg,
             s.number,
             s.label_kind,
@@ -781,6 +820,7 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             s.fill_angle,
             s.fill_block,
             effective_star_points(s.star_points),
+            radii_f64(s.corner_radii),
         );
     }
     match s.kind {
@@ -824,6 +864,7 @@ fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             s.stroke_width,
             s.sloppiness as f64,
             effective_star_points(s.star_points),
+            radii_f64(s.corner_radii),
             // The circle is in `rotation_applies` for hit-testing and for its
             // gradient's warp route, but its outline is rotation-invariant, so
             // it is not handed one here.
@@ -956,6 +997,7 @@ impl ImageHorseTool {
             stroke_width,
             0.0,
             5,
+            [0.0; 4],
             None,
         );
     }
@@ -988,7 +1030,10 @@ impl ImageHorseTool {
     /// `star_points`: star (9) only — 0 = the classic five, else 3..=12
     /// (stored canonical, see [`canonical_star_points`]). `rotation_deg`:
     /// clockwise about the bbox center, normalized to (-180, 180] on the way
-    /// in; x0..y1 stay the UNROTATED box.
+    /// in; x0..y1 stay the UNROTATED box. `corner_radii`: up to four corner
+    /// radii in px (a `Uint16Array` from JS; missing entries are 0), stored
+    /// canonical by [`canonical_corner_radii`] — rect, diamond, star and
+    /// triangle only.
     #[wasm_bindgen(js_name = add_shape_annotation)]
     pub fn add_shape_annotation_full(
         &mut self,
@@ -1008,6 +1053,7 @@ impl ImageHorseTool {
         sloppiness: u8,
         star_points: u8,
         rotation_deg: f64,
+        corner_radii: &[u16],
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
@@ -1032,6 +1078,7 @@ impl ImageHorseTool {
                 sloppiness,
                 rotation_deg: normalize_rotation_deg(rotation_deg),
                 star_points: canonical_star_points(kind, star_points),
+                corner_radii: canonical_corner_radii(kind, corner_radii),
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -1056,7 +1103,7 @@ impl ImageHorseTool {
     /// passed as raw r,g,b (the persisted JSON stores bytes, not hex). Returns
     /// the new id.
     ///
-    /// JS calls this as **`restore_shape_annotation`** (`js_name`); the two
+    /// JS calls this as **`restore_shape_annotation`** (`js_name`); the three
     /// trailing arguments are the same as [`add_shape_annotation_full`](Self::add_shape_annotation_full)'s.
     #[wasm_bindgen(js_name = restore_shape_annotation)]
     pub fn restore_shape_annotation_full(
@@ -1085,6 +1132,7 @@ impl ImageHorseTool {
         sloppiness: u8,
         star_points: u8,
         rotation_deg: f64,
+        corner_radii: &[u16],
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
@@ -1105,6 +1153,7 @@ impl ImageHorseTool {
                 sloppiness,
                 rotation_deg: normalize_rotation_deg(rotation_deg),
                 star_points: canonical_star_points(kind, star_points),
+                corner_radii: canonical_corner_radii(kind, corner_radii),
                 number: 0,
                 label_kind: 0,
                 points: Vec::new(),
@@ -1368,7 +1417,7 @@ impl ImageHorseTool {
     /// an "Edit Shape" snapshot so undo restores the prior values. Used when a
     /// drag/resize or panel restyle of a selected shape is committed.
     ///
-    /// JS calls this as **`update_shape_annotation`** (`js_name`); the two
+    /// JS calls this as **`update_shape_annotation`** (`js_name`); the three
     /// trailing arguments are the same as [`add_shape_annotation_full`](Self::add_shape_annotation_full)'s.
     /// The perspective quad is deliberately NOT a parameter and is left as it
     /// was — it has its own setter and its own op.
@@ -1392,6 +1441,7 @@ impl ImageHorseTool {
         sloppiness: u8,
         star_points: u8,
         rotation_deg: f64,
+        corner_radii: &[u16],
     ) -> bool {
         if !self.layers[self.active]
             .shape_annotations
@@ -1422,6 +1472,7 @@ impl ImageHorseTool {
             s.sloppiness = sloppiness;
             s.rotation_deg = normalize_rotation_deg(rotation_deg);
             s.star_points = canonical_star_points(kind, star_points);
+            s.corner_radii = canonical_corner_radii(kind, corner_radii);
             s.fill_kind = fill_kind;
             s.fill_r = f[0];
             s.fill_g = f[1];
@@ -1914,6 +1965,7 @@ impl ImageHorseTool {
             sloppiness,
             0,
             0.0,
+            &[],
         )
     }
 
@@ -1968,6 +2020,7 @@ impl ImageHorseTool {
             sloppiness,
             0,
             0.0,
+            &[],
         )
     }
 
@@ -2012,6 +2065,7 @@ impl ImageHorseTool {
             sloppiness,
             0,
             0.0,
+            &[],
         )
     }
 }
@@ -3147,7 +3201,23 @@ mod rotation_outline_tests {
     fn add(t: &mut ImageHorseTool, kind: u8, bbox: (f64, f64, f64, f64), rot: f64) -> u32 {
         let (x0, y0, x1, y1) = bbox;
         t.add_shape_annotation_full(
-            kind, x0, y0, x1, y1, "#e02020", 3.0, 0, 0, "#2040e0", "#20e040", 0, 8, 0, 0, rot,
+            kind,
+            x0,
+            y0,
+            x1,
+            y1,
+            "#e02020",
+            3.0,
+            0,
+            0,
+            "#2040e0",
+            "#20e040",
+            0,
+            8,
+            0,
+            0,
+            rot,
+            &[],
         )
     }
 

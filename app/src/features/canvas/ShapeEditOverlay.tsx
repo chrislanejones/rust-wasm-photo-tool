@@ -18,7 +18,14 @@ import { pendingShapeType } from "@/hooks/useDrawingTools";
 import type { DrawEditState, Point } from "@/hooks/useDrawingTools";
 import { lockAxisDelta, lockPointToAxis, lockScaleFactors } from "@/lib/aspectLock";
 import type { ShapeName } from "@/lib/types";
-import { closedOutline } from "@/lib/shapeSloppiness";
+import {
+  canonicalCornerRadii,
+  closedOutline,
+  cornerCount,
+  hasRadius,
+  type CornerRadii,
+} from "@/lib/shapeSloppiness";
+import { cornerHandles, radiusAfterDrag, type CornerHandle } from "@/lib/cornerRadiusHandles";
 import { shapeCanFill } from "@/lib/drawEditState";
 import {
   boxCenter,
@@ -68,12 +75,13 @@ export function ShapeEditOverlay({
   // Read here rather than threaded through `drawSettings`, which AppShell
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
+  const liveCornerRadii = useToolStore((s) => s.toolSettings.cornerRadii);
 
   // ── Shape/arrow edit-overlay drag ──────────────────────────────────
   // Same window-listener pattern as the crop handles. Geometry math is
   // plain JS (trivial); Rust does all pixel rendering at commit.
   const drawDragRef = useRef<{
-    mode: "resize" | "move" | "endpoint" | "rotate";
+    mode: "resize" | "move" | "endpoint" | "rotate" | "radius";
     /** resize: nw|n|ne|e|se|s|sw|w · endpoint: start|end · move: body ·
      *  rotate: "shape" (turns `rotation`) or "segment" (turns a line's
      *  endpoints — see lib/shapeRotation.ts) */
@@ -89,6 +97,10 @@ export function ShapeEditOverlay({
      *  px for the rotate handle, which needs a position, not a delta. */
     originX: number;
     originY: number;
+    /** radius: the corner dot being dragged, and the radii when it began. */
+    corner?: CornerHandle;
+    startRadii?: CornerRadii;
+    shape?: ShapeName;
   } | null>(null);
 
   const onDrawEditChangeRef = useRef(onDrawEditChange);
@@ -102,6 +114,24 @@ export function ShapeEditOverlay({
       let dx = (e.clientX - drag.startX) / drag.scaleX;
       let dy = (e.clientY - drag.startY) / drag.scaleY;
       const g = drag.startGeom;
+      if (drag.mode === "radius" && drag.corner && drag.startRadii && drag.shape) {
+        // Figma's corner dot. The pointer delta is read in the shape's own
+        // frame and along the corner's bisector; Shift rounds this corner
+        // only, otherwise every corner takes the dragged one's new radius.
+        // Written to the panel's value, so it is the slider by other means:
+        // a new shape reads it live and a reselected one takes it through
+        // `panelStylePatch`, exactly as a slider move would.
+        const local = toLocalDelta(dx, dy, drag.startRotation);
+        const r = radiusAfterDrag(drag.corner, drag.startRadii, local.dx, local.dy);
+        const next = canonicalCornerRadii(
+          drag.shape,
+          e.shiftKey
+            ? drag.startRadii.map((v, i) => (i === drag.corner!.index ? r : v))
+            : [r, r, r, r],
+        );
+        useToolStore.getState().setToolSettings((p) => ({ ...p, cornerRadii: next }));
+        return;
+      }
       if (drag.mode === "rotate") {
         // Angle about the box center, in CANVAS px so a zoomed view turns
         // at the same rate as an unzoomed one.
@@ -218,8 +248,9 @@ export function ShapeEditOverlay({
   const handleDrawPointerDown = useCallback(
     (
       e: React.PointerEvent<SVGElement>,
-      mode: "resize" | "move" | "endpoint" | "rotate",
+      mode: "resize" | "move" | "endpoint" | "rotate" | "radius",
       handle: string,
+      corner?: { handle: CornerHandle; radii: CornerRadii; shape: ShapeName },
     ) => {
       if (!drawEditState || !canvasRef.current) return;
       e.preventDefault();
@@ -242,6 +273,9 @@ export function ShapeEditOverlay({
         startRotation: drawEditState.rotation ?? 0,
         originX: rect.left,
         originY: rect.top,
+        corner: corner?.handle,
+        startRadii: corner?.radii,
+        shape: corner?.shape,
       };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
@@ -277,6 +311,13 @@ export function ShapeEditOverlay({
   // legacy hand circle (3) re-edit as circles but the engine does not
   // turn them, so they get no hook.
   const kindByte = drawEditState.style?.kindByte;
+  // Corner radii: the reselected shape's own, else the live panel — the
+  // starPoints rule. Canonical for this shape, as the engine will store it.
+  const radii = canonicalCornerRadii(
+    kindByte === 5 ? "circle" : shape,
+    drawEditState.style?.cornerRadii ?? liveCornerRadii,
+  );
+  const rounded = hasRadius(radii);
   const rotatable = kind !== "arrow" && kindByte !== 5 && kindByte !== 3;
   const deg = isSegment ? 0 : (drawEditState.rotation ?? 0);
 
@@ -295,6 +336,7 @@ export function ShapeEditOverlay({
 
   const HS = 9;   // resize-square size — screen px, zoom-independent
   const EP_R = 6; // endpoint-circle radius — screen px
+  const RADIUS_DOT_R = 4; // corner-radius dot — screen px, smaller than a resize square
   const strokeW = Math.max(1, eff.strokeWidth * sx);
   const color = eff.strokeColor;
   // Sketchy outline? Read live so a panel tweak while the overlay is
@@ -468,7 +510,7 @@ export function ShapeEditOverlay({
   } else if (shape === "diamond" || shape === "star" || shape === "triangle") {
     // Firm → clean polygon over the exact vertex list Rust rasterises;
     // sketchy → the same vertices pushed through the wobble path generator.
-    const verts = closedOutline(shape, start, end, starPoints) ?? [];
+    const verts = closedOutline(shape, start, end, starPoints, radii) ?? [];
     const pts = verts.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ");
     // The fill is its own clean polygon, on the SAME vertices — sloppiness
     // roams the stroke only, which is what `fill_shape` does on the Rust side
@@ -478,7 +520,7 @@ export function ShapeEditOverlay({
     );
     const strokeLayer = sloppy ? (
       <path
-        d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY, starPoints)}
+        d={sloppyShapePath(start, end, shape, sloppyAmt, eff.strokeWidth, toSX, toSY, starPoints, radii)}
         fill="none" stroke={color} strokeWidth={strokeW}
         strokeLinecap="round" strokeLinejoin="round"
       />
@@ -499,13 +541,25 @@ export function ShapeEditOverlay({
       <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
     );
   } else {
-    // rect
-    const fillLayer = (
+    // rect — a rounded one is a polygon over the engine's own arc points.
+    const roundPts = rounded
+      ? (closedOutline("rect", start, end, undefined, radii) ?? [])
+          .map((p) => `${toSX(p.x)},${toSY(p.y)}`)
+          .join(" ")
+      : "";
+    const fillLayer = rounded ? (
+      <polygon points={roundPts} fill={fillAttr} />
+    ) : (
       <rect x={vx} y={vy} width={vw} height={vh} fill={fillAttr} />
     );
-    const strokeLayer = sloppy ? (
+    const strokeLayer = rounded && !sloppy ? (
+      <polygon
+        points={roundPts}
+        fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
+      />
+    ) : sloppy ? (
       <path
-        d={sloppyShapePath(start, end, "rect", sloppyAmt, eff.strokeWidth, toSX, toSY)}
+        d={sloppyShapePath(start, end, "rect", sloppyAmt, eff.strokeWidth, toSX, toSY, undefined, radii)}
         fill="none" stroke={color} strokeWidth={strokeW}
         strokeLinecap="round" strokeLinejoin="round"
       />
@@ -654,6 +708,35 @@ export function ShapeEditOverlay({
             onPointerDown={(e) => handleDrawPointerDown(e, "resize", h.id)}
           />
         ))}
+
+        {/* Corner-radius dots (Figma's): one inside each corner of a rect,
+            diamond or triangle, one at a star's top tip. Drag toward the
+            middle to round every corner; Shift-drag rounds this one only. */}
+        {cornerCount(shape) > 0 && kindByte !== 5 &&
+          cornerHandles(shape, start, end, starPoints, radii, sx, sy).map((c) => (
+            <circle
+              key={`radius-${c.index}`}
+              data-shape-radius-handle={c.index}
+              cx={toSX(c.dot.x)} cy={toSY(c.dot.y)} r={RADIUS_DOT_R}
+              fill="white"
+              stroke="rgba(0,0,0,0.5)"
+              strokeWidth={1}
+              style={{ cursor: "default", pointerEvents: "all" }}
+              onPointerDown={(e) =>
+                handleDrawPointerDown(e, "radius", String(c.index), {
+                  handle: c,
+                  radii,
+                  shape,
+                })
+              }
+            >
+              <title>
+                {cornerCount(shape) > 1
+                  ? "Corner radius — drag to round every corner, Shift-drag to round only this one"
+                  : "Corner radius — drag to round the corners"}
+              </title>
+            </circle>
+          ))}
       </g>
 
       {/* Endpoint circles — line/arrow only: drag to re-angle the

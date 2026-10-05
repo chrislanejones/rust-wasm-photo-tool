@@ -558,6 +558,7 @@ pub fn fill_shape(
     angle_deg: u16,
     fill_block: u32,
     star_points: u32,
+    radii: [f64; 4],
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -569,14 +570,12 @@ pub fn fill_shape(
     let cy = (miny + maxy) * 0.5;
     // Circle radius matches draw_shape's clean circle: min of the half-extents.
     let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
-    // The polygon kinds' clip outline — the same vertices `draw_shape` strokes.
-    // `None` for rect/circle, which clip by bbox/radius instead.
-    let poly: Option<Vec<(f64, f64)>> = match shape {
-        8 => Some(diamond_vertices(x0, y0, x1, y1)),
-        9 => Some(star_vertices_n(x0, y0, x1, y1, star_points)),
-        10 => Some(triangle_vertices(x0, y0, x1, y1)),
-        _ => None,
-    };
+    // The polygon kinds' clip outline — the same vertices `draw_shape` strokes,
+    // corners rounded the same way. `None` for a square-cornered rect and the
+    // circle, which clip by bbox/radius instead (a rounded rect is a polygon).
+    let poly: Option<Vec<(f64, f64)>> =
+        corner_outline(shape as u32, x0, y0, x1, y1, star_points, radii)
+            .filter(|_| shape != 0 || has_radius(radii));
 
     let px0 = (minx.floor() as i32).max(0);
     let py0 = (miny.floor() as i32).max(0);
@@ -768,11 +767,44 @@ pub fn draw_shape(
     stroke_width: f64,
     sloppiness: f64,
     star_points: u32,
+    radii: [f64; 4],
     rot: Option<Rotation>,
 ) {
     let wi = w as i32;
     let hi = h as i32;
     let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
+    // Rounded corners (Figma's corner radius): the outline is the rounded
+    // polygon, and a sketchy one wobbles along it smoothly instead of
+    // overshooting at every arc vertex. Square corners take the branches
+    // below untouched, so every shape drawn before radii existed is the same
+    // pixels.
+    if has_radius(radii) {
+        if let Some(verts) = corner_outline(shape, from_x, from_y, to_x, to_y, star_points, radii) {
+            if sloppiness > 0.0 {
+                let mut pts = sloppy_loop_points(&verts, seed, sloppiness, stroke_width);
+                if let Some(r) = rot {
+                    for p in pts.iter_mut() {
+                        *p = r.apply(*p);
+                    }
+                }
+                draw_polyline(data, w, h, &pts, color, stroke_width);
+            } else {
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    &verts,
+                    true,
+                    seed,
+                    color,
+                    stroke_width,
+                    0.0,
+                    rot,
+                );
+            }
+            return;
+        }
+    }
     match shape {
         // 0 = Rectangle
         0 => {
@@ -938,6 +970,187 @@ fn draw_outline(
             );
         }
     }
+}
+
+/// Whether any corner is rounded. Square corners are the absence of a radius,
+/// and every caller keeps its pre-radius path byte for byte when this is false.
+pub fn has_radius(radii: [f64; 4]) -> bool {
+    radii.iter().any(|&r| r > 0.0)
+}
+
+/// The outline of a cornered shape — rect (0), diamond (8), star (9), triangle
+/// (10) — with its corners rounded by `radii`; `None` for every other kind.
+///
+/// Corner `i` takes `radii[i]`: TL, TR, BR, BL on the rect; top, right,
+/// bottom, left on the diamond; apex, bottom-right, bottom-left on the
+/// triangle. The star rounds every tip and valley with `radii[0]` — it has up
+/// to 24 corners and one slider, like Figma's. Mirrored by hand in
+/// `cornerOutline` (shapeSloppiness.ts).
+pub fn corner_outline(
+    kind: u32,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    star_points: u32,
+    radii: [f64; 4],
+) -> Option<Vec<(f64, f64)>> {
+    let verts = match kind {
+        0 => {
+            let (ax, bx) = (x0.min(x1), x0.max(x1));
+            let (ay, by) = (y0.min(y1), y0.max(y1));
+            vec![(ax, ay), (bx, ay), (bx, by), (ax, by)]
+        }
+        8 => diamond_vertices(x0, y0, x1, y1),
+        9 => star_vertices_n(x0, y0, x1, y1, star_points),
+        10 => triangle_vertices(x0, y0, x1, y1),
+        _ => return None,
+    };
+    if !has_radius(radii) {
+        return Some(verts);
+    }
+    Some(round_corners(&verts, |i| {
+        if kind == 9 {
+            radii[0]
+        } else {
+            radii.get(i).copied().unwrap_or(0.0)
+        }
+    }))
+}
+
+/// Replace each vertex of a closed polygon with a circular arc of radius
+/// `radius_at(i)`, tangent to both of its edges — a fillet, which is what a
+/// design tool's corner radius is. A radius is clamped so its tangent points
+/// stay within half of each edge, so two neighboring corners can never cross
+/// (Figma clamps the same way, by the room the corner has).
+///
+/// Works for reflex corners too (a star's valleys): the arc then bulges into
+/// the shape instead of out of it. Arcs are flattened so no chord sits more
+/// than a quarter pixel off the true circle. Mirrored by hand in
+/// `roundCorners` (shapeSloppiness.ts).
+pub fn round_corners(verts: &[(f64, f64)], radius_at: impl Fn(usize) -> f64) -> Vec<(f64, f64)> {
+    let n = verts.len();
+    let mut out = Vec::with_capacity(n * 8);
+    for i in 0..n {
+        let p = verts[i];
+        let a = verts[(i + n - 1) % n];
+        let b = verts[(i + 1) % n];
+        let r = radius_at(i);
+        let (ax, ay) = (a.0 - p.0, a.1 - p.1);
+        let (bx, by) = (b.0 - p.0, b.1 - p.1);
+        let la = (ax * ax + ay * ay).sqrt();
+        let lb = (bx * bx + by * by).sqrt();
+        // `!(r > 0.0)` also catches NaN, which would otherwise reach every point.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
+        if !(r > 0.0) || la < 1e-9 || lb < 1e-9 {
+            out.push(p);
+            continue;
+        }
+        let (ux, uy) = (ax / la, ay / la);
+        let (vx, vy) = (bx / lb, by / lb);
+        // Half the angle between the two edges at this corner.
+        // Not `clamp`: a NaN vertex must not panic across the wasm boundary.
+        #[allow(clippy::manual_clamp)]
+        let cos_full = (ux * vx + uy * vy).max(-1.0).min(1.0);
+        let half = cos_full.acos() * 0.5;
+        let tan_half = half.tan();
+        if half < 1e-6 || tan_half < 1e-9 || (PI * 0.5 - half) < 1e-6 {
+            // Folded back on itself, or a straight run: no corner to round.
+            out.push(p);
+            continue;
+        }
+        let t = (r / tan_half).min(la * 0.5).min(lb * 0.5);
+        let r = t * tan_half;
+        // The center sits on the bisector, r / sin(half) from the corner.
+        let (mut bxs, mut bys) = (ux + vx, uy + vy);
+        let bl = (bxs * bxs + bys * bys).sqrt();
+        bxs /= bl;
+        bys /= bl;
+        let d = r / half.sin();
+        let (cx, cy) = (p.0 + bxs * d, p.1 + bys * d);
+        let (t1x, t1y) = (p.0 + ux * t, p.1 + uy * t);
+        let (t2x, t2y) = (p.0 + vx * t, p.1 + vy * t);
+        let a1 = (t1y - cy).atan2(t1x - cx);
+        let a2 = (t2y - cy).atan2(t2x - cx);
+        let mut span = a2 - a1;
+        if span > PI {
+            span -= 2.0 * PI;
+        } else if span < -PI {
+            span += 2.0 * PI;
+        }
+        // Chord sagitta ≤ 0.25 px: step = 2·acos(1 − 0.25/r).
+        let step = if r > 0.25 {
+            2.0 * (1.0 - 0.25 / r).acos()
+        } else {
+            PI
+        };
+        let segs = ((span.abs() / step).ceil() as usize).clamp(1, 64);
+        out.push((t1x, t1y));
+        for k in 1..segs {
+            let ang = a1 + span * (k as f64 / segs as f64);
+            out.push((cx + r * ang.cos(), cy + r * ang.sin()));
+        }
+        out.push((t2x, t2y));
+    }
+    out
+}
+
+/// A sketchy CLOSED outline with no hard corners — a rounded shape. The
+/// per-edge `sloppy_polyline_points` treats every vertex as a corner to
+/// overshoot, which on an arc flattened into many short chords reads as a
+/// saw blade. This pushes each point along its edge's normal by a noise that
+/// is a function of how far around the loop it is, so the wobble is continuous
+/// across the arcs, and periodic, so the loop closes.
+///
+/// Scaled by the same `sketch_strength` / `wobble_amp` as everything else, so
+/// it converges on the clean outline as sloppiness approaches 0. Mirrored by
+/// hand in `sloppyLoopPoints` (shapeSloppiness.ts).
+fn sloppy_loop_points(
+    pts: &[(f64, f64)],
+    seed: f64,
+    sloppiness: f64,
+    stroke_width: f64,
+) -> Vec<(f64, f64)> {
+    let strength = sketch_strength(sloppiness);
+    let n = pts.len();
+    if strength <= 0.0 || n < 3 {
+        return pts.to_vec();
+    }
+    let amp = wobble_amp(points_diag(pts), stroke_width, strength);
+    let mut perim = 0.0;
+    for e in 0..n {
+        let (a, b) = (pts[e], pts[(e + 1) % n]);
+        perim += ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+    }
+    let perim = perim.max(1e-6);
+    let mut out: Vec<(f64, f64)> = Vec::with_capacity(n * 4 + 1);
+    let mut walked = 0.0;
+    for e in 0..n {
+        let (ax, ay) = pts[e];
+        let (bx, by) = pts[(e + 1) % n];
+        let dx = bx - ax;
+        let dy = by - ay;
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 1e-9 {
+            continue;
+        }
+        let (px, py) = (-dy / len, dx / len);
+        let steps = ((len / 6.0).ceil() as usize).clamp(1, 24);
+        for i in 0..steps {
+            let t = i as f64 / steps as f64;
+            let p = 2.0 * PI * (walked + len * t) / perim;
+            let off = ((3.0 * p + seed).sin() * 0.5
+                + (5.0 * p + seed * 0.7).sin() * 0.3
+                + (7.0 * p + seed * 1.3).cos() * 0.2)
+                * amp;
+            out.push((ax + dx * t + px * off, ay + dy * t + py * off));
+        }
+        walked += len;
+    }
+    if let Some(&first) = out.first() {
+        out.push(first);
+    }
+    out
 }
 
 /// Diamond vertices filling the drag bbox — (cx, top), (right, cy),
@@ -1544,6 +1757,7 @@ mod geometry_tests {
                 3.0,
                 70.0,
                 7,
+                [0.0; 4],
                 Some(rot),
             );
 

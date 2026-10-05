@@ -2821,6 +2821,10 @@ impl ImageHorseTool {
                 }
                 // Keep a hairline visible rather than letting it round to zero.
                 s.stroke_width = (s.stroke_width * s_uniform).max(0.5);
+                // Corner radii are canvas-space lengths, like the stroke.
+                for r in &mut s.corner_radii {
+                    *r = (*r as f64 * s_uniform).round().min(u16::MAX as f64) as u16;
+                }
             }
         }
         self.width = new_w;

@@ -211,7 +211,21 @@ use serde::{Deserialize, Serialize};
 /// `v7_blobs_still_decode_under_v9`, `v8_blobs_still_decode_under_v9` and
 /// `tests/oplog_v7_v8_fixture_resume.rs`, which replays real captured bytes
 /// and must pass unedited: a `TextFont` frame sits at index 18 in them.
-pub const OP_FORMAT_VERSION: u8 = 9;
+///
+/// **11** — shape CORNER RADII (ADR-082): the recipe an eighth time. **10 is
+/// skipped on purpose** — ADR-070 reserves it by name for the tonal ops and
+/// says a branch that needs a number takes 11. No build ever wrote a 10, so
+/// accepting it in the decode range costs nothing.
+///
+///   * `corner_radii` is `#[serde(skip)]` on [`ShapeParams`]; the
+///     `ShapeAdd`/`ShapeEdit` wire layout is still v2's. Its skipped default
+///     (`[0; 4]`) IS its semantic default — square corners — so no
+///     normalization step is needed on decode.
+///   * The radii ride in an APPENDED variant, [`Op::ShapeCornerRadii`], after
+///     `ShapeStarPoints` (index 21).
+///   * `encode_annotations` gained a TWELFTH tuple element, read as a tail
+///     after v9's, so an empty tail is a v9-or-older blob: square corners.
+pub const OP_FORMAT_VERSION: u8 = 11;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -404,6 +418,15 @@ pub struct ShapeParams {
     /// exactly what every pre-v8 star meant.
     #[serde(skip)]
     pub star_points: u8,
+    /// Corner radii in px, canonical — see
+    /// `annotations::canonical_corner_radii`.
+    ///
+    /// ⚠️ `#[serde(skip)]` for the identical reason as `sloppiness` above.
+    /// Rides as [`Op::ShapeCornerRadii`] in the log and as the twelfth element
+    /// of `encode_annotations`. Deserializes to `[0; 4]` — square corners,
+    /// which is exactly what every pre-v11 shape meant.
+    #[serde(skip)]
+    pub corner_radii: [u16; 4],
     pub number: u32,
     pub label_kind: u8,
     pub points: Vec<(f64, f64)>,
@@ -524,6 +547,7 @@ impl ShapeParams {
             sloppiness: s.sloppiness,
             rotation_deg: s.rotation_deg,
             star_points: s.star_points,
+            corner_radii: s.corner_radii,
             number: s.number,
             label_kind: s.label_kind,
             points: s.points.clone(),
@@ -560,6 +584,7 @@ impl ShapeParams {
             sloppiness: self.sloppiness,
             rotation_deg: self.rotation_deg,
             star_points: self.star_points,
+            corner_radii: self.corner_radii,
             number: self.number,
             label_kind: self.label_kind,
             points: self.points.clone(),
@@ -599,6 +624,8 @@ impl ShapeParams {
         // `#[serde(skip)]` axes, owned by `ShapeRotation` / `ShapeStarPoints`.
         self.rotation_deg = prev.rotation_deg;
         self.star_points = prev.star_points;
+        // v11 (ADR-082): the fifth, owned by `ShapeCornerRadii`.
+        self.corner_radii = prev.corner_radii;
     }
 }
 
@@ -754,6 +781,7 @@ pub(crate) fn annotation_sync_ops(
                 let sloppiness = params.sloppiness;
                 let rotation_deg = params.rotation_deg;
                 let star_points = params.star_points;
+                let corner_radii = params.corner_radii;
                 pending.push(Op::ShapeAdd(params));
                 // The "unset" sentinel is the IDENTITY, not zero —
                 // emitting nothing leaves replay at the identity, which
@@ -785,6 +813,12 @@ pub(crate) fn annotation_sync_ops(
                         star_points,
                     });
                 }
+                if corner_radii != [0; 4] {
+                    pending.push(Op::ShapeCornerRadii {
+                        id: s.id,
+                        radii: corner_radii,
+                    });
+                }
             }
             Some(p) => {
                 if p.perspective != params.perspective {
@@ -811,6 +845,12 @@ pub(crate) fn annotation_sync_ops(
                         star_points: params.star_points,
                     });
                 }
+                if p.corner_radii != params.corner_radii {
+                    pending.push(Op::ShapeCornerRadii {
+                        id: s.id,
+                        radii: params.corner_radii,
+                    });
+                }
                 // Compare everything EXCEPT the four skipped fields, which the
                 // branches above already accounted for — otherwise a
                 // rotate-only drag would also emit a redundant ShapeEdit
@@ -823,6 +863,7 @@ pub(crate) fn annotation_sync_ops(
                 without_side.sloppiness = params.sloppiness;
                 without_side.rotation_deg = params.rotation_deg;
                 without_side.star_points = params.star_points;
+                without_side.corner_radii = params.corner_radii;
                 if without_side != params {
                     pending.push(Op::ShapeEdit(params));
                 }
@@ -964,6 +1005,10 @@ pub enum Op {
     /// v9 — a star's point count, canonical (0 = the classic five, else
     /// 3..=12). Appended after [`Op::ShapeRotation`] (which follows `TextFont`); same rule, same reason.
     ShapeStarPoints { id: u32, star_points: u8 },
+    /// v11 (ADR-082) — a shape's corner radii in px, canonical (see
+    /// `annotations::canonical_corner_radii`). Appended after
+    /// [`Op::ShapeStarPoints`]; same rule, same reason.
+    ShapeCornerRadii { id: u32, radii: [u16; 4] },
 }
 
 impl Op {
@@ -1011,6 +1056,8 @@ impl Op {
             Op::ShapeRotation { .. } => "Rotate Shape",
             // A panel restyle, like sloppiness.
             Op::ShapeStarPoints { .. } => "Edit Shape",
+            // Also a restyle — the panel slider or the on-canvas corner dot.
+            Op::ShapeCornerRadii { .. } => "Edit Shape",
         }
     }
 }
@@ -1193,6 +1240,8 @@ pub fn encode_annotations(
     let fonts: Vec<&str> = texts.iter().map(|t| t.font_id.as_str()).collect();
     let shape_rotations: Vec<f64> = shapes.iter().map(|s| s.rotation_deg).collect();
     let shape_star_points: Vec<u8> = shapes.iter().map(|s| s.star_points).collect();
+    // v11 appends the per-shape CORNER RADII as the twelfth element.
+    let shape_corner_radii: Vec<[u16; 4]> = shapes.iter().map(|s| s.corner_radii).collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -1205,6 +1254,7 @@ pub fn encode_annotations(
         &fonts,
         &shape_rotations,
         &shape_star_points,
+        &shape_corner_radii,
     )) {
         out.extend_from_slice(&body);
     }
@@ -1288,7 +1338,9 @@ pub fn decode_annotations(
         // Empty tail = a v8 (or older-with-fonts) blob: every shape unrotated
         // and five-pointed, which is what `#[serde(skip)]` already left and
         // what v8 meant.
-        if let Ok((rotations, star_points)) = postcard::from_bytes::<(Vec<f64>, Vec<u8>)>(v9_tail) {
+        if let Ok(((rotations, star_points), v11_tail)) =
+            postcard::take_from_bytes::<(Vec<f64>, Vec<u8>)>(v9_tail)
+        {
             // Normalized on the way in, like every other door the values come
             // through: a stored NaN would otherwise reach every outline point.
             for (sp, r) in shapes.iter_mut().zip(rotations) {
@@ -1296,6 +1348,13 @@ pub fn decode_annotations(
             }
             for (sp, n) in shapes.iter_mut().zip(star_points) {
                 sp.star_points = crate::annotations::canonical_star_points(sp.kind, n);
+            }
+            // v11: the same move once more. An empty tail is a v9 blob, and
+            // every shape keeps the square corners the skip left it.
+            if let Ok(radii) = postcard::from_bytes::<Vec<[u16; 4]>>(v11_tail) {
+                for (sp, r) in shapes.iter_mut().zip(radii) {
+                    sp.corner_radii = crate::annotations::canonical_corner_radii(sp.kind, &r);
+                }
             }
         }
         return Ok((texts, shapes, canvas));
@@ -1834,6 +1893,12 @@ pub fn apply(op: &Op, doc: &mut Document) {
                 sp.star_points = *star_points;
             }
         }
+        Op::ShapeCornerRadii { id, radii } => {
+            if let Some(sp) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                // Verbatim, for the reason on ShapeStarPoints above.
+                sp.corner_radii = *radii;
+            }
+        }
         Op::PerspectiveWarp { rect, quad } => {
             let (w, h) = (doc.width(), doc.height());
             if w == 0 || h == 0 {
@@ -2215,6 +2280,7 @@ mod tests {
             sloppiness: 0,
             rotation_deg: 0.0,
             star_points: 0,
+            corner_radii: [0; 4],
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -2294,6 +2360,10 @@ mod tests {
             Op::ShapeStarPoints {
                 id: 2,
                 star_points: 7,
+            },
+            Op::ShapeCornerRadii {
+                id: 2,
+                radii: [4, 0, 12, 300],
             },
             Op::LayerMove {
                 layer: 0,
@@ -3107,6 +3177,7 @@ mod v2_migration_tests {
             sloppiness: 0,
             rotation_deg: 0.0,
             star_points: 0,
+            corner_radii: [0; 4],
             number: 0,
             label_kind: 0,
             points: Vec::new(),
@@ -3879,7 +3950,7 @@ mod v2_migration_tests {
     fn v9_round_trips_rotation_and_star_points() {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        assert_eq!(OP_FORMAT_VERSION, 9);
+        assert_eq!(OP_FORMAT_VERSION, 11, "10 is ADR-070's, skipped (ADR-082)");
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
             shapes[0],
@@ -4011,6 +4082,14 @@ mod v2_migration_tests {
             }),
             20,
             "ShapeStarPoints"
+        );
+        assert_eq!(
+            idx(&Op::ShapeCornerRadii {
+                id: 1,
+                radii: [0; 4]
+            }),
+            21,
+            "ShapeCornerRadii (v11, ADR-082)"
         );
     }
 
@@ -4278,5 +4357,134 @@ mod v2_migration_tests {
             annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc).is_empty(),
             "and the log agrees with the engine — no op on the next sync"
         );
+    }
+
+    // ── v11 (ADR-082): corner radii ─────────────────────────────────────
+
+    /// A v9 writer emitted the v8 9-tuple plus (rotations, star points) — the
+    /// 11-tuple, with no radii. Reconstructed byte-for-byte.
+    fn v9_annotation_blob(shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![9u8];
+        let canvas: Option<CanvasParams> = None;
+        let none_u32: Vec<u32> = Vec::new();
+        let none_quad: Vec<[(f32, f32); 4]> = Vec::new();
+        let none_str: Vec<&str> = Vec::new();
+        let texts: Vec<TextParams> = Vec::new();
+        let shape_quads: Vec<[(f32, f32); 4]> = shapes.iter().map(|s| s.perspective).collect();
+        let shape_sloppiness: Vec<u8> = shapes.iter().map(|s| s.sloppiness).collect();
+        let rotations: Vec<f64> = shapes.iter().map(|s| s.rotation_deg).collect();
+        let star_points: Vec<u8> = shapes.iter().map(|s| s.star_points).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts,
+                shapes,
+                &canvas,
+                &none_u32,
+                &none_u32,
+                &none_quad,
+                &shape_quads,
+                &shape_sloppiness,
+                &none_str,
+                &rotations,
+                &star_points,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v9_blobs_still_decode_under_v11_with_square_corners() {
+        let star = a_styled_star(2);
+        let (_, shapes, _) = decode_annotations(&v9_annotation_blob(std::slice::from_ref(&star)))
+            .expect("a v9 annotation blob must still decode"); // allow: rust-panic
+        assert_eq!(shapes[0], star, "every v9 field survives");
+        assert_eq!(
+            shapes[0].corner_radii, [0; 4],
+            "a v9 shape meant square corners"
+        );
+    }
+
+    #[test]
+    fn v11_round_trips_corner_radii() {
+        let rounded = ShapeParams {
+            corner_radii: [3, 9, 0, 27],
+            ..a_shape(5)
+        };
+        let star = ShapeParams {
+            corner_radii: [4; 4],
+            ..a_styled_star(6)
+        };
+        let blob = encode_annotations(&[], &[rounded.clone(), star.clone(), a_shape(7)], None);
+        let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(shapes, vec![rounded, star, a_shape(7)]);
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_corner_radii() {
+        let a = a_shape(4);
+        let b = ShapeParams {
+            corner_radii: [1, 2, 3, 4],
+            ..a_shape(4)
+        };
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "corner radii must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn a_radius_change_records_one_side_op_and_survives_a_replayed_edit() {
+        let mut live_doc = Document::new(96, 80);
+        let mut ops = Vec::new();
+        let mut s = crate::annotations::ShapeAnnotation {
+            id: 4,
+            kind: 0,
+            x0: 10.0,
+            y0: 10.0,
+            x1: 60.0,
+            y1: 50.0,
+            stroke_width: 3.0,
+            corner_radii: [8, 8, 8, 8],
+            ..Default::default()
+        };
+        let added = annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc);
+        assert!(matches!(
+            added.as_slice(),
+            [
+                Op::ShapeAdd(_),
+                Op::ShapeCornerRadii {
+                    id: 4,
+                    radii: [8, 8, 8, 8]
+                }
+            ]
+        ));
+        for op in added {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        // One corner only (shift on the canvas dot): a side op, no ShapeEdit.
+        s.corner_radii = [8, 20, 8, 8];
+        let one = annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc);
+        assert!(
+            matches!(one.as_slice(), [Op::ShapeCornerRadii { .. }]),
+            "{one:?}"
+        );
+        for op in one {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        // Then a move: the replayed ShapeEdit must keep the radii.
+        s.x0 += 5.0;
+        s.x1 += 5.0;
+        for op in annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc) {
+            apply(&op, &mut live_doc);
+            ops.push(op);
+        }
+        let reloaded = replay_through_the_codec(&ops);
+        assert_eq!(reloaded.shapes[0].corner_radii, [8, 20, 8, 8]);
+        assert_eq!(reloaded.composite_hash(), live_doc.composite_hash());
+        assert!(annotation_sync_ops(&[], std::slice::from_ref(&s), &live_doc).is_empty());
     }
 }

@@ -220,11 +220,194 @@ export function triangleVertices(x0: number, y0: number, x1: number, y1: number)
   ];
 }
 
+/** Four corner radii in px: TL, TR, BR, BL on the rect; top, right, bottom,
+ *  left on the diamond; apex, bottom-right, bottom-left on the triangle; the
+ *  star rounds every corner with the first. Mirrors the engine's
+ *  `corner_radii` (annotations.rs). */
+export type CornerRadii = readonly [number, number, number, number];
+
+export const SQUARE_CORNERS: CornerRadii = [0, 0, 0, 0];
+
+/** Whether any corner is rounded. Mirrors `has_radius` (drawing.rs). */
+export function hasRadius(radii: CornerRadii | undefined): boolean {
+  return !!radii && radii.some((r) => r > 0);
+}
+
+/** How many corners a shape has that can be rounded one at a time: 4 on the
+ *  rect and diamond, 3 on the triangle, 1 on the star (it rounds all of them
+ *  alike), 0 on everything else. Mirrors `has_corners` (annotations.rs). */
+export function cornerCount(shape: string): number {
+  switch (shape) {
+    case "rect":
+    case "diamond":
+      return 4;
+    case "triangle":
+      return 3;
+    case "star":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/** The ONE stored form of a shape's radii — whole px, 0..65535, the star's
+ *  first copied into all four, the triangle's fourth 0, all zero on a shape
+ *  with no corners. Mirrors `canonical_corner_radii` (annotations.rs), so the
+ *  value the panel holds is the value the engine stores. */
+export function canonicalCornerRadii(shape: string, radii: readonly number[] | undefined): CornerRadii {
+  const at = (i: number) => {
+    const v = Math.round(radii?.[i] ?? 0);
+    return Number.isFinite(v) ? Math.min(65535, Math.max(0, v)) : 0;
+  };
+  switch (cornerCount(shape)) {
+    case 4:
+      return [at(0), at(1), at(2), at(3)];
+    case 3:
+      return [at(0), at(1), at(2), 0];
+    case 1:
+      return [at(0), at(0), at(0), at(0)];
+    default:
+      return SQUARE_CORNERS;
+  }
+}
+
+/** Replace each vertex of a closed polygon with a circular arc tangent to both
+ *  of its edges (a fillet), the radius clamped so the tangent points stay
+ *  within half of each edge. Reflex corners (a star's valleys) round inward.
+ *  Arcs are flattened to ≤ ¼ px sagitta. Mirrors `round_corners` (drawing.rs). */
+export function roundCorners(verts: Point[], radiusAt: (i: number) => number): Point[] {
+  const n = verts.length;
+  const out: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const p = verts[i];
+    const a = verts[(i + n - 1) % n];
+    const b = verts[(i + 1) % n];
+    const r0 = radiusAt(i);
+    const ax = a.x - p.x, ay = a.y - p.y;
+    const bx = b.x - p.x, by = b.y - p.y;
+    const la = Math.sqrt(ax * ax + ay * ay);
+    const lb = Math.sqrt(bx * bx + by * by);
+    if (!(r0 > 0) || la < 1e-9 || lb < 1e-9) {
+      out.push(p);
+      continue;
+    }
+    const ux = ax / la, uy = ay / la;
+    const vx = bx / lb, vy = by / lb;
+    const cosFull = Math.min(Math.max(ux * vx + uy * vy, -1), 1);
+    const half = Math.acos(cosFull) * 0.5;
+    const tanHalf = Math.tan(half);
+    if (half < 1e-6 || tanHalf < 1e-9 || Math.PI * 0.5 - half < 1e-6) {
+      out.push(p);
+      continue;
+    }
+    const t = Math.min(r0 / tanHalf, la * 0.5, lb * 0.5);
+    const r = t * tanHalf;
+    let bisx = ux + vx, bisy = uy + vy;
+    const bl = Math.sqrt(bisx * bisx + bisy * bisy);
+    bisx /= bl;
+    bisy /= bl;
+    const d = r / Math.sin(half);
+    const cx = p.x + bisx * d, cy = p.y + bisy * d;
+    const t1x = p.x + ux * t, t1y = p.y + uy * t;
+    const t2x = p.x + vx * t, t2y = p.y + vy * t;
+    const a1 = Math.atan2(t1y - cy, t1x - cx);
+    const a2 = Math.atan2(t2y - cy, t2x - cx);
+    let span = a2 - a1;
+    if (span > Math.PI) span -= 2 * Math.PI;
+    else if (span < -Math.PI) span += 2 * Math.PI;
+    const step = r > 0.25 ? 2 * Math.acos(1 - 0.25 / r) : Math.PI;
+    const segs = Math.min(64, Math.max(1, Math.ceil(Math.abs(span) / step)));
+    out.push({ x: t1x, y: t1y });
+    for (let k = 1; k < segs; k++) {
+      const ang = a1 + span * (k / segs);
+      out.push({ x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) });
+    }
+    out.push({ x: t2x, y: t2y });
+  }
+  return out;
+}
+
+/** A sketchy CLOSED outline with no hard corners — a rounded shape. Each point
+ *  is pushed along its edge's normal by a periodic noise of how far around the
+ *  loop it is, so the wobble flows through the arcs and the loop closes.
+ *  Mirrors `sloppy_loop_points` (drawing.rs). */
+function sloppyLoopPoints(
+  pts: Point[],
+  seed: number,
+  sloppiness: number,
+  strokeWidth: number,
+): Point[] {
+  const strength = sketchStrength(sloppiness);
+  const n = pts.length;
+  if (strength <= 0 || n < 3) return pts;
+  const amp = wobbleAmp(pointsDiag(pts), strokeWidth, strength);
+  let perim = 0;
+  for (let e = 0; e < n; e++) {
+    const a = pts[e], b = pts[(e + 1) % n];
+    perim += Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+  }
+  perim = Math.max(perim, 1e-6);
+  const out: Point[] = [];
+  let walked = 0;
+  for (let e = 0; e < n; e++) {
+    const { x: ax, y: ay } = pts[e];
+    const { x: bx, y: by } = pts[(e + 1) % n];
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-9) continue;
+    const px = -dy / len, py = dx / len;
+    const steps = Math.min(24, Math.max(1, Math.ceil(len / 6)));
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const ph = (2 * Math.PI * (walked + len * t)) / perim;
+      const off =
+        (Math.sin(3 * ph + seed) * 0.5 +
+          Math.sin(5 * ph + seed * 0.7) * 0.3 +
+          Math.cos(7 * ph + seed * 1.3) * 0.2) *
+        amp;
+      out.push({ x: ax + dx * t + px * off, y: ay + dy * t + py * off });
+    }
+    walked += len;
+  }
+  if (out.length > 0) out.push(out[0]);
+  return out;
+}
+
+/** The sketchy version of a closed outline, picking the generator the engine
+ *  picks: a rounded outline wobbles smoothly around the loop, a square one
+ *  overshoots its corners. */
+export function sloppyOutlinePoints(
+  outline: Point[],
+  rounded: boolean,
+  seed: number,
+  sloppiness: number,
+  strokeWidth: number,
+): Point[] {
+  return rounded
+    ? sloppyLoopPoints(outline, seed, sloppiness, strokeWidth)
+    : sloppyPolylinePoints(outline, seed, sloppiness, strokeWidth, true);
+}
+
 /** The CLOSED outline the engine strokes for a polygon shape — rect, diamond,
  *  star, triangle — or `null` for the two that are not polygons (circle,
  *  line). One switch for both previews (the canvas rubber band and the SVG
- *  edit overlay), so a new shape is one case here rather than one in each. */
+ *  edit overlay), so a new shape is one case here rather than one in each.
+ *  With `radii`, the corners come back rounded exactly as the engine rounds
+ *  them (`corner_outline`, drawing.rs). */
 export function closedOutline(
+  shape: string,
+  from: Point,
+  to: Point,
+  starPoints?: number,
+  radii?: CornerRadii,
+): Point[] | null {
+  const sharp = squareOutline(shape, from, to, starPoints);
+  if (!sharp || !hasRadius(radii)) return sharp;
+  const r = radii!;
+  return roundCorners(sharp, (i) => (shape === "star" ? r[0] : (r[i] ?? 0)));
+}
+
+function squareOutline(
   shape: string,
   from: Point,
   to: Point,

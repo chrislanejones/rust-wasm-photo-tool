@@ -1285,6 +1285,9 @@ declare module "stamp_tool" {
     //   star/triangle; the UI turns a line by moving its endpoints instead.
     //   These two trailing params exist in Rust as `*_shape_annotation_full`,
     //   exported under the original names (the lib.rs line ratchet).
+    // corner_radii: up to four radii in px (TL, TR, BR, BL on a rect; the
+    //   star uses the first for every corner), stored canonical per kind;
+    //   missing entries are 0. Rect/diamond/star/triangle only. ADR-082.
     // arrow_style (arrows only): 0=single, 1=double.
     shape_annotation_count(): number;
     /** Add a numbered callout pin (kind 5): circle bbox + label. Pushes "Add Pin". */
@@ -1352,6 +1355,7 @@ declare module "stamp_tool" {
       sloppiness: number,
       star_points: number,
       rotation_deg: number,
+      corner_radii: Uint16Array,
     ): number;
     /** Restore a persisted shape WITHOUT pushing history (load path). Colors are raw bytes. */
     restore_shape_annotation(
@@ -1379,6 +1383,7 @@ declare module "stamp_tool" {
       sloppiness: number,
       star_points: number,
       rotation_deg: number,
+      corner_radii: Uint16Array,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -1399,6 +1404,7 @@ declare module "stamp_tool" {
       sloppiness: number,
       star_points: number,
       rotation_deg: number,
+      corner_radii: Uint16Array,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;

@@ -101,6 +101,7 @@ fn add(
         slop,
         star_points,
         rot,
+        &[],
     )
 }
 
@@ -608,7 +609,24 @@ fn add_and_update_each_cost_exactly_one_undo_step() {
     assert_eq!(t.undo_count(), before + 1, "add = one step");
     let (x0, y0, x1, y1) = BOX;
     assert!(t.update_shape_annotation_full(
-        id, 9, x0, y0, x1, y1, "#e02020", 3.0, 0, 0, "#000000", "#000000", 0, 8, 0, 9, -45.0,
+        id,
+        9,
+        x0,
+        y0,
+        x1,
+        y1,
+        "#e02020",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        8,
+        0,
+        9,
+        -45.0,
+        &[],
     ));
     assert_eq!(t.undo_count(), before + 2, "update = one step");
     let labels = t.history_labels();
@@ -633,7 +651,24 @@ fn update_leaves_the_perspective_quad_alone() {
     assert!(t.set_shape_perspective(id, &KEYSTONE));
     let (x0, y0, x1, y1) = BOX;
     assert!(t.update_shape_annotation_full(
-        id, 0, x0, y0, x1, y1, "#00ff00", 3.0, 0, 0, "#000000", "#000000", 0, 8, 0, 0, 25.0,
+        id,
+        0,
+        x0,
+        y0,
+        x1,
+        y1,
+        "#00ff00",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        8,
+        0,
+        0,
+        25.0,
+        &[],
     ));
     assert_eq!(t.shape_perspective_of(id), KEYSTONE.to_vec());
 }
@@ -643,7 +678,24 @@ fn update_of_a_missing_id_is_refused_without_a_history_step() {
     let mut t = white_tool();
     let before = t.undo_count();
     assert!(!t.update_shape_annotation_full(
-        4242, 0, 1.0, 1.0, 9.0, 9.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0, 0, 0, 10.0,
+        4242,
+        0,
+        1.0,
+        1.0,
+        9.0,
+        9.0,
+        "#000000",
+        1.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        0,
+        0,
+        0,
+        10.0,
+        &[],
     ));
     assert_eq!(t.undo_count(), before);
 }
@@ -713,8 +765,31 @@ fn restore_takes_rotation_and_star_points_without_a_history_step() {
     let mut t = white_tool();
     let before = t.undo_count();
     t.restore_shape_annotation_full(
-        9, 14.0, 10.0, 78.0, 66.0, 224, 32, 32, 3.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 8,
+        9,
+        14.0,
+        10.0,
+        78.0,
+        66.0,
+        224,
+        32,
+        32,
+        3.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        8,
         -120.0,
+        &[],
     );
     assert_eq!(t.undo_count(), before, "restore pushes no history");
     let json = t.get_shape_annotations();
