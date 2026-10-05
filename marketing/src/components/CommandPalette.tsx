@@ -46,7 +46,7 @@ const ITEMS: Item[] = [
 
   { group: "On this site", label: "What runs where", hint: "Every operation, and the machine it runs on", href: "/#runs", kind: "route" },
   { group: "On this site", label: "In the editor", hint: "The whole tool list", href: "/#editor", kind: "route" },
-  { group: "On this site", label: "The Convex schema", hint: "6 tables, every field and index", href: "/architecture#schema", kind: "route" },
+  { group: "On this site", label: "The Convex schema", hint: "9 tables, every field and index", href: "/architecture#schema", kind: "route" },
   { group: "On this site", label: "Download the .mermaid source", hint: "The system flowchart", href: "/system-architecture.mermaid", kind: "asset" },
 
   { group: "Open", label: "Open the beta", hint: "No account, no upload", href: EDITOR_URL, kind: "external" },

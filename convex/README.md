@@ -10,11 +10,6 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 | --- | --- |
 | `users` | the Clerk-backed account row, including `tier` (`free` \| `pro` \| `team`) |
 | `subscriptions` | Stripe subscription state, keyed back to a `users` id |
-| `projects` | a saved document |
-| `images` | image records belonging to a project |
-| `layers` | per-image layer rows |
-| `annotations` | shapes / text / pins attached to an image |
-| `history` | persisted undo history |
 | `recent_texts` | the text tool's reuse list — each string with the font family / size / weight / color it was last used at |
 | `user_colors` | the global "+" palette — one row per saved swatch, newest first, capped at 32. Anonymous users keep the same list in localStorage; this is where it lives once they sign in |
 | `photo_edits` | per-photo canvas archive: canvas dimensions plus a `_storage` id — the bytes live in Convex file storage, not in the row. What makes a signed-in user's edit state survive across devices |
@@ -26,7 +21,7 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 - **`users.ts` / `auth.ts` / `auth.config.ts`** — identity. `auth.config.ts` declares the trusted Clerk **issuers**; Convex validates tokens by fetching Clerk's JWKS, so no signing key is ever stored here.
 - **`subscriptions.ts` / `stripe.ts`** — billing. Stripe is called over **raw REST, no SDK**; `stripe.ts` creates Checkout and Customer Portal sessions.
 - **`ai.ts` / `aiJobs.ts` / `testReplicate.ts`** — the Replicate job queue: dispatch, poll, and the job rows the client subscribes to.
-- **`images.ts` / `layers.ts` / `annotations.ts` / `history.ts` / `textHistory.ts` / `userColors.ts` / `photoEdits.ts` / `projects.ts`** — document persistence.
+- **`textHistory.ts` / `userColors.ts` / `photoEdits.ts` / `sync.ts`** — per-user persistence: recent texts, the saved palette, canvas archives, and synced settings.
 - **`shares.ts`** — share links.
 - **`crons.ts`** — scheduled cleanup.
 - **`http.ts` / `router.ts`** — the two webhook endpoints: `/replicate-webhook` and `/stripe-webhook`. Both verify signatures before touching data.
