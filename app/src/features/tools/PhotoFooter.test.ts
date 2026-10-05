@@ -26,9 +26,12 @@ import { create } from "zustand";
 // the same two fields and the same selector API keeps the test about the
 // footer. It is a REAL zustand store, not a stub returning fixed values, so
 // the re-key case below exercises a genuine subscription.
-const useFakeGallery = create<{ photos: { id: string; name: string }[]; activePhotoId: string | null }>(
-  () => ({ photos: [], activePhotoId: null }),
-);
+const useFakeGallery = create<{
+  photos: { id: string; name: string }[];
+  activePhotoId: string | null;
+  /** The photo whose pixels are in the engine; differs during a switch. */
+  documentPhotoId: string | null;
+}>(() => ({ photos: [], activePhotoId: null, documentPhotoId: null }));
 vi.mock("@/stores/useGalleryStore", () => ({ useGalleryStore: useFakeGallery }));
 
 const { PhotoFooter } = await import("./PhotoFooter");
@@ -43,6 +46,7 @@ function seed(names: string[], activeIndex: number) {
   useFakeGallery.setState({
     photos: names.map((name, i) => ({ id: `p${i}`, name })),
     activePhotoId: activeIndex >= 0 ? `p${activeIndex}` : null,
+    documentPhotoId: activeIndex >= 0 ? `p${activeIndex}` : null,
   });
 }
 
@@ -63,7 +67,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  useFakeGallery.setState({ photos: [], activePhotoId: null });
+  useFakeGallery.setState({ photos: [], activePhotoId: null, documentPhotoId: null });
+  vi.useRealTimers();
 });
 
 describe("the Tools card footer", () => {
@@ -112,5 +117,28 @@ describe("the Tools card footer", () => {
     // A NEW element, not the same one restyled: remounting is what restarts
     // the CSS animation, so a switch always re-highlights.
     expect(line()).not.toBe(first);
+  });
+
+  it("says Loading for the requested photo once a switch has taken 150 ms", () => {
+    vi.useFakeTimers();
+    seed(["checker", "sky-building"], 0);
+    render();
+    // Click photo 2: the id moves now, the pixels arrive later.
+    act(() => {
+      useFakeGallery.setState({ activePhotoId: "p1" });
+    });
+    // A fast switch says nothing extra.
+    expect(line()?.getAttribute("data-loading")).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(160);
+    });
+    expect(line()?.getAttribute("data-loading")).toBe("true");
+    expect(line()?.textContent).toContain("Loading · 2 of 2 · sky-building");
+    // The load lands: back to the plain line.
+    act(() => {
+      useFakeGallery.setState({ documentPhotoId: "p1" });
+    });
+    expect(line()?.getAttribute("data-loading")).toBeNull();
+    expect(line()?.textContent).toBe("2 of 2 · sky-building");
   });
 });

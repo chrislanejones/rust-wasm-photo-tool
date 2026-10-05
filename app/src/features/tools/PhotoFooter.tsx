@@ -22,7 +22,14 @@
 // It keeps the switch CUE: the line re-highlights (~400 ms fade) each time the
 // photo changes, so a switch never looks like nothing happened. Reduced motion
 // gets the same highlight held static — see `.per-photo-name-flash`.
+//
+// During a switch it names the REQUESTED photo (activePhotoId moves on click)
+// and, once the load has taken 150 ms, says so with a ↻ "Loading" mark — the
+// same rule as the gallery tile — so "3 of 12 · IMG_2041" never claims the
+// panel's numbers belong to a photo that is not in the engine yet.
 import { useEffect, useRef, useState } from "react";
+import { StatusMark } from "@/components/ui/status-mark";
+import { useDelayedFlag, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
 export function PhotoFooter() {
@@ -30,6 +37,7 @@ export function PhotoFooter() {
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
   const index = photos.findIndex((p) => p.id === activePhotoId);
   const name = index >= 0 ? photos[index]!.name : null;
+  const loading = useDelayedFlag(usePhotoSwitching(), 150);
 
   // Re-trigger the highlight on every change of photo. A key on the line
   // restarts its CSS animation without any timer bookkeeping.
@@ -49,10 +57,14 @@ export function PhotoFooter() {
   return (
     <p
       key={flash}
-      className={`per-photo-name truncate ${flash ? "per-photo-name-flash" : ""}`}
+      className={`per-photo-name flex items-center gap-1 truncate ${flash ? "per-photo-name-flash" : ""}`}
       title={name}
+      data-loading={loading || undefined}
     >
-      {`${index + 1} of ${photos.length} · ${name}`}
+      {loading && <StatusMark kind="working" label={`Loading ${name}`} />}
+      <span className="truncate">
+        {loading ? `Loading · ${index + 1} of ${photos.length} · ${name}` : `${index + 1} of ${photos.length} · ${name}`}
+      </span>
     </p>
   );
 }
