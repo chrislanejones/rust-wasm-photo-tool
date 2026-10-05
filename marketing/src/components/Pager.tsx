@@ -15,7 +15,7 @@
  */
 
 /** Page numbers to show, with `null` for a collapsed run. 1-indexed. */
-export function pageWindow(current: number, total: number, edge = 1, around = 1): (number | null)[] {
+function pageWindow(current: number, total: number, edge = 1, around = 1): (number | null)[] {
   const keep = new Set<number>();
   for (let i = 1; i <= edge; i++) {
     keep.add(i);

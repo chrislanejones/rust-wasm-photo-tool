@@ -31,6 +31,11 @@
     // `lazy(() => import("./components/CommandPalette"))` in marketing/App.tsx.
     { "file": "marketing/src/components/CommandPalette.tsx", "exports": ["default"] },
     // Read off the dynamically imported scenes module in the figures file.
-    { "file": "marketing/src/posts/engine-in-a-worker.scenes.ts", "exports": ["createScene"] }
+    { "file": "marketing/src/posts/engine-in-a-worker.scenes.ts", "exports": ["createScene"] },
+    // Same shape for the other two posts' scenes, and the three.js barrel they
+    // all import from on demand.
+    { "file": "marketing/src/posts/entropy.scenes.ts", "exports": ["createScene"] },
+    { "file": "marketing/src/posts/offline-by-construction.scenes.ts", "exports": ["createScene"] },
+    { "file": "marketing/src/posts/scene/three.ts", "exports": ["*"] }
   ]
 }

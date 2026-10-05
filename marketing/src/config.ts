@@ -31,12 +31,6 @@ export const PAGES = ROUTES.filter((r) => !r.footerOnly && !r.toolPage && !r.und
   label,
 }));
 
-/** The tool landing pages, for the footer's own column. Same projection again:
- *  a route with `toolPage: true` lands here and nowhere else. */
-export const TOOL_NAV_PAGES = ROUTES.filter((r) => r.toolPage).map(({ to, label }) => ({
-  to,
-  label,
-}));
 
 /** The legal documents, for the footer's second row. Same projection, opposite
  *  filter, so a new `footerOnly: true` route lands here and nowhere else. */
