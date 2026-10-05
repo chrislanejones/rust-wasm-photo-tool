@@ -72,7 +72,7 @@ const crc32 = (b: Uint8Array) => {
  *  not take; every byte array here is backed by a plain ArrayBuffer. */
 type Bytes = Uint8Array<ArrayBuffer>;
 
-export function writeZip(files: { name: string; data: Bytes }[], type: string): Blob {
+function writeZip(files: { name: string; data: Bytes }[], type: string): Blob {
   const enc = new TextEncoder();
   const parts: BlobPart[] = [];
   const cen: Bytes[] = [];

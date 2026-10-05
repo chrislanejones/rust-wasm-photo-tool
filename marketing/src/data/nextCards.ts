@@ -133,7 +133,7 @@ const postCards = (): NextCard[] =>
 
 /** The whole pool, in a stable order. Order matters only as the input to the
  *  seeded shuffle — change it and every page's four change. */
-export const NEXT_CARDS: readonly NextCard[] = [
+const NEXT_CARDS: readonly NextCard[] = [
   ...TOOL_PAGES.map((t) => ({ to: t.slug, group: t.group, label: t.label, blurb: t.blurb })),
   ...ORA_CARDS,
   ...SITE_CARDS,
@@ -147,7 +147,7 @@ const PINNED: Record<string, string[]> = {
   "/openraster": ["/ora-to-png", "/ora-to-psd", "/what-is-ora"],
 };
 
-export const NEXT_COUNT = 4;
+const NEXT_COUNT = 4;
 
 /* FNV-1a, 32-bit. Any stable string→int would do; this one is four lines and
    has no dependencies. */

@@ -34,7 +34,7 @@ export interface CardGroup {
   blurb: string;
 }
 
-export const CARD_GROUPS: CardGroup[] = [
+const CARD_GROUPS: CardGroup[] = [
   {
     key: "annotate",
     name: "Annotate",
@@ -100,7 +100,7 @@ export interface CardCopy {
 
 /** Keyed by the exact `name` in features.ts. Order within a group follows this
  *  object, which follows the design. */
-export const CARD_COPY: Record<string, CardCopy> = {
+const CARD_COPY: Record<string, CardCopy> = {
   // ── Annotate ─────────────────────────────────────────────────────────
   "Paint / Brush": {
     group: "annotate",
