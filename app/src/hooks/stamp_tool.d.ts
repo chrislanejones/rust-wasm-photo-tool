@@ -39,11 +39,20 @@ declare module "stamp_tool" {
 
   /**
    * Web-performance indicators for the Resize & Compress panel.
-   * Returns `[pageSpeedScore, webPerformanceGain]`, both 0..100.
-   * Byte-aware (log-normal on the projected delivered size) and
-   * PSI-audit-aware: format codes (0=png 1=jpeg 2=webp 3=avif, other=neutral)
-   * model the "next-gen formats" audit, and output wider than 1920px accrues
-   * a "properly size images" score penalty.
+   * Returns `[deliveryScore, webPerformanceGain]`.
+   *
+   * `deliveryScore` is the BUDGET USED as a percentage, which is Lighthouse's
+   * own rule — `TARGET_BYTES_PER_PIXEL_AVIF = 2 * 1 / 12`, so an image passes
+   * at `bytes <= width * height / 6` (`image-delivery-insight`, which replaced
+   * modern-image-formats / uses-optimized-images / uses-responsive-images).
+   * 100 or less clears the audit; above 100 is the flagged case and says by how
+   * much. It is NOT a Lighthouse score and does not claim to be one.
+   *
+   * This used to be a fabricated log-normal curve over absolute bytes with a
+   * 1920px width penalty, neither of which is in the audit — see the Rust doc
+   * on `web_perf_metrics` for the two-model comparison.
+   *
+   * `webPerformanceGain` is byte savings vs the immutable upload, 0..100.
    */
   export function web_perf_metrics(
     curW: number,
@@ -55,6 +64,27 @@ declare module "stamp_tool" {
     quality: number,
     curFormat: number,
     newFormat: number,
+  ): Float64Array;
+
+  /**
+   * The byte budget Lighthouse stops flagging an image at, for `w × h`.
+   * The engine-side half of `lib/webPerf.ts`'s `webTargetBytes`, clamped to
+   * reachable bounds (see the Rust source for the constants).
+   */
+  export function web_image_budget(w: number, h: number): number;
+  /** Beta fallback (ih_web_budget off): the OLD model — `[score, gain]`, a
+   *  0–100 score that falls as the file gets heavier. Same arguments as
+   *  `web_perf_metrics`. Goes when the budget is promoted. */
+  export function web_perf_metrics_score(
+    cur_w: number,
+    cur_h: number,
+    cur_bytes: number,
+    orig_bytes: number,
+    new_w: number,
+    new_h: number,
+    quality: number,
+    cur_format: number,
+    new_format: number,
   ): Float64Array;
 
   /**

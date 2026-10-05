@@ -66,7 +66,10 @@ import type { ActiveFormat } from "@/lib/plugins";
  *  PSD export ships as a separate plugin (its own repo), added from Settings. */
 type FormatTileId = DownloadFormat | "psd";
 
-/** The whole-project files, shown in their own "Layered file" group. */
+/** The whole-project files — they hold every layer of the project rather than
+ *  one flattened picture, so they are described as such. Still ONE exclusive
+ *  choice with the rest (see the single `ToolButtonGroup` in the Selected
+ *  pane): a reason to say so, not a second radiogroup. */
 const LAYERED_IDS: FormatTileId[] = ["ora", "psd"];
 
 const SVG_HINT = "Vector · keeps crop";
@@ -205,12 +208,19 @@ function DownloadPanes({
       title: `${f.label} — ${f.hint}`,
     })),
     svgTile(svg.selected),
-    ...pluginFormats.map(({ plugin, format: f }) => ({
-      id: f.id as FormatTileId,
-      label: f.hint,
-      icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
-      title: `${f.label} — ${f.hint} (${plugin.name} plugin)`,
-    })),
+    // The layered plugin formats (ORA, PSD) sort to the END of the one grid, so
+    // the flattened formats keep reading order and "holds every layer" is a
+    // caption rather than a second group. Compared on the hint so the order is
+    // stable when a plugin's hint text changes.
+    ...pluginFormats
+      .filter(({ format: f }) => LAYERED_IDS.includes(f.id as FormatTileId))
+      .sort((a, b) => a.format.hint.localeCompare(b.format.hint))
+      .map(({ plugin, format: f }) => ({
+        id: f.id as FormatTileId,
+        label: f.hint,
+        icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
+        title: `${f.label} — ${f.hint} (${plugin.name} plugin). Holds every layer.`,
+      })),
     // The placeholder, only while no plugin provides PSD.
     ...(pluginIds.has("psd")
       ? []
@@ -253,27 +263,31 @@ function DownloadPanes({
         ) : pane === "selected" ? (
           <>
             <PaneHeader title="Selected Image" onBack={back} />
+            {/* ONE group for ONE exclusive choice.
+                This was two `ToolButtonGroup`s — "Image format" and "Layered
+                file" — and BOTH passed `value`, which is exactly what makes a
+                `ToolButtonGroup` a SELECT: a named radiogroup with one Tab stop
+                and arrow keys between its own tiles. So one choice (JPEG / PNG /
+                WebP / AVIF / SVG / ORA / PSD) was two radio groups, and arrow
+                keys inside the first could not reach ORA or PSD because they
+                were somewhere else entirely. The visible state was right — the
+                code passed `undefined` to whichever group did not own the value
+                — which is why it read correctly and announced wrongly.
+
+                The split is presentational and still is: ORA and PSD hold every
+                layer of the project rather than one flattened picture, so they
+                sit in their own grid with a caption. One radiogroup, two visual
+                rows. `formatGroups` below is the layout; the semantics are
+                `ToolButtonGroup`'s, which already span rows in a 3-column grid. */}
             <ToolButtonGroup<FormatTileId>
               label="Image format"
               stacked
               columns={3}
-              value={LAYERED_IDS.includes(selectedValue) ? undefined : selectedValue}
+              value={selectedValue}
               onChange={(id) => {
                 if (!isPlaceholder(id)) onFormatChange(id);
               }}
-              options={formatOptions.filter((o) => !LAYERED_IDS.includes(o.id))}
-            />
-            {/* ORA and PSD hold every layer of the project, not one flattened
-                picture, so they get their own group. */}
-            <ToolButtonGroup<FormatTileId>
-              label="Layered file"
-              stacked
-              columns={3}
-              value={LAYERED_IDS.includes(selectedValue) ? selectedValue : undefined}
-              onChange={(id) => {
-                if (!isPlaceholder(id)) onFormatChange(id);
-              }}
-              options={formatOptions.filter((o) => LAYERED_IDS.includes(o.id))}
+              options={formatOptions}
             />
             {/* File name only here: a zip of every image keeps each image's
                 own name. */}

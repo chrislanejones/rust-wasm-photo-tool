@@ -4,7 +4,8 @@
 /**
  * Warm-accent ("brown") ring on hover. The ONE definition behind every
  * interactive tile/card: the shared `ToolButton` (and `ActionTile` through it),
- * `RadioCards`, and the main tool-rail tiles. Pair with `transition` so it
+ * `ToolButtonGroup`'s tiles, and the main tool-rail tiles. Pair with
+ * `transition` so it
  * fades. (`theme-sidebar` === `bg-secondary` per styles.css, so the offset
  * matches both the side panels and the dialogs.)
  */

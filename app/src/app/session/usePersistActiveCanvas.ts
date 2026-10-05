@@ -101,6 +101,27 @@ export function usePersistActiveCanvas({
           storedQuality = q;
         }
       }
+      // THE LAST GUARD: never write a file bigger than the one being replaced.
+      //
+      // The step-down above only runs on the RESIZE path (`sourceFormat &&`),
+      // and only when pixels were removed. An Apply Compression with the
+      // dimensions unchanged skipped it entirely — which is how a PNG, chosen at
+      // the panel's default quality, could come back larger than the file it
+      // overwrote. The panel now disables Quality for PNG, but this is the only
+      // place that writes, so the invariant belongs here too.
+      //
+      // A lossless format cannot be walked down — there is no smaller encode to
+      // fall back to — so the only honest action is to keep what is stored.
+      // Returning BEFORE any Dexie write means the stored original, its
+      // thumbnail, and every field on the entry keep describing the file that
+      // is actually there.
+      if (entry.byteSize > 0 && blob.size > entry.byteSize) {
+        console.info(
+          `[persist] ${entry.name}: re-encode would be ${blob.size} B against ` +
+            `${entry.byteSize} B — keeping the stored original`,
+        );
+        return;
+      }
       // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
       // the blob's actual MIME for the stored metadata.
       const mime = blob.type || `image/${encodeFormat}`;
