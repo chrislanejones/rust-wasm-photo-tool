@@ -123,14 +123,7 @@ export function ExportPane({
     try {
       const result = await oraImport.run(
         async () => {
-          try {
-            await importOraAsNewPhoto(file, stampToolRef, onAddPhotos);
-          } catch (err) {
-            // The raw engine message ("engine document replaced") means
-            // nothing to a person; say what happened instead.
-            if (isSuperseded(err)) throw new Error("Another photo was loading at the same time.");
-            throw err;
-          }
+          await importOraAsNewPhoto(file, stampToolRef, onAddPhotos);
           flushToCanvas();
           syncState();
           return stampToolRef.current?.layer_count() ?? 0;
@@ -163,7 +156,14 @@ export function ExportPane({
         </Button>
         <AsyncStatus
           state={oraImport.state}
-          error={oraImport.error && `Couldn't import that .ora file. ${oraImport.error}`}
+          // The raw engine message ("engine document replaced") means nothing
+          // to a person; say what happened instead.
+          error={
+            oraImport.error &&
+            `Couldn't import that .ora file. ${
+              isSuperseded(oraImport.error) ? "Another photo was loading at the same time." : oraImport.error
+            }`
+          }
           processingLabel="Importing…"
           savedLabel={`Imported as a new photo · ${oraLayers} layer${oraLayers === 1 ? "" : "s"}`}
           action={{
