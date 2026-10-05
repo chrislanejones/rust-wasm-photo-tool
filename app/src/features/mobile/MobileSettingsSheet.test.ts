@@ -20,6 +20,31 @@ vi.mock("convex/react", () => ({
   useMutation: () => vi.fn(),
 }));
 
+// The pane reaches convex through lib/cloud (keyless-safe). Under vitest there
+// are no keys, so route lib/cloud to the convex/react mock above.
+vi.mock("@/lib/cloud", async () => {
+  const c = (await import("convex/react")) as Record<string, unknown>;
+  // A hook this file's convex mock leaves out throws when read; stand in a
+  // hook that throws only if it is actually CALLED.
+  const pick = (k: string) => {
+    try {
+      return c[k];
+    } catch {
+      return () => {
+        throw new Error(`${k} is not mocked in this test`);
+      };
+    }
+  };
+  return {
+    CLOUD_CONFIGURED: true,
+    useCloudAuth: pick("useConvexAuth"),
+    useCloudQuery: pick("useQuery"),
+    useCloudMutation: pick("useMutation"),
+    useCloudAction: pick("useAction"),
+    useCloudClient: pick("useConvex"),
+  };
+});
+
 // STATIC imports, loaded once at collection. They were imported inside each
 // test after `vi.resetModules`, so the first test paid the sheet's whole cold
 // import inside its 5 s budget and timed out under full-suite load — and the

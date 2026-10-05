@@ -213,8 +213,10 @@ export default tseslint.config(
     // hook, and the SVG refusal toast moved into svgDownload.ts beside ORA's.
     // 3539 -> 3528 (shapes v9): the local shape-label table became the shared
     // `shapeKindLabel` (perspectiveTarget.ts), which also names the triangle.
+    // 3528 -> 3396 (Plan C §3): Download All / ZIP moved to
+    // app/session/useZipExport.ts on the async grammar.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3528 }] },
+    rules: { "max-lines": ["error", { max: 3396 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

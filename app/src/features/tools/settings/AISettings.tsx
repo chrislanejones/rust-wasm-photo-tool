@@ -124,7 +124,7 @@ export function AISettings({
   settings,
   onChange,
 }: AISettingsProps) {
-  const { run, phase, busy, error } = useAIJob(onAIResult);
+  const { run, retry, phase, busy, error } = useAIJob(onAIResult);
   const [lastType, setLastType] = useState<LiveType | null>(null);
   // Object Removal's mask lives in the tool store, because the surface it is
   // painted on (the canvas) is in a different subtree from these controls.
@@ -485,7 +485,14 @@ export function AISettings({
           />
           )}
           {lastType === "rembg" && error && (
-            <ErrorNote>{error}</ErrorNote>
+            // An error is never only a message: it says what failed and offers
+            // the way back (Plan C §3).
+            <div className="space-y-2">
+              <ErrorNote>{error}</ErrorNote>
+              <Button size="xs" variant="secondary" onClick={retry} disabled={busy}>
+                Try again
+              </Button>
+            </div>
           )}
           {lastType === "rembg" && phase === "done" && !error && (
             <p className="text-2xs text-success">
@@ -494,7 +501,14 @@ export function AISettings({
           )}
 
           {lastType === "inpaint" && error && (
-            <ErrorNote>{error}</ErrorNote>
+            // An error is never only a message: it says what failed and offers
+            // the way back (Plan C §3).
+            <div className="space-y-2">
+              <ErrorNote>{error}</ErrorNote>
+              <Button size="xs" variant="secondary" onClick={retry} disabled={busy}>
+                Try again
+              </Button>
+            </div>
           )}
           {lastType === "inpaint" && phase === "done" && !error && (
             <p className="text-2xs text-success">

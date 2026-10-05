@@ -21,9 +21,13 @@ import { useSyncExternalStore } from "react";
 export interface SaveStatus {
   /** The last save of the active canvas threw. */
   failed: boolean;
+  /** Signed in: the last CLOUD copy of an edit did not upload. The local copy
+   *  is on disk, so nothing is lost — but "backed up" is no longer true, and
+   *  that used to live in the Diagnostics log only (Plan C §3). */
+  backupFailed: boolean;
 }
 
-const INITIAL: SaveStatus = Object.freeze({ failed: false });
+const INITIAL: SaveStatus = Object.freeze({ failed: false, backupFailed: false });
 
 // One frozen object, replaced wholesale on every change — useSyncExternalStore
 // compares snapshots by identity.
@@ -38,7 +42,14 @@ function getSaveStatus(): SaveStatus {
  *  state of "every save works" wakes no subscriber. */
 export function setSaveFailed(failed: boolean): void {
   if (status.failed === failed) return;
-  status = Object.freeze({ failed });
+  status = Object.freeze({ ...status, failed });
+  for (const listener of listeners) listener();
+}
+
+/** Record the outcome of a cloud backup. Clears on the next one that lands. */
+export function setBackupFailed(backupFailed: boolean): void {
+  if (status.backupFailed === backupFailed) return;
+  status = Object.freeze({ ...status, backupFailed });
   for (const listener of listeners) listener();
 }
 

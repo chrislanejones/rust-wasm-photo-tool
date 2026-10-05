@@ -63,7 +63,16 @@
          while /architecture said the demo tier was "No account, no network". -->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Boot shell: a static copy of the React splash, replaced on mount.
+           See .boot-shell in src/styles.css. -->
+      <div class="boot-shell" aria-busy="true">
+        <img src="/Image-Horse-Logo.svg" alt="" width="144" height="144" />
+        <h1>Image Horse</h1>
+        <div class="boot-shell-gap"></div>
+        <p>Loading your workspace…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

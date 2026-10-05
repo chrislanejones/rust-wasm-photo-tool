@@ -53,6 +53,10 @@ interface GalleryState {
    *  load. `activePhotoId !== documentPhotoId` IS "a switch is in flight":
    *  the id moves when you ask, this moves when the pixels arrive. */
   documentPhotoId: string | null;
+  /** Files an import has accepted but not yet decoded, in order. The gallery
+   *  draws a skeleton tile for each so a large import is visibly arriving.
+   *  Session-only (outside `partialize`). */
+  pendingImports: { id: string; name: string }[];
   /** Gallery cap for the current tier. */
   maxPhotos: number;
   /** Prior-session manifest offered on the Resume screen (null = none). */
@@ -71,6 +75,7 @@ interface GalleryState {
   /** A load finished. `photoId` when it put a (possibly different) photo in
    *  the engine; omitted when it only replaced the same photo's pixels. */
   bumpDocumentRevision: (photoId?: string) => void;
+  setPendingImports: (v: SetArg<{ id: string; name: string }[]>) => void;
   setMaxPhotos: (v: SetArg<number>) => void;
   setResumeManifest: (v: SetArg<GalleryManifest | null>) => void;
 }
@@ -87,6 +92,7 @@ export const useGalleryStore = create<GalleryState>()(
   layerRevision: 0,
   documentRevision: 0,
   documentPhotoId: null,
+  pendingImports: [],
   maxPhotos: DEFAULT_PHOTO_LIMIT,
   resumeManifest: null,
 
@@ -106,6 +112,8 @@ export const useGalleryStore = create<GalleryState>()(
       documentRevision: s.documentRevision + 1,
       documentPhotoId: photoId === undefined ? s.documentPhotoId : photoId,
     })),
+  setPendingImports: (v) =>
+    set((s) => ({ pendingImports: resolveSet(v, s.pendingImports) })),
   setMaxPhotos: (v) => set((s) => ({ maxPhotos: resolveSet(v, s.maxPhotos) })),
   setResumeManifest: (v) =>
     set((s) => ({ resumeManifest: resolveSet(v, s.resumeManifest) })),

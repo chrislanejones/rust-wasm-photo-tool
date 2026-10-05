@@ -340,7 +340,7 @@ skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
 
 | Kind | On a switch | Examples |
 | --- | --- | --- |
-| **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Bulk framing |
+| **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Crop framing |
 | **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset), Presets, Flip/Rotate, Apply buttons |
 | **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
 | **App** | Stays | Rulers & grid preferences, theme |
@@ -353,3 +353,55 @@ selection) is cleared on a switch by `usePhotoSwitchReset`.
 Known exception: export quality is seeded from the previous photo until edit
 archives carry it (AppShell quality seed). Guides are cleared rather than
 reloaded until they are persisted per photo (`useGuidesStore` TODO).
+
+## 10. One async grammar (Plan C §3, 10-05-2026)
+
+Every flow that waits — AI result, background removal, export, Download All,
+.ora import, a large decode, a Batch pass, sync, backup — is in exactly one of
+five states. It does not invent its own spinner or toast.
+
+| State | Means | Shows |
+| --- | --- | --- |
+| **Ready** | nothing pending | nothing extra |
+| **Loading** | fetching something that exists | skeletons in place of what it will fill |
+| **Processing** | computing something new | the source stays visible and inert; progress when the length is known, ↻ when it isn't |
+| **Saved** | a result landed somewhere durable | ✓, briefly |
+| **Error** | it didn't work | replaces the skeleton or progress, says what failed in words, and offers an action |
+
+The rules, and what enforces each:
+
+1. **A picture is either a skeleton or the real thing — never a gray or
+   half-loaded one.** (`useThumbImage`, `PendingImportTile`; guardrail
+   `no-gray-photos`.)
+2. **Nothing spins forever.** Every run has a timeout that ends in Error.
+   (`hooks/useAsyncTask.ts`; `useAIJob` 60 s upload / 3 min job.)
+3. **An Error is never only a message.** It carries an action — usually Try
+   again. (`components/ui/async-status.tsx` takes `action`.)
+4. **A superseded request is dropped, not rejected.** A photo switch replaces
+   the engine document under requests still in flight; they resolve as
+   "dropped", paint no error and never surface as an unhandled rejection.
+   (`lib/engine/superseded.ts`, installed at boot; e2e `async-dropped`.)
+5. **A pass that skips some items says how many.** "Zipped 11 of 12 — 1
+   couldn't be read", "Logo applied to 10 of 12 — 2 couldn't be processed".
+   (`useZipExport`, `lib/batchOutcome.ts`.)
+6. **Read document state through the loaded-document accessor.** Mid-switch,
+   the engine mirror still describes the outgoing photo. Components use
+   `hooks/useLoadedDocument`, which is null until the requested photo is in.
+   (Guardrail `direct-document-reads`, baseline 8, may only go down.)
+7. **Where the surface closes, the toast is the surface.** Download and
+   Download All run after their dialog has closed, so their Processing /
+   Saved / Error states are a toast with the same words and the same action.
+
+Where each flow stands (10-05-2026):
+
+| Flow | Grammar |
+| --- | --- |
+| Gallery thumbnails, import | skeleton-or-photo; pending import tiles |
+| Photo switch | footer + canvas "Loading", panel skeletons; Error toast with Try again; superseded dropped |
+| AI result / background removal | timeouts → Error with Try again |
+| Download (single) | Error toast with Try again |
+| Download All / ZIP | `useAsyncTask`: progress toast, skips counted, timeout, Try again |
+| .ora import | `useAsyncTask` + `AsyncStatus` inline |
+| Batch passes | failures counted in the end toast |
+| Settings sync | already the reference (`lib/sync/status.ts`): own states, retry, timeouts |
+| Edit backup | a failed cloud upload holds "Not backed up — saved on this device" in the status bar until the next upload lands |

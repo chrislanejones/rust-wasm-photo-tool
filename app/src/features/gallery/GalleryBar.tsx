@@ -8,6 +8,8 @@ import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
+import { PendingImportTile } from "./PendingImportTile";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -375,6 +377,9 @@ export function GalleryBar({
   // screen reader reading out a list of boxes, which is why the tile
   // placeholders are `decorative` and this is the only thing that speaks.
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  // Files still being opened by an import — drawn as skeleton tiles after the
+  // real ones, and part of the gallery's one aria-busy.
+  const pendingImports = useGalleryStore((s) => s.pendingImports);
   const reportPending = useCallback((id: string, pending: boolean) => {
     setPendingIds((prev) => {
       // Returning `prev` unchanged when nothing moved matters: this is called
@@ -520,7 +525,7 @@ export function GalleryBar({
 
             <div
               ref={stripRef}
-              aria-busy={pendingIds.size > 0}
+              aria-busy={pendingIds.size > 0 || pendingImports.length > 0}
               className={
                 vertical
                   ? // Two thumbs per row, with breathing room between tiles + above.
@@ -607,6 +612,9 @@ export function GalleryBar({
                   }}
                   vertical={vertical}
                 />
+              ))}
+              {pendingImports.map((p) => (
+                <PendingImportTile key={p.id} name={p.name} vertical={vertical} />
               ))}
             </div>
 

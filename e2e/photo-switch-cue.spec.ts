@@ -186,3 +186,37 @@ test("C6 reduced motion: the cue holds a static tint, the skeleton does not shim
   expect(shimmer, "no shimmer under reduced motion").toBe("none");
 });
 
+
+test("C7 a slow switch dims the canvas and names the photo it is loading, then clears", async ({ page }) => {
+  await setup(page);
+  const veil = page.getByTestId("switch-loading-veil");
+  await expect(veil).toHaveCount(0);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+  await pgDn(page);
+  // The OLD photo is still drawn underneath; the veil says which one is coming.
+  await expect(veil).toHaveText(/Loading sky-building/, { timeout: 60_000 });
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  await expect(veil).toHaveCount(0, { timeout: 60_000 });
+  await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
+});
+
+test("C8 a per-photo value this photo changed shows a dot and a reset; reset clears it", async ({ page }) => {
+  await setup(page);
+  await open(page, "Enhance", "Adjustments");
+  const row = page.locator('[data-slot="control-row"]').filter({ hasText: "Brightness" }).first();
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(0);
+  const slider = row.getByRole("slider");
+  const b = (await slider.boundingBox())!;
+  await page.mouse.click(b.x + b.width * 0.8, b.y + b.height / 2);
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(1);
+  await row.getByRole("button", { name: "Reset Brightness" }).click();
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(0);
+  await expect(row.locator('[data-slot="value"]')).toHaveText("0");
+  // Switching photos: the dot belongs to the photo on screen, so B has none.
+  await page.mouse.click(b.x + b.width * 0.8, b.y + b.height / 2);
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(1);
+  await pgDn(page);
+  await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
+  await expect(page.locator('[data-slot="control-row"]').filter({ hasText: "Brightness" }).first().locator('[data-slot="edited"]')).toHaveCount(0);
+});

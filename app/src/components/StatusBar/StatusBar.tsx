@@ -2,6 +2,7 @@
 // Item 8: Architecture link opens in new tab
 // Item 2: Added spacebar hint
 // Item 4: Added PgUp/PgDn hint
+import { useLoadedDocument } from "@/hooks/useLoadedDocument";
 import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
@@ -121,7 +122,7 @@ export function StatusBar({
   const maskEditing = useToolStore((s) => s.maskEditing);
   // Night 5 feedback hierarchy: two errors that used to live ONLY in a toast.
   // Each reads its single publisher; neither computes its own answer.
-  const saveFailed = useSaveStatus().failed;
+  const { failed: saveFailed, backupFailed } = useSaveStatus();
   const sync = useSyncStatus();
   const syncFailed = sync.state === "error";
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
@@ -129,8 +130,11 @@ export function StatusBar({
   // one hook answers both and they cannot disagree. `state.width/height` is
   // the DOCUMENT, which on a default artboard import is photo + 2 ×
   // canvasPadding — a number 20px bigger than the file that was opened.
-  const photoW = photoWidth ?? state.width;
-  const photoH = photoHeight ?? state.height;
+  // Through the loaded-document accessor: mid-switch the engine still holds
+  // the OUTGOING photo, so its size reads "—" rather than the wrong numbers.
+  const doc = useLoadedDocument(state);
+  const photoW = doc ? (photoWidth ?? doc.width) : 0;
+  const photoH = doc ? (photoHeight ?? doc.height) : 0;
 
   // TWO things vary here, and they are independent:
   //   • the TOOL — `activeToolHint` / `activeToolHint2` change the moment the
@@ -235,6 +239,22 @@ export function StatusBar({
             <span className="status-zoom inline-flex items-center gap-1" data-testid="status-save-failed" role="status">
               <StatusMark kind="failed" />
               Couldn&rsquo;t save changes
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {backupFailed && !saveFailed && (
+          <>
+            {/* Signed in only. The edit IS saved on this device; the cloud
+                copy is what failed, and the next save retries it. */}
+            <span
+              className="status-zoom inline-flex items-center gap-1"
+              data-testid="status-backup-failed"
+              role="status"
+              title="Your edits are saved on this device. The cloud copy didn't upload; the next save tries again."
+            >
+              <StatusMark kind="attention" />
+              Not backed up — saved on this device
             </span>
             <span className="status-divider" />
           </>

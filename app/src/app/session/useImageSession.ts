@@ -8,6 +8,8 @@
 // handleDuplicateSelected + selectedIds/clearSelection) intentionally stay in
 // AppShell — see PARKING_LOT.md. `loadPhotoFromEntry` + `activeIdRef` are
 // returned because the AppShell-resident handleDeleteSelected still uses them.
+import { beginPendingImports, reportSwitchFailure } from "./sessionFeedback";
+import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
@@ -197,14 +199,14 @@ export function useImageSession({
       }
       // AI result replaces the doc — re-normalize to the artboard (border +
       // backing) when "Canvas on import" is on, exactly like every other load.
-      loadImageFromPixels(
+      void loadImageFromPixels(
         r.pixels,
         r.width,
         r.height,
         prefs.canvasArtboard
           ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
           : undefined,
-      );
+      ).catch(dropSuperseded);
       setHasBeenModified(true);
     },
     [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
@@ -465,8 +467,11 @@ export function useImageSession({
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
 
+      // A skeleton tile per accepted file until it lands (Plan A §5).
+      const settle = beginPendingImports(accepted);
+
       let firstLoaded = false;
-      for (const raw of accepted) {
+      for (const [index, raw] of accepted.entries()) {
         try {
           // SVGs never enter the pipeline as vectors — rasterize to a PNG File
           // at the boundary (lib/rasterizeSvg), so the stored gallery original
@@ -534,6 +539,7 @@ export function useImageSession({
             if (svg) useSvgSourceStore.getState().setSource(entry.id, svg);
           }
           setPhotos((prev) => [...prev, entry]);
+          settle(index);
 
           if (!firstLoaded) {
             firstLoaded = true;
@@ -556,13 +562,14 @@ export function useImageSession({
                 : undefined,
               // Fresh import — ownership is set inside the load (LoadOpts.photoId).
               { photoId: importedId },
-            );
+            ).catch(dropSuperseded);
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
             setCompareActive(false);
           }
         } catch (err) {
+          settle(index);
           console.error("Failed to add photo:", raw.name, err);
           // #55 — DO NOT BLAME THE FILE FOR THE ORIGIN'S PROBLEM.
           //
@@ -639,7 +646,7 @@ export function useImageSession({
           setLoadProgress(0);
         }, 400);
       } else {
-        void loadPhotoFromEntry(entry, isCurrent);
+        void loadPhotoFromEntry(entry, isCurrent).catch(dropSuperseded);
       }
     },
     [stamp, loadPhotoEdit, loadPhotoFromEntry],
@@ -703,6 +710,7 @@ export function useImageSession({
       // something to see while the save runs; the real steps (20 → 100) follow.
       setIsImageLoading(true);
       setLoadProgress(8);
+      try {
 
       // Persist the OUTGOING photo only if it was actually modified. This used
       // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
@@ -764,9 +772,18 @@ export function useImageSession({
       // it doesn't falsely dot the newly-selected photo mid-transition.
 
       await loadIntoEngine(entry, isCurrent);
+      } catch (err) {
+        // Superseded (a newer switch replaced the document) is "dropped".
+        if (isSuperseded(err) || !isCurrent()) return;
+        setIsImageLoading(false);
+        reportSwitchFailure(entry.name, err, () => void handleSelectPhotoRef.current?.(entry));
+      }
     },
     [activePhotoId, hasBeenModified, layerRevision, stamp, loadIntoEngine, flushEditArchive],
   );
+
+  const handleSelectPhotoRef = useRef<typeof handleSelectPhoto | null>(null); // "Try again" → latest
+  handleSelectPhotoRef.current = handleSelectPhoto;
 
   // Item 4: PgUp/PgDn gallery cycling
   const handleNextPhoto = useCallback(() => {
@@ -819,7 +836,7 @@ export function useImageSession({
         const next = prev.filter((p) => p.id !== id);
         if (id === activePhotoId && next.length > 0) {
           const na = next[Math.min(idx, next.length - 1)]!;
-          void loadPhotoFromEntry(na);
+          void loadPhotoFromEntry(na).catch(dropSuperseded);
           activeIdRef.current = na.id;
           setActivePhotoId(na.id);
           setHasBeenModified(false);

@@ -14,7 +14,8 @@
 // Demo mode is sacred, so the query is skipped when Convex has not completed
 // its handshake and the pane explains itself instead of rendering empty bars.
 import { useEffect, useMemo, useState } from "react";
-import { useConvexAuth, useQuery } from "convex/react";
+// Through lib/cloud, not convex/react: a keyless build must open this pane.
+import { useCloudAuth as useConvexAuth, useCloudQuery as useQuery } from "@/lib/cloud";
 import { Info, Clock3 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { PaneHeading } from "@/components/ui/pane-heading";

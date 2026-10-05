@@ -38,7 +38,8 @@
 //    them. Only a change made after the forget — or the Send button — brings
 //    a document back.
 import { useEffect, useId, useState } from "react";
-import { useConvexAuth, useMutation } from "convex/react";
+// Through lib/cloud, not convex/react: a keyless build must open this pane.
+import { useCloudAuth as useConvexAuth, useCloudMutation as useMutation } from "@/lib/cloud";
 import { CloudOff, RefreshCw, Upload } from "lucide-react";
 import { StatusMark, type StatusKind } from "@/components/ui/status-mark";
 import { api } from "../../../convex/_generated/api";

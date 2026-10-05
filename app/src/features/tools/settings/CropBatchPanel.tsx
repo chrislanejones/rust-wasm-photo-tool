@@ -9,6 +9,7 @@
 // Drag the frame on the preview (BatchCropOverlay) and, on release, that
 // framing becomes the one every photo IN THE SAME GROUP follows; frame another
 // photo to give it its own. Shift-drag breaks the ratio. Enter runs the pass.
+import { batchOutcome } from "@/lib/batchOutcome";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -342,10 +343,13 @@ export function CropBatchPanel({
       setAppliedCount(succeeded);
       const mainLabel = ratioLabel(cropRatioOf(crops.looks.main));
       const exceptionsLabel = ratioLabel(cropRatioOf(crops.looks.exceptions));
-      toast.success(
+      const outcome = batchOutcome("Cropped", succeeded, photos.length);
+      (outcome.ok ? toast.success : toast.warning)(
         hasExceptions
-          ? `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} — Main to ${mainLabel}, Exceptions to ${exceptionsLabel}`
-          : `Cropped ${succeeded} image${succeeded === 1 ? "" : "s"} to ${mainLabel}`,
+          ? `${outcome.text} — Main to ${mainLabel}, Exceptions to ${exceptionsLabel}`
+          : outcome.ok
+            ? `${outcome.text} to ${mainLabel}`
+            : outcome.text,
       );
     } catch (err) {
       console.error("Bulk-crop: fatal error", err);

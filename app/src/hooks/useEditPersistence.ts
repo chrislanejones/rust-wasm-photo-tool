@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { setBackupFailed } from "@/lib/saveStatus";
 import { isNetworkPathAllowed } from "@/lib/networkPaths";
 import { useCloudAuth, useCloudClient, useCloudMutation } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
@@ -568,11 +569,13 @@ export function useEditPersistence() {
               // failed would let a broken network burn the hour's allowance
               // without a single byte reaching Convex.
               recordUpload(photoId);
+              setBackupFailed(false);
               uploadedStorageId = null; // pointer committed — no longer stranded
             } catch (err) {
               // Cloud save failed (upload / storage / auth). The local IDB copy is
-              // ALREADY written, so nothing is lost — just record the failure so it
-              // shows up in the Diagnostics Window instead of vanishing silently.
+              // ALREADY written, so nothing is lost — record it for Diagnostics,
+              // and say so in the status bar until a later upload lands.
+              setBackupFailed(true);
               logDiagnostic(
                 "CONVEX_DB",
                 `Cloud edit save failed for ${photoId}; saved locally only: ${

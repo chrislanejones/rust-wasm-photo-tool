@@ -18,6 +18,7 @@ import { installSaveGuardProbe } from "@/lib/engineDocument";
 import { applyBetaFromUrl } from "@/lib/beta";
 import { hydrateInstalledPlugins } from "@/lib/plugins/state";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
+import { installDroppedRejectionHandler } from "@/lib/engine/superseded";
 
 // `?beta=<id>` — an invite link opting this DEVICE into an experiment. Applied
 // BEFORE anything reads a beta key (the WebGPU gate below is one), and before
@@ -72,6 +73,8 @@ installRotatedTextAudit();
 // indistinguishable from a broken one, and the runaway it guards against
 // happens in production, not in dev.
 installUploadBudgetProbe();
+// A superseded engine request is "dropped", never an unhandled rejection (Plan C §3).
+installDroppedRejectionHandler();
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.

@@ -1,4 +1,7 @@
 import { useRef, useState } from "react";
+import { AsyncStatus } from "@/components/ui/async-status";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { isSuperseded } from "@/lib/engine/superseded";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { Package, Puzzle, Upload } from "lucide-react";
@@ -101,25 +104,34 @@ export function ExportPane({
 
   const handleExport = async () => {
     setBusy("export");
-    await downloadOraWithToast({ stampToolRef, flushToCanvas, syncState, imageName });
-    setBusy(null);
+    try {
+      await downloadOraWithToast({ stampToolRef, flushToCanvas, syncState, imageName });
+    } finally {
+      // A throw used to leave `busy` set and every button here disabled.
+      setBusy(null);
+    }
   };
 
+  // .ora import on the async grammar (Plan C §3): Importing… inline, then ✓,
+  // or an Error that says what failed in words and offers Try again.
+  const oraImport = useAsyncTask();
+  const lastOraFile = useRef<File | null>(null);
+  const [oraLayers, setOraLayers] = useState(0);
   const handleImportFile = async (file: File) => {
+    lastOraFile.current = file;
     setBusy("import");
     try {
-      await importOraAsNewPhoto(file, stampToolRef, onAddPhotos);
-      flushToCanvas();
-      syncState();
-      const count = stampToolRef.current?.layer_count() ?? 0;
-      toast.success("Imported .ora as a new photo", {
-        description: `Restored ${count} layer${count === 1 ? "" : "s"}.`,
-      });
-    } catch (err) {
-      console.error("Import .ora failed:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't import that .ora file.",
+      const result = await oraImport.run(
+        async () => {
+          await importOraAsNewPhoto(file, stampToolRef, onAddPhotos);
+          flushToCanvas();
+          syncState();
+          return stampToolRef.current?.layer_count() ?? 0;
+        },
+        { saved: true, timeoutMs: 120_000, timeoutMessage: "Importing took too long and was stopped." },
       );
+      if (result.status === "done") setOraLayers(result.value);
+      if (result.status === "failed") console.error("Import .ora failed:", result.error);
     } finally {
       setBusy(null);
     }
@@ -142,6 +154,25 @@ export function ExportPane({
           {busy === "import" ? <Spinner size={16} /> : <Upload />}
           {busy === "import" ? "Importing…" : "Import .ora"}
         </Button>
+        <AsyncStatus
+          state={oraImport.state}
+          // The raw engine message ("engine document replaced") means nothing
+          // to a person; say what happened instead.
+          error={
+            oraImport.error &&
+            `Couldn't import that .ora file. ${
+              isSuperseded(oraImport.error) ? "Another photo was loading at the same time." : oraImport.error
+            }`
+          }
+          processingLabel="Importing…"
+          savedLabel={`Imported as a new photo · ${oraLayers} layer${oraLayers === 1 ? "" : "s"}`}
+          action={{
+            label: "Try again",
+            onClick: () => {
+              if (lastOraFile.current) void handleImportFile(lastOraFile.current);
+            },
+          }}
+        />
         <input
           ref={fileInputRef}
           type="file"

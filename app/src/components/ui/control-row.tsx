@@ -24,7 +24,13 @@
 // reader sees an off switch and no way to turn it on. `reason` renders as
 // visible text (not a tooltip: touch has no hover) and its id is handed to the
 // control for `aria-describedby`, so a screen reader hears it too.
+//
+// EDITED. A per-photo value this photo has moved off its default gets a dot
+// after the label and a reset button beside the value (Plan A §4.3), so after
+// a photo switch you can tell at a glance which numbers this photo changed.
+// Defaults show nothing. Pass `edited` only for per-photo values.
 import * as React from "react";
+import { RotateCcw } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { ReasonNote } from "@/components/ui/status-note";
 import { cn } from "@/lib/utils";
@@ -49,12 +55,16 @@ export interface ControlRowProps {
   value?: React.ReactNode;
   /** Why the control is unavailable. Render it only while it is. */
   reason?: React.ReactNode;
+  /** A per-photo value moved off its default: shows the edited dot and a
+   *  reset button that calls `onReset`. Omit, or pass `isEdited: false`, for
+   *  a default. */
+  edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
   /** The control. Use the function form to wire the label / reason ids. */
   children: React.ReactNode | ((ids: ControlRowIds) => React.ReactNode);
   className?: string;
 }
 
-export function ControlRow({ label, info, value, reason, children, className }: ControlRowProps) {
+export function ControlRow({ label, info, value, reason, edited, children, className }: ControlRowProps) {
   const baseId = React.useId();
   const labelId = `${baseId}-label`;
   const reasonId = reason ? `${baseId}-reason` : undefined;
@@ -66,6 +76,30 @@ export function ControlRow({ label, info, value, reason, children, className }: 
             {label}
           </span>
           {info && <InfoTooltip info={info} label={label} />}
+          {edited?.isEdited && (
+            <span
+              data-slot="edited"
+              role="img"
+              aria-label={`${label} changed on this photo`}
+              title="Changed on this photo"
+              className="size-1.5 rounded-full bg-theme-primary"
+            />
+          )}
+          {/* On the label side, so the value stays the header's last child
+              (the panel grammar pins that). */}
+          {edited?.isEdited && (
+            <button
+              type="button"
+              data-slot="reset"
+              onClick={edited.onReset}
+              disabled={edited.disabled}
+              aria-label={`Reset ${label}`}
+              title={`Reset ${label}`}
+              className="flex size-4 items-center justify-center rounded text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40"
+            >
+              <RotateCcw aria-hidden className="size-3" />
+            </button>
+          )}
         </span>
         {value != null && (
           <span data-slot="value" className="tabular-nums text-theme-foreground">

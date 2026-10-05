@@ -16,6 +16,7 @@
 // context, even though the gestures that write them live in the residual hook.
 // That is the honest seam — the state shape is the contract, and the state
 // shape includes the source.
+import { dropSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDiagnosticsSampler } from "./useDiagnosticsSampler";
 import type { RefObject, MouseEvent } from "react";
@@ -349,7 +350,16 @@ export function useEngineCore(
     //
     // The one thing FIFO does NOT cover is the document being replaced while a
     // capture is in flight — see `readUiSnapshot`'s liveness guard.
-    const snap = await readUiSnapshot(t, () => toolRef.current === t);
+    // A capture whose document was replaced mid-flight (a photo switch) is
+    // DROPPED, not failed: every caller fires and forgets, so a rethrow here
+    // was an unhandled "engine document replaced" in the console.
+    let snap: Awaited<ReturnType<typeof readUiSnapshot>>;
+    try {
+      snap = await readUiSnapshot(t, () => toolRef.current === t);
+    } catch (err) {
+      dropSuperseded(err);
+      return;
+    }
     if (!snap) return; // stale capture, discarded
     const {
       has_source,
@@ -497,8 +507,8 @@ export function useEngineCore(
           toolRef.current = tool;
           sourcePosRef.current = null;
           URL.revokeObjectURL(url);
-          syncState();
-        });
+          void syncState();
+        }).catch(dropSuperseded);
       };
       img.src = url;
     },

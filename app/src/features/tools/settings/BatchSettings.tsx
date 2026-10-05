@@ -2,6 +2,7 @@
 // chosen corner/center with a chosen size + opacity. The active photo's stamp
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
+import { batchOutcome } from "@/lib/batchOutcome";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
@@ -575,9 +576,8 @@ function BatchToolPanel({
       }
 
       setAppliedCount(succeeded);
-      toast.success(
-        `Logo applied to ${succeeded} image${succeeded === 1 ? "" : "s"}`,
-      );
+      const outcome = batchOutcome("Logo applied to", succeeded, photos.length);
+      (outcome.ok ? toast.success : toast.warning)(outcome.text);
     } catch (err) {
       console.error("Bulk-logo: fatal error", err);
       setErrorMsg("Something went wrong.");
@@ -1247,9 +1247,8 @@ function TextBatchPanel({
       }
 
       setAppliedCount(succeeded);
-      toast.success(
-        `Text applied to ${succeeded} image${succeeded === 1 ? "" : "s"}`,
-      );
+      const outcome = batchOutcome("Text applied to", succeeded, photos.length);
+      (outcome.ok ? toast.success : toast.warning)(outcome.text);
     } catch (err) {
       console.error("Bulk-text: fatal error", err);
       setErrorMsg("Something went wrong.");

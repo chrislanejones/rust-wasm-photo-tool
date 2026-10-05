@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
+import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
 import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/exportImage";
@@ -186,7 +187,7 @@ export function useCanvasActions({
   /** Download the active image. `stem` is the export dialog's file-name field
    *  (already sanitized); omitted everywhere else, which keeps the
    *  `<name>-revised` default. */
-  const handleExportAs = useCallback(async (stem?: string) => {
+  const exportAsInner = useCallback(async (stem?: string) => {
     const entry = photos.find((p) => p.id === activePhotoId) ?? null;
     const tool = stamp.toolRef.current;
     // Excluding the canvas background crops the export to the photo's own
@@ -263,6 +264,24 @@ export function useCanvasActions({
     // intermittent rather than broken. `handleCopyToClipboard` above always
     // had it; only this path did not.
   }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground, canvasBgTransparent]);
+
+  // Every caller fires this and forgets (the dialog has already closed), so a
+  // failure used to vanish — no file, no word. The Error state says so and
+  // offers the way back; a superseded engine read is dropped (Plan C §3).
+  const handleExportAs = useCallback(
+    async (stem?: string): Promise<void> => {
+      try {
+        await exportAsInner(stem);
+      } catch (err) {
+        if (isSuperseded(err)) return;
+        console.error("Download failed", err);
+        toast.error("Couldn't download the image.", {
+          action: { label: "Try again", onClick: () => void exportAsInner(stem).catch(dropSuperseded) },
+        });
+      }
+    },
+    [exportAsInner],
+  );
 
   // Zero-arg wrapper: this is handed straight to `onClick` (context menu) and
   // the keyboard shortcut, and must not mistake a click event for a name.
