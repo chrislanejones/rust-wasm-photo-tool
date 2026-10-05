@@ -161,6 +161,16 @@ export function EffectsSettings({
           value={brightness}
           onChange={setBrightness}
           onCommit={commitBrightness}
+          edited={{
+            // Latched off neutral = this photo was changed. Reset commits the
+            // way back, so it is one more undoable edit, not a silent revert.
+            isEdited: brightnessCommitted !== 0,
+            onReset: () => {
+              setBrightness(0);
+              commitBrightness(0);
+            },
+            disabled: !imageReady,
+          }}
           min={-100}
           max={100}
           disabled={!imageReady}
@@ -176,6 +186,16 @@ export function EffectsSettings({
           value={contrast}
           onChange={setContrast}
           onCommit={commitContrast}
+          edited={{
+            // Latched off neutral = this photo was changed. Reset commits the
+            // way back, so it is one more undoable edit, not a silent revert.
+            isEdited: contrastCommitted !== 100,
+            onReset: () => {
+              setContrast(100);
+              commitContrast(100);
+            },
+            disabled: !imageReady,
+          }}
           min={10}
           max={300}
           disabled={!imageReady}
@@ -198,6 +218,16 @@ export function EffectsSettings({
             value={saturation}
             onChange={setSaturation}
             onCommit={commitSaturation}
+          edited={{
+            // Latched off neutral = this photo was changed. Reset commits the
+            // way back, so it is one more undoable edit, not a silent revert.
+            isEdited: saturationCommitted !== 100,
+            onReset: () => {
+              setSaturation(100);
+              commitSaturation(100);
+            },
+            disabled: !imageReady,
+          }}
             min={0}
             max={300}
             disabled={!imageReady}

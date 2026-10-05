@@ -200,3 +200,23 @@ test("C7 a slow switch dims the canvas and names the photo it is loading, then c
   await expect(veil).toHaveCount(0, { timeout: 60_000 });
   await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
 });
+
+test("C8 a per-photo value this photo changed shows a dot and a reset; reset clears it", async ({ page }) => {
+  await setup(page);
+  await open(page, "Enhance", "Adjustments");
+  const row = page.locator('[data-slot="control-row"]').filter({ hasText: "Brightness" }).first();
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(0);
+  const slider = row.getByRole("slider");
+  const b = (await slider.boundingBox())!;
+  await page.mouse.click(b.x + b.width * 0.8, b.y + b.height / 2);
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(1);
+  await row.getByRole("button", { name: "Reset Brightness" }).click();
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(0);
+  await expect(row.locator('[data-slot="value"]')).toHaveText("0");
+  // Switching photos: the dot belongs to the photo on screen, so B has none.
+  await page.mouse.click(b.x + b.width * 0.8, b.y + b.height / 2);
+  await expect(row.locator('[data-slot="edited"]')).toHaveCount(1);
+  await pgDn(page);
+  await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
+  await expect(page.locator('[data-slot="control-row"]').filter({ hasText: "Brightness" }).first().locator('[data-slot="edited"]')).toHaveCount(0);
+});

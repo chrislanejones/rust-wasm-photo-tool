@@ -55,6 +55,8 @@ interface CommonProps {
    *  Pass it only while `disabled` is true. */
   reason?: ReactNode;
   onCommit?: (v: number) => void;
+  /** Per-photo values only: the edited dot + reset (see ControlRow). */
+  edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
 }
 
 interface PlainSliderProps extends CommonProps {
@@ -77,7 +79,7 @@ interface DotsSliderProps extends CommonProps {
 type SizeSliderProps = PlainSliderProps | DotsSliderProps;
 
 export function SizeSlider(props: SizeSliderProps) {
-  const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit } = props;
+  const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit, edited } = props;
   const display = valueDisplay ?? `${value}${unit}`;
 
   const onPointerUp = onCommit
@@ -86,7 +88,7 @@ export function SizeSlider(props: SizeSliderProps) {
     : undefined;
 
   return (
-    <ControlRow label={label} info={labelInfo} value={display} reason={reason}>
+    <ControlRow label={label} info={labelInfo} value={display} reason={reason} edited={edited}>
       {({ reasonId }) => {
         if (props.presets) {
           const { presets, blurredDots, renderPreset, variant = "dots" } = props;

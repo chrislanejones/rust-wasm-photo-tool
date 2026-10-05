@@ -125,3 +125,42 @@ describe("ControlRow — the plain children form still works", () => {
     expect(screen.getByRole("slider", { name: "Size" })).toBeTruthy();
   });
 });
+
+// Plan A §4.3 — a per-photo value this photo changed carries a dot and a reset;
+// a default carries neither.
+describe("ControlRow — edited", () => {
+  it("a default shows no dot and no reset", () => {
+    const { container } = render(
+      <ControlRow label="Brightness" value="0" edited={{ isEdited: false, onReset: () => {} }}>
+        <input aria-label="Brightness" type="range" />
+      </ControlRow>,
+    );
+    expect(container.querySelector('[data-slot="edited"]')).toBeNull();
+    expect(container.querySelector('[data-slot="reset"]')).toBeNull();
+  });
+
+  it("an edited value shows the dot and a named reset that calls back", () => {
+    let resets = 0;
+    const { container } = render(
+      <ControlRow label="Brightness" value="+40" edited={{ isEdited: true, onReset: () => resets++ }}>
+        <input aria-label="Brightness" type="range" />
+      </ControlRow>,
+    );
+    expect(container.querySelector('[data-slot="edited"]')?.getAttribute("aria-label")).toBe(
+      "Brightness changed on this photo",
+    );
+    const reset = screen.getByRole("button", { name: "Reset Brightness" });
+    reset.click();
+    expect(resets).toBe(1);
+  });
+
+  it("the dot never leaks into the control's accessible name", () => {
+    // The label span is what aria-labelledby points at; the dot is a sibling.
+    const { container } = render(
+      <ControlRow label="Contrast" edited={{ isEdited: true, onReset: () => {} }}>
+        {({ labelId }) => <input aria-labelledby={labelId} type="range" />}
+      </ControlRow>,
+    );
+    expect(container.querySelector('[data-slot="label"]')?.textContent).toBe("Contrast");
+  });
+});
