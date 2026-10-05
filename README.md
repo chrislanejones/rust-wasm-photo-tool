@@ -86,24 +86,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.12 — 2026-10-05
+### v9.13 — 2026-10-05
 
-**Every photo in Batch's grid gets its own Exception checkbox, and one floating bar serves the canvas.**
+**Switching photos says it's loading, a big import shows its tiles arriving, the app opens on a splash instead of a blank page, and nothing waits for ever.**
 
-In v9.11 only the open photo had an Exception checkbox on the canvas; the other
-eleven had to be ticked down in the gallery. Now every photo in the 12-photo
-grid carries its own, in the same spot, and each one means exactly what the
-gallery checkbox means.
+Switch to a photo that takes a moment and the canvas dims under "Loading
+IMG_0427", the Tools footer says the same, and the panel's numbers wait until
+they belong to the photo you asked for. Change Brightness, Contrast or
+Saturation and a dot sits beside it with a reset button, so you can see what
+this photo has had done to it.
 
-Under the grid there's a bar: ‹ 12 photos · 1 exception ›. With a gallery
-bigger than the grid, it says which page you're on and the arrows step through
-the rest, eleven at a time around the open photo. The old "+N more" badge is
-gone.
+Import a pile of photos and each one gets a placeholder tile in the gallery
+until it's ready, on the phone too. On a slow connection the editor used to
+sit on a blank page for six seconds; the splash is up in about one and a half
+now.
 
-That bar is the same component as Apply · Reset · Cancel under the Perspective,
-Distort and Skew box. There's one file for it now
-(`components/ui/canvas-action-bar.tsx`), so the next tool that wants buttons on
-the canvas gets the same look for free.
+Every flow that waits now either finishes, fails with a reason and a Try
+again, or times out — the AI tools, Download, Download All, .ora import and
+the Batch tools. Download All shows its progress, skips a photo it can't read
+instead of failing the whole ZIP, and tells you how many it skipped. A failed
+cloud backup says so in the status bar. A build with no keys can open
+Settings › Sync and Shared without crashing.
+
+Under the hood: a stray "engine document replaced" error that rapid switching
+used to throw is gone, fourteen end-to-end tests that only ran on a laptop now
+run on every PR, and the repo lost 17.6 MB of unreferenced screenshots and two
+dead files. QC passed against the production build.
 
 No Rust, no IndexedDB — engine unchanged at 829,721 bytes.
 

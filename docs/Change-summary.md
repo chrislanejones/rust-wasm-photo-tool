@@ -11272,3 +11272,28 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Gates** | tsc **0**, eslint **0 errors** / 56 warnings, vitest **151 files / 1,629 tests**, `guardrails.sh` at baseline, PR CI **17 pass / 1 skipped**. |
 | **Engine** | **829,721 bytes — unchanged.** No Rust in this release. |
 | **Not verified** | Paging was never clicked in a browser: the logged-out gallery caps at 12, so there is no second page without a paid tier. |
+
+## v9.13 Change Summary — 2026-10-05
+
+**Switching photos says it's loading, a big import shows its tiles arriving, the app opens on a splash instead of a blank page, and nothing waits for ever.** Two PRs since v9.12: #293 (the night's Plan A / Plan C leftovers) and #294 (cleanup).
+
+| Area | Change |
+| --- | --- |
+| **Photo switch** (#293) | After 150 ms a slow switch dims the canvas under "Loading <name>" (`SwitchLoadingVeil`), and the Tools footer reads "Loading · 2 of 12 · name". |
+| **Edited dot + reset** (#293) | `ControlRow` gains an `edited` slot: a dot after the label and a reset button. Wired on Adjustments' Brightness, Contrast and Saturation. |
+| **Import tiles** (#293) | `pendingImports`: a skeleton tile per file still being opened, in the strip, the grid and the phone grid. |
+| **Shared skeleton** (#293) | Settings › Shared shows skeleton rows in the list's frame instead of a spinner. |
+| **Boot splash** (#293) | Measured 6.1 s of blank on Fast 3G + 4× CPU; `index.html` now ships a static copy of the splash, up at ~1.5 s. Tool panels measured 285–338 ms — no skeleton built. |
+| **One async grammar** (#293) | `useAsyncTask` + `AsyncStatus`: ready / loading / processing / saved / error; every run times out; an Error carries an action. Rules in UI_CONSISTENCY §10. ADR-081 (draft). |
+| **Superseded = dropped** (#293) | Reproduced 3–6 unhandled "engine document replaced" per rapid-switch run; `installDroppedRejectionHandler` + explicit catches → 0. A real switch failure gets an Error toast with Try again. |
+| **Flows on the grammar** (#293) | AI: 60 s upload / 3 min job timeouts, Try again. Download: Error toast. Download All: moved out of AppShell into `useZipExport` — progress, skips counted, timeout. .ora import: inline status. Batch: failures counted. Backup: a status-bar chip on a failed cloud upload. |
+| **Accessor + guardrail** (#293) | `useLoadedDocument` (null mid-switch; StatusBar migrated) and the `direct-document-reads` ratchet, baseline 8. |
+| **Keyless** (#293) | Settings › Sync, Shared, AI usage and the Settings button go through `lib/cloud`. |
+| **CI** (#293, #294) | 14 e2e specs that ran only locally now run on every PR (41 tests). `phone-no-engine`'s wait polled a canvas that is 300×150 by default, so it could not fail — it waits for the engine request now. |
+| **Cleanup** (#294) | fallow unused files 5 → 0 (`radio-cards`, marketing `useMediaQuery` deleted; design-sync and sitemap scripts declared). 17.6 MB of unreferenced screenshots removed. FINDINGS-oplog note archived. twiggy: 240 B of garbage in the engine, nothing to cut. |
+| **AppShell** | 3,528 → 3,396 lines; the lint cap follows. |
+| **QC** | `imagehorse-qc` against the production build, logged out: boot + file picker + drag-drop, edit → undo → redo, download, Export / Settings Esc, Perspective bar, Batch Crop + Exceptions, reload → Resume keeps the edit, keyboard focus on the new controls. **PASS.** |
+| **Gates** | tsc 0, eslint 0 errors / 56 warnings, vitest 1,649 / 1,649, guardrails OK, e2e CI step 41 / 41. |
+| **Engine** | **829,721 bytes — unchanged.** |
+| **Not done** | The edited dot on Levels / Resize / Layers; a real screen-reader pass; the backup chip unseen in a browser (needs a signed-in failing upload). |
+

@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.13",
+    date: "2026-10-05",
+    headline: "Switching photos says it's loading, a big import shows its tiles arriving, the app opens on a splash instead of a blank page, and nothing waits for ever.",
+    entries: [
+      { tag: "ui", text: "A slow photo switch dims the canvas under “Loading IMG_0427,” and the Tools footer says the same, so the numbers on screen never belong to the photo you just left." },
+      { tag: "feature", text: "Change Brightness, Contrast or Saturation and a dot sits beside it with a reset button, so you can see what this photo has had done to it." },
+      { tag: "ui", text: "Import a pile of photos and each one gets a placeholder tile in the gallery until it's ready — on the phone too." },
+      { tag: "perf", text: "On a slow connection the editor sat on a blank page for six seconds. The splash is up in about one and a half now." },
+      { tag: "fix", text: "Every flow that waits now finishes, fails with a reason and a Try again, or times out — the AI tools, Download, Download All, .ora import and the Batch tools. Nothing spins for ever." },
+      { tag: "fix", text: "Download All shows its progress, skips a photo it can't read instead of failing the whole ZIP, and says how many it skipped." },
+      { tag: "fix", text: "A failed cloud backup says so in the status bar until the next one lands, and a build with no keys can open Settings › Sync and Shared without crashing." },
+      { tag: "infra", text: "Fourteen end-to-end tests that only ever ran on a laptop now run on every PR, and the repo lost 17.6 MB of screenshots nothing pointed at." },
+    ],
+  },
+  {
     version: "v9.12",
     date: "2026-10-05",
     headline: "Every photo in Batch's grid gets its own Exception checkbox, and one floating bar serves the canvas.",
