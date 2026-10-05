@@ -110,8 +110,11 @@ describe("the status bar carries both errors", () => {
   const bar = read("components/StatusBar/StatusBar.tsx");
 
   it("reads the save publisher", () => {
-    expect(bar).toMatch(/useSaveStatus\(\)\.failed/);
+    // Read straight off the publisher (destructured since the backup flag
+    // joined it), not a copy passed down as a prop.
+    expect(bar).toMatch(/\{ failed: saveFailed, backupFailed \} = useSaveStatus\(\)/);
     expect(bar).toMatch(/data-testid="status-save-failed"/);
+    expect(bar).toMatch(/data-testid="status-backup-failed"/);
   });
 
   it("reads the sync publisher directly, not a copy", () => {

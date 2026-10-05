@@ -404,4 +404,4 @@ Where each flow stands (10-05-2026):
 | .ora import | `useAsyncTask` + `AsyncStatus` inline |
 | Batch passes | failures counted in the end toast |
 | Settings sync | already the reference (`lib/sync/status.ts`): own states, retry, timeouts |
-| Edit backup | not yet: a cloud upload failure is in Diagnostics only |
+| Edit backup | a failed cloud upload holds "Not backed up — saved on this device" in the status bar until the next upload lands |

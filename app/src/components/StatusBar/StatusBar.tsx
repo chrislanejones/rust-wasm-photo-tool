@@ -122,7 +122,7 @@ export function StatusBar({
   const maskEditing = useToolStore((s) => s.maskEditing);
   // Night 5 feedback hierarchy: two errors that used to live ONLY in a toast.
   // Each reads its single publisher; neither computes its own answer.
-  const saveFailed = useSaveStatus().failed;
+  const { failed: saveFailed, backupFailed } = useSaveStatus();
   const sync = useSyncStatus();
   const syncFailed = sync.state === "error";
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
@@ -239,6 +239,22 @@ export function StatusBar({
             <span className="status-zoom inline-flex items-center gap-1" data-testid="status-save-failed" role="status">
               <StatusMark kind="failed" />
               Couldn&rsquo;t save changes
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {backupFailed && !saveFailed && (
+          <>
+            {/* Signed in only. The edit IS saved on this device; the cloud
+                copy is what failed, and the next save retries it. */}
+            <span
+              className="status-zoom inline-flex items-center gap-1"
+              data-testid="status-backup-failed"
+              role="status"
+              title="Your edits are saved on this device. The cloud copy didn't upload; the next save tries again."
+            >
+              <StatusMark kind="attention" />
+              Not backed up — saved on this device
             </span>
             <span className="status-divider" />
           </>
