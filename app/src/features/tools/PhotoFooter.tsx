@@ -57,14 +57,22 @@ export function PhotoFooter() {
   return (
     <p
       key={flash}
-      className={`per-photo-name flex items-center gap-1 truncate ${flash ? "per-photo-name-flash" : ""}`}
+      className={`per-photo-name truncate ${flash ? "per-photo-name-flash" : ""}`}
       title={name}
       data-loading={loading || undefined}
     >
-      {loading && <StatusMark kind="working" label={`Loading ${name}`} />}
-      <span className="truncate">
-        {loading ? `Loading · ${index + 1} of ${photos.length} · ${name}` : `${index + 1} of ${photos.length} · ${name}`}
-      </span>
+      {/* Inline and small, so the strip keeps its exact 20px: the Tools panel
+          above it is measured for layout shift across a switch. */}
+      {loading && (
+        <StatusMark
+          kind="working"
+          label={`Loading ${name}`}
+          className="mr-1 inline-block align-middle [&_svg]:size-3"
+        />
+      )}
+      {loading
+        ? `Loading · ${index + 1} of ${photos.length} · ${name}`
+        : `${index + 1} of ${photos.length} · ${name}`}
     </p>
   );
 }
