@@ -64,7 +64,6 @@ import { PhotoFooter } from "./PhotoFooter";
  * Per-photo is decided from `docs/UI_CONSISTENCY.md` §9, whose table lists the
  * panels in each kind. The ones left OUT deliberately:
  *   - `rulers` — an app preference, not a per-photo value
- *   - `guides` — cleared on a switch rather than reloaded until persisted
  *   - `select`, `batch` — the selection is cleared by `usePhotoSwitchReset`, and
  *     Batch › Crop's frame is the one batch value that is per-photo
  *   - every Create sub-tool — a brush size does not change because the photo did
@@ -73,6 +72,9 @@ const PER_PHOTO_SUB_TOOLS: ReadonlySet<string> = new Set([
   // Enhance
   "compress", // Resize & Compress — W/H, quality
   "levels", // the curve
+  // One-shot by §9, but its latched sliders and edited dots describe the photo
+  // on screen, so they lock through a switch rather than show the last one's.
+  "adjustments",
   // Edit
   "crop", // the crop box
   "perspective",

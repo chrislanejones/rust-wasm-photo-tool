@@ -50,6 +50,8 @@ export async function primeRustExif(): Promise<void> {
       verbatim: m.exif_apply_verbatim,
       reencoded: m.exif_apply_reencoded,
     };
+    // One line, so a tester (and the e2e) can see the Rust path is live.
+    console.info("EXIF in Rust: engine functions loaded (Beta)");
   } catch (err) {
     logDiagnostic("WASM_ENGINE", `EXIF in Rust: engine failed to load, staying on TypeScript: ${String(err)}`);
   }
@@ -82,10 +84,11 @@ export function crossCheck<T extends Bytes | null>(
     return ts;
   }
   if (same(out ?? null, ts)) return ts === null ? ts : (new Uint8Array(out!) as T);
-  logDiagnostic(
-    "WASM_ENGINE",
-    `EXIF in Rust: ${name} MISMATCH — Rust ${out?.length ?? "none"} B vs TypeScript ${ts?.length ?? "none"} B; used TypeScript`,
-  );
+  const msg = `EXIF in Rust: ${name} MISMATCH — Rust ${out?.length ?? "none"} B vs TypeScript ${ts?.length ?? "none"} B; used TypeScript`;
+  logDiagnostic("WASM_ENGINE", msg);
+  // Also the console: the finding Beta exists to collect should not need the
+  // Diagnostics window open to be seen.
+  console.warn(msg);
   return ts;
 }
 

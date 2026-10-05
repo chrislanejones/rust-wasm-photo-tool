@@ -918,11 +918,8 @@ export function AppShell() {
   //
   // So the split is: the panel's slider is pending state, exactly like its
   // width/height fields, and the engine holds what has actually been APPLIED.
-  //
-  // NOT `setHasBeenModified(true)`: it used to fire on the first pixel of a drag,
-  // before any Apply, so the gallery lit the photo's modified dot while the
-  // panel's own button was still dark. The apply handlers mark it modified once
-  // bytes actually change.
+  // Not setHasBeenModified: that lit the modified dot before any Apply (#289);
+  // the apply handlers mark it once bytes actually change.
   const handleQualityChange = useCallback((q: number) => setQuality(q), []);
 
   // Slider RELEASE. One drag is one undo step, whatever the drag emitted along

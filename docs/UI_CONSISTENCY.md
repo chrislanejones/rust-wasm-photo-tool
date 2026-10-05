@@ -341,7 +341,7 @@ skeletons past 300 ms) while the new photo loads. Per-tool panels get no name.
 | Kind | On a switch | Examples |
 | --- | --- | --- |
 | **Per-photo** | Loads from the new photo; locked until it has | Resize W/H, export quality, Levels, crop box, Canvas Size W/H, Perspective quad, layer list, selection, object-removal strokes, OCR result, Batch › Crop framing |
-| **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset), Presets, Flip/Rotate, Apply buttons |
+| **One-shot** | Nothing to keep; a delta or an action | Adjustments sliders (latch and reset — but the panel still LOCKS through a switch, because its latches and edited dots describe the photo on screen), Presets, Flip/Rotate, Apply buttons |
 | **Per-tool** | Stays. Your brush doesn't change because the photo did | Brush size/hardness/opacity, stabilizer, crop RATIO, select tolerance/combine/refine, text and shape styles for NEW objects, stamp/emoji, Batch Logo/Text/Rename settings |
 | **App** | Stays | Rulers & grid preferences, theme |
 
