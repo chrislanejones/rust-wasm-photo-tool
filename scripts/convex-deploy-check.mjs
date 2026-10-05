@@ -47,9 +47,21 @@ const NOT_A_MODULE = new Set(["schema", "auth.config", "tsconfig", "http", "rout
  *  entitlement ladder, imported by `users.ts` and by the client — so it has no
  *  function for `function-spec` to report, and a client cannot call it
  *  directly either, which is the failure this check exists to catch (#121).
+ *  The v9.16 helpers are the same kind: each registers no query, mutation or
+ *  action and is only imported by modules that do — `aiCaps` (aiJobs),
+ *  `storageOrphans` + `storageQuota` (storageSweep, photoEdits, shares),
+ *  `storedFiles` + `testAccount` (photoEdits, shares, testAccountWipe).
  *  Keep this list SHORT and justified — every entry is a module this check can
  *  no longer vouch for. */
-const NO_CALLABLE_EXPORTS = new Set(["crons", "entitlement"]);
+const NO_CALLABLE_EXPORTS = new Set([
+  "crons",
+  "entitlement",
+  "aiCaps",
+  "storageOrphans",
+  "storageQuota",
+  "storedFiles",
+  "testAccount",
+]);
 
 function repoModules() {
   return readdirSync(CONVEX_DIR)
