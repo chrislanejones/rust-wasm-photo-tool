@@ -31,7 +31,7 @@ const IN_FLIGHT = "kg2d9hbkzj1em7zgwgs6cnc5dx8cdzhv";
 
 const rows = [
   // photo_edits — the pointer `save` commits.
-  { _id: "p1", userId: "jx7ar7fy79jnpf949ykzs1vr7h8baeex", photoKey: "1789651415471-xjkdd8gitfb", storageId: SAVED, canvasW: 1, canvasH: 1, updatedAt: 0 },
+  { _id: "p1", userId: "jx7ar7fy79jnpf949ykzs1vr7h8baeex", photoKey: "photo-key-1", storageId: SAVED, canvasW: 1, canvasH: 1, updatedAt: 0 },
   // shares
   { _id: "s1", token: "e39e5e681ceb412b9852c86b3823ce65", userId: "jx72dwnk62fcc57rb10zdnrphn8es587", storageId: SHARED, views: 2 },
   // a JSON blob in a string field (sync_docs.value / users.settings shape)
