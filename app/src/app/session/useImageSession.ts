@@ -465,8 +465,19 @@ export function useImageSession({
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
 
+      // A skeleton tile per accepted file until it lands (Plan A §5), so a
+      // large import is visibly arriving instead of the gallery sitting still.
+      const pendingFor = accepted.map((f) => ({
+        id: `import-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: f.name,
+      }));
+      const { setPendingImports } = useGalleryStore.getState();
+      setPendingImports((prev) => [...prev, ...pendingFor]);
+      const settle = (i: number) =>
+        setPendingImports((prev) => prev.filter((p) => p.id !== pendingFor[i]!.id));
+
       let firstLoaded = false;
-      for (const raw of accepted) {
+      for (const [index, raw] of accepted.entries()) {
         try {
           // SVGs never enter the pipeline as vectors — rasterize to a PNG File
           // at the boundary (lib/rasterizeSvg), so the stored gallery original
@@ -534,6 +545,7 @@ export function useImageSession({
             if (svg) useSvgSourceStore.getState().setSource(entry.id, svg);
           }
           setPhotos((prev) => [...prev, entry]);
+          settle(index);
 
           if (!firstLoaded) {
             firstLoaded = true;
@@ -563,6 +575,7 @@ export function useImageSession({
             setCompareActive(false);
           }
         } catch (err) {
+          settle(index);
           console.error("Failed to add photo:", raw.name, err);
           // #55 — DO NOT BLAME THE FILE FOR THE ORIGIN'S PROBLEM.
           //

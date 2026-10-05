@@ -505,3 +505,4 @@ jobs:
           e2e/gallery-loading-state.spec.ts
           e2e/batch-exceptions.spec.ts
           e2e/batch-crop-frame.spec.ts
+          e2e/import-skeleton.spec.ts
