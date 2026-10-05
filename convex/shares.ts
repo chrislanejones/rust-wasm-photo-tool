@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
+import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
 
 // ── Public, read-only share links ──────────────────────────────────────────
 // Mirrors the photoEdits storage pattern, but a share stores only the flattened
@@ -142,11 +143,13 @@ async function ownedShare(ctx: MutationCtx, token: string): Promise<Doc<"shares"
 }
 
 /** Short-lived upload URL for the snapshot PNG. Auth-gated so anonymous clients
- *  can't push orphaned blobs into storage (same policy as photoEdits). */
+ *  can't push orphaned blobs into storage (same policy as photoEdits), and
+ *  refused for an account already over its storage quota. */
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
+    const user = await requireUser(ctx);
+    await assertNotOverQuota(ctx, user);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -162,6 +165,8 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    // The exact quota check: the snapshot has landed, so its size is known.
+    await assertStorageQuota(ctx, user, args.storageId);
 
     // Re-roll on the (vanishingly rare) chance of a token collision.
     let token = makeToken();

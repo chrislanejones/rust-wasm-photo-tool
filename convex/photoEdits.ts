@@ -1,14 +1,18 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getUser, requireUser } from "./users";
+import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
 
 /** Returns a short-lived upload URL for storing a canvas archive.
  *  Auth-gated: only signed-in users can mint upload URLs (prevents anonymous
- *  clients from pushing orphaned blobs into storage). */
+ *  clients from pushing orphaned blobs into storage). Refuses an account
+ *  already over its storage quota; the exact check is in `save`, where the
+ *  file's size is known (convex/storageQuota.ts explains why). */
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
+    const user = await requireUser(ctx);
+    await assertNotOverQuota(ctx, user);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -77,7 +81,9 @@ export const discardFailedUpload = mutation({
   },
 });
 
-/** Upsert the canvas state for a photo (replaces any previous storage blob). */
+/** Upsert the canvas state for a photo (replaces any previous storage blob).
+ *  Enforces the account's storage quota before anything is written: the
+ *  previous archive is counted as freed, since this deletes it. */
 export const save = mutation({
   args: {
     photoKey: v.string(),
@@ -93,6 +99,7 @@ export const save = mutation({
         q.eq("userId", user._id).eq("photoKey", args.photoKey),
       )
       .unique();
+    await assertStorageQuota(ctx, user, args.storageId, existing?.storageId);
     if (existing) {
       await ctx.storage.delete(existing.storageId);
       await ctx.db.patch(existing._id, {
