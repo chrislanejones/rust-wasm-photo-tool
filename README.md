@@ -86,27 +86,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.11 — 2026-10-04
+### v9.12 — 2026-10-05
 
-**Batch gets Exceptions on every tool, Crop is called Crop again, and the shape menu stops opening on a line.**
+**Every photo in Batch's grid gets its own Exception checkbox, and one floating bar serves the canvas.**
 
-Ten photos, one crop, but 4 and 6 need a different one. v9.10 answered with a
-second grid of thumbnails in the Tools panel that just skipped the held photos.
-That grid is gone. Tick photos in the gallery (the checkbox reads **Exception**
-while Batch is open) or tick **Exception** on the canvas, and they move to the
-Exceptions group.
+In v9.11 only the open photo had an Exception checkbox on the canvas; the other
+eleven had to be ticked down in the gallery. Now every photo in the 12-photo
+grid carries its own, in the same spot, and each one means exactly what the
+gallery checkbox means.
 
-Every Batch tool — Logo, Text, Crop, Rename, AI Rename — now has a
-**Main | Exceptions** switch, the same toggle as Tools | Gallery | Review. Crop
-keeps a crop for each group and one button does both: "Crop 8 to 1:1 · 2 to
-4:5". The other four run on the group that's showing, and Logo and Text stop
-saying "All Images" when they aren't. Rename was matching new names by position
-across the whole gallery, which would have renamed the wrong photos on a subset;
-it matches by photo now.
+Under the grid there's a bar: ‹ 12 photos · 1 exception ›. With a gallery
+bigger than the grid, it says which page you're on and the arrows step through
+the rest, eleven at a time around the open photo. The old "+N more" badge is
+gone.
 
-Right-clicking a shape opened the canvas menu on a bare separator line. Fixed.
-The marketing pages catch up with Batch: Crop and Exceptions are named, and AI
-Rename is described as what it is.
+That bar is the same component as Apply · Reset · Cancel under the Perspective,
+Distort and Skew box. There's one file for it now
+(`components/ui/canvas-action-bar.tsx`), so the next tool that wants buttons on
+the canvas gets the same look for free.
 
 No Rust, no IndexedDB — engine unchanged at 829,721 bytes.
 

@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.12",
+    date: "2026-10-05",
+    headline: "Every photo in Batch's grid gets its own Exception checkbox, and one floating bar serves the canvas.",
+    entries: [
+      {
+        tag: "feature",
+        text: "Every photo in the Batch grid has its own Exception checkbox now, not just the open one. Tick the fourth and sixth right where you're looking — it's the same mark as the gallery checkbox.",
+      },
+      {
+        tag: "ui",
+        text: "A bar under the grid counts the photos and the exceptions, and a gallery bigger than the grid pages through with ‹ ›, eleven at a time. The “+N more” badge is gone.",
+      },
+      {
+        tag: "ui",
+        text: "That bar and Perspective's Apply · Reset · Cancel are the same component now, so every floating bar on the canvas looks and behaves the same.",
+      },
+    ],
+  },
+  {
     version: "v9.11",
     date: "2026-10-04",
     headline: "Batch gets Exceptions on every tool, Crop is called Crop again, and the shape menu stops opening on a line.",

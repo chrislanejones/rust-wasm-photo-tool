@@ -11257,3 +11257,18 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **829,721 bytes — unchanged.** No Rust in this release. |
 | **QC** | `imagehorse-qc` still owed — the Exception marks, the toggle and the per-group shading are visual. |
 | **Found, not fixed** | Ticking exceptions also lights the gallery's Delete Selected / Export bar, because it is the same selection. The Exceptions crop settings reset on reload (session-only store). |
+
+## v9.12 Change Summary — 2026-10-05
+
+**Every photo in Batch's grid gets its own Exception checkbox, and one floating bar serves the canvas.** One PR since v9.11: #292.
+
+| Area | Change |
+| --- | --- |
+| **Exception on every grid photo** (#292) | Each of the 11 tiles around the hero has its own **Exception** checkbox, bottom-left like the hero's. `BatchExceptionCheckbox` takes a `photoId` and names itself after the photo ("Exception: photo-4"). It writes the same `useGalleryStore.selectedIds` as the gallery checkbox. |
+| **A bar under the grid** (#292) | ‹ count · exceptions ›. A gallery bigger than the grid pages 11 tiles at a time around the hero ("Page 1 of 3 · 30 photos"). The "+N more" badge and its raw zinc colors are gone. |
+| **One floating bar** (#292) | `components/ui/canvas-action-bar.tsx` — `CanvasActionBar`, `CanvasActionBarButton`, `CanvasActionBarText` — owns the look, keeps the bar on screen using its measured size, and stops a button click from starting a drag underneath. Perspective / Distort / Skew's Apply · Reset · Cancel renders through it; its private `BarButton` is deleted. ADR-080 (draft). |
+| **Docs** | `docs/Features.md` (and so /features) describes the per-photo checkbox and the paging bar. |
+| **Tests** | `e2e/batch-exceptions.spec.ts` 4/4 (new: a tile's checkbox is the gallery mark and the bar counts it); `batch-crop-frame` 2/2; `perspective-vector` 1/1. |
+| **Gates** | tsc **0**, eslint **0 errors** / 56 warnings, vitest **151 files / 1,629 tests**, `guardrails.sh` at baseline, PR CI **17 pass / 1 skipped**. |
+| **Engine** | **829,721 bytes — unchanged.** No Rust in this release. |
+| **Not verified** | Paging was never clicked in a browser: the logged-out gallery caps at 12, so there is no second page without a paid tier. |
