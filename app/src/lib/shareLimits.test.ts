@@ -200,8 +200,11 @@ function createFakeConvex() {
     async get(id: string) {
       return tables.get(id.split("|")[0])?.get(id) ?? null;
     },
+    // The `_storage` system table. Both call shapes Convex accepts are used:
+    // storageQuota.ts calls `get(id)`, storedFiles.ts `get("_storage", id)`.
     system: {
-      async get(id: string) {
+      async get(a: string, b?: string) {
+        const id = b ?? a;
         const size = blobs.get(id);
         return size === undefined ? null : { _id: id, _creationTime: 0, sha256: "", size };
       },

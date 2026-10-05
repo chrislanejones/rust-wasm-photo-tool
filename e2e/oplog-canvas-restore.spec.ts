@@ -1,4 +1,5 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
+import { test, expect } from "./guard/test";
+import type { Browser, Page } from "@playwright/test";
 import { join } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────

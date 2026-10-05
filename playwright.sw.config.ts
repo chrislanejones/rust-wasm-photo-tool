@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { PLACEHOLDER_CONVEX_URL, assertPlaceholderConvexUrl, demoEnv } from "./e2e/guard/backend";
 
 // Service-worker lifecycle harness (Night B). A SEPARATE config from
 // playwright.config.ts because the SW is opt-in at BUILD time: these specs
@@ -17,12 +18,14 @@ const BASE_URL = `http://localhost:${PORT}`;
 // Same PUBLIC placeholder env as playwright.config.ts (see the rationale
 // there): dummy Convex URL + a well-formed pk_test key on non-resolving
 // hosts, so the production build boots as the real logged-out demo.
-const DEMO_ENV =
-  'VITE_CONVEX_URL="https://smoke-placeholder-123.convex.cloud" ' +
-  'VITE_CLERK_PUBLISHABLE_KEY="pk_test_Y2xlcmsuc21va2UuaW52YWxpZCQ="';
+// Checked at load (e2e/guard/backend.ts): a real Convex URL fails the run.
+const E2E_CONVEX_URL = PLACEHOLDER_CONVEX_URL;
+assertPlaceholderConvexUrl(E2E_CONVEX_URL);
+const DEMO_ENV = demoEnv(E2E_CONVEX_URL);
 
 export default defineConfig({
   testDir: "./e2e/sw",
+  globalSetup: "./e2e/guard/global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
