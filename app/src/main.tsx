@@ -19,6 +19,7 @@ import { applyBetaFromUrl } from "@/lib/beta";
 import { hydrateInstalledPlugins } from "@/lib/plugins/state";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 import { installDroppedRejectionHandler } from "@/lib/engine/superseded";
+import { primeRustExif } from "@/lib/exif/rust";
 
 // `?beta=<id>` — an invite link opting this DEVICE into an experiment. Applied
 // BEFORE anything reads a beta key (the WebGPU gate below is one), and before
@@ -75,6 +76,8 @@ installRotatedTextAudit();
 installUploadBudgetProbe();
 // A superseded engine request is "dropped", never an unhandled rejection (Plan C §3).
 installDroppedRejectionHandler();
+// Beta: load the engine's EXIF functions in the background (no-op unless on).
+void primeRustExif();
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.

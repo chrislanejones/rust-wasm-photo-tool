@@ -89,6 +89,28 @@ declare module "stamp_tool" {
     h: number,
   ): string;
 
+  /** EXIF in Rust (src/exif.rs, ADR on #240) — byte-identical to lib/exif.
+   *  `mode` "all" | "location". */
+  export function exif_strip_metadata(bytes: Uint8Array, mode: string): Uint8Array;
+  /** The TIFF/EXIF block, or undefined when there is none. */
+  export function exif_read_tiff(bytes: Uint8Array, mime: string): Uint8Array | undefined;
+  /** `mode` "keep" | "strip", `strip_mode` "all" | "location". */
+  export function exif_apply_verbatim(
+    bytes: Uint8Array,
+    mime: string,
+    mode: string,
+    strip_mode: string,
+  ): Uint8Array;
+  /** `mode` "keep" | "strip"; the source TIFF is transplanted for jpeg/webp. */
+  export function exif_apply_reencoded(
+    encoded: Uint8Array,
+    format: string,
+    mode: string,
+    source_tiff: Uint8Array | undefined,
+    width: number,
+    height: number,
+  ): Uint8Array;
+
   /**
    * Stateless bilinear resize of an RGBA buffer.
    * Used by the batch-logo feature to scale logos in Rust.

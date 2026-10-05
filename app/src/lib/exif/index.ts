@@ -21,6 +21,7 @@ import {
 } from "./codecs";
 import type { ExportFormat } from "@/lib/exportImage";
 import { stripJpegGps, stripPngGps, stripWebpGps } from "./gps";
+import { crossCheck, rustExif } from "./rust";
 
 // `extractWebpExifTiff` was a public export of the original single-file module
 // and moved into ./codecs with the rest of the WebP surgery. Re-exported here so
@@ -41,6 +42,12 @@ export type MetadataStripMode = "all" | "location";
  * documented gap — returned unchanged rather than guessed at.
  */
 export function stripMetadata(bytes: Bytes, mode: MetadataStripMode): Bytes {
+  const ts = stripMetadataTs(bytes, mode);
+  const r = rustExif();
+  return r ? crossCheck("stripMetadata", () => r.strip(bytes, mode), ts) : ts;
+}
+
+function stripMetadataTs(bytes: Bytes, mode: MetadataStripMode): Bytes {
   try {
     if (isJpeg(bytes)) return mode === "all" ? stripJpegMetadata(bytes) : stripJpegGps(bytes);
     if (isPng(bytes)) return mode === "all" ? stripPngMetadata(bytes) : stripPngGps(bytes);
@@ -55,6 +62,12 @@ export function stripMetadata(bytes: Bytes, mode: MetadataStripMode): Bytes {
 
 /** Pull a reusable TIFF/Exif block out of a stored original (JPEG/PNG/WebP). */
 export function readExifTiff(bytes: Bytes, mime: string): Bytes | null {
+  const ts = readExifTiffTs(bytes, mime);
+  const r = rustExif();
+  return r ? crossCheck("readExifTiff", () => r.read(bytes, mime), ts) : ts;
+}
+
+function readExifTiffTs(bytes: Bytes, mime: string): Bytes | null {
   try {
     if (mime === "image/jpeg") return extractJpegExifTiff(bytes);
     if (mime === "image/webp") return extractWebpExifTiff(bytes);
@@ -71,6 +84,21 @@ export function readExifTiff(bytes: Bytes, mime: string): Bytes | null {
  * supplied source TIFF where the target format supports it (JPEG/WebP).
  */
 export function applyExifToReencoded(
+  encoded: Bytes,
+  format: ExportFormat,
+  mode: ExifMode,
+  sourceTiff: Bytes | null,
+  width: number,
+  height: number,
+): Bytes {
+  const ts = applyExifToReencodedTs(encoded, format, mode, sourceTiff, width, height);
+  const r = rustExif();
+  return r
+    ? crossCheck("applyExifToReencoded", () => r.reencoded(encoded, format, mode, sourceTiff ?? undefined, width, height), ts)
+    : ts;
+}
+
+function applyExifToReencodedTs(
   encoded: Bytes,
   format: ExportFormat,
   mode: ExifMode,
@@ -100,9 +128,20 @@ export function applyExifToVerbatim(
   mode: ExifMode,
   stripMode: MetadataStripMode = "all",
 ): Bytes {
+  const ts = applyExifToVerbatimTs(bytes, mime, mode, stripMode);
+  const r = rustExif();
+  return r ? crossCheck("applyExifToVerbatim", () => r.verbatim(bytes, mime, mode, stripMode), ts) : ts;
+}
+
+function applyExifToVerbatimTs(
+  bytes: Bytes,
+  mime: string,
+  mode: ExifMode,
+  stripMode: MetadataStripMode,
+): Bytes {
   if (mode === "keep") return bytes;
   if (mime === "image/jpeg" || mime === "image/png" || mime === "image/webp") {
-    return stripMetadata(bytes, stripMode);
+    return stripMetadataTs(bytes, stripMode);
   }
   return bytes; // avif / unknown — left as-is
 }
