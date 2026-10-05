@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { EDITOR_URL, GITHUB_URL, CODEBERG_URL } from "../config";
 import { FEATURES } from "../data/features";
 import { POSTS, postPath } from "../data/posts";

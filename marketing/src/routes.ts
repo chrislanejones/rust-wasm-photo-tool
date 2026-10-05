@@ -1,5 +1,5 @@
 import { lazy, type ComponentType } from "react";
-import { matchRoutes } from "react-router-dom";
+import { matchRoutes } from "react-router";
 
 /* Every page, as its own chunk.
  *

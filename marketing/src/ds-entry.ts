@@ -45,4 +45,4 @@ export { default as Nav } from "./components/Nav";
 // Re-exported so `cfg.provider.component` can resolve it: the provider has to
 // be an export of THIS bundle (window.ImageHorseMarketing.*), not a bare npm
 // import the preview runtime has no way to reach.
-export { MemoryRouter } from "react-router-dom";
+export { MemoryRouter } from "react-router";

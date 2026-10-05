@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import Footer from "../components/Footer";
 import NextCards from "../components/NextCards";
 import { pickNextCards } from "../data/nextCards";

@@ -1,5 +1,5 @@
 import { Fragment, type ReactElement, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { EDITOR_URL, external } from "../config";
 import type { Faq } from "../data/openraster";
 

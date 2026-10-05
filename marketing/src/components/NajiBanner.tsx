@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 /* The bar above the nav on every page: Naji, the horse the editor is named
  * after, is still in Virginia, and we are working on bringing him to

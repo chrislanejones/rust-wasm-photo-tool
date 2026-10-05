@@ -12,7 +12,7 @@
  * the same export's offline-diagrams.js.
  */
 
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 import { external, repoFile } from "../config";
 import { Scene } from "./offline-by-construction.figures";
