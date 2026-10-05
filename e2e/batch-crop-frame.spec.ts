@@ -149,6 +149,10 @@ test("thumbnails shade on release, Shift-drag breaks the ratio, Enter crops all"
   await expect(page.getByText(/Cropped 2 images/).first()).toBeVisible({ timeout: 30_000 });
   const ratio = free.width / free.height;
   const expectedH = Math.round(1080 / ratio);
+  // Polled, not read once: the toast lands as soon as the pass ends, and the
+  // status bar's size follows on the engine's next (async) state sync — read
+  // once, it raced and saw 256 on PR #296's CI.
+  await expect(page.getByText(/^Photo: 1080×\d+$/)).toBeVisible({ timeout: 15_000 });
   const photo = await page.getByText(/^Photo: \d+×\d+$/).textContent();
   const [, pw, ph] = photo!.match(/(\d+)×(\d+)/)!.map(Number);
   expect(pw).toBe(1080);
