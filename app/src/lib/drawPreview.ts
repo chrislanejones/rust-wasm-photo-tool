@@ -10,6 +10,8 @@ import {
   sloppyPolylinePoints,
   type CornerRadii,
 } from "@/lib/shapeSloppiness";
+import { diagramGeometry, diagramStrokes } from "@/lib/diagramShapes";
+import { SHAPE_NAME_KIND } from "@/lib/drawEditState";
 
 /* ------------------------------------------------------------------ */
 /* JS preview functions (used during the initial rubber-band drag only).*/
@@ -82,6 +84,21 @@ export function drawShapePreview(
   ctx.lineWidth = width;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+
+  // A diagram shape (11..=40): its outline and detail strokes, firm or
+  // sketchy, exactly as the engine's diagram arm strokes them.
+  const diagram = diagramGeometry(SHAPE_NAME_KIND[shape] ?? -1, from, to);
+  if (diagram) {
+    for (const { pts, closed } of diagramStrokes(diagram, from, to, sloppiness, width)) {
+      if (pts.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      if (closed) ctx.closePath();
+      ctx.stroke();
+    }
+    return;
+  }
 
   const x = Math.min(from.x, to.x);
   const y = Math.min(from.y, to.y);

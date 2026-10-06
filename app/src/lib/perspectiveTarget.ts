@@ -18,6 +18,8 @@
 // changes rather than letting a pick survive into a layer where the object is
 // not even visible.
 
+import { DIAGRAM_SHAPES } from "@/lib/diagramShapes";
+
 /** Which id space a target's id belongs to. */
 export type PerspectiveTargetKind = "text" | "shape";
 
@@ -61,6 +63,7 @@ const SHAPE_KIND_LABEL: Record<number, string> = {
   8: "Diamond",
   9: "Star",
   10: "Triangle",
+  ...Object.fromEntries(DIAGRAM_SHAPES.map((d) => [d.kind, d.label])),
 };
 
 /** The name for a shape's `kind` byte; "Shape" for anything unrecognised. */

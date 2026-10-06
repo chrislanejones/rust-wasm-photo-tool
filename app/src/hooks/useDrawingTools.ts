@@ -12,6 +12,7 @@ import { normalizeDeg } from "@/lib/shapeRotation";
 import type { Point } from "@/lib/shapeSloppiness";
 import { drawArrowPreview, drawShapePreview } from "@/lib/drawPreview";
 import {
+  drawnShapeFor,
   editStateFromShape,
   FILL_MODE_KIND,
   FILLABLE_KINDS,
@@ -845,7 +846,8 @@ export function useDrawingTools({
       // Erase last frame's band. The overlay is transparent, so this reveals
       // the engine's pixels underneath rather than needing them blitted back.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (activeTool === "arrow") {
+      const drawn = drawnShapeFor(activeTool, settings);
+      if (activeTool === "arrow" && !drawn) {
         drawArrowPreview(
           ctx,
           start,
@@ -854,17 +856,17 @@ export function useDrawingTools({
           settings.strokeWidth,
           settings.arrowStyle,
         );
-      } else if (activeTool === "shapes") {
+      } else if (drawn) {
         drawShapePreview(
           ctx,
           start,
           p,
-          settings.shape ?? "rect",
+          drawn,
           settings.strokeColor,
           settings.strokeWidth,
           settings.sloppiness ?? 0,
           settings.starPoints ?? 5,
-          canonicalCornerRadii(settings.shape ?? "rect", settings.cornerRadii),
+          canonicalCornerRadii(drawn, settings.cornerRadii),
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
@@ -914,16 +916,15 @@ export function useDrawingTools({
       // Edit-overlay flow: the rubber band is already gone (cleared above) and
       // the geometry goes to the SVG overlay instead of being committed. Rust
       // rasterization happens once, in commitEdit.
-      // Ignore stray clicks / sub-3px drags — they'd produce invisible
-      // geometry (and, previously, an empty history snapshot).
+      // Ignore stray clicks / sub-3px drags: they'd be invisible geometry.
       if (Math.hypot(end.x - start.x, end.y - start.y) > 3) {
+        const drawn = drawnShapeFor(activeTool, settingsRef.current);
         const next: DrawEditState = {
-          kind: activeTool === "arrow" ? "arrow" : "shape",
+          kind: drawn ? "shape" : "arrow",
           start,
           end,
-          // Pin the type the user actually drew. Everything else about a new
-          // shape still tracks the panel live; the type does not.
-          drawnShape: settingsRef.current.shape ?? "rect",
+          // Pin the type drawn; everything else tracks the panel live.
+          drawnShape: drawn ?? undefined,
         };
         editStateRef.current = next;
         setEditState(next);

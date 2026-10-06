@@ -154,6 +154,29 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(tri, 5, 5)).toBe(-1); // bbox corner, off the ink
   });
 
+  it("hit-tests an unfilled diagram shape (11..=40) along its outline, not its details", () => {
+    // Database (19) over 0..100: the outline runs down x = 0 and x = 100; the
+    // lid's front rim (a detail) crosses y = 30 at x = 50. Same cases as the
+    // engine's `an_unfilled_diagram_shape_selects_on_its_outline_only`.
+    const db = [shape({ id: 40, kind: 19, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(db, 0, 50)).toBe(40); // on the outline
+    expect(shapeAnnotationAt(db, 50, 60)).toBe(-1); // hollow middle
+    expect(shapeAnnotationAt(db, 50, 30)).toBe(-1); // the rim is ink, not a hit
+    const filled = [shape({ id: 41, kind: 19, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 })];
+    expect(shapeAnnotationAt(filled, 50, 60)).toBe(41); // a fill is ink
+  });
+
+  it("a turned diagram shape is tested in its own frame", () => {
+    // Block arrow (36) turned 90°: the tip moves from (100,50) to (50,100),
+    // and the empty box corner at (12.5,0), far from the shaft, to (100,12.5).
+    // The engine's `a_turned_diagram_shape_turns_its_hit_test_too`, rescaled.
+    const turned = [shape({ id: 42, kind: 36, x0: 0, y0: 0, x1: 100, y1: 100, rotation: 90 })];
+    const upright = [shape({ id: 43, kind: 36, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(turned, 50, 100)).toBe(42);
+    expect(shapeAnnotationAt(turned, 100, 12.5)).toBe(-1);
+    expect(shapeAnnotationAt(upright, 12.5, 0)).toBe(-1);
+  });
+
   it("a star with more points hit-tests its own outline", () => {
     // 8 points: the tip at 3 o'clock (100,50) is a vertex; with 5 points the
     // right-hand tips sit elsewhere and (100,50) is off the ink.

@@ -331,7 +331,7 @@ export function roundCorners(verts: Point[], radiusAt: (i: number) => number): P
  *  is pushed along its edge's normal by a periodic noise of how far around the
  *  loop it is, so the wobble flows through the arcs and the loop closes.
  *  Mirrors `sloppy_loop_points` (drawing.rs). */
-function sloppyLoopPoints(
+export function sloppyLoopPoints(
   pts: Point[],
   seed: number,
   sloppiness: number,
