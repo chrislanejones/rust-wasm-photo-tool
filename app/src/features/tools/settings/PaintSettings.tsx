@@ -208,9 +208,9 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
 
                 {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off
                     by default, a set-once preference rather than a per-stroke
-                    dial, so it is the Advanced section. The closed summary
-                    still says the level, so ON is never hidden. The level
-                    table lives in StabilizerRow, the single copy. */}
+                    dial — and shown in the panel, not collapsed (#283), so ON
+                    is never hidden. The level table lives in StabilizerRow,
+                    the single copy. */}
                 <StabilizerRow
                   value={settings.paintStabilizer}
                   onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
@@ -277,7 +277,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 {/* Applies to all three blur modes — it leashes the STROKE,
                     not the effect, so blur, pixelate and redact all steady
                     the same way. Same field the Paint brush and Eraser read:
-                    one dial, on everywhere. Last, in Advanced, as in Paint. */}
+                    one dial, on everywhere. Last, and visible, as in Paint. */}
                 <StabilizerRow
                   value={settings.paintStabilizer}
                   onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}

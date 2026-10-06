@@ -19,7 +19,7 @@ import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/ui/size-slider";
-import { AdvancedSection } from "@/components/ui/advanced-section";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
@@ -364,26 +364,28 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
         }}
       </ToolModeToggle>
 
-      {/* Placement in an Advanced section (Chris, 09-30-2026). It moved here
+      {/* Placement, collapsed (Chris, 09-30-2026). It took the disclosure
           FROM the Stroke Stabilizer, which people should see rather than have
           to open; placing from a 9-cell grid is the recognisable thing that
-          can wait behind a disclosure. The closed summary stays silent: unlike
-          the stabilizer there is no level to leak, and the grid holds no state
-          between uses. */}
+          can wait. Since 10-05-2026 the header is named for what is inside,
+          so the grid carries no second heading; its accessible name is still
+          "Placement". No closed summary: the grid holds no state between
+          uses. */}
       {onPlace && (
-        <AdvancedSection summary="Placement">
+        <CollapsibleSection
+          label="Placement"
+          info={
+            canPlace
+              ? "Numpad 1-9 also work, spatially matched to the grid."
+              : "Select a shape to place it on the canvas."
+          }
+        >
           <PlacementGrid
-            label="Placement"
-            info={
-              canPlace
-                ? "Numpad 1-9 also work, spatially matched to the grid."
-                : "Select a shape to place it on the canvas."
-            }
             disabled={!canPlace}
             numpadKeys={canPlace}
             onChange={onPlace}
           />
-        </AdvancedSection>
+        </CollapsibleSection>
       )}
     </div>
   );
