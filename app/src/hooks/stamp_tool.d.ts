@@ -1573,6 +1573,10 @@ declare module "stamp_tool" {
      *  endpoints so a polyline copy keeps its own path. Appends, so the copy
      *  lands on TOP of the draw order. One "Duplicate Shape" history entry. */
     duplicate_shape_annotation(id: number, dx: number, dy: number): number;
+    /** Move a connector arrow's (kind 4) endpoints with NO history step of
+     *  its own — it rides the box edit that just snapped, so one undo puts the
+     *  box and its connectors back. False when `id` is not an arrow. */
+    reroute_connector(id: number, x0: number, y0: number, x1: number, y1: number): boolean;
     /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
      *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
      *  hand-circle hits on its outline RING only (the empty middle is a miss,

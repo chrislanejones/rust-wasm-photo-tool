@@ -65,7 +65,7 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
  *  `partialize` allowlist, so a reload reopens Adjustments (the long-standing
  *  default) and no storage schema changes. */
 /** The shape action bar's open ring — see `shapeActionMode`. */
-export type ShapeActionMode = "none" | "duplicate" | "connect";
+export type ShapeActionMode = "none" | "duplicate" | "connect" | "disconnect";
 export type EffectsMode = "adjust" | "levels" | "presets";
 /** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
  *  behind it, `ocr` = read text out of the image. Lifted here out of
@@ -179,8 +179,9 @@ export interface ToolState {
   maskPaintValue: number;
   colorPickerActive: boolean;
   /** Which ring the shape action bar has open around a selected shape:
-   *  Duplicate's arrows, Connect's pigtails, or neither. The two are
-   *  exclusive — Connect is refused while Duplicate is on. NOT PERSISTED
+   *  Duplicate's arrows, Connect's pigtails, Disconnect's X on each
+   *  connector end, or none. One at a time — Connect is refused while
+   *  Duplicate is on. NOT PERSISTED
    *  (`partialize` is an allowlist): a reload opens no ring. */
   shapeActionMode: ShapeActionMode;
   /** The bar's `[-] 20px [+]` — space between duplicated copies, IMAGE px.
