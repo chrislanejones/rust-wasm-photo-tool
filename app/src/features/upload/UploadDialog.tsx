@@ -100,12 +100,16 @@ export function UploadDialog({
             </div>
           )}
 
-          {/* Close — the same named button the shared DialogHeader renders. */}
-          <DialogClose asChild>
-            <Button size="tiny" className="absolute top-4 right-4" aria-label="Close" data-slot="dialog-close">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
+          {/* Close — the same named button the shared DialogHeader renders.
+              In a sub-pane the pane's own header row carries it instead
+              ([<] title [X]), so this corner one steps aside. */}
+          {!blankMode && (
+            <DialogClose asChild>
+              <Button size="tiny" className="absolute top-4 right-4" aria-label="Close" data-slot="dialog-close">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
+          )}
 
           <NewActions
             onFiles={onFiles}
@@ -113,6 +117,7 @@ export function UploadDialog({
             onInvalidFiles={triggerShake}
             autoFocusFirst
             onBlankModeChange={setBlankMode}
+            inDialog
           />
         </motion.div>
       </DialogContent>
