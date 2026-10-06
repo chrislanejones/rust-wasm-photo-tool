@@ -1661,6 +1661,45 @@ impl ImageHorseTool {
         new_id as i32
     }
 
+    /// Re-route a connector (an arrow, kind 4) to new endpoints WITHOUT a
+    /// history step of its own. Returns false — changing nothing — when `id`
+    /// is not an arrow on the active layer.
+    ///
+    /// A connector is drawn from a port of one box shape to a port of
+    /// another, and has to stay attached when either box moves. The JS side
+    /// commits the box (`update_shape_annotation` or `align_annotation`, ONE
+    /// snapshot), then calls this for every arrow end that sat on one of the
+    /// box's ports. Riding that snapshot is the point: one Ctrl+Z puts the
+    /// box AND its connectors back, instead of first un-moving a line and
+    /// leaving the box where it was.
+    ///
+    /// ## Why this breaks the op log
+    ///
+    /// The reconciler (`oplog_sync_annotations`) will see the box edit and
+    /// every re-routed arrow as separate ops under that one snapshot, which is
+    /// the "one recorded op ↔ one snapshot" lockstep `try_oplog_undo` relies
+    /// on — the same hazard `move_shape_annotation` documents. Routing undo
+    /// down the snapshot path is the safe answer there and here, and it only
+    /// happens when a box with connectors actually moves.
+    pub fn reroute_connector(&mut self, id: u32, x0: f64, y0: f64, x1: f64, y1: f64) -> bool {
+        let Some(s) = self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .find(|s| s.id == id && s.kind == 4)
+        else {
+            return false;
+        };
+        s.x0 = x0;
+        s.y0 = y0;
+        s.x1 = x1;
+        s.y1 = y1;
+        #[cfg(feature = "tiles")]
+        {
+            self.oplog_broken = true;
+        }
+        true
+    }
+
     /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
     /// restores it. Returns true if found.
     pub fn remove_shape_annotation(&mut self, id: u32) -> bool {

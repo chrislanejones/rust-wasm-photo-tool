@@ -160,3 +160,7 @@ codegen-units = 1
 [[test]]
 name = "shape_z_order"
 required-features = ["tiles"]
+
+[[test]]
+name = "shape_connectors"
+required-features = ["tiles"]

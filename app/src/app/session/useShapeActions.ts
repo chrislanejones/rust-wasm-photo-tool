@@ -4,13 +4,18 @@ import { pendingShapeType, type useDrawingTools } from "@/hooks/useDrawingTools"
 import {
   BOX_KINDS,
   PORTS,
+  asTarget,
+  attachedEnds,
+  connectorsToFollow,
   duplicateOffset,
+  type AttachedEnd,
+  type PlacedShape,
   type PortBox,
   type PortId,
   type PortTarget,
   type Pt,
 } from "@/lib/shapePorts";
-import { SHAPE_NAME_KIND } from "@/lib/drawEditState";
+import { SHAPE_NAME_KIND, type ShapeMeta } from "@/lib/drawEditState";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 
@@ -19,8 +24,17 @@ const ARROW_KIND = 4;
 
 /**
  * The shape action bar's engine work: Duplicate (copies out of any of the
- * eight ports) and Connect (an arrow from a port of this shape to a port of
- * another). Apply and Cancel are the edit's own `commitEdit` / `cancelEdit`.
+ * eight ports), Connect (an arrow from a port of this shape to a port of
+ * another) and Disconnect (delete one of the connectors on this shape). Apply
+ * and Cancel are the edit's own `commitEdit` / `cancelEdit`.
+ *
+ * CONNECTORS FOLLOW THEIR SHAPES. Every time the shape list is read back
+ * (`drawingTools.shapes` — after a commit, a Placement move, an undo), it is
+ * diffed against the last one: a box that moved drags the ends of the arrows
+ * that sat on its ports along (lib/shapePorts `connectorsToFollow`), through
+ * `reroute_connector`, which takes no history step of its own — the reroute
+ * rides the move's, so one undo puts both back. Watching the list instead of
+ * hooking `commitEdit` covers every way a shape moves, not just a drag.
  *
  * Replaces useDuplicatePad, whose four-way pad was opened from Review ›
  * Reselect. The counting rule is the pad's: copies are counted PER PORT and
@@ -47,6 +61,7 @@ export function useShapeActions(
   const gap = useToolStore((s) => s.duplicateGap);
   const setGap = useToolStore((s) => s.setDuplicateGap);
   const panelShape = useToolStore((s) => s.toolSettings.shape);
+  const panelStarPoints = useToolStore((s) => s.toolSettings.starPoints);
 
   const es = drawingTools.editState;
   const busy = useRef(false);
@@ -62,6 +77,7 @@ export function useShapeActions(
       ? (es.style?.kindByte ?? SHAPE_NAME_KIND[pendingShapeType(es, panelShape)] ?? 0)
       : null;
   const boxy = kind !== null && BOX_KINDS.has(kind);
+  const starPoints = es?.style?.starPoints ?? panelStarPoints;
 
   // The ring closes with the edit: Apply, Cancel, Enter, Esc, or a click
   // away. Not while one of our own commit-and-reopen round trips is running.
@@ -75,6 +91,41 @@ export function useShapeActions(
     await drawingTools.refreshShapes();
   }, [stamp, drawingTools]);
 
+  // The last shape list `follow` saw, and the run in flight (runs chain, so
+  // two reads can never diff against the same baseline twice).
+  const seen = useRef<PlacedShape[] | null>(null);
+  const following = useRef<Promise<void>>(Promise.resolve());
+
+  /** Re-route the connectors of every box that moved since the last look. */
+  const follow = useCallback(() => {
+    const run = following.current.then(async () => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      let now: ShapeMeta[];
+      try {
+        now = JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[];
+      } catch {
+        return;
+      }
+      const before = seen.current;
+      seen.current = now;
+      if (!before) return;
+      const moves = connectorsToFollow(before, now);
+      if (!moves.length) return;
+      for (const m of moves) await tool.reroute_connector(m.id, m.x0, m.y0, m.x1, m.y1);
+      seen.current = now.map((s) => moves.find((m) => m.id === s.id) ?? s) as ShapeMeta[];
+      stamp.flushToCanvas();
+      stamp.syncState();
+      await drawingTools.refreshShapes();
+    });
+    following.current = run.catch(() => {});
+    return run;
+  }, [stamp, drawingTools]);
+
+  useEffect(() => {
+    void follow();
+  }, [drawingTools.shapes, follow]);
+
   /** Commit, run `act` with the committed id, reopen that id. */
   const roundTrip = useCallback(
     async (act: (id: number) => Promise<void>) => {
@@ -87,6 +138,9 @@ export function useShapeActions(
         const editId = drawingTools.editState?.editId ?? null;
         const before = useAnnotationStore.getState().selectedObject;
         await drawingTools.commitEdit();
+        // A moved box's connectors follow it BEFORE the next engine call
+        // snaps, or the reroute would ride that step instead of the move's.
+        await follow();
         const after = useAnnotationStore.getState().selectedObject;
         const id =
           editId ?? (after && after !== before && after.type === "shape" ? after.id : null);
@@ -97,7 +151,7 @@ export function useShapeActions(
         busy.current = false;
       }
     },
-    [drawingTools],
+    [drawingTools, follow],
   );
 
   const duplicateToward = useCallback(
@@ -166,12 +220,38 @@ export function useShapeActions(
     () =>
       drawingTools.shapes
         .filter((s) => BOX_KINDS.has(s.kind) && s.id !== editId)
-        .map((s) => ({
-          id: s.id,
-          box: { x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1 },
-          rotation: s.rotation ?? 0,
-        })),
+        .map(asTarget),
     [drawingTools.shapes, editId],
+  );
+
+  // The connectors on THIS shape, read against its COMMITTED geometry (the
+  // engine's list) — that is where their ends are until the edit commits.
+  // A brand-new shape has none.
+  const connections: AttachedEnd[] = useMemo(() => {
+    const self = drawingTools.shapes.find((s) => s.id === editId);
+    if (!self || !BOX_KINDS.has(self.kind)) return [];
+    return attachedEnds(
+      asTarget(self),
+      drawingTools.shapes.filter((s) => s.kind === ARROW_KIND),
+    );
+  }, [drawingTools.shapes, editId]);
+
+  // Disconnect closes itself when the last connector goes.
+  useEffect(() => {
+    if (mode === "disconnect" && !connections.length) setMode("none");
+  }, [mode, connections.length, setMode]);
+
+  /** Delete one connector (the X on its end). One "Delete Shape" step. */
+  const disconnect = useCallback(
+    (arrowId: number) => {
+      void roundTrip(async () => {
+        const tool = stamp.toolRef.current;
+        if (!tool) return;
+        if (!(await tool.remove_shape_annotation(arrowId))) return;
+        await afterEngineChange();
+      });
+    },
+    [roundTrip, stamp, afterEngineChange],
   );
 
   const toggleDuplicate = useCallback(
@@ -181,6 +261,10 @@ export function useShapeActions(
   // Connect is refused while Duplicate is on — the bar disables it too.
   const toggleConnect = useCallback(
     () => setMode((m) => (m === "connect" ? "none" : m === "duplicate" ? m : "connect")),
+    [setMode],
+  );
+  const toggleDisconnect = useCallback(
+    () => setMode((m) => (m === "disconnect" ? "none" : "disconnect")),
     [setMode],
   );
   const apply = useCallback(() => void drawingTools.commitEdit(), [drawingTools]);
@@ -195,7 +279,9 @@ export function useShapeActions(
             mode,
             gap,
             boxy,
+            outline: { kind: kind ?? 0, starPoints },
             connectTargets,
+            connections,
             onApply: apply,
             onCancel: drawingTools.cancelEdit,
             onToggleDuplicate: toggleDuplicate,
@@ -203,10 +289,12 @@ export function useShapeActions(
             onGap: setGap,
             onDuplicate: duplicateToward,
             onConnect: connect,
+            onToggleDisconnect: toggleDisconnect,
+            onDisconnect: disconnect,
           }
         : null,
-    [es, mode, gap, boxy, connectTargets, apply, drawingTools.cancelEdit, toggleDuplicate, toggleConnect, setGap, duplicateToward, connect],
+    [es, mode, gap, boxy, kind, starPoints, connectTargets, connections, apply, drawingTools.cancelEdit, toggleDuplicate, toggleConnect, toggleDisconnect, setGap, duplicateToward, connect, disconnect],
   );
 
-  return { overlay, duplicateToward, connect };
+  return { overlay, duplicateToward, connect, disconnect };
 }
