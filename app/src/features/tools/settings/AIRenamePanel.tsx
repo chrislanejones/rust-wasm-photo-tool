@@ -219,7 +219,7 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
   }));
 
   return (
-    <div className="space-y-3 pt-1">
+    <div className="space-y-4">
       <SectionHeader
         title="AI Rename"
         info={

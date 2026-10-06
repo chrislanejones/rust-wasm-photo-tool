@@ -40,6 +40,7 @@ import { BatchGroupToggle } from "./BatchGroupToggle";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
 import { Button } from "@/components/ui/button";
 import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /** Batch › Text weight — a two-tile pick, the same group every other
  *  pick-one-of-N control in the panels uses. */
@@ -205,10 +206,10 @@ function hexToRgb(hex: string): [number, number, number] {
 export function BatchSettings(props: BatchSettingsProps) {
   const { groups, group } = useBatchGroups(props.photos, props.activePhotoId);
   return (
-    <div className="space-y-4">
+    <ToolPanel>
       <BatchGroupToggle photos={props.photos} activePhotoId={props.activePhotoId} />
       <BatchToolPanel {...props} scoped={groups[group]} />
-    </div>
+    </ToolPanel>
   );
 }
 
@@ -809,7 +810,7 @@ function RenameBatchPanel({
   };
 
   return (
-    <div className="space-y-3 pt-1">
+    <div className="space-y-4">
       <SectionHeader
         title="Rename"
         info={
@@ -1280,7 +1281,7 @@ function TextBatchPanel({
   ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
         <SectionHeader
           title="Text"
