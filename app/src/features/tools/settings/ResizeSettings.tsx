@@ -352,7 +352,7 @@ export function ResizeSettings({
   ]);
 
   return (
-    <div className="flex flex-col h-full -mt-2">
+    <div className="flex flex-col h-full">
       {/* ONE tile, not two. Compress and Resize were separate sub-modes
           behind a ToolModeToggle, and both of them move the SAME two
           numbers: Web Performance Gain and PageSpeed Insights Score are a
@@ -364,7 +364,7 @@ export function ResizeSettings({
           Order is scores -> resize -> compress: the readout you are steering
           toward sits above the controls that steer it, and resize precedes
           compress because that is the order the pixels actually go through. */}
-      <div className="flex-1 space-y-8 mt-2.5">
+      <div className="flex-1 space-y-8">
         {/* Both scores, 16px apart — what the compress body gave them before
             the tiles merged (its ToolModeToggle slot was space-y-4). The
             32px section gap below is between GROUPS, not inside one. */}
