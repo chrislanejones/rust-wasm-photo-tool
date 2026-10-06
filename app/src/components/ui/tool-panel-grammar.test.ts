@@ -13,7 +13,7 @@ import { SizeSlider } from "./size-slider";
 import { PresetRow } from "./preset-row";
 import { Kbd } from "./kbd";
 import { PanelAction, PanelActionBar } from "./panel-action-bar";
-import { AdvancedSection } from "./advanced-section";
+import { CollapsibleSection } from "./collapsible-section";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -196,14 +196,17 @@ describe("a disabled control says why", () => {
   });
 });
 
-// Mutation seen red: AdvancedSection's `defaultOpen` defaulting to true.
-describe("AdvancedSection", () => {
-  it("is collapsed by default, says what is inside, and opens as a disclosure", () => {
-    render(h(AdvancedSection, { summary: "Stabilizer: Med" }, h("p", null, "inside")));
+// Mutation seen red: CollapsibleSection's `defaultOpen` defaulting to true.
+describe("CollapsibleSection", () => {
+  it("is collapsed by default, is named for what is inside, and opens as a disclosure", () => {
+    render(h(CollapsibleSection, { label: "Placement", summary: "Stabilizer: Med" }, h("p", null, "inside")));
     const toggle = $<HTMLButtonElement>("button[aria-expanded]");
     const region = document.getElementById(toggle.getAttribute("aria-controls")!)!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(region.hidden).toBe(true);
+    // The header is the name of the contents — never the word "Advanced".
+    expect(toggle.textContent).toContain("Placement");
+    expect(toggle.textContent).not.toContain("Advanced");
     expect(toggle.textContent).toContain("Stabilizer: Med");
 
     act(() => toggle.click());

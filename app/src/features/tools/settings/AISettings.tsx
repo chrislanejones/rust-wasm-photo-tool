@@ -300,8 +300,8 @@ export function AISettings({
               takes `settings.paintStabilizer` (usePaintTool.ts:91-98) and
               `types.ts:39` already documents the setting as "shared by the
               Paint brush and the Eraser". There was simply no control, so a
-              working feature was unreachable from this panel. It sits in
-              Advanced, exactly as in Paint; the closed summary says the level. */}
+              working feature was unreachable from this panel. Visible in the
+              panel, exactly as in Paint (#283). */}
           <StabilizerRow
             value={settings.paintStabilizer}
             onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}

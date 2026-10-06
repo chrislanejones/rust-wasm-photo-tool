@@ -1,4 +1,4 @@
-// The vertical rhythm of one tool panel's body: header, controls, Advanced,
+// The vertical rhythm of one tool panel's body: header, controls, a collapsed section,
 // action bar, 16px apart. Nothing else — no padding (the sidebar owns the
 // inset), no border, no scroll.
 //
