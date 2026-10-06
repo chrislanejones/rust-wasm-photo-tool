@@ -14,6 +14,8 @@ import {
   PanelActionBar,
 } from "@/components/ui/panel-action-bar";
 import type { LevelsControls } from "@/hooks/useTransforms";
+import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /** The identity. Gamma is held ×100 so the slider stays integer. */
 const BLACK = 0;
@@ -123,12 +125,19 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
   const mid = midtoneX(black, white, gamma / 100);
 
   return (
-    <div className="space-y-3 -mt-2">
+    <ToolPanel>
       <SectionHeader
         title="Levels"
         info="Drag Black point and White point in to set the darkest and brightest tones, and Midtones to lift or deepen everything between. The photo updates as you drag. Apply makes it one undo step; leave the panel without applying and the photo goes back."
       />
 
+      {/* The edited dot sits on the CURVE's row (UI_CONSISTENCY §9): one dot
+          for the three points together, default = the identity curve, and
+          its Reset is the footer's Reset. */}
+      <ControlRow
+        label="Curve"
+        edited={{ isEdited: !isIdentity, onReset: reset, disabled: !imageReady }}
+      >
       <div className="rounded-md border border-theme-border bg-theme-muted p-2">
         {path ? (
           <svg
@@ -160,6 +169,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
           </p>
         )}
       </div>
+      </ControlRow>
 
       <SizeSlider
         label="Black point"
@@ -205,6 +215,6 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
           Apply
         </PanelAction>
       </PanelActionBar>
-    </div>
+    </ToolPanel>
   );
 }

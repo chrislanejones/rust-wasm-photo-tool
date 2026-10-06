@@ -55,6 +55,7 @@ import {
   type HSV,
 } from "@/lib/colorConvert";
 import { cn } from "@/lib/utils";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 type PickerMode = "wheel" | "rect";
 
@@ -151,6 +152,24 @@ export function ColorPickerDialog({
   const css = formatRgba(rgb, alpha);
   const alreadySaved = userColors.some((c) => c.trim().toLowerCase() === hex);
 
+  // The saved swatches pick exactly one color, so they are a named radio
+  // group, the same contract as ColorSwatchGrid (UI_CONSISTENCY §7). They were
+  // the one swatch row in the app whose lit ring nothing announced.
+  const pickSaved = (c: string) => {
+    const parsed = hexToRgba(c);
+    if (!parsed) return;
+    setHsv(rgbToHsv(parsed.rgb));
+    setAlpha(parsed.a);
+  };
+  const savedIds = userColors.map((c, i) => `${i}:${c}`);
+  const savedChecked = userColors.findIndex((c) => c.toLowerCase() === hex);
+  const savedRadio = useRadioGroup({
+    ids: savedIds,
+    selected: savedChecked >= 0 ? savedIds[savedChecked] : undefined,
+    isDisabled: () => false,
+    onSelect: (id) => pickSaved(userColors[savedIds.indexOf(id)]),
+  });
+
   const setRgbChannel = (key: "r" | "g" | "b", raw: number) => {
     if (Number.isNaN(raw)) return;
     setHsv(rgbToHsv({ ...rgb, [key]: clamp(Math.round(raw), 0, 255) }));
@@ -190,7 +209,7 @@ export function ColorPickerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="grid min-h-0 flex-1 gap-5 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
+        <DialogBody className="grid min-h-0 flex-1 gap-4 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
           {/* ── Left: the picker surface ─────────────────────────────── */}
           <div className="space-y-3">
             <ToolButtonGroup
@@ -273,23 +292,23 @@ export function ColorPickerDialog({
                 info="Colors you save here show up on every color picker in the app — stroke, fill, guides, text. They stay in this browser until you sign in, then follow your account."
               />
               <div className="flex flex-wrap gap-2">
-                {userColors.map((c) => (
-                  <Swatch
-                    key={c}
-                    color={c}
-                    label={`Use ${c}`}
-                    removeLabel={`Remove ${c} from palette`}
-                    title={c}
-                    active={c.toLowerCase() === hex}
-                    onClick={() => {
-                      const parsed = hexToRgba(c);
-                      if (!parsed) return;
-                      setHsv(rgbToHsv(parsed.rgb));
-                      setAlpha(parsed.a);
-                    }}
-                    onRemove={() => removeColor(c)}
-                  />
-                ))}
+                {/* `contents`, as in ColorSwatchGrid: the swatches and the "+"
+                    keep wrapping as one row of circles. */}
+                <div {...savedRadio.groupProps} aria-label="Palette" className="contents">
+                  {userColors.map((c, i) => (
+                    <Swatch
+                      key={c}
+                      color={c}
+                      label={`Use ${c}`}
+                      removeLabel={`Remove ${c} from palette`}
+                      title={c}
+                      active={c.toLowerCase() === hex}
+                      onClick={() => pickSaved(c)}
+                      onRemove={() => removeColor(c)}
+                      radio={savedRadio.itemProps(i)}
+                    />
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => addColor(hex)}

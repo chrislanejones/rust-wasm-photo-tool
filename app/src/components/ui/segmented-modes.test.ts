@@ -11,6 +11,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Circle, Square, Triangle } from "lucide-react";
 import { ToolButtonGroup } from "./tool-button-group";
+import { ControlRow } from "./control-row";
 import { ToggleButtonGroup } from "./toggle-button-group";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,14 +43,20 @@ const OPTS = [
 /** A controlled SELECT group, so arrow keys can be seen moving the selection. */
 function SelectHarness(props: { initial?: string; disabledId?: string; onPick?: (id: string) => void }) {
   const [v, setV] = React.useState<string | undefined>(props.initial);
-  return h(ToolButtonGroup<string>, {
+  // Named the way every caller names it since UI Night 8: ControlRow's label
+  // slot draws the words and the group points at them.
+  return h(ControlRow, {
     label: "Letters",
-    value: v,
-    onChange: (id: string) => {
-      setV(id);
-      props.onPick?.(id);
-    },
-    options: OPTS.map((o) => ({ ...o, disabled: o.id === props.disabledId })),
+    children: ({ labelId }: { labelId: string }) =>
+      h(ToolButtonGroup<string>, {
+        "aria-labelledby": labelId,
+        value: v,
+        onChange: (id: string) => {
+          setV(id);
+          props.onPick?.(id);
+        },
+        options: OPTS.map((o) => ({ ...o, disabled: o.id === props.disabledId })),
+      }),
   });
 }
 
@@ -157,7 +164,7 @@ describe("ACTION mode", () => {
 });
 
 describe("the group carries an accessible name", () => {
-  it("from tool-button-group's own `label`", () => {
+  it("from a ControlRow label it points at", () => {
     render(h(SelectHarness, { initial: "a" }));
     expect(groupName(q('[role="radiogroup"]')[0])).toBe("Letters");
   });

@@ -39,6 +39,9 @@ import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectField } from "@/components/ui/select-field";
 import { PANEL_DIVIDER, PANEL_SECTION } from "@/lib/styles";
 import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
+import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
+import { Kbd } from "@/components/ui/kbd";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
  *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
@@ -242,7 +245,7 @@ export function LayerSettings({
   const sep = section === undefined ? PANEL_DIVIDER : "";
 
   return (
-    <div className="space-y-6 -mt-2">
+    <ToolPanel>
       {/* ── Move or Resize the active layer ──────────────────────────────── */}
       {show("layer") && (
       <div className="space-y-2">
@@ -260,7 +263,7 @@ export function LayerSettings({
               </strong>{" "}
               opens a draggable bounding box to scale/reposition it, then
               Enter or click away to bake it in (Escape cancels). Both are
-              non-destructive until committed. <kbd>Ctrl+M</kbd> toggles Move.
+              non-destructive until committed. <Kbd>Ctrl+M</Kbd> toggles Move.
             </>
           }
         />
@@ -270,28 +273,28 @@ export function LayerSettings({
             per-control layer picker anywhere. Options listed top→bottom to
             match the visual stack. */}
         {layers && layers.length > 0 && onSelectLayer && (
-          <div className="space-y-2">
-            <label className="text-2xs text-theme-muted-foreground">
-              Layer
-            </label>
-            <SelectField
-              value={activeLayer?.id ?? ""}
-              disabled={disabled}
-              onChange={(e) => onSelectLayer(Number(e.target.value))}
-              title="Layer these controls act on"
-            >
-              {[...layers].reverse().map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                  {l.visible ? "" : " (hidden)"}
-                  {l.hasMask ? " · masked" : ""}
-                  {l.overlay ? " · tinted" : ""}
-                  {l.shapeCount > 0 ? ` · ${l.shapeCount} shape${l.shapeCount === 1 ? "" : "s"}` : ""}
-                  {l.textCount > 0 ? ` · ${l.textCount} text` : ""}
-                </option>
-              ))}
-            </SelectField>
-          </div>
+          <ControlRow label="Layer">
+            {({ labelId }) => (
+              <SelectField
+                aria-labelledby={labelId}
+                value={activeLayer?.id ?? ""}
+                disabled={disabled}
+                onChange={(e) => onSelectLayer(Number(e.target.value))}
+                title="Layer these controls act on"
+              >
+                {[...layers].reverse().map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                    {l.visible ? "" : " (hidden)"}
+                    {l.hasMask ? " · masked" : ""}
+                    {l.overlay ? " · tinted" : ""}
+                    {l.shapeCount > 0 ? ` · ${l.shapeCount} shape${l.shapeCount === 1 ? "" : "s"}` : ""}
+                    {l.textCount > 0 ? ` · ${l.textCount} text` : ""}
+                  </option>
+                ))}
+              </SelectField>
+            )}
+          </ControlRow>
         )}
         {/* Move / Resize / mask in ONE row. Add mask used to sit alone in
             the Layer Mask section below, which meant three things you do TO
@@ -448,19 +451,23 @@ export function LayerSettings({
                     store (mask.value / mask.onSetValue), which is what lets
                     the X shortcut swap it from the keyboard hook without this
                     panel in the loop. */}
-                <ToolButtonGroup
-                  label="Brush paints"
-                  columns={2}
-                  stacked
-                  value={mask.value < 128 ? "hide" : "reveal"}
-                  onChange={(v) => mask.onSetValue(v === "hide" ? 0 : 255)}
-                  options={MASK_BRUSH_OPTIONS}
-                />
+                <ControlRow label="Brush paints">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      columns={2}
+                      stacked
+                      value={mask.value < 128 ? "hide" : "reveal"}
+                      onChange={(v) => mask.onSetValue(v === "hide" ? 0 : 255)}
+                      options={MASK_BRUSH_OPTIONS}
+                    />
+                  )}
+                </ControlRow>
                 <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
                   Hide paints black, Reveal paints white — press{" "}
-                  <kbd className="font-mono">X</kbd> to swap, and{" "}
-                  <kbd className="font-mono">Ctrl+[</kbd>/
-                  <kbd className="font-mono">]</kbd> to resize the brush.
+                  <Kbd>X</Kbd> to swap, and{" "}
+                  <Kbd>Ctrl+[</Kbd>/
+                  <Kbd>]</Kbd> to resize the brush.
                 </p>
                 <SizeSlider
                   label="Size"
@@ -580,29 +587,28 @@ export function LayerSettings({
                 dead control. */}
             {activeLayer.overlay && (
               <>
-                <label className="text-2xs text-theme-muted-foreground">
-                  Strength
-                </label>
-                <div className="layer-opacity">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(activeLayer.overlay.opacity * 100)}
-                    disabled={disabled}
-                    aria-label="Color overlay strength"
-                    onChange={(e) =>
-                      overlay.onSet(
-                        activeLayer.id,
-                        activeLayer.overlay?.color ?? OVERLAY_COLORS[0],
-                        Number(e.target.value) / 100,
-                      )
-                    }
-                  />
-                  <span className="layer-opacity-val">
-                    {Math.round(activeLayer.overlay.opacity * 100)}%
-                  </span>
-                </div>
+                <ControlRow label="Strength">
+                  <div className="layer-opacity">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round(activeLayer.overlay.opacity * 100)}
+                      disabled={disabled}
+                      aria-label="Color overlay strength"
+                      onChange={(e) =>
+                        overlay.onSet(
+                          activeLayer.id,
+                          activeLayer.overlay?.color ?? OVERLAY_COLORS[0],
+                          Number(e.target.value) / 100,
+                        )
+                      }
+                    />
+                    <span className="layer-opacity-val">
+                      {Math.round(activeLayer.overlay.opacity * 100)}%
+                    </span>
+                  </div>
+                </ControlRow>
                 {/* One-shot ACTIONS → ActionTile, never `active` (the
                     button-variant SSOT the mask block above spells out). */}
                 <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
@@ -641,7 +647,7 @@ export function LayerSettings({
             <>
               Add evenly-spaced horizontal/vertical guides, then drag them on
               the canvas to reposition. Lock prevents moving;{" "}
-              <kbd>Delete</kbd>/<kbd>Backspace</kbd> removes the selected
+              <Kbd>Delete</Kbd>/<Kbd>Backspace</Kbd> removes the selected
               guide.
             </>
           }
@@ -736,7 +742,7 @@ export function LayerSettings({
 
       {/* ── Canvas size (the checkerboard backdrop is the canvas) ─────────── */}
       {show("canvas") && (
-      <div className={cn("space-y-3", sep)}>
+      <div className={cn("space-y-2", sep)}>
         <SectionHeader
           title="Background Canvas Size"
           info="Resizes the backing canvas, not the photo — content keeps its native resolution, centered; new area uses the backing color."
@@ -754,7 +760,7 @@ export function LayerSettings({
         />
       </div>
       )}
-    </div>
+    </ToolPanel>
   );
 }
 

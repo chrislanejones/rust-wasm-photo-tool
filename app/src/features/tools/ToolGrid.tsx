@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TOOL_GROUPS, type ToolGroupId } from "./toolGroups";
 import { activateGroup, useActiveGroup } from "./activateSubTool";
 import { ToolButton } from "./ToolButton";
+import { Kbd } from "@/components/ui/kbd";
 
 interface Props {
   /** Groups whose tile should render faded + non-clickable, keyed by group id.
@@ -49,9 +50,9 @@ export function ToolGrid({ disabledGroups }: Props) {
             <TooltipContent side="bottom" sideOffset={8}>
               <p className="font-semibold">
                 {group.label}{" "}
-                <kbd className="font-normal text-muted-foreground">
+                <Kbd className="font-normal text-muted-foreground">
                   {group.shortcutKey}
-                </kbd>
+                </Kbd>
               </p>
               <p className="text-muted-foreground text-xs">
                 {disabledReason ?? group.description}

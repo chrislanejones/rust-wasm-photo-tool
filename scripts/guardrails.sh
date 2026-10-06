@@ -95,10 +95,10 @@ check() {
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 21 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
+check "raw-colors" 13 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
-check "type-scale" 7 "off-scale type / faux weights (§4)" "$n_type"
+check "type-scale" 5 "off-scale type / faux weights (§4)" "$n_type"
 
 # Thumb.tsx carries GalleryBar's exclusion because it carries GalleryBar's
 # code: the gallery tile was extracted out of that file, and the 7 raw-colour
@@ -106,8 +106,13 @@ check "type-scale" 7 "off-scale type / faux weights (§4)" "$n_type"
 # 29 and 4 + 7 = 11 were the counts before the globs followed). Neither count
 # grew — a file boundary moved. This is the "it greps TEXT" property CLAUDE.md
 # warns about, read from the other direction.
+# AppShell's exclusion is gone (UI Night 8, 10-06-2026): its three literals,
+# registered for months as "unknown — inherited", were the drawer scrim, the
+# Batch grid's empty overlay and its "Selected" pill. They are tokens now
+# (--z-scrim, --z-canvas-overlay, --z-compare; same values), so AppShell is
+# covered by this check like any other file.
 n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
-      -g '!**/GalleryBar.tsx' -g '!**/Thumb.tsx' -g '!**/AppShell.tsx' | wc -l)
+      -g '!**/GalleryBar.tsx' -g '!**/Thumb.tsx' | wc -l)
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
 # ── UI rules R1, R3 and raw <button> (UI Night 7, docs/UI_CONSISTENCY.md §6) ──
@@ -133,9 +138,39 @@ ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
   exit 1
 }
 ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
-check "ui-spacing" 51 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
-check "ui-radius" 50 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
-check "ui-raw-button" 32 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
+# ui-radius 50 → 26 (UI Night 8, 10-06-2026): 18 bare `rounded` renamed to
+# `rounded-sm` (both 4px — proven 0 px different, element by element, both
+# themes), and 6 hits were never radius at all: the Text tool's corner-preset
+# VALUES ("rounded" as a type, an `id:` and a ternary result), which the
+# counter now reads as values. Its self-test plants all three.
+# Then 26 → 22: four `rounded-xl` in files Night 8 was already in (Batch's logo
+# drop zone and logo row, New's surface and drop zone) → `rounded-lg`. That one
+# DOES change pixels (12px → 10px). The chrome family (Tools/Gallery cards, top
+# bar, master bar) and the modal surfaces stay: changing one of a family alone
+# splits it, and picking the family's radius is a call for Chris.
+check "ui-spacing" 42 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-radius" 22 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-raw-button" 14 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
+
+# ── The exception registry explains every row (UI Night 8, 10-06-2026) ──
+# docs/UI_EXCEPTIONS.md is where an escape hatch says WHY. A row reading
+# "unknown" is an exclusion nobody can defend; the last one (AppShell's three
+# z-index literals) closed on Night 8. Counted case-insensitively as a word,
+# so "unknown" anywhere in the file — table or prose — is a violation. Write
+# what you found, or what you have not checked yet and when you will.
+[ -f docs/UI_EXCEPTIONS.md ] || { echo "FATAL: docs/UI_EXCEPTIONS.md is missing — a missing file must not read as zero." >&2; exit 1; }
+n_unknown=$(rg -ciw 'unknown' docs/UI_EXCEPTIONS.md || true)
+check "exceptions-unknown" 0 "every row in docs/UI_EXCEPTIONS.md gives a reason (R10)" "${n_unknown:-0}"
+
+# ── Every raw <button> left is a REGISTERED one (UI Night 8) ──
+# ui-raw-button counts them; this checks each file that still has one is named
+# in docs/UI_EXCEPTIONS.md §5, so the ratchet's floor is a list of reasons and
+# not a number. A file missing from the registry is one violation.
+n_unreg=0
+for f in $(node scripts/ui-ratchet-counts.mjs --list | awk -F'\t' '$1=="button" {split($2,a,":"); print a[1]}' | sort -u); do
+  rg -qF "\`${f#app/src/}\`" docs/UI_EXCEPTIONS.md || { echo "  unregistered raw <button>: $f"; n_unreg=$((n_unreg+1)); }
+done
+check "unregistered-raw-button" 0 "a raw <button> outside components/ui/ needs a row in docs/UI_EXCEPTIONS.md §5" "$n_unreg"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
 #

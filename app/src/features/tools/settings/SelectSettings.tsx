@@ -84,6 +84,7 @@ import { describeCoverage } from "@/lib/selectionCoverage";
 import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
 import { isNoopRefine, type RefineSettings } from "@/lib/selectionRefine";
 import { PANEL_SECTION } from "@/lib/styles";
+import { Kbd } from "@/components/ui/kbd";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
@@ -169,9 +170,9 @@ const PANEL_MODES: readonly ToolMode<SelectionKind>[] = SELECT_MODES.map(
         {isMarqueeKind(m.id)
           ? "Press, drag and release on the canvas."
           : "Click the canvas to select."}{" "}
-        <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects. Whether this
+        <Kbd>Alt+A</Kbd> selects all, <Kbd>Alt+D</Kbd> deselects. Whether this
         replaces the selection or adds to it is Combine, in the Review panel
-        (<kbd>Alt+R</kbd>); <kbd>Shift</kbd> adds and <kbd>Alt</kbd> subtracts
+        (<Kbd>Alt+R</Kbd>); <Kbd>Shift</Kbd> adds and <Kbd>Alt</Kbd> subtracts
         for one gesture whatever it says.
       </>
     ),
@@ -395,10 +396,10 @@ export function SelectSettings({
           title="Selection"
           info={
             <>
-              All selects the whole canvas (<kbd>Alt+A</kbd>); Deselect drops
-              the selection (<kbd>Alt+D</kbd>); Delete clears the selected
-              pixels. Copy (<kbd>Ctrl+J</kbd>) and Cut (
-              <kbd>Ctrl+Shift+J</kbd>) place the selection on a new layer
+              All selects the whole canvas (<Kbd>Alt+A</Kbd>); Deselect drops
+              the selection (<Kbd>Alt+D</Kbd>); Delete clears the selected
+              pixels. Copy (<Kbd>Ctrl+J</Kbd>) and Cut (
+              <Kbd>Ctrl+Shift+J</Kbd>) place the selection on a new layer
               above — Cut also removes it from this one.
               {patchmatch && (
                 <>

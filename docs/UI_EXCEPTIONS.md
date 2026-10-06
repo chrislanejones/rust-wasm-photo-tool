@@ -86,9 +86,10 @@ decision, so it is a proposal for Chris, not a night's change.
 | File | Hits it hides | Reason | Verdict |
 | --- | ---: | --- | --- |
 | `features/gallery/GalleryBar.tsx` | **7** | **local stacking inside one thumbnail**: scrim `z-10`, label `z-20`, the two corner buttons `z-30` | **Legitimate** (Night 7). The `--z-*` tokens name APP layers (dialog, sticky nav); these never leave the tile's own stacking context, and naming them as app layers would be wrong. |
-| `app/AppShell.tsx` | **3** | unknown — inherited | Expected — AppShell is the stacking root, and it is being dismantled anyway. |
+| ~~`app/AppShell.tsx`~~ | 0 | Read on 10-06-2026 (UI Night 8). The three were the narrow-window drawer scrim (`z-[20]`), the Batch grid's "No photos loaded" overlay (`z-10`) and its "Selected" pill (`z-20`). | **Retired 10-06-2026.** All three are tokens now with the same values: `--z-scrim` (new, 20), `--z-canvas-overlay` (10) and `--z-compare` (20, "NEW pill" — the Selected pill is the same kind of thing). The glob is gone from `guardrails.sh` and `z-index` still reads 4. |
 
-10 hidden against a visible baseline of 4. Of every UI check, this is the one
+Measured 09-23-2026: 10 hidden against a visible baseline of 4. Since
+10-06-2026 it is 7, all in the one thumbnail. Of every UI check, this is the one
 whose real number is furthest from its reported one: the inventory found 15
 `z-` uses across 6 files, and two thirds of them sit behind these two globs.
 
@@ -139,3 +140,27 @@ should be taken, and they belong to whoever next opens `guardrails.sh`.
 4. A comment that merely *mentions* a forbidden pattern is not an exception —
    it is a false positive. Reword the comment. (`role="button"` in prose turned
    the job red once; `\bas any\b` in prose turned it red again.)
+
+## 5. Raw `<button>` outside `components/ui/` — the registered floor
+
+**Opened 10-06-2026 (UI Night 8).** `ui-raw-button` went from **32 to 14**:
+18 were converted (to `ui/button`, `ui/info-tooltip` or `ui/switch`). These
+14 are what is left, and each one is here on purpose. `guardrails.sh` checks
+that every file with a raw `<button>` has a row in this table
+(`unregistered-raw-button`, baseline 0), so the ratchet's floor is a list of
+reasons, not a number.
+
+| File | Buttons | Kind | Why not a primitive | Registered |
+| --- | ---: | --- | --- | --- |
+| `components/ColorPickerDialog.tsx` | 1 | swatch "+" circle | "Save to palette": a 28px dashed circle that sits in the swatch row as one of the swatches. No primitive is round. | 10-06-2026 |
+| `components/ColorSwatchGrid.tsx` | 1 | swatch "+" circle | "Pick a custom color": the same circle, same reason. | 10-06-2026 |
+| `components/DimensionFields.tsx` | 1 | aspect lock | A 34×34 toggle sized to the two `NumberField`s beside it. `ToggleButtonGroup` is a 38px pill and `Button` has no square toggle size; adding one is a primitive change for one caller. | 10-06-2026 |
+| `components/SubscriptionButton.tsx` | 1 | the Settings rail | The Settings modal's vertical tab list. `segmented-tabs` is horizontal. It wants its own primitive (`role="tablist"`, arrow keys), which is a separate change. | 10-06-2026 |
+| `features/canvas/GridThumbnails.tsx` | 1 | thumbnail overlay | The Batch grid tile: the whole photo is the hit area. | 10-06-2026 |
+| `features/canvas/HistogramView.tsx` | 1 | HistogramView | The RGB / Luma pair is styled by the component's inline `CSSProperties`, like the rest of the histogram. Moving it means moving the whole view to classes. | 10-06-2026 |
+| `features/canvas/ShapeActionsOverlay.tsx` | 1 | canvas overlay | Connector ports, positioned on the shape in canvas coordinates. | 10-06-2026 |
+| `features/gallery/GalleryThumbMark.tsx` | 2 | thumbnail overlay | The sync mark pill on a thumbnail, and its conflict menu items (`role="menuitem"`). | 10-06-2026 |
+| `features/gallery/Thumb.tsx` | 2 | thumbnail overlay | Remove and Select, the corner chips drawn over the photo in on-photo ink. | 10-06-2026 |
+| `features/mobile/MobileShell.tsx` | 1 | thumbnail | The phone grid tile is itself the button. | 10-06-2026 |
+| `features/tools/settings/StampSettings.tsx` | 1 | StampSettings | Each stamp preset is drawn in its own stamp color (inline style per preset): a preview of the stamp, not a button style. | 10-06-2026 |
+| `features/upload/CreateAIImagePanel.tsx` | 1 | thumbnail overlay | The "×" on a reference image tile. | 10-06-2026 |

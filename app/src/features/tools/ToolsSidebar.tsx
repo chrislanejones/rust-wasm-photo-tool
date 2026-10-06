@@ -386,7 +386,7 @@ export function ToolsSidebar({
         // comment that described it named a `pb-8` that was no longer in the
         // class, and the 32px token it pointed at was never applied to
         // anything.
-        className="flex-1 overflow-y-auto px-panel pt-panel pb-1.5 space-y-5 scrollbar-thin"
+        className="flex-1 overflow-y-auto px-panel pt-panel pb-1.5 space-y-4 scrollbar-thin"
       >
         {/* Per-photo panels name their photo, cue every switch and lock while
             one is in flight (PerPhotoRegion). Per-tool panels don't. */}

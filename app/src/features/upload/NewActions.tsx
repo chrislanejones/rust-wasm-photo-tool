@@ -34,6 +34,7 @@ import { DEFAULT_IMAGE_MODEL_ID } from "./aiImageDraft";
 import { CreateAIImagePanel } from "./CreateAIImagePanel";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import { namePastedImage } from "@/lib/pastedImageName";
+import { ControlRow } from "@/components/ui/control-row";
 
 interface SizePreset {
   id: string;
@@ -423,7 +424,7 @@ export function NewActions({
           onDragLeave={() => setDragging(false)}
           // Stable min-height so the surface doesn't resize/recenter (and jerk)
           // when swapping the upload actions ⇄ New Canvas panel.
-          className="rounded-xl min-h-[18rem] flex flex-col"
+          className="rounded-lg min-h-[18rem] flex flex-col"
         >
           <PaneSwap
             paneKey={pane}
@@ -471,29 +472,37 @@ export function NewActions({
                 </div>
 
                 {/* Use-case tabs — swap which preset sizes are offered. */}
-                <ToolButtonGroup
-                  label="Canvas type"
-                  options={PRESET_CATEGORIES.map((c) => ({
-                    id: c.id,
-                    label: c.label,
-                  }))}
-                  value={blankCat}
-                  onChange={setBlankCat}
-                  columns={4}
-                />
+                <ControlRow label="Canvas type">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={PRESET_CATEGORIES.map((c) => ({
+                        id: c.id,
+                        label: c.label,
+                      }))}
+                      value={blankCat}
+                      onChange={setBlankCat}
+                      columns={4}
+                    />
+                  )}
+                </ControlRow>
 
-                <ToolButtonGroup
-                  label="Page size"
-                  options={
-                    (
-                      PRESET_CATEGORIES.find((c) => c.id === blankCat) ??
-                      PRESET_CATEGORIES[0]
-                    ).presets
-                  }
-                  value={blankPreset}
-                  onChange={applyPreset}
-                  columns={3}
-                />
+                <ControlRow label="Page size">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={
+                        (
+                          PRESET_CATEGORIES.find((c) => c.id === blankCat) ??
+                          PRESET_CATEGORIES[0]
+                        ).presets
+                      }
+                      value={blankPreset}
+                      onChange={applyPreset}
+                      columns={3}
+                    />
+                  )}
+                </ControlRow>
 
                 <div
                   className={transparent ? "pointer-events-none opacity-40" : ""}
@@ -506,26 +515,29 @@ export function NewActions({
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setTransparent((t) => !t)}
-                  aria-pressed={transparent}
-                  className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
-                    transparent
-                      ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-                      : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
-                  }`}
-                >
-                  <span
-                    className="h-3.5 w-3.5 rounded-sm border border-border"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 75%, transparent 75%)",
-                      backgroundSize: "6px 6px",
-                    }}
+                {/* One binary with no visible pair: a SWITCH (UI_CONSISTENCY §7),
+                    not a hand-rolled pressed button. */}
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="blank-transparent-switch"
+                    className="flex cursor-pointer items-center gap-2 text-xs text-theme-muted-foreground"
+                    >
+                    <span
+                      className="h-3.5 w-3.5 rounded-sm border border-border"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 75%, transparent 75%)",
+                        backgroundSize: "6px 6px",
+                      }}
+                    />
+                    Transparent background
+                  </label>
+                  <Switch
+                    id="blank-transparent-switch"
+                    checked={transparent}
+                    onCheckedChange={setTransparent}
                   />
-                  Transparent background
-                </button>
+                </div>
 
                 {/* Back is in the PaneHeader; the bottom row is the one
                     commit, in the tool panels' Apply Crop button. */}
@@ -600,7 +612,7 @@ export function NewActions({
                 {/* Dotted drop zone — highlights + nudges when an image is
                     dragged over the surface. */}
                 <div
-                  className={`flex w-full flex-1 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dotted p-6 text-center transition-all duration-200 ${
+                  className={`flex w-full flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-dotted p-6 text-center transition-all duration-200 ${
                     dragging
                       ? "border-accent bg-accent/10 scale-[1.02]"
                       : "border-border bg-bg-elevated/30"

@@ -38,6 +38,9 @@ import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { SelectField } from "@/components/ui/select-field";
 import { BatchGroupToggle } from "./BatchGroupToggle";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
+import { Button } from "@/components/ui/button";
+import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /** Batch › Text weight — a two-tile pick, the same group every other
  *  pick-one-of-N control in the panels uses. */
@@ -203,10 +206,10 @@ function hexToRgb(hex: string): [number, number, number] {
 export function BatchSettings(props: BatchSettingsProps) {
   const { groups, group } = useBatchGroups(props.photos, props.activePhotoId);
   return (
-    <div className="space-y-4">
+    <ToolPanel>
       <BatchGroupToggle photos={props.photos} activePhotoId={props.activePhotoId} />
       <BatchToolPanel {...props} scoped={groups[group]} />
-    </div>
+    </ToolPanel>
   );
 }
 
@@ -646,7 +649,7 @@ function BatchToolPanel({
             }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={onDrop}
-            className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center cursor-pointer transition-colors ${
+            className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center cursor-pointer transition-colors ${
               isDragOver
                 ? "border-theme-primary bg-theme-primary/10"
                 : "border-theme-muted/50 bg-theme-muted/20 hover:bg-theme-muted/30"
@@ -660,8 +663,8 @@ function BatchToolPanel({
             </p>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-theme-muted/20 px-3 py-2">
-            <div className="checkerboard flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded">
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-theme-muted/20 px-3 py-2">
+            <div className="checkerboard flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-sm">
               <img
                 src={logo.previewUrl}
                 alt="logo preview"
@@ -673,13 +676,13 @@ function BatchToolPanel({
               <p className="text-2xs text-theme-foreground truncate">
                 {logo.width}×{logo.height}
               </p>
-              <button
+              <Button
+                variant="ghost"
                 onClick={clearLogo}
-                className="mt-0.5 inline-flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
-                type="button"
+                className="mt-0.5 gap-1 px-1 py-0 text-2xs"
               >
                 <X className="h-3 w-3" /> Remove
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -807,7 +810,7 @@ function RenameBatchPanel({
   };
 
   return (
-    <div className="space-y-3 pt-1">
+    <div className="space-y-4">
       <SectionHeader
         title="Rename"
         info={
@@ -1278,7 +1281,7 @@ function TextBatchPanel({
   ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
         <SectionHeader
           title="Text"
@@ -1339,13 +1342,11 @@ function TextBatchPanel({
 
       {/* Background — plain solid box only, no speech-bubble/tail (see the
           module comment on TEXT_BG_KIND_OPTIONS above). */}
-      <ToolButtonGroup
-        label="Background"
-        options={TEXT_BG_KIND_OPTIONS}
-        value={bgKind}
-        onChange={setBgKind}
-        columns={2}
-      />
+      <ControlRow label="Background">
+        {({ labelId }) => (
+          <ToolButtonGroup aria-labelledby={labelId} options={TEXT_BG_KIND_OPTIONS} value={bgKind} onChange={setBgKind} />
+        )}
+      </ControlRow>
 
       {bgKind !== "none" && (
         <>
@@ -1365,13 +1366,12 @@ function TextBatchPanel({
             unit="px"
           />
 
-          <ToolButtonGroup
-            label="Corners"
-            options={TEXT_BG_CORNER_OPTIONS}
-            value={textBgCornerIdFromRadius(bgCornerRadius)}
-            onChange={(id) => setBgCornerRadius(TEXT_BG_CORNER_RADIUS[id])}
-            columns={3}
-          />
+          <ControlRow label="Corners">
+            {({ labelId }) => (
+              <ToolButtonGroup aria-labelledby={labelId} options={TEXT_BG_CORNER_OPTIONS} columns={3}
+                value={textBgCornerIdFromRadius(bgCornerRadius)} onChange={(id) => setBgCornerRadius(TEXT_BG_CORNER_RADIUS[id])} />
+            )}
+          </ControlRow>
 
           <SizeSlider
             label="Opacity"

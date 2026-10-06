@@ -42,7 +42,8 @@
      the --z- custom properties in CSS and as arbitrary z-index values in JSX; no more "+1 to win". ── */
   --z-canvas: 1; /* canvas-wrapper / pen overlay base */
   --z-canvas-overlay: 10; /* loaders, in-canvas badges */
-  --z-compare: 20; /* compare slider handle, NEW pill */
+  --z-compare: 20; /* compare slider handle, NEW pill, the Batch grid's "Selected" pill */
+  --z-scrim: 20; /* narrow-window drawer scrim: above the canvas, below the top bar and panels */
   --z-topbar: 30; /* floating top bar */
   --z-panel: 40; /* Tools / Gallery / Review side panels + status bar */
   --z-mobile: 48; /* mobile version (MobileShell) — covers all editor chrome, below dialogs so the shared confirms/notices land on top */
@@ -1823,19 +1824,10 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
-/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
-   chip in token classes on the house radius. This bare rule stays only for
-   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
-kbd {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0px 4px;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--text-secondary);
-  line-height: 16px;
-}
+/* The bare `kbd { … }` element rule that lived here (3px radius, off the
+   house scale) is gone: UI Night 8 moved its last users to `ui/kbd`, as the
+   note on it asked. `.shortcut-kbd` below is the keycap VARIANT the shortcuts
+   dialog puts on a `Kbd`. */
 
 .status-divider {
   width: 1px;

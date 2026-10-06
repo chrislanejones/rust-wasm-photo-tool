@@ -19,11 +19,12 @@ import {
   type FeatureFlag,
 } from "@/lib/featureFlags";
 import { probeWebGpu, type GpuStatus } from "@/lib/webgpu/detect";
+import { Button } from "@/components/ui/button";
 
 function StateChip({ on }: { on: boolean }) {
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 text-2xs font-bold ${
+      className={`rounded-sm border px-1.5 py-0.5 text-2xs font-bold ${
         on
           ? "border-success/20 bg-success/10 text-success"
           : "border-border/40 bg-bg-elevated/40 text-text-muted"
@@ -45,7 +46,7 @@ function Row({ flag, onChange }: { flag: FeatureFlag; onChange: () => void }) {
           <StateChip on={on} />
           <span className="text-text-primary">{flag.label}</span>
           {overridden && (
-            <span className="rounded border border-warning/20 bg-warning/10 px-1.5 py-0.5 text-2xs font-bold text-warning">
+            <span className="rounded-sm border border-warning/20 bg-warning/10 px-1.5 py-0.5 text-2xs font-bold text-warning">
               OVERRIDDEN
             </span>
           )}
@@ -62,15 +63,16 @@ function Row({ flag, onChange }: { flag: FeatureFlag; onChange: () => void }) {
         </div>
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right">
-        <button
+        <Button
+          variant="ghost"
           onClick={() => {
             setFlagOverride(flag, !overridden);
             onChange();
           }}
-          className="rounded px-2 py-1 text-2xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+          className="px-2 py-1 text-2xs"
         >
           {overridden ? "Reset to default" : flag.kind === "kill" ? "Disable" : "Enable"}
-        </button>
+        </Button>
       </td>
     </tr>
   );

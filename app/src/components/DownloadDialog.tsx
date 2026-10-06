@@ -58,6 +58,7 @@ import type {
   DownloadFormatOption,
 } from "@/app/session/useDownloadFormat";
 import type { ActiveFormat } from "@/lib/plugins";
+import { ControlRow } from "@/components/ui/control-row";
 
 /** The format picker's ids: every real download format, the formats the
  *  active plugins add (Settings → Plugins, lib/plugins — their manifest ids,
@@ -297,16 +298,20 @@ function DownloadPanes({
                 sit in their own grid with a caption. One radiogroup, two visual
                 rows. `formatGroups` below is the layout; the semantics are
                 `ToolButtonGroup`'s, which already span rows in a 3-column grid. */}
-            <ToolButtonGroup<FormatTileId>
-              label="Image format"
-              stacked
-              columns={3}
-              value={selectedValue}
-              onChange={(id) => {
-                if (!isPlaceholder(id)) onFormatChange(id);
-              }}
-              options={formatOptions}
-            />
+            <ControlRow label="Image format">
+              {({ labelId }) => (
+                <ToolButtonGroup<FormatTileId>
+                  aria-labelledby={labelId}
+                  stacked
+                  columns={3}
+                  value={selectedValue}
+                  onChange={(id) => {
+                    if (!isPlaceholder(id)) onFormatChange(id);
+                  }}
+                  options={formatOptions}
+                />
+              )}
+            </ControlRow>
             {/* File name only here: a zip of every image keeps each image's
                 own name. */}
             <ExportFileNameField
@@ -334,18 +339,22 @@ function DownloadPanes({
                 Every image in the zip is written in this format; one already
                 in it goes in untouched (lib/zipEntry.ts). SVG is live here
                 when ANY open image is an SVG, and zips just those. */}
-            <ToolButtonGroup<FormatTileId>
-              label="Image format"
-              stacked
-              columns={3}
-              value={allSvg ? "svg" : zipFormat}
-              onChange={(id) => {
-                if (!isPlaceholder(id) && id !== "ora" && !pluginIds.has(id)) onFormatChange(id);
-              }}
-              options={formatOptions
-                .filter((o) => o.id !== "ora" && o.id !== "psd" && !pluginIds.has(o.id))
-                .map((o) => (o.id === "svg" ? svgTile(svg.all > 0) : o))}
-            />
+            <ControlRow label="Image format">
+              {({ labelId }) => (
+                <ToolButtonGroup<FormatTileId>
+                  aria-labelledby={labelId}
+                  stacked
+                  columns={3}
+                  value={allSvg ? "svg" : zipFormat}
+                  onChange={(id) => {
+                    if (!isPlaceholder(id) && id !== "ora" && !pluginIds.has(id)) onFormatChange(id);
+                  }}
+                  options={formatOptions
+                    .filter((o) => o.id !== "ora" && o.id !== "psd" && !pluginIds.has(o.id))
+                    .map((o) => (o.id === "svg" ? svgTile(svg.all > 0) : o))}
+                />
+              )}
+            </ControlRow>
             <DialogDescription>
               {allSvg ? (
                 <>

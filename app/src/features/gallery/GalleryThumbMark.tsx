@@ -115,7 +115,7 @@ export function GalleryThumbMark({
                 onResolveConflict?.(c.id);
                 setOpen(false);
               }}
-              className="flex min-h-9 w-full items-center rounded px-2 text-left text-xs text-theme-foreground hover:bg-bg-tertiary disabled:opacity-50"
+              className="flex min-h-9 w-full items-center rounded-sm px-2 text-left text-xs text-theme-foreground hover:bg-bg-tertiary disabled:opacity-50"
             >
               {c.label}
             </button>

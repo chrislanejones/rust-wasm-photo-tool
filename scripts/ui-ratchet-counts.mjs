@@ -105,9 +105,39 @@ export function countSource(text, file, { isUi = false } = {}) {
     }
   };
 
+  // A one-word string can be a class list ("rounded") or a plain value that
+  // happens to be spelled like one. UI Night 8 found six of the second kind,
+  // all the Text tool's corner presets: `type CornerId = "circle" | "rounded"`,
+  // `{ id: "rounded", label: "Rounded" }` and `r <= 0 ? "square" : "rounded"`.
+  // Renaming them to `rounded-sm` would have broken the presets, and they are
+  // not radius uses at all. Three contexts are values, never classes:
+  //   - a string in a TYPE (a literal type),
+  //   - the value of an `id:` / `key:` / `value:` property,
+  //   - a branch of a ternary whose other string branch is not a class list.
+  const isValueString = (node) => {
+    const p = node.parent;
+    if (!p) return false;
+    if (ts.isLiteralTypeNode(p)) return true;
+    if (ts.isPropertyAssignment(p) && p.initializer === node) {
+      const name = p.name.getText().replace(/["']/g, "");
+      if (name === "id" || name === "key" || name === "value") return true;
+    }
+    if (ts.isConditionalExpression(p)) {
+      const other = p.whenTrue === node ? p.whenFalse : p.whenTrue;
+      const sib = ts.isConditionalExpression(other) ? [other.whenTrue, other.whenFalse] : [other];
+      if (sib.some((s) => ts.isStringLiteral(s) && s.text.trim() !== "" && !isClassList(s.text))) return true;
+    }
+    // The tail of a chained ternary: `a ? "square" : b ? "circle" : "rounded"`.
+    if (ts.isConditionalExpression(p) && ts.isConditionalExpression(p.parent) && p.parent.whenFalse === p) {
+      const head = p.parent.whenTrue;
+      if (ts.isStringLiteral(head) && head.text.trim() !== "" && !isClassList(head.text)) return true;
+    }
+    return false;
+  };
+
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      readClasses(node.text, node.getStart());
+      if (!isValueString(node)) readClasses(node.text, node.getStart());
     } else if (ts.isTemplateExpression(node)) {
       readClasses(node.head.text, node.head.getStart());
       for (const span of node.templateSpans) readClasses(span.literal.text, span.literal.getStart());
@@ -130,10 +160,15 @@ export function countSource(text, file, { isUi = false } = {}) {
     const tip = "the rounded shape is a square";          // prose, not a class list
     const cls = "rounded p-5 gap-2 rounded-lg md:px-[13px]"; // 3 hits: rounded, p-5, px-[13px]
     export const A = () => <div className={\`flex \${cls} rounded-xl\`}><button>go</button></div>;
+    type Corner = "circle" | "rounded" | "square";          // a type, not a class
+    const OPTS = [{ id: "rounded", label: "Rounded" }];     // an id, not a class
+    const pick = (r) => r <= 0 ? "square" : r >= 200 ? "circle" : "rounded"; // values
+    const pick2 = (on) => on ? "rounded" : "square";        // value, head of the ternary
+    const real = (on) => on ? "rounded" : "";              // a REAL class: counts (+1 radius)
   `;
   const h = countSource(planted, "planted.tsx");
   const got = { spacing: h.spacing.length, radius: h.radius.length, button: h.button.length };
-  const want = { spacing: 2, radius: 2, button: 1 };
+  const want = { spacing: 2, radius: 3, button: 1 };
   if (JSON.stringify(got) !== JSON.stringify(want)) {
     console.error(`FATAL: self-test failed — wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
     console.error(JSON.stringify(h, null, 2));

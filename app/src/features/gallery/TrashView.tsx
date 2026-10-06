@@ -80,7 +80,7 @@ export function TrashView({
               data-trash-item={it.id}
               className="flex items-center gap-3 rounded-md border border-border p-2"
             >
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-bg-tertiary">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-sm bg-bg-tertiary">
                 {it.thumbnailUrl && (
                   <img src={it.thumbnailUrl} alt="" className="h-full w-full object-cover" />
                 )}

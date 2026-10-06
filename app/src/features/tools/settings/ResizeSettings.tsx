@@ -15,6 +15,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics, webTargetBytes } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { ControlRow } from "@/components/ui/control-row";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -351,7 +352,7 @@ export function ResizeSettings({
   ]);
 
   return (
-    <div className="flex flex-col h-full -mt-2">
+    <div className="flex flex-col h-full">
       {/* ONE tile, not two. Compress and Resize were separate sub-modes
           behind a ToolModeToggle, and both of them move the SAME two
           numbers: Web Performance Gain and PageSpeed Insights Score are a
@@ -363,7 +364,7 @@ export function ResizeSettings({
           Order is scores -> resize -> compress: the readout you are steering
           toward sits above the controls that steer it, and resize precedes
           compress because that is the order the pixels actually go through. */}
-      <div className="flex-1 space-y-8 mt-2.5">
+      <div className="flex-1 space-y-8">
         {/* Both scores, 16px apart — what the compress body gave them before
             the tiles merged (its ToolModeToggle slot was space-y-4). The
             32px section gap below is between GROUPS, not inside one. */}
@@ -475,6 +476,17 @@ export function ResizeSettings({
           onHeightChange={handleHeightChange}
           onPercentChange={handlePercentChange}
           onToggleLock={() => setLockAspect((v) => !v)}
+          // Per-photo (UI_CONSISTENCY §9). Default: the photo's own size, as
+          // the fields show it on open. Quality is NOT dotted: its default is
+          // the export default, a tool value, not this photo's.
+          edited={{
+            isEdited: parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight,
+            onReset: () => {
+              setWidth(String(imageWidth));
+              setHeight(String(imageHeight));
+            },
+            disabled,
+          }}
         />
 
         </div>
@@ -494,22 +506,26 @@ export function ResizeSettings({
             exists for; as a native <select> it announced nothing about which
             one was lit. */}
         <div className="space-y-4">
-          <ToolButtonGroup<ResampleMethod>
-            label="Method"
-            columns={3}
-            value={method}
-            onChange={setMethod}
-            aria-describedby="method-note"
-            options={(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => ({
-              id: m,
-              label: METHOD_LABELS[m],
-              title: METHOD_TITLES[m],
-              // Only a resample reads this. With the dimensions unchanged the
-              // filter code is passed in and never used, so offering a choice
-              // here was offering a control that does nothing.
-              disabled: !dimensionsChanged,
-            }))}
-          />
+          <ControlRow label="Method">
+            {({ labelId }) => (
+              <ToolButtonGroup<ResampleMethod>
+                aria-labelledby={labelId}
+                columns={3}
+                value={method}
+                onChange={setMethod}
+                aria-describedby="method-note"
+                options={(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => ({
+                  id: m,
+                  label: METHOD_LABELS[m],
+                  title: METHOD_TITLES[m],
+                  // Only a resample reads this. With the dimensions unchanged the
+                  // filter code is passed in and never used, so offering a choice
+                  // here was offering a control that does nothing.
+                  disabled: !dimensionsChanged,
+                }))}
+              />
+            )}
+          </ControlRow>
           <p
             id="method-note"
             className="text-2xs leading-relaxed text-theme-muted-foreground"
@@ -521,18 +537,22 @@ export function ResizeSettings({
         </div>
 
         <div className="space-y-4">
-          <ToolButtonGroup<ExportFormat>
-            label="Format"
-            columns={4}
-            value={exportFormat}
-            onChange={onExportFormatChange}
-            aria-describedby="format-note"
-            options={(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => ({
-              id: f,
-              label: FORMAT_LABELS[f],
-              disabled: f === "avif" && avifOk === false,
-            }))}
-          />
+          <ControlRow label="Format">
+            {({ labelId }) => (
+              <ToolButtonGroup<ExportFormat>
+                aria-labelledby={labelId}
+                columns={4}
+                value={exportFormat}
+                onChange={onExportFormatChange}
+                aria-describedby="format-note"
+                options={(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => ({
+                  id: f,
+                  label: FORMAT_LABELS[f],
+                  disabled: f === "avif" && avifOk === false,
+                }))}
+              />
+            )}
+          </ControlRow>
           <p
             id="format-note"
             className="text-2xs leading-relaxed text-theme-muted-foreground"

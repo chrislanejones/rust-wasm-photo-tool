@@ -60,6 +60,7 @@ import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
 import type { PerspectiveMode } from "@/stores/useToolStore";
 import { PANEL_SECTION } from "@/lib/styles";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { Kbd } from "@/components/ui/kbd";
 
 /** The three drag rules, as the registry / palette / SubtoolRow consume them.
  *
@@ -159,7 +160,7 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
               non-destructively, so it stays editable afterwards. With nothing
               picked the quad warps the pixels under it instead. Drag the corner
               handles to shape it, or an edge handle to move a whole side.
-              <kbd>Esc</kbd> cancels and takes the box off the canvas. Apply
+              <Kbd>Esc</Kbd> cancels and takes the box off the canvas. Apply
               adds one <em>Perspective</em> step to Review → History, where you
               can re-select it to pick the quad back up.
             </>

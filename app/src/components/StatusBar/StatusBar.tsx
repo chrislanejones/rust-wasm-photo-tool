@@ -17,6 +17,8 @@ import { useSaveStatus } from "@/lib/saveStatus";
 import { retrySync, useSyncStatus } from "@/lib/sync/status";
 import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 
 export interface ShortcutHint {
   keys: string;
@@ -212,7 +214,7 @@ export function StatusBar({
           <Fragment key={`${h.keys}-${h.label}`}>
             {i > 0 && <span className="status-divider" />}
             <span className="status-shortcut-hint">
-              <kbd>{h.keys}</kbd> {h.label}
+              <Kbd>{h.keys}</Kbd> {h.label}
             </span>
           </Fragment>
         ))}
@@ -271,14 +273,14 @@ export function StatusBar({
                   not retried on a timer and would be refused again, so a
                   Retry there would be a button that does nothing. */}
               {sync.willRetry && (
-                <button
-                  type="button"
+                <Button
+                  variant="link"
                   data-testid="status-sync-retry"
                   onClick={() => retrySync()}
-                  className="ml-1 rounded px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
+                  className="ml-1 rounded-sm px-1 text-2xs font-semibold hover:text-theme-foreground"
                 >
                   Retry
-                </button>
+                </Button>
               )}
             </span>
             <span className="status-divider" />

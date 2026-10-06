@@ -47,6 +47,7 @@ import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
 import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
+import { Kbd } from "@/components/ui/kbd";
 
 /** One placed object shown in the Reselect list (text or shape annotation). */
 export interface ReselectObject {
@@ -780,8 +781,8 @@ export function ReviewPanel({
                       How the next region meets the selection you have. It
                       applies to every selection gesture — wand, lasso, marquee
                       — and to the objects listed below: click one to combine
-                      the area it covers. Holding <kbd>Shift</kbd> adds and{" "}
-                      <kbd>Alt</kbd> subtracts for one gesture, whatever is
+                      the area it covers. Holding <Kbd>Shift</Kbd> adds and{" "}
+                      <Kbd>Alt</Kbd> subtracts for one gesture, whatever is
                       chosen here. An object contributes its box, or its
                       ellipse for a circle, not its outline. The marching ants show
                       the result on the canvas whatever tool you hold, and what

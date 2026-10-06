@@ -50,6 +50,7 @@ import { groupOf } from "@/stores/useBatchGroupStore";
 import { useBatchGroups } from "./useBatchGroups";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
+import { ControlRow } from "@/components/ui/control-row";
 
 const RATIO_OPTIONS = BATCH_CROP_RATIOS.map((r) => ({
   id: r.id,
@@ -378,7 +379,7 @@ export function CropBatchPanel({
   }, [applyToAll, setApplyAll]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <SectionHeader
           title="Crop"
@@ -432,13 +433,17 @@ export function CropBatchPanel({
       )}
 
       <div>
-        <ToolButtonGroup
-          label="Output width"
-          options={WIDTH_OPTIONS}
-          value={look.widthId}
-          onChange={(id) => setWidthId(editing, id)}
-          columns={3}
-        />
+        <ControlRow label="Output width">
+          {({ labelId }) => (
+            <ToolButtonGroup
+              aria-labelledby={labelId}
+              options={WIDTH_OPTIONS}
+              value={look.widthId}
+              onChange={(id) => setWidthId(editing, id)}
+              columns={3}
+            />
+          )}
+        </ControlRow>
         <p className="mt-2 text-2xs text-theme-muted-foreground">{sizeNote}</p>
       </div>
 

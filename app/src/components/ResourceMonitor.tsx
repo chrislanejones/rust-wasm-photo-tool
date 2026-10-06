@@ -18,6 +18,7 @@ import {
 import { fmtBytes } from "@/lib/resourceMonitor";
 import type { DiagnosticsSnapshot, ProcessRow } from "@/hooks/useDiagnostics";
 import { SUBSYSTEM_COLOR } from "@/components/subsystemColors";
+import { Button } from "@/components/ui/button";
 import {
   runThreadedBlurBench,
   type ThreadedBlurBenchResult,
@@ -126,14 +127,14 @@ function ThreadedBlurBenchRow() {
         <span className="uppercase tracking-wider">
           Threaded Blur (experimental)
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={run}
           disabled={state.status === "running"}
-          className="rounded border border-border px-2 py-0.5 text-text-secondary hover:bg-card/50 disabled:opacity-50"
+          className="px-2 py-0.5 text-2xs"
         >
           {state.status === "running" ? "Running…" : "Run bench"}
-        </button>
+        </Button>
       </div>
       {state.status === "done" && (
         <div className="tabular-nums">
@@ -195,13 +196,10 @@ export function ResourceMonitor({
       {/* Manual refresh — the only trigger for Tier-0 reads (tab memory,
           cores/RAM); they never poll on an interval. */}
       <div className="flex items-center justify-end">
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
-        >
+        <Button variant="ghost" onClick={onRefresh} className="gap-1 px-2 py-1 text-2xs">
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* ── Top gauges: main thread + memory ─────────────────────────────── */}

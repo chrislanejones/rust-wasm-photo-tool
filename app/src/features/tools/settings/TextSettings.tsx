@@ -13,7 +13,6 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
-import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
@@ -22,6 +21,9 @@ import { useUIStore } from "@/stores/useUIStore";
 import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 import { SelectField } from "@/components/ui/select-field";
 import { ErrorNote } from "@/components/ui/status-note";
+import { Button } from "@/components/ui/button";
+import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -185,7 +187,7 @@ export function TextSettings({
     // The mode tiles moved to the ToolsSidebar header (SubtoolRow); `-mt-2`
     // went with them — it only existed to tuck that row under the panel's top
     // padding, and without it the title would ride too high.
-    <div className="space-y-5" data-text-panel>
+    <ToolPanel data-text-panel>
     {activeModeInfo && (
       <SectionHeader title={activeModeInfo.label} info={activeModeInfo.info} />
     )}
@@ -194,7 +196,7 @@ export function TextSettings({
       return (
         <>
         {m === "text" && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Font Size */}
             <SizeSlider
               label="Font Size"
@@ -207,56 +209,57 @@ export function TextSettings({
             />
 
             {/* Font Family — real, and only as long as the list is. See above. */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-1.5">
-                <label className="text-2xs text-theme-muted-foreground">
-                  Font Family
-                </label>
-                <InfoTooltip
-                  label="Font Family"
-                  info={
-                    <>
-                      Text is drawn by the engine, not the browser. These faces
-                      ship with the app and are handed to the engine as font
-                      files, so what you type is what gets committed — the
-                      preview, the box it sits in and the exported pixels are
-                      all the same typeface. Nothing is fetched from Google.
-                    </>
+            <ControlRow
+              label="Font Family"
+              info={
+                <>
+                  Text is drawn by the engine, not the browser. These faces
+                  ship with the app and are handed to the engine as font
+                  files, so what you type is what gets committed — the
+                  preview, the box it sits in and the exported pixels are
+                  all the same typeface. Nothing is fetched from Google.
+                </>
+              }
+            >
+              {({ labelId }) => (
+                <SelectField
+                  aria-labelledby={labelId}
+                  value={settings.textFontId ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      textFontId: e.target.value,
+                      // `fontFamily` follows the id rather than being picked
+                      // independently — one of the three surfaces ADR-051
+                      // found disagreeing was exactly this one drifting.
+                      fontFamily: faceCss(e.target.value),
+                    })
                   }
-                />
-              </div>
-              <SelectField
-                value={settings.textFontId ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...settings,
-                    textFontId: e.target.value,
-                    // `fontFamily` follows the id rather than being picked
-                    // independently — one of the three surfaces ADR-051
-                    // found disagreeing was exactly this one drifting.
-                    fontFamily: faceCss(e.target.value),
-                  })
-                }
-                style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
-              >
-                {faces.map((f) => (
-                  <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
-                    {f.label}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
+                  style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
+                >
+                  {faces.map((f) => (
+                    <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                      {f.label}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+            </ControlRow>
 
             {/* Font Weight */}
-            <ToolButtonGroup
-              label="Font Weight"
-              options={[
-                { id: "normal", label: "Normal" },
-                { id: "bold", label: "Bold" },
-              ] as const}
-              value={settings.fontWeight ?? "normal"}
-              onChange={(id) => onChange({ ...settings, fontWeight: id })}
-            />
+            <ControlRow label="Font Weight">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={[
+                    { id: "normal", label: "Normal" },
+                    { id: "bold", label: "Bold" },
+                  ] as const}
+                  value={settings.fontWeight ?? "normal"}
+                  onChange={(id) => onChange({ ...settings, fontWeight: id })}
+                />
+              )}
+            </ControlRow>
 
             {/* Color */}
             <ColorSwatchGrid
@@ -274,15 +277,19 @@ export function TextSettings({
             you were editing to reach it. `background` keeps its own mode so the
             existing toggle, route and palette entry all still land somewhere. */}
         {(m === "text" || m === "background") && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Style toggle */}
-            <ToolButtonGroup
-              label="Style"
-              options={BG_KIND_OPTIONS}
-              value={settings.bgKind}
-              onChange={(id) => onChange({ ...settings, bgKind: id })}
-              columns={3}
-            />
+            <ControlRow label="Style">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={BG_KIND_OPTIONS}
+                  value={settings.bgKind}
+                  onChange={(id) => onChange({ ...settings, bgKind: id })}
+                  columns={3}
+                />
+              )}
+            </ControlRow>
 
             {settings.bgKind !== "none" && (
               <>
@@ -305,15 +312,19 @@ export function TextSettings({
                 />
 
                 {/* Corner style — three presets, for both Text BG and Bubble. */}
-                <ToolButtonGroup
-                  label="Corners"
-                  options={BG_CORNER_OPTIONS}
-                  value={cornerIdFromRadius(settings.bgCornerRadius)}
-                  onChange={(id) =>
-                    onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
-                  }
-                  columns={3}
-                />
+                <ControlRow label="Corners">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={BG_CORNER_OPTIONS}
+                      value={cornerIdFromRadius(settings.bgCornerRadius)}
+                      onChange={(id) =>
+                        onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
+                      }
+                      columns={3}
+                    />
+                  )}
+                </ControlRow>
 
                 {/* Tail direction — bubble only. Angle in degrees (0-359):
                     the slider sweeps the tail all the way around the bubble. */}
@@ -344,27 +355,31 @@ export function TextSettings({
                 from the box/bubble and "Text" from the glyphs. With Background =
                 None there's no box, so any shadow (Box/Text/Both) casts from the
                 text silhouette — "Box" still produces a visible shadow. */}
-            <ToolButtonGroup
-              label="Drop Shadow"
-              options={SHADOW_MODE_OPTIONS}
-              value={
-                settings.shadowBox && settings.shadowText
-                  ? "both"
-                  : settings.shadowBox
-                    ? "box"
-                    : settings.shadowText
-                      ? "text"
-                      : "off"
-              }
-              onChange={(id) =>
-                onChange({
-                  ...settings,
-                  shadowBox: id === "box" || id === "both",
-                  shadowText: id === "text" || id === "both",
-                })
-              }
-              columns={4}
-            />
+            <ControlRow label="Drop Shadow">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={SHADOW_MODE_OPTIONS}
+                  value={
+                    settings.shadowBox && settings.shadowText
+                      ? "both"
+                      : settings.shadowBox
+                        ? "box"
+                        : settings.shadowText
+                          ? "text"
+                          : "off"
+                  }
+                  onChange={(id) =>
+                    onChange({
+                      ...settings,
+                      shadowBox: id === "box" || id === "both",
+                      shadowText: id === "text" || id === "both",
+                    })
+                  }
+                  columns={4}
+                />
+              )}
+            </ControlRow>
 
             {(settings.shadowBox || settings.shadowText) && (
               <>
@@ -414,7 +429,7 @@ export function TextSettings({
         )}
 
         {m === "ocr" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!onlineFeaturesEnabled && (
               <OnlineFeaturesOffNotice what="OCR sends the image to a server to read the text." />
             )}
@@ -426,11 +441,14 @@ export function TextSettings({
                 </p>
               </div>
             )}
-            <button
-              type="button"
+            {/* ui/button, not the purple hand-rolled one it was: purple is in
+                no theme token, and AISettings retired the same pair for the
+                same reason (they "read as a different app"). */}
+            <Button
+              size="large"
               onClick={runOcrJob}
               disabled={!canRunOcr || ocrBusy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full"
             >
               {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
               {ocrBusy && <Spinner size={14} />}
@@ -439,7 +457,7 @@ export function TextSettings({
                 : ocrPhase === "running"
                   ? "Reading text..."
                   : "Extract Text"}
-            </button>
+            </Button>
             {ocrError && (
               <ErrorNote>{ocrError}</ErrorNote>
             )}
@@ -451,14 +469,14 @@ export function TextSettings({
                       <span className="text-2xs text-theme-muted-foreground">
                         Extracted text
                       </span>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={copyOcrText}
-                        className="flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
+                        className="gap-1 px-1 py-0 text-2xs"
                       >
                         <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
-                      </button>
+                      </Button>
                     </div>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-theme-sidebar-border p-2 text-2xs text-theme-foreground leading-relaxed">
                       {textResult}
@@ -494,6 +512,6 @@ export function TextSettings({
         />
       </CollapsibleSection>
     )}
-    </div>
+    </ToolPanel>
   );
 }

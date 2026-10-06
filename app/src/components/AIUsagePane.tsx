@@ -16,7 +16,8 @@
 import { useEffect, useMemo, useState } from "react";
 // Through lib/cloud, not convex/react: a keyless build must open this pane.
 import { useCloudAuth as useConvexAuth, useCloudQuery as useQuery } from "@/lib/cloud";
-import { Info, Clock3 } from "lucide-react";
+import { Clock3 } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { api } from "../../../convex/_generated/api";
 import { PaneHeading } from "@/components/ui/pane-heading";
 
@@ -109,14 +110,10 @@ export function AIUsagePane() {
         <div className="space-y-3 rounded-lg bg-card p-4">
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-semibold text-text-primary">Usage limits</p>
-            <button
-              type="button"
-              title="Two windows: a daily cap so one day cannot empty the month, and a monthly cap that bounds what the plan costs to run."
-              aria-label="How does the usage meter work?"
-              className="text-text-muted opacity-50 transition-opacity hover:opacity-100"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
+            <InfoTooltip
+              label="Usage limits"
+              info="Two windows: a daily cap so one day cannot empty the month, and a monthly cap that bounds what the plan costs to run."
+            />
           </div>
 
           <div className="space-y-3">

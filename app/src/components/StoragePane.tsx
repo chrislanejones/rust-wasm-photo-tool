@@ -7,6 +7,7 @@
 // aren't wired yet. This is the entry point that lights up once they land.
 import { Server, UploadCloud, Cloud, Lock } from "lucide-react";
 import { PaneHeading } from "@/components/ui/pane-heading";
+import { Button } from "@/components/ui/button";
 
 interface Provider {
   id: string;
@@ -100,14 +101,9 @@ function ProviderRow({ provider }: { provider: Provider }) {
           <div className="truncate text-2xs text-text-muted">{blurb}</div>
         </div>
       </div>
-      <button
-        type="button"
-        disabled
-        title="Coming soon"
-        className="shrink-0 cursor-not-allowed rounded-md border border-border bg-bg-tertiary/40 px-3 py-1.5 text-xs font-medium text-text-muted opacity-60"
-      >
+      <Button variant="secondary" disabled title="Coming soon" className="shrink-0">
         Connect
-      </button>
+      </Button>
     </div>
   );
 }

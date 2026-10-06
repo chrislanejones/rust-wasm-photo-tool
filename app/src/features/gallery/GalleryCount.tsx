@@ -2,8 +2,7 @@
 // "# of # — # max 💡". Its own file because GalleryBar is under the max-lines
 // ratchet and this is the one piece of it that is genuinely self-contained:
 // four props in, no handlers, no state.
-import { Lightbulb } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { TIERS } from "@/lib/tiers";
 
@@ -41,43 +40,38 @@ export function GalleryCount({
                 {/* Lightbulb, not (i). Every other explanation in the app
                     hides behind a lightbulb (`InfoTooltip`, SectionHeader,
                     the compress block right here) — this was the one (i)
-                    left, so it read as a different KIND of affordance. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Why this limit?"
-                      className="text-theme-muted-foreground hover:text-theme-foreground transition"
-                    >
-                      <Lightbulb className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-semibold mb-1.5">
-                      Gallery photos per session
-                    </p>
-                    <ul className="space-y-1 text-xs">
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Logged out</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.demo.galleryLimit}
-                        </span>
-                      </li>
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Logged in</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.loggedIn.galleryLimit}
-                        </span>
-                      </li>
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Paid · {TIERS.paid.tag}</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.paid.galleryLimit}
-                        </span>
-                      </li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
+                    left, so it read as a different KIND of affordance. Now
+                    it is the same primitive, not a copy of it (Night 8). */}
+                <InfoTooltip
+                  label="Gallery limit"
+                  info={
+                    <>
+                      <p className="font-semibold mb-1.5">
+                        Gallery photos per session
+                      </p>
+                      <ul className="space-y-1 text-xs">
+                        <li className="flex items-center justify-between gap-6">
+                          <span>Logged out</span>
+                          <span className="font-mono tabular-nums">
+                            {TIERS.demo.galleryLimit}
+                          </span>
+                        </li>
+                        <li className="flex items-center justify-between gap-6">
+                          <span>Logged in</span>
+                          <span className="font-mono tabular-nums">
+                            {TIERS.loggedIn.galleryLimit}
+                          </span>
+                        </li>
+                        <li className="flex items-center justify-between gap-6">
+                          <span>Paid · {TIERS.paid.tag}</span>
+                          <span className="font-mono tabular-nums">
+                            {TIERS.paid.galleryLimit}
+                          </span>
+                        </li>
+                      </ul>
+                    </>
+                  }
+                />
               </>
             )}
           </>

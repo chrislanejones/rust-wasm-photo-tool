@@ -397,14 +397,14 @@ export function SubscriptionButton({
                     <Spinner className="size-8" aria-label="Loading your plan" />
                   </div>
                 ) : me === null ? (
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-text-muted">
                     Sign in to view and manage your plan.
                   </p>
                 ) : (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-zinc-400">Current plan</span>
-                      <span className="rounded-full bg-zinc-800 px-2 py-0.5 font-semibold capitalize">
+                      <span className="text-text-muted">Current plan</span>
+                      <span className="rounded-full bg-bg-tertiary px-2 py-0.5 font-semibold capitalize">
                         {tier}
                       </span>
                     </div>
@@ -414,7 +414,7 @@ export function SubscriptionButton({
                         <span className="text-sm font-semibold">Pro</span>
                         <span className="text-2xl font-semibold">
                           $10
-                          <span className="text-xs font-normal text-zinc-400">
+                          <span className="text-xs font-normal text-text-muted">
                             /mo
                           </span>
                         </span>
@@ -423,7 +423,7 @@ export function SubscriptionButton({
                         {PRO_FEATURES.map((f) => (
                           <li
                             key={f}
-                            className="flex items-start gap-2 text-2xs text-zinc-300"
+                            className="flex items-start gap-2 text-2xs text-text-secondary"
                           >
                             <Check className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />
                             {f}
@@ -432,11 +432,10 @@ export function SubscriptionButton({
                       </ul>
 
                       {isPaid ? (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => redirect("portal")}
                           disabled={busy !== null}
-                          className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-zinc-800 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-40"
+                          className="mt-4 w-full"
                         >
                           {busy === "portal" ? (
                             <Spinner size={14} />
@@ -444,19 +443,18 @@ export function SubscriptionButton({
                             <ExternalLink className="h-3.5 w-3.5" />
                           )}
                           Manage subscription
-                        </button>
+                        </Button>
                       ) : PAID_SIGNUP_ENABLED ? (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => redirect("checkout")}
                           disabled={busy !== null}
-                          className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-500 disabled:opacity-40"
+                          className="mt-4 w-full"
                         >
                           {busy === "checkout" && (
                             <Spinner size={14} />
                           )}
                           Upgrade to Pro
-                        </button>
+                        </Button>
                       ) : (
                         /* Signup is off (lib/billing.ts). A plain note, not a
                            disabled "Upgrade to Pro" button: a greyed-out

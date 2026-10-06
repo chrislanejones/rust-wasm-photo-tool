@@ -292,7 +292,7 @@ lines.
 | Item | Where | Why it waits |
 |---|---|---|
 | **Light-theme lit tiles fail AA text contrast: 2.24:1.** `ToolButton`'s active state is `text-theme-primary` on `bg-theme-primary/20`; on the light panel that is `#c98f3f` on its own 20% tint. Dark is 8.05:1. Every SELECT tile in the app (Crop's "Free", Stabilizer "Off", Shapes…) | ui/tool-button.tsx `activeCls` | A color change on every tile in both panels and dialogs, which Night 3's stop conditions forbid. The same `--accent` shortfall styles.css already calls "NOT fixed here". Night 5 (color), or a token decision |
-| **20 bare `<kbd>` in 6 files still ride the legacy element rule** (3px radius): ShortcutModal ×3, StatusBar ×1, ToolGrid ×1, LayerSettings ×6, PerspectiveSettings ×1, SelectSettings ×8 | those files; styles.css `kbd {}` | Mechanical move to `ui/kbd`, 1px radius change each. Delete the CSS rule with the last one |
+| ~~**20 bare `<kbd>` in 6 files still ride the legacy element rule** (3px radius)~~ **DONE 10-06-2026 (UI Night 8): every one moved to `ui/kbd`, ReviewPanel's 2 too, and the `kbd {}` rule is deleted.**: ShortcutModal ×3, StatusBar ×1, ToolGrid ×1, LayerSettings ×6, PerspectiveSettings ×1, SelectSettings ×8 | those files; styles.css `kbd {}` | Mechanical move to `ui/kbd`, 1px radius change each. Delete the CSS rule with the last one |
 | **`ToolButtonGroup`'s own `label` prop is a second spelling of `ControlRow`'s label slot**, 12 call sites in 7 files (RulersGridsPane, BatchSettings ×2, LayerSettings, ShapeSettings, TextSettings ×4, CreateAIImagePanel, NewActions ×2) | ui/tool-button-group.tsx | Same look (text-2xs muted, 8px gap), so moving them is pixel-safe; but it is 7 files outside tonight's three. Then the prop can go |
 | **`FieldLabel` is `ControlRow` without the control**, info on the right instead of beside the label; 5 uses in 3 files | ui/field-label.tsx | Folding it changes where the lightbulb sits. A look decision |
 | **The color picker dialog's saved-palette swatches are still silent** — `Swatch` takes a `radio` prop now, and only `ColorSwatchGrid` passes it | ColorPickerDialog.tsx:277 | Same fix as the grid; the dialog is not a tool panel |
@@ -397,7 +397,17 @@ revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
 after a short delay). Reproduce the miss rate first, then change one line and
 re-measure. Isolate the fix before explaining it.
 
-## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+## CLOSED 10-06-2026 — NOT REPRODUCED: the Stamp panel's preset highlight does not survive a sub-mode switch
+
+UI Night 8 reproduced it first, as asked, in the production build: pick
+[APPROVED], switch Create › Clone Stamp, back to Create › Stamps — nothing is
+lit. The same through Create › Emoji. The header switch remounts the panel, so
+the local highlight goes with it. Pinned by `e2e/ui-night8-finish.spec.ts`
+("§4 Stamp"), which reads the lit tile's solid border. The dead
+`onModeChange`/`showModeRow` surface below is still dead; deleting it is a
+separate cleanup.
+
+Original note (09-22-2026, kept for the reasoning):
 
 Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
 `StampSettings`' `handleModeChange` clears the highlighted preset
@@ -4195,3 +4205,15 @@ watching, and two other numbers had moved:
 All fixed in this PR. The R9 one is the serious number: `title` does not appear
 on touch, which is most of the phone surface, and the two densest files
 (`ReviewPanel` 18, `LayerSettings` 16) are the densest panels in the app.
+
+## OPEN — UI Night 8 leftovers (10-06-2026)
+
+| Item | Where | Why it waits |
+| --- | --- | --- |
+| **Fold `FieldLabel` into `ControlRow`?** It moves the lightbulb from the far right to just after the words. Screenshots of both, both themes: `~/ai-repo/night8-finish-shots/fieldlabel/` (`*-now-*` vs `*-folded-*`; color picker Palette and Batch › Crop Keep) | `ui/field-label`, 7 call sites | A look decision — Chris's call, not done unattended |
+| **Light-mode muted text under 4.5:1**, all pre-existing (same count on the build before Night 8): Settings › General descriptions 3.65, the unselected half of a select pair ("Sync off", "15 min") 3.00, the Shortcuts dialog's group titles 2.67 and `+` 3.65, Sync's "Fetching…" 3.83 (dark 4.10). Measured by computed color over the composited background | `--text-muted` on `--bg-secondary`/tertiary, `.shortcut-group-title`, `.shortcut-plus` | A token change touches every muted string in the app; needs a look in both themes |
+| **The chrome radius family**: Tools card, Gallery card, top bar, master bar are `rounded-xl` (12px, Tailwind's, not a house token); modals mix `rounded-2xl`/`xl` | ToolsSidebar, GalleryBar, TopBar, MasterBar, dialog, ResumeContent, UploadDialog, MobileShell | Convert one alone and it is the odd one out; pick the family's radius first (`ui-radius` 22 is mostly these) |
+| **A vertical tab-rail primitive** for the Settings modal (`role="tablist"`, arrow keys) | SubscriptionButton nav | Registered as a raw-button exception until then |
+| **`px-2.5` pair**: ui/status-note's SuccessCallout and AI Rename's warning box share it | status-note.tsx, AIRenamePanel.tsx | Move both together (to px-2 or px-3) |
+| **`ui-spacing` 42** is mostly dialog chrome (`px-5`, `py-2.5`) and the button `large` size's `py-2.5` | ui/dialog, ui/button, TopBar, SubscriptionButton | Each is a primitive; changing it resizes every caller |
+

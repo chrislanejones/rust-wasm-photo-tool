@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ToolSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 interface EffectsSettingsProps {
   settings: ToolSettings;
@@ -147,7 +148,7 @@ export function EffectsSettings({
   };
 
   return (
-    <div className="space-y-3 -mt-2">
+    <ToolPanel>
       <SectionHeader
         title="Adjustments"
         info="Brightness, Contrast, and Blur each latch to the slider's released position — drag again to apply another delta on top. All are undo-able."
@@ -310,6 +311,6 @@ export function EffectsSettings({
         </div>
       )}
 
-    </div>
+    </ToolPanel>
   );
 }

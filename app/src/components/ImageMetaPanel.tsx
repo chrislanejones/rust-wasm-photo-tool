@@ -17,6 +17,7 @@ import { formatBytes } from "@/lib/format";
 import { sha256Hex } from "@/lib/originalsStore";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { parseExifFromImage, type ExifSummary } from "@/lib/exif";
+import { Button } from "@/components/ui/button";
 
 /** Everything the image-meta tab needs about the currently selected photo.
  *  Assembled by AppShell, which is the only place that knows both the gallery
@@ -63,7 +64,10 @@ function Row({
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
+    <Button
+      size="xs"
+      variant="ghost"
+      aria-label="Copy"
       onClick={() => {
         navigator.clipboard?.writeText(value).then(
           () => {
@@ -73,7 +77,6 @@ function CopyButton({ value }: { value: string }) {
           () => {},
         );
       }}
-      className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
       title="Copy"
     >
       {copied ? (
@@ -81,7 +84,7 @@ function CopyButton({ value }: { value: string }) {
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -118,15 +121,17 @@ function HashBox({
         </div>
         <div className="flex items-center gap-0.5">
           {onRefresh && (
-            <button
+            <Button
+              size="xs"
+              variant="ghost"
               onClick={onRefresh}
-              className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
+              aria-label="Recompute"
               title="Recompute"
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${pending ? "spinner-icon" : ""}`}
               />
-            </button>
+            </Button>
           )}
           {hash && <CopyButton value={hash} />}
         </div>

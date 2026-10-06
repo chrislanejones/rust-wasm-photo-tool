@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { MediaTile } from "@/components/MediaTile";
+import { Button } from "@/components/ui/button";
 
 export function ResumeContent({
   photos,
@@ -51,21 +52,19 @@ export function ResumeContent({
         </div>
 
         <div className="flex w-full gap-2 pt-1">
-          <button
-            type="button"
+          {/* The one filled-accent action on this screen. `theme-primary` is
+              the same value as the `--accent` it used to name raw. */}
+          <Button
+            size="large"
             onClick={onResume}
-            className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-foreground)] transition hover:brightness-110"
+            className="flex-1 border-transparent bg-theme-primary text-sm text-theme-primary-foreground hover:border-transparent"
           >
             Resume editing
-          </button>
-          <button
-            type="button"
-            onClick={onStartFresh}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-elevated/70"
-          >
+          </Button>
+          <Button size="large" onClick={onStartFresh} className="flex-1 gap-1.5 text-sm text-text-secondary">
             <Upload className="h-3.5 w-3.5" />
             Start fresh
-          </button>
+          </Button>
         </div>
       </div>
     </div>
