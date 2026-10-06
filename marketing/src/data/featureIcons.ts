@@ -46,7 +46,6 @@ import {
   Palette,
   ScanText,
   CopyPlus,
-  Copy,
   Magnet,
   CircleSmall,
   SquareDashedMousePointer,
@@ -117,8 +116,7 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Sub-tool canvas dispatch": MousePointerClick,
   "Color picker history": Palette,
   OCR: ScanText,
-  "Directional duplicate pad": CopyPlus,
-  "Duplicate from the Reselect row": Copy,
+  "Shape action bar": CopyPlus,
   "Stroke Stabilizer, everywhere": Magnet,
   // Without this the Batch › Crop card renders the fallback dot.
   "Batch Crop": PackageOpen,

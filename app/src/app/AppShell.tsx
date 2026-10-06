@@ -87,7 +87,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
-import { useDuplicatePad } from "./session/useDuplicatePad";
+import { useShapeActions } from "./session/useShapeActions";
 import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { usePenActions } from "./session/usePenActions";
@@ -96,7 +96,7 @@ import { isExportFormat, useDownloadFormat } from "./session/useDownloadFormat";
 import { usePluginDownload } from "./session/usePluginDownload";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
-import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import { ShapeActionsOverlay } from "@/features/canvas/ShapeActionsOverlay";
 import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
 import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
@@ -1603,10 +1603,10 @@ export function AppShell() {
     [stamp, textTool, drawingTools, bumpAnnotations, setSelectedObject],
   );
 
-  // Reselect's Duplicate button and the directional duplicate pad. Handlers
-  // live in the session hook, not here — AppShell is being dismantled
-  // (CLAUDE.md), and the first cut of this handler sat in this file.
-  const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+  // The shape action bar under a selected shape (Apply · Cancel · Duplicate ·
+  // Connect). Handlers live in the session hook, not here — AppShell is being
+  // dismantled (CLAUDE.md).
+  const shapeActions = useShapeActions(stamp, drawingTools);
 
   // #37 — how deep undo can go, shown in the status bar. The op log records 6
   // of the engine's 67 snapshotting operations; the rest fall back to
@@ -1624,15 +1624,15 @@ export function AppShell() {
     `${activePhotoId}:${stamp.state.width}x${stamp.state.height}:${stamp.state.undoCount}:${photoLayerRevision}`,
   );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
-  // ignorant of the pad and the Batch › Bulk frame (and inside its max-lines cap).
+  // ignorant of the shape action bar and the Batch › Bulk frame (and inside its max-lines cap).
   const renderCanvasOverlays = useCallback(
     (frame: OverlayFrame) => (
       <>
-        {duplicatePad.canvasProps && <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} />}
+        {shapeActions.overlay && <ShapeActionsOverlay canvasRef={canvasRef} {...shapeActions.overlay} />}
         <BatchCropOverlay {...frame} photoBounds={photoBounds} undoCount={stamp.state.undoCount} />
       </>
     ),
-    [duplicatePad.canvasProps, photoBounds, stamp.state.undoCount],
+    [shapeActions.overlay, photoBounds, stamp.state.undoCount],
   );
 
   const redStampTool = useRedStampTool({
@@ -3325,9 +3325,6 @@ export function AppShell() {
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
-            onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
-            onToggleDuplicatePad={duplicatePad.togglePad}
-            duplicatePadId={duplicatePad.padId}
             onMoveShape={drawingTools.moveShape}
             userMode={effectiveUserMode}
             layers={stamp.state.layers}
