@@ -396,7 +396,7 @@ Where each flow stands (10-05-2026):
 
 | Flow | Grammar |
 | --- | --- |
-| Gallery thumbnails, import | skeleton-or-photo; pending import tiles |
+| Gallery thumbnails, import | skeleton-or-photo; pending import tiles; the CARD loads like Tools (UI Night 8): past 300 ms with a tile in view empty or an import in flight, the chrome goes skeleton in place and inert, one status, 15 s cap (`GalleryLoadingRegion`, `useGalleryLoading`) |
 | Photo switch | footer + canvas "Loading", panel skeletons; Error toast with Try again; superseded dropped |
 | AI result / background removal | timeouts → Error with Try again |
 | Download (single) | Error toast with Try again |
