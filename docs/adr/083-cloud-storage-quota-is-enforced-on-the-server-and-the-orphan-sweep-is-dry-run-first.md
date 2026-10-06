@@ -1,5 +1,5 @@
 # ADR-083: Cloud storage quota is enforced on the server, and the orphan sweep is dry-run first
-Date: 2026-10-05   Status: draft   Relates to: ADR-084
+Date: 2026-10-05   Status: accepted (10-06-2026)   Relates to: ADR-084
 
 ## Context
 
@@ -71,3 +71,11 @@ cost problem it was paired with did not go away.
 Early warning sign: `_storage` total bytes climbing while `photo_edits` +
 `shares` bytes stay flat, or `crons.ts` still commented out at the next
 release.
+
+## Outcome
+
+| Date | What happened |
+| --- | --- |
+| 2026-10-05 | Shipped in v9.16 (#300). Functions deployed to dev `brave-ant-608` by hand and to prod `pastel-alligator-180` by CI. Every account under its cap at deploy (largest 563.7 MiB on Pro). |
+| 2026-10-06 | Chris chose to run the sweep. A fresh dry run matched the first one exactly (167 orphans, 6,333.7 MiB, scan complete, none too young), then `apply: true` deleted **167 files** on dev. After: 40 files, 40 referenced, 0 orphans. |
+| Still open | The cron line stays commented out, prod has not been swept, and the client's non-aborting 8 s timeout (the leak's root cause) is still parked. Until the client fix lands, a failed backup upload leaves a file for the next sweep. |
