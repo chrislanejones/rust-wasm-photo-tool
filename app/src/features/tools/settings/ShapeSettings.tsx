@@ -150,7 +150,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
     // shape edit, so stroke/color/shape tweaks live-update the overlay.
-    <div className="space-y-3 -mt-2" data-draw-panel>
+    <div data-draw-panel>
       <ToolModeToggle
         modes={SHAPES_TOOL_MODES}
         columns={3}
@@ -406,20 +406,24 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings" | "onChange">) {
   return (
     <div className="space-y-4">
-      <label className="text-2xs font-bold text-theme-muted-foreground">
-        Fill
-      </label>
-      <ToolButtonGroup
-        aria-label="Fill"
-        options={FILL_MODES}
-        value={settings.fillMode ?? "none"}
-        onChange={(id) =>
-          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-        }
-      />
+      {/* A ControlRow, not a bold bare <label> that labeled nothing: 8px to
+          the tiles like every other row, and the group points at the word. */}
+      <ControlRow label="Fill">
+        {({ labelId }) => (
+          <ToolButtonGroup
+            aria-labelledby={labelId}
+            options={FILL_MODES}
+            value={settings.fillMode ?? "none"}
+            onChange={(id) =>
+              onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+            }
+          />
+        )}
+      </ControlRow>
 
       {settings.fillMode === "solid" && (
         <ColorSwatchGrid
+          label="Fill color"
           colors={TEXT_COLORS}
           value={settings.fillColor}
           onChange={(color) => onChange({ ...settings, fillColor: color })}
@@ -428,22 +432,21 @@ function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings
 
       {settings.fillMode === "gradient" && (
         <div className="space-y-4">
-          <div className="space-y-2">
-            <span className="text-2xs text-theme-muted-foreground">From</span>
-            <ColorSwatchGrid
-              colors={TEXT_COLORS}
-              value={settings.fillColor}
-              onChange={(color) => onChange({ ...settings, fillColor: color })}
-            />
-          </div>
-          <div className="space-y-2">
-            <span className="text-2xs text-theme-muted-foreground">To</span>
-            <ColorSwatchGrid
-              colors={TEXT_COLORS}
-              value={settings.fillColor2}
-              onChange={(color) => onChange({ ...settings, fillColor2: color })}
-            />
-          </div>
+          {/* The grid's own label slot, not a span above a grid that also
+              said "Color": two words for one row, and two radio groups both
+              named "Color". */}
+          <ColorSwatchGrid
+            label="From"
+            colors={TEXT_COLORS}
+            value={settings.fillColor}
+            onChange={(color) => onChange({ ...settings, fillColor: color })}
+          />
+          <ColorSwatchGrid
+            label="To"
+            colors={TEXT_COLORS}
+            value={settings.fillColor2}
+            onChange={(color) => onChange({ ...settings, fillColor2: color })}
+          />
           <ControlRow label="Direction">
             {({ labelId }) => (
               <ToolButtonGroup
