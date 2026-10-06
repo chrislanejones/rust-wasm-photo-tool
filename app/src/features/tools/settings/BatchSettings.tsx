@@ -38,6 +38,7 @@ import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { SelectField } from "@/components/ui/select-field";
 import { BatchGroupToggle } from "./BatchGroupToggle";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
+import { Button } from "@/components/ui/button";
 
 /** Batch › Text weight — a two-tile pick, the same group every other
  *  pick-one-of-N control in the panels uses. */
@@ -673,13 +674,13 @@ function BatchToolPanel({
               <p className="text-2xs text-theme-foreground truncate">
                 {logo.width}×{logo.height}
               </p>
-              <button
+              <Button
+                variant="ghost"
                 onClick={clearLogo}
-                className="mt-0.5 inline-flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
-                type="button"
+                className="mt-0.5 gap-1 px-1 py-0 text-2xs"
               >
                 <X className="h-3 w-3" /> Remove
-              </button>
+              </Button>
             </div>
           </div>
         )}

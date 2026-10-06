@@ -20,6 +20,7 @@ import {
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { WINDOW_TITLE } from "@/lib/styles";
 import { SUBSYSTEM_COLOR } from "@/components/subsystemColors";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   open: boolean;
@@ -87,13 +88,14 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                 onChange={setTab}
               />
               {tab === "telemetry" && (
-                <button
+                <Button
+                  variant="ghost"
                   onClick={clearDiagnostics}
-                  className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+                  className="gap-1 px-2 py-1"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Clear
-                </button>
+                </Button>
               )}
             </div>
           </div>

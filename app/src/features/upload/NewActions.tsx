@@ -506,26 +506,29 @@ export function NewActions({
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setTransparent((t) => !t)}
-                  aria-pressed={transparent}
-                  className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
-                    transparent
-                      ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-                      : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
-                  }`}
-                >
-                  <span
-                    className="h-3.5 w-3.5 rounded-sm border border-border"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 75%, transparent 75%)",
-                      backgroundSize: "6px 6px",
-                    }}
+                {/* One binary with no visible pair: a SWITCH (UI_CONSISTENCY §7),
+                    not a hand-rolled pressed button. */}
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="blank-transparent-switch"
+                    className="flex cursor-pointer items-center gap-2 text-xs text-theme-muted-foreground"
+                    >
+                    <span
+                      className="h-3.5 w-3.5 rounded-sm border border-border"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 75%, transparent 75%)",
+                        backgroundSize: "6px 6px",
+                      }}
+                    />
+                    Transparent background
+                  </label>
+                  <Switch
+                    id="blank-transparent-switch"
+                    checked={transparent}
+                    onCheckedChange={setTransparent}
                   />
-                  Transparent background
-                </button>
+                </div>
 
                 {/* Back is in the PaneHeader; the bottom row is the one
                     commit, in the tool panels' Apply Crop button. */}

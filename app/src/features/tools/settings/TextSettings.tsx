@@ -22,6 +22,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 import { SelectField } from "@/components/ui/select-field";
 import { ErrorNote } from "@/components/ui/status-note";
+import { Button } from "@/components/ui/button";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -426,11 +427,14 @@ export function TextSettings({
                 </p>
               </div>
             )}
-            <button
-              type="button"
+            {/* ui/button, not the purple hand-rolled one it was: purple is in
+                no theme token, and AISettings retired the same pair for the
+                same reason (they "read as a different app"). */}
+            <Button
+              size="large"
               onClick={runOcrJob}
               disabled={!canRunOcr || ocrBusy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full"
             >
               {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
               {ocrBusy && <Spinner size={14} />}
@@ -439,7 +443,7 @@ export function TextSettings({
                 : ocrPhase === "running"
                   ? "Reading text..."
                   : "Extract Text"}
-            </button>
+            </Button>
             {ocrError && (
               <ErrorNote>{ocrError}</ErrorNote>
             )}
@@ -451,14 +455,14 @@ export function TextSettings({
                       <span className="text-2xs text-theme-muted-foreground">
                         Extracted text
                       </span>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={copyOcrText}
-                        className="flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
+                        className="gap-1 px-1 py-0 text-2xs"
                       >
                         <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
-                      </button>
+                      </Button>
                     </div>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-theme-sidebar-border p-2 text-2xs text-theme-foreground leading-relaxed">
                       {textResult}

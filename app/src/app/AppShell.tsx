@@ -2468,7 +2468,7 @@ export function AppShell() {
               setShowTools(false);
               setShowHistory(false);
             }}
-            className="fixed inset-0 z-[20] bg-black/40"
+            className="fixed inset-0 z-[var(--z-scrim)] bg-black/40"
           />
         )}
       </AnimatePresence>
@@ -3066,14 +3066,14 @@ export function AppShell() {
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/95 text-center text-theme-muted-foreground">
+                        <div className="absolute inset-0 z-[var(--z-canvas-overlay)] flex flex-col items-center justify-center gap-3 bg-background/95 text-center text-theme-muted-foreground">
                           <ImagePlus className="h-10 w-10 opacity-60" />
                           <p className="text-sm font-semibold">No photos loaded</p>
                           <p className="text-xs">Upload images to start batch editing</p>
                         </div>
                       )}
                       {activePhotoId && photos.length > 0 && (
-                        <div className="absolute top-2 left-2 z-20 rounded-full bg-orange-500 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-white shadow-md">
+                        <div className="absolute top-2 left-2 z-[var(--z-compare)] rounded-full bg-orange-500 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-white shadow-md">
                           Selected
                         </div>
                       )}

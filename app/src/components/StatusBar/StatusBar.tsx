@@ -17,6 +17,7 @@ import { useSaveStatus } from "@/lib/saveStatus";
 import { retrySync, useSyncStatus } from "@/lib/sync/status";
 import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
+import { Button } from "@/components/ui/button";
 
 export interface ShortcutHint {
   keys: string;
@@ -271,14 +272,14 @@ export function StatusBar({
                   not retried on a timer and would be refused again, so a
                   Retry there would be a button that does nothing. */}
               {sync.willRetry && (
-                <button
-                  type="button"
+                <Button
+                  variant="link"
                   data-testid="status-sync-retry"
                   onClick={() => retrySync()}
-                  className="ml-1 rounded-sm px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
+                  className="ml-1 rounded-sm px-1 text-2xs font-semibold hover:text-theme-foreground"
                 >
                   Retry
-                </button>
+                </Button>
               )}
             </span>
             <span className="status-divider" />
