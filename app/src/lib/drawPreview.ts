@@ -154,3 +154,23 @@ export function drawShapePreview(
     ctx.stroke();
   }
 }
+
+/** The crop rubber band: everything outside `r` dimmed, `r` outlined with a
+ *  dashed white line. Draws over the whole preview surface (`ctx.canvas`). */
+export function drawCropPreview(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+) {
+  const { width, height } = ctx.canvas;
+  const { x, y, w, h } = r;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, width, y);
+  ctx.fillRect(0, y + h, width, height - (y + h));
+  ctx.fillRect(0, y, x, h);
+  ctx.fillRect(x + w, y, width - (x + w), h);
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([5, 5]);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]);
+}
