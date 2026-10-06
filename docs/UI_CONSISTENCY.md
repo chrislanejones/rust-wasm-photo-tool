@@ -239,6 +239,14 @@ short (`rounded-r-full` read as `rounded-r`). Proven both ways: a real
 `<button className="rounded p-5">` turns all three red; the same text in a
 comment, or as a sentence, moves none of them.
 
+**Night 8 (10-06-2026): paid down.** `ui-spacing` 51 → **42**, `ui-radius` 50
+→ **22**, `ui-raw-button` 32 → **14**. The 18 bare `rounded` were renamed to
+`rounded-sm` (same 4px, proven 0 px element by element); six more hits were
+not radius at all but the Text tool's corner-preset VALUES, which the counter
+now reads as values. The 14 raw buttons left are each registered in
+[UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) §5, and `unregistered-raw-button`
+(baseline 0) fails on one that is not.
+
 R7 was already a ratchet (`z-index`). Its GalleryBar exclusion was reviewed and
 kept — see UI_EXCEPTIONS.md. The raw-button count had grown 34 → 37 since
 Night 3, all in Night 6, while nothing was watching it; that is the argument
@@ -324,6 +332,27 @@ the swatches and the "+" still wrap as one row; Chromium keeps the role
 **Focus (R8):** a range input's only keyboard focus cue was a 15%-alpha thumb
 halo, 1.14:1 on the light panel and 1.47:1 on the dark. Ranges now get the
 house dashed ring on `:focus-visible` (styles.css).
+
+**Night 8 (10-06-2026): the remaining panels.** Same probe, 1280, both
+themes, identical in each. "First row" is the frame's first row against the
+body's top; rows are the frame's own gaps; label → control is every
+ControlRow (and the SectionHeader → next row where a section starts).
+
+| Panel | Before | After |
+| --- | --- | --- |
+| Adjustments | no frame · −8 · 12 · 8 | frame · 0 · 16 · 8 |
+| Levels | no frame · −8 · 12 · 8 | frame · 0 · 16 · 8 (+ the Curve row, §9 dot) |
+| Presets | no frame · −8 · 12 | frame · 0 · 16 |
+| Resize & Compress | content at +2 (−8 then +10) | content at 0; 32px between its three groups kept on purpose |
+| Layers / Canvas Size / Guides | no frame · −8 · Canvas 12 to its control, Layer label 4 | frame · 0 · 8 everywhere |
+| Select, Perspective, Stamp | already on it | unchanged (bare `<kbd>` → `Kbd`) |
+| Text | no frame · 0 · 20 · Font Family 16 | frame · 0 · 16 · 8 |
+| Batch (5 tools) | 12 / 20 / 24 per tool, `pt-1` nudges | one 16 |
+| Shapes | −8 · Fill label 4 | 0 · 8 |
+
+Pinned by `e2e/ui-night8-finish.spec.ts` on 14 panels (in CI).
+`ToolButtonGroup` has no `label` any more: ControlRow's slot is the one place
+a control's words go.
 
 **390px has no tool panels.** Phone width is the "Mobile version" (upload and
 download only). The panel's small-window surface is 960px dock mode, which the

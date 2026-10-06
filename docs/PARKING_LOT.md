@@ -4205,3 +4205,15 @@ watching, and two other numbers had moved:
 All fixed in this PR. The R9 one is the serious number: `title` does not appear
 on touch, which is most of the phone surface, and the two densest files
 (`ReviewPanel` 18, `LayerSettings` 16) are the densest panels in the app.
+
+## OPEN — UI Night 8 leftovers (10-06-2026)
+
+| Item | Where | Why it waits |
+| --- | --- | --- |
+| **Fold `FieldLabel` into `ControlRow`?** It moves the lightbulb from the far right to just after the words. Screenshots of both, both themes: `~/ai-repo/night8-finish-shots/fieldlabel/` (`*-now-*` vs `*-folded-*`; color picker Palette and Batch › Crop Keep) | `ui/field-label`, 7 call sites | A look decision — Chris's call, not done unattended |
+| **Light-mode muted text under 4.5:1**, all pre-existing (same count on the build before Night 8): Settings › General descriptions 3.65, the unselected half of a select pair ("Sync off", "15 min") 3.00, the Shortcuts dialog's group titles 2.67 and `+` 3.65, Sync's "Fetching…" 3.83 (dark 4.10). Measured by computed color over the composited background | `--text-muted` on `--bg-secondary`/tertiary, `.shortcut-group-title`, `.shortcut-plus` | A token change touches every muted string in the app; needs a look in both themes |
+| **The chrome radius family**: Tools card, Gallery card, top bar, master bar are `rounded-xl` (12px, Tailwind's, not a house token); modals mix `rounded-2xl`/`xl` | ToolsSidebar, GalleryBar, TopBar, MasterBar, dialog, ResumeContent, UploadDialog, MobileShell | Convert one alone and it is the odd one out; pick the family's radius first (`ui-radius` 22 is mostly these) |
+| **A vertical tab-rail primitive** for the Settings modal (`role="tablist"`, arrow keys) | SubscriptionButton nav | Registered as a raw-button exception until then |
+| **`px-2.5` pair**: ui/status-note's SuccessCallout and AI Rename's warning box share it | status-note.tsx, AIRenamePanel.tsx | Move both together (to px-2 or px-3) |
+| **`ui-spacing` 42** is mostly dialog chrome (`px-5`, `py-2.5`) and the button `large` size's `py-2.5` | ui/dialog, ui/button, TopBar, SubscriptionButton | Each is a primitive; changing it resizes every caller |
+
