@@ -6,6 +6,7 @@ import {
   UserButton,
 } from "@clerk/clerk-react";
 import { User } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { MediaTile } from "@/components/MediaTile";
 import { CLOUD_CONFIGURED } from "@/lib/cloud";
@@ -17,13 +18,20 @@ import { CLOUD_CONFIGURED } from "@/lib/cloud";
  *  master bar's cog/user cluster), so the button must be transparent at rest
  *  and let the pill's `bg-bg-tertiary` through. Default false, because the two
  *  OTHER render sites — the upload dialog and the Settings modal — have no pill
- *  and still need `standalone`'s own fill or they read as a bare glyph. */
+ *  and still need `standalone`'s own fill or they read as a bare glyph.
+ *
+ *  `labeled` → signed out, a text "Sign in" button rather than a bare person
+ *  glyph. The Settings footer uses it (Chris, 10-05-2026): the icon alone, at
+ *  the footer's left beside two large text buttons, read as decoration and he
+ *  could not find where to sign in. */
 export function UserMenu({
   large = false,
   grouped = false,
+  labeled = false,
 }: {
   large?: boolean;
   grouped?: boolean;
+  labeled?: boolean;
 }) {
   // No ClerkProvider in a keyless build, and Clerk's components throw without
   // one — there is nothing to sign in to, so there is nothing to draw.
@@ -46,7 +54,12 @@ export function UserMenu({
       </SignedIn>
       <SignedOut>
         <SignInButton mode="modal">
-          {large ? (
+          {labeled ? (
+            <Button size="large" title="Sign in to save your work">
+              <User aria-hidden />
+              Sign in
+            </Button>
+          ) : large ? (
             <MediaTile
               icon={User}
               onClick={() => {}}
