@@ -135,3 +135,63 @@ test("§4 Stamp: a picked preset is not still lit after Stamps › Clone Stamp �
   await openTool(page, "Create", "Stamps");
   await expect.poll(() => litStamps(page)).toBe(0);
 });
+
+// ── §4 the panel grammar, measured ──────────────────────────────────────────
+// docs/UI_CONSISTENCY.md §8: the ToolPanel frame; its first row at the top of
+// the scrolling body (no -mt-2 tuck); 16px between the frame's rows; 8px from
+// a ControlRow's label to its control. Measured in one evaluate so nothing
+// moves between reads.
+async function grammar(page: Page) {
+  return page.evaluate(() => {
+    const region = document.querySelector('[role="region"][aria-label="Tool options"]')!;
+    const body = region.querySelector<HTMLElement>(".overflow-y-auto")!;
+    const r = (el: Element) => el.getBoundingClientRect();
+    const vis = (el: Element) => r(el).width > 0 && r(el).height > 0;
+    const bodyTop = r(body).top + parseFloat(getComputedStyle(body).paddingTop) - body.scrollTop;
+    const frame = body.querySelector('[data-slot="tool-panel"]');
+    const kids = frame ? [...frame.children].filter(vis) : [];
+    const gaps = kids.slice(1).map((k, i) => Math.round(r(k).top - r(kids[i]).bottom));
+    const rows = [...body.querySelectorAll('[data-slot="control-row"]')].filter(vis).map((row) => {
+      const ctl = row.querySelector('[data-slot="control"]')!;
+      return Math.round(r(ctl).top - r(row.firstElementChild!).bottom);
+    });
+    return {
+      frame: !!frame,
+      firstRow: kids[0] ? Math.round(r(kids[0]).top - bodyTop) : null,
+      gaps: [...new Set(gaps)],
+      labelToControl: [...new Set(rows)],
+    };
+  });
+}
+
+const GRAMMAR_PANELS: [string, string][] = [
+  ["Enhance", "Adjustments"],
+  ["Enhance", "Levels"],
+  ["Enhance", "Presets"],
+  ["Edit", "Layers"],
+  ["Edit", "Canvas Size"],
+  ["Edit", "Guides"],
+  ["Select", "Magic Wand"],
+  ["Edit", "Perspective"],
+  ["Create", "Stamps"],
+  ["Create", "Text"],
+  ["Create", "Shapes"],
+  ["Batch", "Logo"],
+  ["Batch", "Text"],
+  ["Batch", "Crop"],
+];
+
+test("§4 every converted panel measures on the grammar: frame, first row at 0, 16px rows, 8px label → control", async ({ page }) => {
+  const off: string[] = [];
+  for (const [g, s] of GRAMMAR_PANELS) {
+    await openTool(page, g, s);
+    const m = await grammar(page);
+    const ok =
+      m.frame &&
+      m.firstRow === 0 &&
+      m.gaps.every((x) => x === 16) &&
+      m.labelToControl.every((x) => x === 8);
+    if (!ok) off.push(`${g} › ${s}: ${JSON.stringify(m)}`);
+  }
+  expect(off, off.join("\n")).toEqual([]);
+});
