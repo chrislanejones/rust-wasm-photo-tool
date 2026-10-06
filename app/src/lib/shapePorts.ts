@@ -274,7 +274,7 @@ export interface ArrowEnds {
 /** How near an arrow end must sit to a port to count as attached, IMAGE px.
  *  Connectors are written exactly on the port, so this only absorbs float
  *  round-trips through the engine's JSON. */
-export const ATTACH_TOL = 0.75;
+const ATTACH_TOL = 0.75;
 
 /** One arrow end sitting on one of `shape`'s ports. `end` 0 is the arrow's
  *  tail (`x0,y0`), 1 its head (`x1,y1`). */
@@ -314,7 +314,7 @@ export function attachedEnds(
  * attached, and arrows whose ends would not move, are left out, so an empty
  * list means "nothing to re-route".
  */
-export function reroutedConnectors(
+function reroutedConnectors(
   before: PortTarget,
   after: PortTarget,
   arrows: readonly ArrowEnds[],

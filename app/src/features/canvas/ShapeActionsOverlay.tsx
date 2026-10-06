@@ -29,6 +29,7 @@ import {
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
 import type { DrawEditState } from "@/hooks/useDrawingTools";
+import { Button } from "@/components/ui/button";
 import {
   GAP_MAX,
   GAP_STEP,
@@ -269,9 +270,11 @@ export function ShapeActionsOverlay({
         connections.map((c) => {
           const at = toScreen(onOutline(PORTS.find((p) => p.id === c.port)!));
           return (
-            <button
+            // The shared Button, not a raw <button> (ui-raw-button ratchet):
+            // the inline style below still owns the canvas-fixed look.
+            <Button
               key={`${c.arrowId}-${c.end}`}
-              type="button"
+              size="tiny"
               data-disconnect={c.arrowId}
               aria-label="Disconnect — delete this connector"
               title="Disconnect — delete this connector"
@@ -302,7 +305,7 @@ export function ShapeActionsOverlay({
               }}
             >
               <X size={11} strokeWidth={3} aria-hidden="true" />
-            </button>
+            </Button>
           );
         })}
 
