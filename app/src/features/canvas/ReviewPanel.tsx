@@ -81,12 +81,6 @@ interface Props {
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
   onDeleteObject: (o: ReselectObject) => void;
-  /** Duplicate a placed object from its Reselect row. */
-  onDuplicateObject: (o: ReselectObject) => void;
-  /** Open/close the directional duplicate pad for a rect/circle row. */
-  onToggleDuplicatePad: (o: ReselectObject) => void;
-  /** Which shape's pad is open, so its row reads pressed. */
-  duplicatePadId: number | null;
   /** ▲/▼ on a SHAPE row → restack it (text has no draw order). Optional so
    *  callers without shape z-order (tests, older composition) still render. */
   onMoveShape?: (id: number, dir: ZMove) => void | boolean | Promise<boolean>;
@@ -211,9 +205,6 @@ export function ReviewPanel({
   objects,
   onSelectObject,
   onDeleteObject,
-  onDuplicateObject,
-  onToggleDuplicatePad,
-  duplicatePadId,
   onMoveShape,
   userMode,
   layers,
@@ -438,7 +429,7 @@ export function ReviewPanel({
               {objects.length === 0 && (
                 <div className="history-empty">
                   <span className="large-badge">
-                    Add text or a shape to reselect, delete, or duplicate it
+                    Add text or a shape to reselect or delete it
                   </span>
                 </div>
               )}
@@ -456,18 +447,9 @@ export function ReviewPanel({
                     label={o.label}
                     onSelect={() => onSelectObject(o)}
                     onDelete={() => onDeleteObject(o)}
-                    onDuplicate={() => onDuplicateObject(o)}
-                    duplicateLabel={`Duplicate ${o.label}`}
-                    // Rect (0) and circle (1) get the live pad; everything
-                    // else keeps the disabled placeholder so the row shape
-                    // stays constant down the list.
-                    onDirectional={
-                      o.type === "shape" && (o.kind === 0 || o.kind === 1)
-                        ? () => onToggleDuplicatePad(o)
-                        : undefined
-                    }
-                    directionalActive={o.type === "shape" && o.id === duplicatePadId}
-                    showDirectional
+                    // No Duplicate or d-pad here any more: select the shape
+                    // and the action bar under it duplicates and connects
+                    // (ShapeActionsOverlay).
                     title={`Reselect ${o.label}`}
                     deleteLabel={`Delete ${o.label}`}
                     onMoveUp={

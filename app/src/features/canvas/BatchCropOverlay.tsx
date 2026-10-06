@@ -6,7 +6,7 @@
 // shade what Enter / "Crop All" will cut (BatchCropThumbShade), and the
 // frame becomes the one every photo without its own framing follows.
 //
-// Mounted through CanvasArea's `renderOverlay` like DuplicatePadOverlay, and
+// Mounted through CanvasArea's `renderOverlay` like ShapeActionsOverlay, and
 // positioned the same way: a box the size of the canvas's fit-scaled CSS box,
 // riding the same pan/zoom transform, so percentages land on image pixels.
 // The frame is measured in PHOTO px (inside `photoBounds`), not document px,

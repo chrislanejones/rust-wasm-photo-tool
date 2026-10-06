@@ -215,8 +215,10 @@ export default tseslint.config(
     // `shapeKindLabel` (perspectiveTarget.ts), which also names the triangle.
     // 3528 -> 3396 (Plan C §3): Download All / ZIP moved to
     // app/session/useZipExport.ts on the async grammar.
+    // 3396 -> 3392: the Reselect d-pad left with useDuplicatePad; the shape
+    // action bar mounts as one line (app/session/useShapeActions.ts).
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3396 }] },
+    rules: { "max-lines": ["error", { max: 3392 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
