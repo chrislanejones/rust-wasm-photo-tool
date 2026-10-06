@@ -4,6 +4,18 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — UI Night 8 PR 1 leftovers: three things the gallery skeleton work surfaced (10-06-2026)
+
+Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
+All three are on master as well — checked against a master build — so none is
+in that diff.
+
+| What | Where | Notes |
+| --- | --- | --- |
+| The docked vertical gallery's tiles OVERLAP with 12 photos at 1000×800 | `GalleryBar` vertical grid | Rows measure ~61 px for ~87 px tiles, so each row covers the one above. Same picture on a master build. |
+| Hovering the gallery BAR shows every tile's Remove and Select buttons | `Thumb` uses `group-hover:`, and the bar's own wrapper is also `.group` (for its close button) | Tailwind's `group-hover` matches ANY `.group` ancestor. Needs a named group (`group/tile`). |
+| `gallery-loading-state` G1 fails about 1 run in 2 on master too | `e2e/gallery-loading-state.spec.ts:70` | "the mark sits on a gallery tile: Received null" at 30× CPU. Already known as flaky under load; measured 1/2 on master and 1/2 on the branch. |
+
 ## FIXED 10-05-2026 — five main-suite e2e specs were red on master (10-05-2026)
 
 Fixed on `fix/e2e-red-on-master`, and all five now run in CI. One was a real

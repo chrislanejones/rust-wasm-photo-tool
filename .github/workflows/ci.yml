@@ -509,6 +509,7 @@ jobs:
           e2e/batch-exceptions.spec.ts
           e2e/batch-crop-frame.spec.ts
           e2e/import-skeleton.spec.ts
+          e2e/gallery-skeleton-region.spec.ts
           e2e/async-dropped.spec.ts
           e2e/zip-export.spec.ts
           e2e/ora-import-status.spec.ts

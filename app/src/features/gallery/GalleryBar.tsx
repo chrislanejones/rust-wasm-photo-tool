@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { PendingImportTile } from "./PendingImportTile";
+import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
+import { useGalleryLoading } from "./useGalleryLoading";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
@@ -375,23 +377,27 @@ export function GalleryBar({
 
   // ONE busy flag for the gallery. Thirty tiles each announcing "Loading" is a
   // screen reader reading out a list of boxes, which is why the tile
-  // placeholders are `decorative` and this is the only thing that speaks.
-  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  // placeholders are `decorative` and the strip's aria-busy plus the region's
+  // one status are the only things that speak.
   // Files still being opened by an import — drawn as skeleton tiles after the
   // real ones, and part of the gallery's one aria-busy.
   const pendingImports = useGalleryStore((s) => s.pendingImports);
-  const reportPending = useCallback((id: string, pending: boolean) => {
-    setPendingIds((prev) => {
-      // Returning `prev` unchanged when nothing moved matters: this is called
-      // from a tile effect on every decode, and a fresh Set every time would
-      // re-render the whole gallery per tile.
-      if (prev.has(id) === pending) return prev;
-      const next = new Set(prev);
-      if (pending) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
+  // The card loads like Tools: past 300 ms with a tile in view still empty (or
+  // an import in flight) the chrome goes skeleton in place and inert.
+  const gallery = useGalleryLoading({
+    itemIds: photos.map((p) => p.id),
+    pendingImports: pendingImports.length,
+  });
+  const chromeInert = gallery.loading || undefined;
+  // The strip is both the scroll target (stripRef) and the observer root.
+  const { setRoot } = gallery;
+  const stripRefCallback = useCallback(
+    (el: HTMLDivElement | null) => {
+      stripRef.current = el;
+      setRoot(el);
+    },
+    [setRoot],
+  );
 
   if (photos.length === 0) return null;
 
@@ -429,8 +435,10 @@ export function GalleryBar({
             toggle brings it back. The docked (vertical) form is closed from the
             master bar's tabs instead. */}
         {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
-        <div className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
+        <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
           <div
+            inert={chromeInert}
+            data-gallery-chrome=""
             className={
               vertical
                 ? // Divider + padding so the photos never crowd the count/actions
@@ -505,6 +513,8 @@ export function GalleryBar({
           >
             <Button
               size="tiny"
+              inert={chromeInert}
+              data-gallery-chrome=""
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -524,8 +534,9 @@ export function GalleryBar({
             </Button>
 
             <div
-              ref={stripRef}
-              aria-busy={pendingIds.size > 0 || pendingImports.length > 0}
+              ref={stripRefCallback}
+              aria-busy={gallery.busy}
+              data-skeleton-skip
               className={
                 vertical
                   ? // Two thumbs per row, with breathing room between tiles + above.
@@ -584,7 +595,7 @@ export function GalleryBar({
                 <Thumb
                   key={entry.id}
                   entry={entry}
-                  onPendingChange={reportPending}
+                  onPendingChange={gallery.reportPending}
                   loading={switching && entry.id === activeId}
                   index={i}
                   isActive={entry.id === activeId}
@@ -620,6 +631,8 @@ export function GalleryBar({
 
             <Button
               size="tiny"
+              inert={chromeInert}
+              data-gallery-chrome=""
               onClick={() =>
                 stripRef.current?.scrollBy(
                   vertical
@@ -641,7 +654,7 @@ export function GalleryBar({
 
           {/* Vertical (master bar): the count readout is pinned to the bottom. */}
           {vertical && (
-            <div className="mt-3 flex justify-center border-t border-border pt-3">
+            <div inert={chromeInert} data-gallery-chrome="" className="mt-3 flex justify-center border-t border-border pt-3">
               <GalleryCount
                 selectionActive={selectionActive}
                 selectedCount={selectedIds.size}
@@ -650,7 +663,7 @@ export function GalleryBar({
               />
             </div>
           )}
-        </div>
+        </GalleryLoadingRegion>
       </motion.div>
     </motion.div>
   );

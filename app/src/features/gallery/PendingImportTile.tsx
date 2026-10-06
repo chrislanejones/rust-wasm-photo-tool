@@ -4,9 +4,13 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 import { THUMB_SKELETON_DELAY_MS } from "./useThumbImage";
+import { useGalleryRegionLoading } from "./useGalleryLoading";
 
 export function PendingImportTile({ name, vertical }: { name: string; vertical?: boolean }) {
-  const show = useDelayedFlag(true, THUMB_SKELETON_DELAY_MS);
+  // While the card is loading this is a skeleton at once, like every other
+  // empty tile — the card has already waited out the grace.
+  const regionLoading = useGalleryRegionLoading();
+  const show = useDelayedFlag(true, THUMB_SKELETON_DELAY_MS) || regionLoading;
   return (
     <div
       data-testid="pending-import"

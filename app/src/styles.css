@@ -743,39 +743,50 @@ html.reduce-motion .per-photo-name-flash {
   animation-duration: 400ms !important;
 }
 
-/* The slow-switch SKELETON, in place: a switch that takes over 300 ms turns
-   the panel's controls into muted blocks WITHOUT replacing them, so every box
-   keeps its exact size and nothing moves when the new photo's values arrive
-   (layout shift is the bug skeletons exist to prevent). The region is `inert`
-   while this shows.
+/* The SKELETON REGION, in place: a region that is waiting turns its controls
+   into muted blocks WITHOUT replacing them, so every box keeps its exact size
+   and nothing moves when the real values arrive (layout shift is the bug
+   skeletons exist to prevent). The region is `inert` while this shows.
+
+   ONE rule, ONE shimmer, ONE reduced-motion opt-out, for two users:
+     · `PerPhotoRegion` — a per-photo Tools panel through a slow photo switch.
+     · `GalleryLoadingRegion` — the gallery card while tiles in view are empty
+       (UI Night 8 §1). Its strip carries `data-skeleton-skip`: the tiles have
+       their own skeleton-or-photo rule and a decoded photo must stay a photo.
+   The skip is wrapped in `:where()` so it adds NO specificity — the rule wins
+   exactly the fights it won before the gallery joined, so Tools looks the same.
+
+   `[data-switch-skeleton]` is the old name, kept as an ALIAS because
+   e2e/photo-switch-cue.spec.ts still observes and plants it. Drop it from
+   these selectors (and from PerPhotoRegion) when that spec moves.
 
    The photo line used to need carving back out of this by name
    (`> :not(.per-photo-name)`), because it lived inside the region and had to
    stay readable through the switch it was announcing. It is the CARD's footer
    now, outside the region entirely, so the exception is gone rather than
    merely unused — structure doing what a `:not()` was doing. */
-[data-switch-skeleton] {
+:is([data-skeleton-region], [data-switch-skeleton]) {
   position: relative;
   isolation: isolate;
 }
-[data-switch-skeleton]
-  > * :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4) {
+:is([data-skeleton-region], [data-switch-skeleton])
+  > * :is(p, span, label, output, button, input, select, textarea, a, h2, h3, h4):where(:not([data-skeleton-skip], [data-skeleton-skip] *)) {
   color: transparent !important;
   border-color: transparent !important;
   background: var(--muted) !important;
   box-shadow: none !important;
   border-radius: 4px;
 }
-[data-switch-skeleton] > * :is(svg, img, canvas) {
+:is([data-skeleton-region], [data-switch-skeleton]) > * :is(svg, img, canvas):where(:not([data-skeleton-skip] *)) {
   opacity: 0;
 }
-[data-switch-skeleton] input[type="range"]::-webkit-slider-thumb {
+:is([data-skeleton-region], [data-switch-skeleton]) input[type="range"]::-webkit-slider-thumb {
   opacity: 0;
 }
-[data-switch-skeleton] input[type="range"]::-moz-range-thumb {
+:is([data-skeleton-region], [data-switch-skeleton]) input[type="range"]::-moz-range-thumb {
   opacity: 0;
 }
-[data-switch-skeleton]::after {
+:is([data-skeleton-region], [data-switch-skeleton])::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -785,11 +796,23 @@ html.reduce-motion .per-photo-name-flash {
   animation: skeleton-shimmer 1.6s var(--ease-standard) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-switch-skeleton]::after {
+  :is([data-skeleton-region], [data-switch-skeleton])::after {
     display: none;
   }
 }
-html.reduce-motion [data-switch-skeleton]::after {
+html.reduce-motion :is([data-skeleton-region], [data-switch-skeleton])::after {
+  display: none;
+}
+/* The gallery card: its ONE sweep crosses the tiles too, so a tile skeleton's
+   own sweep would be a second shimmer at a different speed — off inside it.
+   The card clips the sweep to its own rounded box; without this the band
+   travels out over the canvas. `overflow: clip` is not a scroll container, so
+   nothing inside changes size. */
+[data-skeleton-region="gallery"] {
+  overflow: clip;
+  border-radius: inherit;
+}
+[data-skeleton-region="gallery"] .skeleton::after {
   display: none;
 }
 
