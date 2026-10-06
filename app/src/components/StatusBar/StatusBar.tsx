@@ -275,7 +275,7 @@ export function StatusBar({
                   type="button"
                   data-testid="status-sync-retry"
                   onClick={() => retrySync()}
-                  className="ml-1 rounded px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
+                  className="ml-1 rounded-sm px-1 font-semibold underline underline-offset-2 hover:text-theme-foreground focus-visible:ring-2 focus-visible:ring-theme-primary"
                 >
                   Retry
                 </button>

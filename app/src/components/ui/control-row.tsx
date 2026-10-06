@@ -95,7 +95,7 @@ export function ControlRow({ label, info, value, reason, edited, children, class
               disabled={edited.disabled}
               aria-label={`Reset ${label}`}
               title={`Reset ${label}`}
-              className="flex size-4 items-center justify-center rounded text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40"
+              className="flex size-4 items-center justify-center rounded-sm text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40"
             >
               <RotateCcw aria-hidden className="size-3" />
             </button>

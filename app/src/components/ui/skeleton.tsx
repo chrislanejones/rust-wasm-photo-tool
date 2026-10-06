@@ -30,7 +30,7 @@ const skeletonVariants = cva(SKELETON_BASE, {
       /** Avatars / circular thumbnails. */
       circle: "rounded-full",
       /** A single line of text (≈ one line-height tall, full width). */
-      text: "h-[0.85em] rounded",
+      text: "h-[0.85em] rounded-sm",
       /** The three shapes of the skeleton plan (§4.1). `line`: a label, a
        *  value, a line of text. `block`: a slider track, a button, an input.
        *  `tile`: a thumbnail, a canvas, an image. The caller still sizes it

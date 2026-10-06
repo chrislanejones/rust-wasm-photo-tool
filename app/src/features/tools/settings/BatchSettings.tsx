@@ -661,7 +661,7 @@ function BatchToolPanel({
           </div>
         ) : (
           <div className="flex items-center gap-3 rounded-xl border border-border bg-theme-muted/20 px-3 py-2">
-            <div className="checkerboard flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded">
+            <div className="checkerboard flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-sm">
               <img
                 src={logo.previewUrl}
                 alt="logo preview"

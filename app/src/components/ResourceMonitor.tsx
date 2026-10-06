@@ -130,7 +130,7 @@ function ThreadedBlurBenchRow() {
           type="button"
           onClick={run}
           disabled={state.status === "running"}
-          className="rounded border border-border px-2 py-0.5 text-text-secondary hover:bg-card/50 disabled:opacity-50"
+          className="rounded-sm border border-border px-2 py-0.5 text-text-secondary hover:bg-card/50 disabled:opacity-50"
         >
           {state.status === "running" ? "Running…" : "Run bench"}
         </button>
@@ -197,7 +197,7 @@ export function ResourceMonitor({
       <div className="flex items-center justify-end">
         <button
           onClick={onRefresh}
-          className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+          className="flex items-center gap-1 rounded-sm px-2 py-1 text-2xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh

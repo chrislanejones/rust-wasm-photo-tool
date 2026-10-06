@@ -334,7 +334,7 @@ export function TransformCropSettings({
                     label={
                       <span className="inline-flex items-center gap-2">
                         <span
-                          className="h-3.5 w-3.5 rounded border border-theme-muted shrink-0"
+                          className="h-3.5 w-3.5 rounded-sm border border-theme-muted shrink-0"
                           style={{ backgroundColor: hex }}
                         />
                         <span className="font-mono uppercase">{hex}</span>

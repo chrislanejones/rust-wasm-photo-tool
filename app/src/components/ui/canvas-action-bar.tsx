@@ -97,7 +97,7 @@ export function CanvasActionBarButton({
       // starting a drag underneath.
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
-        "flex items-center gap-1 rounded px-2 py-1 text-xs text-theme-foreground hover:bg-theme-muted disabled:cursor-not-allowed disabled:opacity-40",
+        "flex items-center gap-1 rounded-sm px-2 py-1 text-xs text-theme-foreground hover:bg-theme-muted disabled:cursor-not-allowed disabled:opacity-40",
         pressed && "bg-theme-muted",
         className,
       )}

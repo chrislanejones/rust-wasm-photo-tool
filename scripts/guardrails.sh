@@ -133,8 +133,13 @@ ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
   exit 1
 }
 ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
+# ui-radius 50 → 26 (UI Night 8, 10-06-2026): 18 bare `rounded` renamed to
+# `rounded-sm` (both 4px — proven 0 px different, element by element, both
+# themes), and 6 hits were never radius at all: the Text tool's corner-preset
+# VALUES ("rounded" as a type, an `id:` and a ternary result), which the
+# counter now reads as values. Its self-test plants all three.
 check "ui-spacing" 51 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
-check "ui-radius" 50 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-radius" 26 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
 check "ui-raw-button" 32 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.

@@ -89,7 +89,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
               {tab === "telemetry" && (
                 <button
                   onClick={clearDiagnostics}
-                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+                  className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Clear
@@ -134,7 +134,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                     </td>
                     <td className="px-3 py-1">
                       <span
-                        className={`rounded border px-1.5 py-0.5 text-2xs font-bold ${SUBSYSTEM_COLOR[log.source].badge}`}
+                        className={`rounded-sm border px-1.5 py-0.5 text-2xs font-bold ${SUBSYSTEM_COLOR[log.source].badge}`}
                       >
                         {log.source}
                       </span>

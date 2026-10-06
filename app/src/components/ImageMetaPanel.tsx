@@ -73,7 +73,7 @@ function CopyButton({ value }: { value: string }) {
           () => {},
         );
       }}
-      className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
+      className="rounded-sm p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
       title="Copy"
     >
       {copied ? (
@@ -120,7 +120,7 @@ function HashBox({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
+              className="rounded-sm p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
               title="Recompute"
             >
               <RefreshCw

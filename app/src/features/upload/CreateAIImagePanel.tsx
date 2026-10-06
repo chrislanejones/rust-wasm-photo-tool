@@ -253,7 +253,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
                 type="button"
                 aria-label={`Remove ${r.name}`}
                 onClick={() => removeRef(i)}
-                className="absolute right-0.5 top-0.5 rounded bg-bg-secondary/80 p-0.5 text-text-primary hover:bg-bg-secondary"
+                className="absolute right-0.5 top-0.5 rounded-sm bg-bg-secondary/80 p-0.5 text-text-primary hover:bg-bg-secondary"
               >
                 <X className="h-3 w-3" />
               </button>
