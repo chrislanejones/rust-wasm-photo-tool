@@ -98,6 +98,15 @@ export function CanvasResize({
         onHeightChange={onHeightChange}
         onPercentChange={onPercentChange}
         onToggleLock={() => setLockAspect((v) => !v)}
+        // Per-photo (UI_CONSISTENCY §9). Default: the canvas as it is now.
+        edited={{
+          isEdited: targetW !== width || targetH !== height,
+          onReset: () => {
+            setW(String(width));
+            setH(String(height));
+          },
+          disabled,
+        }}
       />
 
       {/* Side by side, on ONE line. The two-up bar pushes the pair apart at

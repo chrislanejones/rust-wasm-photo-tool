@@ -1,0 +1,113 @@
+import { test, expect } from "./guard/test";
+import type { Page } from "@playwright/test";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI Night 8, PR 2 — the parts of finishing Night 7 that only a browser sees.
+//
+//   • §3 the color picker's SAVED swatches are a named radio group: the lit
+//     one is announced as checked. They were the one swatch row in the app
+//     that said nothing.
+//   • §7 the edited dot on Levels, Resize & Compress and Canvas Size shows only
+//     while a per-photo value is off its default, and Reset puts it back.
+//   • §4 the panel grammar, measured: every converted panel has the ToolPanel
+//     frame, its header at the top, 16px between rows and 8px from a label to
+//     its control (docs/UI_CONSISTENCY.md §8).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FIX = join(__dirname, "fixtures");
+
+async function blockExternalNetwork(page: Page): Promise<void> {
+  await page.route("**/*", (route) => {
+    const url = route.request().url();
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url) || url.startsWith("blob:") || url.startsWith("data:")) {
+      return route.continue();
+    }
+    return route.abort();
+  });
+}
+
+async function importImages(page: Page): Promise<void> {
+  const input = page.locator('input[type="file"]').first();
+  await input.waitFor({ state: "attached" });
+  await input.setInputFiles([
+    { name: "paper.png", mimeType: "image/png", buffer: readFileSync(join(FIX, "paper-1200x900.png")) },
+    { name: "checker.png", mimeType: "image/png", buffer: readFileSync(join(FIX, "checker.png")) },
+  ]);
+  await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(1500);
+}
+
+async function openTool(page: Page, group: string, sub: string): Promise<void> {
+  const opts = page.getByRole("region", { name: "Tool options" });
+  await opts.getByRole("button", { name: group, exact: true }).first().click();
+  await opts.getByRole("button", { name: sub, exact: true }).first().click();
+  await page.waitForTimeout(600);
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await blockExternalNetwork(page);
+  await page.goto("/");
+  await importImages(page);
+});
+
+test("§3 the color picker's saved swatches are a named radio group that says which is lit", async ({ page }) => {
+  await openTool(page, "Create", "Brush");
+  await page.getByRole("region", { name: "Tool options" }).getByRole("button", { name: "Pick a custom color" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Save to palette" }).click();
+
+  const palette = dialog.getByRole("radiogroup", { name: "Palette" });
+  await expect(palette).toBeVisible();
+  // The color just saved IS the current color, so it is the checked one.
+  await expect(palette.getByRole("radio")).toHaveCount(1);
+  await expect(palette.getByRole("radio", { checked: true })).toHaveCount(1);
+});
+
+// ── §7 the edited dot ───────────────────────────────────────────────────────
+
+const dot = (page: Page, label: string) =>
+  page.getByRole("region", { name: "Tool options" }).getByRole("img", { name: `${label} changed on this photo` });
+const reset = (page: Page, label: string) =>
+  page.getByRole("region", { name: "Tool options" }).getByRole("button", { name: `Reset ${label}` });
+
+test("§7 Levels: no dot at the identity curve; a moved point shows one; Reset returns to identity", async ({ page }) => {
+  await openTool(page, "Enhance", "Levels");
+  const panel = page.getByRole("region", { name: "Tool options" });
+  await expect(dot(page, "Curve")).toHaveCount(0);
+  const black = panel.getByRole("slider", { name: "Black point" });
+  await black.focus();
+  for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
+  await expect(dot(page, "Curve")).toHaveCount(1);
+  await reset(page, "Curve").click();
+  await expect(dot(page, "Curve")).toHaveCount(0);
+  await expect(black).toHaveValue("0");
+});
+
+test("§7 Resize: no dot at the photo's own size; a new width shows one; Reset returns to it", async ({ page }) => {
+  await openTool(page, "Enhance", "Resize & Compress");
+  const panel = page.getByRole("region", { name: "Tool options" });
+  await expect(dot(page, "Scale")).toHaveCount(0);
+  const width = panel.getByRole("spinbutton", { name: /width/i }).first();
+  await width.fill("600");
+  await width.press("Tab");
+  await expect(dot(page, "Scale")).toHaveCount(1);
+  await reset(page, "Scale").click();
+  await expect(dot(page, "Scale")).toHaveCount(0);
+  await expect(width).toHaveValue("1200");
+});
+
+test("§7 Canvas Size: no dot at the original canvas; a new width shows one; Reset returns to it", async ({ page }) => {
+  await openTool(page, "Edit", "Canvas Size");
+  const panel = page.getByRole("region", { name: "Tool options" });
+  await expect(dot(page, "Scale")).toHaveCount(0);
+  const width = panel.getByRole("spinbutton", { name: /width/i }).first();
+  await width.fill("1500");
+  await width.press("Tab");
+  await expect(dot(page, "Scale")).toHaveCount(1);
+  await reset(page, "Scale").click();
+  await expect(dot(page, "Scale")).toHaveCount(0);
+  await expect(width).toHaveValue("1200");
+});

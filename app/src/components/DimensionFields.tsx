@@ -14,6 +14,9 @@ interface Props {
   onHeightChange: (v: string) => void;
   onPercentChange: (pct: number) => void;
   onToggleLock: () => void;
+  /** The edited dot + reset, on the Scale row (ControlRow §9): W/H are
+   *  per-photo values, and Scale is the row that reads them as one number. */
+  edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
 }
 
 /**
@@ -32,6 +35,7 @@ export function DimensionFields({
   onHeightChange,
   onPercentChange,
   onToggleLock,
+  edited,
 }: Props) {
 
   return (
@@ -48,6 +52,7 @@ export function DimensionFields({
         max={100}
         unit="%"
         disabled={disabled}
+        edited={edited}
       />
 
       {/* Dimensions: width / height / lock-aspect on one row.

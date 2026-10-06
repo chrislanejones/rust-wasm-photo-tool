@@ -476,6 +476,17 @@ export function ResizeSettings({
           onHeightChange={handleHeightChange}
           onPercentChange={handlePercentChange}
           onToggleLock={() => setLockAspect((v) => !v)}
+          // Per-photo (UI_CONSISTENCY §9). Default: the photo's own size, as
+          // the fields show it on open. Quality is NOT dotted: its default is
+          // the export default, a tool value, not this photo's.
+          edited={{
+            isEdited: parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight,
+            onReset: () => {
+              setWidth(String(imageWidth));
+              setHeight(String(imageHeight));
+            },
+            disabled,
+          }}
         />
 
         </div>
