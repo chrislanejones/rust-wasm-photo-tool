@@ -144,9 +144,9 @@ export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogPr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Export</DialogTitle>
-        </DialogHeader>
+        {/* The "Export" header is drawn by DownloadPanes: on the first pane it
+            is the dialog's header; on a sub-pane the pane's own row
+            ([<] title [X]) replaces it, so there is one header and one ✕. */}
         <DownloadPanes {...rest} />
       </DialogContent>
     </Dialog>
@@ -246,6 +246,15 @@ function DownloadPanes({
   const isPlaceholder = (id: string) => id === "psd" && !pluginIds.has("psd");
 
   return (
+    <>
+    {pane === "choose" ? (
+      <DialogHeader>
+        <DialogTitle>Export</DialogTitle>
+      </DialogHeader>
+    ) : (
+      // Still the dialog's accessible name; the pane header shows the title.
+      <DialogTitle className="sr-only">Export</DialogTitle>
+    )}
     <DialogBody>
       <PaneSwap paneKey={pane} direction={direction} className="flex flex-col gap-4">
         {pane === "choose" ? (
@@ -271,7 +280,7 @@ function DownloadPanes({
           </>
         ) : pane === "selected" ? (
           <>
-            <PaneHeader title="Selected Image" onBack={back} />
+            <PaneHeader title="Selected Image" onBack={back} closable />
             {/* ONE group for ONE exclusive choice.
                 This was two `ToolButtonGroup`s — "Image format" and "Layered
                 file" — and BOTH passed `value`, which is exactly what makes a
@@ -319,7 +328,7 @@ function DownloadPanes({
           </>
         ) : (
           <>
-            <PaneHeader title="All Images" onBack={back} />
+            <PaneHeader title="All Images" onBack={back} closable />
             {/* The same tiles as Selected, on the same grid, minus the two that
                 are whole-project files rather than one image each (ORA, PSD).
                 Every image in the zip is written in this format; one already
@@ -362,5 +371,6 @@ function DownloadPanes({
         )}
       </PaneSwap>
     </DialogBody>
+    </>
   );
 }

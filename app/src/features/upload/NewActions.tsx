@@ -153,6 +153,9 @@ interface Props {
   /** Notified whenever the New Canvas ("New Document") panel opens/closes, so
    *  the wrapper can drop its logo/title header for the uncluttered setup view. */
   onBlankModeChange?: (active: boolean) => void;
+  /** Rendered inside a Dialog (the New dialog), so a sub-pane's header carries
+   *  the [X] close. The full-page start screen has nothing to close. */
+  inDialog?: boolean;
 }
 
 /*
@@ -183,6 +186,7 @@ export function NewActions({
   onFilesAdded,
   onInvalidFiles,
   autoFocusFirst = false,
+  inDialog = false,
   showLinks = true,
   onBlankModeChange,
 }: Props) {
@@ -443,7 +447,7 @@ export function NewActions({
             {pane === "blank" ? (
               <>
                 {/* ── New Canvas setup (Photoshop-style "New Document") ── */}
-                <PaneHeader title="New Canvas" onBack={() => setBlankMode(false)} />
+                <PaneHeader title="New Canvas" onBack={() => setBlankMode(false)} closable={inDialog} />
                 <div className="flex items-end gap-2">
                   <NumberField
                     label="width"
@@ -538,6 +542,7 @@ export function NewActions({
                   model={aiModel}
                   onModelChange={setAiModel}
                   onBack={() => setAiMode(false)}
+                  closable={inDialog}
                 />
               </>
             ) : (
