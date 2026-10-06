@@ -115,8 +115,8 @@ export function drawShapePreview(
     const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
     const pts = outline
       ? sloppyOutlinePoints(outline, rounded, seed, sloppiness, width)
-      : shape === "circle"
-        ? sloppyCirclePoints(from, to, sloppiness, width)
+      : shape === "circle" || shape === "oval"
+        ? sloppyCirclePoints(from, to, sloppiness, width, shape === "oval")
         : sloppyPolylinePoints(
             [
               { x: from.x, y: from.y },
@@ -147,6 +147,9 @@ export function drawShapePreview(
   } else if (shape === "circle") {
     const r = Math.min(w, h) / 2;
     ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (shape === "oval") {
+    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     ctx.stroke();
   } else {
     ctx.moveTo(from.x, from.y);

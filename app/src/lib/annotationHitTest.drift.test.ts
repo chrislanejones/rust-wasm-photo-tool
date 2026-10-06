@@ -119,7 +119,11 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // (11..=40) turn with θ and, unfilled, hit on their closed outline (never
   // their detail strokes) through the star/triangle edge loop. Port + tests
   // (database outline/middle/rim/fill, turned block arrow) updated FIRST.
-  shape_annotation_at: "240ee76d785a4285",
+  // 240ee76d785a4285 → 31c2e04289aa4ab2 (2026-10-06): the oval moved to kind 41 when it
+  // met the diagram shapes on master (11..=40 were taken); it turns with the
+  // rest and is a ring while unfilled, as the circle is. Port + test ("an
+  // unfilled oval (41) is a ring…") updated FIRST.
+  shape_annotation_at: "31c2e04289aa4ab2",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

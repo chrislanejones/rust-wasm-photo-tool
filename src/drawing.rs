@@ -571,6 +571,8 @@ pub fn fill_shape(
     let cy = (miny + maxy) * 0.5;
     // Circle radius matches draw_shape's clean circle: min of the half-extents.
     let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
+    // The oval (41) fills the whole bbox: one radius per axis.
+    let (rx, ry) = ((maxx - minx) * 0.5, (maxy - miny) * 0.5);
     // The polygon kinds' clip outline — the same vertices `draw_shape` strokes,
     // corners rounded the same way. `None` for a square-cornered rect and the
     // circle, which clip by bbox/radius instead (a rounded rect is a polygon).
@@ -636,6 +638,10 @@ pub fn fill_shape(
                                 if (dx * dx + dy * dy).sqrt() > radius {
                                     continue;
                                 }
+                            } else if shape == 41 {
+                                if !in_ellipse(xx as f64 + 0.5, yy as f64 + 0.5, cx, cy, rx, ry) {
+                                    continue;
+                                }
                             } else if let Some(verts) = poly.as_deref() {
                                 if !point_in_polygon(verts, xx as f64 + 0.5, yy as f64 + 0.5) {
                                     continue;
@@ -678,6 +684,10 @@ pub fn fill_shape(
                 if (dx * dx + dy * dy).sqrt() > radius {
                     continue;
                 }
+            } else if shape == 41 {
+                if !in_ellipse(fx, fy, cx, cy, rx, ry) {
+                    continue;
+                }
             } else if let Some(verts) = poly.as_deref() {
                 if !point_in_polygon(verts, fx, fy) {
                     continue;
@@ -693,6 +703,17 @@ pub fn fill_shape(
             blend_pixel(data, idx, col);
         }
     }
+}
+
+/// Whether `(x, y)` is inside the axis-aligned ellipse centered on `(cx, cy)`
+/// with half-axes `rx`, `ry`. A degenerate (zero-width) ellipse holds nothing.
+fn in_ellipse(x: f64, y: f64, cx: f64, cy: f64, rx: f64, ry: f64) -> bool {
+    if rx <= 0.0 || ry <= 0.0 {
+        return false;
+    }
+    let dx = (x - cx) / rx;
+    let dy = (y - cy) / ry;
+    dx * dx + dy * dy <= 1.0
 }
 
 /// A rotation about a pivot, exactly as SVG's `rotate(θ cx cy)` applies it on
@@ -893,6 +914,45 @@ pub fn draw_shape(
                 color,
                 stroke_width,
             );
+        }
+        // 41 = Oval — a circle stretched to fill the bbox (the circle's oval
+        // handle makes one). Clean: a closed polygon fine enough to read as a
+        // curve, so it rotates like the other outlines. Sketchy: the sketchy
+        // circle's ring with one radius per axis.
+        41 => {
+            let rx = (to_x - from_x).abs() / 2.0;
+            let ry = (to_y - from_y).abs() / 2.0;
+            if sloppiness > 0.0 && rx.min(ry) >= 2.0 {
+                let mut path = sloppy_ellipse_points(
+                    from_x,
+                    from_y,
+                    to_x,
+                    to_y,
+                    rx,
+                    ry,
+                    stroke_width,
+                    sloppiness,
+                );
+                if let Some(r) = rot {
+                    for p in path.iter_mut() {
+                        *p = r.apply(*p);
+                    }
+                }
+                draw_polyline(data, w, h, &path, color, stroke_width);
+            } else {
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    &ellipse_vertices(from_x, from_y, to_x, to_y),
+                    true,
+                    seed,
+                    color,
+                    stroke_width,
+                    0.0,
+                    rot,
+                );
+            }
         }
         // 8 = Diamond, 9 = Star, 10 = Triangle — closed polygons, stroked
         // alike. Their interiors are `fill_shape`'s business, same as rect's
@@ -1254,6 +1314,24 @@ pub fn star_vertices_n(x0: f64, y0: f64, x1: f64, y1: f64, n: u32) -> Vec<(f64, 
     verts
 }
 
+/// The oval (41) filling the drag bbox as a closed polygon, starting at the
+/// right-hand end of the horizontal axis and going clockwise on screen. The
+/// segment count tracks the larger radius the way the clean circle's does.
+/// Mirrored by hand in `ellipseVertices` (shapeSloppiness.ts).
+pub fn ellipse_vertices(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
+    let cx = (x0 + x1) / 2.0;
+    let cy = (y0 + y1) / 2.0;
+    let rx = (x1 - x0).abs() / 2.0;
+    let ry = (y1 - y0).abs() / 2.0;
+    let n = (rx.max(ry) * 4.0).max(60.0) as usize;
+    (0..n)
+        .map(|i| {
+            let a = 2.0 * PI * (i as f64) / (n as f64);
+            (cx + rx * a.cos(), cy + ry * a.sin())
+        })
+        .collect()
+}
+
 /// Isosceles triangle filling the drag bbox, apex up: `(cx, top)`,
 /// `(right, bottom)`, `(left, bottom)`. Mirrored by hand in
 /// `triangleVertices` (shapeSloppiness.ts).
@@ -1477,14 +1555,31 @@ fn draw_sloppy_circle(
     stroke_width: f64,
     sloppiness: f64,
 ) {
+    // The SAME circle the clean branch and `fill_shape` use.
+    let r = (to_x - from_x).abs().min((to_y - from_y).abs()) / 2.0;
+    let path = sloppy_ellipse_points(from_x, from_y, to_x, to_y, r, r, stroke_width, sloppiness);
+    draw_polyline(data, w as u32, h as u32, &path, color, stroke_width);
+}
+
+/// The sketchy ring around the bbox center with half-axes `rx`, `ry` — the
+/// circle's (`rx == ry`, every number as before the oval existed) and the
+/// oval's (41). Mirrored by hand in `sloppyCirclePoints` (shapeSloppiness.ts).
+fn sloppy_ellipse_points(
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+    rx: f64,
+    ry: f64,
+    stroke_width: f64,
+    sloppiness: f64,
+) -> Vec<(f64, f64)> {
     let x = from_x.min(to_x);
     let y = from_y.min(to_y);
     let bw = (to_x - from_x).abs();
     let bh = (to_y - from_y).abs();
     let cx = x + bw / 2.0;
     let cy = y + bh / 2.0;
-    // The SAME circle the clean branch and `fill_shape` use.
-    let r = bw.min(bh) / 2.0;
     let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
     let strength = sketch_strength(sloppiness);
     let diag = (bw * bw + bh * bh).sqrt().max(1e-6);
@@ -1504,7 +1599,7 @@ fn draw_sloppy_circle(
     // Segment count tracks the radius the way the clean branch does; a fixed
     // 60 showed its corners on a big circle, which was one more way the
     // outline changed the moment the slider left 0.
-    let num_points = ((r * 4.0).ceil() as usize).clamp(60, 480);
+    let num_points = ((rx.max(ry) * 4.0).ceil() as usize).clamp(60, 480);
     // Lead-in tail (fades to a point at its tip).
     let tail_steps = 10usize;
     let mut path: Vec<(f64, f64)> = Vec::with_capacity(tail_steps + num_points + 2);
@@ -1513,9 +1608,9 @@ fn draw_sloppy_circle(
         let angle = start_offset - tail_len * (1.0 - t);
         let n = noise(angle) * t;
         let squeeze = 1.0 + (angle * 2.0 + seed).sin() * squeeze_amt;
-        let inward = (1.0 - t) * (r * 0.15) * strength;
-        let px = cx + (r * squeeze - inward + n) * (angle + tilt).cos();
-        let py = cy + (r / squeeze - inward + n) * (angle + tilt).sin();
+        let inward = (1.0 - t) * (rx.min(ry) * 0.15) * strength;
+        let px = cx + (rx * squeeze - inward + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze - inward + n) * (angle + tilt).sin();
         path.push((px, py));
     }
     // Main arc — stops shy of a full turn so the ends visibly miss each other.
@@ -1524,11 +1619,11 @@ fn draw_sloppy_circle(
         let angle = start_offset + t * main_arc;
         let n = noise(angle);
         let squeeze = 1.0 + (angle * 2.0 + seed).sin() * squeeze_amt;
-        let px = cx + (r * squeeze + n) * (angle + tilt).cos();
-        let py = cy + (r / squeeze + n) * (angle + tilt).sin();
+        let px = cx + (rx * squeeze + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze + n) * (angle + tilt).sin();
         path.push((px, py));
     }
-    draw_polyline(data, w as u32, h as u32, &path, color, stroke_width);
+    path
 }
 
 /* ------------------------------------------------------------------ */
@@ -1781,6 +1876,53 @@ mod geometry_tests {
             triangle_vertices(50.0, 80.0, 10.0, 20.0),
             triangle_vertices(10.0, 20.0, 50.0, 80.0)
         );
+    }
+
+    /// The oval (41) is the circle stretched to its whole bbox: its fill
+    /// reaches the box's long axis, where the circle (1) — the inscribed
+    /// `min(w, h)` circle — stops short.
+    #[test]
+    fn the_oval_fills_its_whole_bbox_and_the_circle_does_not() {
+        let (w, h) = (100u32, 40u32);
+        let fill = |shape: u8| {
+            let mut px = vec![0u8; (w * h * 4) as usize];
+            fill_shape(
+                &mut px,
+                w,
+                h,
+                shape,
+                10.0,
+                10.0,
+                90.0,
+                30.0,
+                1,
+                [0, 0, 255, 255],
+                [0; 4],
+                0,
+                0,
+                5,
+                [0.0; 4],
+            );
+            px
+        };
+        let alpha = |px: &[u8], x: u32, y: u32| px[((y * w + x) * 4 + 3) as usize];
+        let (oval, circle) = (fill(41), fill(1));
+        // Near the left end of the horizontal axis: oval only.
+        assert_eq!(alpha(&oval, 12, 20), 255);
+        assert_eq!(alpha(&circle, 12, 20), 0);
+        // The center: both.
+        assert_eq!(alpha(&oval, 50, 20), 255);
+        assert_eq!(alpha(&circle, 50, 20), 255);
+        // The box corner: neither.
+        assert_eq!(alpha(&oval, 11, 11), 0);
+        // Its outline hugs the box on both axes.
+        let v = ellipse_vertices(10.0, 10.0, 90.0, 30.0);
+        assert!(v.len() >= 60);
+        assert_eq!(v[0], (90.0, 20.0));
+        for p in &v {
+            assert!(p.0 >= 10.0 - 1e-9 && p.0 <= 90.0 + 1e-9);
+            assert!(p.1 >= 10.0 - 1e-9 && p.1 <= 30.0 + 1e-9);
+        }
     }
 
     /// The sketch wobble is built from the UNROTATED outline — seeded from the

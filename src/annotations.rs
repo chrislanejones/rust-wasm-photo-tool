@@ -107,7 +107,9 @@ pub struct ShapeAnnotation {
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
     /// 7=bezier (cubic pen path; `points` holds the flat control sequence),
     /// 8=diamond, 9=star, 10=triangle, 11..=40 = the diagram shapes
-    /// (flowchart, basic and block arrows — see `diagram.rs`).
+    /// (flowchart, basic and block arrows — see `diagram.rs`), 41=oval (a
+    /// circle stretched to fill its bbox; kind 1 keeps its inscribed
+    /// `min(w, h)` circle).
     pub kind: u8,
     pub x0: f64,
     pub y0: f64, // start point / bbox corner (canvas coords)
@@ -512,16 +514,17 @@ pub(crate) fn radii_f64(r: [u16; 4]) -> [f64; 4] {
 /// The kinds whose geometry turns with `rotation_deg`. Arrow, pin, polyline,
 /// bézier and the legacy hand-circle keep their stored geometry as-is.
 fn rotation_applies(kind: u8) -> bool {
-    matches!(kind, 0 | 1 | 2 | 8 | 9 | 10) || crate::diagram::is_diagram_kind(kind)
+    matches!(kind, 0 | 1 | 2 | 8 | 9 | 10 | 41) || crate::diagram::is_diagram_kind(kind)
 }
 
 /// The kinds that accept an interior fill (`fill_kind` 1/2/3 through
 /// `drawing::fill_shape`): every bbox shape that encloses an area. The line (2)
 /// encloses nothing, and the pen path (7) is filled by `fill_polygon` against
 /// its own points rather than a bbox, so neither is here. Every diagram shape
-/// (11..=40) has a closed outline and fills inside it.
+/// (11..=40) has a closed outline and fills inside it, and so does the oval
+/// (41), a circle stretched to fill its whole bbox.
 pub(crate) fn is_fillable_kind(kind: u8) -> bool {
-    matches!(kind, 0 | 1 | 8 | 9 | 10) || crate::diagram::is_diagram_kind(kind)
+    matches!(kind, 0 | 1 | 8 | 9 | 10 | 41) || crate::diagram::is_diagram_kind(kind)
 }
 
 /// Serialize a list of shape annotations to JSON for the JS overlay /
@@ -778,9 +781,9 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 /// | shape | route |
 /// |---|---|
 /// | warped (any rotatable kind) | warp path, rotation composed onto the quad |
-/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
+/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40), oval (41) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
 /// | circle (1) with a gradient | warp path, same reason (the gradient has a direction) |
-/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40) unfilled, line (2) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
+/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40), oval (41) unfilled, line (2) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
 /// | circle (1) otherwise | flat, θ ignored — a circle is rotation-invariant |
 /// | 3, 4, 5, 6, 7 | θ ignored |
 ///
@@ -1019,7 +1022,7 @@ impl ImageHorseTool {
     }
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
-    /// 3=handCircle,4=arrow,8=diamond,9=star,10=triangle. Pushes an "Add
+    /// 3=handCircle,4=arrow,8=diamond,9=star,10=triangle,11..=40=diagram, 41=oval. Pushes an "Add
     /// Shape"/"Add Arrow" snapshot so undo removes it. Returns the new id.
     ///
     /// JS calls this as **`add_shape_annotation`** (`js_name`): the wasm export
@@ -1850,7 +1853,7 @@ impl ImageHorseTool {
             // Shadows `x`/`y` for this shape only; the next one starts again
             // from the caller's point.
             let (x, y) =
-                if s.rotation_deg != 0.0 && matches!(s.kind, 0 | 1 | 2 | 8 | 9 | 10 | 11..=40) {
+                if s.rotation_deg != 0.0 && matches!(s.kind, 0 | 1 | 2 | 8 | 9 | 10 | 11..=41) {
                     let t = -s.rotation_deg * std::f64::consts::PI / 180.0;
                     let (sin, cos) = (t.sin(), t.cos());
                     let cx = (s.x0 + s.x1) / 2.0;
@@ -1927,7 +1930,8 @@ impl ImageHorseTool {
                 let maxy = s.y0.max(s.y1);
                 let in_outer =
                     x >= minx - pad && x <= maxx + pad && y >= miny - pad && y <= maxy + pad;
-                let hollow = s.fill_kind == 0 && (s.kind == 0 || s.kind == 1 || s.kind == 3);
+                let hollow =
+                    s.fill_kind == 0 && (s.kind == 0 || s.kind == 1 || s.kind == 3 || s.kind == 41);
                 if !hollow {
                     // filled rect / circle, pin, bézier → padded bounding box
                     in_outer
@@ -1939,7 +1943,7 @@ impl ImageHorseTool {
                         x > minx + pad && x < maxx - pad && y > miny + pad && y < maxy - pad;
                     in_outer && !in_inner
                 } else {
-                    // unfilled circle / hand-circle → the ring between two
+                    // unfilled circle / hand-circle / oval → the ring between two
                     // concentric ellipses, radii ± pad. Same no-hole rule.
                     let cx = (minx + maxx) * 0.5;
                     let cy = (miny + maxy) * 0.5;

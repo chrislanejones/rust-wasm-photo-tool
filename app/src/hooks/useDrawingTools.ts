@@ -1,15 +1,14 @@
 import { importEngine } from "@/lib/engineGate";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
-import type { ToolType, ToolSettings } from "@/lib/types";
+import type { ShapeName, ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { cropTracked } from "@/stores/useSvgSourceStore"; // SVG export's crop record
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
-import { canonicalCornerRadii } from "@/lib/shapeSloppiness";
+import { canonicalCornerRadii, type Point } from "@/lib/shapeSloppiness";
 import { normalizeDeg } from "@/lib/shapeRotation";
-import type { Point } from "@/lib/shapeSloppiness";
 import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
 import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
 import { PressQueue } from "@/lib/pressQueue";
@@ -22,6 +21,7 @@ import {
   pendingStarAndCorners,
   pendingShapeType,
   SHAPE_NAME_KIND,
+  withEditGeometry,
   type CropSelection,
   type DrawEditState,
   type ShapeMeta,
@@ -556,11 +556,11 @@ export function useDrawingTools({
 
   /** Overlay handle drags push new geometry here (canvas coords). `rotation`
    *  is passed only by the rotate handle; every other drag leaves it as is. */
-  const updateEditGeometry = useCallback((start: Point, end: Point, rotation?: number) => {
+  const updateEditGeometry = useCallback((start: Point, end: Point, rotation?: number, shape?: ShapeName) => {
     editDirtyRef.current = true;
     setEditState((prev) => {
       if (!prev) return prev;
-      const next = rotation === undefined ? { ...prev, start, end } : { ...prev, start, end, rotation };
+      const next = withEditGeometry(prev, start, end, rotation, shape);
       editStateRef.current = next;
       return next;
     });

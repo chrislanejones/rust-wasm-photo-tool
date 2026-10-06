@@ -39,11 +39,12 @@ export type DiagramShapeName =
   | "blockArrow" | "doubleBlockArrow" | "quadArrow" | "chevron" | "stepArrow";
 
 /** The shapes the Shapes tool can draw. The Rust `kind` bytes: 0 rect, 1
- *  circle, 2 line, 8 diamond, 9 star, 10 triangle, 11..=40 the diagram shapes
- *  (kind 3, the legacy hand-drawn circle, is no longer creatable but still
- *  renders from old documents). */
+ *  circle, 2 line, 8 diamond, 9 star, 10 triangle, 11..=40 the diagram shapes,
+ *  41 oval (kind 3, the legacy hand-drawn circle, is no longer creatable but
+ *  still renders from old documents). The oval has no panel button: a circle
+ *  becomes one when its oval handle (left of the edit box) is dragged. */
 export type ShapeName =
-  | "rect" | "circle" | "line" | "diamond" | "star" | "triangle"
+  | "rect" | "circle" | "line" | "diamond" | "star" | "triangle" | "oval"
   | DiagramShapeName;
 
 export interface ToolSettings extends StampSettings {

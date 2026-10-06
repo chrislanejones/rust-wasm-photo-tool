@@ -190,8 +190,8 @@ interface Props {
   /** Pending shape/arrow being edited via the Figma-style overlay. */
   drawEditState?: DrawEditState | null;
   /** Overlay handle drags push new geometry (canvas coords) up through this.
-   *  `rotation` rides along only from the rotate handle. */
-  onDrawEditChange?: (start: Point, end: Point, rotation?: number) => void;
+   *  `rotation` only from the rotate handle, `shape` only from the oval one. */
+  onDrawEditChange?: (start: Point, end: Point, rotation?: number, shape?: ShapeDrawSettings["shape"]) => void;
   /** Live stroke/shape settings — read at render so panel tweaks update the
    *  pending shape immediately (same values commitEdit reads at commit). */
   drawSettings?: ShapeDrawSettings;

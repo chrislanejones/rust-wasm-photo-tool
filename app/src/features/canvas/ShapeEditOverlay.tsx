@@ -64,8 +64,9 @@ interface Props {
   drawEditState: DrawEditState;
   drawSettings: ShapeDrawSettings;
   /** Handle drags push new geometry (canvas coords) up through this.
-   *  `rotation` rides along only from the rotate handle. */
-  onDrawEditChange?: (start: Point, end: Point, rotation?: number) => void;
+   *  `rotation` rides along only from the rotate handle, `shape` only from
+   *  the oval handle (it turns a circle into an oval). */
+  onDrawEditChange?: (start: Point, end: Point, rotation?: number, shape?: ShapeName) => void;
 }
 
 export function ShapeEditOverlay({
@@ -84,8 +85,9 @@ export function ShapeEditOverlay({
   // Same window-listener pattern as the crop handles. Geometry math is
   // plain JS (trivial); Rust does all pixel rendering at commit.
   const drawDragRef = useRef<{
-    mode: "resize" | "move" | "endpoint" | "rotate" | "radius";
+    mode: "resize" | "move" | "endpoint" | "rotate" | "radius" | "oval";
     /** resize: nw|n|ne|e|se|s|sw|w · endpoint: start|end · move: body ·
+     *  oval: "w" (the stretch handle left of a circle or oval's box) ·
      *  rotate: "shape" (turns `rotation`) or "segment" (turns a line's
      *  endpoints — see lib/shapeRotation.ts) */
     handle: string;
@@ -100,7 +102,8 @@ export function ShapeEditOverlay({
      *  px for the rotate handle, which needs a position, not a delta. */
     originX: number;
     originY: number;
-    /** radius: the corner dot being dragged, and the radii when it began. */
+    /** radius: the corner dot being dragged, and the radii when it began.
+     *  `shape` also tells the oval handle whether it starts from a circle. */
     corner?: CornerHandle;
     startRadii?: CornerRadii;
     shape?: ShapeName;
@@ -133,6 +136,24 @@ export function ShapeEditOverlay({
             : [r, r, r, r],
         );
         useToolStore.getState().setToolSettings((p) => ({ ...p, cornerRadii: next }));
+        return;
+      }
+      if (drag.mode === "oval") {
+        // Stretch a circle into an oval (or an oval wider/narrower) about
+        // its own center, along the box's horizontal axis. A circle starts
+        // from the circle it SHOWS — the inscribed `min(w, h)` one, not its
+        // bbox — so nothing jumps on grab. The center never moves, so the
+        // rotation pivot does not either. Dragging the left handle left
+        // widens it; Shift snaps back to round within a few px.
+        const { dx: ldx } = toLocalDelta(dx, dy, drag.startRotation);
+        const c = boxCenter({ x: g.sx, y: g.sy }, { x: g.ex, y: g.ey });
+        const w0 = Math.abs(g.ex - g.sx) / 2;
+        const h0 = Math.abs(g.ey - g.sy) / 2;
+        const round = drag.shape === "circle";
+        const ry = round ? Math.min(w0, h0) : h0;
+        let rx = Math.max(1, (round ? ry : w0) - ldx);
+        if (e.shiftKey && Math.abs(rx - ry) < 8 / drag.scaleX) rx = ry;
+        cb({ x: c.x - rx, y: c.y - ry }, { x: c.x + rx, y: c.y + ry }, undefined, "oval");
         return;
       }
       if (drag.mode === "rotate") {
@@ -251,9 +272,9 @@ export function ShapeEditOverlay({
   const handleDrawPointerDown = useCallback(
     (
       e: React.PointerEvent<SVGElement>,
-      mode: "resize" | "move" | "endpoint" | "rotate" | "radius",
+      mode: "resize" | "move" | "endpoint" | "rotate" | "radius" | "oval",
       handle: string,
-      corner?: { handle: CornerHandle; radii: CornerRadii; shape: ShapeName },
+      corner?: { handle?: CornerHandle; radii?: CornerRadii; shape: ShapeName },
     ) => {
       if (!drawEditState || !canvasRef.current) return;
       e.preventDefault();
@@ -408,6 +429,10 @@ export function ShapeEditOverlay({
   // text overlay's "balloon string".
   const STEM_GAP = 4;
   const STEM_LEN = 18;
+  // Oval handle (stem + small oval grip LEFT of the box), screen px.
+  const OVAL_STEM = 12;
+  const OVAL_RX = 7;
+  const OVAL_RY = 4.5;
   const DOT_OFFSET = 4;
   const DOT_R = 5;
 
@@ -521,6 +546,39 @@ export function ShapeEditOverlay({
     );
     bodyHit = (
       <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
+    );
+  } else if (shape === "oval") {
+    // The circle stretched to its whole bbox (kind 41) — one radius per axis.
+    const ccx = vx + vw / 2;
+    const ccy = vy + vh / 2;
+    const fillLayer = <ellipse cx={ccx} cy={ccy} rx={vw / 2} ry={vh / 2} fill={fillAttr} />;
+    const sloppyD = sloppy
+      ? sloppyShapePath(start, end, "oval", sloppyAmt, eff.strokeWidth, toSX, toSY)
+      : "";
+    const strokeLayer = sloppyD ? (
+      <path
+        d={sloppyD}
+        fill="none" stroke={color} strokeWidth={strokeW}
+        strokeLinecap="round" strokeLinejoin="round"
+      />
+    ) : (
+      <ellipse
+        cx={ccx} cy={ccy} rx={vw / 2} ry={vh / 2}
+        fill="none" stroke={color} strokeWidth={strokeW}
+      />
+    );
+    preview = (
+      <>
+        {gradientDef}
+        {fillLayer}
+        {strokeLayer}
+      </>
+    );
+    bodyHit = (
+      <ellipse
+        cx={ccx} cy={ccy} rx={Math.max(vw / 2, 8)} ry={Math.max(vh / 2, 8)}
+        fill="transparent" {...bodyProps}
+      />
     );
   } else if (diagram) {
     // A diagram shape: the fill on its clean outline (what `fill_shape`
@@ -727,6 +785,43 @@ export function ShapeEditOverlay({
               <path d={arcD} fill="none" stroke="white" strokeWidth={2} />
               <line x1={cx} y1={stemTop} x2={cx} y2={stemBot} stroke="white" strokeWidth={2} />
               <circle cx={cx} cy={dotCy} r={DOT_R} fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+            </g>
+          );
+        })()}
+
+        {/* Oval handle — a circle or an oval only (not a pin): a stem out
+            of the box's left edge ending in a small oval. Drag it to
+            stretch the circle into an oval about its center. */}
+        {(shape === "circle" || shape === "oval") && kindByte !== 5 && (() => {
+          const cy = vy + vh / 2;
+          const stemRight = vx - STEM_GAP - HS / 2;
+          const stemLeft = stemRight - OVAL_STEM;
+          const gripCx = stemLeft - OVAL_RX;
+          const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+          return (
+            <g
+              data-shape-oval-handle
+              style={{
+                cursor: deg ? rotatedResizeCursor("w", deg) : "ew-resize",
+                pointerEvents: "all",
+                filter,
+              }}
+              onPointerDown={(e) => handleDrawPointerDown(e, "oval", "w", { shape })}
+            >
+              {/* Invisible fat hit target */}
+              <rect
+                x={gripCx - OVAL_RX - 2}
+                y={cy - 8}
+                width={stemRight - (gripCx - OVAL_RX - 2)}
+                height={16}
+                fill="transparent"
+              />
+              <line x1={stemLeft} y1={cy} x2={stemRight} y2={cy} stroke="white" strokeWidth={2} />
+              <ellipse
+                cx={gripCx} cy={cy} rx={OVAL_RX} ry={OVAL_RY}
+                fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1}
+              />
+              <title>Oval — drag to stretch the circle into an oval (Shift snaps back to round)</title>
             </g>
           );
         })()}

@@ -154,6 +154,18 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(tri, 5, 5)).toBe(-1); // bbox corner, off the ink
   });
 
+  it("an unfilled oval (41) is a ring along its whole bbox, and turns", () => {
+    // 200×60 oval centered on (100,30). pad 6.
+    const oval = [shape({ id: 39, kind: 41, x0: 0, y0: 0, x1: 200, y1: 60 })];
+    expect(shapeAnnotationAt(oval, 1, 30)).toBe(39); // left end of the long axis
+    expect(shapeAnnotationAt(oval, 100, 30)).toBe(-1); // hollow middle
+    expect(shapeAnnotationAt(oval, 2, 2)).toBe(-1); // bbox corner, off the ink
+    // Turned 90° it stands upright on screen: the left end moves to the top.
+    const turned = [shape({ id: 40, kind: 41, x0: 0, y0: 0, x1: 200, y1: 60, rotation: 90 })];
+    expect(shapeAnnotationAt(turned, 100, -69)).toBe(40);
+    expect(shapeAnnotationAt(turned, 1, 30)).toBe(-1);
+  });
+
   it("hit-tests an unfilled diagram shape (11..=40) along its outline, not its details", () => {
     // Database (19) over 0..100: the outline runs down x = 0 and x = 100; the
     // lid's front rim (a detail) crosses y = 30 at x = 50. Same cases as the

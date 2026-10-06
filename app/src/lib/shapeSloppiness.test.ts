@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   closedOutline,
   effectiveStarPoints,
+  sloppyCirclePoints,
   starVertices,
   triangleVertices,
 } from "./shapeSloppiness";
@@ -62,5 +63,21 @@ describe("closedOutline", () => {
     expect(closedOutline("triangle", a, b)).toHaveLength(3);
     expect(closedOutline("circle", a, b)).toBeNull();
     expect(closedOutline("line", a, b)).toBeNull();
+  });
+});
+
+describe("sloppyCirclePoints — the oval", () => {
+  const from = { x: 0, y: 0 };
+  const to = { x: 200, y: 60 };
+  it("stretches the ring to the whole bbox, where the circle keeps min(w, h)", () => {
+    const span = (pts: { x: number }[]) =>
+      Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x));
+    const circle = sloppyCirclePoints(from, to, 40, 2);
+    const oval = sloppyCirclePoints(from, to, 40, 2, true);
+    expect(span(circle)).toBeLessThan(80);
+    expect(span(oval)).toBeGreaterThan(170);
+  });
+  it("with oval off, every point is the circle's", () => {
+    expect(sloppyCirclePoints(from, to, 40, 2, false)).toEqual(sloppyCirclePoints(from, to, 40, 2));
   });
 });
