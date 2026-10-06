@@ -215,8 +215,10 @@ export default tseslint.config(
     // `shapeKindLabel` (perspectiveTarget.ts), which also names the triangle.
     // 3528 -> 3396 (Plan C §3): Download All / ZIP moved to
     // app/session/useZipExport.ts on the async grammar.
+    // 3396 -> 3392: the Reselect d-pad left with useDuplicatePad; the shape
+    // action bar mounts as one line (app/session/useShapeActions.ts).
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3396 }] },
+    rules: { "max-lines": ["error", { max: 3392 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -251,8 +253,14 @@ export default tseslint.config(
     // commitEdit carried became drawEditState.FILL_MODE_KIND / FILL_KIND_MODE,
     // beside the shape-name tables it belongs with — and the inverse ladder in
     // editStateFromShape collapsed onto it too.
+    // 970 -> 954 (the dropped-drag fix): presses now buffer their moves and
+    // release while the engine answers them, in order (lib/pressQueue.ts).
+    // The crop ratio fallback moved to lib/cropRatioFallback.ts and the crop
+    // rubber band to drawPreview.drawCropPreview, which also folded the
+    // free-rect math the move and up handlers each carried into one
+    // `freeCropRect`.
     files: ["app/src/hooks/useDrawingTools.ts"],
-    rules: { "max-lines": ["error", { max: 970 }] },
+    rules: { "max-lines": ["error", { max: 954 }] },
   },
   {
     // A test file, not a god object — it is long because it enumerates 166

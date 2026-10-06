@@ -144,9 +144,9 @@ export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogPr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Export</DialogTitle>
-        </DialogHeader>
+        {/* The "Export" header is drawn by DownloadPanes: on the first pane it
+            is the dialog's header; on a sub-pane the pane's own row
+            ([<] title [X]) replaces it, so there is one header and one ✕. */}
         <DownloadPanes {...rest} />
       </DialogContent>
     </Dialog>
@@ -208,18 +208,27 @@ function DownloadPanes({
       title: `${f.label} — ${f.hint}`,
     })),
     svgTile(svg.selected),
-    // The layered plugin formats (ORA, PSD) sort to the END of the one grid, so
-    // the flattened formats keep reading order and "holds every layer" is a
-    // caption rather than a second group. Compared on the hint so the order is
-    // stable when a plugin's hint text changes.
-    ...pluginFormats
-      .filter(({ format: f }) => LAYERED_IDS.includes(f.id as FormatTileId))
-      .sort((a, b) => a.format.hint.localeCompare(b.format.hint))
+    // Every plugin format gets a tile. The layered ones (ORA, PSD) sort to the
+    // END of the one grid, so the flattened formats keep reading order and
+    // "holds every layer" is a caption rather than a second group. Compared on
+    // the hint so the order is stable when a plugin's hint text changes.
+    // (#297 filtered this list to the layered ids while merging the two
+    // groups, which silently dropped every other plugin format — e2e
+    // plugins.spec caught it with its .ihl fixture.)
+    ...[...pluginFormats]
+      .sort(
+        (a, b) =>
+          Number(LAYERED_IDS.includes(a.format.id as FormatTileId)) -
+            Number(LAYERED_IDS.includes(b.format.id as FormatTileId)) ||
+          a.format.hint.localeCompare(b.format.hint),
+      )
       .map(({ plugin, format: f }) => ({
         id: f.id as FormatTileId,
         label: f.hint,
         icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
-        title: `${f.label} — ${f.hint} (${plugin.name} plugin). Holds every layer.`,
+        title: `${f.label} — ${f.hint} (${plugin.name} plugin).${
+          LAYERED_IDS.includes(f.id as FormatTileId) ? " Holds every layer." : ""
+        }`,
       })),
     // The placeholder, only while no plugin provides PSD.
     ...(pluginIds.has("psd")
@@ -237,6 +246,15 @@ function DownloadPanes({
   const isPlaceholder = (id: string) => id === "psd" && !pluginIds.has("psd");
 
   return (
+    <>
+    {pane === "choose" ? (
+      <DialogHeader>
+        <DialogTitle>Export</DialogTitle>
+      </DialogHeader>
+    ) : (
+      // Still the dialog's accessible name; the pane header shows the title.
+      <DialogTitle className="sr-only">Export</DialogTitle>
+    )}
     <DialogBody>
       <PaneSwap paneKey={pane} direction={direction} className="flex flex-col gap-4">
         {pane === "choose" ? (
@@ -262,7 +280,7 @@ function DownloadPanes({
           </>
         ) : pane === "selected" ? (
           <>
-            <PaneHeader title="Selected Image" onBack={back} />
+            <PaneHeader title="Selected Image" onBack={back} closable />
             {/* ONE group for ONE exclusive choice.
                 This was two `ToolButtonGroup`s — "Image format" and "Layered
                 file" — and BOTH passed `value`, which is exactly what makes a
@@ -310,7 +328,7 @@ function DownloadPanes({
           </>
         ) : (
           <>
-            <PaneHeader title="All Images" onBack={back} />
+            <PaneHeader title="All Images" onBack={back} closable />
             {/* The same tiles as Selected, on the same grid, minus the two that
                 are whole-project files rather than one image each (ORA, PSD).
                 Every image in the zip is written in this format; one already
@@ -353,5 +371,6 @@ function DownloadPanes({
         )}
       </PaneSwap>
     </DialogBody>
+    </>
   );
 }

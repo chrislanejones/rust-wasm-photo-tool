@@ -1,5 +1,5 @@
 import { forwardRef, type KeyboardEvent, type ReactNode } from "react";
-import { Copy, GamepadDirectional } from "lucide-react";
+import { Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-actions";
 
@@ -59,20 +59,6 @@ export interface ReselectBarProps {
   onDuplicate?: () => void;
   /** aria-label for the duplicate button. Default "Duplicate". */
   duplicateLabel?: string;
-  /** Directional (d-pad) affordance, leftmost of the trailing three. Pass
-   *  `true` to render it DISABLED — a placeholder for nudging the object from
-   *  the row, which has no handler yet. Passing a function is not supported on
-   *  purpose: a live control should arrive with its behavior, not be switched
-   *  on by a caller guessing what it does. */
-  showDirectional?: boolean;
-  /** LIVE directional control — opens/closes the duplicate pad for this row.
-   *  When present it wins over `showDirectional`. Only rect/circle rows get
-   *  one; the rest keep the disabled placeholder. */
-  onDirectional?: () => void;
-  /** Whether this row's pad is the open one (aria-pressed + accent). */
-  directionalActive?: boolean;
-  /** aria-label for the directional button. Default "Duplicate pad". */
-  directionalLabel?: string;
   disabled?: boolean;
   /** Title/tooltip for the row. */
   title?: string;
@@ -109,10 +95,6 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       title,
       deleteLabel = "Delete",
       duplicateLabel = "Duplicate",
-      showDirectional = false,
-      onDirectional,
-      directionalActive = false,
-      directionalLabel = "Duplicate pad",
       onMoveUp,
       onMoveDown,
       canMoveUp = true,
@@ -179,27 +161,10 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
               <ChevronGlyph up={false} />
             </RowAction>
           )}
-          {/* The trailing three, in this order and always visible: directional
-              placeholder, duplicate, delete. Delete stays rightmost, where it
-              has always been. */}
-          {onDirectional ? (
-            <RowAction
-              icon={GamepadDirectional}
-              label={directionalActive ? `Close ${directionalLabel.toLowerCase()}` : directionalLabel}
-              pressed={directionalActive}
-              disabled={disabled}
-              onClick={onDirectional}
-            />
-          ) : (
-            showDirectional && (
-              /* Permanently disabled — see `showDirectional`. Its label says so,
-                 rather than reading as a control that is merely unavailable. */
-              <RowAction
-                icon={GamepadDirectional}
-                label={`${directionalLabel} — rectangles and circles only`}
-              />
-            )
-          )}
+          {/* Duplicate then delete; delete stays rightmost, where it has
+              always been. Reselect rows dropped both the d-pad and Duplicate
+              for the canvas action bar (ShapeActionsOverlay); Layers keeps
+              its Duplicate. */}
           {onDuplicate && (
             <RowAction
               icon={Copy}

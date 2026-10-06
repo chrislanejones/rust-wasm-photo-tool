@@ -26,7 +26,8 @@ import {
   type CornerRadii,
 } from "@/lib/shapeSloppiness";
 import { cornerHandles, radiusAfterDrag, type CornerHandle } from "@/lib/cornerRadiusHandles";
-import { shapeCanFill } from "@/lib/drawEditState";
+import { SHAPE_NAME_KIND, shapeCanFill } from "@/lib/drawEditState";
+import { diagramGeometry, diagramStrokes, strokesToPath } from "@/lib/diagramShapes";
 import {
   boxCenter,
   pinAfterResize,
@@ -35,6 +36,7 @@ import {
   rotationAfterDrag,
   toLocalDelta,
 } from "@/lib/shapeRotation";
+import { tooSmallForActions } from "@/lib/shapePorts";
 import { useToolStore } from "@/stores/useToolStore";
 import { ROTATE_CURSOR } from "./canvasCursor";
 import { arrowGeometry, sloppyShapePath } from "./shapeOverlayPath";
@@ -77,6 +79,7 @@ export function ShapeEditOverlay({
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
   const liveCornerRadii = useToolStore((s) => s.toolSettings.cornerRadii);
+  const actionMode = useToolStore((s) => s.shapeActionMode);
 
   // ── Shape/arrow edit-overlay drag ──────────────────────────────────
   // Same window-listener pattern as the crop handles. Geometry math is
@@ -354,6 +357,16 @@ export function ShapeEditOverlay({
   // Everything but the clip turns about the box center — the same
   // pivot the engine uses, so the preview and the commit agree.
   const turn = deg ? `rotate(${deg} ${vx + vw / 2} ${vy + vh / 2})` : undefined;
+  // While the action bar's Duplicate/Connect ring is open, its N and S ports
+  // sit where the move stem and the rotate hook are. The ring wins: the body
+  // still drags to move, and closing the ring brings both back. Same
+  // condition ShapeActionsOverlay draws the ring under.
+  const ringOpen =
+    actionMode !== "none" &&
+    !isSegment &&
+    kindByte !== 5 &&
+    kindByte !== 3 &&
+    !tooSmallForActions(vw, vh);
 
   const HS = 9;   // resize-square size — screen px, zoom-independent
   const EP_R = 6; // endpoint-circle radius — screen px
@@ -442,6 +455,8 @@ export function ShapeEditOverlay({
   };
   let preview: React.ReactNode;
   let bodyHit: React.ReactNode;
+  // A diagram shape (11..=40), flattened once; null for every other shape.
+  const diagram = kind === "arrow" ? null : diagramGeometry(SHAPE_NAME_KIND[shape] ?? -1, start, end);
 
   if (kind === "arrow") {
     const g = arrowGeometry(
@@ -533,7 +548,7 @@ export function ShapeEditOverlay({
       <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
     );
   } else if (shape === "oval") {
-    // The circle stretched to its whole bbox (kind 11) — one radius per axis.
+    // The circle stretched to its whole bbox (kind 41) — one radius per axis.
     const ccx = vx + vw / 2;
     const ccy = vy + vh / 2;
     const fillLayer = <ellipse cx={ccx} cy={ccy} rx={vw / 2} ry={vh / 2} fill={fillAttr} />;
@@ -564,6 +579,29 @@ export function ShapeEditOverlay({
         cx={ccx} cy={ccy} rx={Math.max(vw / 2, 8)} ry={Math.max(vh / 2, 8)}
         fill="transparent" {...bodyProps}
       />
+    );
+  } else if (diagram) {
+    // A diagram shape: the fill on its clean outline (what `fill_shape`
+    // clips to), then the outline and its detail strokes — firm or sketchy,
+    // the points the engine strokes.
+    const g = diagram;
+    const toS = (p: Point) => ({ x: toSX(p.x), y: toSY(p.y) });
+    preview = (
+      <>
+        {gradientDef}
+        <polygon
+          points={g.outline.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ")}
+          fill={fillAttr}
+        />
+        <path
+          d={strokesToPath(diagramStrokes(g, start, end, sloppyAmt, eff.strokeWidth), toS)}
+          fill="none" stroke={color} strokeWidth={strokeW}
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+      </>
+    );
+    bodyHit = (
+      <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
     );
   } else if (shape === "diamond" || shape === "star" || shape === "triangle") {
     // Firm → clean polygon over the exact vertex list Rust rasterises;
@@ -692,7 +730,7 @@ export function ShapeEditOverlay({
 
         {/* Move handle: vertical line + dot above the box (same markup
             as the text overlay's move handle) */}
-        {(() => {
+        {!ringOpen && (() => {
           const cx = vx + vw / 2;
           const stemTop = vy - STEM_GAP;
           const stemBot = stemTop - STEM_LEN;
@@ -719,7 +757,7 @@ export function ShapeEditOverlay({
 
         {/* Rotate hook — every rotatable shape. Drag to turn about the
             box center; Shift snaps to 15°. A line turns its endpoints. */}
-        {rotatable && (() => {
+        {rotatable && !ringOpen && (() => {
           const cx = vx + vw / 2;
           const bottom = vy + vh;
           const arcTop = bottom + HOOK_GAP;

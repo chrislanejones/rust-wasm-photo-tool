@@ -26,6 +26,7 @@ import type { CSSProperties } from "react";
 import { external, repoFile } from "../config";
 import { Queue, Scene } from "./engine-in-a-worker.figures";
 import "./engine-in-a-worker.figures.css";
+import PostAudio from "../components/PostAudio";
 
 /* ── FIG 3's data ─────────────────────────────────────────────────────────
  * Bytes per postMessage, on a log scale, because a linear axis would render
@@ -107,6 +108,7 @@ export default function EngineInAWorker() {
         </a>{" "}
         that closed the last objection to it.
       </p>
+      <PostAudio src="/audio/engine-in-a-worker.mp3" minutes={15} />
 
       <p>
         Until August, the engine that does the actual pixel work in Image Horse — <code>stamp_tool</code>,

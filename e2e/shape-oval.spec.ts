@@ -5,7 +5,7 @@ import { join } from "node:path";
 // ─────────────────────────────────────────────────────────────────────────────
 // The circle's oval handle — the stem + small oval left of the edit box. Drag
 // it and the circle stretches about its own center into an oval, which the
-// engine stores as kind 11 with the stretched bbox. Through the real mouse
+// engine stores as kind 41 with the stretched bbox. Through the real mouse
 // path and asserted on the engine's own JSON after commit. Helpers are copied
 // from shape-corner-radius.spec.ts.
 //
@@ -202,7 +202,7 @@ test("shapes: the circle's oval handle stretches it into an oval", async ({ page
   await page.waitForTimeout(300);
   await shot(page, "3-committed");
   const [s] = await shapes(page);
-  expect(s.kind, "stored as an oval").toBe(11);
+  expect(s.kind, "stored as an oval").toBe(41);
   const w = Math.abs(s.x1 - s.x0);
   const h = Math.abs(s.y1 - s.y0);
   expect(h, "height is the circle's diameter").toBeCloseTo(80, 0);

@@ -33,7 +33,7 @@ describe("withEditGeometry", () => {
       "oval",
     );
     expect(next.style?.shape).toBe("oval");
-    expect(next.style?.kindByte).toBe(11);
+    expect(next.style?.kindByte).toBe(41);
     expect(style.shape).toBe("circle"); // the snapshot itself is not mutated
   });
 });

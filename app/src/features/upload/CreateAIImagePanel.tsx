@@ -72,9 +72,11 @@ interface Props {
   onModelChange: (id: string) => void;
   /** Return to the tile grid. The draft dies with this component. */
   onBack: () => void;
+  /** Inside the New dialog: the header carries the [X] close. */
+  closable?: boolean;
 }
 
-export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
+export function CreateAIImagePanel({ model, onModelChange, onBack, closable = false }: Props) {
   const [prompt, setPrompt] = useState("");
   const [ratio, setRatio] = useState<string>(ASPECT_RATIOS[0].id);
   const [refs, setRefs] = useState<{ name: string; url: string }[]>([]);
@@ -146,6 +148,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack }: Props) {
       <PaneHeader
         title="Create AI Image"
         onBack={back}
+        closable={closable}
         aside={
           <InfoTooltip
             label="Create AI Image"

@@ -69,7 +69,8 @@
 
 /* The lead. The first paragraph after the receipts line is a step up, so the
    argument starts at a reading size before settling into body copy. */
-.post--article > .post__sourcenote + p { font-size: var(--text-deck); }
+.post--article > .post__sourcenote + p,
+.post--article > .post__sourcenote + .post-audio + p { font-size: var(--text-deck); }
 
 /* Section headings are labels, not display type: the design sets them small,
    uppercase and ruled, and lets the prose carry the weight. */
@@ -139,4 +140,76 @@
 .post--article .spec__caption {
   margin-block-end: 0;
   padding-block-end: var(--space-sm);
+}
+
+/* ── narration player (PostAudio) ─────────────────────────────────────────
+   Under the receipts line. The play button is the site's filled pill turned
+   into a circle; the track is a hairline that the accent fills as it plays. */
+.post-audio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  max-width: var(--measure);
+  margin-block-end: var(--space-2xl);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+}
+.post-audio__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  cursor: pointer;
+}
+.post-audio__play:hover { background: var(--color-accent-soft); }
+.post-audio__play:focus-visible,
+.post-audio__seek:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.post-audio__play svg { width: 20px; height: 20px; fill: currentColor; }
+.post-audio__body { flex: 1; min-width: 0; }
+.post-audio__label {
+  margin: 0 0 2px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+.post-audio__track { display: flex; align-items: center; gap: var(--space-sm); }
+.post-audio__time {
+  flex: none;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.post-audio__seek {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--color-accent) var(--post-audio-fill, 0%),
+    var(--color-rule) var(--post-audio-fill, 0%)
+  );
+  cursor: pointer;
+}
+.post-audio__seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+.post-audio__seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-ink);
 }

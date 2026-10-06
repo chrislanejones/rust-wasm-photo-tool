@@ -9,6 +9,7 @@ import {
   type CornerRadii,
   type Point,
 } from "@/lib/shapeSloppiness";
+import { DIAGRAM_SHAPES, DIAGRAM_NAME_KIND } from "@/lib/diagramShapes";
 
 // One `Point` for the drawing stack: defined in lib/shapeSloppiness.ts,
 // re-exported here so canvas code can keep importing it beside CropSelection.
@@ -97,7 +98,7 @@ export interface DrawEditState {
  * A pending edit with new geometry from a handle drag. `shape` rides along
  * only from the circle's oval handle, which turns a circle into an oval: a
  * new shape takes it as its `drawnShape`, a reselected one as its own
- * `style.shape` and `kindByte`, so `commitEdit` writes kind 11 either way.
+ * `style.shape` and `kindByte`, so `commitEdit` writes kind 41 either way.
  */
 export function withEditGeometry(
   prev: DrawEditState,
@@ -140,6 +141,21 @@ export function pendingShapeType(
 ): ShapeName {
   const fromPanel = panelShape as ShapeName | undefined;
   return es?.style?.shape ?? es?.drawnShape ?? fromPanel ?? "rect";
+}
+
+/**
+ * What a rubber-band drag with `tool` draws: the Shapes tool's tile, the
+ * Arrows & Shapes tool's diagram shape, or `null` for the line arrow (and for
+ * every tool that draws neither). One answer for the preview and mouse-up, so
+ * the band and the shape that lands cannot disagree.
+ */
+export function drawnShapeFor(
+  tool: string,
+  s: Pick<ToolSettings, "shape" | "arrowShape">,
+): ShapeName | null {
+  if (tool === "shapes") return s.shape ?? "rect";
+  if (tool === "arrow" && s.arrowShape && s.arrowShape !== "arrow") return s.arrowShape;
+  return null;
 }
 
 /**
@@ -223,7 +239,8 @@ function sameRadii(a: CornerRadii | undefined, b: CornerRadii | undefined): bool
 export interface ShapeMeta {
   id: number;
   kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
-                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle,11=oval
+                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle,
+                // 11..=40=diagram shapes (lib/diagramShapes.ts), 41=oval
   x0: number;
   y0: number;
   x1: number;
@@ -272,7 +289,9 @@ export const SHAPE_KIND_NAME: Record<number, ShapeName> = {
   8: "diamond",
   9: "star",
   10: "triangle",
-  11: "oval",
+  // 11..=40 — the diagram shapes, each under its own name.
+  ...Object.fromEntries(DIAGRAM_SHAPES.map((d) => [d.kind, d.id])),
+  41: "oval",
 };
 
 /** ToolSettings shape name → Rust `kind` byte. */
@@ -283,7 +302,8 @@ export const SHAPE_NAME_KIND: Record<string, number> = {
   diamond: 8,
   star: 9,
   triangle: 10,
-  oval: 11,
+  ...DIAGRAM_NAME_KIND,
+  oval: 41,
 };
 
 /** The four interior fills the Shapes panel offers. */
@@ -314,7 +334,11 @@ export const FILL_KIND_MODE: Record<number, FillMode> = {
  *  that does not, and the arrow (4) / pin (5) / polyline (6) / pen path (7)
  *  kinds are not bbox shapes. Mirrors `annotations::is_fillable_kind` (Rust);
  *  change both together or a committed fill and the preview disagree. */
-export const FILLABLE_KINDS: ReadonlySet<number> = new Set([0, 1, 8, 9, 10, 11]);
+export const FILLABLE_KINDS: ReadonlySet<number> = new Set([
+  0, 1, 8, 9, 10, 41,
+  // Every diagram shape (11..=40) has a closed outline to fill.
+  ...DIAGRAM_SHAPES.map((d) => d.kind),
+]);
 
 /** Does this shape NAME take a Fill section in the Shapes panel? The name twin
  *  of `FILLABLE_KINDS`, for the panel and the overlay, which work in names. */

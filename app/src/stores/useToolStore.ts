@@ -14,6 +14,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
+import { clampGap, GAP_DEFAULT } from "@/lib/shapePorts";
 import {
   resolveSet,
   validated,
@@ -63,6 +64,8 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
  *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
  *  `partialize` allowlist, so a reload reopens Adjustments (the long-standing
  *  default) and no storage schema changes. */
+/** The shape action bar's open ring — see `shapeActionMode`. */
+export type ShapeActionMode = "none" | "duplicate" | "connect" | "disconnect";
 export type EffectsMode = "adjust" | "levels" | "presets";
 /** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
  *  behind it, `ocr` = read text out of the image. Lifted here out of
@@ -175,11 +178,15 @@ export interface ToolState {
   /** Mask paint value (0 = hide/black, 255 = reveal/white). */
   maskPaintValue: number;
   colorPickerActive: boolean;
-  /** Shape id whose directional duplicate pad is open (Review → Reselect
-   *  d-pad), or null. NOT PERSISTED — `partialize` is an allowlist and this
-   *  stays out of it: a pad open across a reload would point at whatever
-   *  shape happened to get that id. */
-  duplicatePadId: number | null;
+  /** Which ring the shape action bar has open around a selected shape:
+   *  Duplicate's arrows, Connect's pigtails, Disconnect's X on each
+   *  connector end, or none. One at a time — Connect is refused while
+   *  Duplicate is on. NOT PERSISTED
+   *  (`partialize` is an allowlist): a reload opens no ring. */
+  shapeActionMode: ShapeActionMode;
+  /** The bar's `[-] 20px [+]` — space between duplicated copies, IMAGE px.
+   *  Not persisted either; every session starts at 20. */
+  duplicateGap: number;
   /** Recently eyedroppered colors, newest first, de-duplicated, capped.
    *
    *  NOT PERSISTED — same reasoning as `activeSubTool`: `partialize` below is
@@ -304,7 +311,8 @@ export interface ToolState {
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
   setColorPickerActive: (v: SetArg<boolean>) => void;
-  setDuplicatePadId: (v: SetArg<number | null>) => void;
+  setShapeActionMode: (v: SetArg<ShapeActionMode>) => void;
+  setDuplicateGap: (v: SetArg<number>) => void;
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
@@ -396,7 +404,8 @@ export const useToolStore = create<ToolState>()(
       maskEditing: false,
       maskPaintValue: 0,
       colorPickerActive: false,
-      duplicatePadId: null,
+      shapeActionMode: "none",
+      duplicateGap: GAP_DEFAULT,
       pickedColorHistory: [],
       stampSubMode: "clone",
       shapesMode: "shapes",
@@ -482,8 +491,10 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ maskPaintValue: resolveSet(v, s.maskPaintValue) })),
       setColorPickerActive: (v) =>
         set((s) => ({ colorPickerActive: resolveSet(v, s.colorPickerActive) })),
-      setDuplicatePadId: (v) =>
-        set((s) => ({ duplicatePadId: resolveSet(v, s.duplicatePadId) })),
+      setShapeActionMode: (v) =>
+        set((s) => ({ shapeActionMode: resolveSet(v, s.shapeActionMode) })),
+      setDuplicateGap: (v) =>
+        set((s) => ({ duplicateGap: clampGap(resolveSet(v, s.duplicateGap)) })),
       setStampSubMode: (v) =>
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),

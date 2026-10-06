@@ -331,7 +331,7 @@ export function roundCorners(verts: Point[], radiusAt: (i: number) => number): P
  *  is pushed along its edge's normal by a periodic noise of how far around the
  *  loop it is, so the wobble flows through the arcs and the loop closes.
  *  Mirrors `sloppy_loop_points` (drawing.rs). */
-function sloppyLoopPoints(
+export function sloppyLoopPoints(
   pts: Point[],
   seed: number,
   sloppiness: number,
@@ -458,7 +458,7 @@ const CIRCLE_SQUEEZE = 0.05;
  *  left 0 and the fill no longer sat under the outline.
  *
  *  `oval` stretches the ring to the whole bbox (one radius per axis) — the
- *  oval shape (kind 11). With it off every number is the circle's as before.
+ *  oval shape (kind 41). With it off every number is the circle's as before.
  *
  *  Mirrors `draw_sloppy_circle` / `sloppy_ellipse_points` (drawing.rs). */
 export function sloppyCirclePoints(

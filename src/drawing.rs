@@ -527,7 +527,8 @@ fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
 }
 
 /// Fill the interior of one of the fillable bbox shapes — rectangle (0),
-/// circle (1), diamond (8), star (9), triangle (10) — defined by the bbox
+/// circle (1), diamond (8), star (9), triangle (10), the diagram shapes
+/// (11..=40) — defined by the bbox
 /// (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear gradient `c0`→`c1`
 /// along `angle_deg` (0 = left→right, 90 = top→bottom), 3 = pixelate/mosaic the
 /// underlying pixels in `block`×`block` cells. Composited source-over (1/2) or
@@ -570,14 +571,16 @@ pub fn fill_shape(
     let cy = (miny + maxy) * 0.5;
     // Circle radius matches draw_shape's clean circle: min of the half-extents.
     let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
-    // The oval (11) fills the whole bbox: one radius per axis.
+    // The oval (41) fills the whole bbox: one radius per axis.
     let (rx, ry) = ((maxx - minx) * 0.5, (maxy - miny) * 0.5);
     // The polygon kinds' clip outline — the same vertices `draw_shape` strokes,
     // corners rounded the same way. `None` for a square-cornered rect and the
     // circle, which clip by bbox/radius instead (a rounded rect is a polygon).
+    // A diagram shape (11..=40) clips by its own outline.
     let poly: Option<Vec<(f64, f64)>> =
         corner_outline(shape as u32, x0, y0, x1, y1, star_points, radii)
-            .filter(|_| shape != 0 || has_radius(radii));
+            .filter(|_| shape != 0 || has_radius(radii))
+            .or_else(|| crate::diagram::geometry(shape, x0, y0, x1, y1).map(|g| g.outline));
 
     let px0 = (minx.floor() as i32).max(0);
     let py0 = (miny.floor() as i32).max(0);
@@ -635,7 +638,7 @@ pub fn fill_shape(
                                 if (dx * dx + dy * dy).sqrt() > radius {
                                     continue;
                                 }
-                            } else if shape == 11 {
+                            } else if shape == 41 {
                                 if !in_ellipse(xx as f64 + 0.5, yy as f64 + 0.5, cx, cy, rx, ry) {
                                     continue;
                                 }
@@ -681,7 +684,7 @@ pub fn fill_shape(
                 if (dx * dx + dy * dy).sqrt() > radius {
                     continue;
                 }
-            } else if shape == 11 {
+            } else if shape == 41 {
                 if !in_ellipse(fx, fy, cx, cy, rx, ry) {
                     continue;
                 }
@@ -912,11 +915,11 @@ pub fn draw_shape(
                 stroke_width,
             );
         }
-        // 11 = Oval — a circle stretched to fill the bbox (the circle's oval
+        // 41 = Oval — a circle stretched to fill the bbox (the circle's oval
         // handle makes one). Clean: a closed polygon fine enough to read as a
         // curve, so it rotates like the other outlines. Sketchy: the sketchy
         // circle's ring with one radius per axis.
-        11 => {
+        41 => {
             let rx = (to_x - from_x).abs() / 2.0;
             let ry = (to_y - from_y).abs() / 2.0;
             if sloppiness > 0.0 && rx.min(ry) >= 2.0 {
@@ -972,6 +975,54 @@ pub fn draw_shape(
                 sloppiness,
                 rot,
             );
+        }
+        // 11..=40 = the diagram shapes (`diagram.rs`): a closed outline plus
+        // open detail strokes, every one stroked like the polygons above.
+        11..=40 => {
+            let Some(g) = crate::diagram::geometry(shape as u8, from_x, from_y, to_x, to_y) else {
+                return;
+            };
+            if g.smooth && sloppiness > 0.0 {
+                // Curves wobble smoothly round the loop, the rounded-corner
+                // rule: per-chord overshoot would read as a saw blade.
+                let mut pts = sloppy_loop_points(&g.outline, seed, sloppiness, stroke_width);
+                if let Some(r) = rot {
+                    for p in pts.iter_mut() {
+                        *p = r.apply(*p);
+                    }
+                }
+                draw_polyline(data, w, h, &pts, color, stroke_width);
+            } else {
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    &g.outline,
+                    true,
+                    seed,
+                    color,
+                    stroke_width,
+                    sloppiness,
+                    rot,
+                );
+            }
+            // Each detail wobbles on its own seed, so two parallel bars do
+            // not shake in step.
+            for (i, d) in g.details.iter().enumerate() {
+                let dseed = seed + (i as f64 + 1.0) * 7.0;
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    d,
+                    false,
+                    dseed,
+                    color,
+                    stroke_width,
+                    sloppiness,
+                    rot,
+                );
+            }
         }
         _ => {}
     }
@@ -1263,7 +1314,7 @@ pub fn star_vertices_n(x0: f64, y0: f64, x1: f64, y1: f64, n: u32) -> Vec<(f64, 
     verts
 }
 
-/// The oval (11) filling the drag bbox as a closed polygon, starting at the
+/// The oval (41) filling the drag bbox as a closed polygon, starting at the
 /// right-hand end of the horizontal axis and going clockwise on screen. The
 /// segment count tracks the larger radius the way the clean circle's does.
 /// Mirrored by hand in `ellipseVertices` (shapeSloppiness.ts).
@@ -1512,7 +1563,7 @@ fn draw_sloppy_circle(
 
 /// The sketchy ring around the bbox center with half-axes `rx`, `ry` — the
 /// circle's (`rx == ry`, every number as before the oval existed) and the
-/// oval's (11). Mirrored by hand in `sloppyCirclePoints` (shapeSloppiness.ts).
+/// oval's (41). Mirrored by hand in `sloppyCirclePoints` (shapeSloppiness.ts).
 fn sloppy_ellipse_points(
     from_x: f64,
     from_y: f64,
@@ -1827,7 +1878,7 @@ mod geometry_tests {
         );
     }
 
-    /// The oval (11) is the circle stretched to its whole bbox: its fill
+    /// The oval (41) is the circle stretched to its whole bbox: its fill
     /// reaches the box's long axis, where the circle (1) — the inscribed
     /// `min(w, h)` circle — stops short.
     #[test]
@@ -1855,7 +1906,7 @@ mod geometry_tests {
             px
         };
         let alpha = |px: &[u8], x: u32, y: u32| px[((y * w + x) * 4 + 3) as usize];
-        let (oval, circle) = (fill(11), fill(1));
+        let (oval, circle) = (fill(41), fill(1));
         // Near the left end of the horizontal axis: oval only.
         assert_eq!(alpha(&oval, 12, 20), 255);
         assert_eq!(alpha(&circle, 12, 20), 0);

@@ -492,6 +492,9 @@ jobs:
       # laptop: the phone never fetches the engine, lit tiles pass AA, a photo
       # switch never moves an edit or a stroke onto the wrong photo, the gallery
       # and footer say Loading, and Batch's Exceptions and crop frame work.
+      # Plus five that went red on master unseen while they ran only on a
+      # laptop (10-05): one of them was a real regression — plugin formats
+      # vanished from the Download dialog in v9.14 — and nothing in CI looked.
       # ~4 min of tests against the default (placeholder-key) build.
       - name: Phone, contrast, photo-switch and Batch e2e
         run: >-
@@ -510,3 +513,10 @@ jobs:
           e2e/zip-export.spec.ts
           e2e/ora-import-status.spec.ts
           e2e/beta-switches.spec.ts
+          e2e/plugins.spec.ts
+          e2e/phone-grid-thumbs.spec.ts
+          e2e/select-refine-mask.spec.ts
+          e2e/ui-night3-panels.spec.ts
+          e2e/settings-restore-confirm.spec.ts
+          e2e/collapsed-section-names.spec.ts
+          e2e/pane-header-row.spec.ts

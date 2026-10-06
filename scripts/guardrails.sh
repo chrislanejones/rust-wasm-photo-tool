@@ -95,7 +95,7 @@ check() {
 n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
     app/src -g '*.tsx' -g '*.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 22 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
+check "raw-colors" 21 "use design tokens (docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17) §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 7 "off-scale type / faux weights (§4)" "$n_type"
@@ -135,7 +135,7 @@ ui_counts="$(node scripts/ui-ratchet-counts.mjs)" || {
 ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
 check "ui-spacing" 51 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
 check "ui-radius" 50 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
-check "ui-raw-button" 33 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
+check "ui-raw-button" 32 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
 #

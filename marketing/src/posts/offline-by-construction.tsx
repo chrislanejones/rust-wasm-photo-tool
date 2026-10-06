@@ -16,6 +16,7 @@ import { Link } from "react-router";
 
 import { external, repoFile } from "../config";
 import { Scene } from "./offline-by-construction.figures";
+import PostAudio from "../components/PostAudio";
 
 export default function OfflineByConstruction() {
   return (
@@ -27,6 +28,7 @@ export default function OfflineByConstruction() {
         </a>
         , the persistence code, and the ADRs it cites.
       </p>
+      <PostAudio src="/audio/offline-by-construction.mp3" minutes={13} />
 
       <p>
         A wound-care nurse photographs a dressing change on a ward tablet, circles the margin, drops

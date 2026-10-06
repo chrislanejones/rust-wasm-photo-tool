@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
  * The glyphs are drawn rather than imported from lucide because they sit at
  * 12×12 beside each other and must share a stroke weight exactly; a lucide
  * icon at this size reads visibly heavier next to them. Icons that DO come
- * from lucide (Copy, GamepadDirectional) are passed in by the caller.
+ * from lucide (Copy) are passed in by the caller.
  */
 
 /** ✕ — delete/remove this row. */

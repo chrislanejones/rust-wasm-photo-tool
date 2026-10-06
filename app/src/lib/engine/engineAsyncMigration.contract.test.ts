@@ -764,7 +764,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`add_layer_mask_from`, whose boolean decides whether to flush and open
     // the mask brush — un-awaited, a refused add would still do both). Same buckets.
     // Photo-only originals — 158 -> 157: a capture DELETED in usePersistActiveCanvas.
-    expect(gate.awaited, "cumulative converted sites").toBe(178); // +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3); +2: Review › Combine producers (ADR-075); +3: plugins bridge (ADR-076)
+    expect(gate.awaited, "cumulative converted sites").toBe(180); // +3: connectors (useShapeActions: get_shape_annotations + reroute_connector in follow, remove_shape_annotation in Disconnect — each read or guarded); +7: Batch › Crop (CropBatchPanel); +9: SVG export (cropTracked 6, activeSvgText 3); +2: Review › Combine producers (ADR-075); +3: plugins bridge (ADR-076); −1: shape action bar (useDuplicatePad's 3 duplicate sites out, useShapeActions' awaited duplicate + connector add in)
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

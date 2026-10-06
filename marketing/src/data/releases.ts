@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.17",
+    date: "2026-10-06",
+    headline: "Thirty diagram shapes, a bar that duplicates and connects them, and fast drags that always land.",
+    entries: [
+      { tag: "feature", text: "Create → Arrows & Shapes has thirty new shapes: the flowchart set from Lucidchart and draw.io — terminator, data, document, database, delay, display, merge, off-page connector and the rest — plus cloud, callout, cube, note, pentagon, octagon and five block arrows." },
+      { tag: "feature", text: "Every one of them fills, turns by its handle and goes hand-drawn with the Sloppiness slider, the same as a rectangle." },
+      { tag: "feature", text: "Select a shape and a bar hangs under it: Apply, Cancel, Duplicate and Connect." },
+      { tag: "feature", text: "Duplicate puts eight arrows around the shape. Each press lays another copy that way, and each arrow counts from the original — press right twice for two marching right, then down for one below." },
+      { tag: "feature", text: "Connect turns the arrows into pigtails. Drag from one onto another shape and an arrow joins them, snapped to the nearest of its eight points. A flowchart, by hand, in a photo editor." },
+      { tag: "rust", text: "The diagram shapes are drawn by the engine from one table of tiny programs, so stroke, fill, rotation and the hand-drawn wobble all work without new code per shape. The saved edit format didn't change." },
+      { tag: "fix", text: "Drawing thirty shapes as fast as you can used to land about twenty — the rest were dropped while the engine caught up. Every press is held now and replayed in order. Thirty in, thirty out." },
+      { tag: "fix", text: "Plugin formats are back in the Download dialog. Since v9.14 every plugin format that wasn't a layered file had quietly lost its tile." },
+      { tag: "ui", text: "The folded section at the bottom of Shapes and Text says Placement, because that's what's in it. The word Advanced is gone." },
+      { tag: "ui", text: "Every dialog with a second step — New Canvas, Create AI Image, Selected Image, All Images — has the same header: back on the left, the title in the middle, close on the right." },
+      { tag: "ui", text: "Settings has a real Sign in button on the right of its footer, not just a small person icon." },
+      { tag: "infra", text: "Five browser tests that had gone red without anyone seeing are green again, and they run on every pull request now." },
+    ],
+  },
+  {
     version: "v9.16",
     date: "2026-10-05",
     headline: "Share links obey the online switch, cloud storage has a real limit, and everything underneath is up to date.",

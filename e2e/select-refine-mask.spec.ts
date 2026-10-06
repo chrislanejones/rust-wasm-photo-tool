@@ -84,9 +84,14 @@ async function engine(page: Page): Promise<{ selected: number; undo: number }> {
 }
 
 async function setSlider(page: Page, label: string, v: number): Promise<void> {
-  const input = page
-    .locator(`xpath=//*[normalize-space(text())="${label}"]/ancestor::*[.//input[@type="range"]][1]//input[@type="range"]`)
-    .first();
+  // Refine is one slider for the picked operation: Holes, Islands, Smooth,
+  // Expand… are radios in "Refine operation", and the slider takes the picked
+  // one's label. The old lookup ("the range nearest the text Expand") found the
+  // Holes slider once Expand became a mode radio, so it set Holes to 8 and the
+  // assertion that Expand grows the selection read a fill-holes result.
+  await page.getByRole("radiogroup", { name: "Refine operation" }).getByRole("radio", { name: label, exact: true }).click();
+  const input = page.locator(`input[type="range"][aria-label="${label}"]`);
+  await expect(input).toHaveCount(1);
   await input.evaluate((el, value) => {
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
     set.call(el, String(value));

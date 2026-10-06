@@ -4,7 +4,15 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — five main-suite e2e specs are red on master (10-05-2026)
+## FIXED 10-05-2026 — five main-suite e2e specs were red on master (10-05-2026)
+
+Fixed on `fix/e2e-red-on-master`, and all five now run in CI. One was a real
+regression: v9.14 (#297) filtered the Download dialog's plugin formats to the
+layered ids, so a non-layered plugin format (the `.ihl` fixture) had no tile.
+The other four were tests left behind by UI changes (the phone grid measured
+the inert desktop layer, Refine became mode radios, #283 moved the Stabilizer
+out of Advanced).
+
 
 Found running the full main suite (104 tests) for v9.16. All five fail the same
 way on master `c13e8622`, so they predate v9.16. The main suite is not in CI,

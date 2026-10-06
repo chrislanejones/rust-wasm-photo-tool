@@ -23,6 +23,7 @@ mod capture;
 mod codec;
 mod core;
 mod describe;
+mod diagram;
 mod drawing;
 mod edges;
 mod effects;

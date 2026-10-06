@@ -32,6 +32,7 @@
 // annotation was hit is as wrong as disagreeing about whether one was.
 
 import { starVertices, triangleVertices } from "./shapeSloppiness";
+import { diagramGeometry } from "./diagramShapes";
 import { rotatePoint } from "./shapeRotation";
 
 /** The geometry subset of a text annotation this module needs. */
@@ -64,8 +65,11 @@ export interface ShapeHitGeometry {
 }
 
 /** The kinds the engine turns: rect, circle, line, diamond, star, triangle,
- *  oval. */
-const TURNED_KINDS = new Set([0, 1, 2, 8, 9, 10, 11]);
+ *  the diagram shapes (11..=40) and the oval (41). */
+const TURNED_KINDS = new Set([
+  0, 1, 2, 8, 9, 10, 41,
+  ...Array.from({ length: 30 }, (_, i) => 11 + i),
+]);
 
 /**
  * Port of `text_annotation_at` (annotations.rs:1792).
@@ -114,7 +118,8 @@ export function pointSegmentDistance(
  * Port of `shape_annotation_at` (annotations.rs).
  *
  * Kind codes: 2 = line, 4 = arrow (distance to segment); 6 = polyline
- * (distance to any segment); 8 = diamond, 9 = star, 10 = triangle — the
+ * (distance to any segment); 8 = diamond, 9 = star, 10 = triangle and the
+ * diagram shapes 11..=40 (their closed outline, never the detail strokes) — the
  * outline edges only while unfilled (a click inside an empty diamond selects
  * whatever is behind it), padded bbox once filled, matching the engine.
  *
@@ -122,7 +127,7 @@ export function pointSegmentDistance(
  * shape's rotation about its box center first, then every rule below applies
  * to the upright box — the engine does exactly this. Closed kinds split on
  * whether they are ink all the way through (2026-08-28):
- *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) / oval (11) is a RING — the
+ *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) / oval (41) is a RING — the
  *     padded outline minus the interior shrunk by the same pad, so a click in
  *     its empty middle is a miss and a shape can be drawn inside it;
  *   - a filled one, a pin (5) and a bézier (7) are a padded bounding box.
@@ -159,7 +164,7 @@ export function shapeAnnotationAt(
           break;
         }
       }
-    } else if ((s.fill_kind ?? 0) === 0 && (s.kind === 8 || s.kind === 9 || s.kind === 10)) {
+    } else if ((s.fill_kind ?? 0) === 0 && s.kind >= 8 && s.kind <= 40) {
       if (s.kind === 8) {
         const minx = Math.min(s.x0, s.x1);
         const maxx = Math.max(s.x0, s.x1);
@@ -182,7 +187,9 @@ export function shapeAnnotationAt(
         const verts =
           s.kind === 9
             ? starVertices(s.x0, s.y0, s.x1, s.y1, s.starPoints)
-            : triangleVertices(s.x0, s.y0, s.x1, s.y1);
+            : s.kind === 10
+              ? triangleVertices(s.x0, s.y0, s.x1, s.y1)
+              : (diagramGeometry(s.kind, { x: s.x0, y: s.y0 }, { x: s.x1, y: s.y1 })?.outline ?? []);
         if (verts.length === 0) {
           hit = false;
         } else {
@@ -208,7 +215,7 @@ export function shapeAnnotationAt(
         x >= minx - pad && x <= maxx + pad && y >= miny - pad && y <= maxy + pad;
       const hollow =
         (s.fill_kind ?? 0) === 0 &&
-        (s.kind === 0 || s.kind === 1 || s.kind === 3 || s.kind === 11);
+        (s.kind === 0 || s.kind === 1 || s.kind === 3 || s.kind === 41);
       if (!hollow) {
         hit = inOuter;
       } else if (s.kind === 0) {

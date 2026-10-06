@@ -485,13 +485,17 @@ const createGroup: ToolGroupDefinition = {
     },
     {
       id: "arrow",
-      label: "Arrow",
-      description: "Single- or double-headed arrows",
+      label: "Arrows & Shapes",
+      description: "Arrows, plus 30 flowchart, basic and block-arrow diagram shapes",
       icon: ArrowUpRight,
       tool: "shapes",
       mode: "arrows",
       cursor: "crosshair",
-      keywords: ["arrow", "pointer", "annotate", "single", "double"],
+      keywords: [
+        "arrow", "pointer", "annotate", "single", "double",
+        "diagram", "flowchart", "process", "decision", "database", "cylinder",
+        "document", "cloud", "callout", "block arrow", "chevron", "lucidchart", "draw.io",
+      ],
     },
     {
       id: "emoji",

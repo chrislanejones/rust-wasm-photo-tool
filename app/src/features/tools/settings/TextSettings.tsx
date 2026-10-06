@@ -9,7 +9,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
-import { AdvancedSection } from "@/components/ui/advanced-section";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
@@ -476,22 +476,23 @@ export function TextSettings({
     })()}
 
     {/* Placement only applies to the Text mode — Background/OCR aren't
-        placing a new object on the canvas. In an Advanced section since
+        placing a new object on the canvas. Collapsed under "Placement" since
         09-30-2026; see the note in ShapeSettings. */}
     {mode === "text" && onPlace && (
-      <AdvancedSection summary="Placement">
-        <PlacementGrid
-          label="Placement"
-          info={
+      <CollapsibleSection
+        label="Placement"
+        info={
             canPlace
               ? "Numpad 1-9 also work, spatially matched to the grid."
               : "Select a text to place it on the canvas."
-          }
+        }
+      >
+        <PlacementGrid
           disabled={!canPlace}
           numpadKeys={canPlace}
           onChange={onPlace}
         />
-      </AdvancedSection>
+      </CollapsibleSection>
     )}
     </div>
   );

@@ -699,10 +699,11 @@ const toPng = (c: HTMLCanvasElement) =>
     c.toBlob((b) => (b ? b.arrayBuffer().then((a) => resolve(new Uint8Array(a))) : reject(new Error("toBlob failed"))), "image/png"),
   );
 
-/** A five-layer .ora drawn on the spot — a sunset, because it needs a blend
- *  mode, an offset layer and a hidden one to exercise every column of the
- *  viewer. Made here rather than shipped as a file: 600 KB of PNG is a real
- *  download, and a few gradients are not. */
+/** A six-layer .ora drawn on the spot — a sunset with a horse trotting across
+ *  the field, because it needs a blend mode, an offset layer and a hidden one to
+ *  exercise every column of the viewer. Made here rather than shipped as a
+ *  file: 600 KB of PNG is a real download, and a few gradients and paths are
+ *  not. */
 export async function makeSample(): Promise<Blob> {
   const W = 720;
   const H = 450;
@@ -752,6 +753,53 @@ export async function makeSample(): Promise<Blob> {
     g.lineTo(0, H);
     g.fill();
   });
+  // The horse (Chris, 10-06-2026): a flat, side-on bay at a trot across the
+  // field, drawn from SVG paths in a 440×320 box at half size. A FULL-canvas
+  // layer at 0,0 on purpose — the Caption already shows an offset layer, and
+  // Image Horse's own .ora importer still places every layer top-left, so an
+  // offset horse would open in the editor standing in the sky.
+  const horse = mk(W, H, (g) => {
+    g.translate(180, 204);
+    g.scale(0.5, 0.5);
+    const fill = (d: string, c: string) => {
+      g.fillStyle = c;
+      g.fill(new Path2D(d));
+    };
+    const leg = (d: string, c: string, w: number) => {
+      g.strokeStyle = c;
+      g.lineWidth = w;
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      g.stroke(new Path2D(d));
+    };
+    const BAY = "#d36b2f";
+    const SHADE = "#a8582a";
+    const FAR = "#7f3f1c";
+    const HAIR = "#33291f";
+    const HOOF = "#2c2420";
+    leg("M170,185 L140,232 L104,296", FAR, 13);
+    leg("M296,186 L292,240 L266,298", FAR, 13);
+    fill("M95,292 l16,-1 l3,11 l-23,1z M257,294 l16,-1 l3,11 l-23,1z", HOOF);
+    fill("M338,118 C372,110 394,138 398,178 C402,214 414,240 430,258 C400,252 382,230 374,200 C366,174 354,154 336,142 Z", HAIR);
+    fill(
+      "M30,92 C26,82 32,72 42,64 L92,30 L95,12 L105,26 L112,28 C138,36 158,70 172,104 C210,110 262,108 296,104 " +
+        "C328,100 346,118 346,144 C346,168 336,186 320,196 C285,210 220,210 178,198 C158,192 144,182 138,168 " +
+        "C130,144 120,120 108,108 C94,104 78,112 62,116 C50,118 38,112 32,102 Z",
+      BAY,
+    );
+    fill("M178,196 C220,184 284,184 322,192 C300,208 228,212 178,198 Z", SHADE);
+    fill("M138,168 C132,146 122,124 110,110 C126,122 138,144 146,166 Z", SHADE);
+    leg("M152,184 L118,232 L156,262", BAY, 14);
+    leg("M316,184 L340,228 L334,298", BAY, 14);
+    fill("M154,254 l15,5 l-5,12 l-14,-6z M325,294 l16,-1 l3,11 l-22,1z", HOOF);
+    fill("M100,26 C130,32 154,62 170,104 L160,97 L162,110 L151,95 L149,107 L140,90 L136,101 C128,80 116,56 98,42 Z", HAIR);
+    fill("M97,16 L102,26 L97,27 Z", SHADE);
+    g.fillStyle = "#3a2418";
+    g.beginPath();
+    g.arc(72, 58, 3, 0, Math.PI * 2);
+    g.arc(35, 90, 2, 0, Math.PI * 2);
+    g.fill();
+  });
   const cap = mk(300, 56, (g) => {
     g.fillStyle = "rgba(20,12,9,0.72)";
     g.beginPath();
@@ -760,10 +808,11 @@ export async function makeSample(): Promise<Blob> {
     g.fillStyle = "#f3e7da";
     g.font = "600 22px Geist, system-ui, sans-serif";
     g.textBaseline = "middle";
-    g.fillText("sample.ora · 5 layers", 18, 29);
+    g.fillText("sample.ora · 6 layers", 18, 29);
   });
   const stack = [
     { name: "Caption", c: cap, x: 32, y: 32, opacity: 1, vis: false, op: "svg:src-over", selected: false },
+    { name: "Horse", c: horse, x: 0, y: 0, opacity: 1, vis: true, op: "svg:src-over", selected: false },
     { name: "Hills", c: hills, x: 0, y: 0, opacity: 1, vis: true, op: "svg:src-over", selected: true },
     { name: "Sun", c: sun, x: 0, y: 0, opacity: 0.95, vis: true, op: "svg:src-over", selected: false },
     { name: "Glow", c: glow, x: 0, y: 0, opacity: 0.6, vis: true, op: "svg:screen", selected: false },

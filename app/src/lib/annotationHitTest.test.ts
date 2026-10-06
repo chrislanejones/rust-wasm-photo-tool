@@ -154,16 +154,39 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(tri, 5, 5)).toBe(-1); // bbox corner, off the ink
   });
 
-  it("an unfilled oval (11) is a ring along its whole bbox, and turns", () => {
+  it("an unfilled oval (41) is a ring along its whole bbox, and turns", () => {
     // 200×60 oval centered on (100,30). pad 6.
-    const oval = [shape({ id: 39, kind: 11, x0: 0, y0: 0, x1: 200, y1: 60 })];
+    const oval = [shape({ id: 39, kind: 41, x0: 0, y0: 0, x1: 200, y1: 60 })];
     expect(shapeAnnotationAt(oval, 1, 30)).toBe(39); // left end of the long axis
     expect(shapeAnnotationAt(oval, 100, 30)).toBe(-1); // hollow middle
     expect(shapeAnnotationAt(oval, 2, 2)).toBe(-1); // bbox corner, off the ink
     // Turned 90° it stands upright on screen: the left end moves to the top.
-    const turned = [shape({ id: 40, kind: 11, x0: 0, y0: 0, x1: 200, y1: 60, rotation: 90 })];
+    const turned = [shape({ id: 40, kind: 41, x0: 0, y0: 0, x1: 200, y1: 60, rotation: 90 })];
     expect(shapeAnnotationAt(turned, 100, -69)).toBe(40);
     expect(shapeAnnotationAt(turned, 1, 30)).toBe(-1);
+  });
+
+  it("hit-tests an unfilled diagram shape (11..=40) along its outline, not its details", () => {
+    // Database (19) over 0..100: the outline runs down x = 0 and x = 100; the
+    // lid's front rim (a detail) crosses y = 30 at x = 50. Same cases as the
+    // engine's `an_unfilled_diagram_shape_selects_on_its_outline_only`.
+    const db = [shape({ id: 40, kind: 19, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(db, 0, 50)).toBe(40); // on the outline
+    expect(shapeAnnotationAt(db, 50, 60)).toBe(-1); // hollow middle
+    expect(shapeAnnotationAt(db, 50, 30)).toBe(-1); // the rim is ink, not a hit
+    const filled = [shape({ id: 41, kind: 19, x0: 0, y0: 0, x1: 100, y1: 100, fill_kind: 1 })];
+    expect(shapeAnnotationAt(filled, 50, 60)).toBe(41); // a fill is ink
+  });
+
+  it("a turned diagram shape is tested in its own frame", () => {
+    // Block arrow (36) turned 90°: the tip moves from (100,50) to (50,100),
+    // and the empty box corner at (12.5,0), far from the shaft, to (100,12.5).
+    // The engine's `a_turned_diagram_shape_turns_its_hit_test_too`, rescaled.
+    const turned = [shape({ id: 42, kind: 36, x0: 0, y0: 0, x1: 100, y1: 100, rotation: 90 })];
+    const upright = [shape({ id: 43, kind: 36, x0: 0, y0: 0, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(turned, 50, 100)).toBe(42);
+    expect(shapeAnnotationAt(turned, 100, 12.5)).toBe(-1);
+    expect(shapeAnnotationAt(upright, 12.5, 0)).toBe(-1);
   });
 
   it("a star with more points hit-tests its own outline", () => {

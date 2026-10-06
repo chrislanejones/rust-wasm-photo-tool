@@ -487,8 +487,6 @@ export function SubscriptionButton({
 
           <DialogFooter className="block border-t border-border px-4 py-2.5">
             <div className="flex items-center justify-between gap-2">
-              {/* Clerk user button / sign-in — same component as the top bar. */}
-              <UserMenu />
               {(tab === "general" ||
                 tab === "canvas" ||
                 tab === "appearance" ||
@@ -525,6 +523,12 @@ export function SubscriptionButton({
                   )}
                 </div>
               )}
+              {/* Sign in / your avatar, on the FAR RIGHT (Chris, 10-05-2026).
+                  It sat on the left as a bare person glyph and was missed;
+                  `ml-auto` keeps it right on the tabs with no Restore/Apply. */}
+              <div className="ml-auto">
+                <UserMenu labeled />
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>

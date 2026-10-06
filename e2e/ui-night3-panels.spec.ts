@@ -108,15 +108,18 @@ test("A slider shows the house focus ring on keyboard focus", async ({ page }) =
   expect(r.width).toBeGreaterThanOrEqual(2);
 });
 
-test("Eraser: the stabilizer is in Advanced, collapsed, and its summary says the level", async ({ page }) => {
+test("Eraser: the stabilizer is visible in the panel, Off by default, and nothing hides it", async ({ page }) => {
+  // #283 (v9.7) reversed Night 3's "stabilizer in a collapsed Advanced": people
+  // should see it, so it sits in the panel and Advanced now holds Placement on
+  // Shapes and Text only. The Eraser has no Advanced section at all.
   await openTool(page, "Create", "Eraser");
   const panel = page.getByRole("region", { name: "Tool options" });
-  const advanced = panel.getByRole("button", { name: /^Advanced/ });
-  await expect(advanced).toHaveAttribute("aria-expanded", "false");
-  await expect(advanced).toContainText("Stabilizer: Off");
-  await expect(panel.getByRole("radiogroup", { name: "Stroke Stabilizer" })).toHaveCount(0);
-  await advanced.click();
-  await expect(panel.getByRole("radiogroup", { name: "Stroke Stabilizer" })).toBeVisible();
+  const stabilizer = panel.getByRole("radiogroup", { name: "Stroke Stabilizer" });
+  await expect(stabilizer).toBeVisible();
+  await expect(stabilizer.getByRole("radio", { name: "Off" })).toBeChecked();
+  await expect(panel.getByRole("button", { name: /^Advanced/ })).toHaveCount(0);
+  await stabilizer.getByRole("radio", { name: "Med" }).click();
+  await expect(stabilizer.getByRole("radio", { name: "Med" })).toBeChecked();
 });
 
 test("Crop: a disabled Apply Crop says why, and stops saying it once there is a crop", async ({ page }) => {
