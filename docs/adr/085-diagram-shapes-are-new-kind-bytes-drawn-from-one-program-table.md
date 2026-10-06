@@ -1,5 +1,5 @@
 # ADR-085: Diagram shapes are new kind bytes, drawn from one program table
-Date: 2026-10-06   Status: draft   Relates to: ADR-059, ADR-082
+Date: 2026-10-06   Status: accepted (10-06-2026)   Relates to: ADR-059, ADR-082
 
 ## Context
 
@@ -58,3 +58,11 @@ The tiles are drawn from the same geometry.
 
 **Pre-mortem warning sign:** a shape edited in only one of the two tables —
 the parity test is the alarm; never update one table from the other's output.
+
+## Outcome
+
+| Date | What happened |
+| --- | --- |
+| 2026-10-06 | Shipped in v9.17 (#304). Engine 858,808 → 868,393 B in the release build. |
+| 2026-10-06 | The first collision this ADR warned about happened the same day: #305, written in parallel, used kind **11** for the oval. Merged as-is, `draw_shape`'s `11 =>` arm would have drawn every terminator as an oval. The oval was moved to **kind 41** before it merged (942ec0d6), and the hit-test drift hash re-pinned (31c2e04289aa4ab2) after the port's tests passed. Engine 870,406 B with the oval. |
+| Allocation now | 11..=40 diagram shapes, 41 oval. **The next free kind is 42.** The kind byte is still never validated, so a collision is silent: grep `is_diagram_kind`, `SHAPE_KIND_NAME` and `matches!(kind` on master before adding one. |

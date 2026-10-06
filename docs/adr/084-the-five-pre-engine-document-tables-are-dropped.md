@@ -1,5 +1,5 @@
 # ADR-084: The five pre-engine document tables are dropped
-Date: 2026-10-05   Status: draft   Relates to: ADR-083
+Date: 2026-10-05   Status: accepted (10-06-2026)   Relates to: ADR-083
 
 ## Context
 
@@ -49,3 +49,11 @@ prod and the repo moved on, and the next schema change on dev failed or
 behaved differently from prod, which cost a debugging session.
 Early warning sign: `projects:*` or `images:*` still listed in the dev
 deployment's function list after this ships.
+
+## Outcome
+
+| Date | What happened |
+| --- | --- |
+| 2026-10-05 | Shipped in v9.16 (#300). Prod `pastel-alligator-180` deployed by CI. Dev `brave-ant-608` deployed by hand with `convex dev --once`, which reported the twelve indexes of the five tables deleted. |
+| 2026-10-05 | The post-deploy module check briefly went red on master because five new helper-only modules register no functions; #301 taught it that, and it now reads 14 of 14 modules live. Not related to the drop. |
+| Pre-mortem check | Old functions are no longer listed on dev; the warning sign above did not fire. |
