@@ -803,6 +803,7 @@ impl ImageHorseTool {
     /// Build a history snapshot of the entire current layer stack.
     fn make_snapshot(&self, label: &str) -> Snapshot {
         Snapshot {
+            node: self.hist.current_node(), // the live document's identity
             label: label.to_string(),
             layers: self.layers.clone(),
             active: self.active,
@@ -2285,7 +2286,7 @@ impl ImageHorseTool {
             &mut layer.buf.data,
             w,
             h,
-            &mut self.hist.redo_stack,
+            &mut self.hist,
             dest_x,
             dest_y,
             snap,

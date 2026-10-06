@@ -1065,6 +1065,16 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
+/* Beta history forks (ADR-086): the branch list under History. Sized to its
+   content and capped, so the linear list above keeps the section's height —
+   the engine holds at most 12 branches. Unlayered on purpose: `.history-list`
+   above is unlayered too, and a Tailwind utility could not override it. */
+.history-branches .history-list {
+  flex: 0 1 auto;
+  max-height: 148px;
+  padding-top: 0;
+}
+
 /* ── Combine section (Review → Combine) ──────────────────────────────────
    The mode strip and its readout, above the object list. `flex: 0 0 auto` is
    the point: the object list below is the `.history-list` that takes the

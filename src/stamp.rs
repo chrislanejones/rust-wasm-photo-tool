@@ -83,7 +83,7 @@ impl StampState {
         data: &mut [u8],
         w: i32,
         h: i32,
-        redo_stack: &mut Vec<Snapshot>,
+        history: &mut History,
         dest_x: f64,
         dest_y: f64,
         pre_snapshot: Snapshot,
@@ -104,7 +104,10 @@ impl StampState {
         self.stroke_counter += 1;
         self.stroke_src_data = data.to_vec();
         self.stroke_pre_snapshot = Some(pre_snapshot);
-        redo_stack.clear();
+        // A stroke started after an undo forks the history like any other
+        // edit: with the history-forks Beta on, the abandoned tail becomes a
+        // branch; off, this is the plain clear it always was (ADR-086).
+        history.abandon_redo_tail();
         // Anchored at the press point, and the first stamp lands there either
         // way — matching paint and blur, which both dab at the down point
         // before the leash takes over.

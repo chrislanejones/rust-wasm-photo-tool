@@ -56,6 +56,11 @@ export const GROUPS: Group[] = [
         body: "Each photo measured against the size Google actually allows for it, instead of a made-up score. Already behind a flag.",
         beta: "pagespeed-budget",
       },
+      {
+        name: "Keep the steps you undo",
+        body: "Undo, make a different edit, and the steps you undid stay under History as a branch you can click back to. Already behind a flag.",
+        beta: "history-forks",
+      },
     ],
   },
   {

@@ -281,6 +281,8 @@ declare module "stamp_tool" {
     layers_json: string;
     active_layer_id: number;
     export_quality: number;
+    /** Beta history forks branch list (ADR-086); `"[]"` when none. */
+    branches_json: string;
   }
 
   /**
@@ -385,6 +387,21 @@ declare module "stamp_tool" {
     jump_to_history(index: number): boolean;
     delete_history_entry(index: number): boolean;
     clear_history(): void;
+    /** Beta history forks (ADR-086). Default OFF = redo is cleared by an
+     *  edit after undo, as always. ON keeps that tail as a branch. Turning it
+     *  off forgets every held branch. */
+    set_history_forks(on: boolean): void;
+    history_forks(): boolean;
+    history_branch_count(): number;
+    /** Newest first: `[{"id":3,"label":"Crop","steps":4,"bytes":50331648,
+     *  "nested":false}]`. Also on `capture_ui_state()` as `branches_json`,
+     *  which is what the panel reads. */
+    history_branches_json(): string;
+    /** Travel to a branch's tip; the timeline left becomes a branch. `false`
+     *  = the branch is gone and nothing moved. */
+    restore_history_branch(id: number): boolean;
+    /** Forget one branch. `false` = it was already gone. */
+    delete_history_branch(id: number): boolean;
     get_image_data(): Uint8Array;
     /** Composite cropped to content with the artboard's backing "Background"
      *  layer left out. Dimensions: export_width/height_excluding_background. */
