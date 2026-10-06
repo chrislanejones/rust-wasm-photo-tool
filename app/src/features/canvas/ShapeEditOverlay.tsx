@@ -36,6 +36,7 @@ import {
   rotationAfterDrag,
   toLocalDelta,
 } from "@/lib/shapeRotation";
+import { tooSmallForActions } from "@/lib/shapePorts";
 import { useToolStore } from "@/stores/useToolStore";
 import { ROTATE_CURSOR } from "./canvasCursor";
 import { arrowGeometry, sloppyShapePath } from "./shapeOverlayPath";
@@ -77,6 +78,7 @@ export function ShapeEditOverlay({
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
   const liveCornerRadii = useToolStore((s) => s.toolSettings.cornerRadii);
+  const actionMode = useToolStore((s) => s.shapeActionMode);
 
   // ── Shape/arrow edit-overlay drag ──────────────────────────────────
   // Same window-listener pattern as the crop handles. Geometry math is
@@ -334,6 +336,16 @@ export function ShapeEditOverlay({
   // Everything but the clip turns about the box center — the same
   // pivot the engine uses, so the preview and the commit agree.
   const turn = deg ? `rotate(${deg} ${vx + vw / 2} ${vy + vh / 2})` : undefined;
+  // While the action bar's Duplicate/Connect ring is open, its N and S ports
+  // sit where the move stem and the rotate hook are. The ring wins: the body
+  // still drags to move, and closing the ring brings both back. Same
+  // condition ShapeActionsOverlay draws the ring under.
+  const ringOpen =
+    actionMode !== "none" &&
+    !isSegment &&
+    kindByte !== 5 &&
+    kindByte !== 3 &&
+    !tooSmallForActions(vw, vh);
 
   const HS = 9;   // resize-square size — screen px, zoom-independent
   const EP_R = 6; // endpoint-circle radius — screen px
@@ -660,7 +672,7 @@ export function ShapeEditOverlay({
 
         {/* Move handle: vertical line + dot above the box (same markup
             as the text overlay's move handle) */}
-        {(() => {
+        {!ringOpen && (() => {
           const cx = vx + vw / 2;
           const stemTop = vy - STEM_GAP;
           const stemBot = stemTop - STEM_LEN;
@@ -687,7 +699,7 @@ export function ShapeEditOverlay({
 
         {/* Rotate hook — every rotatable shape. Drag to turn about the
             box center; Shift snaps to 15°. A line turns its endpoints. */}
-        {rotatable && (() => {
+        {rotatable && !ringOpen && (() => {
           const cx = vx + vw / 2;
           const bottom = vy + vh;
           const arcTop = bottom + HOOK_GAP;

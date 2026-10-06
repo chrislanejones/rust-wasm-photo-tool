@@ -193,19 +193,13 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Nine-cell grid in the Text and Shapes panels; Rust centers the bounding box in the cell (align_annotation) as one undo step.",
   },
-  "Directional duplicate pad": {
+  "Shape action bar": {
     group: "annotate",
-    title: "Directional duplicate pad",
+    title: "Shape action bar",
     plain:
-      "Lay out repeated boxes: press an arrow and a same-sized copy lands beside the last one.",
+      "Apply, Cancel, Duplicate and Connect right under the shape — arrows lay copies, pigtails draw connectors.",
     detail:
-      "Rectangles and circles only; offsets from the shape's own box (lib/duplicatePadGeometry.ts), engine-side struct clone.",
-  },
-  "Duplicate from the Reselect row": {
-    group: "annotate",
-    title: "Duplicate from the Reselect row",
-    plain: "Copy any placed text or shape — shadow, rotation and warp come along.",
-    detail: "The engine clones the annotation struct; a test walks every field the engine emits.",
+      "Eight ports on the bounding box; copies counted per port from the original (lib/shapePorts.ts), engine-side struct clone; connectors are arrow annotations.",
   },
   OCR: {
     group: "annotate",

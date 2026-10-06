@@ -69,12 +69,16 @@ export function CanvasActionBar({ x, y, label, children, ...rest }: CanvasAction
 export function CanvasActionBarButton({
   onClick,
   disabled,
+  pressed,
   title,
   className,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  /** A toggle's state (aria-pressed + the hover tint held on). Omit for a
+   *  plain button. */
+  pressed?: boolean;
   /** Also the accessible name, so it must say what the button does. */
   title: string;
   className?: string;
@@ -85,6 +89,7 @@ export function CanvasActionBarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={pressed}
       title={title}
       aria-label={title}
       // A canvas overlay's window-level drag listeners still hear a pointerdown
@@ -93,6 +98,7 @@ export function CanvasActionBarButton({
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
         "flex items-center gap-1 rounded px-2 py-1 text-xs text-theme-foreground hover:bg-theme-muted disabled:cursor-not-allowed disabled:opacity-40",
+        pressed && "bg-theme-muted",
         className,
       )}
     >
