@@ -153,9 +153,11 @@ for (const shape of SHAPES) {
     });
     expect(shimmer, "the card carries the one shimmer").toBe("skeleton-shimmer");
 
-    // Let every held decode land: the card comes back as one piece.
+    // Let every held decode land: the card comes back as one piece — PROMPTLY.
+    // 5 s, not 30: the 15 s cap would unlock a card whose region never ended,
+    // and a generous timeout let exactly that pass (SESSION_LOG E3).
     await releaseBlobs(page);
-    await expect.poll(async () => (await probe(page)).loading, { timeout: 30_000 }).toBe(false);
+    await expect.poll(async () => (await probe(page)).loading, { timeout: 5_000 }).toBe(false);
     await expect.poll(() => allDrawn(page), { timeout: 30_000 }).toBe(true);
     const after = await probe(page);
     expect(after.chromeInert, "unlocked").toBe(false);
@@ -176,7 +178,11 @@ for (const shape of SHAPES) {
 
 test("a restore whose thumbnails decode in under 300 ms shows no skeleton anywhere — watched every frame", async ({ page }) => {
   await importTwelve(page, 1280, 800);
-  await restore(page, 1280, { mode: "off" });
+  // 150 ms, not instant: every tile really IS empty for a while, in view and
+  // observed, so only the 300 ms grace stands between it and a flash. With
+  // instant decodes the first observer callback arrives after the pictures
+  // and a zero grace passed this test (measured, SESSION_LOG E1).
+  await restore(page, 1280, { mode: "delay", ms: 150 });
   await expect.poll(async () => (await probe(page)).tiles.length, { timeout: 30_000 }).toBe(12);
   await expect.poll(() => allDrawn(page), { timeout: 30_000 }).toBe(true);
   await page.waitForTimeout(1500);
@@ -195,7 +201,9 @@ test("an off-screen tile still empty does not keep the card loading", async ({ p
   // Release every held decode except the last one asked for — the last tile,
   // past the right chevron.
   await releaseBlobs(page, 1);
-  await expect.poll(async () => (await probe(page)).loading, { timeout: 30_000 }).toBe(false);
+  // Promptly — the 15 s cap would otherwise unlock it for the wrong reason
+  // (SESSION_LOG E4: a 30 s wait passed with off-screen tiles counted).
+  await expect.poll(async () => (await probe(page)).loading, { timeout: 5_000 }).toBe(false);
   const p = await probe(page);
   const empty = p.tiles.filter((t) => !t.hasImg);
   // ⚠️ THE CONTROL. If the held decode were not a tile's, or the tile were in
