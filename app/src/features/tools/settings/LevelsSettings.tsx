@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/panel-action-bar";
 import type { LevelsControls } from "@/hooks/useTransforms";
 import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /** The identity. Gamma is held ×100 so the slider stays integer. */
 const BLACK = 0;
@@ -124,7 +125,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
   const mid = midtoneX(black, white, gamma / 100);
 
   return (
-    <div className="space-y-3 -mt-2">
+    <ToolPanel>
       <SectionHeader
         title="Levels"
         info="Drag Black point and White point in to set the darkest and brightest tones, and Midtones to lift or deepen everything between. The photo updates as you drag. Apply makes it one undo step; leave the panel without applying and the photo goes back."
@@ -214,6 +215,6 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
           Apply
         </PanelAction>
       </PanelActionBar>
-    </div>
+    </ToolPanel>
   );
 }
