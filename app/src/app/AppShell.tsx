@@ -81,7 +81,7 @@ import {
 } from "@/lib/galleryManifest";
 import { loadEngineIfWanted } from "@/lib/engineGate";
 import { usePhotoLimit } from "./session/useEngineGate";
-import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { isImportableFile, needsConversion, toDecodableFile } from "@/lib/importBoundary";
 import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
@@ -1708,13 +1708,13 @@ export function AppShell() {
 
   const openImportDialog = useCallback(async (source: Blob, file: File) => {
     try {
-      // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
-      // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
-      // The gallery route gets the SVG itself: `handleAddPhotos` rasterizes it
-      // too, and keeps the markup for SVG export on the way.
+      // SVGs (and, Beta, HEICs) are converted at the boundary — createImageBitmap
+      // can't decode them and neither enters the pipeline (lib/importBoundary).
+      // The gallery route gets the file itself: `handleAddPhotos` converts it
+      // too, and keeps an SVG's markup for SVG export on the way.
       const galleryFile = file;
-      if (isSvgFile(file)) {
-        file = await rasterizeSvgToPng(file);
+      if (needsConversion(file)) {
+        file = await toDecodableFile(file);
         source = file;
       }
 
@@ -1871,9 +1871,9 @@ export function AppShell() {
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
-      // isSvgFile catches .svg drops whose source hands over an empty mime.
+      // Also catches .svg (and, Beta, .heic) drops that hand over an empty mime.
       const files = Array.from(e.dataTransfer?.files ?? []).filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
+        (f) => isImportableFile(f),
       );
       if (files.length === 0) {
         toast.error("That doesn't look like an image");

@@ -61,6 +61,11 @@ export const GROUPS: Group[] = [
         body: "Undo, make a different edit, and the steps you undid stay under History as a branch you can click back to. Already behind a flag.",
         beta: "history-forks",
       },
+      {
+        name: "Open iPhone photos",
+        body: "Open the .heic photos an iPhone takes. They open like any other photo, camera info and all. Already behind a flag.",
+        beta: "heic-import",
+      },
     ],
   },
   {

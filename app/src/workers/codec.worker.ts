@@ -1,24 +1,30 @@
 // app/src/workers/codec.worker.ts
 //
-// ONE module Web Worker that owns off-main-thread image ENCODING and
-// THUMBNAILING. It runs the CPU/codec-heavy `OffscreenCanvas.convertToBlob`
+// ONE module Web Worker that owns off-main-thread image ENCODING,
+// THUMBNAILING and (Beta) HEIC DECODING. It runs the CPU/codec-heavy `OffscreenCanvas.convertToBlob`
 // step so large JPEG/WebP/AVIF encodes and gallery thumbnails don't jank the
 // UI thread.
 //
 // Scope guardrails (see SESSION_LOG):
 //   - No ENGINE wasm here. The Rust engine stays out of this worker; thumbnail
 //     resize uses OffscreenCanvas drawImage instead of the Rust bilinear
-//     resizer. The one wasm this worker loads is the AVIF encoder, lazily, on
-//     the first AVIF encode (lib/avifEncoder.ts, ADR-074).
+//     resizer. The wasm this worker loads is third-party and lazy: the AVIF
+//     encoder on the first AVIF encode (lib/avifEncoder.ts, ADR-074), and
+//     libheif on the first HEIC import with the Beta on (lib/heicCodec.ts,
+//     ADR-087). libheif is HERE rather than on the main thread because it has
+//     to be: it initializes with a synchronous `new WebAssembly.Module`, which
+//     browsers forbid on the main thread above 4 KB.
 //   - Pixel buffers arrive as transferables (see codecWorkerClient.ts). Each
 //     call builds its own OffscreenCanvas and holds no shared state, so
 //     concurrent calls are safe.
 //
 // Exposed via Comlink; the main-thread facade lives in
-// app/src/lib/codecWorkerClient.ts and always keeps a main-thread fallback.
+// app/src/lib/codecWorkerClient.ts and always keeps a main-thread fallback —
+// except for `heicToWebp`, which has nowhere to fall back TO (see above).
 
 import * as Comlink from "comlink";
 import { encodeAvif } from "@/lib/avifEncoder";
+import { decodeHeicToRgba } from "@/lib/heicCodec";
 
 /**
  * Wrap raw RGBA bytes as ImageData over a fresh (non-shared) ArrayBuffer.
@@ -114,6 +120,27 @@ const codecApi = {
     tctx.imageSmoothingQuality = "high";
     tctx.drawImage(full, 0, 0, tw, th);
     return thumb.convertToBlob({ type: "image/webp", quality: 0.78 });
+  },
+
+  /**
+   * Decode a HEIC/HEIF container and re-encode it as WebP, both here. The
+   * dimensions come back with the blob because the caller needs them to
+   * transplant the source EXIF into the WebP it gets.
+   *
+   * Decode AND encode in one call on purpose: shipping raw RGBA back for the
+   * main thread to encode would move ~48 MB per 12 MP photo across the worker
+   * boundary and then re-do on the UI thread the exact work this worker
+   * exists to take off it. `bytes` is consumed (transferred in).
+   */
+  async heicToWebp(
+    bytes: Uint8Array,
+    quality: number,
+  ): Promise<{ blob: Blob; width: number; height: number }> {
+    const { pixels, width, height } = await decodeHeicToRgba(bytes);
+    const oc = new OffscreenCanvas(width, height);
+    oc.getContext("2d")!.putImageData(new ImageData(pixels, width, height), 0, 0);
+    const blob = await oc.convertToBlob({ type: "image/webp", quality });
+    return { blob, width, height };
   },
 };
 

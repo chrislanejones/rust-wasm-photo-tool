@@ -4,6 +4,18 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — HEIC import Beta (ADR-087): what the first pass left out (10-06-2026)
+
+Found while porting #130 onto master (`feat/beta-heic-import`). None is a
+regression; each is HEIC-with-the-Beta-on only.
+
+| What | Where | Notes |
+| --- | --- | --- |
+| The Batch watermark LOGO picker does not take a HEIC | `BatchSettings.tsx` `handleFile` / `decodeImageFile` | The 09-11 branch converted there too. Left out to keep this PR to photo import; a logo is rarely an iPhone photo. Needs the converted file for both the bitmap and the `<img>` preview. |
+| A HEIC dropped on an open photo is decoded twice if you then pick "new gallery image" | `AppShell.openImportDialog` | The dialog converts it once for its layer preview, and `handleAddPhotos` converts the original again. Correct, just slow (~1 s more). Fixing it means passing the converted file as `galleryFile`, which is an AppShell line. |
+| Never run against a real iPhone file | e2e fixture is ImageMagick + libheif's own writer | Live Photos, 48 MP grid-tiled shots and HDR gain maps untested. One pass with a real phone photo (measured, not viewed) before the Beta graduates. |
+| Paste (Ctrl+V) of a HEIC with NO mime is dropped | `handlePasteFromClipboard` filters on `type.startsWith("image/")` | Same as master. A pasted `image/heic` does reach `openImportDialog` and is converted; only a typeless one is lost. |
+
 ## OPEN — UI Night 8 PR 1 leftovers: three things the gallery skeleton work surfaced (10-06-2026)
 
 Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
