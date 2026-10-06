@@ -518,3 +518,5 @@ jobs:
           e2e/select-refine-mask.spec.ts
           e2e/ui-night3-panels.spec.ts
           e2e/settings-restore-confirm.spec.ts
+          e2e/collapsed-section-names.spec.ts
+          e2e/pane-header-row.spec.ts

@@ -11346,3 +11346,22 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Workers** | Probed on production builds of this and master: engine worker and codec worker both start, no main-thread fallback, the AVIF encoder loads in the worker, and JPEG / WebP / AVIF exports are byte-identical between the two (9,511 / 6,526 / 11,075 B). |
 | **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,741/1,741, cargo test 634/634, clippy both ways, guardrails OK, SW e2e 5/5, main e2e 97/104 — the 5 failing also fail on master (parked), 2 skipped. |
 
+## v9.17 Change Summary — 2026-10-06
+
+**Thirty diagram shapes, a bar that duplicates and connects them, and fast drags that always land.** #301, #302, #303, #304, #306, #307, #308.
+
+| Area | Change |
+| --- | --- |
+| **Arrows & Shapes** (#304, ADR-085 draft) | The Arrow sub-tool offers the line arrow plus 30 diagram shapes in three groups: Flowchart (18), Basic (7), Block arrows (5). Engine kinds 11–40, each a short program in the unit square (`src/diagram.rs`) flattened to one closed outline plus detail strokes, so stroke, fill, rotation, sloppiness and hit-testing ride the existing routes. No new field and no op-log bump. TS mirror `lib/diagramShapes.ts` with a parity test that reads the Rust table out of the source. |
+| **Fast drags** (#304) | A press on Shapes / Arrows & Shapes / Crop awaited engine round trips before it became a drag, and its moves and release were dropped meanwhile; 30 fast drags landed 19–24. `lib/pressQueue.ts` records the press at once, buffers its moves and release, and replays them in order. Now 30/30. |
+| **Shape action bar** (#308) | Replaces the Review › Reselect d-pad. Select a box shape and Apply · Cancel · Duplicate · Connect sit under it; Duplicate puts eight port arrows around it (copies counted per port from the original, along the shape's own axes); Connect drags an arrow to the nearest of another shape's eight points. Hidden when the shape is under 32px on screen. |
+| **Plugin formats** (#302) | v9.14 (#297) filtered the Download dialog's plugin formats to the layered ids while merging two format groups, so any other plugin format had no tile. Every plugin format has a tile again; layered last. |
+| **E2E** (#302) | The five main-suite specs that were red on master are green and now run in CI — four were stale tests (inert desktop layer counted at phone width, Refine mode radios, #283's Stabilizer move), one was the plugin regression above. |
+| **Placement** (#303) | `AdvancedSection` → `CollapsibleSection` with a required label: the Shapes / Text header reads Placement, with the lightbulb beside it. |
+| **Dialog headers** (#307) | `PaneHeader` is one `1fr auto 1fr` row — Back, centered title, close — on New Canvas, Create AI Image, Selected Image and All Images; Back is the 24px close button's size; one close per dialog. |
+| **Settings sign-in** (#306) | A labeled Sign in button on the far right of the Settings footer. |
+| **CI** (#301) | gitleaks false positive on a fake test photoKey; the Convex deploy check now knows the five helper-only modules. |
+| **Marketing** | /features: the Arrows card follows its renamed feature ("Arrows & Diagram Shapes"), plus cards for fast drags, the dialog header and Settings sign-in. |
+| **Engine** | **858,808 → 868,393 B** (+9,585), the diagram shapes. |
+| **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,774/1,774, cargo test 643/643, clippy + fmt OK, guardrails OK. |
+
