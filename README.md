@@ -86,31 +86,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.17 — 2026-10-06
+### v9.18 — 2026-10-06
 
-**Thirty diagram shapes, a bar that duplicates and connects them, and fast drags that always land.**
+**Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.**
 
-Create → Arrows & Shapes now has the thirty shapes people reach for most in
-Lucidchart and draw.io — flowchart symbols like terminator, document,
-database and delay, basics like cloud, callout and cube, and block arrows.
-They fill, turn and go hand-drawn like every other shape.
+An arrow you join to a shape with Connect now stays on the same point of the
+shape when you move it, resize it or turn it, and one undo puts both back.
+Disconnect puts a ✕ on each joined end. Drag the handle on the left of a
+circle and it stretches into an oval.
 
-Select a shape and a bar hangs under it: Apply, Cancel, Duplicate and
-Connect. Duplicate puts eight arrows around the shape, and each press lays
-another copy that way. Connect turns them into pigtails: drag from one onto
-another shape and an arrow joins the two. That's a flowchart, built by hand,
-in a photo editor.
+When photos are still loading — a restore, or a big import — the gallery
+goes to placeholders as one piece, the same way the Tools card does during a
+slow switch, and comes back without anything moving.
 
-Drawing thirty shapes as fast as you can used to land about twenty of them.
-Now it lands thirty.
+The tool panels got a tidy-up: they all share one layout now, Levels, Resize
+and Canvas Size show the same "changed" dot as Adjustments, and saved colors
+in the color picker tell a screen reader which one is picked.
 
-Smaller things: plugin formats are back in the Download dialog (v9.14 had
-hidden every one that wasn't layered), the collapsed section in Shapes and
-Text says Placement instead of Advanced, every second-step dialog has the
-same ‹ title ✕ header, and Settings has a real Sign in button on the right.
+New in Settings › Beta: history forks. Undo, edit, and the steps you undid
+are kept as a branch you can go back to.
 
-Engine 858,808 → 868,393 bytes, for the diagram shapes. No change to the
-saved edit format.
+On the site: every blog post has a narrated version, and the OpenRaster
+sample has a horse in it.
+
+Engine 868,393 → 885,380 bytes, for the oval, connectors and history forks.
+No change to the saved edit format.
 
 
 ## License

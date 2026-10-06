@@ -11365,3 +11365,20 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **858,808 → 868,393 B** (+9,585), the diagram shapes. |
 | **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,774/1,774, cargo test 643/643, clippy + fmt OK, guardrails OK. |
 
+## v9.18 Change Summary — 2026-10-06
+
+**Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.** #305, #309, #310, #311, #312, #313, #314, #315.
+
+| Area | Change |
+| --- | --- |
+| **Connectors follow** (#310) | An arrow sitting on a shape's port is re-routed to the same port on the new outline when the shape moves, resizes or turns (`connectorsToFollow`, `reroute_connector`); attachment is geometric, nothing new is saved. The re-route rides the box edit's snapshot, so one undo restores both; it marks the op-log broken so the document saves as a snapshot. **Disconnect** mode on the action bar: a ✕ per joined end. Guardrails fixed before merge (Disconnect on the shared Button; two helpers un-exported). |
+| **Oval** (#305) | A circle's oval handle stretches it to fill its bbox, as **kind 41** — #305 had used 11, which #304 gave the diagram shapes; renumbered everywhere and the hit-test drift hash re-pinned (31c2e04289aa4ab2). Next free kind: 42 (ADR-085 outcome). |
+| **Gallery skeleton** (#314) | One `[data-skeleton-region]` rule (renamed from `[data-switch-skeleton]`, alias kept) for Tools and the gallery. After 300 ms with an in-view tile empty or an import in flight, the gallery chrome goes inert muted blocks of its own size; empty tiles skeleton at once; one "Loading N photos…"; a 15 s cap. Bar box identical before/during/after at 1280, docked and 390. Mode (a) "fill in" ships; (b) is one constant away. |
+| **Night 7 finish** (#315) | Ratchets: raw buttons 32 → 14, radius 50 → 22, spacing 51 → 42, raw colors 21 → 13; new guardrails for unregistered raw buttons and "unknown" exceptions. 11 panels on the §8 grammar (one per commit); every `<kbd>` on `ui/kbd`; ToolButtonGroup's `label` prop moved to ControlRow and deleted; saved swatches are a named radio group; edited dot on Levels, Resize and Canvas Size; 18 bare `rounded` → `rounded-sm` (0-pixel diff). FieldLabel fold left for Chris (screenshots in the PR). |
+| **History forks — Beta** (#313, ADR-086 draft) | `ih_history_forks` / `?beta=history-forks`. Off: redo cleared as before. On: the abandoned redo tail becomes a branch (max 12), re-enterable from a Time Machine list under History; branches share the 512 MB undo budget and are evicted first; memory only. |
+| **ADRs** (#312) | 083, 084 and 085 accepted, each with an Outcome section. |
+| **Storage** | The orphan sweep was applied on the live dev deployment: 167 files, 6,333.7 MiB deleted; 40 of 40 referenced files kept. |
+| **Marketing** | Blog posts carry their narration in a site-styled player under the receipts line, loaded only on Play (#311). The /openraster sample gains a Horse layer (#309). |
+| **Engine** | **868,393 → 885,380 B** (+16,987): the oval, connector re-routing and history branches. |
+| **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,818/1,818, cargo test 674/674, clippy + fmt OK, guardrails OK. |
+

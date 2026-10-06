@@ -24,6 +24,24 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.18",
+    date: "2026-10-06",
+    headline: "Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.",
+    entries: [
+      { tag: "feature", text: "An arrow you join to a shape with Connect stays on the same point of the shape when you move it, resize it or turn it. One undo puts both back." },
+      { tag: "feature", text: "Disconnect puts a ✕ on every joined end. Press one and that connector is gone." },
+      { tag: "feature", text: "Drag the handle on the left of a circle and it stretches into an oval. It fills, turns and goes hand-drawn like any other shape." },
+      { tag: "ui", text: "When photos are still loading, the gallery goes to placeholders as one piece — header, arrows and tiles — and comes back without anything moving. The same way the Tools card does during a slow switch." },
+      { tag: "ui", text: "Every tool panel uses the same layout now: the same header, the same gaps, the same label spacing. Twenty-odd one-off buttons became the shared one." },
+      { tag: "ui", text: "Levels, Resize and Canvas Size show the same small dot as Adjustments when this photo has been changed, with a reset beside it." },
+      { tag: "fix", text: "Saved colors in the color picker now tell a screen reader which one is picked." },
+      { tag: "feature", text: "New in Settings › Beta: history forks. Undo a few steps, make an edit, and the steps you undid are kept as a branch you can go back to." },
+      { tag: "infra", text: "6.3 GB of backup files that nothing pointed at any more were cleaned out of cloud storage. Every file still in use was kept." },
+      { tag: "ui", text: "Every blog post has a narrated version now, in a player under the title. Nothing downloads until you press Play." },
+      { tag: "ui", text: "The OpenRaster sample file has a horse trotting across the field." },
+    ],
+  },
+  {
     version: "v9.17",
     date: "2026-10-06",
     headline: "Thirty diagram shapes, a bar that duplicates and connects them, and fast drags that always land.",
