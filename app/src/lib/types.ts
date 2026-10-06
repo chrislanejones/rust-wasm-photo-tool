@@ -28,11 +28,23 @@ export interface StampSettings {
   opacity: number;
 }
 
+/** The diagram shapes the Arrows & Shapes tool draws — engine kinds 11..=40,
+ *  in the order of `DIAGRAM_SHAPES` (lib/diagramShapes.ts). */
+export type DiagramShapeName =
+  | "terminator" | "data" | "document" | "multiDocument" | "predefinedProcess"
+  | "manualInput" | "manualOperation" | "preparation" | "database"
+  | "internalStorage" | "offPageConnector" | "delay" | "display" | "storedData"
+  | "merge" | "card" | "punchedTape" | "summingJunction"
+  | "pentagon" | "octagon" | "cloud" | "callout" | "cross" | "cube" | "note"
+  | "blockArrow" | "doubleBlockArrow" | "quadArrow" | "chevron" | "stepArrow";
+
 /** The shapes the Shapes tool can draw. The Rust `kind` bytes: 0 rect, 1
- *  circle, 2 line, 8 diamond, 9 star, 10 triangle (kind 3, the legacy
- *  hand-drawn circle, is no longer creatable but still renders from old
- *  documents). */
-export type ShapeName = "rect" | "circle" | "line" | "diamond" | "star" | "triangle";
+ *  circle, 2 line, 8 diamond, 9 star, 10 triangle, 11..=40 the diagram shapes
+ *  (kind 3, the legacy hand-drawn circle, is no longer creatable but still
+ *  renders from old documents). */
+export type ShapeName =
+  | "rect" | "circle" | "line" | "diamond" | "star" | "triangle"
+  | DiagramShapeName;
 
 export interface ToolSettings extends StampSettings {
   strokeWidth: number;
@@ -77,6 +89,11 @@ export interface ToolSettings extends StampSettings {
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: ShapeName;
+  /** What the Arrows & Shapes tool draws next: the line arrow (`arrowStyle`
+   *  picks one head or two) or one of the diagram shapes. Its own field, not
+   *  `shape`, so picking a flowchart shape there does not change the tile
+   *  the Shapes tool has selected. Absent = the arrow. */
+  arrowShape?: "arrow" | DiagramShapeName;
 
   // Shape interior fill (rect + circle only). Painted under the stroke.
   /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2,

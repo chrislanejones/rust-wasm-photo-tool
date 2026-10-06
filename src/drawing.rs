@@ -527,7 +527,8 @@ fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
 }
 
 /// Fill the interior of one of the fillable bbox shapes — rectangle (0),
-/// circle (1), diamond (8), star (9), triangle (10) — defined by the bbox
+/// circle (1), diamond (8), star (9), triangle (10), the diagram shapes
+/// (11..=40) — defined by the bbox
 /// (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear gradient `c0`→`c1`
 /// along `angle_deg` (0 = left→right, 90 = top→bottom), 3 = pixelate/mosaic the
 /// underlying pixels in `block`×`block` cells. Composited source-over (1/2) or
@@ -573,9 +574,11 @@ pub fn fill_shape(
     // The polygon kinds' clip outline — the same vertices `draw_shape` strokes,
     // corners rounded the same way. `None` for a square-cornered rect and the
     // circle, which clip by bbox/radius instead (a rounded rect is a polygon).
+    // A diagram shape (11..=40) clips by its own outline.
     let poly: Option<Vec<(f64, f64)>> =
         corner_outline(shape as u32, x0, y0, x1, y1, star_points, radii)
-            .filter(|_| shape != 0 || has_radius(radii));
+            .filter(|_| shape != 0 || has_radius(radii))
+            .or_else(|| crate::diagram::geometry(shape, x0, y0, x1, y1).map(|g| g.outline));
 
     let px0 = (minx.floor() as i32).max(0);
     let py0 = (miny.floor() as i32).max(0);
@@ -912,6 +915,54 @@ pub fn draw_shape(
                 sloppiness,
                 rot,
             );
+        }
+        // 11..=40 = the diagram shapes (`diagram.rs`): a closed outline plus
+        // open detail strokes, every one stroked like the polygons above.
+        11..=40 => {
+            let Some(g) = crate::diagram::geometry(shape as u8, from_x, from_y, to_x, to_y) else {
+                return;
+            };
+            if g.smooth && sloppiness > 0.0 {
+                // Curves wobble smoothly round the loop, the rounded-corner
+                // rule: per-chord overshoot would read as a saw blade.
+                let mut pts = sloppy_loop_points(&g.outline, seed, sloppiness, stroke_width);
+                if let Some(r) = rot {
+                    for p in pts.iter_mut() {
+                        *p = r.apply(*p);
+                    }
+                }
+                draw_polyline(data, w, h, &pts, color, stroke_width);
+            } else {
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    &g.outline,
+                    true,
+                    seed,
+                    color,
+                    stroke_width,
+                    sloppiness,
+                    rot,
+                );
+            }
+            // Each detail wobbles on its own seed, so two parallel bars do
+            // not shake in step.
+            for (i, d) in g.details.iter().enumerate() {
+                let dseed = seed + (i as f64 + 1.0) * 7.0;
+                draw_outline(
+                    data,
+                    w,
+                    h,
+                    d,
+                    false,
+                    dseed,
+                    color,
+                    stroke_width,
+                    sloppiness,
+                    rot,
+                );
+            }
         }
         _ => {}
     }

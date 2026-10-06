@@ -106,7 +106,8 @@ pub struct ShapeAnnotation {
     pub id: u32,
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
     /// 7=bezier (cubic pen path; `points` holds the flat control sequence),
-    /// 8=diamond, 9=star, 10=triangle.
+    /// 8=diamond, 9=star, 10=triangle, 11..=40 = the diagram shapes
+    /// (flowchart, basic and block arrows — see `diagram.rs`).
     pub kind: u8,
     pub x0: f64,
     pub y0: f64, // start point / bbox corner (canvas coords)
@@ -511,15 +512,16 @@ pub(crate) fn radii_f64(r: [u16; 4]) -> [f64; 4] {
 /// The kinds whose geometry turns with `rotation_deg`. Arrow, pin, polyline,
 /// bézier and the legacy hand-circle keep their stored geometry as-is.
 fn rotation_applies(kind: u8) -> bool {
-    matches!(kind, 0 | 1 | 2 | 8 | 9 | 10)
+    matches!(kind, 0 | 1 | 2 | 8 | 9 | 10) || crate::diagram::is_diagram_kind(kind)
 }
 
 /// The kinds that accept an interior fill (`fill_kind` 1/2/3 through
 /// `drawing::fill_shape`): every bbox shape that encloses an area. The line (2)
 /// encloses nothing, and the pen path (7) is filled by `fill_polygon` against
-/// its own points rather than a bbox, so neither is here.
+/// its own points rather than a bbox, so neither is here. Every diagram shape
+/// (11..=40) has a closed outline and fills inside it.
 pub(crate) fn is_fillable_kind(kind: u8) -> bool {
-    matches!(kind, 0 | 1 | 8 | 9 | 10)
+    matches!(kind, 0 | 1 | 8 | 9 | 10) || crate::diagram::is_diagram_kind(kind)
 }
 
 /// Serialize a list of shape annotations to JSON for the JS overlay /
@@ -776,9 +778,9 @@ fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> 
 /// | shape | route |
 /// |---|---|
 /// | warped (any rotatable kind) | warp path, rotation composed onto the quad |
-/// | rect (0), diamond (8), star (9), triangle (10) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
+/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40) with a fill | warp path through an identity quad + rotation — every fill kind rotates with no fill code of its own |
 /// | circle (1) with a gradient | warp path, same reason (the gradient has a direction) |
-/// | rect (0), diamond (8), star (9), triangle (10) unfilled, line (2) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
+/// | rect (0), diamond (8), star (9), triangle (10), diagram (11..=40) unfilled, line (2) | flat: the outline POINTS are rotated (`drawing::draw_shape`), so edges stay crisp and the sketch wobble matches the preview |
 /// | circle (1) otherwise | flat, θ ignored — a circle is rotation-invariant |
 /// | 3, 4, 5, 6, 7 | θ ignored |
 ///
@@ -1808,21 +1810,22 @@ impl ImageHorseTool {
             // written out so this body carries everything the TS mirror copies.
             // Shadows `x`/`y` for this shape only; the next one starts again
             // from the caller's point.
-            let (x, y) = if s.rotation_deg != 0.0 && matches!(s.kind, 0 | 1 | 2 | 8 | 9 | 10) {
-                let t = -s.rotation_deg * std::f64::consts::PI / 180.0;
-                let (sin, cos) = (t.sin(), t.cos());
-                let cx = (s.x0 + s.x1) / 2.0;
-                let cy = (s.y0 + s.y1) / 2.0;
-                let dx = x - cx;
-                let dy = y - cy;
-                (cx + dx * cos - dy * sin, cy + dx * sin + dy * cos)
-            } else {
-                (x, y)
-            };
+            let (x, y) =
+                if s.rotation_deg != 0.0 && matches!(s.kind, 0 | 1 | 2 | 8 | 9 | 10 | 11..=40) {
+                    let t = -s.rotation_deg * std::f64::consts::PI / 180.0;
+                    let (sin, cos) = (t.sin(), t.cos());
+                    let cx = (s.x0 + s.x1) / 2.0;
+                    let cy = (s.y0 + s.y1) / 2.0;
+                    let dx = x - cx;
+                    let dy = y - cy;
+                    (cx + dx * cos - dy * sin, cy + dx * sin + dy * cos)
+                } else {
+                    (x, y)
+                };
             let pad = (s.stroke_width * 0.5).max(6.0);
             let hit = if s.kind == 2
                 || s.kind == 4
-                || (s.fill_kind == 0 && (s.kind == 8 || s.kind == 9 || s.kind == 10))
+                || (s.fill_kind == 0 && matches!(s.kind, 8..=40))
             {
                 // line / arrow → distance to the segment; diamond (8) / star (9)
                 // / triangle (10) stroke is the outline edges only when unfilled
@@ -1846,8 +1849,10 @@ impl ImageHorseTool {
                     tet.iter().any(|&(ax, ay, bx, by)| {
                         point_segment_distance(x, y, ax, ay, bx, by) <= pad + 4.0
                     })
-                } else if s.kind == 9 || s.kind == 10 {
+                } else if s.kind >= 9 {
                     // Close the loop so the last→first edge is hit-testable too.
+                    // A diagram shape (11..=40) is its closed outline; its
+                    // detail strokes are not.
                     let mut verts = if s.kind == 9 {
                         crate::drawing::star_vertices_n(
                             s.x0,
@@ -1856,8 +1861,12 @@ impl ImageHorseTool {
                             s.y1,
                             effective_star_points(s.star_points),
                         )
-                    } else {
+                    } else if s.kind == 10 {
                         crate::drawing::triangle_vertices(s.x0, s.y0, s.x1, s.y1)
+                    } else {
+                        crate::diagram::geometry(s.kind, s.x0, s.y0, s.x1, s.y1)
+                            .map(|g| g.outline)
+                            .unwrap_or_default()
                     };
                     if let Some(&first) = verts.first() {
                         verts.push(first);
@@ -3263,5 +3272,95 @@ mod rotation_outline_tests {
         add(&mut t, 2, (a.0, a.1, b.0, b.1), 90.0);
         let pts = [rotate(a, 90.0, c), rotate(b, 90.0, c)];
         assert!(t.get_image_data() == polyline_pixels(&pts));
+    }
+}
+
+#[cfg(test)]
+mod diagram_shape_tests {
+    //! The diagram shapes (11..=40) ride every existing shape route: stroke,
+    //! fill, rotation and the unfilled-outline hit rule.
+    use crate::ImageHorseTool;
+
+    const W: u32 = 120;
+    const H: u32 = 120;
+
+    fn tool(kind: u8, fill_kind: u8, rot: f64) -> (ImageHorseTool, i32) {
+        let mut t = ImageHorseTool::new(W, H);
+        t.load_image(&vec![255u8; (W * H * 4) as usize]);
+        let id = t.add_shape_annotation_full(
+            kind,
+            20.0,
+            20.0,
+            100.0,
+            100.0,
+            "#e02020",
+            3.0,
+            0,
+            fill_kind,
+            "#2040e0",
+            "#20e040",
+            0,
+            8,
+            0,
+            0,
+            rot,
+            &[],
+        );
+        (t, id as i32)
+    }
+
+    fn px(t: &ImageHorseTool, x: u32, y: u32) -> [u8; 4] {
+        let d = t.get_image_data();
+        let i = ((y * W + x) * 4) as usize;
+        [d[i], d[i + 1], d[i + 2], d[i + 3]]
+    }
+
+    #[test]
+    fn every_diagram_kind_draws_ink() {
+        for kind in 11..=40u8 {
+            let (t, id) = tool(kind, 0, 0.0);
+            assert!(id >= 0, "kind {kind} was refused");
+            let red = t
+                .get_image_data()
+                .chunks(4)
+                .filter(|p| p[0] > 200 && p[1] < 80 && p[2] < 80)
+                .count();
+            assert!(red > 100, "kind {kind} drew {red} red pixels");
+        }
+    }
+
+    #[test]
+    fn a_filled_diagram_shape_fills_inside_its_outline_only() {
+        // Merge (25): a triangle point down. Its center fills; the top corners
+        // of the box are inside; the bottom corners are outside.
+        let (t, _) = tool(25, 1, 0.0);
+        assert_eq!(
+            px(&t, 60, 45),
+            [0x20, 0x40, 0xe0, 255],
+            "interior is filled"
+        );
+        assert_eq!(px(&t, 24, 95), [255, 255, 255, 255], "outside the outline");
+    }
+
+    #[test]
+    fn an_unfilled_diagram_shape_selects_on_its_outline_only() {
+        // Database (19): its outline runs down x = 20; its middle is empty.
+        let (t, id) = tool(19, 0, 0.0);
+        assert_eq!(t.shape_annotation_at(20.0, 60.0), id, "on the outline");
+        assert_eq!(t.shape_annotation_at(60.0, 60.0), -1, "empty middle");
+        let (t, id) = tool(19, 1, 0.0);
+        assert_eq!(t.shape_annotation_at(60.0, 60.0), id, "a fill is ink");
+    }
+
+    #[test]
+    fn a_turned_diagram_shape_turns_its_hit_test_too() {
+        // Block arrow (36) turned 90°: its tip moves from the right edge
+        // (100, 60) to the bottom (60, 100), and the empty corner of its box
+        // at (30, 20) — far from the shaft — turns to (100, 30).
+        let (t, id) = tool(36, 0, 90.0);
+        assert_eq!(t.shape_annotation_at(60.0, 100.0), id);
+        assert_eq!(t.shape_annotation_at(100.0, 30.0), -1);
+        let (t, _) = tool(36, 0, 0.0);
+        assert_eq!(t.shape_annotation_at(30.0, 20.0), -1);
     }
 }

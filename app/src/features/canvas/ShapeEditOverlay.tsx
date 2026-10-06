@@ -26,7 +26,8 @@ import {
   type CornerRadii,
 } from "@/lib/shapeSloppiness";
 import { cornerHandles, radiusAfterDrag, type CornerHandle } from "@/lib/cornerRadiusHandles";
-import { shapeCanFill } from "@/lib/drawEditState";
+import { SHAPE_NAME_KIND, shapeCanFill } from "@/lib/drawEditState";
+import { diagramGeometry, diagramStrokes, strokesToPath } from "@/lib/diagramShapes";
 import {
   boxCenter,
   pinAfterResize,
@@ -429,6 +430,8 @@ export function ShapeEditOverlay({
   };
   let preview: React.ReactNode;
   let bodyHit: React.ReactNode;
+  // A diagram shape (11..=40), flattened once; null for every other shape.
+  const diagram = kind === "arrow" ? null : diagramGeometry(SHAPE_NAME_KIND[shape] ?? -1, start, end);
 
   if (kind === "arrow") {
     const g = arrowGeometry(
@@ -518,6 +521,29 @@ export function ShapeEditOverlay({
     );
     bodyHit = (
       <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
+    );
+  } else if (diagram) {
+    // A diagram shape: the fill on its clean outline (what `fill_shape`
+    // clips to), then the outline and its detail strokes — firm or sketchy,
+    // the points the engine strokes.
+    const g = diagram;
+    const toS = (p: Point) => ({ x: toSX(p.x), y: toSY(p.y) });
+    preview = (
+      <>
+        {gradientDef}
+        <polygon
+          points={g.outline.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ")}
+          fill={fillAttr}
+        />
+        <path
+          d={strokesToPath(diagramStrokes(g, start, end, sloppyAmt, eff.strokeWidth), toS)}
+          fill="none" stroke={color} strokeWidth={strokeW}
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+      </>
+    );
+    bodyHit = (
+      <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
     );
   } else if (shape === "diamond" || shape === "star" || shape === "triangle") {
     // Firm → clean polygon over the exact vertex list Rust rasterises;

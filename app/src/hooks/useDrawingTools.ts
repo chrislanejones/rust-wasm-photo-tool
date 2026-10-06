@@ -10,8 +10,11 @@ import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { canonicalCornerRadii } from "@/lib/shapeSloppiness";
 import { normalizeDeg } from "@/lib/shapeRotation";
 import type { Point } from "@/lib/shapeSloppiness";
-import { drawArrowPreview, drawShapePreview } from "@/lib/drawPreview";
+import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
+import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
+import { PressQueue } from "@/lib/pressQueue";
 import {
+  drawnShapeFor,
   editStateFromShape,
   FILL_MODE_KIND,
   FILLABLE_KINDS,
@@ -126,29 +129,17 @@ export function useDrawingTools({
         }
       }
       // Cold-cache JS fallback — equivalent geometry.
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const r = ratio[0] / ratio[1];
-      const w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
-        ? Math.abs(dx) : Math.abs(dy) * r;
-      const h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
-        ? Math.abs(dx) / r : Math.abs(dy);
-      let x = start.x;
-      let y = start.y;
-      if (dx < 0) x -= w;
-      if (dy < 0) y -= h;
-      return {
-        x: Math.max(0, Math.round(x)),
-        y: Math.max(0, Math.round(y)),
-        w: Math.max(1, Math.round(w)),
-        h: Math.max(1, Math.round(h)),
-      };
+      return constrainCropFallback(start, end, ratio);
     },
     [],
   );
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
   const lastPoint = useRef<Point | null>(null);
+  // Presses wait on the engine; their moves and release are buffered and
+  // they are handled in order (lib/pressQueue.ts — the dropped-drag fix).
+  const [presses] = useState(() => new PressQueue());
+  const finishDragRef = useRef<(atPress?: ToolSettings) => void>(() => {});
 
   // The preview surface's 2D context, or null while it is unmounted.
   //
@@ -769,57 +760,62 @@ export function useDrawingTools({
       if (!["arrow", "shapes", "crop"].includes(activeTool)) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
-      // Starting a new drag on empty canvas commits the pending edit first, so
-      // the committed geometry is in the engine before a new one begins.
-      //
-      // AWAITED, and this one is load-bearing: the comment above states the
-      // ordering as a requirement, and the hit-test two lines down reads the
-      // annotation list that `commitEdit` writes to. Fire-and-forget here would
-      // let the hit-test run against a list that does not yet contain the shape
-      // just committed — the click would miss it and start a new drag instead
-      // of re-selecting.
-      if (editStateRef.current) await commitEdit();
-      // `p` is read off the event BEFORE any await; after one, `e` is only safe
-      // for values already destructured out of it.
-      const p = getCoords(e);
-      // Pins tab: clicking drops a callout disc, or re-selects an existing pin.
-      if (activeTool === "shapes" && penModeRef.current === "pins") {
-        // `await` outside the optional chain keeps the short-circuit: with no
-        // tool the await yields `undefined` and `?? -1` supplies the miss.
-        const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
-        if (hit >= 0) {
-          await selectShape(hit); // click an existing pin → move it
+      const p = getCoords(e); // read off the event before any await
+      isDrawing.current = false; // a new press ends any gesture still open
+      const atPress = settingsRef.current; // what to draw, if it finishes late
+      await presses.run(p, async (press) => {
+        // Starting a new drag on empty canvas commits the pending edit first, so
+        // the committed geometry is in the engine before a new one begins.
+        //
+        // AWAITED, and this one is load-bearing: the comment above states the
+        // ordering as a requirement, and the hit-test two lines down reads the
+        // annotation list that `commitEdit` writes to. Fire-and-forget here would
+        // let the hit-test run against a list that does not yet contain the shape
+        // just committed — the click would miss it and start a new drag instead
+        // of re-selecting.
+        if (editStateRef.current) await commitEdit();
+        // Pins tab: clicking drops a callout disc, or re-selects an existing pin.
+        if (activeTool === "shapes" && penModeRef.current === "pins") {
+          // `await` outside the optional chain keeps the short-circuit: with no
+          // tool the await yields `undefined` and `?? -1` supplies the miss.
+          const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
+          if (hit >= 0) {
+            await selectShape(hit); // click an existing pin → move it
+            return;
+          }
+          // #50 — a miss on the ACTIVE layer is not proof the canvas is empty.
+          // Without this, clicking a pin that lives on another layer drops a
+          // SECOND pin on top of it. See lib/annotationHitTest.ts.
+          if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
+            return;
+          }
+          await dropPin(p);
           return;
         }
-        // #50 — a miss on the ACTIVE layer is not proof the canvas is empty.
-        // Without this, clicking a pin that lives on another layer drops a
-        // SECOND pin on top of it. See lib/annotationHitTest.ts.
-        if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
-          return;
+        // Shape/arrow tools: clicking an existing live shape re-selects it for
+        // editing instead of starting a brand-new rubber-band drag.
+        if (activeTool === "arrow" || activeTool === "shapes") {
+          const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
+          if (hit >= 0) {
+            await selectShape(hit);
+            return;
+          }
+          // #50, same rule as the pins branch: a shape on another visible layer
+          // is something the user can see and was aiming at. Starting a fresh
+          // rubber-band drag across it is the one wrong answer.
+          if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
+            return;
+          }
         }
-        await dropPin(p);
-        return;
-      }
-      // Shape/arrow tools: clicking an existing live shape re-selects it for
-      // editing instead of starting a brand-new rubber-band drag.
-      if (activeTool === "arrow" || activeTool === "shapes") {
-        const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
-        if (hit >= 0) {
-          await selectShape(hit);
-          return;
-        }
-        // #50, same rule as the pins branch: a shape on another visible layer
-        // is something the user can see and was aiming at. Starting a fresh
-        // rubber-band drag across it is the one wrong answer.
-        if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
-          return;
-        }
-      }
-      isDrawing.current = true;
-      startPoint.current = p;
-      lastPoint.current = p;
-      clearPreviewSurface(); // a stale band from an aborted drag must not linger
-      if (activeTool === "crop") setCropSelection(null);
+        presses.settle(press);
+        isDrawing.current = true;
+        startPoint.current = p;
+        lastPoint.current = press.last;
+        clearPreviewSurface(); // a stale band from an aborted drag must not linger
+        if (activeTool === "crop") setCropSelection(null);
+        // Lifted while the checks ran: finish now, at the point it travelled to.
+        if (press.released) finishDragRef.current(atPress);
+      });
     },
     [
       activeTool,
@@ -830,11 +826,13 @@ export function useDrawingTools({
       selectShape,
       dropPin,
       clearPreviewSurface,
+      presses,
     ],
   );
 
   const onMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (presses.move(getCoords(e))) return; // a press is still waiting
       if (!isDrawing.current || !startPoint.current) return;
       const canvas = canvasRef.current;
       const ctx = previewCtx();
@@ -845,7 +843,8 @@ export function useDrawingTools({
       // Erase last frame's band. The overlay is transparent, so this reveals
       // the engine's pixels underneath rather than needing them blitted back.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (activeTool === "arrow") {
+      const drawn = drawnShapeFor(activeTool, settings);
+      if (activeTool === "arrow" && !drawn) {
         drawArrowPreview(
           ctx,
           start,
@@ -854,41 +853,27 @@ export function useDrawingTools({
           settings.strokeWidth,
           settings.arrowStyle,
         );
-      } else if (activeTool === "shapes") {
+      } else if (drawn) {
         drawShapePreview(
           ctx,
           start,
           p,
-          settings.shape ?? "rect",
+          drawn,
           settings.strokeColor,
           settings.strokeWidth,
           settings.sloppiness ?? 0,
           settings.starPoints ?? 5,
-          canonicalCornerRadii(settings.shape ?? "rect", settings.cornerRadii),
+          canonicalCornerRadii(drawn, settings.cornerRadii),
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
-        const constrained = constrainDrag(start, p);
-        const x = constrained ? constrained.x : Math.min(start.x, p.x);
-        const y = constrained ? constrained.y : Math.min(start.y, p.y);
-        const w = constrained ? constrained.w : Math.abs(p.x - start.x);
-        const h = constrained ? constrained.h : Math.abs(p.y - start.y);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 0, canvas.width, y);
-        ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
-        ctx.fillRect(0, y, x, h);
-        ctx.fillRect(x + w, y, canvas.width - (x + w), h);
-        ctx.strokeStyle = "white";
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, w, h);
-        ctx.setLineDash([]);
+        drawCropPreview(ctx, constrainDrag(start, p) ?? freeCropRect(start, p));
       }
     },
-    [activeTool, canvasRef, getCoords, settings, constrainDrag, previewCtx],
+    [activeTool, canvasRef, getCoords, settings, constrainDrag, previewCtx, presses],
   );
 
-  const onMouseUp = useCallback(() => {
+  const finishDrag = useCallback((atPress?: ToolSettings) => {
     if (!isDrawing.current || !startPoint.current) return;
     isDrawing.current = false;
     const start = startPoint.current;
@@ -897,11 +882,7 @@ export function useDrawingTools({
     // ends, whether it produced a crop rect, an edit overlay, or nothing.
     clearPreviewSurface();
     if (activeTool === "crop") {
-      const constrained = constrainDrag(start, end);
-      const x = constrained ? constrained.x : Math.min(start.x, end.x);
-      const y = constrained ? constrained.y : Math.min(start.y, end.y);
-      const w = constrained ? constrained.w : Math.abs(end.x - start.x);
-      const h = constrained ? constrained.h : Math.abs(end.y - start.y);
+      const { x, y, w, h } = constrainDrag(start, end) ?? freeCropRect(start, end);
       if (w > 5 && h > 5) {
         setCropSelection({
           x: Math.round(x),
@@ -914,16 +895,15 @@ export function useDrawingTools({
       // Edit-overlay flow: the rubber band is already gone (cleared above) and
       // the geometry goes to the SVG overlay instead of being committed. Rust
       // rasterization happens once, in commitEdit.
-      // Ignore stray clicks / sub-3px drags — they'd produce invisible
-      // geometry (and, previously, an empty history snapshot).
+      // Ignore stray clicks / sub-3px drags: they'd be invisible geometry.
       if (Math.hypot(end.x - start.x, end.y - start.y) > 3) {
+        const drawn = drawnShapeFor(activeTool, atPress ?? settingsRef.current);
         const next: DrawEditState = {
-          kind: activeTool === "arrow" ? "arrow" : "shape",
+          kind: drawn ? "shape" : "arrow",
           start,
           end,
-          // Pin the type the user actually drew. Everything else about a new
-          // shape still tracks the panel live; the type does not.
-          drawnShape: settingsRef.current.shape ?? "rect",
+          // Pin the type drawn; everything else tracks the panel live.
+          drawnShape: drawn ?? undefined,
         };
         editStateRef.current = next;
         setEditState(next);
@@ -932,6 +912,11 @@ export function useDrawingTools({
     startPoint.current = null;
     lastPoint.current = null;
   }, [activeTool, constrainDrag, clearPreviewSurface]);
+
+  finishDragRef.current = finishDrag;
+  const onMouseUp = useCallback(() => {
+    if (!presses.release()) finishDrag();
+  }, [presses, finishDrag]);
 
   const applyCrop = useCallback(async () => {
     const [tool, sel] = [toolRef.current, cropSelection];

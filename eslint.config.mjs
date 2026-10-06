@@ -253,8 +253,14 @@ export default tseslint.config(
     // commitEdit carried became drawEditState.FILL_MODE_KIND / FILL_KIND_MODE,
     // beside the shape-name tables it belongs with — and the inverse ladder in
     // editStateFromShape collapsed onto it too.
+    // 970 -> 954 (the dropped-drag fix): presses now buffer their moves and
+    // release while the engine answers them, in order (lib/pressQueue.ts).
+    // The crop ratio fallback moved to lib/cropRatioFallback.ts and the crop
+    // rubber band to drawPreview.drawCropPreview, which also folded the
+    // free-rect math the move and up handlers each carried into one
+    // `freeCropRect`.
     files: ["app/src/hooks/useDrawingTools.ts"],
-    rules: { "max-lines": ["error", { max: 970 }] },
+    rules: { "max-lines": ["error", { max: 954 }] },
   },
   {
     // A test file, not a god object — it is long because it enumerates 166

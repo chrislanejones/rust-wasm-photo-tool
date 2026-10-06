@@ -115,7 +115,11 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // unfilled-edges branch, the star takes its point count. Port + tests
   // (triangle, 8-point star, turned rect, pin ignores θ) updated FIRST, per the
   // order above.
-  shape_annotation_at: "ef6242fa495acca1",
+  // ef6242fa495acca1 → 240ee76d785a4285 (2026-10-06): the diagram shapes
+  // (11..=40) turn with θ and, unfilled, hit on their closed outline (never
+  // their detail strokes) through the star/triangle edge loop. Port + tests
+  // (database outline/middle/rim/fill, turned block arrow) updated FIRST.
+  shape_annotation_at: "240ee76d785a4285",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

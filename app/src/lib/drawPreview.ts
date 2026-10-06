@@ -10,6 +10,8 @@ import {
   sloppyPolylinePoints,
   type CornerRadii,
 } from "@/lib/shapeSloppiness";
+import { diagramGeometry, diagramStrokes } from "@/lib/diagramShapes";
+import { SHAPE_NAME_KIND } from "@/lib/drawEditState";
 
 /* ------------------------------------------------------------------ */
 /* JS preview functions (used during the initial rubber-band drag only).*/
@@ -83,6 +85,21 @@ export function drawShapePreview(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
+  // A diagram shape (11..=40): its outline and detail strokes, firm or
+  // sketchy, exactly as the engine's diagram arm strokes them.
+  const diagram = diagramGeometry(SHAPE_NAME_KIND[shape] ?? -1, from, to);
+  if (diagram) {
+    for (const { pts, closed } of diagramStrokes(diagram, from, to, sloppiness, width)) {
+      if (pts.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      if (closed) ctx.closePath();
+      ctx.stroke();
+    }
+    return;
+  }
+
   const x = Math.min(from.x, to.x);
   const y = Math.min(from.y, to.y);
   const w = Math.abs(to.x - from.x);
@@ -136,4 +153,24 @@ export function drawShapePreview(
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
   }
+}
+
+/** The crop rubber band: everything outside `r` dimmed, `r` outlined with a
+ *  dashed white line. Draws over the whole preview surface (`ctx.canvas`). */
+export function drawCropPreview(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+) {
+  const { width, height } = ctx.canvas;
+  const { x, y, w, h } = r;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, width, y);
+  ctx.fillRect(0, y + h, width, height - (y + h));
+  ctx.fillRect(0, y, x, h);
+  ctx.fillRect(x + w, y, width - (x + w), h);
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([5, 5]);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]);
 }

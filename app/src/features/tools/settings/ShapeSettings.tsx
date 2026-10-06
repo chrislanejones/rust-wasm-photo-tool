@@ -27,6 +27,9 @@ import { TEXT_COLORS } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { shapeCanFill, SHAPE_KIND_NAME } from "@/lib/drawEditState";
 import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
+import type { DiagramShapeName } from "@/lib/types";
+import { isDiagramKind } from "@/lib/diagramShapes";
+import { DIAGRAM_SHAPE_GROUPS } from "./diagramShapeIcons";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -103,9 +106,9 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
   {
     id: "arrows",
     label: "Arrows",
-    title: "Arrow",
+    title: "Arrows & Diagram Shapes",
     icon: ArrowUpRight,
-    info: "Single or double-headed. Drag on the canvas to draw it, then hold Shift while dragging an endpoint to snap the angle to 0/90/180/270°.",
+    info: "A single or double-headed arrow, or one of 30 diagram shapes — flowchart symbols, basic shapes and block arrows. Drag on the canvas to draw it. An arrow's endpoints snap to 0/90/180/270° with Shift; a shape resizes, turns and fills like any other.",
   },
 ];
 
@@ -137,6 +140,11 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   const radii = canonicalCornerRadii(radiusShape ?? "rect", settings.cornerRadii);
   const cornersUsed = radiusShape === "triangle" ? 3 : radiusShape === "star" ? 1 : 4;
   const mixed = radii.slice(0, cornersUsed).some((r) => r !== radii[0]);
+  // Arrows panel: the line arrow is picked (the default), or a diagram shape.
+  // A reselected diagram shape shows its own controls whatever is picked —
+  // the starPoints rule above.
+  const arrowPicked = (settings.arrowShape ?? "arrow") === "arrow";
+  const diagramInHand = !arrowPicked || (editingKind != null && isDiagramKind(editingKind));
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
@@ -235,76 +243,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       diamond, star, triangle. The line is the one shape with no
                       interior, so it is the one without this section. */}
                   {shapeCanFill(currentShape) && (
-                    <div className="space-y-4">
-                      <label className="text-2xs font-bold text-theme-muted-foreground">
-                        Fill
-                      </label>
-                      <ToolButtonGroup
-                        aria-label="Fill"
-                        options={FILL_MODES}
-                        value={settings.fillMode ?? "none"}
-                        onChange={(id) =>
-                          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-                        }
-                      />
-
-                      {settings.fillMode === "solid" && (
-                        <ColorSwatchGrid
-                          colors={TEXT_COLORS}
-                          value={settings.fillColor}
-                          onChange={(color) => onChange({ ...settings, fillColor: color })}
-                        />
-                      )}
-
-                      {settings.fillMode === "gradient" && (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <span className="text-2xs text-theme-muted-foreground">From</span>
-                            <ColorSwatchGrid
-                              colors={TEXT_COLORS}
-                              value={settings.fillColor}
-                              onChange={(color) => onChange({ ...settings, fillColor: color })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <span className="text-2xs text-theme-muted-foreground">To</span>
-                            <ColorSwatchGrid
-                              colors={TEXT_COLORS}
-                              value={settings.fillColor2}
-                              onChange={(color) => onChange({ ...settings, fillColor2: color })}
-                            />
-                          </div>
-                          <ToolButtonGroup
-                            label="Direction"
-                            options={GRADIENT_DIRS}
-                            value={
-                              String(settings.gradientAngle ?? 0) as
-                                (typeof GRADIENT_DIRS)[number]["id"]
-                            }
-                            onChange={(id) =>
-                              onChange({ ...settings, gradientAngle: Number(id) })
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {settings.fillMode === "pixelate" && (
-                        <div className="space-y-2">
-                          <SizeSlider
-                            label="Block Size"
-                            value={settings.fillBlock ?? 16}
-                            min={4}
-                            max={64}
-                            unit="px"
-                            onChange={(v) => onChange({ ...settings, fillBlock: v })}
-                          />
-                          <p className="text-2xs leading-relaxed text-theme-muted-foreground">
-                            Mosaics whatever is beneath the shape — a re-selectable redaction
-                            you can move, resize, and undo from the Review panel.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <FillSection settings={settings} onChange={onChange} />
                   )}
                 </>
               );
@@ -350,20 +289,37 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 </>
               );
 
-            // ── Arrows ── mirrors Pins: style toggle → size → color.
+            // ── Arrows & Diagram Shapes ── the line arrow (Single / Double),
+            // then 30 diagram shapes in three groups. One pick across all
+            // four rows: `arrowShape` is "arrow" or a diagram shape's name.
             case "arrows":
               return (
                 <>
-                  {/* Arrow style: Single / Double — first, above the size. */}
                   <ToolButtonGroup
-                    aria-label="Arrow style"
+                    label="Arrow"
                     stacked
                     options={ARROW_STYLES}
-                    value={settings.arrowStyle ?? "single"}
+                    value={arrowPicked ? (settings.arrowStyle ?? "single") : undefined}
                     onChange={(id) =>
-                      onChange({ ...settings, arrowStyle: id as "single" | "double" })
+                      onChange({
+                        ...settings,
+                        arrowShape: "arrow",
+                        arrowStyle: id as "single" | "double",
+                      })
                     }
                   />
+
+                  {DIAGRAM_SHAPE_GROUPS.map(({ group, options }) => (
+                    <ToolButtonGroup
+                      key={group}
+                      label={group}
+                      stacked
+                      columns={3}
+                      options={options}
+                      value={arrowPicked ? undefined : (settings.arrowShape as DiagramShapeName)}
+                      onChange={(id) => onChange({ ...settings, arrowShape: id })}
+                    />
+                  ))}
 
                   {/* Stroke Width */}
                   <SizeSlider
@@ -381,12 +337,27 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     )}
                   />
 
+                  {/* Sloppiness — a diagram shape only; the arrow has none. */}
+                  {diagramInHand && (
+                    <SizeSlider
+                      label="Sloppiness"
+                      value={settings.sloppiness ?? 0}
+                      onChange={(v) => onChange({ ...settings, sloppiness: v })}
+                      presets={SLOPPINESS_PRESETS}
+                      variant="numbers"
+                      unit="%"
+                    />
+                  )}
+
                   {/* Color */}
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
                     value={settings.strokeColor}
                     onChange={(color) => onChange({ ...settings, strokeColor: color })}
                   />
+
+                  {/* Every diagram shape is closed, so every one fills. */}
+                  {diagramInHand && <FillSection settings={settings} onChange={onChange} />}
                 </>
               );
           }
@@ -413,6 +384,84 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
             onChange={onPlace}
           />
         </AdvancedSection>
+      )}
+    </div>
+  );
+}
+
+/** Fill — None / Solid / Gradient / Pixelate, and each one's controls. One
+ *  section for every shape with an interior, in both the Shapes and the
+ *  Arrows & Diagram Shapes panels. */
+function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings" | "onChange">) {
+  return (
+    <div className="space-y-4">
+      <label className="text-2xs font-bold text-theme-muted-foreground">
+        Fill
+      </label>
+      <ToolButtonGroup
+        aria-label="Fill"
+        options={FILL_MODES}
+        value={settings.fillMode ?? "none"}
+        onChange={(id) =>
+          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+        }
+      />
+
+      {settings.fillMode === "solid" && (
+        <ColorSwatchGrid
+          colors={TEXT_COLORS}
+          value={settings.fillColor}
+          onChange={(color) => onChange({ ...settings, fillColor: color })}
+        />
+      )}
+
+      {settings.fillMode === "gradient" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <span className="text-2xs text-theme-muted-foreground">From</span>
+            <ColorSwatchGrid
+              colors={TEXT_COLORS}
+              value={settings.fillColor}
+              onChange={(color) => onChange({ ...settings, fillColor: color })}
+            />
+          </div>
+          <div className="space-y-2">
+            <span className="text-2xs text-theme-muted-foreground">To</span>
+            <ColorSwatchGrid
+              colors={TEXT_COLORS}
+              value={settings.fillColor2}
+              onChange={(color) => onChange({ ...settings, fillColor2: color })}
+            />
+          </div>
+          <ToolButtonGroup
+            label="Direction"
+            options={GRADIENT_DIRS}
+            value={
+              String(settings.gradientAngle ?? 0) as
+                (typeof GRADIENT_DIRS)[number]["id"]
+            }
+            onChange={(id) =>
+              onChange({ ...settings, gradientAngle: Number(id) })
+            }
+          />
+        </div>
+      )}
+
+      {settings.fillMode === "pixelate" && (
+        <div className="space-y-2">
+          <SizeSlider
+            label="Block Size"
+            value={settings.fillBlock ?? 16}
+            min={4}
+            max={64}
+            unit="px"
+            onChange={(v) => onChange({ ...settings, fillBlock: v })}
+          />
+          <p className="text-2xs leading-relaxed text-theme-muted-foreground">
+            Mosaics whatever is beneath the shape — a re-selectable redaction
+            you can move, resize, and undo from the Review panel.
+          </p>
+        </div>
       )}
     </div>
   );

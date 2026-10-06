@@ -32,6 +32,7 @@
 // annotation was hit is as wrong as disagreeing about whether one was.
 
 import { starVertices, triangleVertices } from "./shapeSloppiness";
+import { diagramGeometry } from "./diagramShapes";
 import { rotatePoint } from "./shapeRotation";
 
 /** The geometry subset of a text annotation this module needs. */
@@ -63,8 +64,12 @@ export interface ShapeHitGeometry {
   starPoints?: number;
 }
 
-/** The kinds the engine turns: rect, circle, line, diamond, star, triangle. */
-const TURNED_KINDS = new Set([0, 1, 2, 8, 9, 10]);
+/** The kinds the engine turns: rect, circle, line, diamond, star, triangle
+ *  and the diagram shapes (11..=40). */
+const TURNED_KINDS = new Set([
+  0, 1, 2, 8, 9, 10,
+  ...Array.from({ length: 30 }, (_, i) => 11 + i),
+]);
 
 /**
  * Port of `text_annotation_at` (annotations.rs:1792).
@@ -113,7 +118,8 @@ export function pointSegmentDistance(
  * Port of `shape_annotation_at` (annotations.rs).
  *
  * Kind codes: 2 = line, 4 = arrow (distance to segment); 6 = polyline
- * (distance to any segment); 8 = diamond, 9 = star, 10 = triangle — the
+ * (distance to any segment); 8 = diamond, 9 = star, 10 = triangle and the
+ * diagram shapes 11..=40 (their closed outline, never the detail strokes) — the
  * outline edges only while unfilled (a click inside an empty diamond selects
  * whatever is behind it), padded bbox once filled, matching the engine.
  *
@@ -158,7 +164,7 @@ export function shapeAnnotationAt(
           break;
         }
       }
-    } else if ((s.fill_kind ?? 0) === 0 && (s.kind === 8 || s.kind === 9 || s.kind === 10)) {
+    } else if ((s.fill_kind ?? 0) === 0 && s.kind >= 8 && s.kind <= 40) {
       if (s.kind === 8) {
         const minx = Math.min(s.x0, s.x1);
         const maxx = Math.max(s.x0, s.x1);
@@ -181,7 +187,9 @@ export function shapeAnnotationAt(
         const verts =
           s.kind === 9
             ? starVertices(s.x0, s.y0, s.x1, s.y1, s.starPoints)
-            : triangleVertices(s.x0, s.y0, s.x1, s.y1);
+            : s.kind === 10
+              ? triangleVertices(s.x0, s.y0, s.x1, s.y1)
+              : (diagramGeometry(s.kind, { x: s.x0, y: s.y0 }, { x: s.x1, y: s.y1 })?.outline ?? []);
         if (verts.length === 0) {
           hit = false;
         } else {
