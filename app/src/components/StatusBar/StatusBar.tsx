@@ -18,6 +18,7 @@ import { retrySync, useSyncStatus } from "@/lib/sync/status";
 import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 
 export interface ShortcutHint {
   keys: string;
@@ -213,7 +214,7 @@ export function StatusBar({
           <Fragment key={`${h.keys}-${h.label}`}>
             {i > 0 && <span className="status-divider" />}
             <span className="status-shortcut-hint">
-              <kbd>{h.keys}</kbd> {h.label}
+              <Kbd>{h.keys}</Kbd> {h.label}
             </span>
           </Fragment>
         ))}

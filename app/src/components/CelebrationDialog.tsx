@@ -198,7 +198,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        <DialogBody className="space-y-5" style={{ position: "relative", zIndex: 1 }}>
+        <DialogBody className="space-y-4" style={{ position: "relative", zIndex: 1 }}>
           <motion.div
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

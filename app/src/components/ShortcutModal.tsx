@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SHORTCUT_GROUPS } from "@/components/shortcutGroups";
+import { Kbd } from "@/components/ui/kbd";
 
 interface Props {
   open: boolean;
@@ -68,7 +69,7 @@ export function ShortcutModal({ open, onClose }: Props) {
                       {s.keys.map((k, i) => (
                         <span key={i}>
                           {i > 0 && <span className="shortcut-plus">+</span>}
-                          <kbd className="shortcut-kbd">{k}</kbd>
+                          <Kbd className="shortcut-kbd">{k}</Kbd>
                         </span>
                       ))}
                     </span>
@@ -80,9 +81,9 @@ export function ShortcutModal({ open, onClose }: Props) {
         </div>
 
         <div className="shortcut-modal-footer">
-          Press <kbd className="shortcut-kbd">Alt</kbd>
+          Press <Kbd className="shortcut-kbd">Alt</Kbd>
           <span className="shortcut-plus">+</span>
-          <kbd className="shortcut-kbd">/</kbd> to toggle this modal
+          <Kbd className="shortcut-kbd">/</Kbd> to toggle this modal
         </div>
       </DialogContent>
     </Dialog>

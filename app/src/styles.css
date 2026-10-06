@@ -1824,19 +1824,10 @@ textarea:focus-visible {
   color: var(--text-secondary);
 }
 
-/* LEGACY: new code uses `components/ui/kbd.tsx` (Night 3), which is this same
-   chip in token classes on the house radius. This bare rule stays only for
-   the files not yet moved — PARKING_LOT lists them. Delete it with the last. */
-kbd {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0px 4px;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--text-secondary);
-  line-height: 16px;
-}
+/* The bare `kbd { … }` element rule that lived here (3px radius, off the
+   house scale) is gone: UI Night 8 moved its last users to `ui/kbd`, as the
+   note on it asked. `.shortcut-kbd` below is the keycap VARIANT the shortcuts
+   dialog puts on a `Kbd`. */
 
 .status-divider {
   width: 1px;

@@ -143,7 +143,7 @@ ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
 # themes), and 6 hits were never radius at all: the Text tool's corner-preset
 # VALUES ("rounded" as a type, an `id:` and a ternary result), which the
 # counter now reads as values. Its self-test plants all three.
-check "ui-spacing" 51 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-spacing" 42 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
 check "ui-radius" 26 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
 check "ui-raw-button" 14 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 

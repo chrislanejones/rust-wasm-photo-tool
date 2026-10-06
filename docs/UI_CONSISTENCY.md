@@ -165,7 +165,7 @@ Import these. Do not re-implement them.
 | A tool panel's body rhythm | `ui/tool-panel` |
 | Settings most strokes do not need | `ui/advanced-section` |
 | "Why is this off" line | `ReasonNote` in `ui/status-note` (both `reason` slots use it) |
-| Keyboard chip | `ui/kbd`. The bare `kbd` CSS rule is legacy, kept for 6 unmoved files |
+| Keyboard chip | `ui/kbd`. Every `<kbd>` in app/src uses it; the bare element rule was deleted 10-06-2026 (UI Night 8). The shortcuts dialog adds `.shortcut-kbd` for its keycaps |
 
 `ui/dialog` is the modal survivor; `Modal` and `SmallDialog` are being
 retired, which was already decided and is tracked in `PARKING_LOT.md`.

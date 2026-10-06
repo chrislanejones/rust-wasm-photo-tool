@@ -6,9 +6,8 @@
 // is the same chip in token classes, so it follows the house radius
 // (`rounded-sm`, 4px) and the theme tokens in both themes.
 //
-// The bare rule still exists for the files that have not moved yet
-// (PARKING_LOT: "<kbd> outside the three Night 3 panels"). Classes outrank an
-// element selector, so a `Kbd` never inherits a stale value from it.
+// The bare rule is gone (UI Night 8, 10-06-2026): every <kbd> in app/src is a
+// `Kbd` now. The shortcuts dialog adds its larger keycap with `.shortcut-kbd`.
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

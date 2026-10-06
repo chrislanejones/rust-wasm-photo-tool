@@ -209,7 +209,7 @@ export function ColorPickerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="grid min-h-0 flex-1 gap-5 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
+        <DialogBody className="grid min-h-0 flex-1 gap-4 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
           {/* ── Left: the picker surface ─────────────────────────────── */}
           <div className="space-y-3">
             <ToolButtonGroup
