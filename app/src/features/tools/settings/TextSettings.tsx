@@ -13,7 +13,6 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
-import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
@@ -24,6 +23,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { ErrorNote } from "@/components/ui/status-note";
 import { Button } from "@/components/ui/button";
 import { ControlRow } from "@/components/ui/control-row";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -187,7 +187,7 @@ export function TextSettings({
     // The mode tiles moved to the ToolsSidebar header (SubtoolRow); `-mt-2`
     // went with them — it only existed to tuck that row under the panel's top
     // padding, and without it the title would ride too high.
-    <div className="space-y-5" data-text-panel>
+    <ToolPanel data-text-panel>
     {activeModeInfo && (
       <SectionHeader title={activeModeInfo.label} info={activeModeInfo.info} />
     )}
@@ -196,7 +196,7 @@ export function TextSettings({
       return (
         <>
         {m === "text" && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Font Size */}
             <SizeSlider
               label="Font Size"
@@ -209,45 +209,42 @@ export function TextSettings({
             />
 
             {/* Font Family — real, and only as long as the list is. See above. */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-1.5">
-                <label className="text-2xs text-theme-muted-foreground">
-                  Font Family
-                </label>
-                <InfoTooltip
-                  label="Font Family"
-                  info={
-                    <>
-                      Text is drawn by the engine, not the browser. These faces
-                      ship with the app and are handed to the engine as font
-                      files, so what you type is what gets committed — the
-                      preview, the box it sits in and the exported pixels are
-                      all the same typeface. Nothing is fetched from Google.
-                    </>
+            <ControlRow
+              label="Font Family"
+              info={
+                <>
+                  Text is drawn by the engine, not the browser. These faces
+                  ship with the app and are handed to the engine as font
+                  files, so what you type is what gets committed — the
+                  preview, the box it sits in and the exported pixels are
+                  all the same typeface. Nothing is fetched from Google.
+                </>
+              }
+            >
+              {({ labelId }) => (
+                <SelectField
+                  aria-labelledby={labelId}
+                  value={settings.textFontId ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      textFontId: e.target.value,
+                      // `fontFamily` follows the id rather than being picked
+                      // independently — one of the three surfaces ADR-051
+                      // found disagreeing was exactly this one drifting.
+                      fontFamily: faceCss(e.target.value),
+                    })
                   }
-                />
-              </div>
-              <SelectField
-                value={settings.textFontId ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...settings,
-                    textFontId: e.target.value,
-                    // `fontFamily` follows the id rather than being picked
-                    // independently — one of the three surfaces ADR-051
-                    // found disagreeing was exactly this one drifting.
-                    fontFamily: faceCss(e.target.value),
-                  })
-                }
-                style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
-              >
-                {faces.map((f) => (
-                  <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
-                    {f.label}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
+                  style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
+                >
+                  {faces.map((f) => (
+                    <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                      {f.label}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+            </ControlRow>
 
             {/* Font Weight */}
             <ControlRow label="Font Weight">
@@ -280,7 +277,7 @@ export function TextSettings({
             you were editing to reach it. `background` keeps its own mode so the
             existing toggle, route and palette entry all still land somewhere. */}
         {(m === "text" || m === "background") && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Style toggle */}
             <ControlRow label="Style">
               {({ labelId }) => (
@@ -432,7 +429,7 @@ export function TextSettings({
         )}
 
         {m === "ocr" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!onlineFeaturesEnabled && (
               <OnlineFeaturesOffNotice what="OCR sends the image to a server to read the text." />
             )}
@@ -515,6 +512,6 @@ export function TextSettings({
         />
       </CollapsibleSection>
     )}
-    </div>
+    </ToolPanel>
   );
 }
