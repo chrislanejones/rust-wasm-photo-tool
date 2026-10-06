@@ -28,17 +28,25 @@ async function blockExternalNetwork(page: Page): Promise<void> {
   });
 }
 
+/** The phone grid, and nothing behind it. At 390px the desktop editor stays
+ *  mounted under the phone layer, `inert` and `aria-hidden` (MobileShell), and
+ *  it has its own 3-column grid, skeletons, and a photo-switch lock region that
+ *  stays aria-busy because a phone never loads the engine. None of that reaches
+ *  a person or a screen reader, so none of it is counted here. */
+const PHONE_GRID = ".grid.grid-cols-3:not([inert] *)";
+
 /** Every phone tile's box, plus what it is currently drawing. */
 const measure = (page: Page) =>
   page.evaluate(() => {
-    const grid = document.querySelector<HTMLElement>(".grid.grid-cols-3");
+    const reachable = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].filter((el) => !el.closest("[inert]"));
+    const grid = reachable(".grid.grid-cols-3")[0];
     const tiles = [...document.querySelectorAll<HTMLElement>("button.photo-thumb-grid")];
     return {
       busy: grid?.getAttribute("aria-busy") ?? null,
-      // How many elements in the whole document claim to be busy. One is the
-      // grid; the tiles must not each add their own.
-      busyCount: document.querySelectorAll('[aria-busy="true"]').length,
-      placeholders: document.querySelectorAll(".skeleton").length,
+      // How many reachable elements claim to be busy. One is the grid; the
+      // tiles must not each add their own.
+      busyCount: reachable('[aria-busy="true"]').length,
+      placeholders: reachable(".skeleton").length,
       tiles: tiles.map((el) => {
         const r = el.getBoundingClientRect();
         const img = el.querySelector("img");
@@ -77,7 +85,7 @@ test("nine photos of nine shapes make one uniform 3-column grid, and the grid sa
   // Wait for all nine tiles, then for the grid to stop reporting itself busy —
   // which is the thing under test, so it is also the wait condition.
   await expect(page.locator("button.photo-thumb-grid")).toHaveCount(9, { timeout: 60_000 });
-  await expect(page.locator(".grid.grid-cols-3")).toHaveAttribute("aria-busy", "false", { timeout: 60_000 });
+  await expect(page.locator(PHONE_GRID)).toHaveAttribute("aria-busy", "false", { timeout: 60_000 });
 
   const m = await measure(page);
   console.log("phone grid: " + JSON.stringify(m));
@@ -184,7 +192,7 @@ test("a placeholder occupies exactly the box its photo will take — zero shift"
   }
 
   // Now let them land.
-  await expect(page.locator(".grid.grid-cols-3")).toHaveAttribute("aria-busy", "false", { timeout: 60_000 });
+  await expect(page.locator(PHONE_GRID)).toHaveAttribute("aria-busy", "false", { timeout: 60_000 });
   const settled = await measure(page);
   console.log("all nine settled: " + JSON.stringify(settled));
   expect(settled.placeholders).toBe(0);
