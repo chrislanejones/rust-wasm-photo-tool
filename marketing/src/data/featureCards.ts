@@ -116,11 +116,32 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Bézier pen; Enter closes, Esc finishes open. Committed paths stay editable and round-trip through history, reload and sync as a kind-7 ShapeAnnotation.",
   },
-  Arrows: {
+  "Arrows & Diagram Shapes": {
     group: "annotate",
-    title: "Arrows",
-    plain: "Clean arrows, single- or double-headed.",
-    detail: "Anti-aliased, drawn directly on the pixel buffer; Create → Arrow.",
+    title: "Arrows & Diagram Shapes",
+    plain:
+      "Arrows, plus thirty flowchart and diagram shapes — terminator, document, database, cloud, callout, block arrows and more — that fill, turn and go hand-drawn like any other shape.",
+    detail:
+      "Kinds 11–40, each a short program in the unit square (src/diagram.rs) flattened to one outline plus detail strokes, so stroke, fill, rotation and sloppiness all just work. Create → Arrows & Shapes.",
+  },
+  "Fast drags are never dropped": {
+    group: "annotate",
+    title: "Fast drags land",
+    plain: "Draw thirty shapes as fast as you can and you get thirty shapes.",
+    detail:
+      "A press is recorded instantly and its moves buffered while the engine hit-tests, then replayed in order (lib/pressQueue.ts). It used to land 19–24 of 30.",
+  },
+  "One header row on every second-step dialog": {
+    group: "hood",
+    title: "One dialog header",
+    plain: "Back on the left, the title in the middle, close on the right — in every dialog that has a second step.",
+    detail: "One PaneHeader, a 1fr auto 1fr grid, so the title stays centered; Back and close are the same 24px button.",
+  },
+  "Sign in from Settings": {
+    group: "privacy",
+    title: "Sign in from Settings",
+    plain: "A Sign in button on the right of the Settings footer, not just a small icon in the top bar.",
+    detail: "Clerk's SignInButton; signed in, the same spot shows your avatar.",
   },
   Shapes: {
     group: "annotate",

@@ -86,24 +86,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.16 — 2026-10-05
+### v9.17 — 2026-10-06
 
-**Share links obey the online switch, cloud storage has a real limit, and everything underneath is up to date.**
+**Thirty diagram shapes, a bar that duplicates and connects them, and fast drags that always land.**
 
-Share links now follow Settings › Security like every other upload: with
-"Everything in your browser" on, the Share link button says why it can't make
-one and nothing leaves the tab. Escape closes the Restore Settings question
-instead of doing nothing, and an admin is never shown AI tools that the server
-then refuses.
+Create → Arrows & Shapes now has the thirty shapes people reach for most in
+Lucidchart and draw.io — flowchart symbols like terminator, document,
+database and delay, basics like cloud, callout and cube, and block arrows.
+They fill, turn and go hand-drawn like every other shape.
 
-Cloud storage has a limit the server actually enforces — 100 MB signed in,
-5 GB on Pro — and there's a tool that finds files nobody's edits point at any
-more. It only reports for now; nothing is deleted until I've read what it
-found.
+Select a shape and a bar hangs under it: Apply, Cancel, Duplicate and
+Connect. Duplicate puts eight arrows around the shape, and each press lays
+another copy that way. Connect turns them into pigtails: drag from one onto
+another shape and an arrow joins the two. That's a flowchart, built by hand,
+in a photo editor.
 
-Package night: React 19.3, Convex 1.46, framer-motion 14, react-router 8 on
-the site, vite-plugin-pwa 2, png 0.18 and 45 Rust crates. Engine 854,542 →
-858,808 bytes. Five old database tables that nothing used are gone.
+Drawing thirty shapes as fast as you can used to land about twenty of them.
+Now it lands thirty.
+
+Smaller things: plugin formats are back in the Download dialog (v9.14 had
+hidden every one that wasn't layered), the collapsed section in Shapes and
+Text says Placement instead of Advanced, every second-step dialog has the
+same ‹ title ✕ header, and Settings has a real Sign in button on the right.
+
+Engine 858,808 → 868,393 bytes, for the diagram shapes. No change to the
+saved edit format.
 
 
 ## License
