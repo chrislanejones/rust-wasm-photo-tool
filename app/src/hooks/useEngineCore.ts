@@ -39,6 +39,8 @@ import {
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { setEngineDocument } from "@/lib/engineDocument";
+import { parseBranches, withHistoryForks } from "@/lib/historyForks";
+import { useHistoryBranchStore } from "@/stores/useHistoryBranchStore";
 import { makeLoadQueue, isStale, claimEngineDocument, type LoadOpts } from "./engineLoadQueue";
 export type { LoadOpts } from "./engineLoadQueue";
 
@@ -155,6 +157,8 @@ export type UiSnapshot = {
   layers_json: string;
   active_layer_id: number;
   export_quality: number;
+  /** Beta history forks (ADR-086). Undefined from an older cached wasm. */
+  branches_json?: string;
 };
 
 /** The minimum of the engine surface this needs — so a test can supply a fake
@@ -208,6 +212,7 @@ export async function readUiSnapshot(
       layers_json: ui.layers_json,
       active_layer_id: ui.active_layer_id,
       export_quality: ui.export_quality,
+      branches_json: ui.branches_json,
     };
   } finally {
     // BOTH paths free. The stale path is the one that matters: it is the new
@@ -311,6 +316,7 @@ export function useEngineCore(
     // ADR-024 a12.2 — via the port: after `transferControlToOffscreen()` this
     // thread cannot get a 2D context and a width assignment throws.
     if (canvas) clearLiveCanvas(canvas);
+    useHistoryBranchStore.getState().setBranches(parseBranches(undefined));
     setState(INITIAL_STATE);
   }, [canvasRef]);
 
@@ -372,7 +378,10 @@ export function useEngineCore(
       layers_json,
       active_layer_id,
       export_quality,
+      branches_json,
     } = snap;
+    // Beta history forks: published beside `history`, from the same capture.
+    useHistoryBranchStore.getState().setBranches(parseBranches(branches_json));
 
     const history: HistoryEntry[] = history_labels
       .split("|")
@@ -503,7 +512,7 @@ export function useEngineCore(
           width: img.width,
           height: img.height,
           pixels: new Uint8Array(imageData.data),
-        }).then((tool) => {
+        }).then(withHistoryForks).then((tool) => {
           toolRef.current = tool;
           sourcePosRef.current = null;
           URL.revokeObjectURL(url);
@@ -568,7 +577,7 @@ export function useEngineCore(
         // and the history clear below stay HERE as ordinary engine calls,
         // because they are this load path's own logic. Folding them into the
         // factory would put five load paths behind one flag branch.
-        const tool = await createLiveEngine({ Tool, width, height, pixels: src });
+        const tool = await createLiveEngine({ Tool, width, height, pixels: src }).then(withHistoryForks);
         tool.set_artboard_border(
           artboard.pad,
           artboard.r,
@@ -601,7 +610,7 @@ export function useEngineCore(
           width,
           height,
         );
-        toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src });
+        toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src }).then(withHistoryForks);
         claimEngineDocument(opts);
       }
       sourcePosRef.current = null;
@@ -648,7 +657,7 @@ export function useEngineCore(
       // Last exit before the engine is touched (the boot placeholder included).
       if (isStale(opts)) return false;
       const tool =
-        toolRef.current ?? (await createLiveEngine({ Tool, width: 1, height: 1 }));
+        toolRef.current ?? (await withHistoryForks(await createLiveEngine({ Tool, width: 1, height: 1 })));
       if ((await restoreOplog(tool, photoId)) !== "restored") return false;
       toolRef.current = tool;
       setEngineDocument(opts?.photoId ?? photoId);
@@ -698,7 +707,7 @@ export function useEngineCore(
         width: saved.canvasW,
         height: saved.canvasH,
         pixels: new Uint8Array(canvasRgba.buffer as ArrayBuffer),
-      });
+      }).then(withHistoryForks);
 
       // Rebuild the full layer stack (archive v5+) BEFORE injecting history —
       // begin_layer_restore clears history, so it must run first. Each layer's

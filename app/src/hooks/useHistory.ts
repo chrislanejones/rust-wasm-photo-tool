@@ -33,9 +33,12 @@
 // so the engine still applies them in order, and the ritual is idempotent
 // (flush/sync/broadcast/refresh all just re-read whatever is current). The
 // worst case is one briefly stale frame, which the second ritual corrects.
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
 import { useToolStore } from "@/stores/useToolStore";
+import { useHistoryBranchStore } from "@/stores/useHistoryBranchStore";
+import { applyHistoryForks } from "@/lib/historyForks";
+import { subscribeBeta } from "@/lib/beta";
 
 export function useHistory(engine: EngineCore) {
   const { toolRef, syncState, flushToCanvas, broadcastAnnotationsChanged } =
@@ -94,6 +97,49 @@ export function useHistory(engine: EngineCore) {
     toolRef.current?.clear_history();
     syncState();
   }, [toolRef, syncState]);
+
+  // ── Beta: history forks (ADR-086) ──────────────────────────────────────
+  // Travel to an abandoned timeline's tip. A branch restore can change pixels,
+  // overlays AND the selection exactly like an undo can, so it runs the same
+  // four-step ritual. Awaited: `false` means the branch was gone and nothing
+  // moved, and an un-awaited Promise would be a truthy trap.
+  const restoreBranch = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.restore_history_branch(id)) {
+        flushToCanvas();
+        syncState();
+        broadcastAnnotationsChanged();
+        await refreshSelectionMask();
+      }
+    },
+    [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask],
+  );
+
+  /** Forget one branch. Only the list changes, so this syncs and stops. */
+  const deleteBranch = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.delete_history_branch(id)) syncState();
+    },
+    [toolRef, syncState],
+  );
+
+  // The panel reaches these through the store, not through AppShell props.
+  useEffect(() => {
+    const { setActions } = useHistoryBranchStore.getState();
+    setActions({ restore: restoreBranch, forget: deleteBranch });
+    return () => setActions(null);
+  }, [restoreBranch, deleteBranch]);
+
+  // Toggled in Settings › Beta (or another tab): push the switch into the
+  // live engine now, so it takes effect without a reload. Turning it off
+  // makes the engine forget its branches, and the sync empties the list.
+  useEffect(
+    () =>
+      subscribeBeta(() => {
+        void applyHistoryForks(toolRef.current).then(() => syncState());
+      }),
+    [toolRef, syncState],
+  );
 
   // ── Keyboard shortcuts: NONE here, on purpose ──────────────────────────
   // Ctrl+Z / Ctrl+Shift+Z are bound in ONE place — `app/useKeyboardShortcuts.ts`

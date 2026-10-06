@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { HistogramView } from "./HistogramView";
+import { HistoryBranches } from "./HistoryBranches";
 // Cross-feature import with precedent (CanvasArea, routing do the same):
 // `activateSubTool` is deliberately callable from anywhere — "the rail, the
 // router and the command palette" — and now this gear.
@@ -404,6 +405,8 @@ export function ReviewPanel({
                 />
               ))}
             </div>
+            {/* Beta history forks (ADR-086) — renders nothing when off. */}
+            <HistoryBranches />
           </section>
         )}
 

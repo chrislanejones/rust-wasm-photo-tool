@@ -35,6 +35,7 @@
 
 import { isWebBudgetEnabled } from "@/lib/webPerf";
 import { isExifRustEnabled } from "@/lib/exif/rust";
+import { isHistoryForksEnabled } from "@/lib/historyForks";
 import { isOplogPersistenceEnabled } from "@/lib/oplogPersistence";
 import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
@@ -165,6 +166,20 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
       label: "PageSpeed budget",
       blurb:
         "Resize & Compress measures each photo against the size Google PageSpeed actually allows for it — bytes against pixels — instead of the old score, and Auto Compress aims for that. The number reads differently: lower is better, and 100% or less passes.",
+    },
+  },
+  {
+    key: "ih_history_forks",
+    label: "History forks (ADR-086)",
+    kind: "optin",
+    isOn: isHistoryForksEnabled,
+    effect: "An edit after an undo keeps the undone steps as a branch (src/history.rs) instead of clearing them, listed under History in Review. Branches share the 512 MB undo budget and are dropped before any undo step, so on big photos they rarely survive. Memory only, never saved. Off clears redo exactly as before.",
+    source: "lib/historyForks.ts",
+    beta: {
+      id: "history-forks",
+      label: "Keep the steps you undo",
+      blurb:
+        "Undo a few steps and then make a different edit, and the steps you undid are kept as a branch under History instead of thrown away. Click one to go back to it. Branches live in memory only, and on large photos there is often no room to keep one.",
     },
   },
   {

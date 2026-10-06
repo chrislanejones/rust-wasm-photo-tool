@@ -238,6 +238,13 @@ pub struct UiStateCapture {
     pub layers_json: String,
     pub active_layer_id: u32,
     pub export_quality: u8,
+    /// The history-forks branch list (Beta, ADR-086), raw JSON for the same
+    /// reason `layers_json` is raw. No pixel access anywhere in it, and a
+    /// constant `"[]"` with no work while the Beta is off (which is also the
+    /// default). It rides here rather than on its own call because the panel
+    /// has to be right after EVERY history move, and `syncState` is the one
+    /// place that already is.
+    pub branches_json: String,
 }
 
 /// The layer stack and the canvas it sits on. Returned by
@@ -454,6 +461,7 @@ impl ImageHorseTool {
             layers_json: self.get_layers(),
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
+            branches_json: self.history_branches_json(),
         }
     }
 
@@ -885,6 +893,14 @@ mod capture_tests {
         let mut t = ImageHorseTool::new(32, 24);
         t.load_image(&solid(32, 24, [10, 20, 30, 128])); // alpha < 255
         t.add_layer("Art");
+        // branches_json: "[]" -> one fork (history-forks Beta on, undo, edit).
+        // First, because the undo restores a snapshot, which would reset the
+        // source and quality set below.
+        t.set_history_forks(true);
+        t.add_shape_annotation(
+            0, 1.0, 1.0, 5.0, 5.0, "#0000ff", 2.0, 0, 1, "#0000ff", "#0000ff", 0, 0, 0,
+        );
+        t.undo();
         t.set_source(4, 5); // has_source: false -> true
         t.set_zoom(2.5); // zoom: 1.0 -> 2.5
         t.set_export_quality(37); // quality: default -> 37
@@ -898,6 +914,7 @@ mod capture_tests {
         assert_eq!(t.get_zoom(), 2.5, "setup: zoom must be non-default");
         assert_eq!(t.export_quality(), 37, "setup: quality must be non-default");
         assert!(t.undo_count() > 0, "setup: history must be non-empty");
+        assert_eq!(t.history_branch_count(), 1, "setup: one fork must be held");
 
         let ui = t.capture_ui_state();
 
@@ -914,6 +931,7 @@ mod capture_tests {
         assert_eq!(ui.layers_json, t.get_layers(), "layers_json");
         assert_eq!(ui.active_layer_id, t.active_layer_id(), "active_layer_id");
         assert_eq!(ui.export_quality, t.export_quality(), "export_quality");
+        assert_eq!(ui.branches_json, t.history_branches_json(), "branches_json");
     }
 
     /// width and height are both `u32` and adjacent in the struct, so a
