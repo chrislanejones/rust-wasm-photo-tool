@@ -36,6 +36,8 @@ import { isSvgFile } from "@/lib/rasterizeSvg";
 import { extFromMime } from "@/lib/mimeExt";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { GalleryLoadingRegion } from "@/features/gallery/GalleryLoadingRegion";
+import { useGalleryLoading, useGalleryTile } from "@/features/gallery/useGalleryLoading";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -83,6 +85,8 @@ function MobileThumb({
   onPendingChange: (id: string, pending: boolean) => void;
 }) {
   const thumb = useThumbImage(entry.thumbBlob);
+  // The grid loads like the desktop gallery card (GalleryLoadingRegion).
+  const view = useGalleryTile(thumb);
 
   // Cleared on unmount as well, or a tile deleted mid-decode leaves the grid
   // busy for ever — and the phone is where tiles get deleted.
@@ -94,6 +98,7 @@ function MobileThumb({
   return (
     <button
       type="button"
+      data-id={entry.id}
       aria-label={`View photo ${entry.name}`}
       className="photo-thumb photo-thumb-grid relative"
       onClick={onOpen}
@@ -101,7 +106,7 @@ function MobileThumb({
       {/* Only once there is a picture. Rendered unconditionally it shows
           through the placeholder — a checkerboard where a photo is supposed to
           be arriving, which reads as a failed load. */}
-      {thumb.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
+      {view.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
 
       {/* Every branch is in flow at the same size, matching `Thumb` — this
           grid is `content-start items-start`, so a tile's row height comes
@@ -116,9 +121,9 @@ function MobileThumb({
           waiting and 117x117 settled, on master as well as here. So this is
           not a layout fix; `absolute` on a `Skeleton` is simply a thing that
           does not work, and there is now no caller that tries. */}
-      {thumb.src ? (
-        <img src={thumb.src} alt={entry.name} draggable={false} decoding="async" />
-      ) : thumb.failed ? (
+      {view.src ? (
+        <img src={view.src} alt={entry.name} draggable={false} decoding="async" />
+      ) : view.failed ? (
         <div
           className="flex w-full aspect-square flex-col items-center justify-center gap-1 rounded-md bg-bg-elevated px-1 text-center"
           role="img"
@@ -131,7 +136,7 @@ function MobileThumb({
         /* Inside the grace period `loading={false}` renders the child instead —
            an invisible box of the same size, so a fast decode shows nothing at
            all and the tile never changes size on the way. */
-        <Skeleton variant="tile" decorative loading={thumb.showSkeleton} className="w-full">
+        <Skeleton variant="tile" decorative loading={view.showSkeleton} className="w-full">
           <div className="w-full aspect-square" aria-hidden="true" />
         </Skeleton>
       )}
@@ -341,20 +346,12 @@ export function MobileShell({
   const [viewerId, setViewerId] = useState<string | null>(null);
 
   const pendingImports = useGalleryStore((s) => s.pendingImports);
-  // Which tiles have no pixels yet, summed into the grid's one `aria-busy`.
-  // A Set of ids rather than a count because a tile can report the same value
-  // twice (React may re-run the effect) and a counter would drift; the id is
-  // idempotent.
-  const [pendingThumbs, setPendingThumbs] = useState<ReadonlySet<string>>(() => new Set());
-  const reportThumbPending = useCallback((id: string, pending: boolean) => {
-    setPendingThumbs((prev) => {
-      if (prev.has(id) === pending) return prev;
-      const next = new Set(prev);
-      if (pending) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
+  // Which tiles have no pixels yet (the grid's one `aria-busy`), and whether
+  // the grid is loading as one piece — the desktop gallery's rule, same hook.
+  const gallery = useGalleryLoading({
+    itemIds: photos.map((p) => p.id),
+    pendingImports: pendingImports.length,
+  });
   // Store flag, not a local useState: dialog visibility is UI-chrome state and
   // every other dialog in the app already lives in useUIStore. It also means a
   // future entry point (a palette command, a `#/settings` deep link) can open
@@ -476,22 +473,22 @@ export function MobileShell({
           </div>
         </div>
       ) : (
-        <>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-24">
+        <GalleryLoadingRegion state={gallery} className="flex min-h-0 flex-1 flex-col">
+          <div ref={gallery.setRoot} data-skeleton-skip className="min-h-0 flex-1 overflow-y-auto p-3 pb-24">
             {/* ONE `aria-busy` for the grid, not one per tile. Thirty tiles
                 each announcing their own "Loading" is a worse experience than
                 silence; the grid says it once while any tile is still
                 decoding, and the tile placeholders are `decorative`. */}
             <div
               className="grid grid-cols-3 content-start items-start gap-2"
-              aria-busy={pendingThumbs.size > 0 || pendingImports.length > 0}
+              aria-busy={gallery.busy}
             >
               {photos.map((entry) => (
                 <MobileThumb
                   key={entry.id}
                   entry={entry}
                   onOpen={() => setViewerId(entry.id)}
-                  onPendingChange={reportThumbPending}
+                  onPendingChange={gallery.reportPending}
                 />
               ))}
               {/* Files an import is still opening — same tile as the desktop. */}
@@ -503,7 +500,7 @@ export function MobileShell({
 
           {/* Count readout + the one-way-in Add button, pinned to the bottom
               like the status bar. */}
-          <div className="flex items-center gap-3 border-t border-border bg-bg-secondary px-4 py-3">
+          <div inert={gallery.loading || undefined} data-gallery-chrome="" className="flex items-center gap-3 border-t border-border bg-bg-secondary px-4 py-3">
             <p className="flex-1 text-xs text-text-muted">
               {photos.length} of {maxPhotos} photos
             </p>
@@ -512,7 +509,7 @@ export function MobileShell({
               Add Images
             </Button>
           </div>
-        </>
+        </GalleryLoadingRegion>
       )}
 
       <input

@@ -8,6 +8,7 @@ import { StatusMark } from "@/components/ui/status-mark";
 import { formatBytes } from "@/lib/format";
 import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { useThumbImage } from "./useThumbImage";
+import { useGalleryTile } from "./useGalleryLoading";
 import { BatchCropThumbShade } from "./BatchCropThumbShade";
 import { useToolStore } from "@/stores/useToolStore";
 import type { PhotoEntry } from "./GalleryBar";
@@ -44,6 +45,9 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
   // A thumbnail is either a placeholder or the photo — never a gray photo.
   // The object URL, the decode and the grace period all live in the hook.
   const thumb = useThumbImage(entry.thumbBlob);
+  // What the tile DRAWS also depends on the card: while the gallery is loading
+  // an empty tile is a skeleton at once (GalleryLoadingRegion).
+  const view = useGalleryTile(thumb);
   // Batch: the checkbox means "exception — treat this one differently". Same
   // checkbox, same selection; only its name and badge change.
   const batchMode = useToolStore((s) => s.activeTool === "emoji");
@@ -133,7 +137,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           THROUGH the placeholder, which is a checkerboard where a photo is
           supposed to be arriving — the exact "failed image load" reading the
           comment above spent twenty lines fixing. */}
-      {thumb.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
+      {view.src && <div className="absolute inset-0 checkerboard rounded-lg" />}
 
       {/* ⚠️ EVERY BRANCH HERE IS IN FLOW AT THE SAME SIZE, and that is
           load-bearing rather than tidy. The vertical grid is `items-start
@@ -146,16 +150,16 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           The image pops inside the clipped card — hoverPop from
           lib/animations.ts, the same definition the tool tiles use. There is no
           develop any more: a thumbnail is a placeholder or the photo. */}
-      {thumb.src ? (
+      {view.src ? (
         <motion.img
           ref={imgRef}
           variants={hoverPop}
-          src={thumb.src}
+          src={view.src}
           alt={entry.name}
           draggable={false}
           decoding="async"
         />
-      ) : thumb.failed ? (
+      ) : view.failed ? (
         <div
           className="flex w-full aspect-square flex-col items-center justify-center gap-1 rounded-md bg-bg-elevated px-1 text-center"
           role="img"
@@ -168,7 +172,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         /* Inside the grace period `loading={false}` renders the child instead —
            an invisible box of the same size, so a fast decode shows nothing at
            all and the tile never changes size on the way. */
-        <Skeleton variant="tile" decorative loading={thumb.showSkeleton} className="w-full">
+        <Skeleton variant="tile" decorative loading={view.showSkeleton} className="w-full">
           <div className="w-full aspect-square" aria-hidden="true" />
         </Skeleton>
       )}

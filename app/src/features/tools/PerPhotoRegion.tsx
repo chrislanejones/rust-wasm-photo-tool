@@ -4,8 +4,10 @@
 // ONE job now: LOCK DURING A SWITCH. From the moment you ask for a photo until
 // its pixels are in the engine, these controls would read or edit the previous
 // photo, so they are `inert`. If that takes longer than 300 ms the controls
-// turn into skeletons IN PLACE (CSS on `data-switch-skeleton`): every box keeps
-// its exact size, nothing moves when the real values return.
+// turn into skeletons IN PLACE (CSS on `data-skeleton-region`, the one rule the
+// gallery card shares): every box keeps its exact size, nothing moves when the
+// real values return. `data-switch-skeleton` is the old name, still emitted as
+// an alias because e2e/photo-switch-cue.spec.ts observes it.
 //
 // Its other two jobs — naming the photo and cueing every switch — went to
 // `PhotoFooter`, which is the Tools CARD's footer rather than a line inside
@@ -46,6 +48,7 @@ export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean
     <div
       aria-busy={locked || undefined}
       inert={locked || undefined}
+      data-skeleton-region={(locked && slow) || undefined}
       data-switch-skeleton={(locked && slow) || undefined}
       className="per-photo-region"
     >
