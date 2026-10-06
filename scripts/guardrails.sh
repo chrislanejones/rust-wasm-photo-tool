@@ -143,8 +143,13 @@ ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
 # themes), and 6 hits were never radius at all: the Text tool's corner-preset
 # VALUES ("rounded" as a type, an `id:` and a ternary result), which the
 # counter now reads as values. Its self-test plants all three.
+# Then 26 → 22: four `rounded-xl` in files Night 8 was already in (Batch's logo
+# drop zone and logo row, New's surface and drop zone) → `rounded-lg`. That one
+# DOES change pixels (12px → 10px). The chrome family (Tools/Gallery cards, top
+# bar, master bar) and the modal surfaces stay: changing one of a family alone
+# splits it, and picking the family's radius is a call for Chris.
 check "ui-spacing" 42 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
-check "ui-radius" 26 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
+check "ui-radius" 22 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
 check "ui-raw-button" 14 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # ── The exception registry explains every row (UI Night 8, 10-06-2026) ──

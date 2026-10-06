@@ -649,7 +649,7 @@ function BatchToolPanel({
             }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={onDrop}
-            className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center cursor-pointer transition-colors ${
+            className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center cursor-pointer transition-colors ${
               isDragOver
                 ? "border-theme-primary bg-theme-primary/10"
                 : "border-theme-muted/50 bg-theme-muted/20 hover:bg-theme-muted/30"
@@ -663,7 +663,7 @@ function BatchToolPanel({
             </p>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-theme-muted/20 px-3 py-2">
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-theme-muted/20 px-3 py-2">
             <div className="checkerboard flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-sm">
               <img
                 src={logo.previewUrl}

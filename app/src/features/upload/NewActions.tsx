@@ -424,7 +424,7 @@ export function NewActions({
           onDragLeave={() => setDragging(false)}
           // Stable min-height so the surface doesn't resize/recenter (and jerk)
           // when swapping the upload actions ⇄ New Canvas panel.
-          className="rounded-xl min-h-[18rem] flex flex-col"
+          className="rounded-lg min-h-[18rem] flex flex-col"
         >
           <PaneSwap
             paneKey={pane}
@@ -612,7 +612,7 @@ export function NewActions({
                 {/* Dotted drop zone — highlights + nudges when an image is
                     dragged over the surface. */}
                 <div
-                  className={`flex w-full flex-1 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dotted p-6 text-center transition-all duration-200 ${
+                  className={`flex w-full flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-dotted p-6 text-center transition-all duration-200 ${
                     dragging
                       ? "border-accent bg-accent/10 scale-[1.02]"
                       : "border-border bg-bg-elevated/30"
