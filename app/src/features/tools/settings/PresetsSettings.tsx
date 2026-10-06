@@ -28,6 +28,7 @@ import {
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButton } from "@/components/ui/tool-button";
 import type { PresetControls, PresetStack } from "@/hooks/useTransforms";
+import { ToolPanel } from "@/components/ui/tool-panel";
 
 /** The presets, in the engine's own units — brightness is a -1..1 fraction,
  *  contrast and saturation are factors (1 = as-is), and shadows/highlights are
@@ -240,7 +241,7 @@ export function PresetsSettings({ presets, imageReady }: PresetsSettingsProps) {
   };
 
   return (
-    <div className="space-y-3 -mt-2">
+    <ToolPanel>
       <SectionHeader
         title="Presets"
         info="Hover a preset to see it on your photo; click to keep it. Each one is a single undo-able step, and they stack if you apply more than one."
@@ -276,6 +277,6 @@ export function PresetsSettings({ presets, imageReady }: PresetsSettingsProps) {
               ? "Hover a preset to try it on your photo."
               : "Load a photo to use presets."}
       </p>
-    </div>
+    </ToolPanel>
   );
 }
