@@ -154,6 +154,18 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(tri, 5, 5)).toBe(-1); // bbox corner, off the ink
   });
 
+  it("an unfilled oval (11) is a ring along its whole bbox, and turns", () => {
+    // 200×60 oval centered on (100,30). pad 6.
+    const oval = [shape({ id: 39, kind: 11, x0: 0, y0: 0, x1: 200, y1: 60 })];
+    expect(shapeAnnotationAt(oval, 1, 30)).toBe(39); // left end of the long axis
+    expect(shapeAnnotationAt(oval, 100, 30)).toBe(-1); // hollow middle
+    expect(shapeAnnotationAt(oval, 2, 2)).toBe(-1); // bbox corner, off the ink
+    // Turned 90° it stands upright on screen: the left end moves to the top.
+    const turned = [shape({ id: 40, kind: 11, x0: 0, y0: 0, x1: 200, y1: 60, rotation: 90 })];
+    expect(shapeAnnotationAt(turned, 100, -69)).toBe(40);
+    expect(shapeAnnotationAt(turned, 1, 30)).toBe(-1);
+  });
+
   it("a star with more points hit-tests its own outline", () => {
     // 8 points: the tip at 3 o'clock (100,50) is a vertex; with 5 points the
     // right-hand tips sit elsewhere and (100,50) is off the ink.

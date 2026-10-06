@@ -93,6 +93,31 @@ export interface DrawEditState {
   };
 }
 
+/**
+ * A pending edit with new geometry from a handle drag. `shape` rides along
+ * only from the circle's oval handle, which turns a circle into an oval: a
+ * new shape takes it as its `drawnShape`, a reselected one as its own
+ * `style.shape` and `kindByte`, so `commitEdit` writes kind 11 either way.
+ */
+export function withEditGeometry(
+  prev: DrawEditState,
+  start: Point,
+  end: Point,
+  rotation?: number,
+  shape?: ShapeName,
+): DrawEditState {
+  const next: DrawEditState = { ...prev, start, end };
+  if (rotation !== undefined) next.rotation = rotation;
+  if (shape !== undefined) {
+    if (next.style) {
+      next.style = { ...next.style, shape, kindByte: SHAPE_NAME_KIND[shape] };
+    } else {
+      next.drawnShape = shape;
+    }
+  }
+  return next;
+}
+
 /** The style fields a reselected shape carries, minus `shape`/`kindByte`. */
 export type ShapeStylePatch = Partial<NonNullable<DrawEditState["style"]>>;
 
@@ -198,7 +223,7 @@ function sameRadii(a: CornerRadii | undefined, b: CornerRadii | undefined): bool
 export interface ShapeMeta {
   id: number;
   kind: number; // 0=rect,1=circle,2=line,3=handCircle(legacy),4=arrow,5=pin,
-                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle
+                // 6=polyline,7=bezier,8=diamond,9=star,10=triangle,11=oval
   x0: number;
   y0: number;
   x1: number;
@@ -247,6 +272,7 @@ export const SHAPE_KIND_NAME: Record<number, ShapeName> = {
   8: "diamond",
   9: "star",
   10: "triangle",
+  11: "oval",
 };
 
 /** ToolSettings shape name → Rust `kind` byte. */
@@ -257,6 +283,7 @@ export const SHAPE_NAME_KIND: Record<string, number> = {
   diamond: 8,
   star: 9,
   triangle: 10,
+  oval: 11,
 };
 
 /** The four interior fills the Shapes panel offers. */
@@ -283,11 +310,11 @@ export const FILL_KIND_MODE: Record<number, FillMode> = {
 };
 
 /** The `kind` bytes that accept an interior fill — rect, circle, diamond, star,
- *  triangle: every drawn shape that encloses an area. The line (2) is the one
+ *  triangle, oval: every drawn shape that encloses an area. The line (2) is the one
  *  that does not, and the arrow (4) / pin (5) / polyline (6) / pen path (7)
  *  kinds are not bbox shapes. Mirrors `annotations::is_fillable_kind` (Rust);
  *  change both together or a committed fill and the preview disagree. */
-export const FILLABLE_KINDS: ReadonlySet<number> = new Set([0, 1, 8, 9, 10]);
+export const FILLABLE_KINDS: ReadonlySet<number> = new Set([0, 1, 8, 9, 10, 11]);
 
 /** Does this shape NAME take a Fill section in the Shapes panel? The name twin
  *  of `FILLABLE_KINDS`, for the panel and the overlay, which work in names. */

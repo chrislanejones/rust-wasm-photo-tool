@@ -101,7 +101,8 @@ export function sloppyShapePath(
       );
       break;
     case "circle":
-      pts = sloppyCirclePoints(from, to, sloppiness, strokeWidth);
+    case "oval":
+      pts = sloppyCirclePoints(from, to, sloppiness, strokeWidth, shape === "oval");
       break;
   }
   if (!pts || pts.length === 0) return "";

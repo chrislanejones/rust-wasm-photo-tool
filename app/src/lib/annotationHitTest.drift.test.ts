@@ -115,7 +115,10 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // unfilled-edges branch, the star takes its point count. Port + tests
   // (triangle, 8-point star, turned rect, pin ignores θ) updated FIRST, per the
   // order above.
-  shape_annotation_at: "ef6242fa495acca1",
+  // ef6242fa495acca1 → c36cfb5fac7053e0 (2026-10-06): the oval (11) turns with
+  // the rest and is a ring while unfilled, exactly as the circle is. Port +
+  // test ("an unfilled oval (11) is a ring…") updated FIRST, per the order above.
+  shape_annotation_at: "c36cfb5fac7053e0",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

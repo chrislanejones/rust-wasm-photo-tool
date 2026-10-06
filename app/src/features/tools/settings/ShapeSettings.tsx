@@ -92,7 +92,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
     id: "shapes",
     label: "Shapes",
     icon: ShapesIcon,
-    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°), and the dots inside the corners to round them (Shift rounds one corner only).",
+    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°), the dots inside the corners to round them (Shift rounds one corner only), and a circle's oval handle — left of its box — to stretch it into an oval.",
   },
   {
     id: "pens",

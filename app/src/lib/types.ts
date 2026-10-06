@@ -29,10 +29,18 @@ export interface StampSettings {
 }
 
 /** The shapes the Shapes tool can draw. The Rust `kind` bytes: 0 rect, 1
- *  circle, 2 line, 8 diamond, 9 star, 10 triangle (kind 3, the legacy
+ *  circle, 2 line, 8 diamond, 9 star, 10 triangle, 11 oval (kind 3, the legacy
  *  hand-drawn circle, is no longer creatable but still renders from old
- *  documents). */
-export type ShapeName = "rect" | "circle" | "line" | "diamond" | "star" | "triangle";
+ *  documents). The oval has no panel button: a circle becomes one when its
+ *  oval handle (left of the edit box) is dragged. */
+export type ShapeName =
+  | "rect"
+  | "circle"
+  | "line"
+  | "diamond"
+  | "star"
+  | "triangle"
+  | "oval";
 
 export interface ToolSettings extends StampSettings {
   strokeWidth: number;

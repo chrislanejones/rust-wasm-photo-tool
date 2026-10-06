@@ -457,12 +457,16 @@ const CIRCLE_SQUEEZE = 0.05;
  *  bbox ellipse, so a non-square drag changed shape the instant the slider
  *  left 0 and the fill no longer sat under the outline.
  *
- *  Mirrors `draw_sloppy_circle` (drawing.rs). */
+ *  `oval` stretches the ring to the whole bbox (one radius per axis) — the
+ *  oval shape (kind 11). With it off every number is the circle's as before.
+ *
+ *  Mirrors `draw_sloppy_circle` / `sloppy_ellipse_points` (drawing.rs). */
 export function sloppyCirclePoints(
   from: Point,
   to: Point,
   sloppiness: number,
   strokeWidth: number,
+  oval = false,
 ): Point[] {
   const x = Math.min(from.x, to.x);
   const y = Math.min(from.y, to.y);
@@ -472,6 +476,8 @@ export function sloppyCirclePoints(
   const cy = y + bh / 2;
   const r = Math.min(bw, bh) / 2;
   if (r < 2) return [];
+  const rx = oval ? bw / 2 : r;
+  const ry = oval ? bh / 2 : r;
   const seed = shapeWobbleSeed(from.x, from.y, to.x, to.y);
   const strength = sketchStrength(sloppiness);
   const diag = Math.max(Math.sqrt(bw * bw + bh * bh), 1e-6);
@@ -490,7 +496,7 @@ export function sloppyCirclePoints(
 
   // Segment count tracks the radius the way the firm branch does; a fixed 60
   // showed its corners on a big circle.
-  const numPoints = Math.max(60, Math.min(480, Math.ceil(r * 4)));
+  const numPoints = Math.max(60, Math.min(480, Math.ceil(Math.max(rx, ry) * 4)));
   const path: Point[] = [];
   // Lead-in tail (fades to a point at its tip).
   const tailSteps = 10;
@@ -501,8 +507,8 @@ export function sloppyCirclePoints(
     const squeeze = 1 + Math.sin(angle * 2 + seed) * squeezeAmt;
     const inward = (1 - t) * (r * 0.15) * strength;
     path.push({
-      x: cx + (r * squeeze - inward + n) * Math.cos(angle + tilt),
-      y: cy + (r / squeeze - inward + n) * Math.sin(angle + tilt),
+      x: cx + (rx * squeeze - inward + n) * Math.cos(angle + tilt),
+      y: cy + (ry / squeeze - inward + n) * Math.sin(angle + tilt),
     });
   }
   // Main arc — stops shy of a full turn so the ends visibly miss each other.
@@ -512,8 +518,8 @@ export function sloppyCirclePoints(
     const n = noise(angle);
     const squeeze = 1 + Math.sin(angle * 2 + seed) * squeezeAmt;
     path.push({
-      x: cx + (r * squeeze + n) * Math.cos(angle + tilt),
-      y: cy + (r / squeeze + n) * Math.sin(angle + tilt),
+      x: cx + (rx * squeeze + n) * Math.cos(angle + tilt),
+      y: cy + (ry / squeeze + n) * Math.sin(angle + tilt),
     });
   }
   return path;

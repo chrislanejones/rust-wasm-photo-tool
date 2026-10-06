@@ -63,8 +63,9 @@ export interface ShapeHitGeometry {
   starPoints?: number;
 }
 
-/** The kinds the engine turns: rect, circle, line, diamond, star, triangle. */
-const TURNED_KINDS = new Set([0, 1, 2, 8, 9, 10]);
+/** The kinds the engine turns: rect, circle, line, diamond, star, triangle,
+ *  oval. */
+const TURNED_KINDS = new Set([0, 1, 2, 8, 9, 10, 11]);
 
 /**
  * Port of `text_annotation_at` (annotations.rs:1792).
@@ -121,7 +122,7 @@ export function pointSegmentDistance(
  * shape's rotation about its box center first, then every rule below applies
  * to the upright box — the engine does exactly this. Closed kinds split on
  * whether they are ink all the way through (2026-08-28):
- *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) is a RING — the
+ *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) / oval (11) is a RING — the
  *     padded outline minus the interior shrunk by the same pad, so a click in
  *     its empty middle is a miss and a shape can be drawn inside it;
  *   - a filled one, a pin (5) and a bézier (7) are a padded bounding box.
@@ -206,7 +207,8 @@ export function shapeAnnotationAt(
       const inOuter =
         x >= minx - pad && x <= maxx + pad && y >= miny - pad && y <= maxy + pad;
       const hollow =
-        (s.fill_kind ?? 0) === 0 && (s.kind === 0 || s.kind === 1 || s.kind === 3);
+        (s.fill_kind ?? 0) === 0 &&
+        (s.kind === 0 || s.kind === 1 || s.kind === 3 || s.kind === 11);
       if (!hollow) {
         hit = inOuter;
       } else if (s.kind === 0) {
