@@ -62,21 +62,22 @@ interface Props<T extends string> {
    *  must survive losing the visible text. The caller shows the active label
    *  elsewhere (SectionHeader's `value`) so the choice is still legible. */
   segmented?: boolean;
-  /** Optional small label rendered above the grid. A ReactNode, not a string,
-   *  so a caller can put an icon and a lightbulb beside the words. */
-  label?: React.ReactNode;
-  /** Center the label over the grid instead of aligning it left. */
-  labelAlign?: "start" | "center";
+  /* NO `label` PROP since UI Night 8 (10-06-2026). It drew the same 2xs
+     muted words, 8px above the grid, that `ControlRow`'s label slot draws —
+     two primitives owning one job. Its 14 callers moved to
+       <ControlRow label="…">{({ labelId }) => <ToolButtonGroup aria-labelledby={labelId} … />}</ControlRow>
+     measured identical (glyph and grid rects) before the prop was deleted.
+     A lightbulb goes in ControlRow's `info`. */
   /** Icon-on-top, text-below tiles (vs the default icon-left row). */
   stacked?: boolean;
   /** Disable every tile (e.g. no image loaded). Default false. */
   disabled?: boolean;
   className?: string;
-  /** The radio group's accessible name, for a SELECT group with no `label`
-   *  of its own, or whose `label` holds more than words. Repeat the visible
-   *  heading's words. A plain-text `label` is already the name. */
+  /** The radio group's accessible name when no visible heading can be
+   *  pointed at. Repeat the visible heading's words. */
   "aria-label"?: string;
-  /** Point at a heading rendered elsewhere. Wins over `label`. */
+  /** Point at the words on screen — ControlRow's `labelId`, a SectionHeader.
+   *  Wins over `aria-label`. */
   "aria-labelledby"?: string;
   /** A sentence that explains the group, e.g. why some options are off. */
   "aria-describedby"?: string;
@@ -108,8 +109,6 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
     onChange,
     columns = 2,
     segmented = false,
-    label,
-    labelAlign = "start",
     stacked = false,
     disabled = false,
     className,
@@ -117,39 +116,20 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
   // The mode comes from props the caller already passes, so no call site
   // had to change to become correct: `value` present = SELECT.
   const isSelect = "value" in props;
-  const labelId = React.useId();
   const radio = useRadioGroup({
     ids: options.map((o) => o.id),
     selected: value,
     isDisabled: (i) => disabled || !!options[i].disabled,
     onSelect: onChange,
   });
-  // Explicit beats derived. `label` can hold more than words (a lightbulb
-  // button, whose own name would be read into the group's), so a caller that
-  // passes aria-label gets exactly that.
+  // Pointing at visible words beats a copy of them.
   const name = props["aria-labelledby"]
     ? { "aria-labelledby": props["aria-labelledby"] }
     : props["aria-label"]
       ? { "aria-label": props["aria-label"] }
-      : label
-        ? { "aria-labelledby": labelId }
-        : {};
+      : {};
   return (
     <div className={cn("space-y-2", className)}>
-      {/* A div, not a <label>: it was never associated with a control (no
-          htmlFor), so it carried no semantics — and it can now hold a
-          lightbulb, which must not be nested inside a label element. */}
-      {label && (
-        <div
-          id={labelId}
-          className={cn(
-            "flex items-center gap-1.5 text-2xs text-theme-muted-foreground",
-            labelAlign === "center" && "justify-center",
-          )}
-        >
-          {label}
-        </div>
-      )}
       {/* grid-auto-rows:1fr equalizes every row to the tallest, so a longer
           label (e.g. "Hand-drawn") makes all buttons that size — not just its
           own row. Buttons stretch to fill via the default align-self. */}

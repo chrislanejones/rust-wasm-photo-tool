@@ -4,6 +4,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { GridKind, Preferences, RulerUnit } from "@/lib/preferences";
+import { ControlRow } from "@/components/ui/control-row";
 
 /**
  * Rulers & Grid — non-destructive canvas overlays persisted via
@@ -105,13 +106,17 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             invisible ruler is a control with no visible effect, which is how a
             panel starts feeling broken. */}
         {value.rulers && (
-          <ToolButtonGroup
-            label="Units"
-            options={RULER_UNITS}
-            columns={3}
-            value={value.rulerUnit}
-            onChange={(id) => onChange({ rulerUnit: id })}
-          />
+          <ControlRow label="Units">
+            {({ labelId }) => (
+              <ToolButtonGroup
+                aria-labelledby={labelId}
+                options={RULER_UNITS}
+                columns={3}
+                value={value.rulerUnit}
+                onChange={(id) => onChange({ rulerUnit: id })}
+              />
+            )}
+          </ControlRow>
         )}
       </div>
 

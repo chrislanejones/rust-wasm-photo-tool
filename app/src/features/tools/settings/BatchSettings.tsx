@@ -39,6 +39,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { BatchGroupToggle } from "./BatchGroupToggle";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
 import { Button } from "@/components/ui/button";
+import { ControlRow } from "@/components/ui/control-row";
 
 /** Batch › Text weight — a two-tile pick, the same group every other
  *  pick-one-of-N control in the panels uses. */
@@ -1340,13 +1341,11 @@ function TextBatchPanel({
 
       {/* Background — plain solid box only, no speech-bubble/tail (see the
           module comment on TEXT_BG_KIND_OPTIONS above). */}
-      <ToolButtonGroup
-        label="Background"
-        options={TEXT_BG_KIND_OPTIONS}
-        value={bgKind}
-        onChange={setBgKind}
-        columns={2}
-      />
+      <ControlRow label="Background">
+        {({ labelId }) => (
+          <ToolButtonGroup aria-labelledby={labelId} options={TEXT_BG_KIND_OPTIONS} value={bgKind} onChange={setBgKind} />
+        )}
+      </ControlRow>
 
       {bgKind !== "none" && (
         <>
@@ -1366,13 +1365,12 @@ function TextBatchPanel({
             unit="px"
           />
 
-          <ToolButtonGroup
-            label="Corners"
-            options={TEXT_BG_CORNER_OPTIONS}
-            value={textBgCornerIdFromRadius(bgCornerRadius)}
-            onChange={(id) => setBgCornerRadius(TEXT_BG_CORNER_RADIUS[id])}
-            columns={3}
-          />
+          <ControlRow label="Corners">
+            {({ labelId }) => (
+              <ToolButtonGroup aria-labelledby={labelId} options={TEXT_BG_CORNER_OPTIONS} columns={3}
+                value={textBgCornerIdFromRadius(bgCornerRadius)} onChange={(id) => setBgCornerRadius(TEXT_BG_CORNER_RADIUS[id])} />
+            )}
+          </ControlRow>
 
           <SizeSlider
             label="Opacity"

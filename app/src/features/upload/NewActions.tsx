@@ -34,6 +34,7 @@ import { DEFAULT_IMAGE_MODEL_ID } from "./aiImageDraft";
 import { CreateAIImagePanel } from "./CreateAIImagePanel";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import { namePastedImage } from "@/lib/pastedImageName";
+import { ControlRow } from "@/components/ui/control-row";
 
 interface SizePreset {
   id: string;
@@ -471,29 +472,37 @@ export function NewActions({
                 </div>
 
                 {/* Use-case tabs — swap which preset sizes are offered. */}
-                <ToolButtonGroup
-                  label="Canvas type"
-                  options={PRESET_CATEGORIES.map((c) => ({
-                    id: c.id,
-                    label: c.label,
-                  }))}
-                  value={blankCat}
-                  onChange={setBlankCat}
-                  columns={4}
-                />
+                <ControlRow label="Canvas type">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={PRESET_CATEGORIES.map((c) => ({
+                        id: c.id,
+                        label: c.label,
+                      }))}
+                      value={blankCat}
+                      onChange={setBlankCat}
+                      columns={4}
+                    />
+                  )}
+                </ControlRow>
 
-                <ToolButtonGroup
-                  label="Page size"
-                  options={
-                    (
-                      PRESET_CATEGORIES.find((c) => c.id === blankCat) ??
-                      PRESET_CATEGORIES[0]
-                    ).presets
-                  }
-                  value={blankPreset}
-                  onChange={applyPreset}
-                  columns={3}
-                />
+                <ControlRow label="Page size">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={
+                        (
+                          PRESET_CATEGORIES.find((c) => c.id === blankCat) ??
+                          PRESET_CATEGORIES[0]
+                        ).presets
+                      }
+                      value={blankPreset}
+                      onChange={applyPreset}
+                      columns={3}
+                    />
+                  )}
+                </ControlRow>
 
                 <div
                   className={transparent ? "pointer-events-none opacity-40" : ""}

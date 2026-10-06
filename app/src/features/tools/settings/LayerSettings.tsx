@@ -39,6 +39,7 @@ import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectField } from "@/components/ui/select-field";
 import { PANEL_DIVIDER, PANEL_SECTION } from "@/lib/styles";
 import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
+import { ControlRow } from "@/components/ui/control-row";
 
 /** A Minus stood on end — the vertical guide's glyph. A named component
  *  because `ToolButtonOption.icon` takes a component TYPE, not an element, so
@@ -448,14 +449,18 @@ export function LayerSettings({
                     store (mask.value / mask.onSetValue), which is what lets
                     the X shortcut swap it from the keyboard hook without this
                     panel in the loop. */}
-                <ToolButtonGroup
-                  label="Brush paints"
-                  columns={2}
-                  stacked
-                  value={mask.value < 128 ? "hide" : "reveal"}
-                  onChange={(v) => mask.onSetValue(v === "hide" ? 0 : 255)}
-                  options={MASK_BRUSH_OPTIONS}
-                />
+                <ControlRow label="Brush paints">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      columns={2}
+                      stacked
+                      value={mask.value < 128 ? "hide" : "reveal"}
+                      onChange={(v) => mask.onSetValue(v === "hide" ? 0 : 255)}
+                      options={MASK_BRUSH_OPTIONS}
+                    />
+                  )}
+                </ControlRow>
                 <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
                   Hide paints black, Reveal paints white — press{" "}
                   <kbd className="font-mono">X</kbd> to swap, and{" "}

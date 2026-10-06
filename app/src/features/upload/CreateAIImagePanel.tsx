@@ -38,6 +38,7 @@ import {
   rejectReason,
 } from "./aiImageDraft";
 import { SelectField } from "@/components/ui/select-field";
+import { ControlRow } from "@/components/ui/control-row";
 
 /**
  * ⚠️ GENERATE IS NOT WIRED, AND SAYING SO BEFORE THE CLICK IS THE POINT.
@@ -302,26 +303,24 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
           which has no text-to-image job type yet, so this is still a
           placeholder — now rendered by the same ToolButtonGroup the
           Crop ratios use rather than a private copy of it. */}
-      <ToolButtonGroup<string>
-        aria-label="Aspect ratio"
-        columns={5}
-        label={
-          <>
-            Aspect Ratio
-            <InfoTooltip
-              label="Aspect Ratio"
-              info="The shape of the generated frame. Provisional: each model publishes its own list of sizes, and this one is replaced by the model's real list when generation is wired up."
-            />
-          </>
-        }
-        value={ratio}
-        onChange={setRatio}
-        options={ASPECT_RATIOS.map((r) => ({
-          id: r.id,
-          label: r.label,
-          title: `${r.w} × ${r.h}`,
-        }))}
-      />
+      <ControlRow
+        label="Aspect Ratio"
+        info="The shape of the generated frame. Provisional: each model publishes its own list of sizes, and this one is replaced by the model's real list when generation is wired up."
+      >
+        {({ labelId }) => (
+          <ToolButtonGroup<string>
+            aria-labelledby={labelId}
+            columns={5}
+            value={ratio}
+            onChange={setRatio}
+            options={ASPECT_RATIOS.map((r) => ({
+              id: r.id,
+              label: r.label,
+              title: `${r.w} × ${r.h}`,
+            }))}
+          />
+        )}
+      </ControlRow>
 
       {/* THE CONSENT LINE. This is the first feature where data
           leaves the tab, and the claim "nothing leaves your tab by

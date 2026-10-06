@@ -23,6 +23,7 @@ import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 import { SelectField } from "@/components/ui/select-field";
 import { ErrorNote } from "@/components/ui/status-note";
 import { Button } from "@/components/ui/button";
+import { ControlRow } from "@/components/ui/control-row";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -249,15 +250,19 @@ export function TextSettings({
             </div>
 
             {/* Font Weight */}
-            <ToolButtonGroup
-              label="Font Weight"
-              options={[
-                { id: "normal", label: "Normal" },
-                { id: "bold", label: "Bold" },
-              ] as const}
-              value={settings.fontWeight ?? "normal"}
-              onChange={(id) => onChange({ ...settings, fontWeight: id })}
-            />
+            <ControlRow label="Font Weight">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={[
+                    { id: "normal", label: "Normal" },
+                    { id: "bold", label: "Bold" },
+                  ] as const}
+                  value={settings.fontWeight ?? "normal"}
+                  onChange={(id) => onChange({ ...settings, fontWeight: id })}
+                />
+              )}
+            </ControlRow>
 
             {/* Color */}
             <ColorSwatchGrid
@@ -277,13 +282,17 @@ export function TextSettings({
         {(m === "text" || m === "background") && (
           <div className="space-y-5">
             {/* Style toggle */}
-            <ToolButtonGroup
-              label="Style"
-              options={BG_KIND_OPTIONS}
-              value={settings.bgKind}
-              onChange={(id) => onChange({ ...settings, bgKind: id })}
-              columns={3}
-            />
+            <ControlRow label="Style">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={BG_KIND_OPTIONS}
+                  value={settings.bgKind}
+                  onChange={(id) => onChange({ ...settings, bgKind: id })}
+                  columns={3}
+                />
+              )}
+            </ControlRow>
 
             {settings.bgKind !== "none" && (
               <>
@@ -306,15 +315,19 @@ export function TextSettings({
                 />
 
                 {/* Corner style — three presets, for both Text BG and Bubble. */}
-                <ToolButtonGroup
-                  label="Corners"
-                  options={BG_CORNER_OPTIONS}
-                  value={cornerIdFromRadius(settings.bgCornerRadius)}
-                  onChange={(id) =>
-                    onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
-                  }
-                  columns={3}
-                />
+                <ControlRow label="Corners">
+                  {({ labelId }) => (
+                    <ToolButtonGroup
+                      aria-labelledby={labelId}
+                      options={BG_CORNER_OPTIONS}
+                      value={cornerIdFromRadius(settings.bgCornerRadius)}
+                      onChange={(id) =>
+                        onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
+                      }
+                      columns={3}
+                    />
+                  )}
+                </ControlRow>
 
                 {/* Tail direction — bubble only. Angle in degrees (0-359):
                     the slider sweeps the tail all the way around the bubble. */}
@@ -345,27 +358,31 @@ export function TextSettings({
                 from the box/bubble and "Text" from the glyphs. With Background =
                 None there's no box, so any shadow (Box/Text/Both) casts from the
                 text silhouette — "Box" still produces a visible shadow. */}
-            <ToolButtonGroup
-              label="Drop Shadow"
-              options={SHADOW_MODE_OPTIONS}
-              value={
-                settings.shadowBox && settings.shadowText
-                  ? "both"
-                  : settings.shadowBox
-                    ? "box"
-                    : settings.shadowText
-                      ? "text"
-                      : "off"
-              }
-              onChange={(id) =>
-                onChange({
-                  ...settings,
-                  shadowBox: id === "box" || id === "both",
-                  shadowText: id === "text" || id === "both",
-                })
-              }
-              columns={4}
-            />
+            <ControlRow label="Drop Shadow">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={SHADOW_MODE_OPTIONS}
+                  value={
+                    settings.shadowBox && settings.shadowText
+                      ? "both"
+                      : settings.shadowBox
+                        ? "box"
+                        : settings.shadowText
+                          ? "text"
+                          : "off"
+                  }
+                  onChange={(id) =>
+                    onChange({
+                      ...settings,
+                      shadowBox: id === "box" || id === "both",
+                      shadowText: id === "text" || id === "both",
+                    })
+                  }
+                  columns={4}
+                />
+              )}
+            </ControlRow>
 
             {(settings.shadowBox || settings.shadowText) && (
               <>

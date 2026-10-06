@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { Check, Crop, Eye, Scissors } from "lucide-react";
 import { ToggleButtonGroup, type ToggleGroupItem } from "./toggle-button-group";
 import { ToolButtonGroup } from "./tool-button-group";
+import { ControlRow } from "./control-row";
 
 // Plan B §1 — the gaps LEFT OVER by segmented-modes.test.ts.
 //
@@ -92,24 +93,33 @@ describe("ToolButtonGroup — name precedence and the onChange payload", () => {
     { id: "cut" as const, label: "Cut", icon: Scissors },
   ];
 
-  it("an explicit aria-label beats a visible label", () => {
-    // `label` may hold more than words — a lightbulb button, whose own name
-    // would otherwise be read into the group's. So an explicit name wins.
+  it("aria-labelledby beats an aria-label copy", () => {
     render(
-      <ToolButtonGroup
-        aria-label="Shape of the crop"
-        label="Shape"
-        options={OPTS}
-        value="crop"
-        onChange={() => {}}
-      />,
+      <>
+        <span id="shape-heading">Shape of the crop</span>
+        <ToolButtonGroup
+          aria-labelledby="shape-heading"
+          aria-label="Shape"
+          options={OPTS}
+          value="crop"
+          onChange={() => {}}
+        />
+      </>,
     );
     expect(screen.getByRole("radiogroup", { name: "Shape of the crop" })).toBeTruthy();
     expect(screen.queryByRole("radiogroup", { name: "Shape" })).toBeNull();
   });
 
-  it("a visible label names the group by POINTING at it, not by copying it", () => {
-    render(<ToolButtonGroup label="Shape" options={OPTS} value="crop" onChange={() => {}} />);
+  it("a ControlRow label names the group by POINTING at it, not by copying it", () => {
+    // UI Night 8: the group's own `label` prop is gone; ControlRow's slot
+    // draws the words and hands over their id.
+    render(
+      <ControlRow label="Shape">
+        {({ labelId }) => (
+          <ToolButtonGroup aria-labelledby={labelId} options={OPTS} value="crop" onChange={() => {}} />
+        )}
+      </ControlRow>,
+    );
     const group = screen.getByRole("radiogroup", { name: "Shape" });
     // aria-labelledby at the words already on screen; an aria-label copy can
     // drift from the visible text and nothing would notice.

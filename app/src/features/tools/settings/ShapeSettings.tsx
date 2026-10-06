@@ -30,6 +30,7 @@ import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
 import type { DiagramShapeName } from "@/lib/types";
 import { isDiagramKind } from "@/lib/diagramShapes";
 import { DIAGRAM_SHAPE_GROUPS } from "./diagramShapeIcons";
+import { ControlRow } from "@/components/ui/control-row";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -295,30 +296,38 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
             case "arrows":
               return (
                 <>
-                  <ToolButtonGroup
-                    label="Arrow"
-                    stacked
-                    options={ARROW_STYLES}
-                    value={arrowPicked ? (settings.arrowStyle ?? "single") : undefined}
-                    onChange={(id) =>
-                      onChange({
-                        ...settings,
-                        arrowShape: "arrow",
-                        arrowStyle: id as "single" | "double",
-                      })
-                    }
-                  />
+                  <ControlRow label="Arrow">
+                    {({ labelId }) => (
+                      <ToolButtonGroup
+                        aria-labelledby={labelId}
+                        stacked
+                        options={ARROW_STYLES}
+                        value={arrowPicked ? (settings.arrowStyle ?? "single") : undefined}
+                        onChange={(id) =>
+                          onChange({
+                            ...settings,
+                            arrowShape: "arrow",
+                            arrowStyle: id as "single" | "double",
+                          })
+                        }
+                      />
+                    )}
+                  </ControlRow>
 
                   {DIAGRAM_SHAPE_GROUPS.map(({ group, options }) => (
-                    <ToolButtonGroup
-                      key={group}
-                      label={group}
-                      stacked
-                      columns={3}
-                      options={options}
-                      value={arrowPicked ? undefined : (settings.arrowShape as DiagramShapeName)}
-                      onChange={(id) => onChange({ ...settings, arrowShape: id })}
-                    />
+                    <ControlRow label={group}>
+                      {({ labelId }) => (
+                        <ToolButtonGroup
+                          key={group}
+                          aria-labelledby={labelId}
+                          stacked
+                          columns={3}
+                          options={options}
+                          value={arrowPicked ? undefined : (settings.arrowShape as DiagramShapeName)}
+                          onChange={(id) => onChange({ ...settings, arrowShape: id })}
+                        />
+                      )}
+                    </ControlRow>
                   ))}
 
                   {/* Stroke Width */}
@@ -435,17 +444,21 @@ function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings
               onChange={(color) => onChange({ ...settings, fillColor2: color })}
             />
           </div>
-          <ToolButtonGroup
-            label="Direction"
-            options={GRADIENT_DIRS}
-            value={
-              String(settings.gradientAngle ?? 0) as
-                (typeof GRADIENT_DIRS)[number]["id"]
-            }
-            onChange={(id) =>
-              onChange({ ...settings, gradientAngle: Number(id) })
-            }
-          />
+          <ControlRow label="Direction">
+            {({ labelId }) => (
+              <ToolButtonGroup
+                aria-labelledby={labelId}
+                options={GRADIENT_DIRS}
+                value={
+                  String(settings.gradientAngle ?? 0) as
+                    (typeof GRADIENT_DIRS)[number]["id"]
+                }
+                onChange={(id) =>
+                  onChange({ ...settings, gradientAngle: Number(id) })
+                }
+              />
+            )}
+          </ControlRow>
         </div>
       )}
 
