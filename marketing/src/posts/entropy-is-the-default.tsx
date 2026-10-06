@@ -37,6 +37,7 @@
 
 import { external, repoFile } from "../config";
 import { Scene } from "./entropy.figures";
+import PostAudio from "../components/PostAudio";
 
 export default function EntropyIsTheDefault() {
   return (
@@ -54,6 +55,7 @@ export default function EntropyIsTheDefault() {
         </a>
         . Nothing here is estimated, and nothing is rounded to make a better point.
       </p>
+      <PostAudio src="/audio/entropy-is-the-default.mp3" minutes={7} />
 
       <p>
         On 27 July, <code>AppShell.tsx</code> was <span className="fig">3,250</span> lines. On 27 August
