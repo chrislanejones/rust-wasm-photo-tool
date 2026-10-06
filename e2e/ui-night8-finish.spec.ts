@@ -111,3 +111,27 @@ test("§7 Canvas Size: no dot at the original canvas; a new width shows one; Res
   await expect(dot(page, "Scale")).toHaveCount(0);
   await expect(width).toHaveValue("1200");
 });
+
+// ── §4 Stamp: the preset highlight must not outlive the armed stamp ─────────
+// docs/PARKING_LOT.md (09-22-2026): switching Stamps › Clone Stamp › Stamps
+// disarms the stamp (useStampTeardown) but the panel kept its own highlight,
+// so a stamp looked picked while clicks no longer placed it.
+const litStamps = (page: Page) =>
+  page.getByRole("region", { name: "Tool options" }).locator("button").evaluateAll(
+    (els) => els.filter((e) => (e as HTMLElement).style.borderStyle === "solid").length,
+  );
+
+test("§4 Stamp: a picked preset is not still lit after Stamps › Clone Stamp › Stamps", async ({ page }) => {
+  await openTool(page, "Create", "Stamps");
+  await page.getByRole("region", { name: "Tool options" }).getByText("[APPROVED]").click();
+  await expect.poll(() => litStamps(page)).toBe(1);
+  await openTool(page, "Create", "Clone Stamp");
+  await openTool(page, "Create", "Stamps");
+  await expect.poll(() => litStamps(page)).toBe(0);
+  // And through the other sibling sub-tool.
+  await page.getByRole("region", { name: "Tool options" }).getByText("[DRAFT]").click();
+  await expect.poll(() => litStamps(page)).toBe(1);
+  await openTool(page, "Create", "Emoji");
+  await openTool(page, "Create", "Stamps");
+  await expect.poll(() => litStamps(page)).toBe(0);
+});

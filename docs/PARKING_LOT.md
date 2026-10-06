@@ -397,7 +397,17 @@ revoke on a later tick (`setTimeout(() => URL.revokeObjectURL(url), 0)` or
 after a short delay). Reproduce the miss rate first, then change one line and
 re-measure. Isolate the fix before explaining it.
 
-## OPEN — the Stamp panel's preset highlight probably survives a sub-mode switch (09-22-2026)
+## CLOSED 10-06-2026 — NOT REPRODUCED: the Stamp panel's preset highlight does not survive a sub-mode switch
+
+UI Night 8 reproduced it first, as asked, in the production build: pick
+[APPROVED], switch Create › Clone Stamp, back to Create › Stamps — nothing is
+lit. The same through Create › Emoji. The header switch remounts the panel, so
+the local highlight goes with it. Pinned by `e2e/ui-night8-finish.spec.ts`
+("§4 Stamp"), which reads the lit tile's solid border. The dead
+`onModeChange`/`showModeRow` surface below is still dead; deleting it is a
+separate cleanup.
+
+Original note (09-22-2026, kept for the reasoning):
 
 Found while deleting dead code on `refactor/ssot-ui-cleanup`, NOT reproduced.
 `StampSettings`' `handleModeChange` clears the highlighted preset
