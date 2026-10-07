@@ -45,6 +45,7 @@ import {
 import { USE_OPLOG_PERSISTENCE } from "@/lib/dexie/flags";
 import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 import { registerOplogPersistStats } from "@/lib/resourceMonitor";
+import { whenStrokeQuiet } from "@/lib/strokeGate";
 
 const BRANCH = "main";
 const DEBOUNCE_MS = 2000;
@@ -449,10 +450,17 @@ export async function onOplogFlush(tool: object): Promise<void> {
   const delay = backlog >= OPS_PER_FORCED_SAVE ? 0 : DEBOUNCE_MS;
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
-    void saveOplogNow(tool, photoId).catch((e) => {
-      console.warn("[oplog-persist] save failed; will retry on next change", e);
-      bound = null; // unknown disk state ⇒ the next save rewrites
-    });
+    // Same rule as the archive autosave (useImageSession, 10-07): the save
+    // encodes a keyframe PNG on the worker — measured 0.4–1.0 s at
+    // 2068×1556 — and a `paint_move` queued behind it waits all of it. Hold
+    // until no stroke has ended for the debounce window; bounded inside the
+    // gate, so a long burst still saves.
+    void whenStrokeQuiet(DEBOUNCE_MS).then(() =>
+      saveOplogNow(tool, photoId).catch((e) => {
+        console.warn("[oplog-persist] save failed; will retry on next change", e);
+        bound = null; // unknown disk state ⇒ the next save rewrites
+      }),
+    );
   }, delay);
 }
 

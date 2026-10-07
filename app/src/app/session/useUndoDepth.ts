@@ -35,6 +35,15 @@ interface UndoDepthWasm {
  * (v7.36–v7.45); without the export the log cannot be driving undo, so the
  * estimate is the snapshot one — which is what that build really does.
  */
+function sameDepth(a: UndoDepth, b: UndoDepth): boolean {
+  return (
+    a.steps === b.steps &&
+    a.maxSteps === b.maxSteps &&
+    a.percent === b.percent &&
+    a.logDriven === b.logDriven
+  );
+}
+
 export function useUndoDepth(
   stamp: ReturnType<typeof useCloneStamp>,
   /** The History depth setting — the 100% mark. */
@@ -62,11 +71,20 @@ export function useUndoDepth(
 
   const { ready, width, height, layers, undoCount } = stamp.state;
   const layerCount = layers.length;
+  // The ref, not `stamp`. `useCloneStamp` returns a fresh object on every
+  // render, so `stamp` in the dependency list below made this effect run on
+  // EVERY render — and it ends in `setDepth`, which is a render. Measured
+  // 10-07 on the v9.18 production build: ~25 engine round trips per second
+  // at idle (`oplog_active` + `has_selection`), 269 React commits during one
+  // two-second brush stroke, every one of them queued on the worker port
+  // behind the stroke's own `paint_move`. The ref is stable for the life of
+  // the hook; `undoCount` below is what actually means "re-estimate".
+  const toolRef = stamp.toolRef;
 
   useEffect(() => {
     if (!ready || maxBytes == null || width <= 0 || height <= 0) return;
     let cancelled = false;
-    const tool = stamp.toolRef.current as UndoDepthWasm | null;
+    const tool = toolRef.current as UndoDepthWasm | null;
 
     void (async () => {
       let logDriven = false;
@@ -82,9 +100,10 @@ export function useUndoDepth(
         // A build without the op log answers nothing: snapshot undo it is.
       }
       if (cancelled) return;
-      setDepth(
-        estimateUndoDepth({ width, height, layerCount, hasSelection, maxHistory, maxBytes, logDriven }),
-      );
+      const next = estimateUndoDepth({ width, height, layerCount, hasSelection, maxHistory, maxBytes, logDriven });
+      // Same readout ⇒ same object ⇒ React bails out of the render. A fresh
+      // object for an unchanged number is a render for nothing.
+      setDepth((prev) => (prev && sameDepth(prev, next) ? prev : next));
     })();
     return () => {
       cancelled = true;
@@ -92,7 +111,7 @@ export function useUndoDepth(
     // `undoCount` is the trigger, not an input: every one of the 67
     // unrecorded operations snaps, so it moves on exactly the edits that can
     // break the log.
-  }, [stamp, ready, maxBytes, width, height, layerCount, maxHistory, activePhotoId, undoCount]);
+  }, [toolRef, ready, maxBytes, width, height, layerCount, maxHistory, activePhotoId, undoCount]);
 
   return ready ? depth : null;
 }

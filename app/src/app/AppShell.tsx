@@ -904,7 +904,7 @@ export function AppShell() {
     stampSettings,
   });
 
-  const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
+  const { cursorRef, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
 
   // The live drag is a DRAFT and must not touch the engine.
@@ -3000,7 +3000,7 @@ export function AppShell() {
                           drawPreviewRef={drawPreviewRef}
                           hookResult={effectiveStamp}
                           brushDiameter={diameter}
-                          cursorPos={pos}
+                          cursorRef={cursorRef}
                           cursorVisible={visible}
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
@@ -3094,7 +3094,7 @@ export function AppShell() {
                       drawPreviewRef={drawPreviewRef}
                       hookResult={effectiveStamp}
                       brushDiameter={diameter}
-                      cursorPos={pos}
+                      cursorRef={cursorRef}
                       cursorVisible={visible}
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
@@ -3377,10 +3377,9 @@ export function AppShell() {
           (activeTool === "ai" &&
             (eraserMode === "brush" || eraserMode === "magic"))) && (
           <div
+            ref={cursorRef}
             className="brush-cursor"
             style={{
-              left: pos.x,
-              top: pos.y,
               width: diameter,
               height: diameter,
             }}
