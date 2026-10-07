@@ -86,31 +86,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.18 — 2026-10-06
+### v9.19 — 2026-10-07
 
-**Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.**
+**The brush keeps up again.**
 
-An arrow you join to a shape with Connect now stays on the same point of the
-shape when you move it, resize it or turn it, and one undo puts both back.
-Disconnect puts a ✕ on each joined end. Drag the handle on the left of a
-circle and it stretches into an oval.
+Painting and Select had got slow enough to feel broken. The engine wasn't the
+problem — a brush dab takes it a third of a millisecond. The app around it was
+busy doing three things it didn't need to.
 
-When photos are still loading — a restore, or a big import — the gallery
-goes to placeholders as one piece, the same way the Tools card does during a
-slow switch, and comes back without anything moving.
+It was redrawing itself about fifty times a second while you did nothing, and
+asking the engine two questions each time. That's gone: sitting still now costs
+nothing, and a stroke that used to cause 250 redraws causes about 8.
 
-The tool panels got a tidy-up: they all share one layout now, Levels, Resize
-and Canvas Size show the same "changed" dot as Adjustments, and saved colors
-in the color picker tell a screen reader which one is picked.
+Saving your work used to start 300 ms after a stroke, which is right when the
+next one starts, and on a big photo a save keeps the engine busy for a second
+or more. It now waits until the pen has been still for 2.5 seconds, so a run of
+strokes saves once, after the run.
 
-New in Settings › Beta: history forks. Undo, edit, and the steps you undid
-are kept as a branch you can go back to.
+The brush circle follows the mouse without redrawing the whole editor on every
+move.
 
-On the site: every blog post has a narrated version, and the OpenRaster
-sample has a horse in it.
-
-Engine 868,393 → 885,380 bytes, for the oval, connectors and history forks.
-No change to the saved edit format.
+Engine unchanged at 885,380 bytes. No change to the saved edit format.
 
 
 ## License

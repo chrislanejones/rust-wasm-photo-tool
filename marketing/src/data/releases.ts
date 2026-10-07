@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.19",
+    date: "2026-10-07",
+    headline: "The brush keeps up again.",
+    entries: [
+      { tag: "perf", text: "Painting and Select had got slow. The app was redrawing itself about fifty times a second while you did nothing. It doesn't now — sitting still costs nothing, and a brush stroke causes about 8 redraws instead of 250." },
+      { tag: "perf", text: "Saving your work waits until the pen has been still for 2.5 seconds. It used to start right as your next stroke did, and on a big photo a save keeps the engine busy for a second or more." },
+      { tag: "perf", text: "The brush circle follows the mouse without redrawing the whole editor every time it moves." },
+      { tag: "infra", text: "Tested hard before shipping: twelve big photos, eight layers each, masks, forty shapes, twenty-five pins, undo and redo, switching photos and reloading — in real Chrome too." },
+    ],
+  },
+  {
     version: "v9.18",
     date: "2026-10-06",
     headline: "Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.",

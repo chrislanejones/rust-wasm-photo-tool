@@ -11382,3 +11382,17 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **868,393 → 885,380 B** (+16,987): the oval, connector re-routing and history branches. |
 | **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,818/1,818, cargo test 674/674, clippy + fmt OK, guardrails OK. |
 
+## v9.19 Change Summary — 2026-10-07
+
+**The brush keeps up again.** #320.
+
+| Area | Change |
+| --- | --- |
+| **Idle render loop** | `useUndoDepth` listed `stamp` (a fresh object every render) as an effect dependency and ended in `setDepth` with a fresh object, so it re-ran forever: two engine round trips per lap, ~25/s at idle. Now keyed on the stable `toolRef` with an unchanged-readout bail-out. `useShapeActions.follow` had the same shape (`get_shape_annotations` per render) and reads through a ref. |
+| **Autosave timing** | New `whenStrokeQuiet(ms)` in `lib/strokeGate`: resolves once no stroke has *ended* for the window, bounded by the same 20 s deadline. The archive autosave (2.5 s) and the op-log keyframe save (2 s) both use it, so `capture_state` no longer starts just as the next stroke does. Five new tests. |
+| **Brush cursor** | `useBrushPreview` wrote React state on every window mousemove, re-rendering AppShell per event. The ring is positioned through a callback ref now; visibility and diameter stay state. |
+| **Measured** (prod build, 2068×1556) | Idle: 146 → **0** commits and 316 → **0** engine calls per 3 s. Per brush stroke: 210–269 → **5–8** commits. Per rect-select drag: ~1,100 → **7** engine calls. 200-event stroke: 1.9–2.6 s → **0.93 s**. |
+| **Still owed** | `recomposite()` is a full-frame composite + `putImageData` per blit: 33–51 ms at one layer, 66–177 ms at eight, which caps ink at 6–25 fps (dirty-rect blit, next). On a heavy document `capture_state` takes 7–10 s because it PNG-encodes every undo snapshot. Twelve photos with eight layers each reach 778 MB of wasm and ~1.5 GB per tab (full-layer history snapshots). |
+| **Testing** | Heavy-document runs on master and the branch, headless and in real Google Chrome: 12 photos, 8 layers each, masks, 40 shapes, 25 pins, undo ×10 / redo ×5, photo switching, reload (12/12 photos and 8/8 layers back in 6.9 s). Every failure seen on the branch reproduced identically on master. |
+| **Engine** | Untouched, **885,380 B**. |
+| **Gates** | tsc 0, lint 0 errors / 57 warnings, unit 1,823/1,823, e2e 131 passed / 2 skipped, guardrails OK, CI 17 pass. |
