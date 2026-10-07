@@ -159,13 +159,13 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     label: "PageSpeed budget (PR #289)",
     kind: "optin",
     isOn: isWebBudgetEnabled,
-    effect: "Resize & Compress reads 'PageSpeed budget used' (bytes against width × height ÷ 6, Lighthouse's own rule) instead of the old 0–100 score, and Auto Compress aims for that budget instead of a flat 200 KB. The never-grows guard is on for everyone either way.",
+    effect: "Auto Compress aims for each photo's own budget (width × height ÷ 6 bytes, Lighthouse's rule, kept between 28 KB and 1 MB) instead of a flat 200 KB. Resize & Compress shows Image weight against Google's limit for everyone since 10-07, so this switch no longer changes that panel. The never-grows guard is on for everyone either way.",
     source: "lib/webPerf.ts",
     beta: {
       id: "pagespeed-budget",
       label: "PageSpeed budget",
       blurb:
-        "Resize & Compress measures each photo against the size Google PageSpeed actually allows for it — bytes against pixels — instead of the old score, and Auto Compress aims for that. The number reads differently: lower is better, and 100% or less passes.",
+        "Auto Compress aims for the size Google PageSpeed actually allows for each photo — bytes against pixels — instead of a flat 200 KB.",
     },
   },
   {

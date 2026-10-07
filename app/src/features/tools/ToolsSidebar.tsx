@@ -1,5 +1,6 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
+import type { MeasureApply } from "./settings/ResizeSettings";
 import { motion } from "framer-motion";
 import { slideFromLeft } from "@/lib/animations";
 import type {
@@ -141,10 +142,12 @@ interface ToolsSidebarProps {
   levels?: LevelsControls;
   presets?: PresetControls;
   imageReady: boolean;
-  /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
-  onResize: (newW: number, newH: number, filter: number) => void;
+  /** The compression Apply (w, h, Rust resampling-filter code); resolves true when the stored file changed. */
+  onResize: (newW: number, newH: number, filter: number) => Promise<boolean> | void;
   /** "Apply Resize" — resample only, no re-compression. See AppShell. */
-  onResizeOnly: (newW: number, newH: number, filter: number) => void;
+  onResizeOnly: (newW: number, newH: number, filter: number) => Promise<boolean> | void;
+  /** Encode what Apply would write and count the bytes (Resize & Compress). */
+  measureApply?: MeasureApply;
   /** Photoshop-style Canvas Size resize (no resample) — Layer Settings tool. */
   onResizeCanvas: (w: number, h: number) => void;
   /** Deletes the artboard's Background layer outright. */
@@ -242,6 +245,7 @@ export function ToolsSidebar({
   imageReady,
   onResize,
   onResizeOnly,
+  measureApply,
   onResizeCanvas,
   onRemoveCanvas,
   canRemoveCanvas,
@@ -378,7 +382,7 @@ export function ToolsSidebar({
       <motion.div
         layout
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
-        // (Apply Compression & Resize) sits the same 6px off
+        // (the Apply button) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
         // the two chrome edges agree instead of each picking a number
         // (Chris, 2026-09-11 — "follow the reference of top bar, button to
@@ -406,6 +410,7 @@ export function ToolsSidebar({
             onQualityCommit={onQualityCommit}
             onResize={onResize}
             onResizeOnly={onResizeOnly}
+            measureApply={measureApply}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             compressProgress={compressProgress}

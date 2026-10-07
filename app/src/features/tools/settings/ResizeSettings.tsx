@@ -11,8 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { getWebPerfMetrics, webTargetBytes } from "@/lib/webPerf";
+import { getImageWeight, type ImageWeight } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ControlRow } from "@/components/ui/control-row";
@@ -55,6 +54,16 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
   avif: "AVIF",
 };
 
+/** Encode the pending output exactly as Apply would; resolves its real size. */
+export type MeasureApply = (req: {
+  w: number;
+  h: number;
+  filter: number;
+  exportFormat: ExportFormat;
+  quality: number;
+  keepSourceEncoding: boolean;
+}) => Promise<{ bytes: number; kept: boolean } | null>;
+
 interface ResizeSettingsProps {
   disabled: boolean;
   imageWidth: number;
@@ -74,29 +83,20 @@ interface ResizeSettingsProps {
   /** Fired on slider RELEASE — commits the quality as one undo step.
    *  ADR-031: `onQualityChange` is the live draft and records nothing. */
   onQualityCommit: (q: number) => void;
-  /** Apply Compression & Resize: resample to w×h with the given Rust filter
-   *  code, then re-encode at the panel's format + quality. */
-  onResize: (w: number, h: number, filter: number) => void;
+  /** Commit everything pending (size, format, quality). */
+  /** Resolves `true` when the stored file changed. */
+  onResize: (w: number, h: number, filter: number) => Promise<boolean> | void;
   /** Apply Resize: the same Rust resample, re-encoded in the photo's OWN format
    *  at full quality — the dimensions change and nothing else does. */
-  onResizeOnly: (w: number, h: number, filter: number) => void;
+  onResizeOnly: (w: number, h: number, filter: number) => Promise<boolean> | void;
+  measureApply?: MeasureApply;
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
   compressProgress: { completed: number; total: number };
 }
 
-function trafficColor(score: number) {
-  if (score >= 80) return "bg-success";
-  if (score >= 40) return "bg-warning";
-  return "bg-destructive";
-}
-
-/** Budget USED reads the other way round from a score: lower is better, and
- *  over 100 fails. trafficColor would paint a failing 120% green. */
-function budgetColor(used: number) {
-  if (used <= 60) return "bg-success";
-  if (used <= 100) return "bg-warning";
-  return "bg-destructive";
+function kb(bytes: number): string {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export function ResizeSettings({
@@ -113,6 +113,7 @@ export function ResizeSettings({
   onQualityCommit,
   onResize,
   onResizeOnly,
+  measureApply,
   exportFormat,
   onExportFormatChange,
 }: ResizeSettingsProps) {
@@ -125,7 +126,6 @@ export function ResizeSettings({
   // sub-mode. Was panel-local useState before Session 2.1.
   const baseQualityRef = useRef(quality);
   const baseFormatRef = useRef(exportFormat);
-  const baseMethodRef = useRef(method);
 
   // Whether the browser can really encode the chosen format. `undefined` until
   // the one-pixel probe resolves — the note simply stays hidden until then
@@ -150,20 +150,20 @@ export function ResizeSettings({
   // A quiet line under the picker. Information, not a warning: PNG being large
   // is correct behavior, and the surprise it causes is only that the status
   // bar shows the SOURCE size while a lossless re-encode lands on disk.
-  const formatNote =
-    exportFormat === "png"
-      ? "Lossless — the largest file, and larger than the source for photos. Quality does not apply, so the slider below is off."
-      : exportFormat === "avif" && avifOk === false
-        ? "This browser can't encode AVIF — the file will be saved as PNG."
-        : null;
+  const avifUnsupported = exportFormat === "avif" && avifOk === false;
 
+  // The fields follow the photo's size. The compression BASELINE follows only
+  // the photo: re-seeding it on a size change made "Apply Resize" quietly
+  // drop a quality change that was still pending.
   useEffect(() => {
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
+  }, [imageWidth, imageHeight, activePhotoId]);
+  useEffect(() => {
     baseQualityRef.current = quality;
     baseFormatRef.current = exportFormat;
-    baseMethodRef.current = method;
-  }, [imageWidth, imageHeight, activePhotoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed per photo only
+  }, [activePhotoId]);
 
   const handleWidthChange = useCallback(
     (val: string) => {
@@ -205,346 +205,242 @@ export function ResizeSettings({
     [imageWidth, imageHeight],
   );
 
-  const handleApplyResize = () => {
-    const w = parseInt(width, 10);
-    const h = parseInt(height, 10);
-    if (w > 0 && h > 0) {
-      onResize(w, h, FILTER_CODE[method]);
-      baseQualityRef.current = quality;
-      baseFormatRef.current = exportFormat;
-      baseMethodRef.current = method;
-    }
-  };
+  const w = parseInt(width, 10);
+  const h = parseInt(height, 10);
+  const dimsValid = w > 0 && h > 0;
+  const newW = dimsValid ? w : imageWidth;
+  const newH = dimsValid ? h : imageHeight;
+  const dimensionsChanged = dimsValid && (w !== imageWidth || h !== imageHeight);
 
-  /** Resize only. Deliberately does NOT touch baseQualityRef / baseFormatRef:
-   *  those track what the COMPRESSION button has committed, and a resize leaves
-   *  a pending quality change still pending. */
-  const handleApplyResizeOnly = () => {
-    const w = parseInt(width, 10);
-    const h = parseInt(height, 10);
-    if (w > 0 && h > 0 && (w !== imageWidth || h !== imageHeight)) {
-      onResizeOnly(w, h, FILTER_CODE[method]);
-      baseMethodRef.current = method;
-    }
-  };
-
-
-  const handleQualityChange = (val: number) => {
-    onQualityChange(val);
-  };
-
-  // Was `<`, so only LOWERING quality counted as a pending change: dragging
-  // 75 → 90 left the apply button dark, recorded nothing, and moved neither
-  // score. Raising the quality is a compression exactly as much as lowering it
-  // is, so this is a plain inequality.
-  const qualityChanged = quality !== baseQualityRef.current;
+  // What counts as a pending COMPRESSION (10-07):
+  //   - format: any change, PNG included. Choosing PNG alone used to leave
+  //     Apply dark, because PNG was excluded from "counts".
+  //   - quality: only when the output is lossy — PNG never reads it.
+  //   - method: never. It picks the resample kernel, which both Apply paths
+  //     use; counting it as compression sent a method-only change down the
+  //     compression path, which saves in the panel's format — so picking
+  //     Catmull-Rom turned a PNG into a JPEG.
   const formatChanged = exportFormat !== baseFormatRef.current;
-  const methodChanged = method !== baseMethodRef.current;
-  /** PNG is lossless, so `encodeQuality` is not consulted at all on the write
-   *  path (`usePersistActiveCanvas`: `const lossy = encodeFormat !== "png"`).
-   *  Method has no resample to choose between unless the dimensions moved, so
-   *  neither of those two can change the bytes when they are what changed.
-   *
-   *  Both used to feed `compressionChanged` anyway, which lit the apply button
-   *  and let it claim a compression that did not happen. */
-  const methodCounts =
-    methodChanged && (parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight);
-  const formatCounts = formatChanged && exportFormat !== "png";
-  /** Dimensions alone — what "Apply Resize" acts on. Separate from
-   *  `resizeChanged` below, which also counts quality/format/method, because a
-   *  resize-only button must stay dark when the only pending change is one it
-   *  would silently discard. */
-  const dimensionsChanged =
-    parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight;
-  const resizeChanged =
-    parseInt(width, 10) !== imageWidth ||
-    parseInt(height, 10) !== imageHeight ||
-    qualityChanged ||
-    formatCounts ||
-    methodCounts;
-  /** Compression alone — the mirror of `dimensionsChanged`. */
-  const compressionChanged = qualityChanged || formatCounts || methodCounts;
-  /** ONE apply button that names what it will actually do. Two buttons became
-   *  wrong the moment the tiles merged: "Apply Resize" and "Apply Compression &
-   *  Resize" sat next to each other, one of them almost always dark, and
-   *  neither label told you which of your pending changes it would commit.
-   *
-   *  Dimensions ONLY routes to `handleApplyResizeOnly`, which re-saves in the
-   *  photo's own format at full quality — the quality slider is deliberately
-   *  left alone, which is the whole reason that handler exists. Every other
-   *  case commits everything pending. */
-  const applyResizeOnly = dimensionsChanged && !compressionChanged;
-  const applyLabel = applyResizeOnly
-    ? "Apply Resize"
-    : compressionChanged && !dimensionsChanged
-      ? "Apply Compression"
-      : "Apply Compression & Resize";
-  // Web-performance indicators come from Rust (`web_perf_metrics`). The
-  // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
-  // scores low, and resizing or lowering quality (smaller projected delivery)
-  // raises it.
-  //
-  // The model must mirror what the Apply button will ACTUALLY write, or the
-  // numbers lie in both directions:
-  //   - nothing pending, or dimensions only ("Apply Resize"): the file keeps
-  //     its own format and quality, so the projection is the current bytes
-  //     scaled by area. This used to multiply by quality/100 regardless, so an
-  //     already-compressed photo was scored as if it would shrink another 25%
-  //     at the default 75 — and then Apply Resize wrote something bigger.
-  //   - compression pending: quality is RELATIVE to the quality the file is
-  //     already at. A file stored at q=60 re-encoded at q=50 does not lose
-  //     half its bytes. Unknown (an untouched upload) counts as 100, which is
-  //     the old absolute model.
-  const qualityApplies = qualityChanged && exportFormat !== "png";
-  const modelQuality = qualityApplies
-    ? Math.min(100, Math.round((quality * 100) / (currentEncodeQuality ?? 100)))
-    : 100;
-  const modelFormat: ExportFormat | undefined = compressionChanged
-    ? effectiveFormat
-    : undefined;
-  const newW = parseInt(width, 10) || imageWidth;
-  const newH = parseInt(height, 10) || imageHeight;
-  // Which reading the panel shows is the Beta switch's call (lib/webPerf).
-  const [perf, setPerf] = useState<{ kind: "budget" | "score"; value: number }>({ kind: "score", value: 0 });
-  const budgetUsed = perf.value;
-  const [savingsPercent, setSavingsPercent] = useState(0);
+  const qualityChanged = quality !== baseQualityRef.current && effectiveFormat !== "png";
+  const compressionChanged = formatChanged || qualityChanged;
+  const pending = dimensionsChanged || compressionChanged;
 
+  // The label names exactly what will be committed — "Resize" appears only
+  // when the dimensions moved. At rest it is just "Apply", not a long label
+  // greyed out that reads like something half-happened.
+  const applyLabel = dimensionsChanged
+    ? compressionChanged
+      ? "Apply Resize & Compression"
+      : "Apply Resize"
+    : compressionChanged
+      ? "Apply Compression"
+      : "Apply";
+
+  const [applying, setApplying] = useState(false);
+  const handleApply = async () => {
+    if (!pending || applying) return;
+    setApplying(true);
+    try {
+      const filter = FILTER_CODE[method];
+      if (!compressionChanged) {
+        await onResizeOnly(newW, newH, filter);
+        return;
+      }
+      // The compression baseline moves only when the stored file actually
+      // changed — a declined re-encode leaves the change pending, so the
+      // button still says what has not happened yet.
+      if ((await onResize(newW, newH, filter)) !== false) {
+        baseQualityRef.current = quality;
+        baseFormatRef.current = exportFormat;
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  // ── The two readings (10-07) ────────────────────────────────────────────
+  // "PageSpeed Insights Score" is gone: Google has no score for one image —
+  // its performance score is built from page-load metrics. What it DOES say
+  // about an image is a pass/fail weight rule (lib/webPerf `getImageWeight`),
+  // so that is what this shows: estimated KB against Google's limit for the
+  // output's pixel count. Quality is modelled RELATIVE to what the file is
+  // stored at, and may exceed 100% — raising q50 to q90 makes it bigger.
+  const relativeQuality = qualityChanged
+    ? Math.round((quality * 100) / (currentEncodeQuality ?? 100))
+    : 100;
+  const modelFormat: ExportFormat | undefined = compressionChanged ? effectiveFormat : undefined;
+  const [weight, setWeight] = useState<ImageWeight | null>(null);
   useEffect(() => {
     let alive = true;
-    void getWebPerfMetrics({
+    void getImageWeight({
       curW: imageWidth,
       curH: imageHeight,
       curBytes: currentByteSize,
       origBytes: originalByteSize,
       newW,
       newH,
-      quality: modelQuality,
+      relativeQuality,
       curMime: currentMime,
-      // Model the format that will ACTUALLY land, not the one requested. AVIF
-      // weights as the most efficient format in the Rust scorer, so an AVIF
-      // selection the browser cannot encode would promise a large gain and then
-      // write a PNG — the panel contradicting its own note one line below.
-      // Undefined with no compression pending: the file keeps its own format.
       newFormat: modelFormat,
-    }).then((m) => {
-      if (!alive) return;
-      setPerf({ kind: m.kind, value: m.value });
-      setSavingsPercent(m.performanceGain);
+    }).then((r) => {
+      if (alive) setWeight(r);
     });
     return () => {
       alive = false;
     };
-  }, [
-    imageWidth,
-    imageHeight,
-    currentByteSize,
-    currentMime,
-    originalByteSize,
-    newW,
-    newH,
-    modelQuality,
-    modelFormat,
-    // effectiveFormat, not exportFormat: the AVIF probe resolves asynchronously,
-    // so the first render models AVIF and only the re-run after `avifOk` lands
-    // corrects it. Depending on exportFormat alone would leave the AVIF numbers
-    // on screen permanently, since exportFormat never changed. (It reaches
-    // the call through `modelFormat`.)
-  ]);
+  }, [imageWidth, imageHeight, currentByteSize, currentMime, originalByteSize, newW, newH, relativeQuality, modelFormat]);
+
+  // The real number: encode what Apply would write and count it. Debounced
+  // so a drag measures once it settles, not per pixel of travel; the formula
+  // estimate above holds the readout (marked "≈") until the measurement lands.
+  const [measured, setMeasured] = useState<{ key: string; bytes: number; kept: boolean } | null>(null);
+  const measureKey = `${activePhotoId}:${currentByteSize}:${newW}x${newH}:${method}:${modelFormat ?? "same"}:${compressionChanged ? quality : "src"}`;
+  useEffect(() => {
+    if (!pending || !measureApply || currentByteSize <= 0) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      void measureApply({
+        w: newW,
+        h: newH,
+        filter: FILTER_CODE[method],
+        exportFormat,
+        quality,
+        keepSourceEncoding: !compressionChanged,
+      })
+        .then((m) => {
+          if (alive && m) setMeasured({ key: measureKey, bytes: m.bytes, kept: m.kept });
+        })
+        .catch(() => {});
+    }, 350);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- measureKey carries every input
+  }, [measureKey, pending, measureApply]);
+
+  const isMeasured = !pending || measured?.key === measureKey;
+  const bytes = !pending ? currentByteSize : isMeasured && measured ? measured.bytes : (weight?.projectedBytes ?? 0);
+  const limitBytes = weight?.limitBytes ?? 0;
+  const known = currentByteSize > 0 && weight !== null;
+  const pass = known && bytes <= limitBytes;
+  const usedPct = known && limitBytes > 0 ? (bytes / limitBytes) * 100 : 0;
+  const gain = known && originalByteSize > 0 ? Math.round((1 - bytes / originalByteSize) * 100) : 0;
+  // Only a same-size re-encode is declined for growing; a resize always writes.
+  const wouldGrow = known && compressionChanged && !dimensionsChanged && (isMeasured && measured ? measured.kept : bytes > currentByteSize);
 
   return (
     <div className="flex flex-col h-full">
-      {/* ONE tile, not two. Compress and Resize were separate sub-modes
-          behind a ToolModeToggle, and both of them move the SAME two
-          numbers: Web Performance Gain and PageSpeed Insights Score are a
-          function of dimensions AND format/quality together. Split across
-          two tiles, the scores sat under one while half their inputs sat
-          under the other. Squoosh keeps the whole pipeline on one panel for
-          the same reason.
-
-          Order is scores -> resize -> compress: the readout you are steering
-          toward sits above the controls that steer it, and resize precedes
-          compress because that is the order the pixels actually go through. */}
+      {/* Order is readings -> resize -> compress: the readout you steer toward
+          sits above the controls that steer it, and resize precedes compress
+          because that is the order the pixels go through. */}
       <div className="flex-1 space-y-8">
-        {/* Both scores, 16px apart — what the compress body gave them before
-            the tiles merged (its ToolModeToggle slot was space-y-4). The
-            32px section gap below is between GROUPS, not inside one. */}
         <div className="space-y-4">
-        {/* ── Web Performance Gain ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-2xs">
-            <span className="flex items-center gap-1 text-theme-muted-foreground">
-              Web Performance Gain
-              <InfoTooltip
-                info="Estimated byte savings vs. the current file, based on the pending size/quality/format below."
-                label="Web Performance Gain"
+          <div className="space-y-2" data-testid="image-weight">
+            <ControlRow
+              label="Image weight"
+              info={
+                known
+                  ? `The size of the file Apply would write — measured by encoding it, not guessed ("≈" while it measures) — against what Google's image check allows for ${newW}×${newH}: ${kb(limitBytes)} (one byte per six pixels, plus 4 KB). Over that, PageSpeed lists it under "Improve image delivery". It can't know how big the image is shown on your page, so a photo much wider than its spot can still be flagged for size.`
+                  : "The size of the file Apply would write, against what Google's image check allows."
+              }
+              value={
+                known ? (
+                  <span className={pass ? "text-success" : "text-destructive"} aria-live="polite">
+                    {isMeasured ? "" : "≈ "}
+                    {kb(bytes)} / {kb(limitBytes)} · {pass ? "Pass" : "Over"}
+                  </span>
+                ) : (
+                  "—"
+                )
+              }
+            >
+              <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-700 ease-out ${pass ? "bg-success" : "bg-destructive"}`}
+                  style={{ width: `${Math.min(100, usedPct)}%` }}
+                />
+              </div>
+            </ControlRow>
+          </div>
+          <ControlRow
+            label="Smaller than upload"
+            info="How much smaller the file Apply would write is than the photo you uploaded. Negative means bigger."
+            value={known ? `${gain > 0 ? "+" : ""}${gain}%` : "—"}
+          >
+            <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-700 ease-out ${gain >= 50 ? "bg-success" : gain > 0 ? "bg-warning" : "bg-destructive"}`}
+                style={{ width: `${Math.max(0, Math.min(100, gain))}%` }}
               />
-            </span>
-            <span className="text-theme-foreground tabular-nums">
-              +{savingsPercent}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
-              style={{ width: `${savingsPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── PageSpeed budget, as a percentage USED ──
-            This is Lighthouse's actual rule (`bytes <= pixels / 6`) expressed
-            as a share of the budget, so it keeps the 0–100 shape while meaning
-            something true. It is not a Lighthouse score — that does not exist
-            for a single image — so the label says what it is.
-
-            OVER 100 is the useful case, and the bar has to show it: a
-            percentage of budget used has no ceiling to normalise against, so
-            anything above 100 draws full and the number carries the rest.
-            Clamping the bar's width at 100 is why the label matters. */}
-        {perf.kind === "score" ? (
-        // Beta switch OFF: the old score, exactly as master drew it.
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-2xs">
-            <span className="flex items-center gap-1 text-theme-muted-foreground">
-              PageSpeed Insights Score
-              <InfoTooltip
-                info="Estimated Lighthouse score (0–100) for the pending output — weighs dimensions, format, and quality the way the real audit does."
-                label="PageSpeed Insights Score"
-              />
-            </span>
-            <span className="text-theme-foreground tabular-nums">
-              {perf.value}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(perf.value)}`}
-              style={{ width: `${perf.value}%` }}
-            />
-          </div>
-        </div>
-        ) : (
-        <div className="space-y-4" data-testid="pagespeed-budget">
-          <div className="flex items-center justify-between text-2xs">
-            <span className="flex items-center gap-1 text-theme-muted-foreground">
-              PageSpeed budget used
-              <InfoTooltip
-                info={`The pending output against the size Google PageSpeed stops flagging: ${Math.round(webTargetBytes(newW, newH) / 1024)} KB for ${newW}×${newH}. At 100% or less it passes; above that it is over by this much.`}
-                label="PageSpeed budget used"
-              />
-            </span>
-            <span className="text-theme-foreground tabular-nums">
-              {budgetUsed}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${budgetColor(budgetUsed)}`}
-              // Clamped: over budget is the failure state and draws the bar
-              // full; the percentage beside it carries how far over. A bar
-              // that overflowed its own track would read as a broken width.
-              style={{ width: `${Math.min(100, budgetUsed)}%` }}
-            />
-          </div>
-          {budgetUsed > 100 && (
-            <p className="text-2xs leading-snug text-destructive">
-              Over what Google PageSpeed allows for this size — pick a smaller
-              size, a lower quality, or WebP or AVIF.
-            </p>
-          )}
-        </div>
-        )}
-        </div>
-
-        {/* Header → first control is 16px in every section, the spacing
-            Select › Magic Wand › Tolerance already uses; the merge had left
-            it at 32 here and 39 under Compress. The border is this panel's own
-            footer rule (and four other panels' section seam) — one line
-            between the scores, Resize and Compress. */}
-        <div className={`space-y-4 ${SECTION_SEP}`}>
-        <SectionHeader
-          title="Resize"
-          info="Sets new pixel dimensions. The lock keeps the aspect ratio; the percent slider scales width and height proportionally. Apply Resize changes dimensions only — Apply Compression &amp; Resize commits both."
-        />
-        <DimensionFields
-          width={width}
-          height={height}
-          widthPercent={widthPercent}
-          lockAspect={lockAspect}
-          disabled={disabled}
-          onWidthChange={handleWidthChange}
-          onHeightChange={handleHeightChange}
-          onPercentChange={handlePercentChange}
-          onToggleLock={() => setLockAspect((v) => !v)}
-          // Per-photo (UI_CONSISTENCY §9). Default: the photo's own size, as
-          // the fields show it on open. Quality is NOT dotted: its default is
-          // the export default, a tool value, not this photo's.
-          edited={{
-            isEdited: parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight,
-            onReset: () => {
-              setWidth(String(imageWidth));
-              setHeight(String(imageHeight));
-            },
-            disabled,
-          }}
-        />
-
+            </div>
+          </ControlRow>
         </div>
 
         <div className={`space-y-4 ${SECTION_SEP}`}>
-        <SectionHeader
-          title="Compress"
-          info="Shrinks the file size: pick a resample Method and output Format, then drag Quality. The two scores above preview the pending output — Apply Compression &amp; Resize commits it."
-        />
-        {/* ── Method / Format as tile groups ──
-            Both were <SelectField>s, which cannot say why a control is off.
-            Method is only meaningful on a click that also resamples — the
-            resize-only path (`keepSourceEncoding`) never calls
-            `resize_with_filter` at all — so it now states that in place of
-            choosing a resample kernel that will not run. And Format is four
-            exclusive choices, which is what `ToolButtonGroup`'s SELECT mode
-            exists for; as a native <select> it announced nothing about which
-            one was lit. */}
-        <div className="space-y-4">
-          <ControlRow label="Method">
+          <SectionHeader
+            title="Resize"
+            info="New pixel size for the photo. The lock keeps its shape; the percent slider scales both sides."
+          />
+          <DimensionFields
+            width={width}
+            height={height}
+            widthPercent={widthPercent}
+            lockAspect={lockAspect}
+            disabled={disabled}
+            onWidthChange={handleWidthChange}
+            onHeightChange={handleHeightChange}
+            onPercentChange={handlePercentChange}
+            onToggleLock={() => setLockAspect((v) => !v)}
+            edited={{
+              isEdited: dimensionsChanged,
+              onReset: () => {
+                setWidth(String(imageWidth));
+                setHeight(String(imageHeight));
+              },
+              disabled,
+            }}
+          />
+          {/* Never disabled: it is the kernel the NEXT resize will use. A
+              disabled row showed the not-allowed cursor right above the
+              Quality slider, which read as the slider being broken. */}
+          <ControlRow
+            label="Method"
+            info="How pixels are resampled when the size changes. Lanczos3 is sharpest; Nearest keeps hard pixel edges for pixel art. It doesn't change the file format."
+          >
             {({ labelId }) => (
               <ToolButtonGroup<ResampleMethod>
                 aria-labelledby={labelId}
                 columns={3}
                 value={method}
                 onChange={setMethod}
-                aria-describedby="method-note"
                 options={(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => ({
                   id: m,
                   label: METHOD_LABELS[m],
                   title: METHOD_TITLES[m],
-                  // Only a resample reads this. With the dimensions unchanged the
-                  // filter code is passed in and never used, so offering a choice
-                  // here was offering a control that does nothing.
-                  disabled: !dimensionsChanged,
                 }))}
               />
             )}
           </ControlRow>
-          <p
-            id="method-note"
-            className="text-2xs leading-relaxed text-theme-muted-foreground"
-          >
-            {dimensionsChanged
-              ? "Applied by resampling the pixels on the way out."
-              : "The filter the resample will use. Change the dimensions above to turn this on."}
-          </p>
         </div>
 
-        <div className="space-y-4">
-          <ControlRow label="Format">
-            {({ labelId }) => (
+        <div className={`space-y-4 ${SECTION_SEP}`}>
+          <SectionHeader
+            title="Compress"
+            info="Pick the output Format, then drag Quality. The readings above preview the file Apply would write."
+          />
+          <ControlRow
+            label="Format"
+            info="WebP and AVIF are smallest for photos. JPEG works everywhere. PNG is lossless and the largest — quality doesn't apply to it."
+            reason={avifUnsupported ? "This browser can't encode AVIF — it would save as PNG." : undefined}
+          >
+            {({ labelId, reasonId }) => (
               <ToolButtonGroup<ExportFormat>
                 aria-labelledby={labelId}
+                aria-describedby={reasonId}
                 columns={4}
                 value={exportFormat}
                 onChange={onExportFormatChange}
-                aria-describedby="format-note"
                 options={(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => ({
                   id: f,
                   label: FORMAT_LABELS[f],
@@ -553,76 +449,38 @@ export function ResizeSettings({
               />
             )}
           </ControlRow>
-          <p
-            id="format-note"
-            className="text-2xs leading-relaxed text-theme-muted-foreground"
-          >
-            {formatNote ??
-              "WebP and AVIF are what the web-performance check below is measured against."}
-          </p>
-        </div>
-
-        {/* ── Quality ──
-            The preset row is the same primitive Paint's Opacity and Hardness
-            use (`variant="numbers"`), so the four quick values are a named
-            radio group above the track rather than four unlabelled buttons.
-
-            Presets turn the input's own value into a TRACK POSITION (0–100,
-            each preset an equal segment), which `SizeSlider` maps both ways and
-            `aria-valuetext` carries the real number. 80 therefore sits at
-            position 67 — visible in the knob, but announced as 80.
-
-            100 is deliberately not a preset: on this panel it is the setting
-            that made a resize-only re-encode heavier than the file it replaced
-            (see `usePersistActiveCanvas`, which keeps the source quality for
-            exactly that reason). */}
-        <SizeSlider
-          label="Quality"
-          labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
-          value={quality}
-          onChange={handleQualityChange}
-          onCommit={onQualityCommit}
-          presets={QUALITY_PRESETS}
-          variant="numbers"
-          min={10}
-          max={100}
-          unit="%"
-          disabled={disabled || exportFormat === "png"}
-          reason={
-            exportFormat === "png"
-              ? "PNG is lossless — quality does not apply to it. Pick JPEG, WebP or AVIF to compress."
-              : undefined
-          }
-        />
-
-        {/* EXIF keep/strip moved to Settings → Security. */}
-
+          {/* Presets map to TRACK POSITIONS; `SizeSlider` maps both ways and
+              commits the mapped value on release. 100 is not a preset: it is
+              what made a resize-only re-encode heavier than its source. */}
+          <SizeSlider
+            label="Quality"
+            labelInfo="Lower is smaller. Relative to the quality the photo is stored at now."
+            value={quality}
+            onChange={onQualityChange}
+            onCommit={onQualityCommit}
+            presets={QUALITY_PRESETS}
+            variant="numbers"
+            min={10}
+            max={100}
+            unit="%"
+            disabled={disabled || effectiveFormat === "png"}
+            reason={effectiveFormat === "png" ? "Not used by PNG." : undefined}
+          />
         </div>
       </div>
 
-      {/* ── Bottom Buttons ── */}
-      {/* `mt-panel`, not `mt-8`: 32px above this rule left a band of dead space
-          under the Quality slider while the rule itself sat nowhere near either
-          neighbour. One panel inset on each side of the rule reads as a
-          separator rather than a gap. */}
       <div className="border-t border-theme-sidebar-border pt-panel mt-panel space-y-2">
-        {/* ONE apply button, labeled for what is actually pending. It says
-            "Apply Resize" when only the dimensions moved, "Apply Compression"
-            when only quality/format/method moved, and "Apply Compression &
-            Resize" when both did — which is also the disabled resting label,
-            because with nothing pending there is nothing to name. It is what
-            commits in every case. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
-              <Button size="large"
-                onClick={applyResizeOnly ? handleApplyResizeOnly : handleApplyResize}
-                disabled={disabled || !resizeChanged}
-                // The longest label is 26 characters; at this width it was
-                // breaking at the ampersand into two lines and a 38px button.
+              <Button
+                size="large"
+                onClick={() => void handleApply()}
+                disabled={disabled || !pending || applying}
+                aria-busy={applying || undefined}
                 className="w-full whitespace-nowrap"
               >
-                {applyResizeOnly ? (
+                {dimensionsChanged && !compressionChanged ? (
                   <Scaling className="h-4 w-4" />
                 ) : (
                   <FileArchive className="h-4 w-4" />
@@ -633,13 +491,15 @@ export function ResizeSettings({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-[240px] text-center">
             <p className="text-xs">
-              {!resizeChanged
-                ? "Change the dimensions, or the quality, format or method, and this commits it."
-                : applyResizeOnly
-                  ? "Changes the pixel dimensions only — re-saved in this photo's own format at full quality, so the quality slider is left alone."
-                  : compressionChanged && !dimensionsChanged
-                    ? "Re-encodes at the chosen format and quality. The dimensions are unchanged."
-                    : "Commits both the new dimensions and the new format and quality."}
+              {!pending
+                ? "Change the size, format or quality first."
+                : wouldGrow
+                  ? "The result would be bigger than the file is now, so it won't be written."
+                  : dimensionsChanged && !compressionChanged
+                    ? "Changes the size only. Saved in this photo's own format and quality."
+                    : compressionChanged && !dimensionsChanged
+                      ? "Re-saves at the chosen format and quality. Same size."
+                      : "Changes the size and re-saves at the chosen format and quality."}
             </p>
           </TooltipContent>
         </Tooltip>

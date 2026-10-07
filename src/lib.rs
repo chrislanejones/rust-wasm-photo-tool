@@ -2695,11 +2695,8 @@ impl ImageHorseTool {
         let sy = new_h as f64 / oh as f64;
         let s_uniform = (sx * sy).sqrt();
 
-        let resample = |data: &[u8], w: u32, h: u32, nw: u32, nh: u32| match filter {
-            0 => transform::resize_nearest(data, w, h, nw, nh),
-            2 => transform::resize_catmull_rom(data, w, h, nw, nh),
-            3 => transform::resize_lanczos3(data, w, h, nw, nh),
-            _ => transform::resize_bilinear(data, w, h, nw, nh),
+        let resample = |data: &[u8], w: u32, h: u32, nw: u32, nh: u32| {
+            resample_with_filter(data, w, h, nw, nh, filter)
         };
 
         for layer in &mut self.layers {
@@ -3413,6 +3410,43 @@ pub fn describe_image(pixels: &[u8], w: u32, h: u32) -> String {
 #[wasm_bindgen]
 pub fn resize_pixels(pixels: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
     transform::resize_bilinear(pixels, old_w, old_h, new_w, new_h)
+}
+
+/// The resample kernel `resize_with_filter` uses, by its filter code:
+/// 0 = nearest, 2 = Catmull-Rom, 3 = Lanczos3, anything else = bilinear.
+/// One definition, so the stateless export below cannot drift from it.
+fn resample_with_filter(data: &[u8], w: u32, h: u32, nw: u32, nh: u32, filter: u8) -> Vec<u8> {
+    match filter {
+        0 => transform::resize_nearest(data, w, h, nw, nh),
+        2 => transform::resize_catmull_rom(data, w, h, nw, nh),
+        3 => transform::resize_lanczos3(data, w, h, nw, nh),
+        _ => transform::resize_bilinear(data, w, h, nw, nh),
+    }
+}
+
+/// Stateless: resample an RGBA buffer with the same kernel `resize_with_filter`
+/// applies for `filter`. The Resize & Compress panel uses it to MEASURE what
+/// Apply would write — encode the real pending pixels and count the bytes —
+/// instead of projecting them from a formula that was off by 7× on detailed
+/// images. A zero dimension returns an empty buffer rather than panicking.
+#[wasm_bindgen]
+pub fn resize_pixels_filter(
+    pixels: &[u8],
+    old_w: u32,
+    old_h: u32,
+    new_w: u32,
+    new_h: u32,
+    filter: u8,
+) -> Vec<u8> {
+    if old_w == 0
+        || old_h == 0
+        || new_w == 0
+        || new_h == 0
+        || pixels.len() < (old_w as usize) * (old_h as usize) * 4
+    {
+        return Vec::new();
+    }
+    resample_with_filter(pixels, old_w, old_h, new_w, new_h, filter)
 }
 
 /// Stateless: encode an RGBA pixel buffer as PNG bytes. Used by the batch-logo
@@ -5080,5 +5114,60 @@ mod web_perf_score_legacy_tests {
             let s = score(b);
             assert!((0.0..=100.0).contains(&s), "{b} B scored {s}");
         }
+    }
+}
+
+#[cfg(test)]
+mod resize_pixels_filter_tests {
+    use super::*;
+
+    fn gradient(w: u32, h: u32) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                v.extend_from_slice(&[
+                    (x * 7 % 256) as u8,
+                    (y * 13 % 256) as u8,
+                    ((x ^ y) % 256) as u8,
+                    255,
+                ]);
+            }
+        }
+        v
+    }
+
+    /// The stateless export must produce exactly the pixels the document
+    /// resize produces for an opaque, borderless image — that equality is
+    /// what makes the panel's measured size the size Apply writes.
+    #[test]
+    fn matches_resize_with_filter_for_every_kernel() {
+        let (w, h, nw, nh) = (64u32, 48u32, 37u32, 29u32);
+        let src = gradient(w, h);
+        for filter in [0u8, 1, 2, 3] {
+            let mut t = ImageHorseTool::new(w, h);
+            t.load_image(&src);
+            t.resize_with_filter(nw, nh, filter);
+            let doc = t.get_image_data();
+            let stateless = resize_pixels_filter(&src, w, h, nw, nh, filter);
+            assert_eq!(
+                stateless.len(),
+                (nw * nh * 4) as usize,
+                "filter {filter}: length"
+            );
+            assert_eq!(
+                stateless, doc,
+                "filter {filter}: pixels differ from resize_with_filter"
+            );
+        }
+    }
+
+    #[test]
+    fn degenerate_input_is_empty_not_a_panic() {
+        assert!(resize_pixels_filter(&[], 0, 0, 10, 10, 3).is_empty());
+        assert!(resize_pixels_filter(&[0; 16], 2, 2, 0, 5, 3).is_empty());
+        assert!(
+            resize_pixels_filter(&[0; 8], 2, 2, 4, 4, 3).is_empty(),
+            "short buffer"
+        );
     }
 }

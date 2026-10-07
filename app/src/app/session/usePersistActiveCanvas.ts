@@ -14,12 +14,16 @@ import { setSaveFailed } from "@/lib/saveStatus";
 import { putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { makeThumbnailFromPixels } from "@/lib/workingCopy";
-import {
-  encodeRgba,
-  extFromMime,
-  formatFromMime,
-} from "@/lib/exportImage";
+import { extFromMime } from "@/lib/exportImage";
+import { encodeForApply } from "@/lib/applyEncode";
 import type { ExportFormat } from "@/lib/exportImage";
+
+/** What an Apply's re-encode actually did to the stored file. */
+export type PersistOutcome =
+  | { status: "saved"; bytes: number }
+  | { status: "kept"; newBytes: number; oldBytes: number }
+  | { status: "skipped" }
+  | { status: "failed" };
 
 export function usePersistActiveCanvas({
   stamp,
@@ -35,95 +39,38 @@ export function usePersistActiveCanvas({
   const setPhotos = useGalleryStore((s) => s.setPhotos);
   const setImageSavings = useGalleryStore((s) => s.setImageSavings);
 
-  return useCallback(async (opts?: { keepSourceEncoding?: boolean }) => {
+  // `allowGrow`: a RESIZE always writes. The size the user typed is the
+  // point; refusing it because the bytes grew (a flat-color PNG downscaled
+  // with Lanczos3 gains soft edges, an upscale has more pixels) answered
+  // "128" with an unchanged 256. The never-grows guard stays for what it was
+  // built for: a same-size re-encode, where a bigger file is pure loss.
+  return useCallback(async (opts?: { keepSourceEncoding?: boolean; allowGrow?: boolean }): Promise<PersistOutcome> => {
     const entry = photos.find((p) => p.id === activePhotoId);
     const tool = stamp.toolRef.current;
-    if (!entry || !tool) return;
-    const sourceFormat = opts?.keepSourceEncoding
-      ? formatFromMime(entry.mimeType ?? "")
-      : null;
-    const encodeFormat = sourceFormat ?? exportFormat;
-    const lossy = encodeFormat !== "png";
-    // "Apply Resize" used to re-encode at quality 1.0 — "full quality" sounds
-    // lossless, but for a JPEG/WebP/AVIF it is the opposite of what the photo
-    // was: a file Auto Compress had brought to ~200 KB at q≈60 came back at
-    // q=100 and several times heavier, even though it now had FEWER pixels, and
-    // the PageSpeed score dropped into the red after a downscale. Keep the
-    // quality the stored bytes were last encoded at; for an untouched upload
-    // (unknown) use 92, the usual camera/export default.
-    const resizeQuality = entry.encodeQuality ?? 92;
-    const encodeQuality = sourceFormat ? resizeQuality / 100 : quality / 100;
+    if (!entry || !tool) return { status: "skipped" };
     try {
-      // ATOMIC CAPTURE (ADR-024). Was `get_image_data()` + `width()` +
-      // `height()`. These three are not merely read together, they TRAVEL
-      // together: `pixels`, `tw` and `th` cross three awaits below and are then
-      // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
-      // scaled as one image. A mismatch here is persisted, not transient.
-      // ⚠️ THE STORED ORIGINAL IS THE PHOTO, NEVER THE MOUNT IT SITS ON.
-      //
-      // This used to write the full padded composite — backing Canvas and all
-      // — and only dropped it when the format had no alpha (ADR-039's black
-      // border). With the defaults (10px border, transparent backing) and any
-      // alpha format, that baked a 10px TRANSPARENT margin into `originalKey`.
-      // Two surfaces then shipped it as real pixels:
-      //
-      //  - the batch ZIP, whose "no saved edit" branch copies `originalKey`
-      //    verbatim — so a signed-out user with "Photo only" set got every
-      //    image framed in a thin white-looking line, whatever the export
-      //    setting said;
-      //  - the next gallery load, which wraps `originalKey` in a FRESH
-      //    artboard (`loadPhotoFromEntry`), nesting border inside border.
-      //
-      // So the Canvas is always left out here. It is not the user's pixels, it
-      // is re-added on every load from the Canvas prefs, and "Include canvas"
-      // is an EXPORT choice that the export surfaces apply themselves. This
-      // also subsumes the ADR-039 rule: with no backing there is nothing
-      // transparent to invent black for. On a document with no Canvas layer
-      // nothing is excluded — the composite is only trimmed of fully
-      // transparent margin (see `composite_excluding_background` in lib.rs).
       const cap = await tool.capture_composite_excluding_background();
       const { rgba: pixels, width: tw, height: th } = cap;
       cap.free();
-      // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
-      // codec worker, which transfers (detaches) it. Give encodeRgba its own
-      // copy so the original `pixels` survives for the thumbnail below.
-      let blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, encodeQuality);
-      let storedQuality = sourceFormat ? resizeQuality : quality;
-      // A resize that REMOVED pixels must not produce a heavier file. With an
-      // unknown source quality the 92 guess can overshoot a heavily compressed
-      // upload, so step down until the result is no bigger than what it
-      // replaces. Bounded; worst case keeps the last attempt.
-      const prevArea = entry.origWidth * entry.origHeight;
-      if (sourceFormat && lossy && prevArea > 0 && tw * th <= prevArea) {
-        for (const q of [85, 78, 70, 62, 55]) {
-          if (blob.size <= entry.byteSize || q >= storedQuality) break;
-          blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, q / 100);
-          storedQuality = q;
-        }
-      }
-      // THE LAST GUARD: never write a file bigger than the one being replaced.
-      //
-      // The step-down above only runs on the RESIZE path (`sourceFormat &&`),
-      // and only when pixels were removed. An Apply Compression with the
-      // dimensions unchanged skipped it entirely — which is how a PNG, chosen at
-      // the panel's default quality, could come back larger than the file it
-      // overwrote. The panel now disables Quality for PNG, but this is the only
-      // place that writes, so the invariant belongs here too.
-      //
-      // A lossless format cannot be walked down — there is no smaller encode to
-      // fall back to — so the only honest action is to keep what is stored.
-      // Returning BEFORE any Dexie write means the stored original, its
-      // thumbnail, and every field on the entry keep describing the file that
-      // is actually there.
-      if (entry.byteSize > 0 && blob.size > entry.byteSize) {
+      // The encode is shared with the panel's measurement (lib/applyEncode),
+      // so what the panel shows is what this writes.
+      const { blob, storedQuality, format: encodeFormat, kept } = await encodeForApply(pixels, tw, th, {
+        entry,
+        exportFormat,
+        quality,
+        keepSourceEncoding: opts?.keepSourceEncoding,
+      });
+      const lossy = encodeFormat !== "png";
+      if (kept && !opts?.allowGrow) {
         console.info(
           `[persist] ${entry.name}: re-encode would be ${blob.size} B against ` +
             `${entry.byteSize} B — keeping the stored original`,
         );
-        return;
+        // REPORTED, not just logged (10-07): the panel used to clear its
+        // pending change and call the Apply done, while the stored file sat
+        // at its old quality. Raising q50 → q90 hit this every time.
+        return { status: "kept", newBytes: blob.size, oldBytes: entry.byteSize };
       }
-      // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
-      // the blob's actual MIME for the stored metadata.
       const mime = blob.type || `image/${encodeFormat}`;
       const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
         type: mime,
@@ -187,12 +134,14 @@ export function usePersistActiveCanvas({
       }));
       // A save landed, so any earlier failure is no longer true.
       setSaveFailed(false);
+      return { status: "saved", bytes: blob.size };
     } catch (err) {
       console.error("Persist canvas failed:", err);
       toast.error("Couldn't save canvas changes");
       // The toast is the moment; this is what stays true after it has gone —
       // the status bar holds it until a later save succeeds.
       setSaveFailed(true);
+      return { status: "failed" };
     }
     // `setPhotos` / `setImageSavings` are listed even though AppShell's array
     // omitted them. Zustand actions are stable references, so naming them

@@ -92,7 +92,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
       });
     };
     updateBox();
-    // Layout size changes (e.g. Apply Compression & Resize swaps dimensions).
+    // Layout size changes (e.g. an Apply Resize swaps dimensions).
     const ro = new ResizeObserver(updateBox);
     ro.observe(canvasEl);
     if (canvasEl.offsetParent) ro.observe(canvasEl.offsetParent);
