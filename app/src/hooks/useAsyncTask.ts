@@ -19,6 +19,7 @@
 //     stale engine call cannot surface as an unhandled rejection.
 //   • `saved` falls back to `ready` on its own after SAVED_MS.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { beginActivity } from "@/lib/activity";
 
 export type AsyncState = "ready" | "loading" | "processing" | "saved" | "error";
 
@@ -90,6 +91,8 @@ export function useAsyncTask() {
       const setProgress = (p: number | null) => {
         if (isCurrent()) set({ state: kind, progress: p, error: null });
       };
+      // The status bar's loading indicator shows while this run is pending.
+      const endActivity = beginActivity();
       let timer: number | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timer = window.setTimeout(
@@ -117,6 +120,7 @@ export function useAsyncTask() {
         set({ state: "error", progress: null, error });
         return { status: "failed", error };
       } finally {
+        endActivity();
         window.clearTimeout(timer);
       }
     },

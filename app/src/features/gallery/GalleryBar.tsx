@@ -11,6 +11,7 @@ import { GalleryCount } from "./GalleryCount";
 import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
+import { useActivityWhile } from "@/lib/activity";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
@@ -388,6 +389,8 @@ export function GalleryBar({
     itemIds: photos.map((p) => p.id),
     pendingImports: pendingImports.length,
   });
+  // The status bar's loading indicator, while any tile is still decoding.
+  useActivityWhile(gallery.busy);
   const chromeInert = gallery.loading || undefined;
   // The strip is both the scroll target (stripRef) and the observer root.
   const { setRoot } = gallery;

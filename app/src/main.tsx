@@ -20,6 +20,11 @@ import { hydrateInstalledPlugins } from "@/lib/plugins/state";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 import { installDroppedRejectionHandler } from "@/lib/engine/superseded";
 import { primeRustExif } from "@/lib/exif/rust";
+import { installActivityFetchTracker } from "@/lib/activity";
+
+// Every request on the page feeds the status bar's loading indicator
+// (lib/activity). Installed before anything else can fetch.
+installActivityFetchTracker();
 
 // `?beta=<id>` — an invite link opting this DEVICE into an experiment. Applied
 // BEFORE anything reads a beta key (the WebGPU gate below is one), and before
