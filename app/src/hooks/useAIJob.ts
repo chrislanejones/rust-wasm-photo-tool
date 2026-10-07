@@ -4,6 +4,7 @@ import { useCloudAction, useCloudMutation, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useUIStore } from "@/stores/useUIStore";
+import { withTimeout } from "@/lib/withTimeout";
 
 /** What a refused job says. */
 const ONLINE_FEATURES_OFF_ERROR =
@@ -144,11 +145,12 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
       setTextResult(null);
       photoKeyRef.current = photoKey;
       setPhase("uploading");
-      let uploadTimer: number | undefined;
+      // One controller for the run, so the timer cancels whichever upload is
+      // in flight (input or mask) instead of abandoning it to land in storage
+      // with no job pointing at it — the same leak ADR-083 measured on the
+      // edit path. Only the timer aborts. See lib/withTimeout.
+      const uploadAbort = new AbortController();
       try {
-        const timedOut = new Promise<never>((_, reject) => {
-          uploadTimer = window.setTimeout(() => reject(new Error(AI_TIMEOUT_MESSAGE)), AI_UPLOAD_TIMEOUT_MS);
-        });
         // Tag as image/png so the stored blob's content-type is correct —
         // Replicate fetches this URL and some models reject octet-stream.
         const uploadPng = async (bytes: Uint8Array) => {
@@ -157,26 +159,27 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
             method: "POST",
             headers: { "Content-Type": "image/png" },
             body: bytes.buffer as ArrayBuffer,
+            signal: uploadAbort.signal,
           });
           const { storageId } = (await resp.json()) as { storageId: string };
           return storageId as Id<"_storage">;
         };
-        const { jobId: newJobId } = await Promise.race([
+        const { jobId: newJobId } = await withTimeout(
           (async () => {
             const inputStorageId = await uploadPng(png);
             const maskStorageId = maskPng ? await uploadPng(maskPng) : undefined;
             return dispatch({ photoKey, type, inputStorageId, maskStorageId });
           })(),
-          timedOut,
-        ]);
+          AI_UPLOAD_TIMEOUT_MS,
+          "AI upload",
+          { abort: uploadAbort, message: AI_TIMEOUT_MESSAGE },
+        );
         consumedRef.current = null;
         setJobId(newJobId);
         setPhase("running");
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setPhase("error");
-      } finally {
-        window.clearTimeout(uploadTimer);
       }
     },
     [generateUploadUrl, dispatch],

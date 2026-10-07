@@ -26,6 +26,7 @@ import type {
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { useUIStore } from "@/stores/useUIStore";
 import { mayUpload, recordUpload, isUploadRetryEnabled } from "@/lib/uploadBudget";
+import { withTimeout as withTimeoutMs } from "@/lib/withTimeout";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -290,16 +291,10 @@ async function archiveHash(archive: Uint8Array): Promise<string | null> {
     .join("");
 }
 
-function withTimeout<T>(p: Promise<T>, what: string): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`${what} did not settle within ${CLOUD_STEP_TIMEOUT_MS}ms`)),
-        CLOUD_STEP_TIMEOUT_MS,
-      ),
-    ),
-  ]);
+/** Every cloud step gets the same 8 s backstop. `abort` is for the one step
+ *  that can be cancelled — the archive upload; see lib/withTimeout. */
+function withTimeout<T>(p: Promise<T>, what: string, abort?: AbortController): Promise<T> {
+  return withTimeoutMs(p, CLOUD_STEP_TIMEOUT_MS, what, { abort });
 }
 
 /**
@@ -530,13 +525,27 @@ export function useEditPersistence() {
               }
 
               const uploadUrl = await withTimeout(generateUploadUrl(), "generateUploadUrl");
+              // ── THE LEAK (ADR-083, Night 10-07) ─────────────────────────
+              // The timeout used to reject WITHOUT aborting: the bytes kept
+              // flowing, the file landed in storage, and this client never
+              // learned its id — so `discardFailedUpload` below, which needs
+              // the id, could not collect it. 167 of 207 stored files were
+              // these. Now the timer aborts the request, so a timed-out upload
+              // is cancelled rather than abandoned.
+              //
+              // A photo switch (`detachCloudUpload`) does NOT abort: it only
+              // stops waiting, and the upload finishes in the background as
+              // designed. Only the timer pulls this trigger.
+              const uploadAbort = new AbortController();
               const resp = await withTimeout(
                 fetch(uploadUrl, {
                   method: "POST",
                   headers: { "Content-Type": "application/octet-stream" },
                   body: archive.buffer as ArrayBuffer,
+                  signal: uploadAbort.signal,
                 }),
                 "archive upload",
+                uploadAbort,
               );
               // A non-2xx upload still parses as JSON — an error body, with no
               // `storageId` in it. Unchecked, that handed `undefined` to saveEdit
