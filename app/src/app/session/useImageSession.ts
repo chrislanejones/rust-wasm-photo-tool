@@ -32,7 +32,7 @@ import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
-import { whenStrokeIdle } from "@/lib/strokeGate";
+import { whenStrokeQuiet } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
 import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
@@ -93,6 +93,17 @@ export function isDirty(
   // moving BACKWARDS past it.
   return undoCount !== savedUndoCount;
 }
+
+/**
+ * How long the pen must have been still before the capture may start. The
+ * fast lane above fires 300 ms after a stroke — which, on a default import
+ * (the artboard border is an unrecorded edit, so the log never covers the
+ * document), is EVERY stroke: pen up, 300 ms, then 1–2 s of the worker
+ * PNG-encoding every snapshot while the next stroke's ink waits. The timer
+ * keeps its lane; the quiet window is the same for both, long enough that
+ * a save lands between bursts, not between strokes.
+ */
+export const AUTOSAVE_QUIET_MS = 2500;
 
 export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): number {
   // ⚠️ "The log is ACTIVE" is NOT the safety condition, and the first cut of
@@ -354,11 +365,21 @@ export function useImageSession({
   // brush to the 60 fps the worker measurably delivers logged-out. The wait is
   // bounded inside the gate — a stuck stroke can only delay a save, never
   // starve it.
+  //
+  // ⚠️ `whenStrokeQuiet(delay)`, not `whenStrokeIdle()` (10-07). Idle only
+  // meant "pointer is up right now" — the capture then started 2.5 s after a
+  // stroke, which is where the NEXT stroke begins, and held the worker for
+  // 1.1–1.6 s (measured: `capture_state` PNG-encodes every undo snapshot)
+  // while that stroke's `paint_move` calls queued behind it, logged out too.
+  // Quiet means no stroke has ended for `delay` ms, so a run of strokes
+  // defers the save until the run is over; the wait stays bounded inside the
+  // gate.
   useEffect(() => {
     if (!activePhotoId || !dirtyRef.current) return;
+    const delay = autosaveDelayMs(getOplogStats(), stamp.state.undoCount);
     const t = window.setTimeout(
-      () => void whenStrokeIdle().then(() => flushRef.current()),
-      autosaveDelayMs(getOplogStats(), stamp.state.undoCount),
+      () => void whenStrokeQuiet(AUTOSAVE_QUIET_MS).then(() => flushRef.current()),
+      delay,
     );
     return () => window.clearTimeout(t);
     // `layerRevision` is in here for its CHANGE, not its value — it is what

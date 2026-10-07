@@ -94,7 +94,8 @@ interface Props {
    *  fit-scale and pan/zoom transform for free. */
   drawPreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   brushDiameter: number;
-  cursorPos: { x: number; y: number };
+  /** Attach to the ring: `useBrushPreview` positions it outside React. */
+  cursorRef: (el: HTMLElement | null) => void;
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
@@ -246,7 +247,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       hookResult,
       drawPreviewRef,
       brushDiameter,
-      cursorPos,
+      cursorRef,
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
@@ -1408,10 +1409,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           !cursor &&
           !isPanning && (
           <div
+            ref={cursorRef}
             className={`brush-cursor${maskEditing ? " brush-cursor--mask" : ""}`}
             style={{
-              left: cursorPos.x,
-              top: cursorPos.y,
               width: brushDiameter,
               height: brushDiameter,
               ...(maskEditing
