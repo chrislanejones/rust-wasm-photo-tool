@@ -79,7 +79,22 @@ export function PenOverlay({
   editRequest,
   onEditRequestHandled,
 }: PenOverlayProps) {
-  const [anchors, setAnchors] = useState<Anchor[]>([]);
+  const [anchors, publishAnchors] = useState<Anchor[]>([]);
+  const anchorsRef = useRef<Anchor[]>([]);
+  const previewFrame = useRef<number | null>(null);
+  const viewportRef = useRef<DOMRect | null>(null);
+  // The current draft is updated synchronously; React paints it once per frame.
+  // Finish/release can therefore serialize a move not yet shown on screen.
+  const setAnchors = useCallback((update: Anchor[] | ((a: Anchor[]) => Anchor[])) => {
+    if (previewFrame.current !== null) cancelAnimationFrame(previewFrame.current);
+    previewFrame.current = null;
+    const next = typeof update === "function" ? update(anchorsRef.current) : update;
+    anchorsRef.current = next;
+    publishAnchors(next);
+  }, []);
+  useEffect(() => () => {
+    if (previewFrame.current !== null) cancelAnimationFrame(previewFrame.current);
+  }, []);
   // #82 Phase 4a — the pen has no dabs to lag, so "stabilize" here means the
   // DRAG: anchor moves and handle pulls, which is the twitchiness the setting
   // actually answers on a mouse. Same `paintStabilizer` field every brush
@@ -110,8 +125,6 @@ export function PenOverlay({
    *  guessed at. Stored as a boolean, not a position, so moving the mouse only
    *  re-renders on the two frames where the answer actually changes. */
   const [nearStart, setNearStart] = useState(false);
-  const anchorsRef = useRef(anchors);
-  anchorsRef.current = anchors;
   const editingIdRef = useRef(editingId);
   editingIdRef.current = editingId;
   const closedRef = useRef(closed);
@@ -128,7 +141,7 @@ export function PenOverlay({
   const mapImg = useCallback(
     (cx: number, cy: number): Pt => {
       if (!canvasEl) return { x: 0, y: 0 };
-      const r = canvasEl.getBoundingClientRect();
+      const r = viewportRef.current ?? canvasEl.getBoundingClientRect();
       return {
         x: (cx - r.left) / (r.width / canvasEl.width),
         y: (cy - r.top) / (r.height / canvasEl.height),
@@ -205,7 +218,7 @@ export function PenOverlay({
           setEditingId(stayOn);
         }
       }),
-    [onCommit, onEditCommit, onEditCancel, onEditStart],
+    [onCommit, onEditCommit, onEditCancel, onEditStart, setAnchors],
   );
 
   // Leaving the pen unmounts this overlay, and a finished path now stays
@@ -258,7 +271,7 @@ export function PenOverlay({
       setAnchors(a);
     }
     onEditRequestHandled?.();
-  }, [editRequest, onEditStart, onEditRequestHandled]);
+  }, [editRequest, onEditStart, onEditRequestHandled, setAnchors]);
 
   // Window-level drag for every drag kind (anchors + handles, create + edit).
   useEffect(() => {
@@ -282,7 +295,7 @@ export function PenOverlay({
         ix = tip.x;
         iy = tip.y;
       }
-      setAnchors((a) => {
+      anchorsRef.current = ((a: Anchor[]) => {
         if (d.index >= a.length) return a;
         const next = a.slice();
         const an = { ...next[d.index] };
@@ -302,7 +315,13 @@ export function PenOverlay({
         }
         next[d.index] = an;
         return next;
-      });
+      })(anchorsRef.current);
+      if (previewFrame.current === null) {
+        previewFrame.current = requestAnimationFrame(() => {
+          previewFrame.current = null;
+          publishAnchors(anchorsRef.current);
+        });
+      }
     };
     const onUp = (e: PointerEvent) => {
       // THE RAW CURSOR, never the tip. Handing `flush` the tip compares a
@@ -339,6 +358,7 @@ export function PenOverlay({
           });
         }
       }
+      if (d) setAnchors(anchorsRef.current);
       leashRef.current = null;
       dragRef.current = null;
     };
@@ -348,7 +368,7 @@ export function PenOverlay({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [mapImg]);
+  }, [mapImg, setAnchors]);
 
   // Keyboard.
   useEffect(() => {
@@ -380,7 +400,7 @@ export function PenOverlay({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [finish]);
+  }, [finish, setAnchors]);
 
   // Ctrl+Z steps back ONE anchor while a path is in progress, the way every
   // other pen tool behaves. Backspace already did this; Ctrl+Z is what people
@@ -420,7 +440,7 @@ export function PenOverlay({
     };
     window.addEventListener("keydown", onUndoKey, true);
     return () => window.removeEventListener("keydown", onUndoKey, true);
-  }, []);
+  }, [setAnchors]);
 
   // Click off the canvas → finish (commit when editing, finish-open when drawing).
   //
@@ -462,6 +482,7 @@ export function PenOverlay({
 
   if (!canvasEl) return null;
   const rect = canvasEl.getBoundingClientRect();
+  viewportRef.current = rect;
   const sx = rect.width / canvasEl.width;
   const sy = rect.height / canvasEl.height;
   const toSX = (ix: number) => rect.left + ix * sx;

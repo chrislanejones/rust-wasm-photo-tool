@@ -89,7 +89,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   ],
   shapes: [
     { id: "shapes", label: "Shapes", icon: ShapesIcon, keywords: ["rectangle", "ellipse", "box"] },
-    { id: "pens", label: "Pens", icon: MapPin, keywords: ["pen", "bezier", "path", "vector"] },
+    { id: "pens", label: "Pins", icon: MapPin, keywords: ["pin", "callout", "number", "letter"] },
     { id: "arrows", label: "Arrows", icon: ArrowUpRight, keywords: ["arrow", "pointer", "annotate"] },
   ],
   text: [

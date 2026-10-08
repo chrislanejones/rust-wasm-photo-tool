@@ -470,7 +470,7 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["shape", "rectangle", "circle", "box", "hand-drawn"],
     },
     {
-      // `shapesMode: "pens"` is labeled "Pens" in toolModes.ts but carries a
+      // `shapesMode: "pens"` is labeled "Pins" in toolModes.ts but carries a
       // MapPin icon and drives PIN_LABELS (Numbers / Letters) — it is the
       // pin-drop feature, not the Bézier pen. The brief separates the two
       // correctly; the stale label is what made them look like one thing.
