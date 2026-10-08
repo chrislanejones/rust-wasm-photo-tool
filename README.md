@@ -86,22 +86,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.23 — 2026-10-08
+### v9.24 — 2026-10-08
 
-**Adjustments works again, every reset is exact, and the AI buttons are there for everyone.**
+**The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.**
 
-Brightness was badly off. Nudge it to +65 and three of four test grays went
-to pure white, and its reset turned what was left into one flat gray. Now the
-photo changes as you drag, letting go is one undo step, and each slider's
-reset puts back exactly what was there — because every change is worked out
-from the photo as it was when you opened the panel. +65 is a lift now, not a
-blowout.
+The histogram under Adjustments, Levels and Presets now takes a third of the
+panel — the same height as Review's when it holds one of three slots. It was
+a fixed strip that came out about half that on a normal window.
 
-Levels has a reset beside each of its three points. Enhance › AI opens even
-with online features off, so you can see Remove Background and Remove
-Object; pressing one tells you what it needs.
-
-Engine 885,735 → 892,634 bytes, for the adjustment session.
+On a phone, every card in the site menu is the same size. And every page on
+imagehorse.app was checked against what ships: the compressor page no longer
+promises a target-file-size search that doesn't exist, the PageSpeed score is
+described as the Image weight it became, and the Architecture page is current
+to this version.
 
 
 ## License

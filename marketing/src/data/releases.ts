@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.24",
+    date: "2026-10-08",
+    headline: "The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.",
+    entries: [
+      { tag: "ui", text: "The histogram under Adjustments, Levels and Presets takes a third of the panel — the same height as Review's. It used to be a short strip." },
+      { tag: "ui", text: "On a phone, every card in the site menu is the same size." },
+      { tag: "fix", text: "Every page on the site was checked against the app. The compressor page no longer promises a feature it doesn't have, and the Architecture page is current." },
+    ],
+  },
+  {
     version: "v9.23",
     date: "2026-10-08",
     headline: "Adjustments works again, every reset is exact, and the AI buttons are there for everyone.",

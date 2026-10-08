@@ -11454,3 +11454,14 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Enhance › AI** (#327) | `openOffline` sub-tool flag: the tile opens with online features off (the default), both buttons show with the key badge, pressing one says why; 0 AI requests while off. OCR unchanged. |
 | **Engine** | **885,735 → 892,634 B** (+6,899): the adjustment session. |
 | **Gates** | cargo test 509/509 + tiles 685/685, clippy both, fmt; tsc 0, lint 0 errors / 55 warnings; unit 1,842/1,842; guardrails OK. |
+
+## v9.24 Change Summary — 2026-10-08
+
+**The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.** #335, #336.
+
+| Area | Change |
+| --- | --- |
+| **Histogram footer** (#336) | `basis-[calc(33.333%-13px)]`, 9rem floor, instead of a fixed `h-36`: chart 187 / 220 / 280 px at 800 / 900 / 1080 px windows — exactly Review's one-third slot (the fixed footer drew 110 at every size). |
+| **Mobile menu** (#335) | All 20 sheet cards one size: `height: 7em` (119 px), descriptions clamped to three lines with the full text as a title. Were 62–134 px; 0 overflow. |
+| **Marketing review** (#335) | Every page checked against v9.19–v9.23 and the app source. /image-compressor (toolPages, seo.ts) no longer claims a target-size search or "page-speed scores"; Features.md / featureCards / comingSoon describe Image weight, the preview row, the histogram footer, the Adjustments session, Levels' per-point resets and AI-for-everyone; remove-object says "on Pro". Architecture: as of v9.23, 893 KB engine, op log v11, 11 stores. |
+| **Gates** | CI 17/17 on both; photo-switch-cue + ui-night8-finish 15/15; unit 1,843/1,843; marketing tsc 0, build OK. No engine change (892,634 B). |
