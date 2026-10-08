@@ -1757,6 +1757,28 @@ textarea:focus-visible {
   to { transform: translateX(225%); }
 }
 
+/* Reduced motion: the indicator stays, the movement goes — a still hourglass
+   and a full, dimmed bar still say "loading". Same two switches as the
+   skeleton shimmer: the OS setting and the app's own html.reduce-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .status-loading-hourglass,
+  .status-loading-bar::after {
+    animation: none;
+  }
+  .status-loading-bar::after {
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+html.reduce-motion .status-loading-hourglass,
+html.reduce-motion .status-loading-bar::after {
+  animation: none;
+}
+html.reduce-motion .status-loading-bar::after {
+  width: 100%;
+  opacity: 0.6;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .status-loading-hourglass,
   .status-loading-bar::after {
