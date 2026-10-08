@@ -27,4 +27,26 @@ describe("save status", () => {
     const { result } = renderHook(() => useSaveStatus());
     expect(result.current.backupFailed).toBe(false);
   });
+
+  it("another photo or another save kind cannot clear an archive failure", () => {
+    setSaveFailed(true, "a", "archive");
+    setSaveFailed(false, "b", "archive");
+    setSaveFailed(false, "a", "canvas");
+    const { result, rerender } = renderHook(() => useSaveStatus());
+    expect(result.current.failed).toBe(true);
+    setSaveFailed(false, "a", "archive");
+    rerender();
+    expect(result.current.failed).toBe(false);
+  });
+
+  it("one successful backup cannot hide a different photo's failed backup", () => {
+    setBackupFailed(true, "a");
+    setBackupFailed(true, "b");
+    setBackupFailed(false, "b");
+    const { result, rerender } = renderHook(() => useSaveStatus());
+    expect(result.current.backupFailed).toBe(true);
+    setBackupFailed(false, "a");
+    rerender();
+    expect(result.current.backupFailed).toBe(false);
+  });
 });

@@ -33,7 +33,7 @@ export function HistoryBranches() {
       </div>
       {/* Height-capped in styles.css (`.history-branches .history-list`) so
           the linear list above is never pushed off screen. */}
-      <div className="history-list" role="group" aria-labelledby="history-branches-heading">
+      <div className="history-list" role="group" aria-label="Alternative history timelines">
         {branches.map((b) => {
           const steps = `${b.steps} step${b.steps === 1 ? "" : "s"}`;
           return (

@@ -349,13 +349,13 @@ export function useEditPersistence() {
               // failed would let a broken network burn the hour's allowance
               // without a single byte reaching Convex.
               recordUpload(photoId);
-              setBackupFailed(false);
+              if (attemptSeqRef.current.get(photoId) === mySeq) setBackupFailed(false, photoId);
               uploadedStorageId = null; // pointer committed — no longer stranded
             } catch (err) {
               // Cloud save failed (upload / storage / auth). The local IDB copy is
               // ALREADY written, so nothing is lost — record it for Diagnostics,
               // and say so in the status bar until a later upload lands.
-              setBackupFailed(true);
+              if (attemptSeqRef.current.get(photoId) === mySeq) setBackupFailed(true, photoId);
               logDiagnostic(
                 "CONVEX_DB",
                 `Cloud edit save failed for ${photoId}; saved locally only: ${

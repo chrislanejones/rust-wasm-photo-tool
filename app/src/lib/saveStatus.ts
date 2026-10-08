@@ -8,8 +8,8 @@
 // feedback hierarchy: an error that needs action never lives only in a toast.
 //
 // The toast still fires (it is the moment you are told); this is what is still
-// true afterwards. It clears on the next successful save, so the chip means
-// "the most recent save did not land", never a stale failure from earlier.
+// true afterwards. Only a successful save of the failed photo and save kind
+// clears it; another photo's success does not recover these edits.
 //
 // Deliberately a module store and NOT a key on useUIStore. useUIStore persists
 // through `partialize`, and a runtime error flag that slipped into it would
@@ -19,7 +19,7 @@
 import { useSyncExternalStore } from "react";
 
 export interface SaveStatus {
-  /** The last save of the active canvas threw. */
+  /** At least one photo has a failed local save that has not recovered. */
   failed: boolean;
   /** Signed in: the last CLOUD copy of an edit did not upload. The local copy
    *  is on disk, so nothing is lost — but "backed up" is no longer true, and
@@ -33,6 +33,16 @@ const INITIAL: SaveStatus = Object.freeze({ failed: false, backupFailed: false }
 // compares snapshots by identity.
 let status: SaveStatus = INITIAL;
 const listeners = new Set<() => void>();
+const localFailures = new Set<string>();
+const backupFailures = new Set<string>();
+
+function recordFailure(failures: Set<string>, failed: boolean, photoId?: string, kind = "canvas") {
+  const key = JSON.stringify([photoId ?? "global", kind]);
+  if (failed) failures.add(key);
+  else if (photoId === undefined) failures.clear(); // legacy unscoped reset
+  else failures.delete(key);
+  return failures.size > 0;
+}
 
 function getSaveStatus(): SaveStatus {
   return status;
@@ -40,14 +50,16 @@ function getSaveStatus(): SaveStatus {
 
 /** Record the outcome of a save. A no-op when nothing moved, so the steady
  *  state of "every save works" wakes no subscriber. */
-export function setSaveFailed(failed: boolean): void {
+export function setSaveFailed(failed: boolean, photoId?: string, kind = "canvas"): void {
+  failed = recordFailure(localFailures, failed, photoId, kind);
   if (status.failed === failed) return;
   status = Object.freeze({ ...status, failed });
   for (const listener of listeners) listener();
 }
 
 /** Record the outcome of a cloud backup. Clears on the next one that lands. */
-export function setBackupFailed(backupFailed: boolean): void {
+export function setBackupFailed(backupFailed: boolean, photoId?: string): void {
+  backupFailed = recordFailure(backupFailures, backupFailed, photoId);
   if (status.backupFailed === backupFailed) return;
   status = Object.freeze({ ...status, backupFailed });
   for (const listener of listeners) listener();

@@ -134,14 +134,14 @@ export function usePersistActiveCanvas({
         [entry.id]: { savingsPercent: realSavings },
       }));
       // A save landed, so any earlier failure is no longer true.
-      setSaveFailed(false);
+      setSaveFailed(false, entry.id);
       return { status: "saved", bytes: blob.size };
     } catch (err) {
       console.error("Persist canvas failed:", err);
       toast.error("Couldn't save canvas changes");
       // The toast is the moment; this is what stays true after it has gone —
       // the status bar holds it until a later save succeeds.
-      setSaveFailed(true);
+      setSaveFailed(true, entry.id);
       return { status: "failed" };
     }
     // `setPhotos` / `setImageSavings` are listed even though AppShell's array

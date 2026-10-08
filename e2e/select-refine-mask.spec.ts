@@ -125,6 +125,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Magic Wand", exact: true }).click();
   await clickSky(page);
   await expect(readout(page)).toHaveText(/^Selected \d/);
+  await expect(page.getByRole("button", { name: "Undo", exact: true }).first()).toBeEnabled();
 });
 
 test("a Refine slider previews on a copy; Apply is one undo step", async ({ page }) => {
