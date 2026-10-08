@@ -6,14 +6,17 @@ import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { CLEAN_UP } from "@/lib/selectionRefine";
+import { toast } from "@/components/ui/sonner";
 
 vi.mock("@/hooks/useCanvasCoords", () => ({ useCanvasCoords: () => () => ({ x: 0, y: 0 }) }));
+vi.mock("@/components/ui/sonner", () => ({ toast: { error: vi.fn(), dismiss: vi.fn() } }));
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.clearAllMocks();
   useGalleryStore.setState({ activePhotoId: "a", documentPhotoId: "a", documentRevision: 1 });
   useUIStore.setState({ isImageLoading: false });
-  useToolStore.setState({ activeTool: "select", selectionMask: new Uint8Array([1]), selectionRefine: CLEAN_UP, refinePreviewing: false });
+  useToolStore.setState({ activeTool: "select", selectionMask: new Uint8Array([1]), selectionRefine: CLEAN_UP, refinePreviewing: false, refineBusy: false });
 });
 afterEach(() => vi.useRealTimers());
 
@@ -51,11 +54,21 @@ it("leaving Select cancels preview and restores committed ants without applying"
 it("leaving while preview is pending rejects the late answer and cancels its engine copy", async () => {
   const { tool, committed, resolve } = setup(true);
   await preview();
+  expect(useToolStore.getState().refineBusy).toBe(true);
   await act(async () => { useToolStore.getState().setActiveTool("arrow"); });
   await act(async () => { resolve(new Uint8Array([9])); });
   expect(tool.selection_refine_cancel).toHaveBeenCalledOnce();
   expect(useToolStore.getState().selectionMask).toBe(committed);
   expect(useToolStore.getState().refinePreviewing).toBe(false);
+  expect(useToolStore.getState().refineBusy).toBe(false);
+});
+
+it("preview failures remain visible and finish their busy state", async () => {
+  const { tool } = setup();
+  tool.selection_refine_preview.mockRejectedValueOnce(new Error("worker failed"));
+  await preview();
+  expect(useToolStore.getState().refineBusy).toBe(false);
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Couldn't preview"), expect.objectContaining({ duration: Infinity, action: expect.anything() }));
 });
 
 it("a switch clears the preview without putting outgoing ants onto the new photo", async () => {

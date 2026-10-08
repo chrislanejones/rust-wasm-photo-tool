@@ -43,119 +43,131 @@ const ZIP_TIMEOUT_MS = 600_000;
 export function useZipExport(deps: ZipDeps) {
   const { run, state } = useAsyncTask();
   const toastId = useRef<string | number | undefined>(undefined);
+  const submitting = useRef(false);
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
   const exportZip = useCallback(
     async (list: PhotoEntry[], filename: string): Promise<void> => {
-      if (list.length === 0) return;
-      const d = depsRef.current;
-      toast.dismiss(toastId.current);
-      toastId.current = toast.loading(`Zipping 1 of ${list.length}…`);
-      const result = await run(
-        async ({ setProgress, isCurrent }) => {
-          // Persist the active photo's in-progress edits so every photo reads
-          // uniformly from the edit store below.
-          if (d.activeChanged && d.activePhotoId && d.toolRef.current) {
-            await d.savePhotoEdit(d.activePhotoId, d.toolRef);
-          }
-          // No `isChanged` gate: the presence of a saved edit in storage is
-          // the question, and it outlives a reload (see batchExportPlan.ts).
-          const { default: JSZip } = await import("jszip");
-          const zip = new JSZip();
-          const usedNames = new Set<string>();
-          const mode = d.exifKeep ? "keep" : "strip";
-          let skipped = 0;
-
-          for (const [i, photo] of list.entries()) {
-            if (!isCurrent()) return { skipped, mode };
-            toast.loading(`Zipping ${i + 1} of ${list.length}…`, { id: toastId.current });
-            setProgress(i / list.length);
-            try {
-              let bytes: Uint8Array<ArrayBuffer>;
-              let mime: string;
-              let ext: string;
-              const { source, edit } = await resolveExportSource(photo.id, d.loadPhotoEdit);
-              if (source === "edit" && edit) {
-                // Honors Settings → "Photo only" like every other export path.
-                const { pixels, w, h } = await compositeSavedEdit(edit, {
-                  excludeBackground: !includeCanvasInExport({
-                    exportCanvasBackground: d.exportCanvasBackground,
-                    format: d.exportFormat,
-                    canvasBgTransparent: d.canvasBgTransparent,
-                  }),
-                });
-                const enc = await encodeRgba(pixels, w, h, d.exportFormat, d.quality / 100);
-                bytes = new Uint8Array(await enc.arrayBuffer());
-                mime = enc.type || "application/octet-stream";
-                ext = EXT[d.exportFormat];
-                // The re-encode carries no EXIF; keep → transplant the original's.
-                let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-                if (mode === "keep" && (d.exportFormat === "jpeg" || d.exportFormat === "webp")) {
-                  const src = await getOriginal(photo.uploadKey ?? photo.originalKey);
-                  if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
-                }
-                bytes = applyExifToReencoded(bytes, d.exportFormat, mode, sourceTiff, w, h);
-              } else {
-                // Never edited, or compressed only: originalKey already holds
-                // the bytes to ship (lib/zipEntry.ts re-encodes when needed).
-                const orig = await getOriginal(photo.originalKey);
-                if (!orig) {
-                  skipped++;
-                  continue;
-                }
-                ({ bytes, mime, ext } = await untouchedZipEntry(orig, d.exportFormat, d.quality / 100, {
-                  mode,
-                  stripMode: d.exifStripMode,
-                }));
-              }
-              const base = photo.name || "image";
-              let name = `${base}${ext}`;
-              for (let n = 2; usedNames.has(name); n++) name = `${base}-${n}${ext}`;
-              usedNames.add(name);
-              zip.file(name, new Blob([bytes], { type: mime }));
-            } catch (err) {
-              // One unreadable photo is a skip, not the end of the archive.
-              console.error("ZIP: skipped", photo.name, err);
-              skipped++;
+      if (list.length === 0 || submitting.current) return;
+      submitting.current = true;
+      try {
+        const d = depsRef.current;
+        toast.dismiss(toastId.current);
+        toastId.current = toast.loading(`Zipping 1 of ${list.length}…`);
+        const result = await run(
+          async ({ setProgress, isCurrent }) => {
+            // Persist the active photo's in-progress edits so every photo reads
+            // uniformly from the edit store below.
+            if (d.activeChanged && d.activePhotoId && d.toolRef.current) {
+              await d.savePhotoEdit(d.activePhotoId, d.toolRef);
             }
-          }
-          if (skipped === list.length) throw new Error("None of the photos could be read.");
-          setProgress(1);
-          const out = await zip.generateAsync({ type: "blob" });
-          const url = URL.createObjectURL(out);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(url);
-          return { skipped, mode };
-        },
-        { timeoutMs: ZIP_TIMEOUT_MS, timeoutMessage: "Making the ZIP took too long and was stopped." },
-      );
+            // No `isChanged` gate: the presence of a saved edit in storage is
+            // the question, and it outlives a reload (see batchExportPlan.ts).
+            const { default: JSZip } = await import("jszip");
+            const zip = new JSZip();
+            const usedNames = new Set<string>();
+            const mode = d.exifKeep ? "keep" : "strip";
+            let skipped = 0;
 
-      toast.dismiss(toastId.current);
-      if (result.status === "done") {
-        const { skipped, mode } = result.value;
-        const done = list.length - skipped;
-        toast.success(
-          skipped > 0
-            ? `Zipped ${done} of ${list.length} — ${skipped} couldn't be read`
-            : `Zipped ${list.length} photo${list.length === 1 ? "" : "s"}`,
-          {
-            description:
-              mode === "strip"
-                ? d.exifStripMode === "location"
-                  ? "GPS removed — camera info kept"
-                  : "EXIF + GPS removed"
-                : undefined,
+            for (const [i, photo] of list.entries()) {
+              if (!isCurrent()) return { skipped, mode };
+              toast.loading(`Zipping ${i + 1} of ${list.length}…`, { id: toastId.current });
+              setProgress(i / list.length);
+              try {
+                let bytes: Uint8Array<ArrayBuffer>;
+                let mime: string;
+                let ext: string;
+                const { source, edit } = await resolveExportSource(photo.id, d.loadPhotoEdit);
+                if (source === "edit" && edit) {
+                  // Honors Settings → "Photo only" like every other export path.
+                  const { pixels, w, h } = await compositeSavedEdit(edit, {
+                    excludeBackground: !includeCanvasInExport({
+                      exportCanvasBackground: d.exportCanvasBackground,
+                      format: d.exportFormat,
+                      canvasBgTransparent: d.canvasBgTransparent,
+                    }),
+                  });
+                  const enc = await encodeRgba(pixels, w, h, d.exportFormat, d.quality / 100);
+                  bytes = new Uint8Array(await enc.arrayBuffer());
+                  mime = enc.type || "application/octet-stream";
+                  ext = EXT[d.exportFormat];
+                  // The re-encode carries no EXIF; keep → transplant the original's.
+                  let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
+                  if (mode === "keep" && (d.exportFormat === "jpeg" || d.exportFormat === "webp")) {
+                    const src = await getOriginal(photo.uploadKey ?? photo.originalKey);
+                    if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
+                  }
+                  bytes = applyExifToReencoded(bytes, d.exportFormat, mode, sourceTiff, w, h);
+                } else {
+                  // Never edited, or compressed only: originalKey already holds
+                  // the bytes to ship (lib/zipEntry.ts re-encodes when needed).
+                  const orig = await getOriginal(photo.originalKey);
+                  if (!orig) {
+                    skipped++;
+                    continue;
+                  }
+                  ({ bytes, mime, ext } = await untouchedZipEntry(orig, d.exportFormat, d.quality / 100, {
+                    mode,
+                    stripMode: d.exifStripMode,
+                  }));
+                }
+                const base = photo.name || "image";
+                let name = `${base}${ext}`;
+                for (let n = 2; usedNames.has(name); n++) name = `${base}-${n}${ext}`;
+                usedNames.add(name);
+                zip.file(name, new Blob([bytes], { type: mime }));
+              } catch (err) {
+                // One unreadable photo is a skip, not the end of the archive.
+                console.error("ZIP: skipped", photo.name, err);
+                skipped++;
+              }
+            }
+            if (skipped === list.length) throw new Error("None of the photos could be read.");
+            if (!isCurrent()) return { skipped, mode };
+            setProgress(null);
+            toast.loading("Packaging ZIP…", { id: toastId.current });
+            const out = await zip.generateAsync({ type: "blob" }, ({ percent }) => {
+              if (!isCurrent()) return;
+              setProgress(percent / 100);
+              toast.loading(`Packaging ZIP ${Math.round(percent)}%`, { id: toastId.current });
+            });
+            if (!isCurrent()) return { skipped, mode };
+            const url = URL.createObjectURL(out);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            return { skipped, mode };
           },
+          { timeoutMs: ZIP_TIMEOUT_MS, timeoutMessage: "Making the ZIP timed out." },
         );
-      } else if (result.status === "failed") {
-        toast.error(`Couldn't make the ZIP. ${result.error}`, {
-          action: { label: "Try again", onClick: () => void exportZip(list, filename) },
-        });
-      }
+
+        toast.dismiss(toastId.current);
+        if (result.status === "done") {
+          const { skipped, mode } = result.value;
+          const done = list.length - skipped;
+          toast.success(
+            skipped > 0
+              ? `Zipped ${done} of ${list.length} — ${skipped} couldn't be read`
+              : `Zipped ${list.length} photo${list.length === 1 ? "" : "s"}`,
+            {
+              description:
+                mode === "strip"
+                  ? d.exifStripMode === "location"
+                    ? "GPS removed — camera info kept"
+                    : "EXIF + GPS removed"
+                  : undefined,
+            },
+          );
+        } else if (result.status === "failed") {
+          toast.error(`Couldn't make the ZIP. ${result.error}`, {
+            duration: Infinity,
+            action: { label: "Try again", onClick: () => void exportZip(list, filename) },
+          });
+        }
+      } finally { submitting.current = false; }
     },
     [run],
   );

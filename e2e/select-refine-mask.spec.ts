@@ -188,3 +188,49 @@ test("leaving Refine restores committed ants; removing a mask exits its brush", 
   await expect(page.getByRole("button", { name: /Add mask/ }).first()).toBeVisible();
   await page.screenshot({ path: "test-results/state-v4-night4-mask.png" });
 });
+
+test("a failed refinement has honest busy feedback and a working retry", async ({ page }) => {
+  const before = await engine(page);
+  const text = await readout(page).innerText();
+  await page.evaluate(() => {
+    type Preview = (...args: number[]) => Promise<Uint8Array>;
+    const w = window as unknown as { __ihTool: { selection_refine_preview: Preview }; restorePreview: () => void };
+    const original = w.__ihTool;
+    const root = document.querySelector("#root") as unknown as Record<string, unknown>;
+    const key = Object.keys(root).find(k => k.startsWith("__reactContainer"))!;
+    type Fiber = { child?: Fiber; sibling?: Fiber; memoizedState?: unknown };
+    let ref: { current: typeof original } | null = null;
+    const walk = (f: Fiber | undefined, depth = 0) => {
+      if (!f || ref || depth > 600) return;
+      let s = f.memoizedState as { memoizedState?: unknown; next?: unknown } | null;
+      while (s && !ref) {
+        const v = s.memoizedState as { current?: unknown } | undefined;
+        if (v?.current === original) ref = v as { current: typeof original };
+        s = s.next as typeof s;
+      }
+      walk(f.child, depth + 1); walk(f.sibling, depth + 1);
+    };
+    walk(root[key] as Fiber);
+    if (!ref) throw new Error("engine reference unavailable");
+    const engineRef = ref as { current: typeof original };
+    w.restorePreview = () => { engineRef.current = original; };
+    engineRef.current = new Proxy(original, { get(target, prop) {
+      if (prop !== "selection_refine_preview") return Reflect.get(target, prop);
+      return async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        throw new Error("Injected refinement failure");
+      };
+    } });
+  });
+  await setSlider(page, "Expand", 8);
+  await expect(page.getByText("Refining selection…", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Couldn't preview refinement/)).toBeVisible();
+  await expect(page.getByText("Refining selection…", { exact: true })).toHaveCount(0);
+  expect(await engine(page)).toEqual(before);
+  await page.screenshot({ path: "test-results/state-v4-night6-error.png" });
+  await page.evaluate(() => { (window as unknown as { restorePreview: () => void }).restorePreview(); });
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(readout(page)).not.toHaveText(text);
+  await expect(page.getByText(/Couldn't preview refinement/)).toHaveCount(0);
+  expect(await engine(page)).toEqual(before);
+});

@@ -98,6 +98,8 @@ export function useSelectionActions(
    *  undo, Deselect), and the preview no longer describes anything. */
   const refinePreviewMask = useRef<Uint8Array | null>(null);
   const refineSessionActive = useRef(false);
+  const refineApplying = useRef(false);
+  const refinePending = useRef(false);
   useEffect(() => {
     const seq = ++coverageSeq.current;
     const tool = stamp.toolRef.current;
@@ -182,6 +184,18 @@ export function useSelectionActions(
   const refinePreview = useRef(
     createLiveRetune<RefineSettings, Uint8Array | null>({
       delayMs: RETUNE_DEBOUNCE_MS,
+      onStart: () => { refinePending.current = true; useToolStore.getState().setRefineBusy(true); },
+      onIdle: () => { refinePending.current = false; useToolStore.getState().setRefineBusy(refineApplying.current); },
+      onError: () => {
+        if (!selectionSessionReady()) return;
+        const revision = useGalleryStore.getState().documentRevision;
+        toast.error("Couldn't preview refinement. Showing the previous selection boundary.", {
+          id: "selection-refine-error", duration: Infinity,
+          action: { label: "Try again", onClick: () => {
+            if (selectionSessionReady() && revision === useGalleryStore.getState().documentRevision) refinePreview.current.schedule(useToolStore.getState().selectionRefine);
+          } },
+        });
+      },
       run: async (r) => {
         const revision = useGalleryStore.getState().documentRevision;
         const tool = stampRef.current.toolRef.current;
@@ -194,6 +208,7 @@ export function useSelectionActions(
         // Empty = nothing selected to refine. A refine that selects nothing
         // comes back as a full-size transparent overlay, so the ants clear.
         if (!selectionSessionReady() || !mask || !mask.length) return;
+        toast.dismiss("selection-refine-error");
         refinePreviewMask.current = mask;
         useToolStore.getState().setRefinePreviewing(true);
         useToolStore.getState().setSelectionMask(mask);
@@ -205,10 +220,13 @@ export function useSelectionActions(
     const clear = () => {
       liveRetune.current.cancel();
       refinePreview.current.cancel();
+      refinePending.current = false;
       const preview = refineSessionActive.current || refinePreviewMask.current !== null;
       refineSessionActive.current = false;
       refinePreviewMask.current = null;
       useToolStore.getState().setRefinePreviewing(false);
+      useToolStore.getState().setRefineBusy(false);
+      toast.dismiss("selection-refine-error");
       if (!preview) return;
       const revision = useGalleryStore.getState().documentRevision;
       const tool = stampRef.current.toolRef.current;
@@ -249,7 +267,7 @@ export function useSelectionActions(
   useEffect(() => {
     if (!refineRequest || refineRequest.n === lastRequest.current) return;
     lastRequest.current = refineRequest.n;
-    if (!selectionSessionReady()) return;
+    if (!selectionSessionReady() || refineApplying.current) return;
     refinePreview.current.cancel();
     const store = useToolStore.getState();
     const r = refineRequest.kind === "cleanUp" ? CLEAN_UP : store.selectionRefine;
@@ -261,16 +279,28 @@ export function useSelectionActions(
     const revision = useGalleryStore.getState().documentRevision;
     if (!tool) return;
     void (async () => {
-      refinePreviewMask.current = null;
-      store.setRefinePreviewing(false);
-      const mask = isNoopRefine(r)
-        ? await tool.selection_overlay()
-        : await tool.selection_refine_apply(...refineArgs(r));
-      if (isPhotoSwitching() || revision !== useGalleryStore.getState().documentRevision) return;
-      store.setSelectionMask(mask.length ? mask : null);
-      // Apply pushes a "Refine Selection" step; the History panel and the
-      // Undo NN% readout both read the count.
-      stampRef.current.syncState();
+      try {
+        refineApplying.current = true;
+        store.setRefineBusy(true);
+        refinePreviewMask.current = null;
+        store.setRefinePreviewing(false);
+        const mask = isNoopRefine(r)
+          ? await tool.selection_overlay()
+          : await tool.selection_refine_apply(...refineArgs(r));
+        if (isPhotoSwitching() || revision !== useGalleryStore.getState().documentRevision) return;
+        store.setSelectionMask(mask.length ? mask : null);
+        // Apply pushes a "Refine Selection" step; the History panel and the
+        // Undo NN% readout both read the count.
+        stampRef.current.syncState();
+        toast.dismiss("selection-refine-error");
+      } catch {
+        if (!isPhotoSwitching() && revision === useGalleryStore.getState().documentRevision) {
+          toast.error("Couldn't apply refinement. Try again.", { id: "selection-refine-error", duration: Infinity });
+        }
+      } finally {
+        refineApplying.current = false;
+        if (revision === useGalleryStore.getState().documentRevision) store.setRefineBusy(refinePending.current);
+      }
     })();
   }, [refineRequest]);
 
