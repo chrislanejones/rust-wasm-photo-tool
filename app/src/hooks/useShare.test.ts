@@ -88,3 +88,31 @@ describe("useShare respects the online switch", () => {
     expect(share!.availability).toBe("signed-out");
   });
 });
+
+// Night 10-07 PR 2 (ADR-083): the snapshot upload had no timeout at all, and
+// a timeout that only rejects would leave the bytes landing in storage with
+// nothing pointing at them. Past SHARE_UPLOAD_TIMEOUT_MS the request is
+// CANCELLED: its signal aborts and no share is minted.
+describe("useShare cancels a stalled snapshot upload", () => {
+  it("past the timeout the fetch's signal is aborted and nothing is created", async () => {
+    const { SHARE_UPLOAD_TIMEOUT_MS } = await import("./useShare");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let signal: AbortSignal | undefined;
+    fetchSpy.mockImplementationOnce(
+      ((_u: string, init?: RequestInit) => {
+        signal = init?.signal ?? undefined;
+        return new Promise<Response>(() => {}); // never answers
+      }) as unknown as () => Promise<Response>,
+    );
+    useUIStore.setState({ onlineFeaturesEnabled: true });
+    act(() => root.render(React.createElement(Probe)));
+    const out = share!.createShare(input);
+    const settled = expect(out).rejects.toThrow(/did not settle/);
+    await vi.advanceTimersByTimeAsync(SHARE_UPLOAD_TIMEOUT_MS + 1);
+    await settled;
+    expect(signal, "the upload carried a signal").toBeDefined();
+    expect(signal!.aborted, "the timeout ABORTED the request").toBe(true);
+    expect(createShareMutation).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
