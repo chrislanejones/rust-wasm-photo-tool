@@ -10,6 +10,7 @@
 // Size of 20 sits at position 67. A screen reader read "67". `aria-valuetext`
 // now carries the same text the value slot shows, so what is heard is what
 // is seen.
+import { strokeDown } from "@/lib/strokeGate";
 import type { ReactNode } from "react";
 import { ControlRow } from "@/components/ui/control-row";
 import { PresetRow } from "@/components/ui/preset-row";
@@ -82,6 +83,13 @@ export function SizeSlider(props: SizeSliderProps) {
   const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit, edited } = props;
   const display = valueDisplay ?? `${value}${unit}`;
 
+  // A slider drag counts as a stroke for the autosave gate (lib/strokeGate):
+  // releasing Quality records a history step, and the save it woke held the
+  // engine ~1.6 s on a 12 MP photo — right while the panel re-measured. The
+  // gate closes on the window pointerup CanvasArea already listens for, and
+  // autosave then waits for 2.5 s of quiet, the same as after a brush stroke.
+  const markAdjusting = onCommit ? () => strokeDown() : undefined;
+
   const onPointerUp = onCommit
     ? (e: React.PointerEvent<HTMLInputElement>) =>
         onCommit(Number((e.target as HTMLInputElement).value))
@@ -117,7 +125,15 @@ export function SizeSlider(props: SizeSliderProps) {
                 value={Math.round(valueToPos(value, presets))}
                 disabled={disabled}
                 onChange={(e) => onChange(posToValue(Number(e.target.value), presets))}
-                onPointerUp={onPointerUp}
+                // The input's value is a TRACK POSITION here, not the setting:
+                // committing it raw stored 67 for a knob sitting on the 80
+                // preset (10-07). Commit the same mapped value onChange sends.
+                onPointerDown={markAdjusting}
+                onPointerUp={
+                  onCommit
+                    ? (e) => onCommit(posToValue(Number((e.target as HTMLInputElement).value), presets))
+                    : undefined
+                }
                 className="w-full"
               />
             </div>
@@ -136,6 +152,7 @@ export function SizeSlider(props: SizeSliderProps) {
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(Number(e.target.value))}
+            onPointerDown={markAdjusting}
             onPointerUp={onPointerUp}
             className="w-full"
           />

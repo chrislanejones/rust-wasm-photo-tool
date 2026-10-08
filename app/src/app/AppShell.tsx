@@ -96,6 +96,7 @@ import { isExportFormat, useDownloadFormat } from "./session/useDownloadFormat";
 import { usePluginDownload } from "./session/usePluginDownload";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
+import { useResizeCompress } from "./session/useResizeCompress";
 import { ShapeActionsOverlay } from "@/features/canvas/ShapeActionsOverlay";
 import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
 import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
@@ -1956,16 +1957,6 @@ export function AppShell() {
   }, []);
 
   /**
-   * Apply Compression & Resize. Resamples the WASM canvas with the chosen
-   * filter, then re-encodes the (annotation-free) canvas buffer at the chosen
-   * format + quality and persists it as the photo's stored bytes — mirroring
-   * the Auto Compress pattern: putOriginal → deleteOriginal(old) → PhotoEntry
-   * update (byteSize / mimeType / dims / thumbnail). The StatusBar size label
-   * and the gallery tooltip both read from the entry, so they update on their
-   * own. Text annotations stay live overlays (not flattened), like
-   * Auto Compress.
-   */
-  /**
    * Re-encode the active photo's CURRENT canvas (composited pixels, live text
    * left un-flattened) and store the new bytes + thumbnail + dims. Shared by
    * Apply Compression/Resize and the Canvas-Size paths so a resized document is
@@ -1974,7 +1965,7 @@ export function AppShell() {
   /**
    * @param opts.keepSourceEncoding  Re-encode in the photo's OWN format at full
    *   quality instead of the compression panel's format + quality slider. This
-   *   is what separates "Apply Resize" from "Apply Compression & Resize":
+   *   is what separates "Apply Resize" from the compression Apply:
    *   resizing changes how many pixels there are, and should not silently also
    *   change the file's type or push it through the quality slider. Falls back
    *   to the panel's format when the stored MIME is not one we re-encode to
@@ -1989,71 +1980,18 @@ export function AppShell() {
     quality,
   });
 
-  const handleApplyCompression = useCallback(
-    async (w: number, h: number, filter: number) => {
-      const origW = stamp.state.width;
-      const origH = stamp.state.height;
-      if (w !== origW || h !== origH) {
-        stamp.resizeWithFilter(w, h, filter);
-      } else {
-        // Quality/format-only apply: pixels are unchanged but the stored file
-        // is re-encoded — record a "Compress" entry so History reflects it.
-        //
-        // ADR-031: the quality goes WITH the step. Before that, this pushed a
-        // bare marker, so undo restored identical pixels and left the slider
-        // where it was — a step consumed, nothing reversed. The engine snaps
-        // the outgoing value and applies the incoming one, so undo returns the
-        // quality that was live before this Apply.
-        stamp.toolRef.current?.push_compress_marker(quality);
-        stamp.syncState();
-      }
-      setHasBeenModified(true);
-      if (activePhotoId) {
-        setModifiedPhotos((prev) =>
-          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-        );
-      }
-      // No instant badge estimate: the badge derives from the entry's sizes
-      // (lib/sizeDelta), which the re-encode below updates.
-
-      // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
-      await persistActiveCanvas();
-    },
-    [stamp, activePhotoId, quality, persistActiveCanvas],
-  );
-
-  /**
-   * "Apply Resize" — resample and nothing else.
-   *
-   * The panel's older button couples two decisions: how many pixels the image
-   * has, and how hard it is compressed. Wanting the first without the second
-   * meant accepting whatever the quality slider happened to sit at. This
-   * applies the resample (Rust `resize_with_filter`, same kernel) and persists
-   * in the photo's OWN format at full quality, so the only loss is the
-   * resample itself.
-   *
-   * Guarded on an actual dimension change: with w/h unchanged there is nothing
-   * to resample, and the compression path is the one that has a job to do.
-   */
-  const handleApplyResizeOnly = useCallback(
-    async (w: number, h: number, filter: number) => {
-      if (w < 1 || h < 1) return;
-      if (w === stamp.state.width && h === stamp.state.height) return;
-      stamp.resizeWithFilter(w, h, filter);
-      setHasBeenModified(true);
-      if (activePhotoId) {
-        setModifiedPhotos((prev) =>
-          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-        );
-      }
-      // No instant estimate here. The compression path can predict its own
-      // result from area x quality; a resize-only re-encode cannot be guessed
-      // that way (format efficiency dominates), and a wrong number that flashes
-      // for a moment is worse than the real one arriving a moment later.
-      await persistActiveCanvas({ keepSourceEncoding: true });
-    },
-    [stamp, activePhotoId, persistActiveCanvas, setHasBeenModified, setModifiedPhotos],
-  );
+  // Resize & Compress's two Apply handlers live in a session hook (10-07):
+  // photo-vs-document sizing and the save's kept-original outcome.
+  const { applyCompression: handleApplyCompression, applyResizeOnly: handleApplyResizeOnly, measureApply } =
+    useResizeCompress({
+      stamp,
+      photoBounds,
+      quality,
+      activePhotoId,
+      persistActiveCanvas,
+      setHasBeenModified,
+      setModifiedPhotos,
+    });
 
   /**
    * Photoshop-style **Canvas Size** apply (the "Resize canvas" control in Layer
@@ -2817,6 +2755,7 @@ export function AppShell() {
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}
+            measureApply={measureApply}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
             onRemoveCanvas={() => void handleRemoveCanvas()}
             canRemoveCanvas={backgroundLayerId !== undefined}

@@ -152,6 +152,17 @@ declare module "stamp_tool" {
     new_w: number,
     new_h: number,
   ): Uint8Array;
+  /** Stateless: resample with the kernel `resize_with_filter` uses for
+   *  `filter` (0 nearest, 2 Catmull-Rom, 3 Lanczos3, else bilinear). Empty on
+   *  a zero dimension or a short buffer. */
+  export function resize_pixels_filter(
+    pixels: Uint8Array,
+    old_w: number,
+    old_h: number,
+    new_w: number,
+    new_h: number,
+    filter: number,
+  ): Uint8Array;
 
   /**
    * Stateless: encode an RGBA pixel buffer as PNG bytes.

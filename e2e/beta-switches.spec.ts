@@ -41,21 +41,19 @@ test("the invite links turn each switch on for this device", async ({ page }) =>
   }
 });
 
-test("PageSpeed budget OFF: the panel shows the old score", async ({ page }) => {
-  await boot(page);
-  await openResize(page);
-  await expect(page.getByText("PageSpeed Insights Score").first()).toBeVisible();
-  await expect(page.getByTestId("pagespeed-budget")).toHaveCount(0);
-});
-
-test("PageSpeed budget ON: the panel shows budget used", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("ih_web_budget", "1"));
-  await boot(page);
-  await openResize(page);
-  await expect(page.getByTestId("pagespeed-budget")).toBeVisible();
-  await expect(page.getByText("PageSpeed budget used").first()).toBeVisible();
-  await expect(page.getByText("PageSpeed Insights Score")).toHaveCount(0);
-});
+// Since 10-07 the panel shows Image weight against Google's limit for
+// everyone — there is no per-image PageSpeed score to show. The switch now
+// only moves Auto Compress's target, so both states show the same panel.
+for (const on of [false, true]) {
+  test(`PageSpeed budget ${on ? "ON" : "OFF"}: the panel shows Image weight, not a PageSpeed score`, async ({ page }) => {
+    if (on) await page.addInitScript(() => localStorage.setItem("ih_web_budget", "1"));
+    await boot(page);
+    await openResize(page);
+    await expect(page.getByTestId("image-weight")).toBeVisible();
+    await expect(page.getByText("PageSpeed Insights Score")).toHaveCount(0);
+    await expect(page.getByText("PageSpeed budget used")).toHaveCount(0);
+  });
+}
 
 test("EXIF in Rust ON: the engine functions load and an export cross-checks without a mismatch", async ({ page }) => {
   const consoleLines: string[] = [];

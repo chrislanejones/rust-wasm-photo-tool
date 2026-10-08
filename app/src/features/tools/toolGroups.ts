@@ -187,7 +187,7 @@ const enhanceGroup: ToolGroupDefinition = {
   subTools: [
     {
       // ONE tile, was two. Compress and Resize both move the SAME two numbers —
-      // Web Performance Gain and PageSpeed Insights Score read dimensions AND
+      // Image weight and Smaller-than-upload read dimensions AND
       // format/quality together — so splitting them put the scores under one
       // tile and half their inputs under the other. Squoosh keeps the whole
       // pipeline on one panel for the same reason. Keeps the `compress` id
