@@ -100,7 +100,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
   },
   {
     id: "pens",
-    label: "Pens",
+    label: "Pins",
     icon: MapPin,
     info: "Click the canvas to drop an auto-sequenced callout pin — Numbers or Letters, in the order you place them.",
   },
