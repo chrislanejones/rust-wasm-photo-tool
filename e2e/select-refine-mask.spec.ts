@@ -170,3 +170,20 @@ test("Add mask → Reveal selection masks exactly the selection, in one step", a
   expect(alpha.building, "the unselected building is hidden").toBe(0);
   expect(alpha.undo).toBe(undo0 + 1);
 });
+
+test("leaving Refine restores committed ants; removing a mask exits its brush", async ({ page }) => {
+  const before = await engine(page);
+  const text = await readout(page).innerText();
+  await setSlider(page, "Expand", 8);
+  await expect(readout(page)).not.toHaveText(text);
+  await page.evaluate(() => { location.hash = "#/tool/layers"; });
+  await expect(page.getByRole("contentinfo")).toContainText(text);
+  expect(await engine(page)).toEqual(before);
+  await page.getByRole("button", { name: /Add mask/ }).first().click();
+  await page.getByRole("button", { name: "Reveal selection", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Painting mask/ })).toBeVisible();
+  await page.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Painting mask/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Add mask/ }).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/state-v4-night4-mask.png" });
+});
