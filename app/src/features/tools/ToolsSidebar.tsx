@@ -385,7 +385,12 @@ export function ToolsSidebar({
       </motion.div>
 
       <motion.div
-        layout
+        // "position", not `layout`: this body only needs to SLIDE when the
+        // sub-tool rows above change count. Full `layout` also animated its
+        // SIZE, by scaling the contents — with the histogram footer below it,
+        // a photo switch resized the body and every slider measured 49.94 px
+        // instead of 50 mid-animation (photo-switch C3, 10-08).
+        layout="position"
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
         // (the Apply button) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
@@ -589,7 +594,9 @@ export function ToolsSidebar({
         )}
         </PerPhotoRegion>
       </motion.div>
-      {histogram && imageReady && !!subToolId && HISTOGRAM_FOOTER_SUB_TOOLS.has(subToolId) && (
+      {/* Not gated on imageReady: hiding it mid-switch grew the scroll body,
+          dropped its scrollbar and widened every control (photo-switch C3). */}
+      {histogram && !!subToolId && HISTOGRAM_FOOTER_SUB_TOOLS.has(subToolId) && (
         <HistogramFooter {...histogram} />
       )}
 
