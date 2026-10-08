@@ -11,13 +11,15 @@
 // Now: opening the panel starts a preview (src/adjust.rs), every move
 // recomputes all seven from the copy, each ↺ puts exactly that slider back,
 // Apply is ONE undo step, and leaving the panel for another tool applies what
-// is set. A photo switch drops it (the engine is changing documents).
+// is set, and a photo switch applies it to the outgoing photo before the
+// switch saves it (lib/pendingEdits).
 import { useEffect, useRef, useState } from "react";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolPanel } from "@/components/ui/tool-panel";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { ADJUST_DEFAULTS, type AdjustControls, type AdjustValues } from "@/hooks/useTransforms";
+import { registerPendingCommit } from "@/lib/pendingEdits";
 
 interface EffectsSettingsProps {
   adjust?: AdjustControls;
@@ -55,6 +57,20 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSe
     [],
   );
 
+  // A photo switch bakes what is set onto the OUTGOING photo before it saves
+  // it (lib/pendingEdits). Resetting the ref first means the session cleanup
+  // and the unmount apply below both see the identity and do nothing more.
+  useEffect(() => {
+    if (!adjust) return;
+    return registerPendingCommit(async () => {
+      const v = valuesRef.current;
+      if (isIdentity(v)) return;
+      valuesRef.current = ADJUST_DEFAULTS;
+      setValues(ADJUST_DEFAULTS);
+      await adjust.apply(v);
+    });
+  }, [adjust]);
+
   // One preview per photo for as long as the panel is open on an image.
   useEffect(() => {
     if (!adjust || !imageReady) return;
@@ -91,7 +107,7 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSe
     <ToolPanel>
       <SectionHeader
         title="Adjustments"
-        info="The photo updates as you drag. Each slider's ↺ puts just that one back. Apply makes it one undo step; switching to another tool applies it too."
+        info="The photo updates as you drag. Each slider's ↺ puts just that one back. Apply makes it one undo step; switching to another tool or photo applies it too."
       />
       {SLIDERS.map((s) => (
         <SizeSlider
