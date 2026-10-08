@@ -77,7 +77,7 @@ test("the Resize & Compress Apply says what it will commit", async ({ page }) =>
   await expect(applyRest.first(), "nothing to commit yet, so it is disabled").toBeDisabled();
 
   // ── Method alone is not a change: it is the kernel the next resize uses.
-  await page.getByRole("radio", { name: "Nearest", exact: true }).first().click();
+  await page.getByLabel("Method", { exact: true }).selectOption("nearest");
   await page.waitForTimeout(300);
   await expect(applyRest.first(), "Method alone leaves Apply disabled").toBeDisabled();
 

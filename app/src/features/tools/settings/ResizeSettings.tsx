@@ -15,6 +15,7 @@ import { getImageWeight, type ImageWeight } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ControlRow } from "@/components/ui/control-row";
+import { SelectField } from "@/components/ui/select-field";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -318,24 +319,25 @@ export function ResizeSettings({
             title="Resize"
             info="New pixel size for the photo. The lock keeps its shape; Scale sizes both sides by percent."
           />
-          {/* Never disabled: it is the kernel the NEXT resize uses. A disabled
-              row showed the not-allowed cursor right above the slider. */}
+          {/* The same dropdown as Text › Font Family and Batch's text font
+              (`SelectField`) — every dropdown in the app is that one. Never
+              disabled: it is the kernel the NEXT resize uses. */}
           <ControlRow
             label="Method"
-            info="How pixels are resampled when the size changes. Lanczos3 is sharpest; Nearest keeps hard pixel edges for pixel art."
+            info="How pixels are resampled when the size changes. Lanczos3 is sharpest; Catmull-Rom is slightly softer and faster; Nearest keeps hard pixel edges for pixel art."
           >
             {({ labelId }) => (
-              <ToolButtonGroup<ResampleMethod>
+              <SelectField
                 aria-labelledby={labelId}
-                columns={3}
                 value={method}
-                onChange={setMethod}
-                options={(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => ({
-                  id: m,
-                  label: METHOD_LABELS[m],
-                  title: METHOD_TITLES[m],
-                }))}
-              />
+                onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+              >
+                {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                  <option key={m} value={m} title={METHOD_TITLES[m]}>
+                    {METHOD_LABELS[m]}
+                  </option>
+                ))}
+              </SelectField>
             )}
           </ControlRow>
           <DimensionFields
@@ -386,7 +388,7 @@ export function ResizeSettings({
           />
         </div>
 
-        <div className="space-y-3 rounded-lg border border-border bg-bg-elevated p-3" data-testid="pagespeed-box">
+        <div className={`space-y-4 ${SECTION_SEP}`} data-testid="pagespeed-box">
           <SectionHeader
             title="Google PageSpeed"
             info={`What this photo would weigh as each format at the size and quality above — measured by encoding it ("≈" while it measures). Google's image check allows ${known ? kb(limitBytes) : "one byte per six pixels plus 4 KB"} for ${newW}×${newH}; over that, PageSpeed lists it under "Improve image delivery". The format here is a preview: pick the real one when you export.`}
