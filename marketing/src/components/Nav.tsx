@@ -403,7 +403,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                   <span style={{ color: "var(--color-accent)", flexShrink: 0 }}><Paths d={l.paths} size={15} /></span>
                   {l.title}
                 </span>
-                <span className="nav-sheet__card-desc">{l.desc}</span>
+                <span className="nav-sheet__card-desc" title={l.desc}>{l.desc}</span>
               </NavLink>
             ))}
           </div>
@@ -423,7 +423,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                     {g.name}
                   </span>
                   <span className="nav-sheet__card-title">{p.title}</span>
-                  <span className="nav-sheet__card-desc">{p.desc}</span>
+                  <span className="nav-sheet__card-desc" title={p.desc}>{p.desc}</span>
                 </Link>
               ))
             )}
@@ -451,7 +451,7 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
                   <span style={{ color: "var(--color-accent)", flexShrink: 0 }}><Paths d={l.paths} size={15} /></span>
                   {l.title}
                 </span>
-                <span className="nav-sheet__card-desc">{l.desc}</span>
+                <span className="nav-sheet__card-desc" title={l.desc}>{l.desc}</span>
               </NavLink>
             ))}
           </div>

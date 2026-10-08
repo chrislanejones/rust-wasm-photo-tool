@@ -63,7 +63,7 @@ const GROUPS: Group[] = [
     items: [
       ["React App", "Vite + React 19 · Vercel static SPA", "demo free pro"],
       ["Canvas Engine", "Engine worker · zero-copy blit to an OffscreenCanvas", "demo free pro"],
-      ["Zustand State", "7 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
+      ["Zustand State", "11 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
     ],
   },
   {
@@ -77,12 +77,12 @@ const GROUPS: Group[] = [
       ["annotations · selection", "Live text & shape overlays · magic-wand, edge-aware and lasso selection", "demo free pro"],
       ["stamp · transform", "Clone brush · flip / rotate / resize / crop", "demo free pro"],
       ["filters", "Brightness · contrast · saturation · shadows / highlights · sharpen · gaussian blur", "demo free pro"],
-      ["levels · presets", "Black / white / midtones · a preset is a stack of filters · one shared preview slot", "demo free pro"],
+      ["levels · presets · adjust", "Black / white / midtones · a preset is a stack of filters · Adjustments worked out from an untouched copy · one shared preview slot", "demo free pro"],
       ["perspective", "Four-corner warp for shapes, text and pixels · homography solved in Rust", "demo free pro"],
       ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust", "demo free pro"],
       ["describe", "Local image description — names a photo from its content, no account", "demo free pro"],
-      // The design said "format v6". OP_FORMAT_VERSION in src/ops.rs is 8.
-      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v9", "demo free pro"],
+      // OP_FORMAT_VERSION in src/ops.rs is 11 (10-08-2026).
+      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v11", "demo free pro"],
       ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill", "demo free pro"],
       ["simd", "v128/f32x4 kernels · scalar fallback", "demo free pro"],
     ],
@@ -194,7 +194,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.6, 09-30-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.23, 10-08-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -246,7 +246,7 @@ export default function Architecture() {
             <div className="arch-plane__head">
               <span className="arch-plane__name">Browser</span>
               <span className="arch-plane__note">
-                no server in the edit path · one 814 KB engine
+                no server in the edit path · one 893 KB engine
               </span>
             </div>
 
@@ -257,10 +257,10 @@ export default function Architecture() {
                 <ul className="arch-node__list">
                   <li>AppShell — composition and layout only</li>
                   <li>Tool registry — 5 modules registered; routing still hand-wired in AppShell</li>
-                  <li>Session hooks — image · selection · canvas · mask</li>
+                  <li>Session hooks — image · selection · canvas · mask · resize &amp; compress · shapes</li>
                   <li>
-                    7 Zustand stores — UI · tool · gallery · annotation · guides · perspective ·
-                    text box
+                    11 Zustand stores — UI · tool · gallery · annotation · guides · perspective ·
+                    text box · batch crop · batch group · history branches · SVG source
                   </li>
                 </ul>
               </article>
