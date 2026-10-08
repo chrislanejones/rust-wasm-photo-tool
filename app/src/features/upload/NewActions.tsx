@@ -32,7 +32,9 @@ import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 import { DEFAULT_IMAGE_MODEL_ID } from "./aiImageDraft";
 import { CreateAIImagePanel } from "./CreateAIImagePanel";
-import { isSvgFile } from "@/lib/rasterizeSvg";
+import { isImportableFile } from "@/lib/importBoundary";
+import { HEIC_ACCEPT } from "@/lib/heicImport";
+import { useBetaOn } from "@/hooks/useBetaOn";
 import { namePastedImage } from "@/lib/pastedImageName";
 import { ControlRow } from "@/components/ui/control-row";
 
@@ -191,6 +193,7 @@ export function NewActions({
   showLinks = true,
   onBlankModeChange,
 }: Props) {
+  const heicOn = useBetaOn("heic-import");
   // No image-load bar here. The gallery thumbnails ARE the progress: they
   // appear one per decoded photo, which is real per-item feedback rather than
   // an aggregate. `useUIStore`'s isImageLoading/loadProgress still drive the
@@ -251,11 +254,10 @@ export function NewActions({
 
   const processFiles = useCallback(
     (files: File[]) => {
-      // isSvgFile catches .svg files whose source hands over an empty mime;
-      // the session's handleAddPhotos rasterizes them to PNG at the boundary.
-      const images = files.filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
-      );
+      // isImportableFile also catches .svg (and, Beta, .heic) files whose
+      // source hands over an empty mime; the session's handleAddPhotos
+      // converts them at the boundary (lib/importBoundary).
+      const images = files.filter(isImportableFile);
       if (images.length) {
         onFiles(images);
         onFilesAdded?.();
@@ -629,7 +631,9 @@ export function NewActions({
                     <Upload className="h-7 w-7 text-text-muted" />
                   </div>
                   <p className="text-xs text-text-secondary">
-                    Supports PNG, JPG, GIF, WebP, AVIF, SVG
+                    {heicOn
+                      ? "Supports PNG, JPG, GIF, WebP, AVIF, HEIC, SVG"
+                      : "Supports PNG, JPG, GIF, WebP, AVIF, SVG"}
                   </p>
                 </div>
               </>
@@ -641,7 +645,7 @@ export function NewActions({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.svg"
+        accept={heicOn ? `image/*,.svg,${HEIC_ACCEPT}` : "image/*,.svg"}
         multiple
         className="hidden"
         onChange={(e) => {

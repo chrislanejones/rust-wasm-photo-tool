@@ -514,6 +514,7 @@ jobs:
           e2e/zip-export.spec.ts
           e2e/ora-import-status.spec.ts
           e2e/beta-switches.spec.ts
+          e2e/heic-import.spec.ts
           e2e/plugins.spec.ts
           e2e/phone-grid-thumbs.spec.ts
           e2e/select-refine-mask.spec.ts

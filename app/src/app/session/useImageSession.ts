@@ -26,7 +26,8 @@ import { makeWorkingCopy, makeThumbnailFromPixels, ImageTooLargeError } from "@/
 import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
-import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { isSvgFile } from "@/lib/rasterizeSvg";
+import { HeicDecodeError, toDecodableFile } from "@/lib/importBoundary";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
@@ -494,13 +495,11 @@ export function useImageSession({
       let firstLoaded = false;
       for (const [index, raw] of accepted.entries()) {
         try {
-          // SVGs never enter the pipeline as vectors — rasterize to a PNG File
-          // at the boundary (lib/rasterizeSvg), so the stored gallery original
-          // is pixels too. Everything below sees the PNG.
-          // The markup itself is kept on the side (never rendered) so the
-          // image can go back out as an SVG — lib/svgPassthrough.
+          // SVG → PNG, and (Beta) HEIC → WebP with its EXIF, at the boundary
+          // (lib/importBoundary): the stored original is pixels. An SVG's
+          // markup is kept on the side for SVG export — lib/svgPassthrough.
           const svgText = isSvgFile(raw) ? await raw.text() : null;
-          const f = svgText !== null ? await rasterizeSvgToPng(raw) : raw;
+          const f = await toDecodableFile(raw);
           const t0 = performance.now();
           const working = await makeWorkingCopy(f);
           logDiagnostic(
@@ -609,7 +608,7 @@ export function useImageSession({
           const insecureOrigin =
             !window.isSecureContext && typeof crypto?.subtle === "undefined";
           toast.error(
-            err instanceof ImageTooLargeError
+            err instanceof ImageTooLargeError || err instanceof HeicDecodeError
               ? `${raw.name}: ${err.message}`
               : insecureOrigin
                 ? `Can't save images on an insecure page. ${location.protocol}//${location.host} isn't a secure context, so the browser withholds the crypto API used to store originals. Use https, or localhost.`
