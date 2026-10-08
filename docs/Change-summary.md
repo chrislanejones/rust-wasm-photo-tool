@@ -11465,3 +11465,15 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Mobile menu** (#335) | All 20 sheet cards one size: `height: 7em` (119 px), descriptions clamped to three lines with the full text as a title. Were 62–134 px; 0 overflow. |
 | **Marketing review** (#335) | Every page checked against v9.19–v9.23 and the app source. /image-compressor (toolPages, seo.ts) no longer claims a target-size search or "page-speed scores"; Features.md / featureCards / comingSoon describe Image weight, the preview row, the histogram footer, the Adjustments session, Levels' per-point resets and AI-for-everyone; remove-object says "on Pro". Architecture: as of v9.23, 893 KB engine, op log v11, 11 stores. |
 | **Gates** | CI 17/17 on both; photo-switch-cue + ui-night8-finish 15/15; unit 1,843/1,843; marketing tsc 0, build OK. No engine change (892,634 B). |
+
+## v9.25 Change Summary — 2026-10-08
+
+**Create AI Image makes pictures now.** #337.
+
+| Area | Change |
+| --- | --- |
+| **Backend** (#337) | `ai.generate` action + `aiJobs.startGenerateJob`; `ai_jobs.type` gains `generate`, optional `prompt` / `model` (additive). Calls `/v1/models/{owner}/{name}/predictions`, so no version hash to go stale; the existing webhook stores the image. Deployed to `brave-ant-608` before the client merged. |
+| **Plan check** (#337) | The allowance logic is one shared `chargeAiUse`: a free tier (cap 0) is refused on the server before any Replicate call, the same as background removal. |
+| **Models** (#337) | Flux Schnell, Flux Dev, Flux 1.1 Pro, Flux Kontext Pro, Stable Diffusion 3.5 Large, Ideogram v3 Turbo. Inputs from each model's published schema; references go as `input_image` / `image` / `style_reference_images` and never to a model that can't read them. |
+| **Client** (#337) | `useImageGeneration`: online-features gate, references downscaled and uploaded, job subscription with timeout; the result is added to the gallery as a File. The panel's "not connected" line is gone; the model dropdown is the shared `SelectField`. |
+| **Gates** | CI 17/17; tsc 0, convex tsc 0 (bar the existing `process` types), lint 0 errors; unit 1,843/1,843; guardrails OK. Signed-out check on a prod build: 6 models, Generate disabled empty / enabled with a prompt, pressing it says "needs sign-in and a Paid plan", 0 requests. No engine change (892,634 B). |

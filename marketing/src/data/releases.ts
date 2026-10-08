@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.25",
+    date: "2026-10-08",
+    headline: "Create AI Image makes pictures now.",
+    entries: [
+      { tag: "feature", text: "Create AI Image works. Write a prompt, pick one of six models from the dropdown, and the picture lands in your gallery like an upload. It needs online features on and a Paid plan, and it tells you so before anything is sent." },
+    ],
+  },
+  {
     version: "v9.24",
     date: "2026-10-08",
     headline: "The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.",

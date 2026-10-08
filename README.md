@@ -86,19 +86,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.24 — 2026-10-08
+### v9.25 — 2026-10-08
 
-**The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.**
+**Create AI Image makes pictures now.**
 
-The histogram under Adjustments, Levels and Presets now takes a third of the
-panel — the same height as Review's when it holds one of three slots. It was
-a fixed strip that came out about half that on a normal window.
+New › Create AI Image used to end in "image generation isn't connected yet."
+Now Generate runs. Write a prompt, pick one of six models from the dropdown,
+choose a shape, and the picture lands in your gallery like any upload. Three
+of the models can also take reference images.
 
-On a phone, every card in the site menu is the same size. And every page on
-imagehorse.app was checked against what ships: the compressor page no longer
-promises a target-file-size search that doesn't exist, the PageSpeed score is
-described as the Image weight it became, and the Architecture page is current
-to this version.
+It shows up only with online features on, and Generate is for Paid plans.
+Without one, the panel says so and nothing leaves your browser. The server
+checks the plan again before it spends anything.
 
 
 ## License
