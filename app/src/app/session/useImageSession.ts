@@ -8,7 +8,7 @@
 // handleDuplicateSelected + selectedIds/clearSelection) intentionally stay in
 // AppShell — see PARKING_LOT.md. `loadPhotoFromEntry` + `activeIdRef` are
 // returned because the AppShell-resident handleDeleteSelected still uses them.
-import { beginPendingImports, reportSwitchFailure } from "./sessionFeedback";
+import { beginPendingImports, reportSwitchFailure, PhotoSaveError } from "./sessionFeedback";
 import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -36,6 +36,7 @@ import { whenStrokeQuiet } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
 import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
+import { writeEditArchive } from "./archiveSave";
 
 /**
  * How long the idle debounce waits before archiving — v8.35, and the number is
@@ -269,7 +270,7 @@ export function useImageSession({
   hasBeenModifiedRef.current = hasBeenModified;
   const layerRevisionRef = useRef(layerRevision);
   layerRevisionRef.current = layerRevision;
-  const savingRef = useRef(false);
+  const savingRef = useRef<Promise<boolean> | null>(null);
   /** photoId → the engine's undo count when its archive was last written.
    *  Absent ≡ never written this session. Keyed per photo because gallery
    *  cycling switches documents under one hook instance. */
@@ -304,36 +305,26 @@ export function useImageSession({
       // change into a silently dropped save.
       const id = photoId ?? activeIdRef.current;
       const live = opts?.liveUndoCount;
-      if (!id || !stamp.toolRef.current) return;
+      if (!id || !stamp.toolRef.current) return false;
+      while (savingRef.current) {
+        if (!(await savingRef.current)) return false;
+      }
       const dirty =
         live === undefined
           ? dirtyRef.current
           : isDirty(live, savedUndoRef.current.get(id), hasBeenModifiedRef.current, layerRevisionRef.current);
-      if (!dirty) return;
-      if (savingRef.current) return; // never overlap two archive writes
-      savingRef.current = true;
+      if (!dirty) return true;
       // Read BEFORE the await: `savePhotoEdit` captures the engine's state at
       // its own moment, and an edit landing mid-write must leave the document
       // dirty rather than be marked saved by a write that predates it.
       const writtenAtUndoCount = live ?? stamp.state.undoCount;
-      try {
-        // In the document queue: the ownership check inside savePhotoEdit and
-        // its capture must not straddle a load (see LoadOpts.photoId).
-        const wrote = await stamp.serialize(() => savePhotoEdit(id, stamp.toolRef, opts));
-        // Only on a write the ownership guard actually allowed. A refused save
-        // returns false and must NOT move the saved point, or the next undo
-        // would compare against a write that never happened.
-        if (wrote !== false) savedUndoRef.current.set(id, writtenAtUndoCount);
-      } catch (err) {
-        // Never let an autosave failure surface as an unhandled rejection — but
-        // never swallow it either: the Diagnostics window is where it belongs.
-        logDiagnostic(
-          "CONSOLE",
-          `Autosave failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      } finally {
-        savingRef.current = false;
-      }
+      const write = writeEditArchive(id,
+        () => stamp.serialize(() => savePhotoEdit(id, stamp.toolRef, opts)),
+        () => savedUndoRef.current.set(id, writtenAtUndoCount),
+      );
+      savingRef.current = write;
+      try { return await write; }
+      finally { if (savingRef.current === write) savingRef.current = null; }
     },
     [stamp, savePhotoEdit],
   );
@@ -724,6 +715,12 @@ export function useImageSession({
 
       try {
 
+      // A failed switch can be abandoned by selecting the intact loaded photo.
+      if (outgoing === entry.id && useGalleryStore.getState().documentPhotoId === entry.id) {
+        setIsImageLoading(false);
+        return;
+      }
+
       // Persist the OUTGOING photo only if it was actually modified. This used
       // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
       // full edit archive to Convex, so just browsing the gallery re-uploaded
@@ -767,7 +764,10 @@ export function useImageSession({
           // the outgoing document while the UI has moved on. The archive bytes
           // are captured synchronously before the upload detaches, so the
           // upload cannot read a document that has since been replaced.
-          await flushEditArchive(outgoing, { detachCloudUpload: true, liveUndoCount: liveUndo });
+          if (!(await flushEditArchive(outgoing, { detachCloudUpload: true, liveUndoCount: liveUndo }))) {
+            const name = useGalleryStore.getState().photos.find((p) => p.id === outgoing)?.name ?? "current photo";
+            throw new PhotoSaveError(`The outgoing edits couldn't be saved (${name}). They are still in the canvas; select that photo to continue editing or try again.`);
+          }
         }
       }
       if (!isCurrent()) return; // a newer selection superseded this one

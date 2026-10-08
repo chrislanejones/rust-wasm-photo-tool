@@ -93,16 +93,16 @@ describe("saveStatus — its REAL initial value", () => {
 
 describe("the save path publishes both outcomes", () => {
   const src = read("app/session/usePersistActiveCanvas.ts");
-  const catchBlock = src.slice(src.indexOf("} catch (err) {"), src.indexOf("}", src.indexOf("setSaveFailed(true)")) + 1);
+  const catchBlock = src.slice(src.indexOf("} catch (err) {"), src.indexOf("}", src.indexOf("setSaveFailed(true,")) + 1);
 
   it("a failed save sets the flag, not only the toast", () => {
     expect(catchBlock).toMatch(/toast\.error\("Couldn't save canvas changes"\)/);
-    expect(catchBlock).toMatch(/setSaveFailed\(true\)/);
+    expect(catchBlock).toMatch(/setSaveFailed\(true, entry\.id\)/);
   });
 
   it("a successful save clears it, so the chip never reports a stale failure", () => {
     const tryBlock = src.slice(0, src.indexOf("} catch (err) {"));
-    expect(tryBlock).toMatch(/setSaveFailed\(false\)/);
+    expect(tryBlock).toMatch(/setSaveFailed\(false, entry\.id\)/);
   });
 });
 

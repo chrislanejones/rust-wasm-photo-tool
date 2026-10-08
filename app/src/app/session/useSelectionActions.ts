@@ -357,6 +357,7 @@ export function useSelectionActions(
             ? await tool.color_range_select(x, y, selectionTolerance)
             : await tool.magic_wand_select(x, y, selectionTolerance);
       setSelectionMask(mask.length ? mask : null);
+      stamp.syncState();
     },
     [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold, selectionCombine],
   );
@@ -409,6 +410,7 @@ export function useSelectionActions(
     // TRUTHY TRAP — un-awaited this closes a loop that was never open.
     if (!tool || !(await tool.lasso_active())) return;
     const mask = await tool.lasso_close();
+    stamp.syncState();
     setLassoCommitted(null);
     setLassoPreview(null);
     setSelectionMask(mask.length ? mask : null);
@@ -554,6 +556,7 @@ export function useSelectionActions(
           ? await tool.ellipse_select(x0, y0, x1, y1)
           : await tool.rect_select(x0, y0, x1, y1);
       setSelectionMask(mask.length ? mask : null);
+      stamp.syncState();
     },
     [stamp, setSelectionMask],
   );

@@ -19,8 +19,10 @@ export function beginPendingImports(files: readonly File[]): (i: number) => void
 
 /** A photo switch that really failed (not a superseded one): the Error state —
  *  what failed, and a way out (Plan C §3). */
+export class PhotoSaveError extends Error {}
 export function reportSwitchFailure(name: string, err: unknown, retry: () => void): void {
   logDiagnostic("UI_THREAD", `switch to ${name} failed: ${String(err)}`);
-  useUIStore.setState({ photoSwitchError: `Couldn't open ${name}. Select it again to retry, or choose another photo.` });
-  toast.error(`Couldn't open ${name}.`, { id: "photo-switch-error", duration: Infinity, action: { label: "Try again", onClick: retry } });
+  const message = err instanceof PhotoSaveError ? err.message : `Couldn't open ${name}. Select it again to retry, or choose another photo.`;
+  useUIStore.setState({ photoSwitchError: message });
+  toast.error(message, { id: "photo-switch-error", duration: Infinity, action: { label: "Try again", onClick: retry } });
 }
