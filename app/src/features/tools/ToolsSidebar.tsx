@@ -46,6 +46,8 @@ import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PerPhotoRegion } from "./PerPhotoRegion";
+import { HistogramFooter, type HistogramFooterProps } from "./HistogramFooter";
+import { HISTOGRAM_FOOTER_SUB_TOOLS } from "./histogramFooterTools";
 import { PhotoFooter } from "./PhotoFooter";
 
 /** Panels whose values belong to the open photo (skeleton plan §1): the rest —
@@ -206,6 +208,8 @@ interface ToolsSidebarProps {
   syncState: () => void;
   /** Whether the current tier may use Replicate AI (Paid only). */
   aiEnabled?: boolean;
+  /** Enhance › Adjustments / Levels / Presets footer histogram. */
+  histogram?: HistogramFooterProps;
   /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
   onAIResult: (r: AIResultPixels) => void;
 }
@@ -288,6 +292,7 @@ export function ToolsSidebar({
   flushToCanvas,
   syncState,
   aiEnabled = false,
+  histogram,
   onAIResult,
 }: ToolsSidebarProps) {
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
@@ -380,7 +385,12 @@ export function ToolsSidebar({
       </motion.div>
 
       <motion.div
-        layout
+        // "position", not `layout`: this body only needs to SLIDE when the
+        // sub-tool rows above change count. Full `layout` also animated its
+        // SIZE, by scaling the contents — with the histogram footer below it,
+        // a photo switch resized the body and every slider measured 49.94 px
+        // instead of 50 mid-animation (photo-switch C3, 10-08).
+        layout="position"
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
         // (the Apply button) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
@@ -584,6 +594,11 @@ export function ToolsSidebar({
         )}
         </PerPhotoRegion>
       </motion.div>
+      {/* Not gated on imageReady: hiding it mid-switch grew the scroll body,
+          dropped its scrollbar and widened every control (photo-switch C3). */}
+      {histogram && !!subToolId && HISTOGRAM_FOOTER_SUB_TOOLS.has(subToolId) && (
+        <HistogramFooter {...histogram} />
+      )}
 
       </div>
 

@@ -25,7 +25,6 @@ export interface LevelsControls {
   /** Commit as one undo step. Resolves whether pixels changed. */
   apply: (black: number, white: number, gamma: number) => Promise<boolean>;
   /** Histogram of the current composite: R, G, B and luma, 256 bins each. */
-  histogram: () => Promise<Uint32Array | null>;
 }
 
 /** One color preset's five components, in the engine's own units: brightness
@@ -529,10 +528,6 @@ export function useTransforms(engine: EngineCore) {
         levelsFlushRef.current();
         levelsSyncRef.current();
         return changed;
-      },
-      histogram: async () => {
-        const t = toolRef.current;
-        return t ? await t.calculate_histogram() : null;
       },
     }),
     [toolRef],
