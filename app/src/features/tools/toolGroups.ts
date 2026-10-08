@@ -123,6 +123,12 @@ interface SubToolBase {
    * which is why `networkFlagCoverage.contract.test.ts` exists.
    */
   requiresNetwork?: boolean;
+  /** Openable while online features are off (10-08): the panel shows its
+   *  buttons, and its handlers refuse the network call with a toast naming
+   *  the switch. Enhance › AI only — online features are OFF by default, so
+   *  without this nobody saw the AI buttons at all. Every request is still
+   *  gated; OCR keeps the plain disabled tile. */
+  openOffline?: boolean;
 }
 
 /** A sub-tool that resolves to something the app can actually do. */
@@ -271,6 +277,7 @@ const enhanceGroup: ToolGroupDefinition = {
       // Replicate-backed: the image is uploaded and a model runs on it.
       tier: "pro",
       requiresNetwork: true,
+      openOffline: true,
     },
   ],
 };

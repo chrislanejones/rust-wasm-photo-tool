@@ -132,6 +132,7 @@ export function isBlockedOffline(
   return (
     !subTool.comingSoon &&
     subTool.requiresNetwork === true &&
+    subTool.openOffline !== true &&
     !isNetworkPathAllowed("ai_processing", onlineFeaturesEnabled)
   );
 }
