@@ -221,3 +221,31 @@ test("C8 a per-photo value this photo changed shows a dot and a reset; reset cle
   await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe("1220x820");
   await expect(page.locator('[data-slot="control-row"]').filter({ hasText: "Brightness" }).first().locator('[data-slot="edited"]')).toHaveCount(0);
 });
+
+test("C9 requested-photo identity never exposes outgoing readouts or an editable canvas", async ({ page }) => {
+  await setup(page);
+  await open(page, "Enhance", "Adjustments");
+  await page.evaluate(() => {
+    const w = window as unknown as { __switchAudit: { locked: boolean; stale: string[] } };
+    w.__switchAudit = { locked: false, stale: [] };
+    const observer = new MutationObserver(() => {
+      const canvas = document.querySelector('.canvas-wrapper');
+      const locked = canvas?.hasAttribute('data-document-locked');
+      if (!locked) return;
+      w.__switchAudit.locked = true;
+      if (!canvas?.hasAttribute('inert')) w.__switchAudit.stale.push('editable canvas');
+      const footer = document.querySelector('footer.status-bar') ?? document.querySelector('[data-testid="status-selection"]')?.closest('footer');
+      const photo = [...document.querySelectorAll('.status-zoom')].find(e => e.textContent?.startsWith('Photo:'));
+      if (photo?.textContent?.trim() !== 'Photo: —') w.__switchAudit.stale.push(photo?.textContent ?? 'missing readout');
+      if (document.querySelector('[data-testid="status-selection"], [data-testid="status-mask-editing"]')) w.__switchAudit.stale.push(footer?.textContent ?? 'stale editing target');
+    });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  await pgDn(page);
+  await expect.poll(() => canvasSize(page), { timeout: 30_000 }).toBe('1220x820');
+  await expect(page.locator('.canvas-wrapper')).not.toHaveAttribute('inert');
+  const audit = await page.evaluate(() => (window as unknown as { __switchAudit: { locked: boolean; stale: string[] } }).__switchAudit);
+  expect(audit.locked).toBe(true);
+  expect(audit.stale).toEqual([]);
+  await page.screenshot({ path: 'test-results/state-v4-night1-switch-complete.png' });
+});

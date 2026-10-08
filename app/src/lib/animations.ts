@@ -1,4 +1,4 @@
-import type { Variants, Transition, Easing } from "framer-motion";
+import type { Variants, Transition } from "framer-motion";
 
 // Standardized quick motion transition (200ms spring animation)
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -199,17 +199,6 @@ export const thumbEnter = (i: number) => ({
   transition: { duration: 0.2, delay: i * 0.05 },
 });
 
-// Top-of-screen image loading progress bar
-export const imageLoadBarFade: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
-export const imageLoadBarProgress = {
-  initial: { width: "0%" } as const,
-  transition: { duration: 0.15, ease: "easeOut" as Easing },
-};
 
 // ── Hover pop ────────────────────────────────────────────────────────────────
 // The glyph inside a hovered control grows 10%. ONE definition: the tool rail

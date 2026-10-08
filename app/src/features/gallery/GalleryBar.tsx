@@ -12,6 +12,7 @@ import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
 import { useActivityWhile } from "@/lib/activity";
+import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
@@ -375,6 +376,7 @@ export function GalleryBar({
   // The gallery is the one surface that can show the gap, because it lights the
   // photo you asked for while the canvas still holds the previous one.
   const switching = usePhotoSwitching();
+  const switchError = useUIStore((s) => s.photoSwitchError);
 
   // ONE busy flag for the gallery. Thirty tiles each announcing "Loading" is a
   // screen reader reading out a list of boxes, which is why the tile
@@ -599,7 +601,7 @@ export function GalleryBar({
                   key={entry.id}
                   entry={entry}
                   onPendingChange={gallery.reportPending}
-                  loading={switching && entry.id === activeId}
+                  loading={switching && !switchError && entry.id === activeId}
                   index={i}
                   isActive={entry.id === activeId}
                   onSelect={() => onSelect(entry)}

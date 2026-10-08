@@ -30,7 +30,7 @@ import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
-import { setEngineDocument } from "@/lib/engineDocument";
+import { getEngineDocument, setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
 import { whenStrokeQuiet } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
@@ -153,6 +153,7 @@ export function useImageSession({
   const photos = useGalleryStore((s) => s.photos);
   const setPhotos = useGalleryStore((s) => s.setPhotos);
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const documentPhotoId = useGalleryStore((s) => s.documentPhotoId);
   const setActivePhotoId = useGalleryStore((s) => s.setActivePhotoId);
   const resumeManifest = useGalleryStore((s) => s.resumeManifest);
   const setResumeManifest = useGalleryStore((s) => s.setResumeManifest);
@@ -169,7 +170,6 @@ export function useImageSession({
   const setCompareActive = useUIStore((s) => s.setCompareActive);
   const startImageLoad = useUIStore((s) => s.startImageLoad);
   const setIsImageLoading = useUIStore((s) => s.setIsImageLoading);
-  const setLoadProgress = useUIStore((s) => s.setLoadProgress);
   const setShowUpload = useUIStore((s) => s.setShowUpload);
 
   // Set when a phone selected/added a photo without loading it into the engine;
@@ -191,7 +191,12 @@ export function useImageSession({
         return Promise.resolve(false);
       }
       startImageLoad();
-      return stamp.loadImageFromPixels(pixels, width, height, artboard, opts);
+      return stamp.loadImageFromPixels(pixels, width, height, artboard, opts).finally(() => {
+        const gallery = useGalleryStore.getState();
+        if ((!opts?.isCurrent || opts.isCurrent()) && gallery.activePhotoId === gallery.documentPhotoId) {
+          setIsImageLoading(false);
+        }
+      });
     },
     [stamp, startImageLoad],
   );
@@ -410,8 +415,8 @@ export function useImageSession({
   // saves off this. Inert unless USE_OPLOG_PERSISTENCE / ih_oplog_persist is
   // on AND the wasm build has the op-log surface.
   useEffect(() => {
-    setActiveOplogPhoto(activePhotoId);
-  }, [activePhotoId]);
+    setActiveOplogPhoto(getEngineDocument() ?? activePhotoId);
+  }, [activePhotoId, documentPhotoId]);
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
@@ -427,7 +432,7 @@ export function useImageSession({
       let working = getWorkingCopy(entry.originalKey);
       if (!working) {
         const original = await getOriginal(entry.originalKey);
-        if (!original) return;
+        if (!original) throw new Error("The original photo is unavailable on this device.");
         if (isCurrent && !isCurrent()) return;
         const file = new File([original.bytes], original.name, { type: original.mimeType });
         working = await makeWorkingCopy(file);
@@ -437,7 +442,7 @@ export function useImageSession({
       // Every load is normalized: when "Canvas on import" is on, a gallery
       // switch lands the photo on the same padded artboard as a fresh import
       // (border + backing), not just at native size.
-      await loadImageFromPixels(
+      const loaded = await loadImageFromPixels(
         working.pixels,
         working.width,
         working.height,
@@ -446,6 +451,7 @@ export function useImageSession({
           : undefined,
         { isCurrent, photoId: entry.id },
       );
+      if (!loaded && (!isCurrent || isCurrent())) throw new Error("The photo could not be loaded.");
       // Ownership is recorded INSIDE the load, in the document queue, the
       // moment the engine holds this photo (LoadOpts.photoId). It used to be
       // set here — first before the load finished, then after the await —
@@ -645,30 +651,21 @@ export function useImageSession({
       // (Ownership is set inside the load when it restores — LoadOpts.photoId.)
       if (!isCurrent()) return;
       if (restored) {
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
+        setIsImageLoading(false);
         return;
       }
 
       const saved = await loadPhotoEdit(entry.id);
       if (!isCurrent()) return;
       if (saved) {
-        setLoadProgress(20);
-        await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
+        const loaded = await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
+        if (!loaded && isCurrent()) throw new Error("The saved photo could not be restored.");
         if (!isCurrent()) return;
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
+
       } else {
-        void loadPhotoFromEntry(entry, isCurrent).catch(dropSuperseded);
+        await loadPhotoFromEntry(entry, isCurrent);
       }
+      if (isCurrent()) setIsImageLoading(false);
     },
     [stamp, loadPhotoEdit, loadPhotoFromEntry],
   );
@@ -685,26 +682,34 @@ export function useImageSession({
     const seq = ++selectSeqRef.current;
     const isCurrent = () => seq === selectSeqRef.current;
     setIsImageLoading(true);
-    setLoadProgress(8);
     void loadEngineIfWanted()
-      .catch((e) => console.error("WASM init failed after widening:", e))
-      .then(() => loadIntoEngine(entry, isCurrent));
+      .then(() => loadIntoEngine(entry, isCurrent))
+      .catch((err) => {
+        if (!isCurrent() || isSuperseded(err)) return;
+        setIsImageLoading(false);
+        reportSwitchFailure(entry.name, err, () => void handleSelectPhotoRef.current?.(entry));
+      });
   }, [editing, loadIntoEngine]);
 
   // ── Select photo ───────────────────────────────────────────────────────────
   const handleSelectPhoto = useCallback(
     async (entry: PhotoEntry) => {
-      // `activeIdRef`, not the React state: the state only moves after the
-      // outgoing save, so a click back to the photo you just left (A→B→A)
-      // matched it, returned without bumping the sequence, and B's switch
-      // finished — you clicked A and got B.
-      if (entry.id === (activeIdRef.current ?? activePhotoId)) return;
+      // The imperative request identity handles rapid navigation; failed
+      // requests remain retryable even when the thumbnail is already selected.
+      if (entry.id === (activeIdRef.current ?? activePhotoId) &&
+          useGalleryStore.getState().documentPhotoId === entry.id &&
+          !useUIStore.getState().isImageLoading) return;
 
       // Claim the latest selection. Any await below that resolves after a newer
       // click bails before touching the canvas, so highlight and pixels stay in sync.
       const seq = ++selectSeqRef.current;
       const isCurrent = () => seq === selectSeqRef.current;
+      const outgoing = getEngineDocument() ?? activePhotoId;
       activeIdRef.current = entry.id; // advance synchronously so cycling sees it
+      setIsImageLoading(true);
+      setActivePhotoId(entry.id);
+      useUIStore.setState({ photoSwitchError: null });
+      toast.dismiss("photo-switch-error");
 
       // Phone: record the selection, skip the engine. No save either — nothing
       // can have been edited. Widening loads this photo (effect below).
@@ -713,24 +718,10 @@ export function useImageSession({
         setHasBeenModified(false);
         setActivePhotoId(entry.id);
         setCompareActive(false);
+        setIsImageLoading(false);
         return;
       }
 
-      // Acknowledge the click NOW, before the save below. Saving a modified
-      // outgoing photo uploads its whole edit archive when signed in, which
-      // measured 2-4s on a 12-photo gallery — and for that entire window the
-      // thumbnail highlight didn't move, no spinner ran, and nothing else
-      // happened. Clicking a photo and watching the app ignore you for four
-      // seconds reads as "the gallery is broken", which is exactly how it was
-      // reported. The flag is idempotent and a superseded selection clears it
-      // on the way out, so setting it this early costs nothing.
-      //
-      // Both lines are needed. The bar's WIDTH is loadProgress, so raising the
-      // flag alone renders a zero-width bar — in the DOM, invisible on screen,
-      // which is indistinguishable from the bug. Seed a few percent so there is
-      // something to see while the save runs; the real steps (20 → 100) follow.
-      setIsImageLoading(true);
-      setLoadProgress(8);
       try {
 
       // Persist the OUTGOING photo only if it was actually modified. This used
@@ -748,10 +739,9 @@ export function useImageSession({
       // in order, so this read already includes that edit.
       const liveUndo = stamp.toolRef.current ? await stamp.toolRef.current.undo_count() : 0;
       if (
-        activePhotoId &&
+        outgoing &&
         (liveUndo > 0 || stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
       ) {
-        const outgoing = activePhotoId;
         setModifiedPhotos((prev) => {
           if (prev.has(outgoing)) return prev;
           const next = new Set(prev);
@@ -783,7 +773,6 @@ export function useImageSession({
       if (!isCurrent()) return; // a newer selection superseded this one
 
       setHasBeenModified(false);
-      setActivePhotoId(entry.id);
       setCompareActive(false);
       // Loading is already flagged above, ahead of the save's awaits — it has to
       // be, or the flag lands after the slow part it exists to cover. It still
@@ -793,6 +782,9 @@ export function useImageSession({
       // it doesn't falsely dot the newly-selected photo mid-transition.
 
       await loadIntoEngine(entry, isCurrent);
+      if (isCurrent()) {
+        setIsImageLoading(false);
+      }
       } catch (err) {
         // Superseded (a newer switch replaced the document) is "dropped".
         if (isSuperseded(err) || !isCurrent()) return;

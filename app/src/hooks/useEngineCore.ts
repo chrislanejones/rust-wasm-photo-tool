@@ -614,7 +614,7 @@ export function useEngineCore(
         claimEngineDocument(opts);
       }
       sourcePosRef.current = null;
-      syncState();
+      await syncState();
       useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),
@@ -663,7 +663,7 @@ export function useEngineCore(
       setEngineDocument(opts?.photoId ?? photoId);
       sourcePosRef.current = null;
       flushToCanvas(); // resizes the canvas to the restored dimensions
-      syncState();
+      await syncState();
       // Restored annotation lists differ from whatever was showing — same
       // re-sync the undo path performs.
       useAnnotationStore.getState().bumpAnnotations();
@@ -864,7 +864,7 @@ export function useEngineCore(
       }
 
       flushToCanvas();
-      syncState();
+      await syncState();
       useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),
