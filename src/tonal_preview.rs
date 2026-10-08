@@ -29,6 +29,10 @@ pub(crate) struct TonalPreview {
     pub(crate) layer: usize,
     pub(crate) generation: u64,
     pub(crate) base: Vec<u8>,
+    /// Adjustments committed during this session (`adjust_commit`), so a
+    /// cancel puts THOSE back rather than the untouched base. Levels and
+    /// Presets never set it.
+    pub(crate) committed: Option<crate::adjust::Adjust>,
 }
 
 impl ImageHorseTool {
@@ -64,6 +68,7 @@ impl ImageHorseTool {
             layer: self.active,
             generation: self.hist.generation,
             base: layer.buf.data.clone(),
+            committed: None,
         });
         true
     }
@@ -86,6 +91,10 @@ impl ImageHorseTool {
         }
         if let Some(layer) = self.layers.get_mut(p.layer) {
             layer.buf.data.copy_from_slice(&p.base);
+            if let Some(a) = &p.committed {
+                // What the session already committed stays committed.
+                crate::adjust::adjust_in_place(&mut layer.buf.data, self.width, self.height, a);
+            }
             return true;
         }
         false

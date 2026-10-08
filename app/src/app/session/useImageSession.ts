@@ -30,6 +30,7 @@ import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
+import { commitPendingEdits } from "@/lib/pendingEdits";
 import { setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
 import { whenStrokeQuiet } from "@/lib/strokeGate";
@@ -746,6 +747,9 @@ export function useImageSession({
       // was skipped and the edit was gone when you came back (e2e
       // photo-switch-state, "switch 0ms after release"). The worker answers
       // in order, so this read already includes that edit.
+      // A panel previewing an unapplied edit (Adjustments) bakes it NOW, on
+      // the outgoing photo, so the undo read and the save below include it.
+      await commitPendingEdits();
       const liveUndo = stamp.toolRef.current ? await stamp.toolRef.current.undo_count() : 0;
       if (
         activePhotoId &&

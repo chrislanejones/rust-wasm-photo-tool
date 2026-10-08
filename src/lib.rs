@@ -40,6 +40,7 @@ mod presets;
 // `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen
 // surface of its own, and visibility is a compile-time check — the emitted
 // bytes are identical either way.
+mod adjust;
 pub mod perspective;
 mod selection;
 mod selection_refine;

@@ -591,6 +591,36 @@ declare module "stamp_tool" {
     /** Recompute the preview from the copy — black/white 0..=255, gamma > 0.
      *  Never an undo step. `false` means there is no live preview (it was
      *  dropped because history moved), so begin again. */
+    /** Adjustments preview from the untouched copy (src/adjust.rs). */
+    adjust_preview_set(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
+    /** Save the settings as ONE undo step and KEEP the session (src/adjust.rs). */
+    adjust_commit(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
+    /** End the preview and bake as ONE undo step ("Adjustments"). */
+    adjust_apply(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
     levels_preview_set(black: number, white: number, gamma: number): boolean;
     /** Close the preview and put the copy back. `true` when pixels changed. */
     tonal_preview_cancel(): boolean;
