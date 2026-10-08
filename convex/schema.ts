@@ -215,6 +215,9 @@ export default defineSchema({
       // undoing the decision. See docs/adr/028-image-description-runs-locally
       // -in-the-engine.md before touching it.
       v.literal("alt"),
+      // Text-to-image from New › Create AI Image (10-08). No input frame:
+      // the prompt and model are stored instead (optional fields below).
+      v.literal("generate"),
     ),
     status: v.union(
       v.literal("pending"),
@@ -223,6 +226,10 @@ export default defineSchema({
       v.literal("failed"),
     ),
     replicateId: v.optional(v.string()),
+    /** Text-to-image prompt ("generate" jobs only). */
+    prompt: v.optional(v.string()),
+    /** Replicate model slug ("generate" jobs only), e.g. black-forest-labs/flux-schnell. */
+    model: v.optional(v.string()),
     /** Source frame handed to the model (current canvas PNG). */
     inputStorageId: v.optional(v.id("_storage")),
     /** Mask frame for inpaint / object removal (white = region to erase). */

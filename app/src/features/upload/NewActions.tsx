@@ -555,6 +555,10 @@ export function NewActions({
                   onModelChange={setAiModel}
                   onBack={() => setAiMode(false)}
                   closable={inDialog}
+                  onGenerated={(file) => {
+                    onFiles([file]);
+                    onFilesAdded?.();
+                  }}
                 />
               </>
             ) : (

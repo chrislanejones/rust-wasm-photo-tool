@@ -39,6 +39,7 @@ import {
 } from "./aiImageDraft";
 import { SelectField } from "@/components/ui/select-field";
 import { ControlRow } from "@/components/ui/control-row";
+import { useImageGeneration } from "@/hooks/useImageGeneration";
 
 /**
  * ⚠️ GENERATE IS NOT WIRED, AND SAYING SO BEFORE THE CLICK IS THE POINT.
@@ -60,10 +61,6 @@ import { ControlRow } from "@/components/ui/control-row";
  * `onClick` — passing `model` as a CHOICE for the server to validate against
  * its own registry, never as a version to POST (see IMAGE_MODELS).
  */
-const GENERATE_BLOCKED_REASON =
-  "Image generation isn't connected yet — there's no text-to-image job type " +
-  "in the backend, so nothing is sent.";
-
 interface Props {
   /** The chosen Replicate model, OWNED BY THE PARENT on purpose: the prompt
    *  and the references are a draft that Back throws away, but which model you
@@ -75,12 +72,14 @@ interface Props {
   onBack: () => void;
   /** Inside the New dialog: the header carries the [X] close. */
   closable?: boolean;
+  /** The generated image, as a file — the New menu adds it like an upload. */
+  onGenerated?: (file: File) => void;
 }
 
-export function CreateAIImagePanel({ model, onModelChange, onBack, closable = false }: Props) {
+export function CreateAIImagePanel({ model, onModelChange, onBack, closable = false, onGenerated }: Props) {
   const [prompt, setPrompt] = useState("");
   const [ratio, setRatio] = useState<string>(ASPECT_RATIOS[0].id);
-  const [refs, setRefs] = useState<{ name: string; url: string }[]>([]);
+  const [refs, setRefs] = useState<{ name: string; url: string; file: File }[]>([]);
   const refInputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const modelInfo = modelById(model);
@@ -88,6 +87,24 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
    *  model. Drives the add tile, the thumbnails' dimming, and (through
    *  `attachmentsSent`) what the consent sentence claims is sent. */
   const modelTakesRefs = modelInfo.supportsReferences;
+  const gen = useImageGeneration(
+    useCallback((file: File) => onGenerated?.(file), [onGenerated]),
+  );
+  const busy = gen.phase === "sending" || gen.phase === "running";
+  const generateNow = () => {
+    if (!prompt.trim() || busy) return;
+    if (!gen.canGenerate) {
+      toast.info(gen.signedIn ? "Generate Image needs a Paid plan." : "Generate Image needs sign-in and a Paid plan.");
+      return;
+    }
+    void gen.run({
+      model,
+      prompt: prompt.trim(),
+      aspectRatio: ratio,
+      references: modelTakesRefs ? refs.map((r) => r.file) : [],
+      referenceEdge: ATTACHMENT_LONGEST_EDGE,
+    });
+  };
 
   // The prompt is the only thing anyone opens this panel to type, so the
   // caret starts in it. Mount-only: re-focusing on any later render would
@@ -117,7 +134,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
           toast.error(reason);
           continue;
         }
-        next.push({ name: f.name, url: URL.createObjectURL(f) });
+        next.push({ name: f.name, url: URL.createObjectURL(f), file: f });
       }
       return next;
     });
@@ -334,19 +351,29 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
         {consentSentence(attachmentsSent(model, refs.length))}
       </p>
 
-      {/* WHY GENERATE CANNOT FIRE, SAID BEFORE THE CLICK rather
-          than in a toast after it. See GENERATE_BLOCKED_REASON. The
-          button below is really `disabled`, so this line is the only
-          thing explaining it — it is not decoration. */}
-      <p className="text-2xs leading-relaxed text-text-secondary">
-        {GENERATE_BLOCKED_REASON}
-      </p>
+      {/* What the button will do, said before the click — one short line. */}
+      {(gen.phase === "error" || busy || !gen.canGenerate) && (
+        <p
+          className={`text-2xs leading-relaxed ${gen.phase === "error" ? "text-destructive" : "text-text-secondary"}`}
+          aria-live="polite"
+        >
+          {gen.phase === "error"
+            ? gen.error
+            : busy
+              ? gen.phase === "sending"
+                ? "Sending your prompt…"
+                : "Generating — usually a few seconds."
+              : gen.signedIn
+                ? "Generate Image needs a Paid plan."
+                : "Generate Image needs sign-in and a Paid plan."}
+        </p>
+      )}
 
       {/* Back is in the PaneHeader at the top; the bottom row is the one
           commit, in the tool panels' Apply Crop button. */}
       <PanelActionBar>
-        <PanelAction disabled title={GENERATE_BLOCKED_REASON}>
-          Generate Image
+        <PanelAction onClick={generateNow} disabled={!prompt.trim() || busy} aria-busy={busy || undefined}>
+          {busy ? "Generating…" : "Generate Image"}
         </PanelAction>
       </PanelActionBar>
     </>
