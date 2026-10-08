@@ -273,14 +273,14 @@ const CARD_COPY: Record<string, CardCopy> = {
     title: "Adjustments",
     plain: "Brightness, contrast, saturation, shadows, highlights, blur and sharpen.",
     detail:
-      "Enhance → Adjustments; each adjustment is its own undo snapshot. Change Brightness, Contrast or Saturation and a dot marks it on this photo, with a reset beside it.",
+      "Enhance → Adjustments. The photo updates as you drag and letting go is one undo step. Every slider has its own reset, and it puts back exactly what was there (src/adjust.rs).",
   },
   Levels: {
     group: "enhance",
     title: "Levels",
-    plain: "Black point, white point and midtones against a live histogram.",
+    plain: "Black point, white point and midtones, each with its own reset, over a live histogram.",
     detail:
-      "Preview from a copy of the layer through a 256-entry LUT so moves never compound; Apply is one undo step (src/levels.rs).",
+      "Preview from a copy of the layer through a 256-entry LUT so moves never compound; Apply is one undo step (src/levels.rs). No curve chart: the histogram is pinned under the panel.",
   },
   Presets: {
     group: "enhance",
@@ -292,16 +292,16 @@ const CARD_COPY: Record<string, CardCopy> = {
   Histogram: {
     group: "enhance",
     title: "Histogram",
-    plain: "A live RGB / luma scope while you work.",
+    plain: "A live RGB / luma scope while you work, pinned under Adjustments, Levels and Presets.",
     detail:
       "Computed in Rust (calculate_histogram) from the composite buffer — no offscreen-canvas sampling.",
   },
   "Resize & Compress": {
     group: "enhance",
     title: "Resize & Compress",
-    plain: "One panel for dimensions, format and quality, with the page-speed scores on top.",
+    plain: "Resize, then Compress, then what the file would weigh against Google's limit for that many pixels.",
     detail:
-      "Resampling fully in WASM; one Apply button named for what is pending. Dimensions-only re-saves in the photo's own format at full quality.",
+      "Resampling fully in WASM and lands on the exact size you type. Image weight is the measured file Apply would write; the WebP · JPEG · PNG · AVIF row is a preview, and Apply keeps the photo's own format.",
   },
   "Perspective / Distort / Skew": {
     group: "enhance",

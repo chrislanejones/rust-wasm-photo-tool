@@ -53,7 +53,7 @@ export const GROUPS: Group[] = [
       },
       {
         name: "PageSpeed budget",
-        body: "Each photo measured against the size Google actually allows for it, instead of a made-up score. Already behind a flag.",
+        body: "Compress All aims for the size Google actually allows each photo, instead of a flat 200 KB. Resize & Compress already shows that limit to everyone; this brings it to the one-click pass. Already behind a flag.",
         beta: "pagespeed-budget",
       },
       {
