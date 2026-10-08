@@ -247,6 +247,7 @@ export interface ToolState {
    *  refined copy, not the selection. Cleared by Apply, Clean Up, and any
    *  other change to the selection. */
   refinePreviewing: boolean;
+  refineBusy: boolean;
   /** Panel → session hook: "apply now". The panel has no engine handle (it
    *  would mean threading props through AppShell), so it asks through the
    *  store and `useSelectionActions` answers. `n` makes each request new. */
@@ -327,6 +328,7 @@ export interface ToolState {
   setSelectionCoverage: (v: SelectionCoverage | null) => void;
   setSelectionRefine: (v: SetArg<RefineSettings>) => void;
   setRefinePreviewing: (v: boolean) => void;
+  setRefineBusy: (v: boolean) => void;
   requestRefine: (kind: "apply" | "cleanUp") => void;
   requestCombine: (ref: ObjectRef) => void;
   /** Enter/leave on-canvas mask painting. Leaving ALWAYS drops the strokes:
@@ -428,6 +430,7 @@ export const useToolStore = create<ToolState>()(
       selectionCoverage: null,
       selectionRefine: CLEAN_UP,
       refinePreviewing: false,
+      refineBusy: false,
       refineRequest: null,
       combineRequest: null,
       objectRemovalMasking: false,
@@ -518,6 +521,7 @@ export const useToolStore = create<ToolState>()(
       setSelectionRefine: (v) =>
         set((s) => ({ selectionRefine: resolveSet(v, s.selectionRefine) })),
       setRefinePreviewing: (v) => set({ refinePreviewing: v }),
+      setRefineBusy: (v) => set({ refineBusy: v }),
       requestRefine: (kind) =>
         set((s) => ({ refineRequest: { kind, n: (s.refineRequest?.n ?? 0) + 1 } })),
       requestCombine: (ref) =>
