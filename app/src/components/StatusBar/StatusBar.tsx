@@ -4,7 +4,7 @@
 // Item 4: Added PgUp/PgDn hint
 import { useLoadedDocument } from "@/hooks/useLoadedDocument";
 import { Fragment, useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Hourglass } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
 import { describeUndoDepth, type UndoDepth } from "@/lib/undoDepth";
@@ -15,6 +15,8 @@ import { useToolStore } from "@/stores/useToolStore";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { useSaveStatus } from "@/lib/saveStatus";
 import { retrySync, useSyncStatus } from "@/lib/sync/status";
+import { usePageActivity } from "@/lib/activity";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,10 @@ const BASE_HINTS: ShortcutHint[] = [
  *  also in the rotation pool renders twice. */
 const PINNED_SHORTCUTS: ShortcutHint = { keys: "Alt+/", label: "shortcuts" };
 const PINNED_COMMANDS: ShortcutHint = { keys: "Alt+,", label: "commands" };
+
+/** Loads shorter than this never show the indicator, so a quick request
+ *  doesn't blink the bar. */
+const LOADING_SHOW_DELAY_MS = 120;
 
 const CYCLE_MS = 3 * 60 * 1000; // rotate the interface-hint slots every 3 minutes
 
@@ -127,6 +133,9 @@ export function StatusBar({
   const { failed: saveFailed, backupFailed } = useSaveStatus();
   const sync = useSyncStatus();
   const syncFailed = sync.state === "error";
+  // Anything on the page loading — fetches, engine loads, async tasks, the
+  // gallery decoding (lib/activity is the one publisher).
+  const loading = useDelayedFlag(usePageActivity(), LOADING_SHOW_DELAY_MS);
   // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
   // already holds the engine and the same numbers feed the Resize panel, so
   // one hook answers both and they cannot disagree. `state.width/height` is
@@ -298,6 +307,23 @@ export function StatusBar({
           <>
             <span className="status-zoom" data-testid="status-selection">
               {describeCoverage(coverage)}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        {/* Left of Undo NN%: an hourglass that flips and an 18px bar,
+            present only while something on the page is loading. */}
+        {loading && (
+          <>
+            <span
+              className="status-loading"
+              data-testid="status-loading"
+              role="status"
+              aria-label="Loading"
+              title="Loading…"
+            >
+              <Hourglass size={12} className="status-loading-hourglass" aria-hidden="true" />
+              <span className="status-loading-bar" aria-hidden="true" />
             </span>
             <span className="status-divider" />
           </>

@@ -1715,6 +1715,81 @@ textarea:focus-visible {
   backdrop-filter: blur(8px);
 }
 
+/* Loading indicator (left of Undo NN%): a flipping hourglass and an 18px
+   indeterminate bar, shown while lib/activity reports anything loading. */
+.status-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-loading-hourglass {
+  animation: status-hourglass-flip 1.6s ease-in-out infinite;
+}
+
+@keyframes status-hourglass-flip {
+  0%, 40% { transform: rotate(0deg); }
+  50%, 90% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.status-loading-bar {
+  position: relative;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.status-loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: status-loading-slide 1s ease-in-out infinite;
+}
+
+@keyframes status-loading-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(225%); }
+}
+
+/* Reduced motion: the indicator stays, the movement goes — a still hourglass
+   and a full, dimmed bar still say "loading". Same two switches as the
+   skeleton shimmer: the OS setting and the app's own html.reduce-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .status-loading-hourglass,
+  .status-loading-bar::after {
+    animation: none;
+  }
+  .status-loading-bar::after {
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+html.reduce-motion .status-loading-hourglass,
+html.reduce-motion .status-loading-bar::after {
+  animation: none;
+}
+html.reduce-motion .status-loading-bar::after {
+  width: 100%;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-loading-hourglass,
+  .status-loading-bar::after {
+    animation: none;
+  }
+  .status-loading-bar::after {
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 .status-section {
   display: flex;
   align-items: center;
