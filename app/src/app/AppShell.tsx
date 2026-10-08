@@ -1951,6 +1951,10 @@ export function AppShell() {
     closeImportDialog();
   }, [importImage, handleAddPhotos, closeImportDialog]);
 
+  // One signature for both histograms (Review's and the Enhance footer's):
+  // it changes whenever the pixels may have.
+  const histogramSignature = `${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`;
+
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
@@ -2835,6 +2839,7 @@ export function AppShell() {
             flushToCanvas={stamp.flushToCanvas}
             syncState={stamp.syncState}
             aiEnabled={hasReplicateAI(effectiveUserMode)}
+            histogram={{ getHistogram, signature: histogramSignature, photoKey: activePhotoId ?? "" }}
             onAIResult={handleAIResult}
           />
         )}
@@ -3277,7 +3282,7 @@ export function AppShell() {
             onMergeDown={stamp.mergeDown}
             onFlattenAll={stamp.flattenAll}
             getHistogram={getHistogram}
-            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
+            histogramSignature={histogramSignature}
             histogramPhotoKey={activePhotoId ?? ""}
           />
         )}

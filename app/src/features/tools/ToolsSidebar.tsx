@@ -46,6 +46,8 @@ import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PerPhotoRegion } from "./PerPhotoRegion";
+import { HistogramFooter, type HistogramFooterProps } from "./HistogramFooter";
+import { HISTOGRAM_FOOTER_SUB_TOOLS } from "./histogramFooterTools";
 import { PhotoFooter } from "./PhotoFooter";
 
 /** Panels whose values belong to the open photo (skeleton plan §1): the rest —
@@ -206,6 +208,8 @@ interface ToolsSidebarProps {
   syncState: () => void;
   /** Whether the current tier may use Replicate AI (Paid only). */
   aiEnabled?: boolean;
+  /** Enhance › Adjustments / Levels / Presets footer histogram. */
+  histogram?: HistogramFooterProps;
   /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
   onAIResult: (r: AIResultPixels) => void;
 }
@@ -288,6 +292,7 @@ export function ToolsSidebar({
   flushToCanvas,
   syncState,
   aiEnabled = false,
+  histogram,
   onAIResult,
 }: ToolsSidebarProps) {
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
@@ -584,6 +589,9 @@ export function ToolsSidebar({
         )}
         </PerPhotoRegion>
       </motion.div>
+      {histogram && imageReady && !!subToolId && HISTOGRAM_FOOTER_SUB_TOOLS.has(subToolId) && (
+        <HistogramFooter {...histogram} />
+      )}
 
       </div>
 
