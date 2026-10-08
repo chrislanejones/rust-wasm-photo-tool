@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.22",
+    date: "2026-10-08",
+    headline: "The histogram stays in view while you adjust, and Resize & Compress loses its box.",
+    entries: [
+      { tag: "feature", text: "Adjustments, Levels and Presets have the histogram pinned to the bottom of the panel. Drag any slider and watch it change, without scrolling." },
+      { tag: "perf", text: "Levels no longer draws a curve chart of its own, so it opens faster." },
+      { tag: "ui", text: "Google PageSpeed in Resize & Compress is an ordinary section now, not a box." },
+      { tag: "ui", text: "Method is a dropdown — the same one Font Family uses. Every dropdown in the app is that one." },
+      { tag: "fix", text: "Switching photos no longer shrinks the tool panel by a hair for a moment." },
+    ],
+  },
+  {
     version: "v9.21",
     date: "2026-10-08",
     headline: "Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.",

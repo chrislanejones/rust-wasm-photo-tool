@@ -86,22 +86,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.21 — 2026-10-08
+### v9.22 — 2026-10-08
 
-**Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.**
+**The histogram stays in view while you adjust, and Resize & Compress loses its box.**
 
-The panel goes Resize, then Compress, then a Google PageSpeed box. Resize is
-Method, width and height, then Scale. Quality has the same reset light Scale
-has, and dragging it no longer adds a step to History. Apply does that.
+Adjustments, Levels and Presets have the histogram pinned to the bottom of
+the panel. Drag Brightness, Shadows, Blur or anything else and it updates
+right there, without scrolling. Levels no longer draws its own curve chart,
+so it opens faster.
 
-The Google PageSpeed box shows what the photo would weigh, and how much
-smaller than your upload it is, for each format: WebP, JPEG, PNG or AVIF.
-WebP is lit by default because that's where most photos save the most. The
-row is a preview. Apply keeps your photo's format, and the Export dialog
-opens on whichever one you picked, so you choose for real when you export.
-
-Enhance › AI shows Remove Background and Remove Object to every account,
-with a key in the corner. Without a Paid plan, pressing one tells you so.
+In Resize & Compress, Google PageSpeed is an ordinary section now, not a
+box, and Method is a dropdown — the same one Font Family uses. Every
+dropdown in the app is that one.
 
 
 ## License

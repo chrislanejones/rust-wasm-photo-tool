@@ -11426,3 +11426,16 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Format names** | `formatName()` in `lib/exportImage`: the Download button, ZIP label and canvas-menu Export item say "WebP", not `toUpperCase()`'s "WEBP" — which also hid the button from the Beta-switches e2e once WebP became the default. |
 | **Measured** | Test photo at 2048 px: WebP 118 KB, JPEG 202 KB, PNG 2.5 MB against a 459 KB limit. |
 | **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,840/1,840, guardrails OK, browser checks 7/7. |
+
+## v9.22 Change Summary — 2026-10-08
+
+**The histogram stays in view while you adjust, and Resize & Compress loses its box.** #324, #325.
+
+| Area | Change |
+| --- | --- |
+| **Histogram footer** (#325) | `HistogramFooter` renders Review's `HistogramView` in the tools sidebar's non-scrolling area on Enhance › Adjustments, Levels and Presets (`histogramFooterTools`). One `histogramSignature` in AppShell feeds Review and the footer. |
+| **Levels** (#325) | The Curve chart and its `levels.histogram()` read are deleted; the engine's `calculate_histogram` stays (Review and the footer use it). The edited dot moved to Black point. |
+| **Sidebar layout animation** (#325) | The scroll body is `layout="position"`: full `layout` scaled its contents when the footer changed its box, and photo-switch C3 measured rows at 49.94 px mid-animation. C3 3/3 green after; it failed 3/3 before. |
+| **PageSpeed unboxed** (#324) | A plain section with the panel divider, like Resize and Compress. |
+| **Method dropdown** (#324) | `SelectField`, the same as Text › Font Family. Audit: Layer, Text, Batch and Create AI Image were the only dropdowns and all use it; Method makes five. |
+| **Known flake** | `gallery-loading-state` G1 fails about 1 run in 4 on master too (already parked); unrelated to either PR. |
