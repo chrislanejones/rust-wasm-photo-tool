@@ -167,6 +167,13 @@ export const EXT: Record<ExportFormat, string> = {
  *  file is something we do not re-encode to (gif/svg). Used by "Apply Resize",
  *  which must re-encode in the photo's OWN format rather than the compression
  *  panel's chosen one — resizing is not the moment to change a file's type. */
+/** How a format is written in the UI — "WebP", not "WEBP". `toUpperCase()`
+ *  on the id wrote "Download WEBP", which nothing else in the app spells
+ *  that way, and an e2e that looks for "WebP" never found the button. */
+export function formatName(f: ExportFormat): string {
+  return { png: "PNG", jpeg: "JPEG", webp: "WebP", avif: "AVIF" }[f];
+}
+
 export function formatFromMime(mime: string): ExportFormat | null {
   switch (mime) {
     case "image/png": return "png";
