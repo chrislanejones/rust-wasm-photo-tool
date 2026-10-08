@@ -42,11 +42,14 @@ export async function encodeForApply(
     exportFormat: ExportFormat;
     quality: number;
     keepSourceEncoding?: boolean;
+    /** Encode in this format at `quality` (Apply Compression keeps the
+     *  photo's own format; the panel's format row is a preview). */
+    format?: ExportFormat;
   },
 ): Promise<ApplyEncodeResult> {
   const { entry, exportFormat, quality } = opts;
   const sourceFormat = opts.keepSourceEncoding ? formatFromMime(entry.mimeType ?? "") : null;
-  const format = sourceFormat ?? exportFormat;
+  const format = opts.format ?? sourceFormat ?? exportFormat;
   const lossy = format !== "png";
   const resizeQuality = entry.encodeQuality ?? 92;
   let storedQuality = sourceFormat ? resizeQuality : quality;

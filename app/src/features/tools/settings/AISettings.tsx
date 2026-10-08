@@ -13,8 +13,9 @@
 // strokes, same rasterizer, same black/white PNG at native resolution — only
 // the surface moved. This panel keeps the controls (brush size, undo, clear,
 // cancel, confirm) and the store holds the paint.
+import { toast } from "@/components/ui/sonner";
 import { useEffect, useRef, useState } from "react";
-import { Scissors, Eraser, BroomSparkles, Trash2, Lock, Undo2 } from "lucide-react";
+import { Scissors, Eraser, BroomSparkles, Trash2, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { StabilizerRow } from "./StabilizerRow";
@@ -35,7 +36,6 @@ import {
   pngDimensions,
 } from "@/lib/objectRemovalMask";
 import { useUIStore } from "@/stores/useUIStore";
-import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
 import { ErrorNote } from "@/components/ui/status-note";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
@@ -352,17 +352,6 @@ export function AISettings({
 
       {isReplicate && (
         <>
-          {!onlineFeaturesEnabled && (
-            <OnlineFeaturesOffNotice what="Remove Background and Remove Object send the image to a server." />
-          )}
-          {onlineFeaturesEnabled && !aiEnabled && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
-              <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
-              <p className="text-2xs text-warning/90">
-                This needs <strong>sign-in</strong> + a <strong>Paid</strong> plan.
-              </p>
-            </div>
-          )}
 
           {/* The same stacked tile group Select → Wand's Selection row uses,
               in ACTION mode (no `value`, so nothing ever lights). These were
@@ -445,8 +434,21 @@ export function AISettings({
           <ToolButtonGroup<"rembg" | "inpaint">
             columns={2}
             stacked
-            disabled={!canRun || busy}
+            // Visible and pressable whatever the account (10-07): the key
+            // badge in the corner says it's a Paid feature, and pressing it
+            // without one explains why instead of a greyed-out tile and a
+            // warning paragraph.
+            disabled={busy || !activePhotoId}
             onChange={(id) => {
+              if (!aiEnabled) {
+                toast.info("Remove Background and Remove Object need sign-in and a Paid plan.");
+                return;
+              }
+              if (!onlineFeaturesEnabled) {
+                toast.info("Online features are off. Turn them on in Settings to send the image to the AI server.");
+                return;
+              }
+              if (!canRun) return;
               if (id === "rembg") void runModel("rembg");
               else startMasking();
             }}

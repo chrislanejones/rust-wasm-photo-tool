@@ -118,8 +118,7 @@ import { collectExtraRoots } from "@/lib/extraRoots";
 import {
   encodeRgba,
   EXT,
-  includeCanvasInExport,
-} from "@/lib/exportImage";
+  includeCanvasInExport, formatName } from "@/lib/exportImage";
 import { useZipExport } from "./session/useZipExport";
 import { useExportFileName } from "@/hooks/useExportFileName";
 import { pinLabelText } from "@/lib/pinLabel";
@@ -2626,12 +2625,12 @@ export function AppShell() {
             ? "Download SVG"
             : isOraDownload
               ? "Download ORA"
-              : (plugin.label ?? `Download ${effectiveExportFormat.toUpperCase()}`)
+              : (plugin.label ?? `Download ${formatName(effectiveExportFormat)}`)
         }
         svg={{ selected: activeIsSvg, all: svgAll }}
         onDownload={downloadFromDialog}
         zipFormat={exportFormat}
-        zipLabel={effectiveExportFormat.toUpperCase()}
+        zipLabel={formatName(effectiveExportFormat)}
         shareAction={
           <ShareButton
             exportPng={async () => {
@@ -3167,7 +3166,7 @@ export function AppShell() {
           </ContextMenuItem>
           <ContextMenuItem onClick={handleExport} disabled={!hasImage}>
             <Download className="h-4 w-4 mr-2" /> Export{" "}
-            {exportFormat.toUpperCase()}
+            {formatName(exportFormat)}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
           {photos.length > 1 && (

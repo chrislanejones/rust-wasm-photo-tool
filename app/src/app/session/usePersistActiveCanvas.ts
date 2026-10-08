@@ -44,7 +44,7 @@ export function usePersistActiveCanvas({
   // with Lanczos3 gains soft edges, an upscale has more pixels) answered
   // "128" with an unchanged 256. The never-grows guard stays for what it was
   // built for: a same-size re-encode, where a bigger file is pure loss.
-  return useCallback(async (opts?: { keepSourceEncoding?: boolean; allowGrow?: boolean }): Promise<PersistOutcome> => {
+  return useCallback(async (opts?: { keepSourceEncoding?: boolean; allowGrow?: boolean; format?: ExportFormat }): Promise<PersistOutcome> => {
     const entry = photos.find((p) => p.id === activePhotoId);
     const tool = stamp.toolRef.current;
     if (!entry || !tool) return { status: "skipped" };
@@ -59,6 +59,7 @@ export function usePersistActiveCanvas({
         exportFormat,
         quality,
         keepSourceEncoding: opts?.keepSourceEncoding,
+        format: opts?.format,
       });
       const lossy = encodeFormat !== "png";
       if (kept && !opts?.allowGrow) {

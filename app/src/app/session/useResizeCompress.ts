@@ -19,7 +19,7 @@ import type { PhotoBounds } from "@/hooks/usePhotoBounds";
 import type { PersistOutcome } from "./usePersistActiveCanvas";
 import { documentSizeForPhoto, keptOriginalMessage } from "@/lib/resizeTarget";
 import { encodeForApply } from "@/lib/applyEncode";
-import type { ExportFormat } from "@/lib/exportImage";
+import { formatFromMime, type ExportFormat } from "@/lib/exportImage";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
 
@@ -28,7 +28,7 @@ interface Deps {
   photoBounds: PhotoBounds | null;
   quality: number;
   activePhotoId: string | null;
-  persistActiveCanvas: (opts?: { keepSourceEncoding?: boolean; allowGrow?: boolean }) => Promise<PersistOutcome>;
+  persistActiveCanvas: (opts?: { keepSourceEncoding?: boolean; allowGrow?: boolean; format?: ExportFormat }) => Promise<PersistOutcome>;
   setHasBeenModified: (v: boolean) => void;
   setModifiedPhotos: (fn: (prev: Set<string>) => Set<string>) => void;
 }
@@ -64,30 +64,42 @@ export function useResizeCompress({
     if (out.status === "kept") toast.info(keptOriginalMessage(out.newBytes, out.oldBytes));
   };
 
-  /** Commit everything pending: dimensions (if they moved) plus the panel's
-   *  format and quality. Resolves `true` only when the stored file changed. */
+  /** Commit size (if it moved) and QUALITY. The photo keeps its own format:
+   *  the panel's format row is a preview of what each format would weigh,
+   *  and the format is chosen at export (10-07). A PNG has no quality to
+   *  re-encode at, so a quality-only Apply on one just records the setting —
+   *  it is what a lossy export will use. Resolves `true` when it applied. */
   const applyCompression = useCallback(
     async (w: number, h: number, filter: number): Promise<boolean> => {
+      const entry = useGalleryStore.getState().photos.find((p) => p.id === activePhotoId);
+      const own = formatFromMime(entry?.mimeType ?? "");
+      const lossy = own !== null && own !== "png";
       const resized = w !== photoW || h !== photoH;
       if (resized) resizePhotoTo(w, h, filter);
+      const recordQuality = () => {
+        stamp.toolRef.current?.push_compress_marker(quality);
+        stamp.syncState();
+      };
+      if (!lossy && !resized) {
+        recordQuality();
+        return true;
+      }
       // A resize always writes (see `allowGrow`), so the canvas and the
-      // stored file can never disagree about the size — before this, the
-      // canvas showed 800×600 while the file stayed 1600×1200.
-      const out = await persistActiveCanvas({ allowGrow: resized });
+      // stored file can never disagree about the size.
+      const out = await persistActiveCanvas(
+        lossy ? { allowGrow: resized, format: own } : { allowGrow: true, keepSourceEncoding: true },
+      );
       report(out);
       if (out.status === "saved") {
-        // The Compress history step is recorded only for a compression that
-        // landed — an undo step for a file that never changed undoes nothing.
-        if (!resized) {
-          stamp.toolRef.current?.push_compress_marker(quality);
-          stamp.syncState();
-        }
+        // The Compress step is recorded only for a compression that landed —
+        // an undo step for a file that never changed undoes nothing.
+        if (!resized) recordQuality();
         markModified();
         return true;
       }
       return false;
     },
-    [photoW, photoH, resizePhotoTo, persistActiveCanvas, stamp, quality, markModified],
+    [activePhotoId, photoW, photoH, resizePhotoTo, persistActiveCanvas, stamp, quality, markModified],
   );
 
   /** Dimensions only, re-saved in the photo's own format and quality. */
@@ -118,6 +130,7 @@ export function useResizeCompress({
       exportFormat: ExportFormat;
       quality: number;
       keepSourceEncoding: boolean;
+      format?: ExportFormat;
     }): Promise<{ bytes: number; kept: boolean } | null> => {
       const tool = stamp.toolRef.current;
       const entry = useGalleryStore.getState().photos.find((p) => p.id === activePhotoId);
@@ -144,6 +157,7 @@ export function useResizeCompress({
         exportFormat: req.exportFormat,
         quality: req.quality,
         keepSourceEncoding: req.keepSourceEncoding,
+        format: req.format,
       });
       // Mirrors `allowGrow`: only a same-size re-encode can be declined.
       return { bytes: r.blob.size, kept: r.kept && req.w === photoW && req.h === photoH };
