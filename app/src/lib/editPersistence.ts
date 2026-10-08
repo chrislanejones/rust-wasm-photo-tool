@@ -84,6 +84,8 @@ export interface SnapEntry {
   /** PNG-encoded snapshot (losslessly compressed RGBA). */
   png: Uint8Array;
   label: string;
+  /** ADR-031; absent in older saved edits. */
+  exportQuality?: number;
   /** Live text annotations active at this history step. Optional for
    *  backwards-compat with older persisted entries; omitted ≡ empty. */
   annotations?: PersistedAnnotation[];
@@ -238,6 +240,8 @@ interface LayerMeta {
 export interface CapturedState {
   canvasW: number;
   canvasH: number;
+  /** Committed export quality; absent in legacy captures/archives. */
+  exportQuality?: number;
   canvasPng: Uint8Array;
   undoStack: SnapEntry[];
   redoStack: SnapEntry[];
@@ -249,7 +253,7 @@ export interface CapturedState {
 }
 
 const CAPTURE_MAGIC = 0x49484353; // "IHCS"
-const CAPTURE_VERSION = 1;
+const CAPTURE_VERSION = 2;
 
 /**
  * Decode the engine's one-call state capture. ADR-024 Stage 3.5.
@@ -293,7 +297,7 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
 
   const magic = u32();
   const version = u32();
-  if (magic !== CAPTURE_MAGIC || version !== CAPTURE_VERSION) {
+  if (magic !== CAPTURE_MAGIC || (version !== 1 && version !== CAPTURE_VERSION)) {
     // Loud, not silent. A mismatch means the wasm and the JS disagree about
     // the frame — almost always a stale `pkg/` — and a half-decoded archive
     // written to IndexedDB is far worse than a failed save.
@@ -351,6 +355,12 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
   }
 
   const activeLayerId = u32();
+  let exportQuality: number | undefined;
+  if (version >= 2) {
+    exportQuality = u32();
+    for (const snapshot of undoStack) snapshot.exportQuality = u32();
+    for (const snapshot of redoStack) snapshot.exportQuality = u32();
+  }
 
   if (p !== blob.byteLength) {
     throw new Error(
@@ -362,6 +372,7 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
   return {
     canvasW,
     canvasH,
+    exportQuality,
     canvasPng,
     undoStack,
     redoStack,
@@ -386,6 +397,7 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
 export interface SavedEdit {
   canvasW: number;
   canvasH: number;
+  exportQuality?: number;
   /** Current canvas state as PNG. */
   canvasPng: Uint8Array;
   /** Undo stack, oldest → newest. */
@@ -523,6 +535,7 @@ export async function savePhotoEdit(
   const {
     canvasW,
     canvasH,
+    exportQuality,
     canvasPng,
     undoStack,
     redoStack,
@@ -535,6 +548,7 @@ export async function savePhotoEdit(
   await idbSet<SavedEdit>(`edit-${photoId}`, {
     canvasW,
     canvasH,
+    exportQuality,
     canvasPng,
     undoStack,
     redoStack,

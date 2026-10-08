@@ -26,6 +26,8 @@ import { shapeKindLabel } from "@/lib/perspectiveTarget";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import { usePhotoSwitching } from "@/hooks/usePhotoSwitching";
+import { useDocumentQuality } from "./session/useDocumentQuality";
 import { ImageLoadingBar } from "@/components/ImageLoadingBar";
 import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
@@ -341,6 +343,7 @@ export function AppShell() {
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const isImageLoading = useUIStore((s) => s.isImageLoading);
+  const switching = usePhotoSwitching();
 
   // Item 2: Pan mode state
   const isPanning = useUIStore((s) => s.isPanning);
@@ -883,7 +886,7 @@ export function AppShell() {
   // snaps and then sets, so it needs the engine still holding the OUTGOING
   // value at Apply time. A live write makes undo restore what you just asked
   // for — which is exactly the bug this arrangement replaced.
-  const quality = useToolStore((s) => s.quality);
+  const quality = useDocumentQuality(stamp.state);
   const setQuality = useToolStore((s) => s.setQuality);
 
   const effectiveBrushSize = brushCursorSize({
@@ -929,37 +932,6 @@ export function AppShell() {
     [stamp],
   );
 
-  // Seed once per photo, then follow the engine. ONE effect, because the order
-  // matters and two effects raced.
-  //
-  // A fresh engine starts at its own default (75) and knows nothing about the
-  // remembered preference, so a sync-only effect would fire on load, see 75,
-  // and overwrite the user's saved setting — destroying the preference on
-  // every photo open. Seeding first, then following, is the whole reason this
-  // is one effect keyed on the photo rather than two independent ones.
-  //
-  // After the seed, the engine is authoritative: undo and redo move
-  // `exportQuality`, and the draft is pulled along. That is what makes undo
-  // VISIBLE, which is the entire point of ADR-031.
-  //
-  // ⚠️ When the archive learns to carry quality (the remaining half of
-  // ADR-031, needing archive v6), a RESTORED document must keep its own stored
-  // value and the seed must yield to it. Today no archive carries one, so
-  // seeding from the preference is both correct and what users already expect.
-  const qualitySeededForRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!activePhotoId || !stamp.state.ready || isImageLoading) return;
-    if (qualitySeededForRef.current !== activePhotoId) {
-      qualitySeededForRef.current = activePhotoId;
-      if (stamp.state.exportQuality !== quality) {
-        stamp.toolRef.current?.set_export_quality(quality);
-        stamp.syncState();
-      }
-      return;
-    }
-    setQuality(stamp.state.exportQuality);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePhotoId, stamp.state.ready, isImageLoading, stamp.state.exportQuality]);
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
@@ -2344,14 +2316,14 @@ export function AppShell() {
     onSpaceUp: () => setIsPanning(false),
   });
 
-  const hasImage = stamp.state.ready;
+  const hasImage = stamp.state.ready && !switching;
   // The top bar's Compare toggle: needs a loaded photo and its stored upload
   // baseline, and is off in the Batch editor (`emoji`), where edits hit every
   // photo at once and there is no single before/after. CompareSlider closes an
   // open overlay when Batch opens.
   const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
-  const canUndo = stamp.state.undoCount > 0;
-  const canRedo = stamp.state.redoCount > 0;
+  const canUndo = hasImage && stamp.state.undoCount > 0;
+  const canRedo = hasImage && stamp.state.redoCount > 0;
 
   return (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
@@ -2746,6 +2718,7 @@ export function AppShell() {
             activePhotoId={activePhotoId}
             undoCount={stamp.state.undoCount}
             quality={quality}
+            appliedQuality={stamp.state.exportQuality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
             compressProgress={compressProgress}
