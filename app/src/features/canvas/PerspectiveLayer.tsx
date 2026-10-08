@@ -9,13 +9,14 @@
 // instead. Everything it needs is already on the props CanvasArea has to hand,
 // and the results go back through `usePerspectiveStore`, so the move costs no
 // prop drilling in either direction.
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { PerspectiveOverlay } from "./PerspectiveOverlay";
 import { PerspectiveActionBar } from "./PerspectiveActionBar";
 import { usePerspectiveTool } from "@/hooks/usePerspectiveTool";
 import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import {
   basisOfShape,
   sameTarget,
@@ -91,6 +92,20 @@ export function PerspectiveLayer({
     () => targets.find((o) => sameTarget(target, o)) ?? null,
     [targets, target],
   );
+
+  // Entering the tool with an object already picked (Review → Reselect, or the
+  // last text / shape you touched) warps THAT object rather than starting on
+  // the destructive pixel box beside it. Runs once per visit; after that the
+  // canvas click and the Reselect list own the pick.
+  const selectedObject = useAnnotationStore((s) => s.selectedObject);
+  useEffect(() => {
+    if (!selectedObject || usePerspectiveStore.getState().target) return;
+    if (targets.some((o) => o.kind === selectedObject.type && o.id === selectedObject.id)) {
+      setTarget({ kind: selectedObject.type, id: selectedObject.id });
+    }
+    // Mount only — see the note above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const perspective = usePerspectiveTool({
     toolRef,

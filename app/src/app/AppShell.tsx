@@ -23,6 +23,7 @@ import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { namePastedImage } from "@/lib/pastedImageName";
 import { shapeKindLabel } from "@/lib/perspectiveTarget";
+import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -1516,6 +1517,14 @@ export function AppShell() {
   const handleSelectObject = useCallback(
     (o: ReselectObject) => {
       setSelectedObject(o);
+      // With Perspective / Skew / Distort open, picking an object from the
+      // list POINTS THE TOOL AT IT instead of switching to the text or shape
+      // tool — otherwise the tool is left behind and the warp falls through to
+      // the destructive pixel path under the object.
+      if (activeTool === "perspective") {
+        usePerspectiveStore.getState().setTarget({ kind: o.type, id: o.id });
+        return;
+      }
       if (o.type === "text") {
         setActiveTool("text");
         void textTool.selectAnnotation(o.id);
@@ -1534,7 +1543,7 @@ export function AppShell() {
       }
       void drawingTools.selectShape(o.id);
     },
-    [textTool, drawingTools, setActiveTool, setBrushMode],
+    [textTool, drawingTools, setActiveTool, setBrushMode, activeTool],
   );
 
   // Place the selected object into one of the nine grid cells — Rust centers the
