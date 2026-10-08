@@ -4217,3 +4217,7 @@ on touch, which is most of the phone surface, and the two densest files
 | **`px-2.5` pair**: ui/status-note's SuccessCallout and AI Rename's warning box share it | status-note.tsx, AIRenamePanel.tsx | Move both together (to px-2 or px-3) |
 | **`ui-spacing` 42** is mostly dialog chrome (`px-5`, `py-2.5`) and the button `large` size's `py-2.5` | ui/dialog, ui/button, TopBar, SubscriptionButton | Each is a primitive; changing it resizes every caller |
 
+
+- **Stale comment in `NewActions.tsx`** (10-08, after v9.25): the header block
+  still says "Generate is STILL disabled (see GENERATE_BLOCKED_REASON)". #337
+  removed that constant and Generate runs now. Comment-only fix.

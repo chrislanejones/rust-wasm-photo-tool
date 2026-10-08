@@ -11477,3 +11477,12 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Models** (#337) | Flux Schnell, Flux Dev, Flux 1.1 Pro, Flux Kontext Pro, Stable Diffusion 3.5 Large, Ideogram v3 Turbo. Inputs from each model's published schema; references go as `input_image` / `image` / `style_reference_images` and never to a model that can't read them. |
 | **Client** (#337) | `useImageGeneration`: online-features gate, references downscaled and uploaded, job subscription with timeout; the result is added to the gallery as a File. The panel's "not connected" line is gone; the model dropdown is the shared `SelectField`. |
 | **Gates** | CI 17/17; tsc 0, convex tsc 0 (bar the existing `process` types), lint 0 errors; unit 1,843/1,843; guardrails OK. Signed-out check on a prod build: 6 models, Generate disabled empty / enabled with a prompt, pressing it says "needs sign-in and a Paid plan", 0 requests. No engine change (892,634 B). |
+
+## v9.26 Change Summary — 2026-10-08
+
+**A generated picture actually arrives.** #338.
+
+| Area | Change |
+| --- | --- |
+| **Webhook output host** (#338) | The first real generate job failed with "Rejected non-Replicate output host": Replicate returned the image from its Cloudflare R2 bucket (`ai-gateway-outputs.<account>.r2.cloudflarestorage.com`). The SSRF guard in `convex/http.ts` now also accepts that one bucket host, pinned with its account id — never `*.r2.cloudflarestorage.com`. Deployed to `brave-ant-608` before the merge. |
+| **Gates** | CI 17/17; convex tsc 0 (bar the existing `process` types). No client or engine change (892,634 B). |

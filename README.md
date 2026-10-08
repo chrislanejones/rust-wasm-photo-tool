@@ -86,18 +86,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.25 — 2026-10-08
+### v9.26 — 2026-10-08
 
-**Create AI Image makes pictures now.**
+**A generated picture actually arrives.**
 
-New › Create AI Image used to end in "image generation isn't connected yet."
-Now Generate runs. Write a prompt, pick one of six models from the dropdown,
-choose a shape, and the picture lands in your gallery like any upload. Three
-of the models can also take reference images.
+The first real Create AI Image job was made and paid for, then thrown away.
+Replicate handed the picture back from a storage address the server didn't
+recognize, and the server refuses addresses it doesn't know. It now accepts
+that one address, and the picture lands in your gallery as a new image.
 
-It shows up only with online features on, and Generate is for Paid plans.
-Without one, the panel says so and nothing leaves your browser. The server
-checks the plan again before it spends anything.
+Other storage addresses are still refused, so a result can only come from
+Replicate.
 
 
 ## License

@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.26",
+    date: "2026-10-08",
+    headline: "A generated picture actually arrives.",
+    entries: [
+      { tag: "fix", text: "Create AI Image made the picture and then dropped it, because it came back from a storage address the server didn't recognize. It now lands in your gallery as a new image." },
+    ],
+  },
+  {
     version: "v9.25",
     date: "2026-10-08",
     headline: "Create AI Image makes pictures now.",
