@@ -24,8 +24,9 @@ import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { namePastedImage } from "@/lib/pastedImageName";
 import { shapeKindLabel } from "@/lib/perspectiveTarget";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { springStandard, instantTransition, fadeIn } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import { ImageLoadingBar } from "@/components/ImageLoadingBar";
 import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
 import { MobileShell } from "@/features/mobile/MobileShellLazy";
@@ -340,11 +341,6 @@ export function AppShell() {
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const isImageLoading = useUIStore((s) => s.isImageLoading);
-  const loadProgress = useUIStore((s) => s.loadProgress);
-  // finishImageLoad ends the fake-progress interval + hide-timer (both live in
-  // the UI store). startImageLoad + the raw progress setters moved into
-  // useImageSession along with the load callbacks that used them.
-  const finishImageLoad = useUIStore((s) => s.finishImageLoad);
 
   // Item 2: Pan mode state
   const isPanning = useUIStore((s) => s.isPanning);
@@ -564,11 +560,6 @@ export function AppShell() {
     deletePhotoEdit,
   });
 
-  useEffect(() => {
-    if (stamp.state.ready && isImageLoading) {
-      finishImageLoad();
-    }
-  }, [stamp.state.ready, isImageLoading, finishImageLoad]);
 
   // ── Compare: fetch original from IndexedDB when slider activates ───────────
   const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
@@ -2373,26 +2364,7 @@ export function AppShell() {
       >
         Skip to canvas
       </a>
-      <AnimatePresence>
-        {isImageLoading && (
-          <motion.div
-            variants={imageLoadBarFade}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed top-0 left-0 right-0 z-[var(--z-progress)] h-1 bg-bg-elevated"
-          >
-            <motion.div
-              className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
-              {...imageLoadBarProgress}
-              animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-              transition={
-                prefs.reduceMotion ? instantTransition : imageLoadBarProgress.transition
-              }
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ImageLoadingBar />
 
       {/* Narrow-window drawer scrim — dims the canvas behind an open side panel
           and click-to-closes it. Sits above the canvas (z 10) but below the top

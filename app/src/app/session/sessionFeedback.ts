@@ -1,5 +1,6 @@
 // Small, testable pieces of useImageSession's user feedback, kept out of the
 // hook so it stays under its line budget.
+import { useUIStore } from "@/stores/useUIStore";
 import { toast } from "@/components/ui/sonner";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -20,5 +21,6 @@ export function beginPendingImports(files: readonly File[]): (i: number) => void
  *  what failed, and a way out (Plan C §3). */
 export function reportSwitchFailure(name: string, err: unknown, retry: () => void): void {
   logDiagnostic("UI_THREAD", `switch to ${name} failed: ${String(err)}`);
-  toast.error(`Couldn't open ${name}.`, { action: { label: "Try again", onClick: retry } });
+  useUIStore.setState({ photoSwitchError: `Couldn't open ${name}. Select it again to retry, or choose another photo.` });
+  toast.error(`Couldn't open ${name}.`, { id: "photo-switch-error", duration: Infinity, action: { label: "Try again", onClick: retry } });
 }

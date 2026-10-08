@@ -5,12 +5,22 @@
 // load — useEngineCore bumps it). Between the two, anything that reads or edits
 // the photo would be reading or editing the previous one.
 import { useEffect, useState } from "react";
+import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
+/** Read at the action boundary: a callback may outlive the render that created it. */
+export function isPhotoSwitching(): boolean {
+  const { activePhotoId, documentPhotoId } = useGalleryStore.getState();
+  return useUIStore.getState().isImageLoading ||
+    (activePhotoId !== null && documentPhotoId !== activePhotoId);
+}
+
 export function usePhotoSwitching(): boolean {
-  return useGalleryStore(
+  const loading = useUIStore((s) => s.isImageLoading);
+  const mismatch = useGalleryStore(
     (s) => s.activePhotoId !== null && s.documentPhotoId !== s.activePhotoId,
   );
+  return loading || mismatch;
 }
 
 /** `active`, but only once it has stayed true for `delayMs`. Fast loads show

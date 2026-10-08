@@ -39,7 +39,7 @@ const canvasSize = (page: Page) =>
   });
 
 /** Every ↻ working-mark currently in the gallery strip. */
-const marks = (page: Page) => page.locator('[data-slot="status-mark"][data-status="working"]');
+const marks = (page: Page) => page.locator('[data-id] [data-slot="status-mark"][data-status="working"]');
 
 async function setup(page: Page) {
   await blockExternalNetwork(page);
@@ -71,23 +71,25 @@ test("G1 the requested-but-not-loaded photo carries a ↻ mark, and only that on
   await setup(page);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
-  await pgDn(page);
-
-  // One mark, on exactly one tile — not one per thumbnail.
-  await expect(marks(page)).toHaveCount(1, { timeout: 60_000 });
-  const owner = await marks(page).first().evaluate((el) => {
-    const tile = el.closest("[data-id]");
-    return tile?.getAttribute("data-id") ?? null;
+  await page.evaluate(() => {
+    const audit = { observed: false, errors: [] as string[] };
+    (window as unknown as { galleryAudit: typeof audit }).galleryAudit = audit;
+    const observer = new MutationObserver(() => {
+      const nodes = [...document.querySelectorAll('[data-id] [data-slot="status-mark"][data-status="working"]')];
+      if (!nodes.length) return;
+      audit.observed = true;
+      if (nodes.length !== 1) audit.errors.push("multiple loading thumbnails");
+      for (const node of nodes) {
+        if (node.closest("[data-id]")?.getAttribute("aria-pressed") !== "true") audit.errors.push("loading thumbnail is not requested");
+      }
+    });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true });
   });
-  expect(owner, "the mark sits on a gallery tile").not.toBeNull();
-
-  // It is the tile the ring is on — the photo we asked for, not the one the
-  // canvas is still showing.
-  const pressed = await page.evaluate(
-    (id) => document.querySelector(`[data-id="${id}"]`)?.getAttribute("aria-pressed"),
-    owner,
-  );
-  expect(pressed, "the marked tile is the selected one").toBe("true");
+  await pgDn(page);
+  // Record owner and pressed state together while the mark exists, including
+  // a fast completion between Playwright calls. Status-bar marks are unrelated.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { galleryAudit: { observed: boolean } }).galleryAudit.observed)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { galleryAudit: { errors: string[] } }).galleryAudit.errors)).toEqual([]);
 
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
 });

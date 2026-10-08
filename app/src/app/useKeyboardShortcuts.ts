@@ -1,3 +1,4 @@
+import { isPhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
@@ -201,8 +202,10 @@ export function useKeyboardShortcuts({
       if (nonTextInput) {
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) {
           e.preventDefault();
-          if (e.shiftKey) onRedo();
-          else onUndo();
+          if (!isPhotoSwitching()) {
+            if (e.shiftKey) onRedo();
+            else onUndo();
+          }
         }
         return;
       }
@@ -241,7 +244,7 @@ export function useKeyboardShortcuts({
         onApplyCrop
       ) {
         e.preventDefault();
-        onApplyCrop();
+        if (!isPhotoSwitching()) onApplyCrop();
         return;
       }
       if (
@@ -304,8 +307,10 @@ export function useKeyboardShortcuts({
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
-          if (e.shiftKey) onRedo();
-          else onUndo();
+          if (!isPhotoSwitching()) {
+            if (e.shiftKey) onRedo();
+            else onUndo();
+          }
           return;
         }
         if (e.code === "KeyC") {
@@ -331,8 +336,10 @@ export function useKeyboardShortcuts({
         if (e.code === "KeyJ") {
           if (!hasSelection) return;
           e.preventDefault();
-          if (e.shiftKey) onNewLayerCut?.();
-          else onNewLayerCopy?.();
+          if (!isPhotoSwitching()) {
+            if (e.shiftKey) onNewLayerCut?.();
+            else onNewLayerCopy?.();
+          }
           return;
         }
         // Ctrl/Cmd + M → toggle Move-layer (Layer Settings tool).
@@ -363,7 +370,7 @@ export function useKeyboardShortcuts({
           e.preventDefault();
           const toFront = e.code === "BracketRight";
           if (e.shiftKey) {
-            (toFront ? onLayerToFront : onLayerToBack)?.();
+            if (!isPhotoSwitching()) (toFront ? onLayerToFront : onLayerToBack)?.();
           } else {
             onAdjustBrushSize(toFront ? 1 : -1);
           }
@@ -415,8 +422,8 @@ export function useKeyboardShortcuts({
           case "Equal": e.preventDefault(); onZoomIn(); break;
           case "Minus": e.preventDefault(); onZoomOut(); break;
           case "Digit0": e.preventDefault(); onZoomReset?.(); break;
-          case "KeyF": e.preventDefault(); onFlipH?.(); break;
-          case "KeyV": e.preventDefault(); onFlipV?.(); break;
+          case "KeyF": e.preventDefault(); if (!isPhotoSwitching()) onFlipH?.(); break;
+          case "KeyV": e.preventDefault(); if (!isPhotoSwitching()) onFlipV?.(); break;
           case "KeyS":
             e.preventDefault();
             // Store action, not the old `image-horse:open-settings` CustomEvent
@@ -425,11 +432,13 @@ export function useKeyboardShortcuts({
             navigateTo({ kind: "settings", tab: useUIStore.getState().settingsTab });
             break;
           case "KeyE": e.preventDefault(); onExport(); break;
-          case "KeyA": e.preventDefault(); onSelectAll?.(); break;
+          case "KeyA": e.preventDefault(); if (!isPhotoSwitching()) onSelectAll?.(); break;
           case "KeyD":
             e.preventDefault();
-            if (hasSelection) onDeselect?.();
-            else onDeleteAll();
+            if (!isPhotoSwitching()) {
+              if (hasSelection) onDeselect?.();
+              else onDeleteAll();
+            }
             break;
         }
         return;

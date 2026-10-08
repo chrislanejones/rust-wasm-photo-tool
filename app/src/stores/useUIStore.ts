@@ -1,3 +1,4 @@
+import { useGalleryStore } from "./useGalleryStore";
 // UI-chrome store: panel/dialog visibility and the compact master-bar tab.
 //
 // These flags used to be ~15 separate `useState`s in AppShell that got
@@ -6,7 +7,7 @@
 // /zustand) and is the first slice of slimming the 3k-line AppShell down.
 //
 // Boot/lifecycle flags (booting, firstRun), the image-load indicator
-// (isImageLoading/loadProgress + the fake-progress interval, encapsulated in the
+// (isImageLoading/loadProgress, encapsulated in the
 // startImageLoad/finishImageLoad action pair), the A/B compare view state
 // (compareActive/originalUrl), the spacebar pan flag (isPanning), and the
 // resolved auth tier (userMode/authResolved/devTierOverride) also live here now —
@@ -26,10 +27,7 @@ import { idbStorage } from "./storage/idbStorage";
 import type { UserMode } from "@/components/StatusBar";
 import type { SettingsTab } from "@/components/SubscriptionButton";
 
-// Module-scoped handles for the fake image-load progress interval and the
-// hide-after-finish timer. Kept out of store state (they're imperative timer
-// ids, not render inputs) — mirrors the loadIntervalRef AppShell used to hold.
-let loadInterval: ReturnType<typeof setInterval> | null = null;
+// Hide-after-finish timer, kept outside persisted UI state.
 let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
@@ -112,6 +110,8 @@ interface UIState {
   firstRun: boolean;
   // Image-load indicator (top progress bar + New/Upload spinners).
   isImageLoading: boolean;
+  /** Recoverable failure of the selected photo load; session-only. */
+  photoSwitchError: string | null;
   loadProgress: number;
   // A/B compare: the "before" original blob URL, whether the slider is on, and
   // where the divider sits (0..1). The handle position lives here rather than in
@@ -229,6 +229,7 @@ export const useUIStore = create<UIState>()(
       booting: true,
       firstRun: true,
       isImageLoading: false,
+      photoSwitchError: null,
       loadProgress: 0,
       originalUrl: null,
       compareActive: false,
@@ -291,28 +292,22 @@ export const useUIStore = create<UIState>()(
       setLoadProgress: (v) =>
         set((s) => ({ loadProgress: resolveSet(v, s.loadProgress) })),
       startImageLoad: () => {
-        if (loadInterval) clearInterval(loadInterval);
         if (finishTimer) {
           clearTimeout(finishTimer);
           finishTimer = null;
         }
         set({ isImageLoading: true, loadProgress: 0 });
-        loadInterval = setInterval(() => {
-          set((s) => ({
-            loadProgress: s.loadProgress >= 90 ? 90 : s.loadProgress + Math.random() * 15,
-          }));
-        }, 100);
       },
       finishImageLoad: () => {
-        if (loadInterval) {
-          clearInterval(loadInterval);
-          loadInterval = null;
-        }
+        const gallery = useGalleryStore.getState();
+        if (gallery.activePhotoId !== gallery.documentPhotoId) return;
         set({ loadProgress: 100 });
         if (finishTimer) clearTimeout(finishTimer);
         finishTimer = setTimeout(() => {
-          set({ isImageLoading: false, loadProgress: 0 });
+          const current = useGalleryStore.getState();
           finishTimer = null;
+          if (current.activePhotoId !== current.documentPhotoId) return;
+          set({ isImageLoading: false, loadProgress: 0 });
         }, 500);
       },
       setOriginalUrl: (v) => set((s) => ({ originalUrl: resolveSet(v, s.originalUrl) })),
