@@ -424,3 +424,17 @@ Night 3, alongside the `repo-boundaries` work.
 No component changed. No class changed. No baseline moved. The script is an
 instrument tonight, not a gate — turning any of these counts into a ratchet is
 Night 7, and it needs the prose problem in §1 solved first.
+
+## 10. Document-state ownership (UI State v4, 10-08-2026)
+
+| Surface | Owner / behavior |
+| --- | --- |
+| Requested gallery thumbnail / photo footer | Gallery identity; navigation remains available during loading |
+| Canvas, document panels, status bar, histogram, diagnostics image metadata | Loaded engine document; neutral values and inert actions until ownership is resolved |
+| Resize quality / dimensions | Engine committed baseline; panel draft scoped to document revision |
+| Refine, lasso wires, mask editing target | Temporary session, invalidated on document changes or loss of its underlying mask |
+| History current position / alternatives | Engine history, with one `aria-current="step"` and labeled alternative branch group |
+| Local save / cloud backup | Separate completed writes; failures tracked per photo and save kind |
+| ZIP and OpenRaster feedback | Shared async lifecycle and existing status primitives; measured packaging progress where available |
+
+Regression and visual evidence: [Night 7 audit](ui-state-v4/07-audit.md).

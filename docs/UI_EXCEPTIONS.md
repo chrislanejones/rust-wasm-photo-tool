@@ -17,6 +17,14 @@ a bug that was quieted.
 This file is the registry. **An exception is allowed. An undocumented one is
 not.**
 
+UI State v4 audit (10-08-2026): no new visual exception and no raised lint or
+guardrail baseline. The eight remaining `direct-document-reads` are in
+`features/canvas/CanvasArea.tsx` and describe the outgoing canvas geometry while it
+remains visible under the transition veil. Document actions are locked and sidebar
+readouts use the loaded-document accessor. Retain this measured floor until that
+geometry can safely be moved; do not hide additional readouts behind this exception.
+Diagnostics image metadata now uses the same accessor, including late hash isolation.
+
 ## 1. The two kinds
 
 | Kind | How it looks | Scope |
