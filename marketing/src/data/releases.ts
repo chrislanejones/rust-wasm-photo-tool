@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.20",
+    date: "2026-10-07",
+    headline: "Resize & Compress tells the truth, and the status bar shows when something is loading.",
+    entries: [
+      { tag: "fix", text: "Resize lands on the size you type. Typing 128 used to give you 118, because the canvas border got shrunk into it." },
+      { tag: "fix", text: "The Quality slider saves the number it shows. Let go on 80 and you get 80, not 67." },
+      { tag: "fix", text: "Picking a resize method no longer turns a PNG into a JPEG, and picking PNG on its own lights up Apply." },
+      { tag: "feature", text: "Image weight replaces the PageSpeed score, which Google doesn't give single images. It's the real size of the file Apply would write — measured, not guessed — next to the limit Google's image check uses for that many pixels." },
+      { tag: "fix", text: "If a re-save would come out bigger than the file you have, Apply says so instead of quietly doing nothing." },
+      { tag: "ui", text: "No paragraphs on the Resize & Compress panel. Every explanation sits behind its lightbulb, and the button just says Apply until there's something to apply." },
+      { tag: "ui", text: "An hourglass and a small bar sit left of Undo in the status bar while anything is loading. They hold still if you've asked for less motion." },
+      { tag: "rust", text: "The engine gained one small resample function so the size readout can use the exact same resize Apply does. 355 bytes." },
+    ],
+  },
+  {
     version: "v9.19",
     date: "2026-10-07",
     headline: "The brush keeps up again.",

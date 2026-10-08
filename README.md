@@ -86,27 +86,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.19 — 2026-10-07
+### v9.20 — 2026-10-07
 
-**The brush keeps up again.**
+**Resize & Compress tells the truth, and the status bar shows when something is loading.**
 
-Painting and Select had got slow enough to feel broken. The engine wasn't the
-problem — a brush dab takes it a third of a millisecond. The app around it was
-busy doing three things it didn't need to.
+Resize lands on the size you type. It used to shrink the photo by the
+canvas border's share, so 128 came out 118. The Quality slider saves the
+number it shows: let go on 80 and you get 80, not 67. Picking a resize
+method no longer turns a PNG into a JPEG, and picking PNG on its own
+lights up Apply.
 
-It was redrawing itself about fifty times a second while you did nothing, and
-asking the engine two questions each time. That's gone: sitting still now costs
-nothing, and a stroke that used to cause 250 redraws causes about 8.
+The panel's "PageSpeed Insights Score" is gone, because Google doesn't
+score single images. In its place is Image weight: the real size of the
+file Apply would write, measured by encoding it, next to the limit Google's
+image check uses for that many pixels. If a re-save would come out bigger
+than the file you have, Apply says so instead of quietly doing nothing.
 
-Saving your work used to start 300 ms after a stroke, which is right when the
-next one starts, and on a big photo a save keeps the engine busy for a second
-or more. It now waits until the pen has been still for 2.5 seconds, so a run of
-strokes saves once, after the run.
+No more paragraphs on the panel: every explanation sits behind its
+lightbulb. The button just says Apply until there's something to apply,
+and only says Resize when the size changed.
 
-The brush circle follows the mouse without redrawing the whole editor on every
-move.
+An hourglass and a small bar sit left of Undo in the status bar while
+anything is loading, and hold still if you've asked for less motion.
 
-Engine unchanged at 885,380 bytes. No change to the saved edit format.
+Engine 885,380 → 885,735 bytes, for the exact resample the size readout
+uses. No change to the saved edit format.
 
 
 ## License

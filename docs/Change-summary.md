@@ -11396,3 +11396,19 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Testing** | Heavy-document runs on master and the branch, headless and in real Google Chrome: 12 photos, 8 layers each, masks, 40 shapes, 25 pins, undo ×10 / redo ×5, photo switching, reload (12/12 photos and 8/8 layers back in 6.9 s). Every failure seen on the branch reproduced identically on master. |
 | **Engine** | Untouched, **885,380 B**. |
 | **Gates** | tsc 0, lint 0 errors / 57 warnings, unit 1,823/1,823, e2e 131 passed / 2 skipped, guardrails OK, CI 17 pass. |
+
+## v9.20 Change Summary — 2026-10-07
+
+**Resize & Compress tells the truth, and the status bar shows when something is loading.** #321, #322.
+
+| Area | Change |
+| --- | --- |
+| **Exact resize** (#322) | The panel shows the photo's size but `resize_with_filter` scales the document, artboard border included. `lib/resizeTarget.documentSizeForPhoto` inverts the engine's mapping, so 128 typed lands on 128 (was 118), and a quality-only Apply no longer resizes a bordered photo (was 256 → 238). |
+| **Quality slider** (#322) | With presets the input's value is a track position; release committed it raw (80 shown, 67 stored). `SizeSlider` commits the mapped value. A slider press opens the autosave quiet window like a brush stroke. |
+| **Pending changes** (#322) | Method is the resample kernel only, never compression (it had turned PNGs into JPEGs) and never disabled. Any format change counts, PNG included. Label: "Apply" at rest, "Resize" only when the size moved. |
+| **Declined saves** (#322) | `usePersistActiveCanvas` returns saved / kept / skipped / failed. A same-size re-encode bigger than the stored file is refused with a toast and stays pending; a resize always writes (`allowGrow`). Handlers moved out of AppShell into `useResizeCompress`. |
+| **Image weight** (#322) | Replaces the PageSpeed "score": the bytes Apply would write, measured with the shared `lib/applyEncode.encodeForApply`, against the Lighthouse ImageDelivery limit `pixels / 6 + 4096`, unclamped. Measured vs stored: 0.0% off in 4 of 4 browser cases. Smaller-than-upload replaces Web Performance Gain. |
+| **No panel paragraphs** (#322) | Method, Format and budget notes moved behind lightbulbs. |
+| **Loading indicator** (#321) | `lib/activity`: one page-activity flag fed by every fetch, engine load, `useAsyncTask` run and gallery decode; tokens self-expire at 60 s. The status bar shows a flipping hourglass + 18px bar after 120 ms. Still under reduced motion (OS setting and the app switch). |
+| **Engine** | `resize_pixels_filter`, stateless, shares `resize_with_filter`'s kernel (pixel-identical on all four filters). **885,380 → 885,735 B** (+355). |
+| **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,837/1,837, cargo test 500/500 + tiles 676/676, clippy both configs, guardrails OK, e2e 131 passed / 2 skipped, browser checks 21/21. |
