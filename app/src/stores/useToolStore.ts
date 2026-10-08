@@ -416,7 +416,10 @@ export const useToolStore = create<ToolState>()(
       batchMode: "logo",
       // Same defaults the AppShell useState pair had, so a user with no
       // persisted blob (or one written before #14) sees no change at all.
-      exportFormat: "jpeg",
+      // WebP by default (10-07): Resize & Compress previews the weight in
+      // this format, and WebP is what shows a photo's real savings. The
+      // Export dialog still offers every format.
+      exportFormat: "webp",
       quality: 75,
       cropRatio: null,
       selectionTolerance: 24,
