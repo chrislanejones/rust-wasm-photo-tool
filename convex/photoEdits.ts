@@ -64,39 +64,42 @@ export const generateUploadUrl = mutation({
  * only ids this can delete are ones nobody references, which are garbage by
  * definition. A caller passing someone else's live storage id gets a refusal.
  *
- * Bounded scans rather than an index: these tables are small (single digits to
- * low hundreds), and adding a `by_storageId` index to three tables to serve a
- * failure path would be a schema change carried forever for a rare call.
+ * One index lookup per storage-id field, not a scan. This used to read the
+ * first 2,000 rows of each table, on the grounds that the tables were small —
+ * and a file referenced by row 2,001 then read as unreferenced and was deleted
+ * under a live record. A lookup's answer does not depend on the table's size.
+ * `.first()`, not `.unique()`: one file can be referenced by several rows (an
+ * AI job's input and output, two jobs on the same frame), and any one is enough
+ * to refuse.
  */
 export const discardFailedUpload = mutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
     await requireUser(ctx);
+    const id = args.storageId;
 
-    for (const row of await ctx.db.query("photo_edits").take(2000)) {
-      if (row.storageId === args.storageId) return { deleted: false, reason: "referenced" };
-    }
-    for (const row of await ctx.db.query("shares").take(2000)) {
-      if (row.storageId === args.storageId) return { deleted: false, reason: "referenced" };
-    }
-    for (const row of await ctx.db.query("ai_jobs").take(2000)) {
-      if (
-        row.inputStorageId === args.storageId ||
-        row.outputStorageId === args.storageId ||
-        row.maskStorageId === args.storageId
-      ) {
-        return { deleted: false, reason: "referenced" };
-      }
-    }
+    const referenced =
+      (await ctx.db.query("photo_edits").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
+      (await ctx.db.query("shares").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
+      (await ctx.db.query("ai_jobs").withIndex("by_inputStorageId", (q) => q.eq("inputStorageId", id)).first()) ??
+      (await ctx.db.query("ai_jobs").withIndex("by_outputStorageId", (q) => q.eq("outputStorageId", id)).first()) ??
+      (await ctx.db.query("ai_jobs").withIndex("by_maskStorageId", (q) => q.eq("maskStorageId", id)).first());
+    if (referenced) return { deleted: false, reason: "referenced" };
 
-    await ctx.storage.delete(args.storageId);
+    await ctx.storage.delete(id);
     return { deleted: true, reason: "unreferenced" };
   },
 });
 
 /** Upsert the canvas state for a photo (replaces any previous storage blob).
  *  Enforces the account's storage quota before anything is written: the
- *  previous archive is counted as freed, since this deletes it. */
+ *  previous archive is counted as freed, since this deletes it.
+ *
+ *  A save naming the file the record ALREADY holds — a retry, or a save that
+ *  timed out on the client and was sent again — must not delete "the previous
+ *  archive", because that is the archive it was just asked to keep. It used to,
+ *  and left the record pointing at nothing. Such a save writes no new file, so
+ *  it only updates the dimensions if they changed, and writes nothing if not. */
 export const save = mutation({
   args: {
     photoKey: v.string(),
@@ -112,8 +115,19 @@ export const save = mutation({
         q.eq("userId", user._id).eq("photoKey", args.photoKey),
       )
       .unique();
+    // Also confirms the incoming file exists — on the same-file path too, so a
+    // retry against a file that has since vanished fails instead of reporting
+    // a save that restores nothing.
     await assertStorageQuota(ctx, user, args.storageId, existing?.storageId);
-    if (existing) {
+    if (existing && existing.storageId === args.storageId) {
+      if (existing.canvasW !== args.canvasW || existing.canvasH !== args.canvasH) {
+        await ctx.db.patch(existing._id, {
+          canvasW: args.canvasW,
+          canvasH: args.canvasH,
+          updatedAt: Date.now(),
+        });
+      }
+    } else if (existing) {
       await ctx.storage.delete(existing.storageId);
       await ctx.db.patch(existing._id, {
         storageId: args.storageId,

@@ -89,7 +89,12 @@ export default defineSchema({
     canvasW: v.number(),
     canvasH: v.number(),
     updatedAt: v.number(),
-  }).index("by_userId_photoKey", ["userId", "photoKey"]),
+  })
+    .index("by_userId_photoKey", ["userId", "photoKey"])
+    // "Does anything point at this file?" — photoEdits.discardFailedUpload.
+    // One per storage-id field in this file (shares and ai_jobs below too), so
+    // that answer is an index lookup whatever the table's size.
+    .index("by_storageId", ["storageId"]),
 
   // ── Share links (public, read-only canvas snapshots) ───────────────────────
   // A `create` packs the flattened canvas PNG into Convex file storage and mints
@@ -128,7 +133,8 @@ export default defineSchema({
     lastViewedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
-    .index("by_userId", ["userId"]),
+    .index("by_userId", ["userId"])
+    .index("by_storageId", ["storageId"]),
 
   // ── Share views (one row per counted view) ────────────────────────────────
   // TIMESTAMP ONLY. No IP, no user agent, no viewer id, nothing that could
@@ -239,5 +245,8 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_photoKey", ["userId", "photoKey"])
     .index("by_replicateId", ["replicateId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_inputStorageId", ["inputStorageId"])
+    .index("by_outputStorageId", ["outputStorageId"])
+    .index("by_maskStorageId", ["maskStorageId"]),
 });

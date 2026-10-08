@@ -63,6 +63,11 @@ async function entitlementFor(ctx: MutationCtx, user: Doc<"users">) {
  * The exact check, at the moment a pointer is committed. Throws a readable
  * `ConvexError` when writing `incoming` would take the account over its cap.
  * `replacing` is the file this write frees in the same transaction, if any.
+ *
+ * `incoming === replacing` is a re-save of the file the row already holds: it
+ * adds no bytes, so it passes even for an account currently over its cap —
+ * refusing it would turn a harmless retry into an error. The file must still
+ * exist; that check comes first on every path.
  */
 export async function assertStorageQuota(
   ctx: MutationCtx,
@@ -72,7 +77,8 @@ export async function assertStorageQuota(
 ): Promise<void> {
   const incomingMeta = await ctx.db.system.get(incoming);
   if (!incomingMeta) throw new ConvexError("That upload was not found in storage. Please try again.");
-  const replacingMeta = replacing && replacing !== incoming ? await ctx.db.system.get(replacing) : null;
+  if (incoming === replacing) return;
+  const replacingMeta = replacing ? await ctx.db.system.get(replacing) : null;
 
   const refusal = storageQuotaVerdict({
     usedBytes: await storedBytes(ctx, user._id),

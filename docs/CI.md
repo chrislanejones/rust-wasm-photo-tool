@@ -24,7 +24,7 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 | `rust` | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, then `wasm-pack build` | Vercel's Rust build |
 | `web` | Typecheck (`tsc -b`) + `pnpm build:all` (WASM + editor app) | Vercel's app build |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
-| `convex` | `convex codegen` + a `_generated` drift check | — |
+| `convex` | `pnpm test:convex` (backend suite on `convex-test`, no deployment needed), then `convex codegen` + a `_generated` drift check | — |
 | `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` export | The manual check that caught the five-week featureless-prod bug |
 
 Build/quality jobs are skipped on the weekly cron (`if: github.event_name != 'schedule'`) — no point rebuilding when nothing changed.

@@ -194,6 +194,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The backend suite (convex/*.test.ts) runs the real mutations against
+      # convex-test's in-memory backend. Needs no deployment, so it runs on
+      # fork PRs too, unlike the codegen step below.
+      - run: pnpm test:convex
       # `convex codegen` runs Convex's OWN TypeScript check (correct runtime type
       # environment — plain `tsc` falsely reports `process`/global errors on
       # backend code) AND regenerates convex/_generated. It connects to the

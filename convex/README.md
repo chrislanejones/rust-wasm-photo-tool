@@ -34,7 +34,10 @@ Read **`_generated/ai/guidelines.md` first** — it overrides general Convex kno
 pnpm exec convex dev          # watch + push to your dev deployment
 pnpm exec convex dev --once   # push once
 pnpm exec convex codegen      # regenerate _generated/ (CI checks this for drift)
+pnpm test:convex              # backend tests: convex/*.test.ts on convex-test's in-memory backend
 ```
+
+Test files sit beside the functions as `*.test.ts`; the Convex bundler skips any file name with more than one dot, so they are never deployed.
 
 ⚠️ **Never run `pnpm exec convex env list` — it prints every secret in the deployment to your terminal.** Use `pnpm exec convex env get <NAME>` for a single value. This has already caused one credential exposure.
 
