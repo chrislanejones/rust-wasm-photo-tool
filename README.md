@@ -86,18 +86,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.22 — 2026-10-08
+### v9.23 — 2026-10-08
 
-**The histogram stays in view while you adjust, and Resize & Compress loses its box.**
+**Adjustments works again, every reset is exact, and the AI buttons are there for everyone.**
 
-Adjustments, Levels and Presets have the histogram pinned to the bottom of
-the panel. Drag Brightness, Shadows, Blur or anything else and it updates
-right there, without scrolling. Levels no longer draws its own curve chart,
-so it opens faster.
+Brightness was badly off. Nudge it to +65 and three of four test grays went
+to pure white, and its reset turned what was left into one flat gray. Now the
+photo changes as you drag, letting go is one undo step, and each slider's
+reset puts back exactly what was there — because every change is worked out
+from the photo as it was when you opened the panel. +65 is a lift now, not a
+blowout.
 
-In Resize & Compress, Google PageSpeed is an ordinary section now, not a
-box, and Method is a dropdown — the same one Font Family uses. Every
-dropdown in the app is that one.
+Levels has a reset beside each of its three points. Enhance › AI opens even
+with online features off, so you can see Remove Background and Remove
+Object; pressing one tells you what it needs.
+
+Engine 885,735 → 892,634 bytes, for the adjustment session.
 
 
 ## License

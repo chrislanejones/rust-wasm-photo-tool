@@ -11439,3 +11439,18 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **PageSpeed unboxed** (#324) | A plain section with the panel divider, like Resize and Compress. |
 | **Method dropdown** (#324) | `SelectField`, the same as Text › Font Family. Audit: Layer, Text, Batch and Create AI Image were the only dropdowns and all use it; Method makes five. |
 | **Known flake** | `gallery-loading-state` G1 fails about 1 run in 4 on master too (already parked); unrelated to either PR. |
+
+## v9.23 Change Summary — 2026-10-08
+
+**Adjustments works again, every reset is exact, and the AI buttons are there for everyone.** #326, #327.
+
+| Area | Change |
+| --- | --- |
+| **Brightness, measured** (#326) | Four bands 40/120/200/240: +65 gave 206/255/255/255 (±255 per unit, no preview while dragging) and its reset gave 40/89/89/89 (an inverse delta on clipped pixels). Now 81/161/241/255, previewed live, and a reset returns 40/120/200/240 exactly. |
+| **Adjustments session** (#326) | `src/adjust.rs` on the shared `tonal_preview` copy: `adjust_preview_set` recomputes all seven settings from the untouched copy; `adjust_commit` saves the current settings as ONE undo step and keeps the session, so every reset stays exact; `TonalPreview.committed` makes a cancel keep committed work. Brightness ±100 = ±64 levels. 9 Rust tests. |
+| **Panel** (#326) | Release = one undo step (no Apply button); each ↺ commits its reset; Reset commits the defaults; an outside undo returns the sliders to neutral; leaving the panel or switching photo commits anything still moving (`lib/pendingEdits`, awaited first by the switch). |
+| **Op-log / reload review** (#326) | Reviewed before publishing on the production build: a release survives a reload with no Apply; Levels + an adjustment survive a real photo switch and a reload; undo after the reload steps back to Levels. The first draft (preview until Apply) lost a released adjustment on reload — caught here and replaced by commit-on-release. |
+| **Levels** (#326) | A reset beside Black point, Midtones and White point, each independent. |
+| **Enhance › AI** (#327) | `openOffline` sub-tool flag: the tile opens with online features off (the default), both buttons show with the key badge, pressing one says why; 0 AI requests while off. OCR unchanged. |
+| **Engine** | **885,735 → 892,634 B** (+6,899): the adjustment session. |
+| **Gates** | cargo test 509/509 + tiles 685/685, clippy both, fmt; tsc 0, lint 0 errors / 55 warnings; unit 1,842/1,842; guardrails OK. |

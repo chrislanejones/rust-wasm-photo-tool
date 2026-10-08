@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.23",
+    date: "2026-10-08",
+    headline: "Adjustments works again, every reset is exact, and the AI buttons are there for everyone.",
+    entries: [
+      { tag: "fix", text: "Brightness was far too strong — +65 turned most of a photo white — and its reset left a flat gray mess. It's a gentle lift now, and the reset puts back exactly what was there." },
+      { tag: "feature", text: "Adjustments update the photo as you drag. Letting go is one undo step, and each slider's reset is exact, however many changes came before." },
+      { tag: "ui", text: "Levels has a reset beside each of Black point, Midtones and White point." },
+      { tag: "ui", text: "Enhance › AI opens even with online features off, so everyone can see Remove Background and Remove Object. Pressing one tells you what it needs." },
+      { tag: "rust", text: "The engine works every adjustment out from the photo as it was when you opened the panel, so nothing piles up or clips along the way." },
+    ],
+  },
+  {
     version: "v9.22",
     date: "2026-10-08",
     headline: "The histogram stays in view while you adjust, and Resize & Compress loses its box.",
