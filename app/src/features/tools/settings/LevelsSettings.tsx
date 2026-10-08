@@ -95,9 +95,10 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
       {/* The Curve chart is gone (10-08): the histogram is the sidebar's
           footer on Adjustments, Levels and Presets, so this panel no longer
           reads one of its own. The edited dot moved to Black point — one
-          dot for the three points together, its Reset resets all three. */}
+          dot per point now (10-08): each ↺ puts just that point back; the footer's
+          Reset puts all three back. */}
       <SizeSlider
-        edited={{ isEdited: !isIdentity, onReset: reset, disabled: !imageReady }}
+        edited={{ isEdited: black !== BLACK, onReset: () => onBlack(BLACK), disabled: !imageReady }}
         label="Black point"
         labelInfo="Everything this dark or darker becomes black."
         value={black}
@@ -108,6 +109,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
         valueDisplay={String(black)}
       />
       <SizeSlider
+        edited={{ isEdited: gamma !== GAMMA, onReset: () => onGamma(GAMMA), disabled: !imageReady }}
         label="Midtones"
         labelInfo="Above 1.00 lifts the tones between black and white; below 1.00 deepens them."
         value={gamma}
@@ -118,6 +120,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
         valueDisplay={(gamma / 100).toFixed(2)}
       />
       <SizeSlider
+        edited={{ isEdited: white !== WHITE, onReset: () => onWhite(WHITE), disabled: !imageReady }}
         label="White point"
         labelInfo="Everything this bright or brighter becomes white."
         value={white}

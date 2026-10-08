@@ -113,6 +113,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustHighlights,
     adjustSharpen,
     levels,
+    adjust,
     presets,
   } = useTransforms(engine);
 
@@ -307,6 +308,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustHighlights,
     adjustSharpen,
     levels,
+    adjust,
     presets,
     // Layers
     addLayer,

@@ -1,316 +1,124 @@
+// Enhance › Adjustments — a preview SESSION over an untouched copy (10-08),
+// the same shape as Levels.
+//
+// It used to bake a DELTA into the layer on every slider release. Measured on
+// a four-band test image (40/120/200/240): brightness +65 gave 206/255/255/255
+// — the scale was ±255 per unit — and ↺ applied −65 to pixels already clipped,
+// leaving 40/89/89/89 that only Undo could repair. Nothing moved while you
+// dragged, and four of the seven sliders snapped back to 0 after applying, so
+// their ↺ had nothing to reset.
+//
+// Now: opening the panel starts a preview (src/adjust.rs), every move
+// recomputes all seven from the copy, each ↺ puts exactly that slider back,
+// Apply is ONE undo step, and leaving the panel for another tool applies what
+// is set. A photo switch drops it (the engine is changing documents).
 import { useEffect, useRef, useState } from "react";
-import type { ToolSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolPanel } from "@/components/ui/tool-panel";
+import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
+import { ADJUST_DEFAULTS, type AdjustControls, type AdjustValues } from "@/hooks/useTransforms";
 
 interface EffectsSettingsProps {
-  settings: ToolSettings;
-  onChange: (settings: ToolSettings) => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
-  onGlobalBlur?: (intensity: number) => void;
-  onSaturation?: (factor: number) => void;
-  onShadows?: (amount: number) => void;
-  onHighlights?: (amount: number) => void;
-  onSharpen?: (amount: number) => void;
+  adjust?: AdjustControls;
   imageReady: boolean;
-  /** WASM undo count — changes (other than our own commits) re-sync the latches. */
-  undoCount?: number;
-  /** Active photo id — switching photos also re-syncs the latches. */
   activePhotoId?: string | null;
 }
 
-export function EffectsSettings({
-  settings: _settings,
-  onChange: _onChange,
-  onBrightness,
-  onContrast,
-  onGlobalBlur,
-  onSaturation,
-  onShadows,
-  onHighlights,
-  onSharpen,
-  imageReady,
-  undoCount,
-  activePhotoId,
-}: EffectsSettingsProps) {
-  // Latching brightness: slider stays at released position.
-  // Each release applies only the delta since the last commit.
-  const [brightness, setBrightness] = useState(0);
-  const [brightnessCommitted, setBrightnessCommitted] = useState(0);
+type Key = keyof AdjustValues;
 
-  // Latching contrast: same principle, but delta is a ratio.
-  const [contrast, setContrast] = useState(100);
-  const [contrastCommitted, setContrastCommitted] = useState(100);
+const isIdentity = (v: AdjustValues) =>
+  (Object.keys(ADJUST_DEFAULTS) as Key[]).every((k) => v[k] === ADJUST_DEFAULTS[k]);
 
-  // Blur resets after each apply (applying more blur is additive anyway).
-  const [blur, setBlur] = useState(0);
+const SLIDERS: { key: Key; label: string; info: string; min: number; max: number; unit?: string }[] = [
+  { key: "brightness", label: "Brightness", info: "Lighter or darker, evenly across every tone.", min: -100, max: 100 },
+  { key: "contrast", label: "Contrast", info: "100 is the photo as it is. Higher pulls darks and lights apart.", min: 10, max: 300 },
+  { key: "saturation", label: "Saturation", info: "100 is the photo as it is. 0 is black and white.", min: 0, max: 300 },
+  { key: "shadows", label: "Shadows", info: "Lifts or deepens the dark tones only.", min: -100, max: 100 },
+  { key: "highlights", label: "Highlights", info: "Recovers or brightens the light tones only.", min: -100, max: 100 },
+  { key: "blur", label: "Blur", info: "Softens the whole photo.", min: 0, max: 100, unit: "%" },
+  { key: "sharpen", label: "Sharpen", info: "Crisps up edges across the whole photo.", min: 0, max: 100, unit: "%" },
+];
 
-  // Latching saturation: same latch-to-position principle as Contrast — a
-  // ratio relative to the last committed value, 100 = neutral.
-  const [saturation, setSaturation] = useState(100);
-  const [saturationCommitted, setSaturationCommitted] = useState(100);
+export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSettingsProps) {
+  const [values, setValues] = useState<AdjustValues>(ADJUST_DEFAULTS);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
 
-  // Shadows/Highlights are absolute, non-latching sliders like Blur: each
-  // release applies the raw slider value as a luminance-masked brightness
-  // delta, then resets to neutral (0) rather than staying at the dragged
-  // position — repeated drags are additive on the image, not on the slider.
-  const [shadows, setShadows] = useState(0);
-  const [highlights, setHighlights] = useState(0);
+  // Leaving the panel for another tool APPLIES what is set (declared first,
+  // so on unmount its cleanup runs before the session's cancel below).
+  useEffect(
+    () => () => {
+      if (adjust && !isIdentity(valuesRef.current)) void adjust.apply(valuesRef.current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount only
+    [],
+  );
 
-  // Sharpen mirrors Blur's own UX exactly (0..100 range, resets after apply).
-  const [sharpen, setSharpen] = useState(0);
-
-  // Set right before we apply our own brightness/contrast/blur so the history
-  // effect below can tell our own commit apart from an external change.
-  const selfEditRef = useRef(false);
-
-  // The latched sliders track *deltas* applied to the image. When the image's
-  // history moves underneath us — undo, redo, or a photo switch — those latches
-  // go stale (e.g. undo reverts the pixels but the slider stayed put). Re-sync
-  // them to neutral so the next drag applies a correct delta from the real
-  // current state, and so undo visibly returns the slider to its origin.
+  // One preview per photo for as long as the panel is open on an image.
   useEffect(() => {
-    if (selfEditRef.current) {
-      selfEditRef.current = false;
-      return;
-    }
-    setBrightness(0);
-    setBrightnessCommitted(0);
-    setContrast(100);
-    setContrastCommitted(100);
-    setBlur(0);
-    setSaturation(100);
-    setSaturationCommitted(100);
-    setShadows(0);
-    setHighlights(0);
-    setSharpen(0);
-  }, [undoCount, activePhotoId]);
+    if (!adjust || !imageReady) return;
+    void adjust.begin();
+    return () => {
+      void adjust.cancel();
+      setValues(ADJUST_DEFAULTS);
+    };
+  }, [adjust, imageReady, activePhotoId]);
 
-  const commitBrightness = (v: number) => {
-    const delta = (v - brightnessCommitted) / 100;
-    if (delta !== 0) {
-      selfEditRef.current = true;
-      onBrightness(delta);
-      setBrightnessCommitted(v);
-    }
+  const set = (key: Key, v: number) => {
+    const next = { ...valuesRef.current, [key]: v };
+    setValues(next);
+    adjust?.preview(next);
   };
 
-  const commitContrast = (v: number) => {
-    if (v === contrastCommitted) return;
-    const factor = v / contrastCommitted;
-    selfEditRef.current = true;
-    onContrast(factor);
-    setContrastCommitted(v);
+  const resetAll = () => {
+    setValues(ADJUST_DEFAULTS);
+    adjust?.preview(ADJUST_DEFAULTS);
   };
 
-  const commitBlur = (v: number) => {
-    if (v > 0 && onGlobalBlur) {
-      selfEditRef.current = true;
-      onGlobalBlur(v / 100);
-      setBlur(0);
-    }
+  const apply = async () => {
+    if (!adjust || isIdentity(values)) return;
+    const v = values;
+    setValues(ADJUST_DEFAULTS);
+    await adjust.apply(v);
+    // Keep working: a fresh preview on the new pixels.
+    await adjust.begin();
   };
 
-  const commitSaturation = (v: number) => {
-    if (v === saturationCommitted || !onSaturation) return;
-    const factor = v / saturationCommitted;
-    selfEditRef.current = true;
-    onSaturation(factor);
-    setSaturationCommitted(v);
-  };
-
-  const commitShadows = (v: number) => {
-    if (v !== 0 && onShadows) {
-      selfEditRef.current = true;
-      onShadows(v);
-      setShadows(0);
-    }
-  };
-
-  const commitHighlights = (v: number) => {
-    if (v !== 0 && onHighlights) {
-      selfEditRef.current = true;
-      onHighlights(v);
-      setHighlights(0);
-    }
-  };
-
-  const commitSharpen = (v: number) => {
-    if (v > 0 && onSharpen) {
-      selfEditRef.current = true;
-      // Map the 0..100 slider fraction onto a 0..2 unsharp-mask `amount`
-      // (default-strength sharpen sits around v≈50-75 → amount 1.0-1.5).
-      onSharpen((v / 100) * 2);
-      setSharpen(0);
-    }
-  };
+  const identity = isIdentity(values);
 
   return (
     <ToolPanel>
       <SectionHeader
         title="Adjustments"
-        info="Brightness, Contrast, and Blur each latch to the slider's released position — drag again to apply another delta on top. All are undo-able."
+        info="The photo updates as you drag. Each slider's ↺ puts just that one back. Apply makes it one undo step; switching to another tool applies it too."
       />
-
-      {/* Brightness */}
-      <div className="space-y-3">
+      {SLIDERS.map((s) => (
         <SizeSlider
-          label="Brightness"
-          labelInfo="Drag & release — applies delta from current position. Undo-able."
-          value={brightness}
-          onChange={setBrightness}
-          onCommit={commitBrightness}
-          edited={{
-            // Latched off neutral = this photo was changed. Reset commits the
-            // way back, so it is one more undoable edit, not a silent revert.
-            isEdited: brightnessCommitted !== 0,
-            onReset: () => {
-              setBrightness(0);
-              commitBrightness(0);
-            },
-            disabled: !imageReady,
-          }}
-          min={-100}
-          max={100}
+          key={s.key}
+          label={s.label}
+          labelInfo={s.info}
+          value={values[s.key]}
+          onChange={(v) => set(s.key, v)}
+          min={s.min}
+          max={s.max}
+          unit={s.unit}
           disabled={!imageReady}
-          valueDisplay={brightness > 0 ? `+${brightness}` : String(brightness)}
-        />
-      </div>
-
-      {/* Contrast */}
-      <div className="space-y-3">
-        <SizeSlider
-          label="Contrast"
-          labelInfo="100 = neutral. Slider latches — drag again to adjust further."
-          value={contrast}
-          onChange={setContrast}
-          onCommit={commitContrast}
           edited={{
-            // Latched off neutral = this photo was changed. Reset commits the
-            // way back, so it is one more undoable edit, not a silent revert.
-            isEdited: contrastCommitted !== 100,
-            onReset: () => {
-              setContrast(100);
-              commitContrast(100);
-            },
+            isEdited: values[s.key] !== ADJUST_DEFAULTS[s.key],
+            onReset: () => set(s.key, ADJUST_DEFAULTS[s.key]),
             disabled: !imageReady,
           }}
-          min={10}
-          max={300}
-          disabled={!imageReady}
-          valueDisplay={
-            contrast > 100
-              ? `+${contrast - 100}`
-              : contrast < 100
-                ? `${contrast - 100}`
-                : "0"
-          }
         />
-      </div>
-
-      {/* Saturation */}
-      {onSaturation && (
-        <div className="space-y-3">
-          <SizeSlider
-            label="Saturation"
-            labelInfo="100 = neutral, 0 = grayscale. Slider latches — drag again to adjust further."
-            value={saturation}
-            onChange={setSaturation}
-            onCommit={commitSaturation}
-          edited={{
-            // Latched off neutral = this photo was changed. Reset commits the
-            // way back, so it is one more undoable edit, not a silent revert.
-            isEdited: saturationCommitted !== 100,
-            onReset: () => {
-              setSaturation(100);
-              commitSaturation(100);
-            },
-            disabled: !imageReady,
-          }}
-            min={0}
-            max={300}
-            disabled={!imageReady}
-            valueDisplay={
-              saturation > 100
-                ? `+${saturation - 100}`
-                : saturation < 100
-                  ? `${saturation - 100}`
-                  : "0"
-            }
-          />
-        </div>
-      )}
-
-      {/* Shadows */}
-      {onShadows && (
-        <div className="space-y-3">
-          <SizeSlider
-            label="Shadows"
-            labelInfo="Lifts dark tones. Drag & release — resets after apply. Undo-able."
-            value={shadows}
-            onChange={setShadows}
-            onCommit={commitShadows}
-            min={-100}
-            max={100}
-            disabled={!imageReady}
-            valueDisplay={shadows > 0 ? `+${shadows}` : String(shadows)}
-          />
-        </div>
-      )}
-
-      {/* Highlights */}
-      {onHighlights && (
-        <div className="space-y-3">
-          <SizeSlider
-            label="Highlights"
-            labelInfo="Recovers blown highlights. Drag & release — resets after apply. Undo-able."
-            value={highlights}
-            onChange={setHighlights}
-            onCommit={commitHighlights}
-            min={-100}
-            max={100}
-            disabled={!imageReady}
-            valueDisplay={highlights > 0 ? `+${highlights}` : String(highlights)}
-          />
-        </div>
-      )}
-
-      {/* Global Blur */}
-      {onGlobalBlur && (
-        <div className="space-y-3">
-          <SizeSlider
-            label="Blur"
-            labelInfo="Gaussian blur across the full image. Resets after apply."
-            value={blur}
-            onChange={setBlur}
-            onCommit={commitBlur}
-            min={0}
-            max={100}
-            unit="%"
-            disabled={!imageReady}
-          />
-        </div>
-      )}
-
-      {/* Sharpen */}
-      {onSharpen && (
-        <div className="space-y-3">
-          <SizeSlider
-            label="Sharpen"
-            labelInfo="Unsharp mask across the full image. Resets after apply."
-            value={sharpen}
-            onChange={setSharpen}
-            onCommit={commitSharpen}
-            min={0}
-            max={100}
-            unit="%"
-            disabled={!imageReady}
-          />
-        </div>
-      )}
-
+      ))}
+      <PanelActionBar layout="split">
+        <PanelAction onClick={resetAll} disabled={!imageReady || identity}>
+          Reset
+        </PanelAction>
+        <PanelAction onClick={() => void apply()} disabled={!imageReady || identity}>
+          Apply
+        </PanelAction>
+      </PanelActionBar>
     </ToolPanel>
   );
 }

@@ -12,7 +12,7 @@ import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
-import type { LevelsControls, PresetControls } from "@/hooks/useTransforms";
+import type { AdjustControls, LevelsControls, PresetControls } from "@/hooks/useTransforms";
 import { LevelsSettings } from "./settings/LevelsSettings";
 import { PresetsSettings } from "./settings/PresetsSettings";
 import { ToolGrid } from "./ToolGrid";
@@ -134,14 +134,11 @@ interface ToolsSidebarProps {
   onRotate90Cw: () => void;
   /** "Resize Layer" — see `TransformCropSettingsProps.onResizeLayer`. */
   onResizeLayer?: () => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
-  onSaturation?: (factor: number) => void;
-  onShadows?: (amount: number) => void;
-  onHighlights?: (amount: number) => void;
-  onSharpen?: (amount: number) => void;
+
   /** Enhance › Levels: live preview and commit (useTransforms). */
   levels?: LevelsControls;
+  /** Enhance › Adjustments preview session. */
+  adjust?: AdjustControls;
   presets?: PresetControls;
   imageReady: boolean;
   /** The compression Apply (w, h, Rust resampling-filter code); resolves true when the stored file changed. */
@@ -189,7 +186,7 @@ interface ToolsSidebarProps {
   pickedColor?: string;
   /** Re-apply a color from the Color Picker history. */
   onPickColor?: (hex: string) => void;
-  onGlobalBlur?: (intensity: number) => void;
+
   // Shapes sub-mode
   shapesMode?: ShapesMode;
   onShapesModeChange?: (mode: ShapesMode) => void;
@@ -238,13 +235,8 @@ export function ToolsSidebar({
   onFlipV,
   onRotate90Cw,
   onResizeLayer,
-  onBrightness,
-  onContrast,
-  onSaturation,
-  onShadows,
-  onHighlights,
-  onSharpen,
   levels,
+  adjust,
   presets,
   imageReady,
   onResize,
@@ -277,7 +269,6 @@ export function ToolsSidebar({
   onSetColorPickerActive,
   pickedColor,
   onPickColor,
-  onGlobalBlur,
   shapesMode,
   onShapesModeChange,
   stampSubMode,
@@ -497,17 +488,8 @@ export function ToolsSidebar({
             rendered the Adjustments panel. */}
         {activeTool === "effects" && effectsMode === "adjust" && (
           <EffectsSettings
-            settings={toolSettings}
-            onChange={onToolSettingsChange}
-            onBrightness={onBrightness}
-            onContrast={onContrast}
-            onGlobalBlur={onGlobalBlur}
-            onSaturation={onSaturation}
-            onShadows={onShadows}
-            onHighlights={onHighlights}
-            onSharpen={onSharpen}
+            adjust={adjust}
             imageReady={imageReady}
-            undoCount={undoCount}
             activePhotoId={activePhotoId}
           />
         )}

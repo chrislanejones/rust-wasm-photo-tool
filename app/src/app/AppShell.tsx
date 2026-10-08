@@ -2746,14 +2746,8 @@ export function AppShell() {
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
             onResizeLayer={pastePlacement.beginLayerResize}
-            onBrightness={stamp.adjustBrightness}
-            onContrast={stamp.adjustContrast}
-            onGlobalBlur={stamp.applyGlobalBlur}
-            onSaturation={stamp.adjustSaturation}
-            onShadows={stamp.adjustShadows}
-            onHighlights={stamp.adjustHighlights}
-            onSharpen={stamp.adjustSharpen}
             levels={stamp.levels}
+            adjust={stamp.adjust}
             presets={stamp.presets}
             imageReady={hasImage}
             onResize={handleApplyCompression}

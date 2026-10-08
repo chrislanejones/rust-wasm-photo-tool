@@ -24,7 +24,39 @@ export interface LevelsControls {
   cancel: () => Promise<void>;
   /** Commit as one undo step. Resolves whether pixels changed. */
   apply: (black: number, white: number, gamma: number) => Promise<boolean>;
-  /** Histogram of the current composite: R, G, B and luma, 256 bins each. */
+}
+
+/** Enhance › Adjustments, in the panel's own units (src/adjust.rs). */
+export interface AdjustValues {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  shadows: number;
+  highlights: number;
+  sharpen: number;
+  blur: number;
+}
+
+export const ADJUST_DEFAULTS: AdjustValues = {
+  brightness: 0,
+  contrast: 100,
+  saturation: 100,
+  shadows: 0,
+  highlights: 0,
+  sharpen: 0,
+  blur: 0,
+};
+
+/** Adjustments as a preview session over an untouched copy (10-08) — the
+ *  Levels shape. Moves recompute from the copy; Apply is one undo step. */
+export interface AdjustControls {
+  begin: () => Promise<boolean>;
+  /** Move the preview. Latest wins; never an undo step. */
+  preview: (v: AdjustValues) => void;
+  /** Close the preview and put the photo back. */
+  cancel: () => Promise<void>;
+  /** Commit as one undo step. Resolves whether pixels changed. */
+  apply: (v: AdjustValues) => Promise<boolean>;
 }
 
 /** One color preset's five components, in the engine's own units: brightness
@@ -541,6 +573,71 @@ export function useTransforms(engine: EngineCore) {
   // the worker, so at most one `preset_preview_set` is in flight and a newer
   // preset overwrites the unsent one. `open` gates the loop so a queued hover
   // cannot reopen a preview after the panel has canceled or applied.
+  // ── Adjustments session (10-08): same one-in-flight, latest-wins shape as
+  // Levels above, on the same tonal_preview copy.
+  const adjFlushRef = useRef(flushToCanvas);
+  adjFlushRef.current = flushToCanvas;
+  const adjSyncRef = useRef(syncState);
+  adjSyncRef.current = syncState;
+  const adjOpenRef = useRef(false);
+  const adjPendingRef = useRef<AdjustValues | null>(null);
+  const adjBusyRef = useRef(false);
+  const adjArgs = (v: AdjustValues) =>
+    [v.brightness, v.contrast, v.saturation, v.shadows, v.highlights, v.sharpen, v.blur] as const;
+
+  const adjust = useMemo<AdjustControls>(
+    () => ({
+      begin: async () => {
+        const t = toolRef.current;
+        if (!t) return false;
+        adjOpenRef.current = true;
+        await t.tonal_preview_begin();
+        return true;
+      },
+      preview: (v) => {
+        adjPendingRef.current = v;
+        if (adjBusyRef.current) return;
+        adjBusyRef.current = true;
+        void (async () => {
+          try {
+            while (adjPendingRef.current && adjOpenRef.current) {
+              const next = adjPendingRef.current;
+              adjPendingRef.current = null;
+              const t = toolRef.current;
+              if (!t) break;
+              let ok = await t.adjust_preview_set(...adjArgs(next));
+              if (!ok && adjOpenRef.current) {
+                await t.tonal_preview_begin();
+                ok = await t.adjust_preview_set(...adjArgs(next));
+              }
+              if (ok) adjFlushRef.current();
+            }
+          } finally {
+            adjBusyRef.current = false;
+          }
+        })();
+      },
+      cancel: async () => {
+        adjOpenRef.current = false;
+        adjPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return;
+        if (await t.tonal_preview_cancel()) adjFlushRef.current();
+      },
+      apply: async (v) => {
+        adjOpenRef.current = false;
+        adjPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        const changed = await t.adjust_apply(...adjArgs(v));
+        adjFlushRef.current();
+        adjSyncRef.current();
+        return changed;
+      },
+    }),
+    [toolRef],
+  );
+
   const presetsFlushRef = useRef(flushToCanvas);
   presetsFlushRef.current = flushToCanvas;
   const presetsSyncRef = useRef(syncState);
@@ -643,6 +740,7 @@ export function useTransforms(engine: EngineCore) {
       adjustHighlights,
       adjustSharpen,
       levels,
+      adjust,
       presets,
     }),
     [
@@ -665,6 +763,7 @@ export function useTransforms(engine: EngineCore) {
       adjustHighlights,
       adjustSharpen,
       levels,
+      adjust,
       presets,
     ],
   );
