@@ -107,12 +107,12 @@ describe("hash -> state", () => {
     expect(useToolStore.getState().textMode).toBe("ocr");
   });
 
-  it("a link cannot open an upload tool while online features are off", () => {
+  it("a link cannot open OCR while online features are off; AI opens (its panel refuses the request)", () => {
     useUIStore.setState({ onlineFeaturesEnabled: false });
-    apply("#/enhance/ai");
-    expect(useToolStore.getState().activeTool).toBe("compress");
     apply("#/create/ocr");
     expect(useToolStore.getState().activeTool).toBe("compress");
+    apply("#/enhance/ai");
+    expect(useToolStore.getState().activeTool).toBe("ai");
   });
 });
 
