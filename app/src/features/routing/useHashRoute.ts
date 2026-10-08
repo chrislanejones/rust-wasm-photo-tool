@@ -55,6 +55,7 @@ export function useHashRoute(): void {
     if (initial) applyRoute(initial);
     if (fromSearch) dropRoutingParams();
     writeHash(routableHash(), { replace: true });
+    let publishedHash = routableHash();
 
     // ── location -> state ───────────────────────────────────────────────────
     const onHashChange = () => {
@@ -63,7 +64,8 @@ export function useHashRoute(): void {
       // Whether we honoured it or not, re-assert the canonical fragment: a
       // typo'd/garbage hash heals back to where the app actually is instead of
       // sitting in the address bar lying about the view.
-      writeHash(routableHash(), { replace: true });
+      publishedHash = routableHash();
+      writeHash(publishedHash, { replace: true });
     };
     window.addEventListener("hashchange", onHashChange);
 
@@ -71,7 +73,12 @@ export function useHashRoute(): void {
     // Catches every navigation that DIDN'T come through navigateTo(): a tool
     // click in the sidebar, a digit-key shortcut, closing the Settings modal.
     // Those still push a history entry, so Back walks your tool history.
-    const onStoreChange = () => writeHash(routableHash());
+    const onStoreChange = () => {
+      const next = routableHash();
+      if (next === publishedHash) return;
+      publishedHash = next;
+      writeHash(next);
+    };
     const unsubTool = useToolStore.subscribe(onStoreChange);
     const unsubUI = useUIStore.subscribe(onStoreChange);
     // The gallery store too, because the ROUTABILITY of the view changes with it:

@@ -5,6 +5,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { isPhotoSwitching, useDelayedFlag, usePhotoSwitching } from "./usePhotoSwitching";
 import { PerPhotoRegion } from "@/features/tools/PerPhotoRegion";
+import { useLoadedDocument } from "./useLoadedDocument";
 
 beforeEach(() => {
   useGalleryStore.setState({ activePhotoId: "A", documentPhotoId: "A", photos: [{ id: "A", name: "A" }] as ReturnType<typeof useGalleryStore.getState>["photos"] });
@@ -33,12 +34,18 @@ describe("photo switch readiness", () => {
     act(() => { vi.advanceTimersByTime(300); });
     expect(h.result.current).toBe(false);
   });
-  it("a generic ready timer cannot clear a newer mismatched document load", () => {
+  it("engine readiness cannot unlock the wrong document, regardless of elapsed time", () => {
     vi.useFakeTimers();
-    useUIStore.setState({ isImageLoading: true });
-    useUIStore.getState().finishImageLoad();
-    useGalleryStore.setState({ activePhotoId: "B" });
-    act(() => { vi.advanceTimersByTime(600); });
-    expect(useUIStore.getState().isImageLoading).toBe(true);
+    const state = { ready: true, width: 1200, undoCount: 4 };
+    const h = renderHook(() => useLoadedDocument(state));
+    act(() => { useGalleryStore.setState({ activePhotoId: "B" }); });
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(h.result.current).toBeNull();
+  });
+  it("a matching identity still requires a ready engine document", () => {
+    const h = renderHook(({ ready }) => useLoadedDocument({ ready, width: 0 }), { initialProps: { ready: false } });
+    expect(h.result.current).toBeNull();
+    h.rerender({ ready: true });
+    expect(h.result.current).not.toBeNull();
   });
 });

@@ -24,6 +24,11 @@ function setup(pending = false) {
   let resolve!: (mask: Uint8Array) => void;
   const committed = new Uint8Array([4]);
   const tool = {
+    set_selection_combine: vi.fn(),
+    lasso_active: vi.fn(async () => false),
+    lasso_begin: vi.fn(async () => true),
+    lasso_committed_path: vi.fn(async () => new Int32Array([0, 0])),
+    lasso_cancel: vi.fn(),
     has_selection: vi.fn(async () => true),
     selection_refine_preview: vi.fn(() => pending ? new Promise<Uint8Array>((r) => { resolve = r; }) : Promise.resolve(new Uint8Array([9]))),
     selection_refine_cancel: vi.fn(async () => undefined),
@@ -79,4 +84,18 @@ it("a switch clears the preview without putting outgoing ants onto the new photo
   expect(tool.selection_overlay).not.toHaveBeenCalled();
   expect(useToolStore.getState().refinePreviewing).toBe(false);
   expect(useToolStore.getState().selectionCoverage).toBeNull();
+});
+
+it("a photo switch ends the outgoing lasso draft and its visible wire", async () => {
+  useToolStore.setState({ selectionKind: "lasso" });
+  const { hook, tool } = setup();
+  await act(async () => {
+    await hook.result.current.handleSelectionClick({ shiftKey: false, altKey: false } as Parameters<typeof hook.result.current.handleSelectionClick>[0]);
+  });
+  expect(hook.result.current.lassoCommitted).not.toBeNull();
+  const calls = tool.lasso_cancel.mock.calls.length;
+  act(() => { useGalleryStore.setState({ activePhotoId: "b" }); });
+  expect(hook.result.current.lassoCommitted).toBeNull();
+  expect(hook.result.current.lassoPreview).toBeNull();
+  expect(tool.lasso_cancel.mock.calls.length).toBe(calls + 1);
 });

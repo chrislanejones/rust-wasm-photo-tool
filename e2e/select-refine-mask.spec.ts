@@ -190,6 +190,7 @@ test("leaving Refine restores committed ants; removing a mask exits its brush", 
 });
 
 test("a failed refinement has honest busy feedback and a working retry", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const before = await engine(page);
   const text = await readout(page).innerText();
   await page.evaluate(() => {
@@ -224,6 +225,7 @@ test("a failed refinement has honest busy feedback and a working retry", async (
   });
   await setSlider(page, "Expand", 8);
   await expect(page.getByText("Refining selection…", { exact: true })).toBeVisible();
+  expect(await page.locator('[data-status="working"] svg').first().evaluate(el => getComputedStyle(el).animationName)).toBe("none");
   await expect(page.getByText(/Couldn't preview refinement/)).toBeVisible();
   await expect(page.getByText("Refining selection…", { exact: true })).toHaveCount(0);
   expect(await engine(page)).toEqual(before);

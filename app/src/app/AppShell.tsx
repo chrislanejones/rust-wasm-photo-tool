@@ -2458,6 +2458,7 @@ export function AppShell() {
         open={showDiagnostics}
         onClose={() => setShowDiagnostics(false)}
         imageMeta={{
+          ready: stamp.state.ready,
           photoId: activePhotoId,
           name: activeEntry?.name,
           mimeType: activeEntry?.mimeType,

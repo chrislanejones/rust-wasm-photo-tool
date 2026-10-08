@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
  *  Assembled by AppShell, which is the only place that knows both the gallery
  *  entry and the live WASM canvas. */
 export interface ImageMeta {
+  /** Engine readiness, distinct from the requested gallery identity. */
+  ready?: boolean;
   /** Editor id of the active photo (also the Convex `photoKey`). null = none. */
   photoId: string | null;
   name?: string;

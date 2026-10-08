@@ -169,7 +169,6 @@ export function useImageSession({
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const maxPhotos = useGalleryStore((s) => s.maxPhotos);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
-  const startImageLoad = useUIStore((s) => s.startImageLoad);
   const setIsImageLoading = useUIStore((s) => s.setIsImageLoading);
   const setShowUpload = useUIStore((s) => s.setShowUpload);
 
@@ -191,7 +190,7 @@ export function useImageSession({
         engineDeferredRef.current = true;
         return Promise.resolve(false);
       }
-      startImageLoad();
+      setIsImageLoading(true);
       return stamp.loadImageFromPixels(pixels, width, height, artboard, opts).finally(() => {
         const gallery = useGalleryStore.getState();
         if ((!opts?.isCurrent || opts.isCurrent()) && gallery.activePhotoId === gallery.documentPhotoId) {
@@ -199,7 +198,7 @@ export function useImageSession({
         }
       });
     },
-    [stamp, startImageLoad],
+    [stamp, setIsImageLoading],
   );
 
   /** Apply a finished AI image result (decoded RGBA) back to the canvas as the

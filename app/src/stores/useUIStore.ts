@@ -1,4 +1,3 @@
-import { useGalleryStore } from "./useGalleryStore";
 // UI-chrome store: panel/dialog visibility and the compact master-bar tab.
 //
 // These flags used to be ~15 separate `useState`s in AppShell that got
@@ -7,8 +6,7 @@ import { useGalleryStore } from "./useGalleryStore";
 // /zustand) and is the first slice of slimming the 3k-line AppShell down.
 //
 // Boot/lifecycle flags (booting, firstRun), the image-load indicator
-// (isImageLoading/loadProgress, encapsulated in the
-// startImageLoad/finishImageLoad action pair), the A/B compare view state
+// (isImageLoading, owned by the document loading session), the A/B compare view state
 // (compareActive/originalUrl), the spacebar pan flag (isPanning), and the
 // resolved auth tier (userMode/authResolved/devTierOverride) also live here now —
 // evicted from AppShell's local useState in the stage-1 dismantle.
@@ -26,9 +24,6 @@ import {
 import { idbStorage } from "./storage/idbStorage";
 import type { UserMode } from "@/components/StatusBar";
 import type { SettingsTab } from "@/components/SubscriptionButton";
-
-// Hide-after-finish timer, kept outside persisted UI state.
-let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
 const MASTER_TABS = ["tools", "gallery", "review"] as const;
@@ -112,7 +107,6 @@ interface UIState {
   isImageLoading: boolean;
   /** Recoverable failure of the selected photo load; session-only. */
   photoSwitchError: string | null;
-  loadProgress: number;
   // A/B compare: the "before" original blob URL, whether the slider is on, and
   // where the divider sits (0..1). The handle position lives here rather than in
   // CompareSlider's own useState so it survives a CanvasArea remount and so the
@@ -157,11 +151,6 @@ interface UIState {
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
   setIsImageLoading: (v: SetArg<boolean>) => void;
-  setLoadProgress: (v: SetArg<number>) => void;
-  /** Begin the fake-progress indicator: reset to 0, tick up toward 90%. */
-  startImageLoad: () => void;
-  /** Finish it: snap to 100%, then hide + reset after a short beat. */
-  finishImageLoad: () => void;
   setOriginalUrl: (v: SetArg<string | null>) => void;
   setCompareActive: (v: SetArg<boolean>) => void;
   setComparePosition: (v: SetArg<number>) => void;
@@ -230,7 +219,6 @@ export const useUIStore = create<UIState>()(
       firstRun: true,
       isImageLoading: false,
       photoSwitchError: null,
-      loadProgress: 0,
       originalUrl: null,
       compareActive: false,
       comparePosition: 0.5,
@@ -289,27 +277,6 @@ export const useUIStore = create<UIState>()(
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
       setIsImageLoading: (v) =>
         set((s) => ({ isImageLoading: resolveSet(v, s.isImageLoading) })),
-      setLoadProgress: (v) =>
-        set((s) => ({ loadProgress: resolveSet(v, s.loadProgress) })),
-      startImageLoad: () => {
-        if (finishTimer) {
-          clearTimeout(finishTimer);
-          finishTimer = null;
-        }
-        set({ isImageLoading: true, loadProgress: 0 });
-      },
-      finishImageLoad: () => {
-        const gallery = useGalleryStore.getState();
-        if (gallery.activePhotoId !== gallery.documentPhotoId) return;
-        set({ loadProgress: 100 });
-        if (finishTimer) clearTimeout(finishTimer);
-        finishTimer = setTimeout(() => {
-          const current = useGalleryStore.getState();
-          finishTimer = null;
-          if (current.activePhotoId !== current.documentPhotoId) return;
-          set({ isImageLoading: false, loadProgress: 0 });
-        }, 500);
-      },
       setOriginalUrl: (v) => set((s) => ({ originalUrl: resolveSet(v, s.originalUrl) })),
       setCompareActive: (v) =>
         set((s) => {

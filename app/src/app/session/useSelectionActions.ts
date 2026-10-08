@@ -451,7 +451,11 @@ export function useSelectionActions(
     stamp.toolRef.current?.lasso_cancel();
     setLassoCommitted(null);
     setLassoPreview(null);
-  }, [stamp]);
+  }, [stamp.toolRef]);
+  useEffect(() => {
+    lassoMoveSeq.current++;
+    handleLassoCancel();
+  }, [documentRevision, switching, handleLassoCancel]);
 
   // Bound here rather than in useKeyboardShortcuts: the listener only exists
   // while a lasso session is actually open, so Escape keeps its existing
