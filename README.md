@@ -86,31 +86,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.20 — 2026-10-07
+### v9.21 — 2026-10-08
 
-**Resize & Compress tells the truth, and the status bar shows when something is loading.**
+**Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.**
 
-Resize lands on the size you type. It used to shrink the photo by the
-canvas border's share, so 128 came out 118. The Quality slider saves the
-number it shows: let go on 80 and you get 80, not 67. Picking a resize
-method no longer turns a PNG into a JPEG, and picking PNG on its own
-lights up Apply.
+The panel goes Resize, then Compress, then a Google PageSpeed box. Resize is
+Method, width and height, then Scale. Quality has the same reset light Scale
+has, and dragging it no longer adds a step to History. Apply does that.
 
-The panel's "PageSpeed Insights Score" is gone, because Google doesn't
-score single images. In its place is Image weight: the real size of the
-file Apply would write, measured by encoding it, next to the limit Google's
-image check uses for that many pixels. If a re-save would come out bigger
-than the file you have, Apply says so instead of quietly doing nothing.
+The Google PageSpeed box shows what the photo would weigh, and how much
+smaller than your upload it is, for each format: WebP, JPEG, PNG or AVIF.
+WebP is lit by default because that's where most photos save the most. The
+row is a preview. Apply keeps your photo's format, and the Export dialog
+opens on whichever one you picked, so you choose for real when you export.
 
-No more paragraphs on the panel: every explanation sits behind its
-lightbulb. The button just says Apply until there's something to apply,
-and only says Resize when the size changed.
-
-An hourglass and a small bar sit left of Undo in the status bar while
-anything is loading, and hold still if you've asked for less motion.
-
-Engine 885,380 → 885,735 bytes, for the exact resample the size readout
-uses. No change to the saved edit format.
+Enhance › AI shows Remove Background and Remove Object to every account,
+with a key in the corner. Without a Paid plan, pressing one tells you so.
 
 
 ## License

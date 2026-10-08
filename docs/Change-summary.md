@@ -11412,3 +11412,17 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Loading indicator** (#321) | `lib/activity`: one page-activity flag fed by every fetch, engine load, `useAsyncTask` run and gallery decode; tokens self-expire at 60 s. The status bar shows a flipping hourglass + 18px bar after 120 ms. Still under reduced motion (OS setting and the app switch). |
 | **Engine** | `resize_pixels_filter`, stateless, shares `resize_with_filter`'s kernel (pixel-identical on all four filters). **885,380 → 885,735 B** (+355). |
 | **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,837/1,837, cargo test 500/500 + tiles 676/676, clippy both configs, guardrails OK, e2e 131 passed / 2 skipped, browser checks 21/21. |
+
+## v9.21 Change Summary — 2026-10-08
+
+**Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.** #323.
+
+| Area | Change |
+| --- | --- |
+| **Layout** | Resize (Method, W×H, Scale) → Compress (Quality) → a Google PageSpeed box (`rounded-lg border border-border bg-bg-elevated p-3`, the panels' existing grouped look): Image weight and Than upload, the format row, both bars at the bottom. `DimensionFields` takes `scaleLast`. |
+| **Quality** | No `onCommit`: releasing the slider records nothing. Apply records one Compress step. The edited dot + reset (ControlRow `edited`) is on Quality as on Scale. |
+| **Format = preview** | The row measures what the photo would weigh as each format (`measureApply` with an explicit `format`) and is the persisted `exportFormat` the Export dialog opens on. Choosing one is never a pending change. Apply keeps the photo's own format at the chosen quality (`encodeForApply` / `usePersistActiveCanvas` take `format`); a quality-only Apply on a PNG just records the quality. Default `exportFormat` is now `webp` for new users (persisted values are untouched). |
+| **Enhance › AI** | Both buttons pressable for every account, key badge kept; without Paid, a toast says why. The sign-in/Paid warning paragraph is gone. The online-features switch still blocks the tile while off — unchanged and pinned by `onlineGate.test.ts`. |
+| **Format names** | `formatName()` in `lib/exportImage`: the Download button, ZIP label and canvas-menu Export item say "WebP", not `toUpperCase()`'s "WEBP" — which also hid the button from the Beta-switches e2e once WebP became the default. |
+| **Measured** | Test photo at 2048 px: WebP 118 KB, JPEG 202 KB, PNG 2.5 MB against a 459 KB limit. |
+| **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,840/1,840, guardrails OK, browser checks 7/7. |

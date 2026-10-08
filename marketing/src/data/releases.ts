@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.21",
+    date: "2026-10-08",
+    headline: "Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.",
+    entries: [
+      { tag: "ui", text: "Resize & Compress goes Resize, then Compress, then a Google PageSpeed box. Resize is Method, width and height, then Scale." },
+      { tag: "ui", text: "Quality has the same reset light as Scale, and dragging it no longer adds a step to History. Apply does." },
+      { tag: "feature", text: "The Google PageSpeed box shows what your photo would weigh as WebP, JPEG, PNG or AVIF — WebP lit first. It's a preview: Apply keeps your photo's format, and the Export dialog opens on the one you picked." },
+      { tag: "ui", text: "Enhance › AI shows Remove Background and Remove Object to every account, with a key in the corner. Without a Paid plan, pressing one tells you so." },
+      { tag: "fix", text: "The Download button says WebP, the way everything else does, instead of WEBP." },
+    ],
+  },
+  {
     version: "v9.20",
     date: "2026-10-07",
     headline: "Resize & Compress tells the truth, and the status bar shows when something is loading.",
