@@ -1,3 +1,4 @@
+import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
@@ -26,6 +27,7 @@ export function HistogramView({
   photoKey,
   active,
 }: Props) {
+  const switching = usePhotoSwitching();
   const plotRef = useRef<HTMLCanvasElement | null>(null);
   const targetRef = useRef<Float32Array | null>(null);
   const dispRef = useRef<Float32Array>(new Float32Array(LEN));
@@ -160,8 +162,10 @@ export function HistogramView({
     draw();
   }, [draw]);
 
-  const sample = useCallback(async () => {
+  const sample = useCallback(async (isCurrent: () => boolean) => {
+    if (!isCurrent() || isPhotoSwitching()) return false;
     const raw = await getHistogram();
+    if (!isCurrent() || isPhotoSwitching()) return false;
     if (!raw || raw.length < LEN) return false;
 
     let total = 0;
@@ -178,10 +182,19 @@ export function HistogramView({
     return true;
   }, [getHistogram]);
 
+  useEffect(() => {
+    if (switching) {
+      targetRef.current = null;
+      dispRef.current.fill(0);
+      cancelAnim();
+      draw();
+    }
+  }, [switching, cancelAnim, draw]);
+
   // Drop bars immediately when switching photos, and keep them down
   // until a valid Rust histogram is available for the new image.
   useEffect(() => {
-    if (!active) return;
+    if (!active || switching) return;
 
     const reduce = reducedMotion();
     const switchedPhoto = photoKeyRef.current !== photoKey;
@@ -194,7 +207,7 @@ export function HistogramView({
       if (reduce) settle();
       else animate();
     }
-  }, [active, photoKey, animate, settle, cancelAnim]);
+  }, [active, switching, photoKey, animate, settle, cancelAnim]);
 
   // Only raise bars when the backing image is actually ready enough
   // for Rust to return a valid histogram. The parent-controlled
@@ -216,8 +229,9 @@ export function HistogramView({
     const tryOnce = async () => {
       if (cancelled) return;
 
-      if (await sample()) {
-        if (cancelled) return;
+      const sampled = await sample(() => !cancelled);
+      if (cancelled) return;
+      if (sampled) {
         setEmpty(false);
         cancelAnim();
         if (reduce) settle();
@@ -242,7 +256,7 @@ export function HistogramView({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [active, signature, sample, animate, settle, cancelAnim]);
+  }, [active, switching, signature, sample, animate, settle, cancelAnim]);
 
   useEffect(() => {
     draw();
@@ -264,7 +278,7 @@ export function HistogramView({
 
   return (
     <div style={WRAP}>
-      <canvas ref={plotRef} style={PLOT} />
+      <canvas ref={plotRef} hidden={switching} style={PLOT} />
       <div style={emptyStyle(empty)}>No image to analyze</div>
       <div style={MODES}>
         {(["rgb", "luma"] as const).map((m) => (

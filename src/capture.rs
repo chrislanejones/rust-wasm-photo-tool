@@ -52,7 +52,7 @@ use wasm_bindgen::prelude::*;
 /// "IHCS" — Image Horse Capture State. Distinct from the archive's "IHST" so a
 /// transport blob can never be mistaken for something persistable.
 const CAPTURE_MAGIC: u32 = 0x49_48_43_53;
-const CAPTURE_VERSION: u32 = 1;
+const CAPTURE_VERSION: u32 = 2;
 
 /// Little-endian writer. Mirrors the conventions the JS archive already uses
 /// (u32 lengths, length-prefixed blobs) so the decoder on the other side reads
@@ -112,6 +112,7 @@ impl ImageHorseTool {
     ///   layers_json                       -- the get_layers() metadata array
     ///   layer_count(4) { png, text_json, shape_json } × N
     ///   active_layer_id(4)
+    ///   export_quality(4) undo_qualities(4 × N) redo_qualities(4 × N)
     /// ```
     ///
     /// Every field is read through the same getter the JS used to call, so this
@@ -155,6 +156,13 @@ impl ImageHorseTool {
         }
 
         f.u32(self.active_layer_id());
+        f.u32(self.export_quality() as u32);
+        for snapshot in &self.hist.undo_stack {
+            f.u32(snapshot.export_quality as u32);
+        }
+        for snapshot in &self.hist.redo_stack {
+            f.u32(snapshot.export_quality as u32);
+        }
         f.0
     }
 }
@@ -597,15 +605,18 @@ mod capture_tests {
     fn capture_state_round_trips_every_field() {
         let mut t = ImageHorseTool::new(24, 16);
         t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.set_export_quality(37);
         t.add_shape_annotation(
             0, 2.0, 2.0, 10.0, 10.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
         );
 
+        t.push_compress_marker(63);
+        assert!(t.undo());
         let blob = t.capture_state();
         let mut r = Read { b: &blob, p: 0 };
 
         assert_eq!(r.u32(), 0x49_48_43_53, "magic");
-        assert_eq!(r.u32(), 1, "version");
+        assert_eq!(r.u32(), 2, "version");
         assert_eq!(r.u32(), t.width(), "canvas width");
         assert_eq!(r.u32(), t.height(), "canvas height");
 
@@ -651,6 +662,13 @@ mod capture_tests {
         }
 
         assert_eq!(r.u32(), t.active_layer_id(), "active layer id");
+        assert_eq!(r.u32(), 37, "current quality");
+        for _ in 0..undo {
+            assert_eq!(r.u32(), 37, "undo quality");
+        }
+        for _ in 0..redo {
+            assert_eq!(r.u32(), 63, "redo quality");
+        }
         assert_eq!(
             r.p,
             blob.len(),
@@ -1014,7 +1032,7 @@ mod capture_tests {
         let blob = t.capture_state();
         let mut r = Read { b: &blob, p: 0 };
         assert_eq!(r.u32(), 0x49_48_43_53);
-        assert_eq!(r.u32(), 1);
+        assert_eq!(r.u32(), super::CAPTURE_VERSION);
         r.u32();
         r.u32();
         r.blob();
@@ -1040,6 +1058,10 @@ mod capture_tests {
             r.text();
         }
         r.u32();
+        assert_eq!(r.u32(), 75, "empty-document quality");
+        for _ in 0..u + d {
+            assert_eq!(r.u32(), 75, "empty-document snapshot quality");
+        }
         assert_eq!(r.p, blob.len(), "empty-document frame must parse cleanly");
     }
 

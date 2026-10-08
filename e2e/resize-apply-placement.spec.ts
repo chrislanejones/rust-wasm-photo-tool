@@ -107,3 +107,40 @@ test("the Resize & Compress Apply says what it will commit", async ({ page }) =>
   await expect(page.getByText(`Photo: ${target}×${targetH}`), "the status bar reports the typed size").toBeVisible({ timeout: 15_000 });
   await expect(applyRest.first(), "nothing left pending").toBeDisabled();
 });
+
+test("compression drafts, applied quality and undo follow each photo", async ({ page }) => {
+  await blockExternalNetwork(page);
+  await page.goto('/');
+  await page.locator('input[type="file"]').first().setInputFiles([FIXTURE_PNG, join(__dirname, 'fixtures', 'sky-building.png')]);
+  await page.locator('canvas.main-canvas').waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'Enhance', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Resize & Compress', exact: true }).first().click();
+  const quality = page.getByRole('slider', { name: 'Quality', exact: true });
+  await expect(quality).toHaveAttribute('aria-valuetext', '75%');
+  const choose = async (value: number) => {
+    await quality.evaluate((el, v) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(el, v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value === 70 ? 33 : 0);
+  };
+  await choose(70);
+  await page.getByRole('button', { name: 'Apply Compression', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.keyboard.press('PageDown');
+  await expect(page.getByLabel('width', { exact: true })).toHaveValue('1200');
+  await expect(quality).toHaveAttribute('aria-valuetext', '75%');
+  await choose(50);
+  await page.getByRole('button', { name: 'Apply Compression', exact: true }).click();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.keyboard.press('PageUp');
+  await expect(page.getByLabel('width', { exact: true })).toHaveValue('256');
+  await expect(quality).toHaveAttribute('aria-valuetext', '70%');
+  await page.keyboard.press('Control+z');
+  await expect(quality).toHaveAttribute('aria-valuetext', '75%');
+  await page.keyboard.press('Control+Shift+z');
+  await expect(quality).toHaveAttribute('aria-valuetext', '70%');
+  await page.screenshot({ path: 'test-results/state-v4-night2-quality.png' });
+});
