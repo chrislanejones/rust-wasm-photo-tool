@@ -491,6 +491,7 @@ export function ToolsSidebar({
             adjust={adjust}
             imageReady={imageReady}
             activePhotoId={activePhotoId}
+            undoCount={undoCount}
           />
         )}
 

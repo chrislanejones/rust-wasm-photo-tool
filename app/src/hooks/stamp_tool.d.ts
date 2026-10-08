@@ -601,6 +601,16 @@ declare module "stamp_tool" {
       sharpen: number,
       blur: number,
     ): boolean;
+    /** Save the settings as ONE undo step and KEEP the session (src/adjust.rs). */
+    adjust_commit(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
     /** End the preview and bake as ONE undo step ("Adjustments"). */
     adjust_apply(
       brightness: number,

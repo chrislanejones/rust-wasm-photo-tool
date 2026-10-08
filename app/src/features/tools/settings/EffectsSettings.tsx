@@ -8,11 +8,11 @@
 // dragged, and four of the seven sliders snapped back to 0 after applying, so
 // their ↺ had nothing to reset.
 //
-// Now: opening the panel starts a preview (src/adjust.rs), every move
-// recomputes all seven from the copy, each ↺ puts exactly that slider back,
-// Apply is ONE undo step, and leaving the panel for another tool applies what
-// is set, and a photo switch applies it to the outgoing photo before the
-// switch saves it (lib/pendingEdits).
+// Now: opening the panel starts a session over an untouched copy
+// (src/adjust.rs). Dragging previews live; RELEASING saves it as one undo
+// step (`adjust.commit`), so it survives a reload or a closed tab; every ↺ is
+// exact because each step is recomputed from the copy. Leaving the panel or
+// switching photo commits anything still moving (lib/pendingEdits).
 import { useEffect, useRef, useState } from "react";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -25,6 +25,8 @@ interface EffectsSettingsProps {
   adjust?: AdjustControls;
   imageReady: boolean;
   activePhotoId?: string | null;
+  /** Moves on every history step — an undo while the panel is open resets it. */
+  undoCount?: number;
 }
 
 type Key = keyof AdjustValues;
@@ -42,63 +44,89 @@ const SLIDERS: { key: Key; label: string; info: string; min: number; max: number
   { key: "sharpen", label: "Sharpen", info: "Crisps up edges across the whole photo.", min: 0, max: 100, unit: "%" },
 ];
 
-export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSettingsProps) {
+const same = (a: AdjustValues, b: AdjustValues) =>
+  (Object.keys(ADJUST_DEFAULTS) as Key[]).every((k) => a[k] === b[k]);
+
+export function EffectsSettings({ adjust, imageReady, activePhotoId, undoCount }: EffectsSettingsProps) {
   const [values, setValues] = useState<AdjustValues>(ADJUST_DEFAULTS);
   const valuesRef = useRef(values);
   valuesRef.current = values;
+  /** What the engine has committed this session. */
+  const committedRef = useRef<AdjustValues>(ADJUST_DEFAULTS);
+  /** History steps this panel itself made — an undo/redo is anything else. */
+  const ownStepsRef = useRef(0);
 
-  // Leaving the panel for another tool APPLIES what is set (declared first,
-  // so on unmount its cleanup runs before the session's cancel below).
+  const commitNow = async (v: AdjustValues = valuesRef.current) => {
+    if (!adjust || same(v, committedRef.current)) return;
+    committedRef.current = v;
+    ownStepsRef.current += 1;
+    if (!(await adjust.commit(v))) ownStepsRef.current -= 1;
+  };
+
+  // Leaving the panel for another tool commits anything still moving
+  // (declared first, so on unmount it runs before the session's cancel).
   useEffect(
     () => () => {
-      if (adjust && !isIdentity(valuesRef.current)) void adjust.apply(valuesRef.current);
+      void commitNow();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount only
     [],
   );
 
-  // A photo switch bakes what is set onto the OUTGOING photo before it saves
-  // it (lib/pendingEdits). Resetting the ref first means the session cleanup
-  // and the unmount apply below both see the identity and do nothing more.
+  // A photo switch commits onto the OUTGOING photo before it saves it.
   useEffect(() => {
     if (!adjust) return;
-    return registerPendingCommit(async () => {
-      const v = valuesRef.current;
-      if (isIdentity(v)) return;
-      valuesRef.current = ADJUST_DEFAULTS;
-      setValues(ADJUST_DEFAULTS);
-      await adjust.apply(v);
-    });
+    return registerPendingCommit(() => commitNow());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- commitNow reads refs
   }, [adjust]);
 
-  // One preview per photo for as long as the panel is open on an image.
+  // One session per photo for as long as the panel is open on an image.
   useEffect(() => {
     if (!adjust || !imageReady) return;
     void adjust.begin();
     return () => {
       void adjust.cancel();
+      committedRef.current = ADJUST_DEFAULTS;
       setValues(ADJUST_DEFAULTS);
     };
   }, [adjust, imageReady, activePhotoId]);
 
+  // An undo/redo from outside the panel moves the photo out from under the
+  // session: the sliders go back to neutral on the undone photo.
+  const lastUndoRef = useRef(undoCount);
+  useEffect(() => {
+    if (lastUndoRef.current === undoCount) return;
+    lastUndoRef.current = undoCount;
+    if (ownStepsRef.current > 0) {
+      ownStepsRef.current -= 1;
+      return;
+    }
+    if (!adjust || !imageReady) return;
+    committedRef.current = ADJUST_DEFAULTS;
+    setValues(ADJUST_DEFAULTS);
+    void (async () => {
+      await adjust.cancel();
+      await adjust.begin();
+    })();
+  }, [undoCount, adjust, imageReady]);
+
   const set = (key: Key, v: number) => {
     const next = { ...valuesRef.current, [key]: v };
+    valuesRef.current = next;
     setValues(next);
     adjust?.preview(next);
   };
 
-  const resetAll = () => {
-    setValues(ADJUST_DEFAULTS);
-    adjust?.preview(ADJUST_DEFAULTS);
+  const resetOne = (key: Key) => {
+    set(key, ADJUST_DEFAULTS[key]);
+    void commitNow();
   };
 
-  const apply = async () => {
-    if (!adjust || isIdentity(values)) return;
-    const v = values;
+  const resetAll = () => {
+    valuesRef.current = ADJUST_DEFAULTS;
     setValues(ADJUST_DEFAULTS);
-    await adjust.apply(v);
-    // Keep working: a fresh preview on the new pixels.
-    await adjust.begin();
+    adjust?.preview(ADJUST_DEFAULTS);
+    void commitNow(ADJUST_DEFAULTS);
   };
 
   const identity = isIdentity(values);
@@ -107,7 +135,7 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSe
     <ToolPanel>
       <SectionHeader
         title="Adjustments"
-        info="The photo updates as you drag. Each slider's ↺ puts just that one back. Apply makes it one undo step; switching to another tool or photo applies it too."
+        info="The photo updates as you drag, and each release is one undo step. Each slider's ↺ puts just that one back, exactly; Reset puts them all back."
       />
       {SLIDERS.map((s) => (
         <SizeSlider
@@ -116,23 +144,21 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId }: EffectsSe
           labelInfo={s.info}
           value={values[s.key]}
           onChange={(v) => set(s.key, v)}
+          onCommit={() => void commitNow()}
           min={s.min}
           max={s.max}
           unit={s.unit}
           disabled={!imageReady}
           edited={{
             isEdited: values[s.key] !== ADJUST_DEFAULTS[s.key],
-            onReset: () => set(s.key, ADJUST_DEFAULTS[s.key]),
+            onReset: () => resetOne(s.key),
             disabled: !imageReady,
           }}
         />
       ))}
-      <PanelActionBar layout="split">
+      <PanelActionBar>
         <PanelAction onClick={resetAll} disabled={!imageReady || identity}>
           Reset
-        </PanelAction>
-        <PanelAction onClick={() => void apply()} disabled={!imageReady || identity}>
-          Apply
         </PanelAction>
       </PanelActionBar>
     </ToolPanel>

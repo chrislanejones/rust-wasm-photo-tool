@@ -40,6 +40,16 @@ pub(crate) struct Adjust {
 }
 
 impl Adjust {
+    pub(crate) const IDENTITY: Adjust = Adjust {
+        brightness: 0.0,
+        contrast: 100.0,
+        saturation: 100.0,
+        shadows: 0.0,
+        highlights: 0.0,
+        sharpen: 0.0,
+        blur: 0.0,
+    };
+
     pub(crate) fn new(
         brightness: f64,
         contrast: f64,
@@ -144,9 +154,56 @@ impl ImageHorseTool {
         false
     }
 
-    /// End the preview and bake `a` into the active layer as ONE undo step
-    /// ("Adjustments"). At the identity it only ends the preview. Returns
-    /// whether the pixels changed.
+    /// Save the current settings as ONE undo step ("Adjustments") and KEEP the
+    /// session: later moves and resets still compute from the untouched copy,
+    /// so a reset is exact however many releases came before it. Called on
+    /// every slider release, so an adjustment survives a reload or a closed
+    /// tab without an Apply. `false` when there is no current session or the
+    /// settings equal what is already committed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn adjust_commit(
+        &mut self,
+        brightness: f64,
+        contrast: f64,
+        saturation: f64,
+        shadows: f64,
+        highlights: f64,
+        sharpen: f64,
+        blur: f64,
+    ) -> bool {
+        if !self.tonal_preview_is_current() {
+            return false;
+        }
+        let a = Adjust::new(
+            brightness, contrast, saturation, shadows, highlights, sharpen, blur,
+        );
+        let (w, h) = (self.width, self.height);
+        let Some(mut p) = self.tonal_preview.take() else {
+            return false;
+        };
+        let prev = p.committed.unwrap_or(Adjust::IDENTITY);
+        if prev == a {
+            self.tonal_preview = Some(p);
+            return false;
+        }
+        // The undo step records what was committed BEFORE this release, so
+        // the live preview is swapped for it before the snapshot.
+        if let Some(layer) = self.layers.get_mut(p.layer) {
+            layer.buf.data.copy_from_slice(&p.base);
+            adjust_in_place(&mut layer.buf.data, w, h, &prev);
+        }
+        self.snap("Adjustments");
+        if let Some(layer) = self.layers.get_mut(p.layer) {
+            layer.buf.data.copy_from_slice(&p.base);
+            adjust_in_place(&mut layer.buf.data, w, h, &a);
+        }
+        p.committed = if a.is_identity() { None } else { Some(a) };
+        p.generation = self.hist.generation;
+        self.tonal_preview = Some(p);
+        true
+    }
+
+    /// Commit the settings (as `adjust_commit`) and end the session.
     #[allow(clippy::too_many_arguments)]
     pub fn adjust_apply(
         &mut self,
@@ -158,17 +215,17 @@ impl ImageHorseTool {
         sharpen: f64,
         blur: f64,
     ) -> bool {
-        let restored = self.tonal_preview_cancel();
-        let a = Adjust::new(
+        if !self.tonal_preview_is_current() {
+            self.tonal_preview = None;
+            return false;
+        }
+        let changed = self.adjust_commit(
             brightness, contrast, saturation, shadows, highlights, sharpen, blur,
         );
-        if a.is_identity() || self.layers.get(self.active).is_none() {
-            return restored;
-        }
-        self.snap("Adjustments");
-        let (w, h) = (self.width, self.height);
-        adjust_in_place(&mut self.layers[self.active].buf.data, w, h, &a);
-        true
+        // End the session through cancel, which puts back base + what was
+        // committed — so a preview that was never committed cannot linger.
+        self.tonal_preview_cancel();
+        changed
     }
 }
 
@@ -297,5 +354,56 @@ mod tests {
             "a non-finite value falls back to the default"
         );
         assert_eq!(a.blur, 0.0);
+    }
+
+    #[test]
+    fn each_commit_is_one_undo_step_and_undo_walks_back_one_release() {
+        let (w, h) = (64, 8);
+        let mut t = tool(w, h);
+        let original = t.get_image_data();
+        let before = t.undo_count();
+        assert!(t.tonal_preview_begin());
+        assert!(t.adjust_commit(30.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        let first = t.get_image_data();
+        assert!(t.adjust_commit(30.0, 150.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        let second = t.get_image_data();
+        assert_eq!(t.undo_count(), before + 2, "two releases, two steps");
+        assert!(
+            !t.adjust_commit(30.0, 150.0, 100.0, 0.0, 0.0, 0.0, 0.0),
+            "same settings record nothing"
+        );
+        t.undo();
+        assert_eq!(t.get_image_data(), first, "undo steps back ONE release");
+        t.undo();
+        assert_eq!(t.get_image_data(), original);
+        let _ = second;
+    }
+
+    #[test]
+    fn resetting_after_commits_is_exact() {
+        let (w, h) = (64, 8);
+        let mut t = tool(w, h);
+        let original = t.get_image_data();
+        assert!(t.tonal_preview_begin());
+        assert!(t.adjust_commit(65.0, 180.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        // The old delta model turned this into 40/89/89/89; from the copy it is exact.
+        assert!(t.adjust_commit(0.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        assert_eq!(t.get_image_data(), original);
+    }
+
+    #[test]
+    fn cancel_after_a_commit_keeps_the_commit() {
+        let (w, h) = (64, 8);
+        let mut t = tool(w, h);
+        assert!(t.tonal_preview_begin());
+        assert!(t.adjust_commit(40.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        let committed = t.get_image_data();
+        assert!(t.adjust_preview_set(-80.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+        t.tonal_preview_cancel();
+        assert_eq!(
+            t.get_image_data(),
+            committed,
+            "leaving drops the uncommitted move, not the commit"
+        );
     }
 }

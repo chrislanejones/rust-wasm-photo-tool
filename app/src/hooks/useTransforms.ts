@@ -55,7 +55,10 @@ export interface AdjustControls {
   preview: (v: AdjustValues) => void;
   /** Close the preview and put the photo back. */
   cancel: () => Promise<void>;
-  /** Commit as one undo step. Resolves whether pixels changed. */
+  /** Save the current settings as ONE undo step and keep the session —
+   *  called on every slider release. Resolves whether a step was recorded. */
+  commit: (v: AdjustValues) => Promise<boolean>;
+  /** Commit and end the session. Resolves whether pixels changed. */
   apply: (v: AdjustValues) => Promise<boolean>;
 }
 
@@ -623,6 +626,24 @@ export function useTransforms(engine: EngineCore) {
         const t = toolRef.current;
         if (!t) return;
         if (await t.tonal_preview_cancel()) adjFlushRef.current();
+      },
+      commit: async (v) => {
+        // A preview move still queued would land AFTER the commit and paint
+        // stale values over it, so it is dropped: the commit carries the
+        // newest values anyway.
+        adjPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        let changed = await t.adjust_commit(...adjArgs(v));
+        if (!changed && adjOpenRef.current && !(await t.tonal_preview_active())) {
+          // The session went stale (an undo, a load): start one and retry.
+          await t.tonal_preview_begin();
+          await t.adjust_preview_set(...adjArgs(v));
+          changed = await t.adjust_commit(...adjArgs(v));
+        }
+        adjFlushRef.current();
+        if (changed) adjSyncRef.current();
+        return changed;
       },
       apply: async (v) => {
         adjOpenRef.current = false;
