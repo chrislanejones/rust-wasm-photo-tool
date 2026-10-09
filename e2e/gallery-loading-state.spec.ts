@@ -39,7 +39,7 @@ const canvasSize = (page: Page) =>
   });
 
 /** Every ↻ working-mark currently in the gallery strip. */
-const marks = (page: Page) => page.locator('[data-slot="status-mark"][data-status="working"]');
+const marks = (page: Page) => page.locator('[data-id] [data-slot="status-mark"][data-status="working"]');
 
 async function setup(page: Page) {
   await blockExternalNetwork(page);
@@ -49,7 +49,8 @@ async function setup(page: Page) {
   await input.setInputFiles(FIXTURES);
   await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 30_000 });
   await expect.poll(() => canvasSize(page), { timeout: 30_000 }).not.toBe("none");
-  await page.waitForTimeout(1500);
+  await expect(page.locator("[data-id] img")).toHaveCount(2);
+  await expect(marks(page)).toHaveCount(0);
 }
 
 async function pgDn(page: Page) {
@@ -67,29 +68,39 @@ test("G0 at rest the gallery shows no working mark at all", async ({ page }) => 
   await expect(marks(page)).toHaveCount(0);
 });
 
+// Observe the transient DOM state in the page. Driver polling can miss a
+// complete switch, even under CPU throttling, or read two different frames.
+async function watchSwitch(page: Page) {
+  await page.evaluate(() => {
+    const root = document.querySelector("[data-gallery-card]")!;
+    const observer = new MutationObserver(() => {
+      const marks = root.querySelectorAll('[data-id] [data-status="working"]');
+      if (!marks.length) return;
+      const mark = marks[0]!;
+      const sample = {
+        count: marks.length,
+        selected: mark.closest("[data-id]")?.getAttribute("aria-pressed"),
+        glyph: !!mark.querySelector("svg"),
+        text: mark.textContent,
+      };
+      root.setAttribute("data-switch-sample", JSON.stringify(sample));
+      observer.disconnect();
+    });
+    observer.observe(root, { childList: true, subtree: true, attributes: true });
+  });
+}
+
+async function switchSample(page: Page) {
+  const root = page.locator("[data-gallery-card]").first();
+  await expect(root).toHaveAttribute("data-switch-sample", /Loading/);
+  return JSON.parse((await root.getAttribute("data-switch-sample"))!);
+}
+
 test("G1 the requested-but-not-loaded photo carries a ↻ mark, and only that one", async ({ page }) => {
   await setup(page);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+  await watchSwitch(page);
   await pgDn(page);
-
-  // One mark, on exactly one tile — not one per thumbnail.
-  await expect(marks(page)).toHaveCount(1, { timeout: 60_000 });
-  const owner = await marks(page).first().evaluate((el) => {
-    const tile = el.closest("[data-id]");
-    return tile?.getAttribute("data-id") ?? null;
-  });
-  expect(owner, "the mark sits on a gallery tile").not.toBeNull();
-
-  // It is the tile the ring is on — the photo we asked for, not the one the
-  // canvas is still showing.
-  const pressed = await page.evaluate(
-    (id) => document.querySelector(`[data-id="${id}"]`)?.getAttribute("aria-pressed"),
-    owner,
-  );
-  expect(pressed, "the marked tile is the selected one").toBe("true");
-
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  expect(await switchSample(page)).toMatchObject({ count: 1, selected: "true" });
 });
 
 test("G2 once the pixels are in, the mark goes away and the ring stays", async ({ page }) => {
@@ -104,13 +115,9 @@ test("G2 once the pixels are in, the mark goes away and the ring stays", async (
 
 test("G3 the mark is not colour-only and says what it means", async ({ page }) => {
   await setup(page);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+  await watchSwitch(page);
   await pgDn(page);
-  const mark = marks(page).first();
-  await expect(mark).toHaveCount(1, { timeout: 60_000 });
-  // A glyph, so it reads in greyscale, plus text for assistive tech.
-  expect(await mark.locator("svg").count(), "there is a glyph, not just a tint").toBe(1);
-  expect(await mark.locator(".sr-only").innerText(), "the meaning travels as text").toMatch(/^Loading /);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  const sample = await switchSample(page);
+  expect(sample.glyph).toBe(true);
+  expect(sample.text).toMatch(/Loading /);
 });

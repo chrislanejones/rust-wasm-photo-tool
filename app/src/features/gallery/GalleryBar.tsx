@@ -431,7 +431,7 @@ export function GalleryBar({
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "group pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+            : "group/bar pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
         }
       >
         {/* Hover the bar and a close appears top-left; the top bar's Gallery
@@ -589,7 +589,16 @@ export function GalleryBar({
                     // pictures. Now 20px both ways, with the side padding
                     // raised to match so the left column is not tighter to the
                     // panel edge than it is to its neighbour.
-                    "grid w-full grid-cols-2 content-start items-start gap-x-5 gap-y-5 overflow-y-auto px-3 pt-3 pb-3"
+                    //
+                    // `auto-rows-max` is the THIRD, and closes the overlap
+                    // (Night 10-07). This grid's height is fixed by its
+                    // minmax(0,1fr) row, and each tile is overflow-hidden, so
+                    // its automatic minimum is 0: with 12 photos the plain
+                    // `auto` rows were squeezed to fit the column (61px rows
+                    // under 91px tiles, each row covering the one above)
+                    // instead of overflowing into the scroll. max-content
+                    // rows are sized by the tile and the grid scrolls.
+                    "grid w-full grid-cols-2 auto-rows-max content-start items-start gap-x-5 gap-y-5 overflow-y-auto px-3 pt-3 pb-3"
                   : "flex gap-2 overflow-x-auto py-1.5 px-2"
               }
               style={{ scrollbarWidth: "none" }}
