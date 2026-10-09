@@ -131,7 +131,21 @@ function button(label: string): HTMLButtonElement {
   return btn as HTMLButtonElement;
 }
 
+let previews: { onload: (() => void) | null; onerror: (() => void) | null; src: string }[];
+let intersect: (() => void)[];
 beforeEach(() => {
+  previews = [];
+  intersect = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: Element) { intersect.push(() => this.callback([{ target, isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver)); }
+    unobserve() {}
+    disconnect() {}
+  });
+  vi.stubGlobal("Image", class {
+    onload = null; onerror = null; src = "";
+    constructor() { previews.push(this); }
+  });
   vi.useFakeTimers({ now: T0 });
   h.auth = { isAuthenticated: true, isLoading: false };
   h.links = [];
@@ -148,6 +162,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("Settings › Shared", () => {
@@ -290,4 +305,24 @@ describe("Settings › Shared", () => {
     expect(thumb!.querySelector("svg")).not.toBeNull();
     expect(document.body.querySelector("img")).toBeNull();
   });
+});
+
+
+it("defers preview fetches until near view, then handles failure and a renewed URL", async () => {
+  h.links = [link()];
+  await render();
+  expect(previews).toHaveLength(0);
+  act(() => intersect.forEach((show) => show()));
+  expect(previews).toHaveLength(1);
+  act(() => vi.advanceTimersByTime(301));
+  expect(container.querySelectorAll('.skeleton')).toHaveLength(1);
+  expect(button("Pause sunset.jpg").disabled).toBe(false);
+  act(() => previews[0]!.onerror!());
+  expect(container.querySelector('[aria-label^="Preview unavailable"]')).toBeTruthy();
+  expect(container.querySelector('.skeleton')).toBeNull();
+  h.links = [link({ imageUrl: "https://example.invalid/renewed.png" })];
+  await render();
+  act(() => intersect.forEach((show) => show()));
+  act(() => previews.at(-1)!.onload!());
+  expect(container.querySelector('img')?.getAttribute('src')).toBe("https://example.invalid/renewed.png");
 });

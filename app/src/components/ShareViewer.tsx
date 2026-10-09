@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { Download, Link2, Pencil } from "lucide-react";
+import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,9 @@ export function ShareViewer({ token }: { token: string }) {
   const share = useQuery(api.shares.get, { token });
   const recordView = useMutation(api.shares.recordView);
   const counted = useRef(false);
+  const querySkeleton = useDelayedFlag(share === undefined);
+  const [loadingShown, setLoadingShown] = useState(false);
+  useEffect(() => { if (querySkeleton) setLoadingShown(true); }, [querySkeleton]);
 
   // Count a view once per open (best-effort; ignore failures). Not for a
   // stopped link: the server would refuse it anyway, and a paused link that
@@ -56,10 +61,10 @@ export function ShareViewer({ token }: { token: string }) {
       </header>
 
       <main className="flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-10">
-        {share === undefined && (
-          <div className="flex w-full flex-col items-center gap-4" aria-label="Loading shared image">
-            <Skeleton className="h-[60vh] w-full rounded-xl" />
-            <SkeletonText aria-hidden="true" noOfLines={1} className="max-w-[16rem] items-center" lineClassName="h-3" />
+        {share === undefined && querySkeleton && (
+          <div className="flex w-full flex-col items-center gap-4" role="status" aria-busy="true" aria-label="Loading shared image">
+            <Skeleton decorative className="h-[60vh] w-full rounded-xl" />
+            <SkeletonText role={undefined} aria-live={undefined} aria-busy={undefined} aria-hidden="true" noOfLines={1} className="max-w-[16rem] items-center" lineClassName="h-3" />
           </div>
         )}
 
@@ -104,7 +109,7 @@ export function ShareViewer({ token }: { token: string }) {
         )}
 
         {share && share.status === "live" && (
-          <ShareReady share={share} editorUrl={editorUrl} />
+          <ShareReady key={token} share={share} editorUrl={editorUrl} loadingShown={loadingShown} />
         )}
       </main>
     </div>
@@ -120,7 +125,8 @@ interface ShareData {
   createdAt: number;
 }
 
-function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string }) {
+function ShareReady({ share, editorUrl, loadingShown = false }: { share: ShareData; editorUrl: string; loadingShown?: boolean }) {
+  const [attempt, setAttempt] = useState(0);
   const [downloading, setDownloading] = useState(false);
 
   const handleDownload = async () => {
@@ -156,12 +162,11 @@ function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string 
 
   return (
     <div className="flex w-full flex-col items-center gap-4">
-      <div className="w-full overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl">
-        <img
-          src={share.imageUrl}
-          alt={share.title ?? "Shared image"}
-          className="mx-auto block max-h-[70vh] w-auto max-w-full"
-        />
+      <div
+        className="overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
+        style={{ width: `min(100%, ${70 * share.canvasW / Math.max(1, share.canvasH)}vh)`, aspectRatio: `${share.canvasW} / ${Math.max(1, share.canvasH)}` }}
+      >
+        <ShareImage key={`${share.imageUrl}:${attempt}`} src={share.imageUrl} alt={share.title ?? "Shared image"} loadingShown={loadingShown} onRetry={() => setAttempt((n) => n + 1)} />
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-text-muted">
@@ -195,4 +200,16 @@ function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string 
       </div>
     </div>
   );
+}
+
+function ShareImage({ src, alt, loadingShown, onRetry }: { src: string; alt: string; loadingShown: boolean; onRetry: () => void }) {
+  const view = useThumbImage(src);
+  if (view.src) return <img src={view.src} alt={alt} className="block size-full object-contain" />;
+  if (view.failed) return (
+    <div className="flex size-full flex-col items-center justify-center gap-3 p-4">
+      <p role="status" className="text-sm">This image could not be loaded.</p>
+      <Button onClick={onRetry}>Try again</Button>
+    </div>
+  );
+  return view.showSkeleton || loadingShown ? <Skeleton className="size-full" aria-label={`Loading ${alt}`} /> : null;
 }
