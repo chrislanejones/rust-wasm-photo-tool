@@ -383,6 +383,15 @@ Known exception: export quality is seeded from the previous photo until edit
 archives carry it (AppShell quality seed). Guides are cleared rather than
 reloaded until they are persisted per photo (`useGuidesStore` TODO).
 
+**Night 13 audit (10-09-2026, master 315e857f):** still true. `SavedEdit`
+and the version-1 `CapturedState` omit export quality; changing only the seed
+would replace a preference with an engine default, not recover saved quality.
+ADR-031's persisted-format work is separate (also proposed in draft #329).
+Guide positions likewise have no saved field; clearing them prevents coordinates
+from one photo appearing on another. Guide color remains an app preference.
+The gallery caption names the collection (`12 photos · 12 max`); the Tools
+footer names the active photo (`3 of 12 · filename`).
+
 ## 10. One async grammar (Plan C §3, 10-05-2026)
 
 Every flow that waits — AI result, background removal, export, Download All,

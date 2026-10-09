@@ -1,5 +1,5 @@
 // The gallery count readout — "Selected: # of #" while selecting, otherwise
-// "# of # — # max 💡". Its own file because GalleryBar is under the max-lines
+// "# photos · # max 💡". Its own file because GalleryBar is under the max-lines
 // ratchet and this is the one piece of it that is genuinely self-contained:
 // four props in, no handlers, no state.
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -30,11 +30,10 @@ export function GalleryCount({
         ) : (
           <>
             <TinyNumberBox>{total}</TinyNumberBox>
-            <span>of</span>
-            <TinyNumberBox>{total}</TinyNumberBox>
+            <span>{total === 1 ? "photo" : "photos"}</span>
             {maxPhotos != null && (
               <>
-                <span>—</span>
+                <span>·</span>
                 <TinyNumberBox>{maxPhotos}</TinyNumberBox>
                 <span>max</span>
                 {/* Lightbulb, not (i). Every other explanation in the app
