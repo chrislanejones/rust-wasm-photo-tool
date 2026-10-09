@@ -57,3 +57,28 @@ no image-processing changes, no ratchet increase. Browser tests use synthetic
 network failure; they do not claim a real user's stored thumbnails are corrupt.
 
 Night 9: commit f648e0f9, PR #339.
+
+## Night 11: Sharing
+
+Master still `315e857f`; reviewed async rules, exceptions, sharing tests and
+ADR-063 (share limits remain server-owned). A local browser harness mounted the
+real ShareReady and LinkCard with held image responses, without a live backend:
+both rendered undecoded images and zero skeletons before the fix. Public image
+failure had no useful message. SharedPane already handled native load errors;
+that behavior was retained and now recovers when a signed URL changes.
+
+Changes: retain the viewer's loading feedback through decode; one status during
+query loading; dimensioned image frame, explicit error and Try again; per-preview
+loading/error state in the list. Preview requests remain deferred until near the
+viewport. All use the existing thumbnail loader and Skeleton.
+
+Files: ShareViewer.tsx, SharedPane.tsx, their tests, this report.
+Validation: 17 focused Vitest tests pass, including deferred preview fetch,
+renewed URL recovery and unchanged share actions. Browser harness verified two
+skeletons, failure, successful retry and identical image-frame bounds, with
+light/dark loading and ready screenshots. TypeScript and guardrails pass;
+ESLint has zero errors (existing warnings). No backend, authentication, share
+limits or mutations changed. Query data supplies dimensions; the pre-query
+placeholder cannot know an image's aspect ratio. No baseline increases.
+
+Night 10: commit 8ae47ea9, PR #340.

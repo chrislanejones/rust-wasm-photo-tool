@@ -28,7 +28,9 @@
 // NO CHART. There was a thirty-day bar row here; with views on one or two
 // days it drew a lone block at the right edge that read as a stray box, not a
 // chart. The view count and "last opened" beside the thumbnail say it.
-import { useEffect, useState } from "react";
+import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { useInView } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 // Through lib/cloud, not convex/react: a keyless build must open this pane
 // without "Could not find ConvexProviderWithAuth".
 import { useCloudAuth as useConvexAuth, useCloudMutation as useMutation, useCloudQuery as useQuery } from "@/lib/cloud";
@@ -120,7 +122,6 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
   // Limits are the rarely-used control, so they fold away under the row like
   // any other list's detail, and the pane reads as a list of links.
   const [limitsOpen, setLimitsOpen] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
 
   const run = async (what: NonNullable<typeof busy>, fn: () => Promise<unknown>, done?: string) => {
     setBusy(what);
@@ -146,7 +147,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
 
   const title = link.title ?? "Untitled";
   const paused = link.pausedAt !== null;
-  const hasImage = link.imageUrl !== null && !imageFailed;
+  const hasImage = link.imageUrl !== null;
 
   return (
     <li className="px-3 py-2.5">
@@ -159,13 +160,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
           title={hasImage ? undefined : "Preview unavailable"}
         >
           {hasImage ? (
-            <img
-              src={link.imageUrl!}
-              alt=""
-              className="size-full object-cover"
-              loading="lazy"
-              onError={() => setImageFailed(true)}
-            />
+            <LazySharePreview key={link.imageUrl} src={link.imageUrl!} />
           ) : (
             <ImageOff aria-hidden className="size-4 text-text-muted" />
           )}
@@ -346,4 +341,17 @@ export function SharedPane() {
       )}
     </div>
   );
+}
+
+function SharePreview({ src }: { src: string }) {
+  const view = useThumbImage(src);
+  if (view.src) return <img src={view.src} alt="" className="size-full object-cover" />;
+  if (view.failed) return <span role="img" aria-label="Preview unavailable. Open the shared link to try the image."><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
+  return view.showSkeleton ? <Skeleton className="size-full" aria-label="Loading share preview" /> : null;
+}
+
+function LazySharePreview({ src }: { src: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const visible = useInView(ref, { once: true, margin: "200px" });
+  return <span ref={ref} className="size-full">{visible && <SharePreview src={src} />}</span>;
 }
