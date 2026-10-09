@@ -107,3 +107,25 @@ title tooltip. It now locates the thumbnail by accessible name; both crop-frame
 regressions pass, including drag, Shift-drag, thumbnail shading and Crop All.
 
 Night 11: commit cd320838, PR #341.
+
+## Night 13: Photo identity
+
+Master remains v9.26. Confirmed the gallery repeated its total as both sides of
+"12 of 12". It now reads "12 photos · 12 max" (singular supported); selection
+still reads "Selected: 3 of 12". Tools keeps the active-photo identity.
+
+Audit: CapturedState v1 and SavedEdit contain no export quality. AppShell seeds
+the preference, then follows engine undo/redo. ADR-031's archive work and draft
+#329 propose persistence changes; changing only the UI seed cannot restore a
+value that was never saved. Deferred that dependency explicitly. Guide positions
+are not persisted and are cleared on photo switch; guide color is already a
+persistent app preference, covered by existing tests. No persistence migration.
+
+Files: GalleryCount.tsx and test, UI_CONSISTENCY.md, this report.
+Validation: 10 focused tests pass (count and guide preferences); 4 gallery
+browser regressions pass at compact/wide/phone widths with light/dark screenshots.
+Caption stays in its footer without changing gallery geometry. TypeScript,
+lint (existing warnings) and guardrails pass. Plain text clarifies identity;
+no processing, photo state, keyboard behavior or runtime cost changes.
+
+Night 12: commit cdeb0c50, PR #342.
