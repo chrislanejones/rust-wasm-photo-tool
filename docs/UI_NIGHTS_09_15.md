@@ -32,3 +32,28 @@ Accessibility/performance: keyboard focus still reveals controls; only the
 hovered tile reveals pointer actions. CSS-only product changes add no runtime
 work. Remaining risk: overlapping drafts #317 and #319 should be reconciled
 at review; this branch does not include their other changes.
+
+## Night 10: Welcome Back
+
+Master remains `315e857f`; rechecked rules, exceptions and async ADR-081.
+Browser reproduction held restored thumbnail URLs: both boxes stayed empty.
+Resume also formerly rendered from effect-created URLs, so its initial render
+omitted the photo tiles. Rendered-component coverage confirms the stable count.
+
+Changes: MediaTile uses the existing useThumbImage hook; Resume renders by photo
+identity immediately. The hook accepts existing URLs as well as owned blobs,
+uses useDelayedFlag, waits for actual decode, and terminates stalled loading at
+15 seconds. Previously decoded pixels survive updates and superseded callbacks
+are ignored. Icons/count tiles are unchanged; no new presentation primitive.
+
+Files: MediaTile.tsx and its test, ResumeContent.tsx, useThumbImage.ts,
+resume-image-loading.spec.ts, this report.
+Validation: 41 focused tests pass, including existing gallery tests; browser
+hold/failure test passes, with identical card bounds and usable Resume action.
+Light/dark screenshots show skeletons where the baseline had blank boxes.
+TypeScript, ESLint and guardrails pass. Each thumbnail has one loading status;
+error has a named image fallback and directs users to Resume. No new animation,
+no image-processing changes, no ratchet increase. Browser tests use synthetic
+network failure; they do not claim a real user's stored thumbnails are corrupt.
+
+Night 9: commit f648e0f9, PR #339.

@@ -5,11 +5,16 @@
 //             small to see on its own)
 // Used by the Welcome-back row and anywhere an icon needs to read at tile size.
 import type { ComponentType } from "react";
+import { ImageOff } from "lucide-react";
+import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface MediaTileProps {
   /** Photo thumbnail URL. */
   src?: string;
+  thumbBlob?: Blob;
+  alt?: string;
   /** "+N" overflow placeholder (when there's no src/icon). */
   count?: number;
   /** An icon rendered at the tile size. */
@@ -22,6 +27,8 @@ interface MediaTileProps {
 
 export function MediaTile({
   src,
+  thumbBlob,
+  alt = "Photo preview",
   count,
   icon: Icon,
   onClick,
@@ -38,14 +45,14 @@ export function MediaTile({
       title={title}
       className={cn(
         "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border",
-        src ? "" : "bg-bg-elevated text-text-secondary",
+        (src || thumbBlob) ? "" : "bg-bg-elevated text-text-secondary",
         interactive && "transition-colors hover:border-border-active",
         className,
       )}
       {...rest}
     >
-      {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
+      {src || thumbBlob ? (
+        <MediaTilePhoto source={thumbBlob ?? src!} alt={alt} />
       ) : Icon ? (
         <Icon className="h-7 w-7" />
       ) : count != null ? (
@@ -53,4 +60,11 @@ export function MediaTile({
       ) : null}
     </Comp>
   );
+}
+
+function MediaTilePhoto({ source, alt }: { source: Blob | string; alt: string }) {
+  const view = useThumbImage(source);
+  if (view.src) return <img src={view.src} alt={alt} className="h-full w-full object-cover" />;
+  if (view.failed) return <span role="img" aria-label={`${alt} could not be displayed. Resume editing to open the photo.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
+  return view.showSkeleton ? <Skeleton className="size-full" aria-label={`Loading ${alt}`} /> : null;
 }
