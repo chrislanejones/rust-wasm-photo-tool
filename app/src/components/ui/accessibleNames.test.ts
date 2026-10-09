@@ -105,10 +105,10 @@ describe("hover-only controls still show on keyboard focus (WCAG 2.4.7)", () => 
   const gallery = read("features/gallery/Thumb.tsx");
 
   it("Remove reveals itself on keyboard focus", () => {
-    expect(gallery).toMatch(/opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"/);
+    expect(gallery).toMatch(/opacity-0 group-hover\/tile:opacity-100 focus-visible:opacity-100 transition-all"/);
   });
 
   it("Select reveals itself on keyboard focus", () => {
-    expect(gallery).toMatch(/"opacity-0 group-hover:opacity-100 focus-visible:opacity-100"/);
+    expect(gallery).toMatch(/"opacity-0 group-hover\/tile:opacity-100 focus-visible:opacity-100"/);
   });
 });

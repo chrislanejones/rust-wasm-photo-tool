@@ -101,7 +101,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           tabIndex={0}
           aria-label={`Select photo ${entry.name}`}
           aria-pressed={isActive}
-          className={`photo-thumb group ${isActive ? "active" : ""} ${selected ? "selected" : ""} ${vertical ? "photo-thumb-grid" : ""} relative`}
+          className={`photo-thumb group/tile ${isActive ? "active" : ""} ${selected ? "selected" : ""} ${vertical ? "photo-thumb-grid" : ""} relative`}
           onClick={onSelect}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -273,7 +273,10 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
       )}
 
       {/* Remove — bottom-left, same rounded-square shape as the checkbox, red.
-          Shown on hover only. */}
+          Shown on hover only — hover of THIS tile: the group is named
+          (`group/tile`) because a bare group-hover matches any `.group`
+          ancestor, and the bar's wrapper was one, so hovering the bar's
+          padding lit all 24 buttons of 12 tiles (Night 10-07). */}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
         aria-label="Remove image"
@@ -283,7 +286,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         // INVISIBLE: opacity 0, and opacity hides an element's outline too, so
         // the global button:focus-visible ring could not show (WCAG 2.4.7,
         // measured in QC 09-27-2026). The Select toggle beside it gets the same.
-        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-on-photo opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-on-photo opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
       </button>
@@ -332,7 +335,7 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-on-photo opacity-100"
             : "bg-black/55 border-on-photo/80 text-on-photo/45"
-        } ${selectionActive || batchMode ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+        } ${selectionActive || batchMode ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
       </button>
