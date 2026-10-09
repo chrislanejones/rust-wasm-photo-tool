@@ -325,4 +325,9 @@ it("defers preview fetches until near view, then handles failure and a renewed U
   act(() => intersect.forEach((show) => show()));
   act(() => previews.at(-1)!.onload!());
   expect(container.querySelector('img')?.getAttribute('src')).toBe("https://example.invalid/renewed.png");
+  h.links = [link({ imageUrl: "https://example.invalid/renewed-again.png" })];
+  await render();
+  expect(container.querySelector('img')?.getAttribute('src')).toBe("https://example.invalid/renewed.png");
+  act(() => previews.at(-1)!.onload!());
+  expect(container.querySelector('img')?.getAttribute('src')).toBe("https://example.invalid/renewed-again.png");
 });

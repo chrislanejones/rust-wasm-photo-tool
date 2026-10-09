@@ -46,3 +46,14 @@ it("retries a failed image without disabling other actions", async () => {
   expect(screen.getByRole("img", { name: "Harbor" })).toBeTruthy();
   expect(container.querySelector(".skeleton")).toBeNull();
 });
+
+it("keeps decoded pixels when the same share receives a renewed image URL", async () => {
+  query.value = share;
+  const { rerender } = render(<ShareViewer token="test" />);
+  await act(async () => { probes[0]!.onload!(); probes[0]!.resolve(); });
+  query.value = { ...share, imageUrl: "/renewed.png" };
+  rerender(<ShareViewer token="test" />);
+  expect(screen.getByRole('img', { name: 'Harbor' }).getAttribute('src')).toBe('/share.png');
+  await act(async () => { probes.at(-1)!.onload!(); probes.at(-1)!.resolve(); });
+  expect(screen.getByRole('img', { name: 'Harbor' }).getAttribute('src')).toBe('/renewed.png');
+});

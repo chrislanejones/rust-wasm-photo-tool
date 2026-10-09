@@ -28,7 +28,7 @@ function LazyImage(props: Omit<DecodedImageProps, "loading">) {
 }
 
 function ImageContent({ source, alt, className = "size-full object-cover", fallback, loadingShown = false }: Omit<DecodedImageProps, "loading">) {
-  const view = useThumbImage(source);
+  const view = useThumbImage(source, 15_000);
   if (view.src) return <img src={view.src} alt={alt} draggable={false} className={className} />;
   if (view.failed) return fallback ?? <span role="img" aria-label={`${alt || "Image"} could not be displayed`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
   return view.showSkeleton || loadingShown ? <Skeleton className="size-full" aria-label={`Loading ${alt || "image preview"}`} /> : null;

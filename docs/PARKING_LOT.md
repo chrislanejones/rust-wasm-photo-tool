@@ -4,11 +4,14 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — UI Night 8 PR 1 leftovers: three things the gallery skeleton work surfaced (10-06-2026)
+## Addressed in UI Night 9 draft #339 — gallery leftovers (10-06-2026)
 
 Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
 All three are on master as well — checked against a master build — so none is
 in that diff.
+
+UI Nights 9–15 (10-09-2026) reproduced and addressed these on the review stack;
+see [the run report](UI_NIGHTS_09_15.md). They are not yet merged.
 
 | What | Where | Notes |
 | --- | --- | --- |
@@ -4221,3 +4224,18 @@ on touch, which is most of the phone surface, and the two densest files
 - **Stale comment in `NewActions.tsx`** (10-08, after v9.25): the header block
   still says "Generate is STILL disabled (see GENERATE_BLOCKED_REASON)". #337
   removed that constant and Generate runs now. Comment-only fix.
+
+
+## UI Nights 9–15 follow-ups (10-09-2026)
+
+- Export-quality restoration needs persisted quality in capture/saved edits and
+  archive compatibility work (ADR-031, draft #329). The UI run does not migrate
+  data or claim per-photo quality persistence.
+- Guide positions have no persisted owner. They still clear on photo switch;
+  guide color is an app preference. Persisting positions remains separate work.
+- Trash/purge and per-photo cloud backup/conflict state remain separate backend
+  projects. No UI-night change presents unwired actions or fabricated state.
+- Existing drafts #317 (gallery) and #319 (loading tests) overlap the Night 9
+  changes and need reconciliation during review. Do not merge both blindly.
+- The Night 14 stack addresses the muted-text and Settings-rail rows above;
+  their implementation is pending review, not a master release.

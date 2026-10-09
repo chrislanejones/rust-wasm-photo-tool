@@ -159,7 +159,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
           title={hasImage ? undefined : "Preview unavailable"}
         >
           {hasImage ? (
-            <DecodedImage key={link.imageUrl} source={link.imageUrl!} alt="" loading="lazy" fallback={<span role="img" aria-label="Preview unavailable. Open the shared link to try the image."><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
+            <DecodedImage source={link.imageUrl!} alt="" loading="lazy" fallback={<span role="img" aria-label="Preview unavailable. Open the shared link to try the image."><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
           ) : (
             <ImageOff aria-hidden className="size-4 text-text-muted" />
           )}

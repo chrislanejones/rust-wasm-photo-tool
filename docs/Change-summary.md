@@ -11486,3 +11486,15 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | --- | --- |
 | **Webhook output host** (#338) | The first real generate job failed with "Rejected non-Replicate output host": Replicate returned the image from its Cloudflare R2 bucket (`ai-gateway-outputs.<account>.r2.cloudflarestorage.com`). The SSRF guard in `convex/http.ts` now also accepts that one bucket host, pinned with its account id — never `*.r2.cloudflarestorage.com`. Deployed to `brave-ant-608` before the merge. |
 | **Gates** | CI 17/17; convex tsc 0 (bar the existing `process` types). No client or engine change (892,634 B). |
+
+
+## Pending review: UI Nights 9–15 — 2026-10-10
+
+Draft PRs #339–#345 contain the gallery layout, Welcome Back/Shared/Batch preview
+loading, gallery count and Settings keyboard/contrast improvements. These have
+not been merged or released; v9.26 remains the latest release.
+
+The follow-up fixes two stale ORA/plugin test selectors to address Settings tabs,
+updates the marketing feature cards and canonical feature list, and regenerates
+the Trail Log squares and sitemap dates from their sources. Details and validation
+are in [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md).

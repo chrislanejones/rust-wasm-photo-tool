@@ -166,7 +166,7 @@ function ShareReady({ share, editorUrl, loadingShown = false }: { share: ShareDa
         className="overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
         style={{ width: `min(100%, ${70 * share.canvasW / Math.max(1, share.canvasH)}vh)`, aspectRatio: `${share.canvasW} / ${Math.max(1, share.canvasH)}` }}
       >
-        <ShareImage key={`${share.imageUrl}:${attempt}`} src={share.imageUrl} alt={share.title ?? "Shared image"} loadingShown={loadingShown} onRetry={() => setAttempt((n) => n + 1)} />
+        <ShareImage key={attempt} src={share.imageUrl} alt={share.title ?? "Shared image"} loadingShown={loadingShown} onRetry={() => setAttempt((n) => n + 1)} />
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-text-muted">

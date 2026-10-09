@@ -400,9 +400,9 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Multi-photo Gallery": {
     group: "export",
     title: "Multi-photo gallery",
-    plain: "Work on many photos at once: add, switch, duplicate, multi-select and export together.",
+    plain: "Work on many photos at once, with clear loading previews: add, switch, duplicate, multi-select and export together.",
     detail:
-      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read.",
+      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read. Docked rows scroll without overlapping; hover reveals only that photo's controls. Welcome Back previews keep their space while loading and show a fallback if an image cannot be displayed.",
   },
   // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
   "Batch Crop": {
@@ -411,7 +411,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain:
       "Crop every open photo to the same shape at once. Tick the exceptions and they get a crop of their own.",
     detail:
-      "Batch › Crop. Main and Exceptions each keep their own ratio, and one press crops both. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all.",
+      "Batch › Crop. Main and Exceptions each keep their own ratio, and one press crops both. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all. Grid previews keep their space while loading, show when an image is unavailable, and keep the previous preview visible while an edit loads.",
   },
   "SVG → SVG": {
     group: "export",
@@ -448,7 +448,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain:
       "Share a link anyone can open. See how often it was viewed, and let it switch off after N views or on a date.",
     detail:
-      "Export → Share link uploads a flattened PNG; Settings → Shared lists every link. Each opening is stored as a time only.",
+      "Export → Share link uploads a flattened PNG; Settings → Shared lists every link. Each opening is stored as a time only. The public image shows a loading placeholder until it is ready, with Try again if it fails. List previews load near the viewport and keep the previous picture while a renewed image address loads.",
   },
   "Security tab": {
     group: "export",
@@ -484,8 +484,8 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Keyboard accessibility": {
     group: "privacy",
     title: "Keyboard accessibility",
-    plain: "Skip to canvas, labeled landmarks, named tool buttons, Escape closes dialogs.",
-    detail: "On top of the tool / number / Alt shortcuts.",
+    plain: "Skip to canvas, named controls, keyboard navigation in Settings, and readable help text in both themes.",
+    detail: "Up/Down moves through Settings sections, Home/End jumps to the first or last, and Tab reaches the selected section. Escape closes dialogs. Muted help text and shortcut headings meet AA contrast in light and dark themes, alongside the tool / number / Alt shortcuts.",
   },
   "Keyboard Shortcut Modal": {
     group: "privacy",
