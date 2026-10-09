@@ -6,8 +6,7 @@
 // Used by the Welcome-back row and anywhere an icon needs to read at tile size.
 import type { ComponentType } from "react";
 import { ImageOff } from "lucide-react";
-import { useThumbImage } from "@/features/gallery/useThumbImage";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DecodedImage } from "@/components/ui/decoded-image";
 import { cn } from "@/lib/utils";
 
 interface MediaTileProps {
@@ -52,7 +51,7 @@ export function MediaTile({
       {...rest}
     >
       {src || thumbBlob ? (
-        <MediaTilePhoto source={thumbBlob ?? src!} alt={alt} />
+        <DecodedImage source={thumbBlob ?? src!} alt={alt} fallback={<span role="img" aria-label={`${alt} could not be displayed. Resume editing to open the photo.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
       ) : Icon ? (
         <Icon className="h-7 w-7" />
       ) : count != null ? (
@@ -60,11 +59,4 @@ export function MediaTile({
       ) : null}
     </Comp>
   );
-}
-
-function MediaTilePhoto({ source, alt }: { source: Blob | string; alt: string }) {
-  const view = useThumbImage(source);
-  if (view.src) return <img src={view.src} alt={alt} className="h-full w-full object-cover" />;
-  if (view.failed) return <span role="img" aria-label={`${alt} could not be displayed. Resume editing to open the photo.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
-  return view.showSkeleton ? <Skeleton className="size-full" aria-label={`Loading ${alt}`} /> : null;
 }

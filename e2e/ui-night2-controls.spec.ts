@@ -80,7 +80,7 @@ test("Settings › Appearance: each labeled pair is one named radio group and on
   await importImages(page, 1);
   await page.getByRole("button", { name: /^Settings/ }).first().click();
   const dialog = page.getByRole("dialog").first();
-  await dialog.getByRole("button", { name: "Appearance", exact: true }).click();
+  await dialog.getByRole("tab", { name: "Appearance", exact: true }).click();
 
   // The accessibility tree, not the DOM: getByRole reads the tree.
   const theme = dialog.getByRole("radiogroup", { name: "Theme" });
@@ -143,7 +143,7 @@ test("Super User's plain inputs: their class string still gets the focus ring (p
   await importImages(page, 1);
   await page.getByRole("button", { name: /^Settings/ }).first().click();
   const dialog = page.getByRole("dialog").first();
-  await dialog.getByRole("button", { name: "General", exact: true }).click();
+  await dialog.getByRole("tab", { name: "General", exact: true }).click();
   await dialog.evaluate((d, cls) => {
     const before = document.createElement("button");
     before.textContent = "before";

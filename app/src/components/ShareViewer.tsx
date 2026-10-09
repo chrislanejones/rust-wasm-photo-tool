@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { Download, Link2, Pencil } from "lucide-react";
-import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { DecodedImage } from "@/components/ui/decoded-image";
 import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "../../../convex/_generated/api";
@@ -203,13 +203,10 @@ function ShareReady({ share, editorUrl, loadingShown = false }: { share: ShareDa
 }
 
 function ShareImage({ src, alt, loadingShown, onRetry }: { src: string; alt: string; loadingShown: boolean; onRetry: () => void }) {
-  const view = useThumbImage(src);
-  if (view.src) return <img src={view.src} alt={alt} className="block size-full object-contain" />;
-  if (view.failed) return (
+  return <DecodedImage source={src} alt={alt} className="block size-full object-contain" loadingShown={loadingShown} fallback={
     <div className="flex size-full flex-col items-center justify-center gap-3 p-4">
       <p role="status" className="text-sm">This image could not be loaded.</p>
       <Button onClick={onRetry}>Try again</Button>
     </div>
-  );
-  return view.showSkeleton || loadingShown ? <Skeleton className="size-full" aria-label={`Loading ${alt}`} /> : null;
+  } />;
 }

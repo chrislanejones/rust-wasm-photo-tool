@@ -12,8 +12,7 @@ import {
   CanvasActionBarButton,
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
-import { useThumbImage } from "@/features/gallery/useThumbImage";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DecodedImage } from "@/components/ui/decoded-image";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
 interface Props {
@@ -37,15 +36,6 @@ const TILE_AREAS: string[] = [
   "3 / 4 / 4 / 5",
   "3 / 5 / 4 / 6",
 ];
-
-/** Each mounted photo owns its decode; the gallery loader retains the last
- * decoded pixels through edits and releases object URLs on unmount. */
-function BatchThumbnail({ photo }: { photo: PhotoEntry }) {
-  const view = useThumbImage(photo.thumbBlob);
-  if (view.src) return <img src={view.src} alt={photo.name} draggable={false} className="size-full object-contain" />;
-  if (view.failed) return <span role="img" aria-label={`${photo.name} could not be displayed. Select the photo to open it.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
-  return view.showSkeleton ? <Skeleton className="size-full" aria-label={`Loading ${photo.name}`} /> : null;
-}
 
 export function GridThumbnails({
   photos,
@@ -115,7 +105,7 @@ export function GridThumbnails({
               className="flex h-full w-full items-center justify-center"
               aria-label={p.name}
             >
-              <BatchThumbnail photo={p} />
+              <DecodedImage source={p.thumbBlob} alt={p.name} className="size-full object-contain" fallback={<span role="img" aria-label={`${p.name} could not be displayed. Select the photo to open it.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
             </button>
             <BatchCropThumbShade entry={p} isActive={false} cover={false} />
             <BatchExceptionCheckbox photoId={p.id} name={p.name} />

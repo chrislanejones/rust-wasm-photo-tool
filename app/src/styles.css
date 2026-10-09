@@ -94,7 +94,7 @@
   --border-active: #c98f3f;
   --text-primary: #2a2622;
   --text-secondary: #5c554c;
-  --text-muted: #8a8175;
+  --text-muted: #6b6258;
   /* Light-mode accent = deeper warm tan (not the dark-mode cream): cream is
      illegible as text / a slider thumb / a thin line on light surfaces. Used
      for --accent + --primary so all fills, text-primary, and the range thumb
@@ -211,7 +211,7 @@
   --border-active: #fcdfc2;
   --text-primary: #eeeeee;
   --text-secondary: #b4b4b4;
-  --text-muted: #8a8a8a;
+  --text-muted: #969696;
   --accent: #fcdfc2;
   --accent-foreground: #3a3128;
   --accent-dim: rgba(252, 223, 194, 0.15);
@@ -346,9 +346,9 @@
      dark (14.70:1 / 11.11:1).
 
      Likewise --color-theme-sidebar-muted is --muted-foreground, NOT the
-     name-matching --text-muted: that one is #8a8175 in light and measures
-     **3.65:1** on the sidebar, which fails AA for the `text-xs` helper line it
-     would have colored. --muted-foreground is 6.99:1 light / 8.56:1 dark.
+     name-matching --text-muted: before Night 14 that was #8a8175 in light
+     and measured **3.65:1** on the sidebar. Night 14 darkens muted text; the
+     sidebar retains its already-legible role. --muted-foreground is 6.99:1 light / 8.56:1 dark.
      The token whose NAME matches is not always the token whose CONTRAST does.
 
      The five `bg-theme-accent` references moved to `bg-theme-muted` instead of
@@ -2695,7 +2695,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--accent);
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 

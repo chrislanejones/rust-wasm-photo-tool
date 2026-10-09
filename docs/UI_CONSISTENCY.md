@@ -149,7 +149,8 @@ Import these. Do not re-implement them.
 | Segmented / single-select | `ui/tool-button-group` |
 | Independent toggles | `ui/toggle-button-group` |
 | Tool mode switch | `ui/tool-mode-toggle` (wraps `tool-button-group`) |
-| Overlay tabs | `ui/segmented-tabs` |
+| Overlay / Settings tabs | `ui/segmented-tabs` (vertical variant: roving arrows, Home/End, linked panel) |
+| Decoded resource images | `ui/decoded-image`, over `useThumbImage` and `ui/skeleton` |
 | Cards as a radio group | none — `ui/radio-cards` lost its last caller and was deleted 10-05-2026 (fallow: unused file) |
 | On/off switch | `ui/switch` |
 | Modal | `ui/dialog` |
@@ -443,3 +444,20 @@ Where each flow stands (10-05-2026):
 | Batch passes | failures counted in the end toast |
 | Settings sync | already the reference (`lib/sync/status.ts`): own states, retry, timeouts |
 | Edit backup | a failed cloud upload holds "Not backed up — saved on this device" in the status bar until the next upload lands |
+
+
+## UI Night 14 follow-up (10-09-2026)
+
+The four new media consumers share `ui/decoded-image`; resource identity belongs
+to the caller's React key, and a changed blob for that identity retains its last
+decoded pixels. It introduces no second loading state machine or shimmer. Lazy
+share previews only start their loader near the viewport. Each independent image
+loading region has one status; the existing gallery card retains its aggregate
+announcement. A processing operation continues to show its source and progress.
+
+Settings uses the vertical `segmented-tabs` variant with one Tab stop and linked
+panel semantics. Muted text now clears AA on secondary/tertiary/elevated surfaces
+in both themes (minimum 4.68:1 light, 4.79:1 dark); shortcut group headings use the
+secondary text role. Ratchets tighten: spacing 42 → 41, raw buttons 14 → 13;
+radius remains 22. Measured by `e2e/ui-night14-accessibility.spec.ts` and the AST
+counter, not rounded assumptions.
