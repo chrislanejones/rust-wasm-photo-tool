@@ -2,8 +2,8 @@
 // hero, each with its own Exception checkbox, and the bar under the grid that
 // pages through a gallery bigger than one grid. The hero (the open photo's live
 // canvas) is rendered by AppShell.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { BatchCropThumbShade } from "@/features/gallery/BatchCropThumbShade";
 import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
@@ -12,6 +12,8 @@ import {
   CanvasActionBarButton,
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
+import { useThumbImage } from "@/features/gallery/useThumbImage";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
 interface Props {
@@ -36,66 +38,13 @@ const TILE_AREAS: string[] = [
   "3 / 5 / 4 / 6",
 ];
 
-/**
- * Maps each photo to a stable Object URL for its `thumbBlob`. URLs are tracked
- * per (photo.id, blob identity) in a ref so we don't churn URLs (and trigger
- * <img> re-fetches) when the photos array reference changes but the blob
- * itself didn't. URLs are only revoked when:
- *   • the photo is removed from the array, or
- *   • its `thumbBlob` is replaced with a new blob (e.g. after Apply Logo to All),
- *   • the hook unmounts.
- * This prevents the race where rapid `setPhotos` calls during a batch run
- * revoke a brand-new URL before the browser has fetched it.
- */
-function useThumbUrls(photos: PhotoEntry[]): Record<string, string> {
-  // ref maps photo.id → { blob, url } so we can detect blob swaps reliably.
-  const cacheRef = useRef<Map<string, { blob: Blob; url: string }>>(new Map());
-  const [urls, setUrls] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const cache = cacheRef.current;
-    const seenIds = new Set<string>();
-    const next: Record<string, string> = {};
-    let changed = false;
-
-    for (const p of photos) {
-      seenIds.add(p.id);
-      const cached = cache.get(p.id);
-      if (cached && cached.blob === p.thumbBlob) {
-        next[p.id] = cached.url;
-      } else {
-        // Either new photo or thumbBlob was replaced.
-        if (cached) URL.revokeObjectURL(cached.url);
-        const url = URL.createObjectURL(p.thumbBlob);
-        cache.set(p.id, { blob: p.thumbBlob, url });
-        next[p.id] = url;
-        changed = true;
-      }
-    }
-
-    // Drop URLs for photos that have been removed.
-    for (const id of Array.from(cache.keys())) {
-      if (!seenIds.has(id)) {
-        const entry = cache.get(id)!;
-        URL.revokeObjectURL(entry.url);
-        cache.delete(id);
-        changed = true;
-      }
-    }
-
-    if (changed) setUrls(next);
-  }, [photos]);
-
-  // Final cleanup on unmount only — revoke everything left in the cache.
-  useEffect(() => {
-    const cache = cacheRef.current;
-    return () => {
-      for (const { url } of cache.values()) URL.revokeObjectURL(url);
-      cache.clear();
-    };
-  }, []);
-
-  return urls;
+/** Each mounted photo owns its decode; the gallery loader retains the last
+ * decoded pixels through edits and releases object URLs on unmount. */
+function BatchThumbnail({ photo }: { photo: PhotoEntry }) {
+  const view = useThumbImage(photo.thumbBlob);
+  if (view.src) return <img src={view.src} alt={photo.name} draggable={false} className="size-full object-contain" />;
+  if (view.failed) return <span role="img" aria-label={`${photo.name} could not be displayed. Select the photo to open it.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
+  return view.showSkeleton ? <Skeleton className="size-full" aria-label={`Loading ${photo.name}`} /> : null;
 }
 
 export function GridThumbnails({
@@ -103,7 +52,6 @@ export function GridThumbnails({
   activePhotoId,
   onSelectPhoto,
 }: Props) {
-  const thumbUrls = useThumbUrls(photos);
   const exceptionCount = useGalleryStore(
     (s) => photos.filter((p) => s.selectedIds.has(p.id)).length,
   );
@@ -154,7 +102,6 @@ export function GridThumbnails({
             />
           );
         }
-        const url = thumbUrls[p.id];
         return (
           <div
             key={p.id}
@@ -166,19 +113,9 @@ export function GridThumbnails({
               type="button"
               onClick={() => onSelectPhoto(p)}
               className="flex h-full w-full items-center justify-center"
-              title={p.name}
+              aria-label={p.name}
             >
-              {url && (
-                <img
-                  src={url}
-                  alt={p.name}
-                  draggable={false}
-                  // Fills the tile (letterboxed) rather than sitting at its
-                  // natural size, so the Batch › Bulk shade below — sized to
-                  // the tile — lands on the same pixels.
-                  className="h-full w-full object-contain"
-                />
-              )}
+              <BatchThumbnail photo={p} />
             </button>
             <BatchCropThumbShade entry={p} isActive={false} cover={false} />
             <BatchExceptionCheckbox photoId={p.id} name={p.name} />

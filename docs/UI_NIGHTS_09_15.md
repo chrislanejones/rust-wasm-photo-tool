@@ -82,3 +82,28 @@ limits or mutations changed. Query data supplies dimensions; the pre-query
 placeholder cannot know an image's aspect ratio. No baseline increases.
 
 Night 10: commit 8ae47ea9, PR #340.
+
+## Night 12: Batch grid
+
+Master unchanged. Reviewed ADR-079, the gallery loader and Batch exception tests.
+Browser probe confirmed all 11 non-active thumbnails could remain undecoded
+without any placeholder. Removed the separate all-photo object-URL cache;
+each mounted page tile now reuses useThumbImage, with unchanged dimensions,
+a 300 ms grace period, error fallback and last-decoded-image retention.
+The hero canvas is outside this component and stays visible.
+
+Files: GridThumbnails.tsx and its new component test, batch-crop-frame browser
+test, this report.
+Validation: 11 focused unit tests pass; browser probe shows 11 placeholders,
+stable failure frames and working exception selection, in light/dark at
+1000×800. Four existing Batch Playwright tests pass (crop scopes, shared
+selection, rename exceptions, grid count). TypeScript, lint (existing warnings)
+and guardrails pass. Unit tests also cover pagination, retained selection,
+photo updates, active-photo changes and clamping after deletion. Only visible
+page thumbnails allocate URLs/probes, instead of every photo in the gallery.
+Per-image status does not make the canvas or list inert. No ratchet increases.
+The broader remote suite exposed a crop-test selector tied to the replaced
+title tooltip. It now locates the thumbnail by accessible name; both crop-frame
+regressions pass, including drag, Shift-drag, thumbnail shading and Crop All.
+
+Night 11: commit cd320838, PR #341.

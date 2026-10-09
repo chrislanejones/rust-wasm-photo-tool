@@ -110,7 +110,10 @@ test("thumbnails shade on release, Shift-drag breaks the ratio, Enter crops all"
   await expect(shade).toHaveCount(1);
   await expect(page.locator(".photo-thumb.active [data-testid=batch-crop-thumb-shade]")).toHaveCount(0);
   // …and so does its tile in the canvas grid beside the open photo.
-  const gridShade = page.locator("button[title] ~ [data-testid=batch-crop-thumb-shade] path");
+  const gridShade = page.getByRole("button", { name: "sky-building", exact: true })
+    .locator("..")
+    .getByTestId("batch-crop-thumb-shade")
+    .locator("path");
   await expect(gridShade).toHaveCount(1);
   const gridD = () => gridShade.getAttribute("d");
   const gridBefore = await gridD();
