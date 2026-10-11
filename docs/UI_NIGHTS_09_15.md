@@ -260,3 +260,46 @@ errors. The live editor mounts its upload input without page errors, the engine
 sentinel passes tier 1 (tier 2 explicitly skipped without a CI expectation), and
 all 30 live skip-link targets pass. Evidence logs and screenshots are alongside
 the original evidence. Native pre-push checks run for the remote updates.
+
+
+## Continuation: reconcile overlapping drafts (10-10-2026)
+
+Drafts #317 and #319 now target Night 15 so the gallery has one implementation
+and one set of loading observations. Both original branch snapshots are
+preserved under local `backup/ui-overlap-*-20261010` branches.
+
+- #317 retains the independent unfilled-pen hit-test fix, TypeScript drift
+  guard and shape/resize browser regressions. Gallery row sizing, named hover
+  groups and focus guards are inherited from Night 9. Resize sizing already
+  shipped in v9.20 (#322); the current session hook and utility stay in place.
+  Resize regressions verify exact dimensions, undo and redo.
+- #319 retains full-directory CI coverage, archive moves, a coverage checker,
+  the CSS warning gate, CPU throttling and fast-drag readiness checks. Its
+  `gallery-loading-state.spec.ts` is identical to Night 15, preserving the
+  MutationObserver samples, readiness waits and 30× CPU coverage. CI docs
+  distinguish the full-suite job from the service-worker/keyless job.
+- The extra 4× CPU run found that the drag test accepted an empty canvas and
+  slept 1.2 seconds before probing the engine. It now waits for the imported
+  fixture's actual photo dimensions. The corrected test passes at normal
+  speed and 4× CPU. This fixes startup readiness; the separate first-frame
+  Enter-listener product race remains in PARKING_LOT.
+
+#317 validation: 47 focused unit tests and 12 distinct browser scenarios pass;
+Rust formatting, Clippy and tests pass with and without tiles. TypeScript, lint
+(0 errors, 55 existing warnings), guardrails, production build and inert-class
+audit pass. A real-WASM browser probe hits both legs of an L-stroke and misses
+empty space inside its bounding box. WASM grows 892,634→892,897 bytes (+263),
+from making the segment branch reachable; hit-testing runs per click. Full
+imagehorse-qc remains required before release.
+
+#319 validation: TypeScript, lint, guardrails and the production build pass.
+The coverage checker includes all 49 eligible specs. All 123 browser tests
+pass with zero failures and no retries (16.1 minutes); the corrected drag test
+also passes separately at normal speed and 4× CPU. The CSS gate fails on a
+warning-bearing log and passes on the clean build log.
+
+Git Routine regenerated marketing data before pushing. The local marketing
+build and browser check confirm 832 merged commits in the Trail Log squares,
+v9.26 as latest, and no page errors. This is a data refresh, not a release
+entry for unmerged work. Review the original UI stack in order, then these two
+independent drafts. No merge or deployment command was run.
