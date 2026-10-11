@@ -104,6 +104,8 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           className={`photo-thumb group/tile ${isActive ? "active" : ""} ${selected ? "selected" : ""} ${vertical ? "photo-thumb-grid" : ""} relative`}
           onClick={onSelect}
           onKeyDown={(e) => {
+            // Nested action buttons keep their native Enter/Space activation.
+            if (e.target !== e.currentTarget) return;
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               onSelect();

@@ -485,7 +485,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "privacy",
     title: "Keyboard accessibility",
     plain: "Skip to canvas, named controls, keyboard navigation in Settings, and readable help text in both themes.",
-    detail: "Up/Down moves through Settings sections, Home/End jumps to the first or last, and Tab reaches the selected section. Escape closes dialogs. Muted help text and shortcut headings meet AA contrast in light and dark themes, alongside the tool / number / Alt shortcuts.",
+    detail: "Enter or Space works on gallery tiles and their Remove/Select buttons; toggling a selection keeps the current photo open. Up/Down moves through Settings sections, Home/End jumps to the first or last, and Tab reaches the selected section. Escape closes dialogs. Muted help text and shortcut headings meet AA contrast in light and dark themes, alongside the tool / number / Alt shortcuts.",
   },
   "Keyboard Shortcut Modal": {
     group: "privacy",
