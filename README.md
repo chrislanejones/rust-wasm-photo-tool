@@ -103,6 +103,10 @@ keyboard entry point return to General. An unfilled freehand stroke selects alon
 instead of the empty space inside its bounds. Every eligible browser test now
 runs in CI, across two jobs.
 
+Every version tag now has a matching
+[GitHub Release](https://github.com/chrislanejones/rust-wasm-photo-tool/releases);
+v8.98, v9.2 and v9.19–v9.26 were missing one.
+
 [UI Nights 9–15](docs/UI_NIGHTS_09_15.md) records the work and validation.
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
 commit squares; [what is in the works](https://imagehorse.app/in-the-works)

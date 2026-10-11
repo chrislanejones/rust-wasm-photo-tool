@@ -106,3 +106,6 @@ ds-bundle/
 # Claude Design sync working dirs (tooling + build output; rebuilt on every re-sync)
 .ds-sync/
 ds-bundle/
+
+# Codex CLI local config (holds MCP auth tokens)
+.codex/

@@ -33,7 +33,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Welcome Back, Shared and Batch wait for previews to decode, keep the last good picture during an update, and show when an image fails. A shared image can be retried." },
       { tag: "fix", text: "Enter and Space work on a gallery photo's Remove and Select buttons. Remove asks before deleting; Select keeps the photo you're editing open." },
       { tag: "fix", text: "A freehand pen stroke selects where the ink is. Clicking empty space inside its bounds no longer picks it up." },
-      { tag: "infra", text: "Every eligible browser test runs on each pull request, split across two jobs. Friday and Saturday's commits keep their original dates, with Sunday's release completing the three days." },
+      { tag: "infra", text: "Every browser test that can run in CI now runs on each pull request, split across two jobs." },
     ],
   },
   {
