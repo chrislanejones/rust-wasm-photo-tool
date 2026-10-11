@@ -121,3 +121,17 @@ test("G3 the mark is not colour-only and says what it means", async ({ page }) =
   expect(sample.glyph).toBe(true);
   expect(sample.text).toMatch(/Loading /);
 });
+
+test("the atomic gallery observation also survives 30× CPU throttling", async ({ page }) => {
+  await setup(page);
+  await watchSwitch(page);
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 30 });
+    await pgDn(page);
+    expect(await switchSample(page)).toMatchObject({ count: 1, selected: "true", glyph: true });
+  } finally {
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  }
+  await expect(marks(page)).toHaveCount(0);
+});

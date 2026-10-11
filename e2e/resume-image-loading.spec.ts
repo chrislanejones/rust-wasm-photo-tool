@@ -29,10 +29,19 @@ test("resume thumbnails reserve space through loading and failure", async ({ pag
     await card.screenshot({ path: info.outputPath(`resume-loading-${theme}.png`), animations: "disabled" });
   }
   const before = await card.boundingBox();
+  // Each preview is its own loading region, with exactly one voice.
+  await expect(card.getByRole("status")).toHaveCount(2);
+  expect(await card.locator(".skeleton").first().evaluate(el => getComputedStyle(el, "::after").display)).not.toBe("none");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await card.locator(".skeleton").first().evaluate(el => getComputedStyle(el, "::after").display)).toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.evaluate(() => document.documentElement.classList.add("reduce-motion"));
+  expect(await card.locator(".skeleton").first().evaluate(el => getComputedStyle(el, "::after").display)).toBe("none");
   await expect(card.locator(".skeleton")).toHaveCount(2);
   release();
   await expect(card.getByRole("img", { name: /could not be displayed/ })).toHaveCount(2);
   await expect(card.locator(".skeleton")).toHaveCount(0);
+  await expect(card.getByRole("status")).toHaveCount(0);
   expect(await card.boundingBox()).toEqual(before);
   await expect(page.getByRole("button", { name: "Resume editing" })).toBeEnabled();
 });

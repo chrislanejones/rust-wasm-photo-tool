@@ -37,8 +37,7 @@ export interface ThumbViewInput {
 
 /**
  * The whole decision, as a pure function of three strings — extracted so the
- * truth table can be tested without a renderer, which this repo has no
- * dependency for.
+ * truth table can be tested independently of the rendered presentation.
  *
  * ⚠️ `shownUrl` is deliberately NOT compared against `url`. That is the point.
  * A tile mid-edit has `shownUrl` = the previous URL and `url` = the new one,
@@ -78,7 +77,9 @@ export function thumbViewState({ url, shownUrl, failedUrl }: ThumbViewInput): {
  * load that already happened cannot be erased, and a load that belongs to an
  * old URL cannot be counted for a new one.
  */
-export function useThumbImage(thumbBlob: Blob | string): ThumbImage {
+// Gallery callers already have a region deadline; independent resource images
+// opt into their own timeout rather than racing that existing state machine.
+export function useThumbImage(thumbBlob: Blob | string, timeoutMs?: number): ThumbImage {
   const [url, setUrl] = useState("");
 
   // Created and revoked in ONE effect. Creating in a memo and revoking in an
@@ -119,7 +120,7 @@ export function useThumbImage(thumbBlob: Blob | string): ThumbImage {
       if (failed) setFailedUrl(url);
       else setShownUrl(url);
     };
-    const timeout = window.setTimeout(() => finish(true), 15_000);
+    const timeout = timeoutMs === undefined ? undefined : window.setTimeout(() => finish(true), timeoutMs);
     probe.onload = () => {
       // A load event can precede decode. Keep the previous pixels until the
       // browser can paint the replacement; older engines lack decode().
@@ -134,7 +135,7 @@ export function useThumbImage(thumbBlob: Blob | string): ThumbImage {
       probe.onload = null;
       probe.onerror = null;
     };
-  }, [url]);
+  }, [url, timeoutMs]);
 
   const view = thumbViewState({ url, shownUrl, failedUrl });
 
