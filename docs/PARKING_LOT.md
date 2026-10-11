@@ -4,6 +4,18 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+Found surveying skeleton gaps for UI Night 16. `useRealTier()`
+(`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,
+and `userModeForTier(null)` maps that to `loggedIn` (`app/AppShell.tsx`, the
+mode watcher). So a paid user briefly sees the logged-in gallery limit (24
+instead of 100) in "N photos · N max", and every other tier gate reads the
+lower tier for the same beat. Not a UI-night fix: the honest version is a
+"tier pending" user mode that the gates and the count can each read, which
+touches AppShell and gating semantics. Once that exists, GalleryCount can
+show a `Skeleton variant="line"` the width of a `TinyNumberBox` for the max.
+
 ## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
 
 Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
