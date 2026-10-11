@@ -40,6 +40,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 - **[UI Nights 9–15](docs/UI_NIGHTS_09_15.md)** — gallery, preview loading and Settings accessibility improvements shipped in v9.27.
+- **[Next UI pass](docs/ui-state-v4/08-v927-integration.md)** — photo switching, document controls, Pen/Pins, masks, history and error feedback, under review against v9.27.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 

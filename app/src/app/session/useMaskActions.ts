@@ -6,14 +6,22 @@
 // to the Paint brush instead, which unmounted this panel and stranded the
 // brush controls on Paint's — Chris, 09-24-2026: "don't go to brush, add a
 // brush tool in it". Only the WASM `stamp` handle is passed in.
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
 import { MASK_SOURCE, type MaskSource } from "@/lib/selectionRefine";
+import { useLoadedDocument } from "@/hooks/useLoadedDocument";
+import { isPhotoSwitching } from "@/hooks/usePhotoSwitching";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 export function useMaskActions(stamp: ReturnType<typeof useCloneStamp>) {
   const maskEditing = useToolStore((s) => s.maskEditing);
   const setMaskEditing = useToolStore((s) => s.setMaskEditing);
+  const document = useLoadedDocument(stamp.state);
+  const activeHasMask = document?.layers.find((l) => l.id === document.activeLayerId)?.hasMask ?? false;
+  useEffect(() => {
+    if (maskEditing && !activeHasMask) setMaskEditing(false);
+  }, [maskEditing, activeHasMask, setMaskEditing]);
 
   /** Add a mask and start painting it. `source` is the Add mask choice:
    *  reveal all (the old one-click behavior, and the default), hide all, or
@@ -22,19 +30,23 @@ export function useMaskActions(stamp: ReturnType<typeof useCloneStamp>) {
    *  exactly as it always has. */
   const handleAddMask = useCallback(
     async (id: number, source: MaskSource = MASK_SOURCE.revealAll) => {
+      if (isPhotoSwitching()) return;
+      const revision = useGalleryStore.getState().documentRevision;
       stamp.setActiveLayer(id);
       const feather = useToolStore.getState().selectionRefine.feather;
       // TRUTHY TRAP — un-awaited, a refused add would still flush and sync.
       if (await stamp.toolRef.current?.add_layer_mask_from(id, source, feather)) {
         stamp.flushToCanvas();
-        stamp.syncState();
-        setMaskEditing(true);
+        await stamp.syncState();
+        if (!isPhotoSwitching() && useGalleryStore.getState().documentRevision === revision) setMaskEditing(true);
       }
     },
-    [stamp],
+    [stamp, setMaskEditing],
   );
   const handleToggleMaskEdit = useCallback(
     async (id: number) => {
+      if (isPhotoSwitching() || !document?.layers.some((l) => l.id === id && l.hasMask)) return;
+      const revision = useGalleryStore.getState().documentRevision;
       // AWAITED: the engine lives in a worker (ADR-024), so `active_layer_id()`
       // comes back as a Promise — the old synchronous `activeId === id` compared
       // a Promise to a number, was always false, and made this toggle a switch
@@ -42,6 +54,7 @@ export function useMaskActions(stamp: ReturnType<typeof useCloneStamp>) {
       // reachable from here now that editing keeps this panel mounted.)
       if (maskEditing) {
         const activeId = await stamp.toolRef.current?.active_layer_id();
+        if (isPhotoSwitching() || useGalleryStore.getState().documentRevision !== revision) return;
         if (activeId === id) {
           setMaskEditing(false);
           return;
@@ -50,7 +63,7 @@ export function useMaskActions(stamp: ReturnType<typeof useCloneStamp>) {
       stamp.setActiveLayer(id);
       setMaskEditing(true);
     },
-    [stamp, maskEditing],
+    [stamp, maskEditing, document, setMaskEditing],
   );
 
   return { handleAddMask, handleToggleMaskEdit };

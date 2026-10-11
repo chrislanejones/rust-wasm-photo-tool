@@ -14,6 +14,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useUIStore } from "@/stores/useUIStore";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { GROUP_BY_KEY, TOOL_GROUPS } from "@/features/tools/toolGroups";
 
@@ -105,6 +107,8 @@ function pressCtrlJ(target: EventTarget = window, shift = false) {
 }
 
 beforeEach(() => {
+  useGalleryStore.setState({ activePhotoId: null, documentPhotoId: null });
+  useUIStore.setState({ isImageLoading: false });
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -528,5 +532,24 @@ describe("H is the hand key: hold pans while held, tap latches, Space still work
     key("keydown", "KeyH", 0, { target: btn });
     expect(onSpaceDown).toHaveBeenCalledTimes(1);
     btn.remove();
+  });
+});
+
+
+describe("document shortcuts during switching", () => {
+  it("blocks mutations at dispatch time but keeps gallery navigation available", () => {
+    const p = baseProps({ onApplyCrop: vi.fn(), hasCropSelection: true, onCopyToNewLayer: vi.fn(), onNextPhoto: vi.fn() });
+    mount(p);
+    useGalleryStore.setState({ activePhotoId: "B", documentPhotoId: "A" });
+    pressEnter();
+    pressCtrlJ();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", code: "PageDown" }));
+    });
+    expect(p.onApplyCrop).not.toHaveBeenCalled();
+    expect(p.onCopyToNewLayer).not.toHaveBeenCalled();
+    expect(p.onUndo).not.toHaveBeenCalled();
+    expect(p.onNextPhoto).toHaveBeenCalledOnce();
   });
 });

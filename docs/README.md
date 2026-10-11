@@ -15,6 +15,7 @@ What is in this folder, and what deliberately is not.
 | [CI.md](CI.md) | the gates, and which ones block |
 | [UI_CONSISTENCY.md](UI_CONSISTENCY.md) | the ten UI rules, and the canonical scale |
 | [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md) | gallery, preview loading and Settings keyboard work shipped in v9.27 |
+| [ui-state-v4/08-v927-integration.md](ui-state-v4/08-v927-integration.md) | the next seven-night UI pass, reconciled with v9.27 and still under review |
 | [UI_INVENTORY.md](UI_INVENTORY.md) | what the UI vocabulary actually is, counted |
 | [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) | every registered exception to a UI gate |
 | [Deploying.md](Deploying.md) | how a release reaches production |

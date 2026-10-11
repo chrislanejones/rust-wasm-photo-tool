@@ -13,5 +13,6 @@ import { usePhotoSwitching } from "./usePhotoSwitching";
 
 export function useLoadedDocument<T>(state: T): T | null {
   const switching = usePhotoSwitching();
-  return switching ? null : state;
+  const notReady = state !== null && typeof state === "object" && "ready" in state && state.ready === false;
+  return switching || notReady ? null : state;
 }

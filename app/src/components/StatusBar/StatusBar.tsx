@@ -295,7 +295,7 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
-        {maskEditing && (
+        {doc && maskEditing && (
           <>
             <span className="status-zoom" data-testid="status-mask-editing">
               Editing mask &middot; black hides, white reveals
@@ -303,7 +303,7 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
-        {coverage && (
+        {doc && coverage && (
           <>
             <span className="status-zoom" data-testid="status-selection">
               {describeCoverage(coverage)}
@@ -328,7 +328,7 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
-        {undoDepth && (
+        {doc && undoDepth && (
           <>
             <span className="status-zoom" title={describeUndoDepth(undoDepth)}>
               Undo {undoDepth.percent}%
@@ -336,13 +336,13 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
-        {sizeLabel && (
+        {doc && sizeLabel && (
           <>
             <span className="status-zoom">{sizeLabel}</span>
             <span className="status-divider" />
           </>
         )}
-        {uploadDims && (
+        {doc && uploadDims && (
           <>
             <span className="status-zoom" title="Dimensions of the photo as uploaded">
               Original: {uploadDims.width}×{uploadDims.height}

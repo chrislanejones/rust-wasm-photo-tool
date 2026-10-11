@@ -48,6 +48,7 @@ export interface ReselectBarProps {
   children?: ReactNode;
   /** Row color/dot variant — `.full-width-badge.type-*`. Default "redo". */
   type?: "undo" | "redo" | "current";
+  current?: boolean;
   /** Persistent-selection highlight (lists without selection just omit it). */
   selected?: boolean;
   onSelect: () => void;
@@ -87,6 +88,7 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       actions,
       children,
       type = "redo",
+      current = false,
       selected = false,
       onSelect,
       onDelete,
@@ -127,6 +129,7 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-pressed={selected}
+        aria-current={current ? "step" : undefined}
         aria-disabled={disabled || undefined}
         title={title}
         onClick={disabled ? undefined : onSelect}

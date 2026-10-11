@@ -614,7 +614,7 @@ export function useEngineCore(
         claimEngineDocument(opts);
       }
       sourcePosRef.current = null;
-      syncState();
+      await syncState();
       useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),
@@ -663,7 +663,7 @@ export function useEngineCore(
       setEngineDocument(opts?.photoId ?? photoId);
       sourcePosRef.current = null;
       flushToCanvas(); // resizes the canvas to the restored dimensions
-      syncState();
+      await syncState();
       // Restored annotation lists differ from whatever was showing — same
       // re-sync the undo path performs.
       useAnnotationStore.getState().bumpAnnotations();
@@ -727,6 +727,7 @@ export function useEngineCore(
       // Rust rebuilds the tile cache (we don't store tile bytes on disk).
       for (let i = 0; i < saved.undoStack.length; i++) {
         const snap = saved.undoStack[i];
+        await tool.set_export_quality(snap.exportQuality ?? 75);
         const { rgba, w, h } = await decodePngToRgba(snap.png);
         tool.inject_undo_snapshot(
           new Uint8Array(rgba.buffer as ArrayBuffer),
@@ -760,6 +761,7 @@ export function useEngineCore(
       // Re-inject redo snapshots
       for (let i = 0; i < saved.redoStack.length; i++) {
         const snap = saved.redoStack[i];
+        await tool.set_export_quality(snap.exportQuality ?? 75);
         const { rgba, w, h } = await decodePngToRgba(snap.png);
         tool.inject_redo_snapshot(
           new Uint8Array(rgba.buffer as ArrayBuffer),
@@ -790,6 +792,7 @@ export function useEngineCore(
         }
       }
 
+      await tool.set_export_quality(saved.exportQuality ?? 75);
       toolRef.current = tool;
       claimEngineDocument(opts);
       sourcePosRef.current = null;
@@ -864,7 +867,7 @@ export function useEngineCore(
       }
 
       flushToCanvas();
-      syncState();
+      await syncState();
       useGalleryStore.getState().bumpDocumentRevision(opts?.photoId);
       return true;
     }),

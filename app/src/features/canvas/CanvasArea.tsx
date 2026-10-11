@@ -16,6 +16,7 @@ import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import { cornerDelta } from "@/lib/aspectLock";
 import { CompareSlider } from "./CompareSlider";
+import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { SwitchLoadingVeil } from "./SwitchLoadingVeil";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
@@ -46,7 +47,6 @@ import { selectionCombineMode, type SelectionCombineMode } from "@/lib/selection
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
 import { getCursorForSubTool, ROTATE_CURSOR } from "./canvasCursor";
-
 /* On-canvas ink. Neutral black/white on purpose, not theme tokens: these sit on
    arbitrary photo pixels, so they contrast by pairing a light line with a dark
    one rather than by hue. Named because each was a literal repeated 2–7 times. */
@@ -58,14 +58,11 @@ const EDIT_BOX_STROKE = "rgba(255,255,255,0.85)";
 const HANDLE_OUTLINE = "rgba(0,0,0,0.5)";
 /** The soft shadow that lifts a handle cluster off the image. */
 const HANDLE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
-
 const EMPTY_SEGMENTS = new Float32Array(0);
-
 /** Screen-px movement below which a Select-tool press is a CLICK (fires the
  *  active kind), at or above which it's a marquee DRAG. Screen px, not canvas
  *  px, so the feel is zoom-independent. Matches the crop tool's 5px spirit. */
 const MARQUEE_THRESHOLD_PX = 4;
-
 interface TextInputState {
   screenX: number;
   screenY: number;
@@ -77,7 +74,6 @@ interface TextInputState {
   fontWeight?: string;
   textColor?: string;
 }
-
 interface AnnotationBox {
   id: number;
   x: number;            // canvas-space top-left of the *rotated* tile bbox
@@ -903,6 +899,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // `paint_move` behind the worker port is why this exists; `lib/strokeGate`
     // has the measurements.
     const gatedMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (isPhotoSwitching()) return;
       strokeDown();
       wrappedMouseDown?.(e);
     };
@@ -1013,8 +1010,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const selectGuide = useGuidesStore((s) => s.selectGuide);
     const moveGuide = useGuidesStore((s) => s.moveGuide);
 
+    const switching = usePhotoSwitching();
     return (
       <div
+        inert={switching || undefined}
+        data-document-locked={switching || undefined}
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >

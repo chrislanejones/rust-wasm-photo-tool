@@ -85,6 +85,7 @@ import { edgeSensitivityReason, toleranceReason } from "./selectReasons";
 import { isNoopRefine, type RefineSettings } from "@/lib/selectionRefine";
 import { PANEL_SECTION } from "@/lib/styles";
 import { Kbd } from "@/components/ui/kbd";
+import { StatusMark } from "@/components/ui/status-mark";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
@@ -214,6 +215,7 @@ export function SelectSettings({
   const setRefine = useToolStore((s) => s.setSelectionRefine);
   const requestRefine = useToolStore((s) => s.requestRefine);
   const previewing = useToolStore((s) => s.refinePreviewing);
+  const refining = useToolStore((s) => s.refineBusy);
   const setOne = (key: keyof RefineSettings) => (v: number) =>
     setRefine((r) => ({ ...r, [key]: v }));
   const canRefine = !disabled && selection.active;
@@ -332,7 +334,7 @@ export function SelectSettings({
         <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
           <ToolButton
             stacked
-            disabled={!canRefine}
+            disabled={!canRefine || refining}
             onClick={() => requestRefine("cleanUp")}
             title="Remove specks, fill pinholes, smooth the edge — one undo step"
           >
@@ -377,12 +379,13 @@ export function SelectSettings({
         )}
         <PanelActionBar>
           <PanelAction
-            disabled={!canRefine || isNoopRefine(refine)}
+            disabled={!canRefine || refining || isNoopRefine(refine)}
             onClick={() => requestRefine("apply")}
           >
             {previewing ? "Apply refine" : "Apply"}
           </PanelAction>
         </PanelActionBar>
+        {refining && <p role="status" className="flex items-center gap-1 text-2xs text-theme-muted-foreground"><StatusMark kind="working" />Refining selection…</p>}
       </div>
 
       {/* ── Act on the selection: one title + bulb over all five actions ──

@@ -461,3 +461,27 @@ in both themes (minimum 4.68:1 light, 4.79:1 dark); shortcut group headings use 
 secondary text role. Ratchets tighten: spacing 42 → 41, raw buttons 14 → 13;
 radius remains 22. Measured by `e2e/ui-night14-accessibility.spec.ts` and the AST
 counter, not rounded assumptions.
+
+## UI State Consistency v4 (10-08-2026)
+
+Requested gallery identity and loaded engine identity are distinct. `usePhotoSwitching`
+locks document actions immediately; `useLoadedDocument` returns null while loading,
+while identities differ, or when the engine explicitly reports unready. Global
+preferences remain available. Readouts show neutral values first, with existing
+300 ms skeletons for slow transitions. Time passing never unlocks an outgoing document.
+
+Quality drafts reset from the loaded document and its history revision. Apply uses
+the displayed draft; successful engine synchronization publishes the committed value.
+Temporary refinement and lasso sessions end on document changes. Mask editing requires
+an actual active-layer mask and exits when that mask is removed or undone.
+
+An archive write must finish successfully before switching away from unsaved edits.
+Save failures remain visible until a matching write succeeds; returning to the loaded
+photo preserves recoverable edits. Cloud backup and local save are separate outcomes.
+Async contexts expire on completion, failure and timeout; late progress and downloads
+cannot revive them. OpenRaster currently cannot cancel its underlying import, so its
+timeout communicates that limitation honestly.
+
+See [the seven audit records](ui-state-v4/07-audit.md) for regression coverage,
+screenshots, measurements, dependencies and remaining limits. Guardrail
+`legacy-photo-loading` prevents obsolete timer-based completion state returning.
