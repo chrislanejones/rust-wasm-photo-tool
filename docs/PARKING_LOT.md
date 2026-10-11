@@ -181,7 +181,12 @@ must be conservative: a photo whose real edge is a flat white line (a white
 background, a scan) would pass the same test. `uploadKey`, where present, is
 the untouched upload and gives the true aspect ratio to check against.
 
-## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+## FIXED in v9.20 (#322) — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+> The current `useResizeCompress` session hook already maps photo sizes through
+> `lib/resizeTarget.documentSizeForPhoto`. Draft #317 keeps browser regressions
+> for 256→200 and 1600→800; its older AppShell handlers and duplicate utility
+> are omitted when rebasing onto the UI Nights stack.
 
 Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
 The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
@@ -569,7 +574,12 @@ and docs are Dara's, not a CI change. The right fix is probably to stop
 hand-copying baselines into prose at all and have the doc point at the script,
 since a number duplicated in two files drifts by default.
 
-## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+## CLOSED 10-07-2026 — NOT REPRODUCED as a stuck value: "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+
+> **Night 10-07 (#317):** 4/4 runs (6000×4000 PNG → 2048×1365, reload → Resume, with and without
+> an edit) settle on `Photo: 2048×1365` within 750 ms. One run showed `2068×1385` for under 750 ms
+> first: the documented "fall back to the document until the engine answers" flash, not a stuck
+> value. The 09-27 `usePhotoBounds` revision fix (a photo LOAD now re-asks) is the likely closer.
 
 Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not
 investigated. Production build, demo mode, a 6000×4000 PNG (the demo downscale
@@ -641,7 +651,12 @@ config only declares globals for `app/src`. That is 9 errors in
 `gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
 `marketing/**` block with node and browser globals would make this gate real.
 
-## OPEN — a commit click can leave a stray rectangle behind (2026-09-18)
+## CLOSED 10-07-2026 — NOT REPRODUCED: a commit click can leave a stray rectangle behind (2026-09-18)
+
+> **Night 10-07 (#317):** the exact repro below is now e2e/shape-commit-no-stray, and it is green
+> 12/12 on master `20418196` (keyboard and track-click restyle, 1× and 4× CPU, `mouse.click`).
+> #304 rebuilt the press handling on `PressQueue`, which targets the race hypothesized below;
+> likely the reason, not isolated. The spec stays as the guard.
 
 **Pre-existing — reproduced on a master-based production build**, found while
 smoke-testing shape rotation. Not caused by feat/shapes-triangle-rotate.
@@ -700,7 +715,11 @@ boundaries (a group marker per snapshot, and undo seeks to the group start),
 or record a shape's skipped fields in ONE appended op on add
 (`ShapeAddStyled`) instead of ShapeAdd + N side ops.
 
-## OPEN — pen polylines hit-test as their whole bbox since #172 (2026-09-18)
+## FIXED 10-07-2026 (#317) — pen polylines hit-test as their whole bbox since #172 (2026-09-18)
+
+> **Fixed in #317:** an UNFILLED polyline joins the edges branch (`matches!(kind, 6 | 8..=40)`
+> under `fill_kind == 0`), which is what the TS port already did. #60 hash updated in the same
+> commit with the reason. tests/polyline_hit_test.rs: the (150,30) probe misses, ink hits.
 
 `shape_annotation_at`'s docstring says polylines hit by "distance to the
 stroke", and before #172 they did: `if kind 2|4 {…} else if kind 6 {…}`. The

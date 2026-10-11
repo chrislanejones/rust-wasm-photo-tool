@@ -1867,9 +1867,12 @@ impl ImageHorseTool {
             let pad = (s.stroke_width * 0.5).max(6.0);
             let hit = if s.kind == 2
                 || s.kind == 4
-                || (s.fill_kind == 0 && matches!(s.kind, 8..=40))
+                || (s.fill_kind == 0 && matches!(s.kind, 6 | 8..=40))
             {
-                // line / arrow → distance to the segment; diamond (8) / star (9)
+                // line / arrow → distance to the segment; an unfilled pen
+                // polyline (6) → distance to its segments (its arm below was
+                // dead from #172 until Night 10-07: the 6 never got in, so a
+                // click anywhere in an L-stroke's bbox hit it); diamond (8) / star (9)
                 // / triangle (10) stroke is the outline edges only when unfilled
                 // (a click inside an empty diamond selects whatever is behind
                 // it).
