@@ -1,4 +1,4 @@
-import { test, expect } from "./guard/test";
+import { test, expect } from "../guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
@@ -22,7 +22,7 @@ import { join } from "node:path";
 // needs eyes on a visible window, and is reported separately.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FIXTURE_PNG = join(__dirname, "fixtures", "checker.png"); // 256×256
+const FIXTURE_PNG = join(__dirname, "..", "fixtures", "checker.png"); // 256×256
 
 /** Keep the run offline + deterministic. */
 async function blockExternalNetwork(page: Page): Promise<void> {

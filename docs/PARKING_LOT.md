@@ -4,6 +4,24 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
+
+Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
+Add mask button after `location.hash = "#/tool/layers"` (shard 2/2; passed on the run before).
+Locally at 4× CPU (`E2E_CPU_THROTTLE=4`), 10 repeats: Add mask 10/10, but "a Refine slider
+previews on a copy" failed 1/10. The spec was already in the old CI list, and nothing tonight
+touched it. Same treatment as G1/fast-drags: find the clock it waits on and make it wait on state.
+
+## OPEN — Enter in the first frame after a shape appears is dropped (10-07-2026)
+
+Found making `fast-drags-are-not-dropped` wait on state instead of a clock (Night 10-07 PR 3).
+`useDrawingTools` binds its Enter/Escape/Delete listener in a `useEffect` keyed on `editState`. A
+`useEffect` runs AFTER the paint, so for about a frame the drawn shape is visibly pending in the
+overlay and Enter does nothing. Measured: 2 of 20 runs at 4× CPU pressed Enter inside that window
+and the 30th shape never committed. A person is unlikely to hit it (Enter within ~16 ms of release),
+a script or a fast keyboard user can. Candidate fix: bind the listener once, reading `editStateRef`
+(it already does), or `useLayoutEffect`. Not done: no product change in a test-stability PR.
+
 ## Addressed in UI Night 9 draft #339 — gallery leftovers (10-06-2026)
 
 Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
@@ -17,7 +35,7 @@ see [the run report](UI_NIGHTS_09_15.md). They are not yet merged.
 | --- | --- | --- |
 | The docked vertical gallery's tiles OVERLAP with 12 photos at 1000×800 | `GalleryBar` vertical grid | Rows measure ~61 px for ~87 px tiles, so each row covers the one above. Same picture on a master build. |
 | Hovering the gallery BAR shows every tile's Remove and Select buttons | `Thumb` uses `group-hover:`, and the bar's own wrapper is also `.group` (for its close button) | Tailwind's `group-hover` matches ANY `.group` ancestor. Needs a named group (`group/tile`). |
-| `gallery-loading-state` G1 fails about 1 run in 2 on master too | `e2e/gallery-loading-state.spec.ts:70` | "the mark sits on a gallery tile: Received null" at 30× CPU. Already known as flaky under load; measured 1/2 on master and 1/2 on the branch. |
+| `gallery-loading-state` G1 observation | `e2e/gallery-loading-state.spec.ts` | Addressed in draft #339: tile-scoped MutationObserver samples and readiness waits. This branch retains that version instead of #319's older driver polling. |
 
 ## FIXED 10-05-2026 — five main-suite e2e specs were red on master (10-05-2026)
 
@@ -303,7 +321,11 @@ lines.
 | **Paint's `erase` mode is still an orphan** (no tile, ORPHAN O-1) and was left on the old grammar on purpose | PaintSettings.tsx `case "erase"` | Reviving or deleting it is a product call, not a layout one |
 | **Stroke Stabilizer now sits in a collapsed Advanced section** in Paint, Blur and both Eraser modes. Its closed summary says the level ("Stabilizer: Med"), so ON is never hidden | StabilizerRow.tsx `AdvancedStabilizer` | Chris to confirm this is where it belongs. If not, `defaultOpen` on `AdvancedSection` is the one-word revert |
 
-## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+## FIXED — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+> **The three comments were reworded before 10-07 (master builds clean). Night 10-07 PR 3 keeps it at zero:**
+> `scripts/css-build-warnings.sh` fails CI's `web` job on any "warning while optimizing generated CSS";
+> proven red by re-adding the class to a comment.
 
 Found during the Select morning run (live tolerance). `pnpm run build` prints
 "Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
@@ -548,7 +570,10 @@ Related but separate: this is the same family as the op-log version collision �
 two branches moving one counter independently, where only the merge order
 decides which value survives.
 
-## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+## FIXED 10-07-2026 (Night 10-07 PR 3) — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+> **Deleted, not regenerated:** docs/CI.md now points at `./scripts/guardrails.sh`, which prints every
+> check with its baseline. A second copy of the numbers is what drifted.
 
 Noticed while checking whether any doc repeated the false "runs in CI" skip
 message. It does not — the three matched-pair checks are not documented at all
@@ -4235,7 +4260,19 @@ on touch, which is most of the phone surface, and the two densest files
   guide color is an app preference. Persisting positions remains separate work.
 - Trash/purge and per-photo cloud backup/conflict state remain separate backend
   projects. No UI-night change presents unwired actions or fabricated state.
-- Existing drafts #317 (gallery) and #319 (loading tests) overlap the Night 9
-  changes and need reconciliation during review. Do not merge both blindly.
+- Drafts #317 and #319 now target Night 15. #317 keeps the independent pen
+  hit-test fix and browser guards; #319 keeps full CI coverage and drag-readiness
+  checks. Both inherit the stack's gallery fixes and newer loading observations.
 - The Night 14 stack addresses the muted-text and Settings-rail rows above;
   their implementation is pending review, not a master release.
+
+
+## PR overlap review (10-10-2026)
+
+- The 4× CPU run of `fast-drags-are-not-dropped` exposed a startup wait that
+  accepted an empty canvas, then slept 1.2 seconds before probing the engine.
+  The corrected test waits for the imported fixture's actual photo dimensions;
+  the 4× run passes. This fixes the test's startup assumption. The separate
+  first-frame Enter-listener product race remains open above.
+- Regenerated marketing Trail Log data totals 832 merged commits. Unmerged
+  draft work is excluded, and v9.26 stays the latest release.

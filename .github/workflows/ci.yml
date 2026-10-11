@@ -126,7 +126,16 @@ jobs:
       # test and is actually a missing build artifact. It passed locally only
       # because pkg/ was already on disk; reproduced by moving pkg/ aside.
       # (The `rust` job builds pkg/ too, but jobs don't share a filesystem.)
-      - run: pnpm run build:all
+      # Captured so the CSS optimizer's warnings can fail the job: Tailwind
+      # mints rules from COMMENTS too, and a comment spelling a whole arbitrary
+      # class printed "Unexpected token Delim('*')" on every build while the
+      # build stayed green (Night 10-07 §3.3). `shell: bash` for pipefail, so
+      # a failed build still fails here rather than being eaten by `tee`.
+      - name: Build (CSS warnings stay at zero)
+        shell: bash
+        run: |
+          pnpm run build:all 2>&1 | tee build.log
+          ./scripts/css-build-warnings.sh build.log
       - run: pnpm -C app test
 
   # Asserts the LIVE site is serving a real engine — not that a build succeeded.
@@ -432,6 +441,50 @@ jobs:
           ./scripts/gate-run.test.sh
           ./scripts/gate-run.test.sh --prove-red
 
+  # EVERY spec in e2e/ (Night 10-07 §3.1). This used to be a hand-kept file
+  # list inside service-worker-e2e, and it fell behind: 23 of 49 specs never
+  # ran in CI, including the two that protect the saved format
+  # (shape-rotation-survives-reload, text-face-survives-reload) and five
+  # written in the two days before. Now the job runs the directory under
+  # playwright.config.ts, which ignores only sw/ (own build), archive/
+  # (one-off sweeps) and boot-no-keys (keyless build), and
+  # scripts/e2e-coverage-check.mjs fails it if the run and the directory
+  # ever disagree, so a new spec cannot be silently left out again.
+  #
+  # Sharded by file: serially the full suite is 13.0 min on a laptop (115
+  # tests, 10-07) and a CI runner is slower, so two shards keep each ~7 min.
+  # Each shard builds its own wasm + app (jobs share no filesystem).
+  e2e:
+    name: E2E (every spec, shard ${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    needs: rust
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: rustup show   # toolchain pinned by rust-toolchain.toml (ADR-038)
+      - uses: Swatinem/rust-cache@v2
+      # Pinned for the same reason as the `web` job — see the long note there.
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.15.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build:wasm
+      - name: Every spec in e2e/ is in the run
+        if: matrix.shard == 1
+        run: node scripts/e2e-coverage-check.mjs
+      - name: E2E shard ${{ matrix.shard }}/2
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/2
+
   # ---------- Service-worker e2e (ADR-049 gate 1) ----------
   # ADR-049 found that this repo had NINE CI jobs and none of them ran
   # Playwright, so every test guarding the service worker was hand-run only.
@@ -488,37 +541,3 @@ jobs:
       # crashed to a blank page and nothing could tell).
       - name: Keyless build boots (no Convex/Clerk env)
         run: pnpm run test:e2e:nokeys
-      # The specs that prove the plans' promises and used to run only on a
-      # laptop: the phone never fetches the engine, lit tiles pass AA, a photo
-      # switch never moves an edit or a stroke onto the wrong photo, the gallery
-      # and footer say Loading, and Batch's Exceptions and crop frame work.
-      # Plus five that went red on master unseen while they ran only on a
-      # laptop (10-05): one of them was a real regression — plugin formats
-      # vanished from the Download dialog in v9.14 — and nothing in CI looked.
-      # ~4 min of tests against the default (placeholder-key) build.
-      - name: Phone, contrast, photo-switch and Batch e2e
-        run: >-
-          pnpm exec playwright test
-          e2e/phone-no-engine.spec.ts
-          e2e/lit-tile-contrast.spec.ts
-          e2e/photo-switch-state.spec.ts
-          e2e/photo-switch-paint.spec.ts
-          e2e/photo-switch-leftovers.spec.ts
-          e2e/photo-switch-cue.spec.ts
-          e2e/gallery-loading-state.spec.ts
-          e2e/batch-exceptions.spec.ts
-          e2e/batch-crop-frame.spec.ts
-          e2e/import-skeleton.spec.ts
-          e2e/gallery-skeleton-region.spec.ts
-          e2e/async-dropped.spec.ts
-          e2e/zip-export.spec.ts
-          e2e/ora-import-status.spec.ts
-          e2e/beta-switches.spec.ts
-          e2e/plugins.spec.ts
-          e2e/phone-grid-thumbs.spec.ts
-          e2e/select-refine-mask.spec.ts
-          e2e/ui-night3-panels.spec.ts
-          e2e/settings-restore-confirm.spec.ts
-          e2e/collapsed-section-names.spec.ts
-          e2e/pane-header-row.spec.ts
-          e2e/ui-night8-finish.spec.ts

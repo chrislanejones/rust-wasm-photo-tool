@@ -1,4 +1,4 @@
-import { test, expect } from "./guard/test";
+import { test, expect } from "../guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
@@ -33,7 +33,7 @@ import { existsSync, readdirSync } from "node:fs";
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FIXTURE_PNG = join(__dirname, "fixtures", "checker.png");
+const FIXTURE_PNG = join(__dirname, "..", "fixtures", "checker.png");
 const PHOTO_DIR = process.env.IH_SWEEP_PHOTOS ?? "/tmp/ih-sweep-photos";
 
 function bulkPhotos(): string[] {
