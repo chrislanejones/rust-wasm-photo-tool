@@ -143,7 +143,7 @@ export function SubscriptionButton({
   const tabId = useId();
   const panelId = `${tabId}-panel`;
   const open = useUIStore((s) => s.settingsOpen);
-  const tab = useUIStore((s) => s.settingsTab);
+  const storedTab = useUIStore((s) => s.settingsTab);
   const openSettings = useUIStore((s) => s.openSettings);
   const closeSettings = useUIStore((s) => s.closeSettings);
   const setTab = useUIStore((s) => s.setSettingsTab);
@@ -187,6 +187,9 @@ export function SubscriptionButton({
     "beta",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
+  // A category can disappear while Settings is open. Keep the selected pane,
+  // its label and the rail's Tab stop on an available category.
+  const tab = TAB_ORDER.includes(storedTab) ? storedTab : "general";
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] =
     TAB_ORDER.map((id) => ({
       id,

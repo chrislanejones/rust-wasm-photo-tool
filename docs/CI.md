@@ -27,7 +27,7 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 | `e2e` | Every spec under the default Playwright config, in 2 shards. `scripts/e2e-coverage-check.mjs` checks that every eligible file is included; SW, keyless boot and archived sweeps have separate handling | — |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
 | `convex` | `convex codegen` + a `_generated` drift check | — |
-| `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` export | The manual check that caught the five-week featureless-prod bug |
+| `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and checks content types, the 800,000-byte floor, required exports and the build-info SHA256 | The manual check that caught the five-week featureless-prod bug |
 
 Build/quality jobs are skipped on the weekly cron (`if: github.event_name != 'schedule'`) — no point rebuilding when nothing changed.
 
@@ -113,7 +113,7 @@ satisfy it — `command -v rg` has to find an executable.
 Installed as **native git hooks** in [`.githooks/`](../.githooks), enabled through `core.hooksPath`. No dependency, no package manager.
 
 - **`pre-commit`** — `cargo fmt --check` on staged Rust.
-- **`pre-push`** — mirrors the blocking CI jobs: `cargo fmt --check`, `cargo clippy -D warnings`, `tsc -b`, and the UploadThing secret-leak guard. Uses only local tools, no ripgrep.
+- **`pre-push`** — mirrors the blocking CI jobs: `cargo fmt --check`, `cargo clippy --all-targets --features tiles -D warnings`, `cargo test --features tiles`, `tsc -b`, and the UploadThing secret-leak guard. Uses only local tools, no ripgrep.
 
 `core.hooksPath` is per-clone local config and is not committed, so enable it once on a fresh clone:
 
@@ -129,7 +129,7 @@ Bypass a single run with `git commit --no-verify` / `git push --no-verify`. Pair
 
 Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
-- Require status checks before merging — required: `rust`, `web`, `marketing`, `convex`.
+- Require status checks before merging — required: `Rust / WASM`, `Frontend (typecheck + build)`, `Marketing build (mirrors Vercel /marketing root)`, `Convex (codegen + typecheck + drift)`, `E2E (every spec, shard 1/2)` and `E2E (every spec, shard 2/2)`. Both browser shards must pass.
 - Don't require `guardrails`, `cargo-audit`, `pnpm-audit`, `secrets` or `codeql` until their baselines are clean.
 - Require branches to be up to date before merging.
 

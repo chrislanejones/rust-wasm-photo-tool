@@ -98,7 +98,8 @@ controls. Enter and Space work on Remove and Select; selection keeps the
 current photo open. The gallery shows the current count and the 12-photo demo limit.
 
 Settings has named tabs with Up/Down and Home/End navigation, and readable help
-text in both themes. An unfilled freehand stroke selects along its segments
+text in both themes. If a section disappears while Settings is open, its pane and
+keyboard entry point return to General. An unfilled freehand stroke selects along its segments
 instead of the empty space inside its bounds. Every eligible browser test now
 runs in CI, across two jobs.
 

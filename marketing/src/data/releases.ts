@@ -28,7 +28,7 @@ export const RELEASES: Release[] = [
     date: "2026-10-11",
     headline: "The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.",
     entries: [
-      { tag: "feature", text: "Settings has named tabs you can move through with Up, Down, Home and End. Its help text is readable in both themes." },
+      { tag: "feature", text: "Settings has named tabs you can move through with Up, Down, Home and End. Its help text is readable in both themes. If a section disappears while Settings is open, its pane and keyboard entry point return to General." },
       { tag: "ui", text: "Gallery rows scroll without overlapping. Hover one photo and only its controls appear. The count shows your loaded photos and the 12-photo demo limit." },
       { tag: "fix", text: "Welcome Back, Shared and Batch wait for previews to decode, keep the last good picture during an update, and show when an image fails. A shared image can be retried." },
       { tag: "fix", text: "Enter and Space work on a gallery photo's Remove and Select buttons. Remove asks before deleting; Select keeps the photo you're editing open." },

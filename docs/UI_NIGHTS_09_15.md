@@ -5,9 +5,12 @@ pen hit-test fix, full browser coverage and gallery keyboard correction.
 Original Friday and Saturday commit dates are preserved. The reports below
 record the development-time branch state; their earlier no-merge and pending-QC
 notes are historical. Full scoped production QC now passes all five sections:
-129 combined browser cases, 1,862 unit tests, 512/688 Rust tests, four keyless
+133 combined browser cases, 1,864 unit tests, 512/688 Rust tests, four keyless
 cases and four additional keyboard cases proved red before the fix and green
-after it. The cached-restore timing concern remains parked.
+after it. Two more rendered Settings cases prove that losing an admin-only
+category leaves a labelled General pane, one keyboard entry point, and a
+working reopen action; seven focused production browser cases pass afterward.
+The cached-restore timing concern remains parked.
 
 Run against master `315e857f` (v9.26), 2026-10-09. Each night is a separate
 stacked branch and draft PR; review and land in order. No merges or deployment commands.
