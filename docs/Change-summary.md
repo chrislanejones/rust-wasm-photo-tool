@@ -11498,3 +11498,16 @@ The follow-up fixes two stale ORA/plugin test selectors to address Settings tabs
 updates the marketing feature cards and canonical feature list, and regenerates
 the Trail Log squares and sitemap dates from their sources. Details and validation
 are in [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md).
+
+## Pending review: gallery keyboard actions — 2026-10-10
+
+Enter and Space now work on each gallery photo’s Remove and Select buttons.
+The tile had intercepted those keys before the button could act. Selecting a
+checkbox leaves the current photo open; activating the tile still opens it.
+
+Four production-browser cases cover both keys, the removal confirmation and
+Cancel, actual removal, selection toggling, and photo activation. All four failed
+on the original build. The marketing feature copy describes the corrected
+keyboard behavior; Trail Log data is regenerated from merged history.
+
+This follow-up is a draft based on the UI Nights 9–15 work, not a new release.
