@@ -39,7 +39,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
-- **[UI Nights 9–15](docs/UI_NIGHTS_09_15.md)** — gallery, preview loading and Settings accessibility improvements in draft PRs #339–#345; pending review.
+- **[UI Nights 9–15](docs/UI_NIGHTS_09_15.md)** — gallery, preview loading and Settings accessibility improvements shipped in v9.27.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 
@@ -65,11 +65,12 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 
 ## The marketing site
 
-`marketing/` — the five-page site at **[imagehorse.app](https://imagehorse.app/)**:
-home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
+`marketing/` — the site at **[imagehorse.app](https://imagehorse.app/)**:
+home, tool pages, architecture, features, pricing, Trail Log and what is in the works. Vite + React 19 + react-router,
 plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
-Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what
-points the deploy at `marketing/dist` instead of the app.
+The marketing Vercel project uses Root Directory `marketing` and
+`marketing/vercel.json`, publishing `marketing/dist`. The root `vercel.json`
+builds the editor at **edit.imagehorse.app**. See [marketing/README.md](marketing/README.md).
 
 ```bash
 pnpm run dev:marketing      # local
@@ -87,17 +88,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.26 — 2026-10-08
+### v9.27 — 2026-10-11
 
-**A generated picture actually arrives.**
+**The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.**
 
-The first real Create AI Image job was made and paid for, then thrown away.
-Replicate handed the picture back from a storage address the server didn't
-recognize, and the server refuses addresses it doesn't know. It now accepts
-that one address, and the picture lands in your gallery as a new image.
+Welcome Back, Shared and Batch keep previews in place while images decode.
+Gallery rows scroll without overlapping, and hovering one photo reveals its
+controls. Enter and Space work on Remove and Select; selection keeps the
+current photo open. The gallery shows the current count and the 12-photo demo limit.
 
-Other storage addresses are still refused, so a result can only come from
-Replicate.
+Settings has named tabs with Up/Down and Home/End navigation, and readable help
+text in both themes. An unfilled freehand stroke selects along its segments
+instead of the empty space inside its bounds. Every eligible browser test now
+runs in CI, across two jobs.
+
+[UI Nights 9–15](docs/UI_NIGHTS_09_15.md) records the work and validation.
+The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
+commit squares; [what is in the works](https://imagehorse.app/in-the-works)
+shows the next pass still under review.
 
 
 ## License

@@ -194,7 +194,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.23, 10-08-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.27, 10-11-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">

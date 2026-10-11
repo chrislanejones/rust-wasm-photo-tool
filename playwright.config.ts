@@ -40,7 +40,16 @@ export default defineConfig({
   // default harness builds WITHOUT the flag, which is itself part of the
   // gate — e2e/no-sw-default.spec.ts pins that a default build never
   // registers a service worker.
-  testIgnore: ["**/sw/**"],
+  //
+  // e2e/archive/* are one-off sweeps (a release's QC slice, a PR sweep): kept
+  // to read and to re-run by hand with `--config` pointed at them, never part
+  // of the suite. boot-no-keys needs a build with NO keys and runs under
+  // playwright.nokeys.config.ts.
+  //
+  // Everything else in e2e/ runs, in CI too: the CI step runs this config
+  // over the WHOLE directory, so a new spec is in the net the moment it lands
+  // (Night 10-07 — 23 of 49 had been left out of a hand-kept list).
+  testIgnore: ["**/sw/**", "**/archive/**", "**/boot-no-keys.spec.ts"],
   // Fails the run if the served build names a real Convex host, or if a spec
   // bypasses the guarded `test` (e2e/guard/).
   globalSetup: "./e2e/guard/global-setup.ts",

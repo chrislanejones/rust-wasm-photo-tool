@@ -76,11 +76,21 @@ function monthStats(key: string) {
   const score = (r: Release) =>
     features > 0 ? r.entries.filter((e) => e.tag === "feature").length : r.entries.length;
   const cap = features >= 15 || rs.length >= 20 ? 8 : 4;
-  const perks = rs
+  const ranked = rs
     .map((r) => ({ h: r.headline, v: r.version, date: r.date, f: score(r) }))
     .filter((x) => x.f > 0)
     .sort((a, b) => b.f - a.f || (a.date < b.date ? 1 : -1))
     .slice(0, cap);
+
+  // Keep the latest release visible alongside the biggest changes. Otherwise
+  // a small fix disappears from the year summary behind older feature releases.
+  const newest = rs[0]; // RELEASES is newest first.
+  const perks = newest
+    ? [
+        { h: newest.headline, v: newest.version, date: newest.date, f: score(newest) },
+        ...ranked.filter((x) => x.v !== newest.version),
+      ].slice(0, cap)
+    : [];
 
   return { releases: rs.length, commits, activeDays, perks };
 }

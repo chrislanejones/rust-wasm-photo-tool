@@ -11488,13 +11488,20 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Gates** | CI 17/17; convex tsc 0 (bar the existing `process` types). No client or engine change (892,634 B). |
 
 
-## Pending review: UI Nights 9–15 — 2026-10-10
+## v9.27 Change Summary — 2026-10-11
 
-Draft PRs #339–#345 contain the gallery layout, Welcome Back/Shared/Batch preview
-loading, gallery count and Settings keyboard/contrast improvements. These have
-not been merged or released; v9.26 remains the latest release.
+**The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.** UI Nights 9–15 (#339–#345), pen selection (#317), browser coverage (#319) and keyboard actions (#346), published together.
 
-The follow-up fixes two stale ORA/plugin test selectors to address Settings tabs,
-updates the marketing feature cards and canonical feature list, and regenerates
-the Trail Log squares and sitemap dates from their sources. Details and validation
-are in [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md).
+| Area | Change |
+| --- | --- |
+| **Gallery** | Rows scroll without overlapping at narrow widths; hover and focus controls belong to one photo. The count says how many photos are loaded and the 12-photo demo limit. |
+| **Previews** | Welcome Back, Shared and Batch wait for actual image decoding, preserve the last good preview during updates, and show a per-image failure state. Shared images can be retried. |
+| **Keyboard** | Enter and Space activate gallery Remove and Select. Remove opens confirmation; Select toggles the checkbox without opening a different photo. The tile itself still opens a photo. |
+| **Settings** | Named, linked tabs; Up/Down, Home and End navigation; readable help text in both themes. |
+| **Pen** | An unfilled freehand stroke selects on its segments, not the empty area in its bounding box. Delete, undo and redo preserve that behavior. |
+| **Browser coverage** | Every eligible default browser spec runs in two CI shards, with a coverage check. Service worker and keyless builds remain separate. Existing v9.20 resize behavior gains regression coverage; it is not a new resize implementation. |
+| **Marketing and docs** | Feature descriptions, annual and October Trail Log totals and commit squares, the newest release kept visible in each summary, remaining multi-night work, README deployment instructions and the documentation index are current. Commit dates preserve the work done on Friday and Saturday; the release lands Sunday. |
+| **Validation** | Full scoped production QC passes all five sections. The combined candidate passes 129 browser cases and 1,862 unit tests; the keyboard correction adds four cases proved red before the fix and green afterward. Keyless boot: 4 passes. Rust: 512 featureless / 688 tiles. TypeScript, lint (0 errors, 55 existing warnings), guardrails, builds and inert-class audit pass. [Implementation and validation report](UI_NIGHTS_09_15.md). |
+| **Engine** | 892,634 → 892,897 B (+263), the pen hit-test branch. No saved-edit format, IndexedDB schema, authentication or billing change. |
+
+The historical cached-restore timing concern remains recorded in the implementation report; passing runs do not establish a flake rate. Authenticated Shared actions have source and boundary-test coverage, not a live-account release test.
