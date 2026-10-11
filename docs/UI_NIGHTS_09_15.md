@@ -129,3 +129,34 @@ lint (existing warnings) and guardrails pass. Plain text clarifies identity;
 no processing, photo state, keyboard behavior or runtime cost changes.
 
 Night 12: commit cdeb0c50, PR #342.
+
+## Night 14: Component library and accessibility
+
+Master unchanged; read UI exceptions and ADR-062. Browser tests first failed on
+missing Settings tablist and measured low-contrast tokens. Extended the existing
+segmented-tabs primitive (no second rail component): vertical orientation,
+roving focus, wrapping Up/Down, Home/End and linked tabpanel. Settings keeps its
+existing selected-tab store and all pane actions. Retired its raw-button exception.
+
+Measured muted text minima: light 3.00 → 4.68:1; dark elevated 4.10 → 4.79:1.
+Shortcut headings now use secondary text, 6.99:1 light / 8.56:1 dark.
+Before/after compact Settings screenshots retain the layout with clearer helper
+text. Both themes reviewed. Shared loading markup in four surfaces is now
+`ui/decoded-image`, a presentation wrapper over useThumbImage and Skeleton;
+resource-specific recovery stays with each caller. Lazy previews remain lazy.
+
+Files: MediaTile, ShareViewer, SharedPane, GridThumbnails, SubscriptionButton,
+ui/decoded-image, ui/segmented-tabs and its test, styles.css, the Night 14 and
+Night 2 e2e specs, UI_EXCEPTIONS, UI_CONSISTENCY, guardrails, this report.
+Validation: 20 focused component tests and 5 browser tests pass; TypeScript,
+ESLint (existing warnings) and guardrails pass. Counts tighten to spacing 41,
+raw buttons 13; radius stays 22. No added dependencies or loading state machine.
+Risk: muted text is a global token; tested its documented surface combinations,
+not every possible composited color throughout the app.
+
+Continuation (2026-10-10): remote CI found the ORA and plugin test helpers still
+looking for Settings buttons. Both now address the named tabs, preserving the
+real import/export and plugin assertions and the Settings accessibility contract.
+All seven focused ORA, plugin, Settings keyboard/contrast and control tests pass.
+
+Night 13: commit 636583a3, PR #343.

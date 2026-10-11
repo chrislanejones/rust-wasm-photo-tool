@@ -2,10 +2,11 @@
 // selected pane on the right). General (app preferences), Plan & Billing (Stripe
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 // Through lib/cloud, not convex/react: a keyless build must render this.
 import { useCloudAction as useAction, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
 import { toast } from "sonner";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
@@ -139,6 +140,8 @@ export function SubscriptionButton({
   // palette, a deep link) now goes through the same store actions instead of
   // the old one-shot request + grandfathered `image-horse:open-settings`
   // CustomEvent, both of which are gone.
+  const tabId = useId();
+  const panelId = `${tabId}-panel`;
   const open = useUIStore((s) => s.settingsOpen);
   const tab = useUIStore((s) => s.settingsTab);
   const openSettings = useUIStore((s) => s.openSettings);
@@ -311,26 +314,14 @@ export function SubscriptionButton({
 
           <div className="flex min-h-0 flex-1">
           {/* GNOME-style category rail (left) */}
-          <nav className="w-48 shrink-0 space-y-1 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                  tab === id
-                    ? "bg-bg-elevated text-text-primary"
-                    : "text-text-secondary hover:bg-bg-elevated/60"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </button>
-            ))}
-          </nav>
+          <SegmentedTabs
+            tabs={tabs} value={tab} onChange={setTab} label="Settings sections"
+            orientation="vertical" idPrefix={tabId} panelId={panelId}
+            className="w-48 shrink-0 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2"
+          />
 
           {/* Selected pane (right) */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div role="tabpanel" id={panelId} aria-labelledby={`${tabId}-${tab}`} tabIndex={0} className="flex-1 overflow-y-auto p-5">
             {tab === "general" ? (
               <GeneralPane
                 value={draft}

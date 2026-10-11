@@ -28,9 +28,8 @@
 // NO CHART. There was a thirty-day bar row here; with views on one or two
 // days it drew a lone block at the right edge that read as a stray box, not a
 // chart. The view count and "last opened" beside the thumbnail say it.
-import { useThumbImage } from "@/features/gallery/useThumbImage";
-import { useInView } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { DecodedImage } from "@/components/ui/decoded-image";
+import { useEffect, useState } from "react";
 // Through lib/cloud, not convex/react: a keyless build must open this pane
 // without "Could not find ConvexProviderWithAuth".
 import { useCloudAuth as useConvexAuth, useCloudMutation as useMutation, useCloudQuery as useQuery } from "@/lib/cloud";
@@ -160,7 +159,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
           title={hasImage ? undefined : "Preview unavailable"}
         >
           {hasImage ? (
-            <LazySharePreview key={link.imageUrl} src={link.imageUrl!} />
+            <DecodedImage key={link.imageUrl} source={link.imageUrl!} alt="" loading="lazy" fallback={<span role="img" aria-label="Preview unavailable. Open the shared link to try the image."><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
           ) : (
             <ImageOff aria-hidden className="size-4 text-text-muted" />
           )}
@@ -341,17 +340,4 @@ export function SharedPane() {
       )}
     </div>
   );
-}
-
-function SharePreview({ src }: { src: string }) {
-  const view = useThumbImage(src);
-  if (view.src) return <img src={view.src} alt="" className="size-full object-cover" />;
-  if (view.failed) return <span role="img" aria-label="Preview unavailable. Open the shared link to try the image."><ImageOff aria-hidden className="size-4 text-text-muted" /></span>;
-  return view.showSkeleton ? <Skeleton className="size-full" aria-label="Loading share preview" /> : null;
-}
-
-function LazySharePreview({ src }: { src: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const visible = useInView(ref, { once: true, margin: "200px" });
-  return <span ref={ref} className="size-full">{visible && <SharePreview src={src} />}</span>;
 }
