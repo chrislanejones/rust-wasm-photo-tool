@@ -11506,3 +11506,21 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | 892,634 → 892,897 B (+263), the pen hit-test branch. No saved-edit format, IndexedDB schema, authentication or billing change. Settings only normalizes the visible category; access rules and server calls are unchanged. |
 
 The historical cached-restore timing concern remains recorded in the implementation report; passing runs do not establish a flake rate. Authenticated Shared actions have source and boundary-test coverage, not a live-account release test.
+
+## v9.28 Change Summary — 2026-10-12
+
+**Things that load now hold their place instead of popping in.** UI Nights 16–18 (#349, #350, #353) and the Plan & Billing skeleton (#352), published together.
+
+| Area | Change |
+| --- | --- |
+| **Sign-in** | The sign-in or avatar button reserves its space while Clerk loads, at each of its five sizes. The gray placeholder appears only after 300 ms and leaves with Clerk if Clerk fails. |
+| **AI Usage** | While auth connects or usage is on its way, the pane shows the shape of the Usage limits card. Signed-in users no longer see "Sign in to see your usage" first. |
+| **Plan & Billing** | A skeleton of the Current plan row and the Pro card replaces the large spinner. Signed in and still connecting, it no longer flashes the sign-in copy. A build without cloud keys showed it loading for good, on the old spinner too; it now shows the sign-in copy at once. |
+| **Compare** | The original is decoded before it shows. Nothing for 300 ms, then a skeleton in the Original half; "Original unavailable" on a decode error or after 15 s, sized to that half. |
+| **Phone viewer** | Opening a photo shows a skeleton in that photo's own shape after 300 ms, then the photo lands in the same box. A missing original says "This photo couldn't be loaded." instead of spinning for good. A swipe never shows the new photo's name with the old picture. The phone boot screen is unchanged. |
+| **Tests** | 38 new unit cases across the four changes; the old code fails each red check. Three phone-grid browser specs now count the grid's own placeholders, not the header's sign-in skeleton, which CI's placeholder Clerk key keeps on screen. |
+| **Validation** | Browser checks: Compare and the phone viewer with decode slowed to 3 s and forced to fail; Plan & Billing in a keyless build and with auth that never connects, in dark and light themes. CI green on all four PRs. Combined master: 1,902 unit tests; TypeScript, lint (0 errors, 55 existing warnings), guardrails, build and inert-class audit pass. [Implementation report](UI_NIGHTS_16_19.md). |
+| **Engine** | Unchanged, 892,897 B. No saved-edit format, IndexedDB schema, authentication or billing change. |
+
+Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Billing skeletons giving way to real data. Night 19 (import preview, image info, narrow menu bar) is still to do.
+

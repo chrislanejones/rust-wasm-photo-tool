@@ -40,6 +40,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 - **[UI Nights 9–15](docs/UI_NIGHTS_09_15.md)** — gallery, preview loading and Settings accessibility improvements shipped in v9.27.
+- **[UI Nights 16–19](docs/UI_NIGHTS_16_19.md)** — loading skeletons for sign-in, AI Usage, Compare, Plan & Billing and the phone viewer, shipped in v9.28.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 
@@ -88,29 +89,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.27 — 2026-10-11
+### v9.28 — 2026-10-12
 
-**The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.**
+**Things that load now hold their place instead of popping in.**
 
-Welcome Back, Shared and Batch keep previews in place while images decode.
-Gallery rows scroll without overlapping, and hovering one photo reveals its
-controls. Enter and Space work on Remove and Select; selection keeps the
-current photo open. The gallery shows the current count and the 12-photo demo limit.
+The sign-in button and Settings › AI Usage reserve their space while you sign
+in, so a signed-in user no longer sees "Sign in" first. Plan & Billing shows
+the shape of your plan instead of a spinner. Compare waits until the original
+is ready, then shows it; if it can't load, it says "Original unavailable". On
+a phone, opening a photo shows a gray box the shape of that photo until it
+arrives, and a missing photo says so instead of spinning forever.
 
-Settings has named tabs with Up/Down and Home/End navigation, and readable help
-text in both themes. If a section disappears while Settings is open, its pane and
-keyboard entry point return to General. An unfilled freehand stroke selects along its segments
-instead of the empty space inside its bounds. Every eligible browser test now
-runs in CI, across two jobs.
+A fast load shows none of this: nothing appears for the first 300 ms.
 
-Every version tag now has a matching
-[GitHub Release](https://github.com/chrislanejones/rust-wasm-photo-tool/releases);
-v8.98, v9.2 and v9.19–v9.26 were missing one.
-
-[UI Nights 9–15](docs/UI_NIGHTS_09_15.md) records the work and validation.
+[UI Nights 16–19](docs/UI_NIGHTS_16_19.md) records the work and validation.
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
-commit squares; [what is in the works](https://imagehorse.app/in-the-works)
-shows the next pass still under review.
+commit squares.
 
 
 ## License

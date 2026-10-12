@@ -16,8 +16,8 @@ Reserve the final footprint at once; paint the grey only after the grace.
 |---|---|---|---|
 | **16** | Sign-in / avatar slot (`UserMenu`, 5 render sites) | Empty until Clerk loads, then pops in | **Done**: `ClerkLoading` reserves the slot, decorative skeleton after 300 ms |
 | **16** | Settings › AI Usage | "Sign in to see your usage" flashes at signed-in users, then a "Loading your usage…" line | **Done**: card-shaped skeleton while auth connects or the query is in flight |
-| 17 | Compare slider (`features/canvas/CompareSlider.tsx`) | Renders nothing until the original is read from IndexedDB; the before half can be blank until its CSS background decodes | Skeleton clipped like the before layer; decode before reveal |
-| 18 | Mobile full-screen viewer (`MobileShell.tsx` ~302) | Spinner at once, no grace; each swipe pops in | `aspect-ratio` skeleton from the known size, with the grace |
+| **17** | Compare slider (`features/canvas/CompareSlider.tsx`) | Renders nothing until the original is read from IndexedDB; the before half can be blank until its CSS background decodes | **Done** (#350): decoded off-screen before reveal; skeleton clipped like the before layer; "Original unavailable" on failure or after 15 s |
+| **18** | Mobile full-screen viewer (`MobileShell.tsx` ~302) | Spinner at once, no grace; each swipe pops in | **Done** (#353): photo-shaped skeleton from the known size after the grace; "This photo couldn't be loaded." on failure |
 | 18 | Mobile boot (`MobileShell.tsx` ~441) | Logo + spinner | 3-column tile grid skeleton. **Chris's call**: the spinner doubles as the brand screen |
 | 19 | Import dialog preview (`ImportImageDialog.tsx`) | Bare `<img>`; the frame collapses, then grows | `DecodedImage` in a box reserved from the known width/height |
 | 19 | Diagnostics › Image meta EXIF | "reading…" text | `SkeletonText`. The hash stays "computing…": that is new work |
@@ -27,7 +27,7 @@ Reserve the final footprint at once; paint the grey only after the grace.
 
 | Item | Why |
 |---|---|
-| Settings › Plan & Billing spinner | A code comment says the spinner deliberately **replaced** a skeleton. The rule says skeleton. **Chris's call** before anyone changes it |
+| Settings › Plan & Billing spinner | **Done** (#352), Chris chose skeleton on 10-11. Full-pane shape, not the small inline one the spinner replaced. Also fixed: a keyless build showed it loading for good |
 | Gallery "· N max" while the tier loads | A gating problem, not a skeleton: a paid user is `loggedIn` until `users.me` lands. In PARKING_LOT |
 | TrashView thumbnails | Not rendered anywhere in the app. Use `DecodedImage` if it is ever wired |
 
@@ -62,3 +62,37 @@ Engine untouched (892,897 B).
 
 Risk: the signed-in look of both skeletons has not been seen against a real
 Clerk/Convex session. imagehorse-qc is required before release.
+
+## Night 17: Compare slider (#350)
+
+`useOriginalImage` decodes the original off-screen and keys readiness and
+failure to its URL. Nothing for 300 ms, then a skeleton clipped to the Original
+half; "Original unavailable" sized to that half on a decode error or after 15 s.
+Browser, decode slowed to 3 s: nothing at 100 ms, skeleton at 800 ms, photo at
+3 s. The first version centered the failure message on the whole photo, and the
+divider cut it to "Origina"; caught in the browser and fixed. 8 hook tests.
+
+## Night 18: phone viewer (#353)
+
+`useViewerOriginal` reads, decodes and keys each result to the photo it was read
+for, so a swipe never pairs the new name with the old picture. The skeleton
+takes the photo's own box from `origWidth`/`origHeight` (`viewerBox`, `cq`
+units on the stage). Browser at 390×844: skeleton 390×293, photo 390×293.
+A missing original used to spin for good; it now says so. 13 tests; the old
+viewer fails 3 of 4. The phone boot screen is unchanged (Chris's call).
+
+## Plan & Billing (#352)
+
+Full-pane skeleton (Current plan row, Pro card) instead of a spinner. Browser
+testing found that a keyless build answers every query with `undefined`, which
+held the pane loading for good, on master too. It now waits only while auth
+connects or a signed-in user's plan is in flight. 6 tests.
+
+## Released together in v9.28
+
+Night 16's skeleton in the phone header broke three phone-grid browser specs
+that counted every `.skeleton` on the page; CI's placeholder Clerk key never
+finishes loading. The specs now count the grid's own placeholders.
+Combined master: 1,902 unit tests; tsc, lint (0 errors, 55 warnings),
+guardrails, build and inert-class audit pass. Engine unchanged (892,897 B).
+Night 19 is still to do.
