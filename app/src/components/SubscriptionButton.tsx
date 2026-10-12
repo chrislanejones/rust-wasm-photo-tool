@@ -4,7 +4,7 @@
 // the TopBar).
 import { useState, useEffect, useRef, useId } from "react";
 // Through lib/cloud, not convex/react: a keyless build must render this.
-import { useCloudAction as useAction, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
+import { useCloudAction as useAction, useCloudAuth, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
 import { toast } from "sonner";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { WINDOW_TITLE } from "@/lib/styles";
@@ -52,6 +52,9 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PAID_SIGNUP_ENABLED, PAID_SIGNUP_OFF_NOTE } from "@/lib/billing";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
+import { cn } from "@/lib/utils";
 import {
   DEFAULT_PREFERENCES,
   serializePreferences,
@@ -260,7 +263,13 @@ export function SubscriptionButton({
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const { isLoading: authLoading, isAuthenticated } = useCloudAuth();
   const me = useQuery(api.users.me, {});
+  // While auth connects, `me` can read null for a signed-in user, which would
+  // flash "Sign in to view…" before the plan arrives. Signed out, there is
+  // nothing to wait for: a keyless build's query never answers (lib/cloud),
+  // and waiting on it kept this pane loading for good.
+  const planLoading = authLoading || (isAuthenticated && me === undefined);
   const sub = useQuery(api.subscriptions.getByUser, {});
   const checkout = useAction(api.stripe.createCheckoutSession);
   const portal = useAction(api.stripe.createPortalSession);
@@ -383,14 +392,9 @@ export function SubscriptionButton({
                 <h3 className="text-sm font-semibold text-text-primary">
                   Plan &amp; Billing
                 </h3>
-                {me === undefined ? (
-                  /* Plan & Billing is still loading — one larger spinner,
-                     centered above the panel body (replaces the small inline
-                     skeleton). */
-                  <div className="flex justify-center pt-1 pb-6">
-                    <Spinner className="size-8" aria-label="Loading your plan" />
-                  </div>
-                ) : me === null ? (
+                {planLoading ? (
+                  <PlanSkeleton />
+                ) : !isAuthenticated || me == null ? (
                   <p className="text-xs text-text-muted">
                     Sign in to view and manage your plan.
                   </p>
@@ -554,5 +558,42 @@ export function SubscriptionButton({
           : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
       </ConfirmDialog>
     </>
+  );
+}
+
+/** The loaded pane's shape: the Current plan row, then the Pro card (name and
+ *  price, the feature list, the action at the foot), so the plan arriving does
+ *  not move anything. This replaced a small inline skeleton that was only a
+ *  line or two tall; the spinner after it said "working" for what is a read.
+ *  The box is reserved at once; the gray bars wait out the 300 ms grace. One
+ *  announcement for the region; the bars are decorative. */
+function PlanSkeleton() {
+  const shown = useDelayedFlag(true);
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      data-testid="plan-skeleton"
+      data-shown={shown || undefined}
+      className={cn("space-y-4", !shown && "[&>*]:invisible")}
+    >
+      <span className="sr-only">Loading your plan…</span>
+      <div className="flex items-center justify-between text-xs">
+        <Skeleton decorative variant="line" className="w-20" />
+        <Skeleton decorative variant="block" className="h-5 w-14 rounded-full" />
+      </div>
+      <div className="rounded-lg border border-border p-4">
+        <div className="flex items-baseline justify-between">
+          <Skeleton decorative variant="line" className="w-10 text-sm" />
+          <Skeleton decorative variant="line" className="w-16 text-2xl" />
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {PRO_FEATURES.map((f) => (
+            <Skeleton key={f} decorative variant="line" className="w-3/4 text-2xs" />
+          ))}
+        </div>
+        <Skeleton decorative variant="block" className="mt-4 h-8 w-full rounded-lg" />
+      </div>
+    </div>
   );
 }
