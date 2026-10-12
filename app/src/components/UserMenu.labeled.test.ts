@@ -11,6 +11,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 vi.mock("@/lib/cloud", () => ({ CLOUD_CONFIGURED: true }));
 vi.mock("@clerk/clerk-react", () => ({
+  ClerkLoading: () => null,
   SignedIn: () => null,
   SignedOut: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
   SignInButton: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
