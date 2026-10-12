@@ -263,11 +263,13 @@ export function SubscriptionButton({
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const { isLoading: authLoading } = useCloudAuth();
+  const { isLoading: authLoading, isAuthenticated } = useCloudAuth();
   const me = useQuery(api.users.me, {});
   // While auth connects, `me` can read null for a signed-in user, which would
-  // flash "Sign in to view…" before the plan arrives.
-  const planLoading = authLoading || me === undefined;
+  // flash "Sign in to view…" before the plan arrives. Signed out, there is
+  // nothing to wait for: a keyless build's query never answers (lib/cloud),
+  // and waiting on it kept this pane loading for good.
+  const planLoading = authLoading || (isAuthenticated && me === undefined);
   const sub = useQuery(api.subscriptions.getByUser, {});
   const checkout = useAction(api.stripe.createCheckoutSession);
   const portal = useAction(api.stripe.createPortalSession);
@@ -392,7 +394,7 @@ export function SubscriptionButton({
                 </h3>
                 {planLoading ? (
                   <PlanSkeleton />
-                ) : me == null ? (
+                ) : !isAuthenticated || me == null ? (
                   <p className="text-xs text-text-muted">
                     Sign in to view and manage your plan.
                   </p>

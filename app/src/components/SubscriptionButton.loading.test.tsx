@@ -81,6 +81,15 @@ describe("Plan & Billing loading", () => {
     expect(screen.getByText(/Sign in to view and manage your plan/)).toBeTruthy();
   });
 
+  it("a keyless build (signed out, query never answers) shows the sign-in copy, not a skeleton for good", () => {
+    cloud.auth = { isLoading: false, isAuthenticated: false };
+    cloud.me = undefined;
+    show();
+    act(() => { vi.advanceTimersByTime(5_000); });
+    expect(skeleton()).toBeNull();
+    expect(screen.getByText(/Sign in to view and manage your plan/)).toBeTruthy();
+  });
+
   it("signed in with a plan, shows the plan and no skeleton", () => {
     cloud.auth = { isLoading: false, isAuthenticated: true };
     cloud.me = { tier: "free" };
