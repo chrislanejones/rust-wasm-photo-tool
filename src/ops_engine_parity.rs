@@ -1731,3 +1731,42 @@ fn a_no_op_gesture_leaves_the_cursor_alone() {
     assert_eq!(composite_hash(&mut t), h0);
     assert!(!t.oplog_is_broken());
 }
+
+/// A step that records NO op is not the same as a step that changed nothing.
+/// A resize snaps and records nothing, and an empty log rebases onto the
+/// resized document at the next recomposite, so the log stays "in sync". The
+/// first v12 build read that as an empty gesture and popped it without
+/// restoring a pixel: Ctrl+Z after Apply Resize left the photo resized
+/// (`e2e/resize-photo-size.spec.ts` caught it in CI).
+#[test]
+fn undo_of_an_unrecorded_resize_puts_the_size_back() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    t.resize(48, 40);
+    t.recomposite();
+    assert_eq!((t.width, t.height), (48, 40));
+    assert!(t.undo());
+    assert_eq!((t.width, t.height), (96, 80), "undo puts the size back");
+    assert_eq!(composite_hash(&mut t), h0);
+    assert!(t.redo());
+    assert_eq!((t.width, t.height), (48, 40), "redo resizes again");
+}
+
+/// The same after a recorded gesture: the resize still undoes, and the stroke
+/// before it is still one more undo away.
+#[test]
+fn undo_of_a_resize_after_a_stroke_puts_both_back_in_order() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    stroke(&mut t, (5.0, 70.0), (90.0, 70.0), "#2040e0");
+    let h1 = composite_hash(&mut t);
+    t.resize(48, 40);
+    t.recomposite();
+    assert!(t.undo());
+    assert_eq!((t.width, t.height), (96, 80), "undo puts the size back");
+    assert_eq!(composite_hash(&mut t), h1);
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h0, "then the stroke");
+}

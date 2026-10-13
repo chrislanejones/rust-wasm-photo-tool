@@ -1793,13 +1793,49 @@ impl ImageHorseTool {
             log.gesture_redo_target()
         };
         match snap_cursor {
-            Some(Some(t)) if t == cursor || Some(t) == marker => Some(t),
+            // A step that recorded nothing. Empty only if the snapshot really
+            // is the live document: a resize snaps and records no op, and an
+            // empty log rebases onto the result, so "in sync" proves nothing
+            // here. Anything else goes to snapshot undo, which is always right.
+            Some(Some(t)) if t == cursor => {
+                let snap = if back {
+                    self.hist.undo_stack.back()
+                } else {
+                    self.hist.redo_stack.last()
+                };
+                if snap.is_some_and(|s| self.snapshot_is_live(s)) {
+                    Some(t)
+                } else {
+                    None
+                }
+            }
+            Some(Some(t)) if Some(t) == marker => Some(t),
             Some(Some(_)) => {
                 self.oplog_broken = true;
                 None
             }
             Some(None) | None => marker,
         }
+    }
+
+    /// Does `snap` hold exactly the live document: size, layer stack, pixels,
+    /// masks and annotation counts? Only asked of a step that recorded no op,
+    /// on an undo or redo press, so the full compare is affordable.
+    #[cfg(feature = "tiles")]
+    fn snapshot_is_live(&self, snap: &Snapshot) -> bool {
+        snap.width == self.width
+            && snap.height == self.height
+            && snap.layers.len() == self.layers.len()
+            && snap.layers.iter().zip(&self.layers).all(|(a, b)| {
+                a.visible == b.visible
+                    && a.opacity == b.opacity
+                    && a.buf.width == b.buf.width
+                    && a.buf.height == b.buf.height
+                    && a.buf.data == b.buf.data
+                    && a.mask == b.mask
+                    && a.text_annotations.len() == b.text_annotations.len()
+                    && a.shape_annotations.len() == b.shape_annotations.len()
+            })
     }
 
     /// Seek the log to `target` and bring the engine along. The press that
