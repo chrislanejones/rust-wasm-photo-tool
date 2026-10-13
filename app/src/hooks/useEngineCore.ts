@@ -40,6 +40,7 @@ import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { setEngineDocument } from "@/lib/engineDocument";
 import { parseBranches, withHistoryForks } from "@/lib/historyForks";
+import { withOplogUndo } from "@/lib/tilesFlush";
 import { useHistoryBranchStore } from "@/stores/useHistoryBranchStore";
 import { makeLoadQueue, isStale, claimEngineDocument, type LoadOpts } from "./engineLoadQueue";
 export type { LoadOpts } from "./engineLoadQueue";
@@ -512,7 +513,7 @@ export function useEngineCore(
           width: img.width,
           height: img.height,
           pixels: new Uint8Array(imageData.data),
-        }).then(withHistoryForks).then((tool) => {
+        }).then(withHistoryForks).then(withOplogUndo).then((tool) => {
           toolRef.current = tool;
           sourcePosRef.current = null;
           URL.revokeObjectURL(url);
@@ -577,7 +578,9 @@ export function useEngineCore(
         // and the history clear below stay HERE as ordinary engine calls,
         // because they are this load path's own logic. Folding them into the
         // factory would put five load paths behind one flag branch.
-        const tool = await createLiveEngine({ Tool, width, height, pixels: src }).then(withHistoryForks);
+        const tool = await createLiveEngine({ Tool, width, height, pixels: src })
+          .then(withHistoryForks)
+          .then(withOplogUndo);
         tool.set_artboard_border(
           artboard.pad,
           artboard.r,
@@ -610,7 +613,9 @@ export function useEngineCore(
           width,
           height,
         );
-        toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src }).then(withHistoryForks);
+        toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src })
+          .then(withHistoryForks)
+          .then(withOplogUndo);
         claimEngineDocument(opts);
       }
       sourcePosRef.current = null;
@@ -657,7 +662,8 @@ export function useEngineCore(
       // Last exit before the engine is touched (the boot placeholder included).
       if (isStale(opts)) return false;
       const tool =
-        toolRef.current ?? (await withHistoryForks(await createLiveEngine({ Tool, width: 1, height: 1 })));
+        toolRef.current ??
+        (await withOplogUndo(await withHistoryForks(await createLiveEngine({ Tool, width: 1, height: 1 }))));
       if ((await restoreOplog(tool, photoId)) !== "restored") return false;
       toolRef.current = tool;
       setEngineDocument(opts?.photoId ?? photoId);
@@ -707,7 +713,9 @@ export function useEngineCore(
         width: saved.canvasW,
         height: saved.canvasH,
         pixels: new Uint8Array(canvasRgba.buffer as ArrayBuffer),
-      }).then(withHistoryForks);
+      })
+        .then(withHistoryForks)
+        .then(withOplogUndo);
 
       // Rebuild the full layer stack (archive v5+) BEFORE injecting history —
       // begin_layer_restore clears history, so it must run first. Each layer's

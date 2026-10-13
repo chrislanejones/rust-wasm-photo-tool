@@ -4,6 +4,18 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+Found surveying skeleton gaps for UI Night 16. `useRealTier()`
+(`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,
+and `userModeForTier(null)` maps that to `loggedIn` (`app/AppShell.tsx`, the
+mode watcher). So a paid user briefly sees the logged-in gallery limit (24
+instead of 100) in "N photos · N max", and every other tier gate reads the
+lower tier for the same beat. Not a UI-night fix: the honest version is a
+"tier pending" user mode that the gates and the count can each read, which
+touches AppShell and gating semantics. Once that exists, GalleryCount can
+show a `Skeleton variant="line"` the width of a `TinyNumberBox` for the max.
+
 ## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
 
 Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
@@ -12,7 +24,14 @@ Locally at 4× CPU (`E2E_CPU_THROTTLE=4`), 10 repeats: Add mask 10/10, but "a Re
 previews on a copy" failed 1/10. The spec was already in the old CI list, and nothing tonight
 touched it. Same treatment as G1/fast-drags: find the clock it waits on and make it wait on state.
 
-## OPEN — Enter in the first frame after a shape appears is dropped (10-07-2026)
+## FIXED 10-13-2026 (#356) — Enter in the first frame after a shape appears is dropped (10-07-2026)
+
+The listener is now a `useLayoutEffect`, so it is bound before the pending
+shape paints. Not "bind once at mount", the other candidate below: capture
+listeners fire in registration order, and ShapeActionsOverlay's mid-drag
+Escape (drop the connector, keep the edit) only works because it registers
+after this one and stops it. `fast-drags-are-not-dropped` 20/20 at 4x CPU.
+
 
 Found making `fast-drags-are-not-dropped` wait on state instead of a clock (Night 10-07 PR 3).
 `useDrawingTools` binds its Enter/Escape/Delete listener in a `useEffect` keyed on `editState`. A
@@ -78,7 +97,7 @@ quota. These are the holes that feed the sweep, left out of that diff:
 
 | What | Where | Effect |
 | --- | --- | --- |
-| The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch` | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
+| ~~The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch`~~ **FIXED 10-07-2026 (Night 10-07 PR 2): `lib/withTimeout` aborts the upload's `AbortController`; edit, AI and share uploads all use it. ⚠️ STILL OPEN, the other half: a size-scaled timeout. 108 of the 167 orphans were archives over 30 MiB, which cannot upload in 8 s on most links. They used to land as orphans; now they are cancelled. Either way a big photo never backs up. Chris's call.** | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
 | `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
 | The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
 | `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
@@ -703,7 +722,18 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## OPEN — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+## FIXED 10-13-2026 (#356, ADR-088) — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+
+**Fixed by op-log v12.** `oplog_record` writes `Op::SameGesture` in front of
+the second and every later op of a gesture, and each snapshot remembers the
+op-log cursor it was taken at. Undo seeks back one GESTURE; after a reload
+(no snapshots) the markers alone find where it began. A one-op gesture writes
+no marker, so it is byte-identical to v11, and an old log with no markers
+still undoes one op per press. `one_undo_removes_a_seven_point_star` is
+un-ignored and passes, with twins for corner radii, rotation + sloppiness, a
+duplicate, a reload and a no-op gesture; `e2e/oplog-undo-shapes.spec.ts`
+drives it through the real UI. The original entry follows.
+
 
 **Pre-existing since v7 (sloppiness), widened by v9.** Reproduced at engine
 level by `ops_engine_parity::one_undo_removes_a_seven_point_star`, which is
@@ -731,9 +761,14 @@ Narrowed on the branch, not fixed: the sync used to emit a redundant
 all four skipped fields are neutralized now, so a side-field-only change is
 exactly one op.
 
-**Masked in the running app today** by "in the running app, undo of ANY
-recorded edit breaks the op log" (below): a broken log falls back to snapshot
-undo, which is correct. Fix that entry and this one surfaces.
+**Masked in the running app until 10-11-2026** by "in the running app, undo of
+ANY recorded edit breaks the op log" (below): a broken log falls back to
+snapshot undo, which is correct. That entry is fixed, so this one is now LIVE
+in the app: the first Ctrl+Z after adding a sloppy, rotated or 7-point-star
+shape changes nothing on screen. `cargo test --features tiles -- --ignored
+one_undo_removes_a_seven_point_star` still fails the same way (re-run
+10-11-2026; see the entry's fix options — format-level, ADR material, not
+touched by that fix).
 
 Fix options, both format-level (ADR material): give the log gesture
 boundaries (a group marker per snapshot, and undo seeks to the group start),
@@ -939,7 +974,49 @@ on this evidence it would copy the un-undone document to the second device and
 hand it back to the first on the next pull — two devices disagreeing with the
 user instead of one. Fix and cover with a test before any sync code is written.
 
-## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+## OPEN — two shape edits still route undo to the snapshot path on purpose (10-13-2026)
+
+`move_shape_annotation` and `reroute_connector` (src/annotations.rs) record
+several ops under one snapshot (a box move plus every re-routed connector),
+so they deliberately send undo down the snapshot path, which marks the op log
+broken for the rest of the session. Since op-log v12 (ADR-088) one undo can
+take a multi-op gesture back, so both could stay on the op-log path. Not done
+in #356: each needs its own red test (a box with two connectors, moved,
+then one Ctrl+Z) before the workaround comes out.
+
+## FIXED 10-11-2026 — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+> **Fixed on `ccr-f9643a38-5maj0q` (10-11-2026).** The bisect below was run
+> and the flush path is innocent: run A replayed against the BUILT engine with
+> `blitLiveEngine`, `onOplogFlush` (and the save it schedules), the
+> diagnostics sampler and the whole `flushToCanvas` added one at a time stays
+> healthy every time — `app/src/lib/oplogFlushPath.test.ts`, kept as the
+> record. Every one of those calls is a read plus `recomposite()`, and
+> `oplog_engine_in_sync` recomposites before it hashes anyway, so there was
+> nothing for them to desync.
+>
+> **What broke it:** the engine's replay switch `oplog_use_for_undo` defaults
+> to OFF (it is the runtime verification switch; the app owns it), and the only
+> push — `set_oplog_undo(isOplogUndoEnabled())` inside `syncOplog` — ran from
+> `useDiagnosticsSampler`, i.e. ONLY while the Diagnostics window is open. In
+> an ordinary session the switch never reached the engine, `undo()` took the
+> snapshot path, and `restore_snapshot` marks a non-empty log broken. That is
+> row C exactly (cursor stays 1, status "broken"), and it is why runs A and B
+> replayed: they were taken at the console with Diagnostics open, which had
+> pushed the switch. "Breaks BETWEEN the edit and the undo" was the wrong
+> reading — it broke AT the undo, on the wrong path.
+>
+> **Fix:** `withOplogUndo` (`lib/tilesFlush.ts`) pushes the switch at every
+> `createLiveEngine` site in `useEngineCore`, chained beside `withHistoryForks`
+> — the same shape as the history-forks switch, and like `ih_tiles_flush` it
+> takes effect on the next load. No engine change, no format change, nothing
+> persisted changes. Pinned by `e2e/oplog-undo-through-ui.spec.ts`: a brush
+> stroke and a Levels apply through the real UI, Ctrl+Z, `oplog_is_broken()`
+> false and the cursor 1 → 0 (red on master, green with the push; 10× at 4× CPU
+> each). The engine-call ratchet moved 191 → 192 for the awaited push.
+>
+> **Now unmasked:** "one gesture can record several ops" (above) — see the
+> note added there.
 
 Found while testing the Levels tile, and **not caused by it**. Undo still shows
 the right pixels, so nothing is lost — but it always takes the snapshot path,

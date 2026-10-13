@@ -32,6 +32,13 @@ pub struct Snapshot {
     /// `ImageHorseTool::undo`). The layer stack in a selection-only snapshot
     /// is identical to the state below it by construction.
     pub selection_only: bool,
+    /// The op-log cursor when this snapshot was taken (ADR-088): where an undo
+    /// that pops it must seek the log, however many ops the gesture recorded.
+    /// `None` when there was no log, or for a snapshot injected by a session
+    /// restore, which cannot know; the log's own gesture markers decide then.
+    /// Read only by the op-log undo path, which builds with `tiles`.
+    #[cfg_attr(not(feature = "tiles"), allow(dead_code))]
+    pub oplog_cursor: Option<usize>,
     /// Export quality at the time of the snapshot, 1..=100. ADR-031.
     ///
     /// The only non-pixel parameter here that the engine itself never reads —
@@ -680,6 +687,7 @@ impl ImageHorseTool {
             height: h,
             selection: None,
             selection_only: false,
+            oplog_cursor: None,
         });
     }
 
@@ -698,6 +706,7 @@ impl ImageHorseTool {
             height: h,
             selection: None,
             selection_only: false,
+            oplog_cursor: None,
         });
     }
 
@@ -903,6 +912,7 @@ mod branch_budget_tests {
             height: 1,
             selection: None,
             selection_only: false,
+            oplog_cursor: None,
             export_quality: 75,
         }
     }

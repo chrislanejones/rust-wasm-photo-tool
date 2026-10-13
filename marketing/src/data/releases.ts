@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.28",
+    date: "2026-10-12",
+    headline: "Things that load now hold their place instead of popping in.",
+    entries: [
+      { tag: "ui", text: "The sign-in button and Settings › AI Usage keep their space while you sign in. Signed-in users no longer see \"Sign in\" first." },
+      { tag: "ui", text: "Plan & Billing shows the shape of your plan while it loads, instead of a spinner." },
+      { tag: "fix", text: "Compare shows the original only once it's ready, and says \"Original unavailable\" if it can't load." },
+      { tag: "fix", text: "On a phone, a photo you open shows a gray box its own shape until it arrives. A missing photo says so instead of spinning forever." },
+    ],
+  },
+  {
     version: "v9.27",
     date: "2026-10-11",
     headline: "The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.",
@@ -33,7 +44,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Welcome Back, Shared and Batch wait for previews to decode, keep the last good picture during an update, and show when an image fails. A shared image can be retried." },
       { tag: "fix", text: "Enter and Space work on a gallery photo's Remove and Select buttons. Remove asks before deleting; Select keeps the photo you're editing open." },
       { tag: "fix", text: "A freehand pen stroke selects where the ink is. Clicking empty space inside its bounds no longer picks it up." },
-      { tag: "infra", text: "Every eligible browser test runs on each pull request, split across two jobs. Friday and Saturday's commits keep their original dates, with Sunday's release completing the three days." },
+      { tag: "infra", text: "Every browser test that can run in CI now runs on each pull request, split across two jobs." },
     ],
   },
   {
