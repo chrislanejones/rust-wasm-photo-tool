@@ -19,6 +19,26 @@ it. Decide each one, then delete the worktree.
 
 Open-PR worktrees (#316, #318, #348, #354, #355, #356) can go as soon as each PR is merged.
 
+Also in the main checkout's root, untracked and not committed (repo is public):
+
+| File | What it is | Decide |
+|---|---|---|
+| `zzzz-space-bunny-plan.md` | 10-02 handoff note for #289 (PageSpeed budget), 13 KB | Keep with #289 or trash |
+| `edit-v97-boot.png` | 10-01 screenshot of the editor booting, 60 KB | Trash |
+
+State on 10-13, after the cleanup and before the morning merges:
+
+| Check | Result |
+|---|---|
+| Master on GitHub and Codeberg | `97304ccd` (v9.28), in sync |
+| Live editor engine (sentinel) | Pass, 892,897 B |
+| Marketing site | Up |
+| Master CI | Red only on the weekly scheduled run (cargo audit + gitleaks, both parked) |
+
+This entry rode in on a docs-only branch (#357), not a master commit, because
+the git-routine gate treats every master commit as a release (README,
+Change-summary and Trail must be staged).
+
 ## OPEN — the tonal Presets op is still not recorded in the op log (10-13-2026)
 
 §4 of the 10-13 op-log night plan was skipped. #356 had already added one new op
