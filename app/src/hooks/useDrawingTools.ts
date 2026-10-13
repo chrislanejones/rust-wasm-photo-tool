@@ -1,5 +1,5 @@
 import { importEngine } from "@/lib/engineGate";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import type { ShapeName, ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
@@ -588,10 +588,10 @@ export function useDrawingTools({
   // Enter commits, Escape cancels, Delete/Backspace deletes, and Ctrl+Z
   // drops an UNCOMMITTED change instead of reaching the engine.
   //
-  // CAPTURE phase, deliberately. useKeyboardShortcuts binds Ctrl+Z on the same
-  // window in the bubble phase; a capture listener runs first and can stop it
-  // for the one case where engine undo is the wrong answer (below).
-  useEffect(() => {
+  // CAPTURE: runs before useKeyboardShortcuts' bubble Ctrl+Z (below). LAYOUT effect: bound before
+  // the pending shape paints (an Enter in that frame was dropped). Not bound once at mount: the
+  // later-registered ShapeActionsOverlay mid-drag Escape must keep running first and stop this.
+  useLayoutEffect(() => {
     if (!editState) return;
     const onKey = (e: KeyboardEvent) => {
       if (

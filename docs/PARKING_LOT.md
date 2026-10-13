@@ -12,7 +12,14 @@ Locally at 4× CPU (`E2E_CPU_THROTTLE=4`), 10 repeats: Add mask 10/10, but "a Re
 previews on a copy" failed 1/10. The spec was already in the old CI list, and nothing tonight
 touched it. Same treatment as G1/fast-drags: find the clock it waits on and make it wait on state.
 
-## OPEN — Enter in the first frame after a shape appears is dropped (10-07-2026)
+## FIXED 10-13-2026 (#PRNUM) — Enter in the first frame after a shape appears is dropped (10-07-2026)
+
+The listener is now a `useLayoutEffect`, so it is bound before the pending
+shape paints. Not "bind once at mount", the other candidate below: capture
+listeners fire in registration order, and ShapeActionsOverlay's mid-drag
+Escape (drop the connector, keep the edit) only works because it registers
+after this one and stops it. `fast-drags-are-not-dropped` 20/20 at 4x CPU.
+
 
 Found making `fast-drags-are-not-dropped` wait on state instead of a clock (Night 10-07 PR 3).
 `useDrawingTools` binds its Enter/Escape/Delete listener in a `useEffect` keyed on `editState`. A
