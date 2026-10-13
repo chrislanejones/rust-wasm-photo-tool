@@ -8,7 +8,7 @@
  * REWRITTEN 10-13-2026 at Chris's request, for a reader who is not deep in the
  * stack: a tech manager, or someone two years in. Same measurements, same
  * figures and tables, plainer words. The narration mp3 was re-recorded from
- * the new text the same day (Ava, edge-tts 7.3.1).
+ * the new text the same day (Emma, widened stereo, edge-tts 7.3.1).
  *
  * Every figure in here is in the repository. The blocking times and the
  * round-trip numbers come from docs/engine-worker-feasibility.md and
@@ -110,7 +110,7 @@ export default function EngineInAWorker() {
         </a>{" "}
         that closed the last objection.
       </p>
-      <PostAudio src="/audio/engine-in-a-worker.mp3" minutes={16} />
+      <PostAudio src="/audio/engine-in-a-worker.mp3" minutes={15} />
 
       <p>
         Picture a Lowe's with one employee. He runs the register, answers the phone, restocks the

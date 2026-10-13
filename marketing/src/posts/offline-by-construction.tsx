@@ -9,7 +9,7 @@
  * stack. Same facts, same figures and tables, plainer words. Two framing
  * changes, both his: the hospital is a "could use this" example, not the
  * product's target, and the clinical detail is gone. The narration mp3 still
- * was re-recorded from the new text the same day (Ava, edge-tts 7.3.1).
+ * was re-recorded from the new text the same day (Emma, widened stereo, edge-tts 7.3.1).
  *
  * Originally ported from Chris's Claude Design export (project "Image Horse
  * Web Worker Blog", file "Blog - Offline by Construction.dc.html"). The
@@ -33,7 +33,7 @@ export default function OfflineByConstruction() {
         </a>
         , the code that saves your work, and the decision records it cites.
       </p>
-      <PostAudio src="/audio/offline-by-construction.mp3" minutes={14} />
+      <PostAudio src="/audio/offline-by-construction.mp3" minutes={12} />
 
       <p>
         I was editing a photo in a hotel room, the kind of hotel where the Wi-Fi password is on a laminated
