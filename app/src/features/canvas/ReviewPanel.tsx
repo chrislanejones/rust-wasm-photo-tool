@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Aperture,
@@ -264,6 +264,8 @@ export function ReviewPanel({
   );
 
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  // Each layer row, so a keyboard rename can hand focus back to its row.
+  const layerRowRefs = useRef(new Map<number, HTMLDivElement>());
   const [renameDraft, setRenameDraft] = useState("");
 
   // Per-tier layer allowance. 0 → feature locked (must log in / upgrade).
@@ -569,6 +571,14 @@ export function ReviewPanel({
                   return (
                     <ReselectBar
                       key={layer.id}
+                      ref={(el) => {
+                        if (el) layerRowRefs.current.set(layer.id, el);
+                        else layerRowRefs.current.delete(layer.id);
+                      }}
+                      onRename={() => {
+                        setRenameDraft(layer.name);
+                        setRenamingId(layer.id);
+                      }}
                       size="lg"
                       type={layer.active ? "current" : "redo"}
                       selected={layer.active}
@@ -582,6 +592,7 @@ export function ReviewPanel({
                         renamingId === layer.id ? (
                           <input
                             className="layer-rename-input"
+                            aria-label={`Rename ${layer.name}`}
                             autoFocus
                             value={renameDraft}
                             onChange={(e) => setRenameDraft(e.target.value)}
@@ -591,6 +602,12 @@ export function ReviewPanel({
                               e.stopPropagation();
                               if (e.key === "Enter") commitRename(layer.id);
                               else if (e.key === "Escape") setRenamingId(null);
+                              else return;
+                              // The input unmounts on either key; without this
+                              // focus falls to <body> and a keyboard user loses
+                              // their place in the list.
+                              const id = layer.id;
+                              requestAnimationFrame(() => layerRowRefs.current.get(id)?.focus());
                             }}
                           />
                         ) : (
@@ -601,7 +618,7 @@ export function ReviewPanel({
                               setRenameDraft(layer.name);
                               setRenamingId(layer.id);
                             }}
-                            title="Double-click to rename"
+                            title="Double-click or press F2 to rename"
                           >
                             {layer.name}
                           </span>

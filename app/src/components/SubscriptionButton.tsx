@@ -472,7 +472,7 @@ export function SubscriptionButton({
                       </p>
                     )}
                     {err && (
-                      <p className="text-2xs leading-relaxed text-red-400">{err}</p>
+                      <p role="alert" className="text-2xs leading-relaxed text-red-400">{err}</p>
                     )}
                   </>
                 )}

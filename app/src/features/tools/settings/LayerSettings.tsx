@@ -314,6 +314,7 @@ export function LayerSettings({
           <ToolButton
             stacked
             active={moveActive}
+            aria-pressed={moveActive}
             disabled={disabled}
             onClick={onToggleMove}
           >

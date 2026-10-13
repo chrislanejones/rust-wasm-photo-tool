@@ -9,6 +9,7 @@ import { useToolStore } from "@/stores/useToolStore";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { useResolvedTheme } from "@/lib/useTheme";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
@@ -34,6 +35,7 @@ const RED_STAMP_PRESETS = [
   { id: "confidential", label: "CONFIDENTIAL", color: "#dc2626" },
   { id: "review", label: "UNDER REVIEW", color: "#2563eb" },
 ] as const;
+const RED_STAMP_IDS = RED_STAMP_PRESETS.map((p) => p.id);
 
 export type StampMode = "clone" | "red" | "emojis";
 
@@ -99,6 +101,18 @@ export function StampSettingsPanel({
       }),
     );
   };
+
+  // The presets pick exactly one stamp, so they are a named radio group. The
+  // chosen one showed only as a solid border and a dot.
+  const stampRadio = useRadioGroup({
+    ids: RED_STAMP_IDS,
+    selected: selectedStampId ?? undefined,
+    isDisabled: () => false,
+    onSelect: (id) => {
+      const stamp = RED_STAMP_PRESETS.find((p) => p.id === id)!;
+      handleStampPreset(stamp.id, stamp.label, stamp.color);
+    },
+  });
 
   return (
     <ToolModeToggle
@@ -182,12 +196,14 @@ export function StampSettingsPanel({
                 />
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-2">
-                    {RED_STAMP_PRESETS.map((stamp) => {
+                  <div className="grid grid-cols-1 gap-2" {...stampRadio.groupProps} aria-label="Stamp">
+                    {RED_STAMP_PRESETS.map((stamp, i) => {
                       const isSelected = selectedStampId === stamp.id;
                       return (
                         <button
                           key={stamp.id}
+                          type="button"
+                          {...stampRadio.itemProps(i)}
                           onClick={() =>
                             handleStampPreset(stamp.id, stamp.label, stamp.color)
                           }

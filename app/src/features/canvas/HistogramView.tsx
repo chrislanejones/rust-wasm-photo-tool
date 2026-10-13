@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 const BIN = 256;
 const LEN = BIN * 4;
@@ -12,6 +13,8 @@ interface Props {
   photoKey: string;
   active: boolean;
 }
+
+const HISTOGRAM_MODES = ["rgb", "luma"] as const;
 
 function reducedMotion(): boolean {
   return (
@@ -32,6 +35,12 @@ export function HistogramView({
   const rafRef = useRef<number | null>(null);
   const photoKeyRef = useRef<string | null>(null);
   const [mode, setMode] = useState<HistMode>("rgb");
+  const modeRadio = useRadioGroup({
+    ids: HISTOGRAM_MODES,
+    selected: mode,
+    isDisabled: () => false,
+    onSelect: setMode,
+  });
   const [empty, setEmpty] = useState(false);
 
   const draw = useCallback(() => {
@@ -266,11 +275,15 @@ export function HistogramView({
     <div style={WRAP}>
       <canvas ref={plotRef} style={PLOT} />
       <div style={emptyStyle(empty)}>No image to analyze</div>
-      <div style={MODES}>
-        {(["rgb", "luma"] as const).map((m) => (
+      {/* One of two, so a named radio group: the lit pill was the only thing
+          saying which channel was drawn, and a screen reader heard two plain
+          buttons. Arrow keys move and select (useRadioGroup). */}
+      <div style={MODES} {...modeRadio.groupProps} aria-label="Histogram channels">
+        {HISTOGRAM_MODES.map((m, i) => (
           <button
             key={m}
             type="button"
+            {...modeRadio.itemProps(i)}
             style={modeBtn(mode === m)}
             onClick={() => setMode(m)}
           >

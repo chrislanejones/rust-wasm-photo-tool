@@ -244,7 +244,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
               {busy === "limits" ? "Saving…" : "Save limits"}
             </Button>
           </div>
-          {!draftValid && <ErrorNote>The view limit has to be a whole number, 1 or more.</ErrorNote>}
+          {!draftValid && <ErrorNote polite>The view limit has to be a whole number, 1 or more.</ErrorNote>}
           <p className="text-2xs text-text-muted">
             Reaching either limit pauses the link. Raise it and the link works again.
           </p>
