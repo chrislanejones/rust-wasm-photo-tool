@@ -18,6 +18,8 @@ import { sha256Hex } from "@/lib/originalsStore";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { parseExifFromImage, type ExifSummary } from "@/lib/exif";
 import { Button } from "@/components/ui/button";
+import { SkeletonText } from "@/components/ui/skeleton";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 
 /** Everything the image-meta tab needs about the currently selected photo.
  *  Assembled by AppShell, which is the only place that knows both the gallery
@@ -161,6 +163,9 @@ export function ImageMetaPanel({
   const [pending, setPending] = useState(false);
   const [exif, setExif] = useState<ExifSummary | null>(null);
   const [exifChecked, setExifChecked] = useState(false);
+  // The EXIF is already in IndexedDB, so the wait gets a skeleton, and only
+  // after the 300 ms grace: a fast read shows nothing at all.
+  const exifSkeleton = useDelayedFlag(active && !!meta.photoId && !exifChecked);
 
   // Read the latest getter through a ref so `recompute` stays stable and the
   // effect below doesn't re-fire every render.
@@ -328,7 +333,14 @@ export function ImageMetaPanel({
               Capture metadata (EXIF)
             </div>
             {!exifChecked ? (
-              <div className="py-2 text-center text-text-muted">reading…</div>
+              // The space is held from the first frame; the grey only paints
+              // once the grace is up, so a quick read never flashes it.
+              <SkeletonText
+                lines={3}
+                data-testid="exif-skeleton"
+                className={`py-2 ${exifSkeleton ? "" : "invisible"}`}
+                lineClassName="h-3"
+              />
             ) : !exif ? (
               <div className="py-2 text-text-muted">
                 No EXIF metadata in the original

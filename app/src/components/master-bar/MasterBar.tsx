@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
 import { IconButton } from "@/components/ui/icon-button";
-import { MASTER_BAR_CHROME_H } from "./constants";
+import { MASTER_BAR_CHROME_H, MASTER_BAR_SHELL } from "./constants";
 import type { MasterTab } from "@/stores/useUIStore";
 
 interface Props {
@@ -80,7 +80,7 @@ export function MasterBar({
       exit="exit"
       role="region"
       aria-label="Master bar"
-      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center justify-between overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5 shadow-panel"
+      className={MASTER_BAR_SHELL}
       style={{ height: MASTER_BAR_CHROME_H }}
     >
       {/* New · Tools · Gallery · Review · Export, one run of five, then

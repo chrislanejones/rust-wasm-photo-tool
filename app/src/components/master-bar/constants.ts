@@ -17,6 +17,11 @@ export const MASTER_BAR_CHROME_H = 50;
 /** Master-bar width (px) — the amount the canvas clears on the left. */
 export const MASTER_BAR_WIDTH = 252;
 
+/** The bar's outer box. Shared with MasterBarFallback, which holds this exact
+ *  box while the lazy chunk loads, so the two can never drift apart. */
+export const MASTER_BAR_SHELL =
+  "fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center justify-between overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5 shadow-panel";
+
 /**
  * The content box the active tab (Tools / Gallery / Review) renders in, flush
  * below the chrome strip. ToolsSidebar, ReviewPanel and GalleryBar each used to
