@@ -88,9 +88,10 @@ export const POSTS: readonly Post[] = [
     // the headline (scripts/gen-og-images.mjs). Keeping it short and whole is
     // deliberate: the previous wording put three lines of mono on the card and
     // crowded the headline into the wordmark.
-    deck: "Code entropy, measured, and the ratchet that stops it — extraction was working and the file still grew, because features kept arriving. That part is inevitable: entropy is whack-a-mole and you do not win it. What helped was a number allowed to move in one direction.",
+    deck: "Code entropy, measured, and the ratchet that stops it. The cleanup was working and the file still grew, because features kept arriving. That part is inevitable: entropy is whack-a-mole and you do not win it. What helped was a number that is only allowed to move one way.",
+    updated: "2026-10-13",
     description:
-      "AppShell went 3,250 to 3,806 lines during the month it was being dismantled, and is still 314 lines above where it started. What code entropy actually looks like, and what a one-way ratchet did and did not fix.",
+      "AppShell went from 3,250 to 3,806 lines during the month it was being cleaned out, and is still 314 lines above where it started. What code entropy looks like, and what a one-way ratchet did and did not fix.",
     published: "2026-09-28",
     version: "v9.3",
     tag: "engineering",
@@ -113,9 +114,10 @@ export const POSTS: readonly Post[] = [
     slug: "offline-by-construction",
     headline: "The hotel Wi-Fi died. The editor kept running.",
     title: "Image Horse works offline by construction",
-    deck: "Why an image editor whose engine runs in a Web Worker and whose truth lives in IndexedDB keeps working when the Wi-Fi doesn't — and what that buys a ward, an operating room, or anyone whose work can't wait for a signal.",
+    deck: "Why an image editor that does its work inside the tab keeps going when the Wi-Fi doesn't. The engine runs in a back room, the work is saved on the device, and the internet was only ever carrying the extras.",
+    updated: "2026-10-13",
     description:
-      "The engine runs in a Web Worker and the truth lives in IndexedDB, so Image Horse keeps editing when the network drops — measured, not assumed, and built for the hardest network in the building.",
+      "The engine runs in a Web Worker and your work lives in IndexedDB, so Image Horse keeps editing when the network drops. Measured, not assumed, with a hospital as the worst-case network.",
     published: "2026-09-22",
     version: "v8.85",
     tag: "engineering",
@@ -134,7 +136,8 @@ export const POSTS: readonly Post[] = [
     slug: "engine-in-a-worker",
     headline: "We moved the engine off the main thread. The pixels stayed put.",
     title: "Moving a Rust engine into a Web Worker",
-    deck: "How Image Horse moved its Rust engine into a worker without ever sending a frame across a thread boundary — and why the obvious way to do it is impossible.",
+    deck: "How Image Horse moved its Rust engine into a back room without ever sending a frame across the wall, and why the obvious way to do it is impossible.",
+    updated: "2026-10-13",
     description:
       "The Rust engine behind Image Horse now runs in a Web Worker. Heavy operations blocked the UI for 129–137 ms; they block it for none. Here is what it took.",
     published: "2026-09-18",
