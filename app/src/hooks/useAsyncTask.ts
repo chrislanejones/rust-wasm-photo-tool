@@ -84,7 +84,9 @@ export function useAsyncTask() {
       opts: RunOptions = {},
     ): Promise<RunResult<T>> => {
       const id = ++seq.current;
-      const isCurrent = () => id === seq.current && mounted.current;
+      const ownsCurrent = () => id === seq.current && mounted.current;
+      let pending = true;
+      const isCurrent = () => pending && ownsCurrent();
       window.clearTimeout(savedTimer.current);
       const kind = opts.kind ?? "processing";
       set({ state: kind, progress: null, error: null });
@@ -96,17 +98,18 @@ export function useAsyncTask() {
       let timer: number | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timer = window.setTimeout(
-          () => reject(new TimeoutError(opts.timeoutMessage ?? "It took too long and was stopped.")),
+          () => reject(new TimeoutError(opts.timeoutMessage ?? "This operation timed out.")),
           opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         );
       });
       try {
         const value = await Promise.race([work({ setProgress, isCurrent }), timeout]);
         if (!isCurrent()) return { status: "dropped" };
+        pending = false;
         if (opts.saved) {
           set({ state: "saved", progress: null, error: null });
           savedTimer.current = window.setTimeout(() => {
-            if (isCurrent()) set({ state: "ready", progress: null, error: null });
+            if (ownsCurrent()) set({ state: "ready", progress: null, error: null });
           }, SAVED_MS);
         } else {
           set({ state: "ready", progress: null, error: null });
@@ -116,10 +119,12 @@ export function useAsyncTask() {
         // A superseded run's failure is not news: it never rejects and never
         // paints an Error over the run that replaced it.
         if (!isCurrent()) return { status: "dropped" };
+        pending = false;
         const error = messageOf(err);
         set({ state: "error", progress: null, error });
         return { status: "failed", error };
       } finally {
+        pending = false;
         endActivity();
         window.clearTimeout(timer);
       }

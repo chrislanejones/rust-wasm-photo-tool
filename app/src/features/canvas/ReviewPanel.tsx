@@ -388,6 +388,8 @@ export function ReviewPanel({
                 <ReselectBar
                   key={`${entry.type}-${entry.index}-${listIdx}`}
                   type={entry.type}
+                  selected={entry.type === "current"}
+                  current={entry.type === "current"}
                   index={entry.index}
                   label={entry.label}
                   onSelect={() => onJump(entry.index)}

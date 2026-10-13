@@ -242,6 +242,10 @@ n_docreads=$(rg -n '\bstate\.(width|height|undoCount|redoCount)\b' app/src/compo
   | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
 check "direct-document-reads" 8 "read document state via hooks/useLoadedDocument" "$n_docreads"
 
+# Document readiness belongs to the loader, never a legacy UI completion timer.
+n_load_legacy=$(( $( (rg -n '\b(loadProgress|setLoadProgress|startImageLoad|finishImageLoad)\b' app/src/stores/useUIStore.ts || true) | wc -l) ))
+check "legacy-photo-loading" 0 "use document readiness; remove obsolete UI loading timers" "$n_load_legacy"
+
 # SIMD unsafe is expected here; the count keeps it from growing unnoticed.
 #
 # `// allow: rust-panic` skips a reviewed site. The docs have promised this

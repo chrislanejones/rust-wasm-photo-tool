@@ -122,13 +122,14 @@ export function ExportPane({
     setBusy("import");
     try {
       const result = await oraImport.run(
-        async () => {
+        async ({ isCurrent }) => {
           await importOraAsNewPhoto(file, stampToolRef, onAddPhotos);
+          if (!isCurrent()) return 0;
           flushToCanvas();
           syncState();
           return stampToolRef.current?.layer_count() ?? 0;
         },
-        { saved: true, timeoutMs: 120_000, timeoutMessage: "Importing took too long and was stopped." },
+        { saved: true, timeoutMs: 120_000, timeoutMessage: "Importing timed out. A pending import may still finish." },
       );
       if (result.status === "done") setOraLayers(result.value);
       if (result.status === "failed") console.error("Import .ora failed:", result.error);

@@ -4,16 +4,18 @@
 //
 // No fade, so Reduce Motion needs no special case. The PANEL's lock and its
 // screen-reader line live in PerPhotoRegion; this is the visual half only.
+import { useUIStore } from "@/stores/useUIStore";
 import { StatusMark } from "@/components/ui/status-mark";
 import { useDelayedFlag, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
 export function SwitchLoadingVeil() {
   const show = useDelayedFlag(usePhotoSwitching(), 150);
+  const error = useUIStore((s) => s.photoSwitchError);
   const name = useGalleryStore(
     (s) => s.photos.find((p) => p.id === s.activePhotoId)?.name ?? null,
   );
-  if (!show || !name) return null;
+  if ((!show && !error) || !name) return null;
   return (
     <div
       data-testid="switch-loading-veil"
@@ -27,8 +29,8 @@ export function SwitchLoadingVeil() {
         aria-hidden="true"
         className="flex items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 py-1.5 text-xs text-text-primary shadow-lg"
       >
-        <StatusMark kind="working" />
-        {`Loading ${name}`}
+        <StatusMark kind={error ? "failed" : "working"} />
+        {error ?? `Loading ${name}`}
       </span>
     </div>
   );

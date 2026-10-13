@@ -27,6 +27,10 @@ import { toCoverage } from "@/lib/selectionCoverage";
 import { createLiveRetune } from "@/lib/liveRetune";
 import { CLEAN_UP, isNoopRefine, refineArgs, type RefineSettings } from "@/lib/selectionRefine";
 import { objectFootprint } from "@/lib/objectSelection";
+import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+
+const selectionSessionReady = () => !isPhotoSwitching() && useToolStore.getState().activeTool === "select";
 
 /** Quiet time before a Tolerance tick re-runs the selection. Long enough to
  *  skip the ticks of one drag, short enough to read as live. */
@@ -57,6 +61,9 @@ export function useSelectionActions(
   const setSelectionCoverage = useToolStore((s) => s.setSelectionCoverage);
   const setMoveActive = useToolStore((s) => s.setMoveActive);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
+  const activeTool = useToolStore((s) => s.activeTool);
+  const switching = usePhotoSwitching();
+  const documentRevision = useGalleryStore((s) => s.documentRevision);
 
   // ── Magnetic lasso session state (kind === "lasso") ─────────────────────────
   // The lasso is the one selection kind that isn't click-once: it's a session
@@ -90,6 +97,9 @@ export function useSelectionActions(
    *  `selectionMask` means something else changed the selection (a click, an
    *  undo, Deselect), and the preview no longer describes anything. */
   const refinePreviewMask = useRef<Uint8Array | null>(null);
+  const refineSessionActive = useRef(false);
+  const refineApplying = useRef(false);
+  const refinePending = useRef(false);
   useEffect(() => {
     const seq = ++coverageSeq.current;
     const tool = stamp.toolRef.current;
@@ -101,7 +111,7 @@ export function useSelectionActions(
       useToolStore.getState().setRefinePreviewing(false);
       void tool?.selection_refine_cancel();
     }
-    if (!selectionMask) {
+    if (switching || !selectionMask) {
       setSelectionCoverage(null);
       return;
     }
@@ -119,7 +129,7 @@ export function useSelectionActions(
         if (seq === coverageSeq.current) setSelectionCoverage(null);
       }
     })();
-  }, [stamp, selectionMask, setSelectionCoverage]);
+  }, [stamp, selectionMask, setSelectionCoverage, switching, documentRevision]);
 
   // ── Live Tolerance ─────────────────────────────────────────────────────────
   // Moving the slider re-runs the LAST CLICK from the same seed. The engine
@@ -147,9 +157,11 @@ export function useSelectionActions(
         return width * height > budget ? RETUNE_PAUSE_MS : RETUNE_DEBOUNCE_MS;
       },
       run: async ({ tolerance, edge }) => {
+        const revision = useGalleryStore.getState().documentRevision;
         const tool = stampRef.current.toolRef.current;
         // TRUTHY TRAP — un-awaited, a Promise would say "yes" every time.
-        if (!tool || !(await tool.selection_can_retune())) return null;
+        if (!selectionSessionReady() || !tool || !(await tool.selection_can_retune())) return null;
+        if (!selectionSessionReady() || revision !== useGalleryStore.getState().documentRevision) return null;
         const mask = await tool.selection_retune(tolerance, edge);
         // Empty is ambiguous (refused, or the result selects nothing); the
         // overlay read settles it — both are empty only if nothing is selected.
@@ -172,21 +184,71 @@ export function useSelectionActions(
   const refinePreview = useRef(
     createLiveRetune<RefineSettings, Uint8Array | null>({
       delayMs: RETUNE_DEBOUNCE_MS,
+      onStart: () => { refinePending.current = true; useToolStore.getState().setRefineBusy(true); },
+      onIdle: () => { refinePending.current = false; useToolStore.getState().setRefineBusy(refineApplying.current); },
+      onError: () => {
+        if (!selectionSessionReady()) return;
+        const revision = useGalleryStore.getState().documentRevision;
+        toast.error("Couldn't preview refinement. Showing the previous selection boundary.", {
+          id: "selection-refine-error", duration: Infinity,
+          action: { label: "Try again", onClick: () => {
+            if (selectionSessionReady() && revision === useGalleryStore.getState().documentRevision) refinePreview.current.schedule(useToolStore.getState().selectionRefine);
+          } },
+        });
+      },
       run: async (r) => {
+        const revision = useGalleryStore.getState().documentRevision;
         const tool = stampRef.current.toolRef.current;
-        if (!tool || !(await tool.has_selection())) return null;
+        if (!selectionSessionReady() || !tool || !(await tool.has_selection())) return null;
+        if (!selectionSessionReady() || revision !== useGalleryStore.getState().documentRevision) return null;
+        refineSessionActive.current = true;
         return await tool.selection_refine_preview(...refineArgs(r));
       },
       onResult: (mask) => {
         // Empty = nothing selected to refine. A refine that selects nothing
         // comes back as a full-size transparent overlay, so the ants clear.
-        if (!mask || !mask.length) return;
+        if (!selectionSessionReady() || !mask || !mask.length) return;
+        toast.dismiss("selection-refine-error");
         refinePreviewMask.current = mask;
         useToolStore.getState().setRefinePreviewing(true);
         useToolStore.getState().setSelectionMask(mask);
       },
     }),
   );
+  useEffect(() => {
+    // The preview is a temporary Select session; mask creation uses committed selection.
+    const clear = () => {
+      liveRetune.current.cancel();
+      refinePreview.current.cancel();
+      refinePending.current = false;
+      const preview = refineSessionActive.current || refinePreviewMask.current !== null;
+      refineSessionActive.current = false;
+      refinePreviewMask.current = null;
+      useToolStore.getState().setRefinePreviewing(false);
+      useToolStore.getState().setRefineBusy(false);
+      toast.dismiss("selection-refine-error");
+      if (!preview) return;
+      const revision = useGalleryStore.getState().documentRevision;
+      const tool = stampRef.current.toolRef.current;
+      void (async () => {
+        try {
+          await tool?.selection_refine_cancel();
+          if (isPhotoSwitching() || !tool) return;
+          const mask = await tool.selection_overlay();
+          if (!isPhotoSwitching() && revision === useGalleryStore.getState().documentRevision) {
+            useToolStore.getState().setSelectionMask(mask.length ? mask : null);
+          }
+        } catch {
+          if (!isPhotoSwitching() && revision === useGalleryStore.getState().documentRevision) {
+            useToolStore.getState().setSelectionMask(null);
+            toast.error("Couldn't restore the selection preview. Select a region again to continue.", { id: "selection-refine-error", duration: Infinity });
+          }
+        }
+      })();
+    };
+    if (switching || activeTool !== "select") clear();
+    return clear;
+  }, [activeTool, switching, documentRevision]);
   const lastRefine = useRef(selectionRefine);
   useEffect(() => {
     const prev = lastRefine.current;
@@ -197,7 +259,7 @@ export function useSelectionActions(
       prev.holes === selectionRefine.holes &&
       prev.smooth === selectionRefine.smooth &&
       prev.expand === selectionRefine.expand;
-    if (same) return;
+    if (same || !selectionSessionReady()) return;
     refinePreview.current.schedule(selectionRefine);
   }, [selectionRefine]);
 
@@ -205,6 +267,7 @@ export function useSelectionActions(
   useEffect(() => {
     if (!refineRequest || refineRequest.n === lastRequest.current) return;
     lastRequest.current = refineRequest.n;
+    if (!selectionSessionReady() || refineApplying.current) return;
     refinePreview.current.cancel();
     const store = useToolStore.getState();
     const r = refineRequest.kind === "cleanUp" ? CLEAN_UP : store.selectionRefine;
@@ -213,17 +276,31 @@ export function useSelectionActions(
       store.setSelectionRefine(CLEAN_UP);
     }
     const tool = stampRef.current.toolRef.current;
+    const revision = useGalleryStore.getState().documentRevision;
     if (!tool) return;
     void (async () => {
-      refinePreviewMask.current = null;
-      store.setRefinePreviewing(false);
-      const mask = isNoopRefine(r)
-        ? await tool.selection_overlay()
-        : await tool.selection_refine_apply(...refineArgs(r));
-      store.setSelectionMask(mask.length ? mask : null);
-      // Apply pushes a "Refine Selection" step; the History panel and the
-      // Undo NN% readout both read the count.
-      stampRef.current.syncState();
+      try {
+        refineApplying.current = true;
+        store.setRefineBusy(true);
+        refinePreviewMask.current = null;
+        store.setRefinePreviewing(false);
+        const mask = isNoopRefine(r)
+          ? await tool.selection_overlay()
+          : await tool.selection_refine_apply(...refineArgs(r));
+        if (isPhotoSwitching() || revision !== useGalleryStore.getState().documentRevision) return;
+        store.setSelectionMask(mask.length ? mask : null);
+        // Apply pushes a "Refine Selection" step; the History panel and the
+        // Undo NN% readout both read the count.
+        stampRef.current.syncState();
+        toast.dismiss("selection-refine-error");
+      } catch {
+        if (!isPhotoSwitching() && revision === useGalleryStore.getState().documentRevision) {
+          toast.error("Couldn't apply refinement. Try again.", { id: "selection-refine-error", duration: Infinity });
+        }
+      } finally {
+        refineApplying.current = false;
+        if (revision === useGalleryStore.getState().documentRevision) store.setRefineBusy(refinePending.current);
+      }
     })();
   }, [refineRequest]);
 
@@ -232,7 +309,7 @@ export function useSelectionActions(
     const prev = lastTuned.current;
     if (prev.tolerance === selectionTolerance && prev.edge === edgeThreshold) return;
     lastTuned.current = { tolerance: selectionTolerance, edge: edgeThreshold };
-    liveRetune.current.schedule({ tolerance: selectionTolerance, edge: edgeThreshold });
+    if (selectionSessionReady()) liveRetune.current.schedule({ tolerance: selectionTolerance, edge: edgeThreshold });
   }, [selectionTolerance, edgeThreshold]);
 
   // The same mapping every canvas tool uses; one implementation, stable for a
@@ -310,6 +387,7 @@ export function useSelectionActions(
             ? await tool.color_range_select(x, y, selectionTolerance)
             : await tool.magic_wand_select(x, y, selectionTolerance);
       setSelectionMask(mask.length ? mask : null);
+      stamp.syncState();
     },
     [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold, selectionCombine],
   );
@@ -362,6 +440,7 @@ export function useSelectionActions(
     // TRUTHY TRAP — un-awaited this closes a loop that was never open.
     if (!tool || !(await tool.lasso_active())) return;
     const mask = await tool.lasso_close();
+    stamp.syncState();
     setLassoCommitted(null);
     setLassoPreview(null);
     setSelectionMask(mask.length ? mask : null);
@@ -372,7 +451,11 @@ export function useSelectionActions(
     stamp.toolRef.current?.lasso_cancel();
     setLassoCommitted(null);
     setLassoPreview(null);
-  }, [stamp]);
+  }, [stamp.toolRef]);
+  useEffect(() => {
+    lassoMoveSeq.current++;
+    handleLassoCancel();
+  }, [documentRevision, switching, handleLassoCancel]);
 
   // Bound here rather than in useKeyboardShortcuts: the listener only exists
   // while a lasso session is actually open, so Escape keeps its existing
@@ -507,6 +590,7 @@ export function useSelectionActions(
           ? await tool.ellipse_select(x0, y0, x1, y1)
           : await tool.rect_select(x0, y0, x1, y1);
       setSelectionMask(mask.length ? mask : null);
+      stamp.syncState();
     },
     [stamp, setSelectionMask],
   );

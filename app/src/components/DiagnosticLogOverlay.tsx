@@ -21,6 +21,8 @@ import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { WINDOW_TITLE } from "@/lib/styles";
 import { SUBSYSTEM_COLOR } from "@/components/subsystemColors";
 import { Button } from "@/components/ui/button";
+import { useLoadedDocument } from "@/hooks/useLoadedDocument";
+import { PerPhotoRegion } from "@/features/tools/PerPhotoRegion";
 
 interface Props {
   open: boolean;
@@ -40,6 +42,7 @@ function fmtTime(ts: number): string {
 }
 
 export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
+  const documentMeta = useLoadedDocument(imageMeta);
   const entries = useSyncExternalStore(subscribeDiagnostics, getDiagnostics);
   const [tab, setTab] = useState<Tab>("resources");
 
@@ -107,10 +110,13 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
           ) : tab === "flags" ? (
             <FeatureFlagsPanel active={open && tab === "flags"} />
           ) : tab === "imagemeta" ? (
-            <ImageMetaPanel
-              active={open && tab === "imagemeta"}
-              meta={imageMeta ?? { photoId: null }}
-            />
+            <PerPhotoRegion>
+              <ImageMetaPanel
+                key={`${documentMeta?.photoId}:${documentMeta?.undoCount}:${documentMeta?.redoCount}:${documentMeta?.currentWidth}x${documentMeta?.currentHeight}`}
+                active={open && tab === "imagemeta" && !!documentMeta}
+                meta={documentMeta ?? { photoId: imageMeta?.photoId ?? null, name: imageMeta?.name }}
+              />
+            </PerPhotoRegion>
           ) : entries.length === 0 ? (
             <div className="px-4 py-10 text-center font-mono text-xs text-text-muted">
               No events yet. Warnings, errors, and timed operations appear here.

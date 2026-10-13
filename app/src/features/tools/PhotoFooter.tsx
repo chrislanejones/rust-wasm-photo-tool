@@ -28,6 +28,7 @@
 // same rule as the gallery tile — so "3 of 12 · IMG_2041" never claims the
 // panel's numbers belong to a photo that is not in the engine yet.
 import { useEffect, useRef, useState } from "react";
+import { useUIStore } from "@/stores/useUIStore";
 import { StatusMark } from "@/components/ui/status-mark";
 import { useDelayedFlag, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -37,7 +38,8 @@ export function PhotoFooter() {
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
   const index = photos.findIndex((p) => p.id === activePhotoId);
   const name = index >= 0 ? photos[index]!.name : null;
-  const loading = useDelayedFlag(usePhotoSwitching(), 150);
+  const error = useUIStore((s) => s.photoSwitchError);
+  const loading = useDelayedFlag(usePhotoSwitching(), 150) && !error;
 
   // Re-trigger the highlight on every change of photo. A key on the line
   // restarts its CSS animation without any timer bookkeeping.
@@ -63,14 +65,14 @@ export function PhotoFooter() {
     >
       {/* Inline and small, so the strip keeps its exact 20px: the Tools panel
           above it is measured for layout shift across a switch. */}
-      {loading && (
+      {(loading || error) && (
         <StatusMark
-          kind="working"
-          label={`Loading ${name}`}
+          kind={error ? "failed" : "working"}
+          label={error ? `Could not open ${name}` : `Loading ${name}`}
           className="mr-1 inline-block align-middle [&_svg]:size-3"
         />
       )}
-      {loading
+      {error ? `Could not open · ${index + 1} of ${photos.length} · ${name}` : loading
         ? `Loading · ${index + 1} of ${photos.length} · ${name}`
         : `${index + 1} of ${photos.length} · ${name}`}
     </p>

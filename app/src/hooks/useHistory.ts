@@ -33,6 +33,7 @@
 // so the engine still applies them in order, and the ritual is idempotent
 // (flush/sync/broadcast/refresh all just re-read whatever is current). The
 // worst case is one briefly stale frame, which the second ritual corrects.
+import { isPhotoSwitching } from "./usePhotoSwitching";
 import { useCallback, useEffect, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
 import { useToolStore } from "@/stores/useToolStore";
@@ -54,6 +55,7 @@ export function useHistory(engine: EngineCore) {
   }, [toolRef]);
 
   const undo = useCallback(async () => {
+    if (isPhotoSwitching()) return;
     if (await toolRef.current?.undo()) {
       flushToCanvas();
       syncState();
@@ -63,6 +65,7 @@ export function useHistory(engine: EngineCore) {
   }, [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask]);
 
   const redo = useCallback(async () => {
+    if (isPhotoSwitching()) return;
     if (await toolRef.current?.redo()) {
       flushToCanvas();
       syncState();
@@ -73,6 +76,7 @@ export function useHistory(engine: EngineCore) {
 
   const jumpToHistory = useCallback(
     async (index: number) => {
+      if (isPhotoSwitching()) return;
       if (await toolRef.current?.jump_to_history(index)) {
         flushToCanvas();
         syncState();
@@ -85,6 +89,7 @@ export function useHistory(engine: EngineCore) {
 
   const deleteHistoryEntry = useCallback(
     async (index: number) => {
+      if (isPhotoSwitching()) return;
       if (await toolRef.current?.delete_history_entry(index)) {
         flushToCanvas();
         syncState();
@@ -94,6 +99,7 @@ export function useHistory(engine: EngineCore) {
   );
 
   const clearHistory = useCallback(() => {
+    if (isPhotoSwitching()) return;
     toolRef.current?.clear_history();
     syncState();
   }, [toolRef, syncState]);
@@ -105,6 +111,7 @@ export function useHistory(engine: EngineCore) {
   // moved, and an un-awaited Promise would be a truthy trap.
   const restoreBranch = useCallback(
     async (id: number) => {
+      if (isPhotoSwitching()) return;
       if (await toolRef.current?.restore_history_branch(id)) {
         flushToCanvas();
         syncState();
@@ -118,6 +125,7 @@ export function useHistory(engine: EngineCore) {
   /** Forget one branch. Only the list changes, so this syncs and stops. */
   const deleteBranch = useCallback(
     async (id: number) => {
+      if (isPhotoSwitching()) return;
       if (await toolRef.current?.delete_history_branch(id)) syncState();
     },
     [toolRef, syncState],
