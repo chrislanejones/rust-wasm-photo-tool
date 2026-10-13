@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.28",
+    date: "2026-10-12",
+    headline: "Things that load now hold their place instead of popping in.",
+    entries: [
+      { tag: "ui", text: "The sign-in button and Settings › AI Usage keep their space while you sign in. Signed-in users no longer see \"Sign in\" first." },
+      { tag: "ui", text: "Plan & Billing shows the shape of your plan while it loads, instead of a spinner." },
+      { tag: "fix", text: "Compare shows the original only once it's ready, and says \"Original unavailable\" if it can't load." },
+      { tag: "fix", text: "On a phone, a photo you open shows a gray box its own shape until it arrives. A missing photo says so instead of spinning forever." },
+    ],
+  },
+  {
     version: "v9.27",
     date: "2026-10-11",
     headline: "The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.",

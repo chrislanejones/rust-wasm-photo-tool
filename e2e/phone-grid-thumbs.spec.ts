@@ -34,6 +34,10 @@ async function blockExternalNetwork(page: Page): Promise<void> {
  *  stays aria-busy because a phone never loads the engine. None of that reaches
  *  a person or a screen reader, so none of it is counted here. */
 const PHONE_GRID = ".grid.grid-cols-3:not([inert] *)";
+/** The grid's placeholders only. The header's sign-in slot draws its own
+ *  skeleton while Clerk loads, and under the placeholder key Clerk never
+ *  finishes, so a page-wide `.skeleton` count measured the header too. */
+const GRID_SKELETON = `${PHONE_GRID} .skeleton`;
 
 /** Every phone tile's box, plus what it is currently drawing. */
 const measure = (page: Page) =>
@@ -46,7 +50,7 @@ const measure = (page: Page) =>
       // How many reachable elements claim to be busy. One is the grid; the
       // tiles must not each add their own.
       busyCount: reachable('[aria-busy="true"]').length,
-      placeholders: reachable(".skeleton").length,
+      placeholders: reachable(".grid.grid-cols-3 .skeleton").length,
       tiles: tiles.map((el) => {
         const r = el.getBoundingClientRect();
         const img = el.querySelector("img");
@@ -175,7 +179,7 @@ test("a placeholder occupies exactly the box its photo will take — zero shift"
 
   await expect(page.locator("button.photo-thumb-grid")).toHaveCount(9, { timeout: 60_000 });
   // Past the 300 ms grace with nothing decoded: placeholders, by construction.
-  await expect(page.locator(".skeleton")).toHaveCount(9, { timeout: 30_000 });
+  await expect(page.locator(GRID_SKELETON)).toHaveCount(9, { timeout: 30_000 });
 
   const waiting = await measure(page);
   console.log("all nine waiting: " + JSON.stringify(waiting));
@@ -187,7 +191,7 @@ test("a placeholder occupies exactly the box its photo will take — zero shift"
   for (const t of waiting.tiles) expect(t.hasImg, "a waiting tile draws no photo").toBe(false);
   expect(waiting.busyCount, "the grid announces once, the tiles not at all").toBe(1);
   expect(waiting.busy, "and it is the grid that announces").toBe("true");
-  for (const el of await page.locator(".skeleton").all()) {
+  for (const el of await page.locator(GRID_SKELETON).all()) {
     expect(await el.getAttribute("aria-hidden"), "tile placeholders are decorative").toBe("true");
   }
 
@@ -226,7 +230,7 @@ test("an ordinary open flashes no placeholder at all — watched every frame", a
     w.__peak = 0;
     w.__frames = 0;
     const tick = () => {
-      w.__peak = Math.max(w.__peak, document.querySelectorAll(".skeleton").length);
+      w.__peak = Math.max(w.__peak, document.querySelectorAll(".grid.grid-cols-3 .skeleton").length);
       w.__frames++;
       requestAnimationFrame(tick);
     };

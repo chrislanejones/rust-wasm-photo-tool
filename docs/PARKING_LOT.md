@@ -4,6 +4,18 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+Found surveying skeleton gaps for UI Night 16. `useRealTier()`
+(`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,
+and `userModeForTier(null)` maps that to `loggedIn` (`app/AppShell.tsx`, the
+mode watcher). So a paid user briefly sees the logged-in gallery limit (24
+instead of 100) in "N photos · N max", and every other tier gate reads the
+lower tier for the same beat. Not a UI-night fix: the honest version is a
+"tier pending" user mode that the gates and the count can each read, which
+touches AppShell and gating semantics. Once that exists, GalleryCount can
+show a `Skeleton variant="line"` the width of a `TinyNumberBox` for the max.
+
 ## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
 
 Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
@@ -85,7 +97,7 @@ quota. These are the holes that feed the sweep, left out of that diff:
 
 | What | Where | Effect |
 | --- | --- | --- |
-| The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch` | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
+| ~~The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch`~~ **FIXED 10-07-2026 (Night 10-07 PR 2): `lib/withTimeout` aborts the upload's `AbortController`; edit, AI and share uploads all use it. ⚠️ STILL OPEN, the other half: a size-scaled timeout. 108 of the 167 orphans were archives over 30 MiB, which cannot upload in 8 s on most links. They used to land as orphans; now they are cancelled. Either way a big photo never backs up. Chris's call.** | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
 | `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
 | The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
 | `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |

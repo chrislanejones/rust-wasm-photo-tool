@@ -31,7 +31,8 @@ import { UserMenu } from "@/components/UserMenu";
 import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
-import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
+import { getOriginal } from "@/lib/dexie/originalsAdapter";
+import { useViewerOriginal, viewerBox } from "@/features/mobile/useViewerOriginal";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import { extFromMime } from "@/lib/mimeExt";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -161,28 +162,11 @@ function MobileViewer({
 }) {
   const index = photos.findIndex((p) => p.id === photoId);
   const photo = index >= 0 ? photos[index] : null;
-  const [url, setUrl] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
 
-  // Full-res original from IndexedDB. Keyed on the content hash so a
-  // superseded load can't blit over a newer photo's URL; revoke on the way out.
-  const originalKey = photo?.originalKey ?? null;
-  useEffect(() => {
-    if (!originalKey) return;
-    let cancelled = false;
-    let created: string | null = null;
-    setUrl(null);
-    void (async () => {
-      const u = await getOriginalAsBlobUrl(originalKey);
-      if (cancelled || !u) return;
-      created = u;
-      setUrl(u);
-    })();
-    return () => {
-      cancelled = true;
-      if (created) URL.revokeObjectURL(created);
-    };
-  }, [originalKey]);
+  // Full-res original from IndexedDB, decoded before it paints; a result
+  // counts only for the photo it was read for (see the hook).
+  const original = useViewerOriginal(photo?.originalKey ?? null);
 
   const goto = useCallback(
     (dir: 1 | -1) => {
@@ -286,7 +270,7 @@ function MobileViewer({
       </div>
 
       <div
-        className="relative flex min-h-0 flex-1 items-center justify-center"
+        className="relative flex min-h-0 flex-1 items-center justify-center [container-type:size]"
         onTouchStart={(e) => {
           touchStartX.current = e.touches[0]?.clientX ?? null;
         }}
@@ -299,15 +283,38 @@ function MobileViewer({
           if (Math.abs(dx) > 48) goto(dx < 0 ? 1 : -1);
         }}
       >
-        {url ? (
+        {original.src ? (
           <img
-            src={url}
+            src={original.src}
             alt={photo.name}
             draggable={false}
             className="max-h-full max-w-full object-contain"
           />
+        ) : original.failed ? (
+          <div
+            role="img"
+            aria-label={`${photo.name} could not be displayed`}
+            className="flex flex-col items-center gap-2 px-6 text-center text-text-muted"
+          >
+            <ImageOff className="h-8 w-8" aria-hidden="true" />
+            <p className="text-sm">This photo couldn't be loaded.</p>
+          </div>
         ) : (
-          <Spinner size={28} aria-label={`Loading ${photo.name}`} />
+          <>
+            {/* The photo's own box, from the dimensions the gallery already
+                knows, so the picture lands where the gray was. Reserved at
+                once, painted only after the grace. */}
+            <Skeleton
+              decorative
+              variant="block"
+              data-testid="viewer-skeleton"
+              className={original.showSkeleton ? undefined : "invisible"}
+              style={viewerBox(photo.origWidth, photo.origHeight)}
+            />
+            <span role="status" className="sr-only">
+              Loading {photo.name}
+            </span>
+          </>
         )}
 
         {photos.length > 1 && (
