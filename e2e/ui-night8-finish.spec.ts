@@ -73,16 +73,16 @@ const dot = (page: Page, label: string) =>
 const reset = (page: Page, label: string) =>
   page.getByRole("region", { name: "Tool options" }).getByRole("button", { name: `Reset ${label}` });
 
-test("§7 Levels: no dot at the identity curve; a moved point shows one; Reset returns to identity", async ({ page }) => {
+test("§7 Levels: no dot at the identity; a moved point shows one on Black point; Reset returns to identity", async ({ page }) => {
   await openTool(page, "Enhance", "Levels");
   const panel = page.getByRole("region", { name: "Tool options" });
-  await expect(dot(page, "Curve")).toHaveCount(0);
+  await expect(dot(page, "Black point")).toHaveCount(0);
   const black = panel.getByRole("slider", { name: "Black point" });
   await black.focus();
   for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
-  await expect(dot(page, "Curve")).toHaveCount(1);
-  await reset(page, "Curve").click();
-  await expect(dot(page, "Curve")).toHaveCount(0);
+  await expect(dot(page, "Black point")).toHaveCount(1);
+  await reset(page, "Black point").click();
+  await expect(dot(page, "Black point")).toHaveCount(0);
   await expect(black).toHaveValue("0");
 });
 

@@ -26,9 +26,14 @@ beforeEach(() => {
 });
 
 describe("which sub-tools the switch gates", () => {
-  it("is exactly the requiresNetwork set, and it is not empty", () => {
+  it("is the requiresNetwork set minus the openOffline tiles, and it is not empty", () => {
     const gated = LIVE_SUB_TOOLS.filter((r) => isBlockedOffline(r.subTool, false));
-    expect(gated.map((r) => r.key).sort()).toEqual(["create/ocr", "enhance/ai"]);
+    expect(gated.map((r) => r.key).sort()).toEqual(["create/ocr"]);
+    // Enhance › AI opens with the switch off (10-08): online features are off
+    // by default, and a tile nobody could open hid the AI buttons from
+    // everyone. Its panel refuses every request instead (AISettings).
+    expect(ai().subTool.requiresNetwork).toBe(true);
+    expect(isBlockedOffline(ai().subTool, false)).toBe(false);
   });
 
   it("gates nothing when online features are on", () => {
@@ -37,11 +42,11 @@ describe("which sub-tools the switch gates", () => {
 });
 
 describe("activation", () => {
-  it("refuses Enhance › AI and OCR while the switch is off", () => {
-    activateSubTool(ai());
-    expect(useToolStore.getState().activeTool).toBe("brush");
+  it("refuses OCR while the switch is off; Enhance › AI opens", () => {
     activateSubTool(ocr());
     expect(useToolStore.getState().activeTool).toBe("brush");
+    activateSubTool(ai());
+    expect(useToolStore.getState().activeTool).toBe("ai");
   });
 
   it("allows them once the switch is on", () => {
@@ -59,12 +64,18 @@ describe("activation", () => {
 });
 
 describe("turning the switch off", () => {
-  it("moves off a lit server-backed sub-tool to its group's first tool", () => {
+  it("moves off a lit blocked sub-tool to its group's first tool", () => {
+    useUIStore.setState({ onlineFeaturesEnabled: true });
+    activateSubTool(ocr());
+    useUIStore.getState().setOnlineFeaturesEnabled(false);
+    expect(useToolStore.getState().activeSubTool).not.toBe("create/ocr");
+  });
+
+  it("leaves Enhance › AI open — its panel refuses the request, not the tile", () => {
     useUIStore.setState({ onlineFeaturesEnabled: true });
     activateSubTool(ai());
     useUIStore.getState().setOnlineFeaturesEnabled(false);
-    expect(useToolStore.getState().activeTool).toBe("compress");
-    expect(useToolStore.getState().activeSubTool).toBe("enhance/compress");
+    expect(useToolStore.getState().activeTool).toBe("ai");
   });
 
   it("leaves a local tool alone", () => {
@@ -80,9 +91,10 @@ describe("command palette", () => {
     buildPaletteCommands({ photoCount: 1, onlineFeatures: online }).find((c) => c.id === id)!;
 
   it("disables server-backed entries while off, and when the flag is absent", () => {
-    expect(entry(false, "sub.enhance.ai").disabled).toBe(true);
     expect(entry(false, "sub.create.ocr").disabled).toBe(true);
-    expect(entry(undefined, "sub.enhance.ai").disabled).toBe(true);
+    expect(entry(undefined, "sub.create.ocr").disabled).toBe(true);
+    // AI opens offline; its panel refuses the request.
+    expect(entry(false, "sub.enhance.ai").disabled).toBe(false);
   });
 
   it("enables them when on, and never disables a local entry for this", () => {

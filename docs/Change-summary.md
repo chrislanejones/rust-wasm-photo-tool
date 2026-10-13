@@ -11382,3 +11382,145 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Engine** | **868,393 → 885,380 B** (+16,987): the oval, connector re-routing and history branches. |
 | **Gates** | tsc 0 (app, marketing), lint 0 errors / 56 warnings, unit 1,818/1,818, cargo test 674/674, clippy + fmt OK, guardrails OK. |
 
+## v9.19 Change Summary — 2026-10-07
+
+**The brush keeps up again.** #320.
+
+| Area | Change |
+| --- | --- |
+| **Idle render loop** | `useUndoDepth` listed `stamp` (a fresh object every render) as an effect dependency and ended in `setDepth` with a fresh object, so it re-ran forever: two engine round trips per lap, ~25/s at idle. Now keyed on the stable `toolRef` with an unchanged-readout bail-out. `useShapeActions.follow` had the same shape (`get_shape_annotations` per render) and reads through a ref. |
+| **Autosave timing** | New `whenStrokeQuiet(ms)` in `lib/strokeGate`: resolves once no stroke has *ended* for the window, bounded by the same 20 s deadline. The archive autosave (2.5 s) and the op-log keyframe save (2 s) both use it, so `capture_state` no longer starts just as the next stroke does. Five new tests. |
+| **Brush cursor** | `useBrushPreview` wrote React state on every window mousemove, re-rendering AppShell per event. The ring is positioned through a callback ref now; visibility and diameter stay state. |
+| **Measured** (prod build, 2068×1556) | Idle: 146 → **0** commits and 316 → **0** engine calls per 3 s. Per brush stroke: 210–269 → **5–8** commits. Per rect-select drag: ~1,100 → **7** engine calls. 200-event stroke: 1.9–2.6 s → **0.93 s**. |
+| **Still owed** | `recomposite()` is a full-frame composite + `putImageData` per blit: 33–51 ms at one layer, 66–177 ms at eight, which caps ink at 6–25 fps (dirty-rect blit, next). On a heavy document `capture_state` takes 7–10 s because it PNG-encodes every undo snapshot. Twelve photos with eight layers each reach 778 MB of wasm and ~1.5 GB per tab (full-layer history snapshots). |
+| **Testing** | Heavy-document runs on master and the branch, headless and in real Google Chrome: 12 photos, 8 layers each, masks, 40 shapes, 25 pins, undo ×10 / redo ×5, photo switching, reload (12/12 photos and 8/8 layers back in 6.9 s). Every failure seen on the branch reproduced identically on master. |
+| **Engine** | Untouched, **885,380 B**. |
+| **Gates** | tsc 0, lint 0 errors / 57 warnings, unit 1,823/1,823, e2e 131 passed / 2 skipped, guardrails OK, CI 17 pass. |
+
+## v9.20 Change Summary — 2026-10-07
+
+**Resize & Compress tells the truth, and the status bar shows when something is loading.** #321, #322.
+
+| Area | Change |
+| --- | --- |
+| **Exact resize** (#322) | The panel shows the photo's size but `resize_with_filter` scales the document, artboard border included. `lib/resizeTarget.documentSizeForPhoto` inverts the engine's mapping, so 128 typed lands on 128 (was 118), and a quality-only Apply no longer resizes a bordered photo (was 256 → 238). |
+| **Quality slider** (#322) | With presets the input's value is a track position; release committed it raw (80 shown, 67 stored). `SizeSlider` commits the mapped value. A slider press opens the autosave quiet window like a brush stroke. |
+| **Pending changes** (#322) | Method is the resample kernel only, never compression (it had turned PNGs into JPEGs) and never disabled. Any format change counts, PNG included. Label: "Apply" at rest, "Resize" only when the size moved. |
+| **Declined saves** (#322) | `usePersistActiveCanvas` returns saved / kept / skipped / failed. A same-size re-encode bigger than the stored file is refused with a toast and stays pending; a resize always writes (`allowGrow`). Handlers moved out of AppShell into `useResizeCompress`. |
+| **Image weight** (#322) | Replaces the PageSpeed "score": the bytes Apply would write, measured with the shared `lib/applyEncode.encodeForApply`, against the Lighthouse ImageDelivery limit `pixels / 6 + 4096`, unclamped. Measured vs stored: 0.0% off in 4 of 4 browser cases. Smaller-than-upload replaces Web Performance Gain. |
+| **No panel paragraphs** (#322) | Method, Format and budget notes moved behind lightbulbs. |
+| **Loading indicator** (#321) | `lib/activity`: one page-activity flag fed by every fetch, engine load, `useAsyncTask` run and gallery decode; tokens self-expire at 60 s. The status bar shows a flipping hourglass + 18px bar after 120 ms. Still under reduced motion (OS setting and the app switch). |
+| **Engine** | `resize_pixels_filter`, stateless, shares `resize_with_filter`'s kernel (pixel-identical on all four filters). **885,380 → 885,735 B** (+355). |
+| **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,837/1,837, cargo test 500/500 + tiles 676/676, clippy both configs, guardrails OK, e2e 131 passed / 2 skipped, browser checks 21/21. |
+
+## v9.21 Change Summary — 2026-10-08
+
+**Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.** #323.
+
+| Area | Change |
+| --- | --- |
+| **Layout** | Resize (Method, W×H, Scale) → Compress (Quality) → a Google PageSpeed box (`rounded-lg border border-border bg-bg-elevated p-3`, the panels' existing grouped look): Image weight and Than upload, the format row, both bars at the bottom. `DimensionFields` takes `scaleLast`. |
+| **Quality** | No `onCommit`: releasing the slider records nothing. Apply records one Compress step. The edited dot + reset (ControlRow `edited`) is on Quality as on Scale. |
+| **Format = preview** | The row measures what the photo would weigh as each format (`measureApply` with an explicit `format`) and is the persisted `exportFormat` the Export dialog opens on. Choosing one is never a pending change. Apply keeps the photo's own format at the chosen quality (`encodeForApply` / `usePersistActiveCanvas` take `format`); a quality-only Apply on a PNG just records the quality. Default `exportFormat` is now `webp` for new users (persisted values are untouched). |
+| **Enhance › AI** | Both buttons pressable for every account, key badge kept; without Paid, a toast says why. The sign-in/Paid warning paragraph is gone. The online-features switch still blocks the tile while off — unchanged and pinned by `onlineGate.test.ts`. |
+| **Format names** | `formatName()` in `lib/exportImage`: the Download button, ZIP label and canvas-menu Export item say "WebP", not `toUpperCase()`'s "WEBP" — which also hid the button from the Beta-switches e2e once WebP became the default. |
+| **Measured** | Test photo at 2048 px: WebP 118 KB, JPEG 202 KB, PNG 2.5 MB against a 459 KB limit. |
+| **Gates** | tsc 0, lint 0 errors / 55 warnings, unit 1,840/1,840, guardrails OK, browser checks 7/7. |
+
+## v9.22 Change Summary — 2026-10-08
+
+**The histogram stays in view while you adjust, and Resize & Compress loses its box.** #324, #325.
+
+| Area | Change |
+| --- | --- |
+| **Histogram footer** (#325) | `HistogramFooter` renders Review's `HistogramView` in the tools sidebar's non-scrolling area on Enhance › Adjustments, Levels and Presets (`histogramFooterTools`). One `histogramSignature` in AppShell feeds Review and the footer. |
+| **Levels** (#325) | The Curve chart and its `levels.histogram()` read are deleted; the engine's `calculate_histogram` stays (Review and the footer use it). The edited dot moved to Black point. |
+| **Sidebar layout animation** (#325) | The scroll body is `layout="position"`: full `layout` scaled its contents when the footer changed its box, and photo-switch C3 measured rows at 49.94 px mid-animation. C3 3/3 green after; it failed 3/3 before. |
+| **PageSpeed unboxed** (#324) | A plain section with the panel divider, like Resize and Compress. |
+| **Method dropdown** (#324) | `SelectField`, the same as Text › Font Family. Audit: Layer, Text, Batch and Create AI Image were the only dropdowns and all use it; Method makes five. |
+| **Known flake** | `gallery-loading-state` G1 fails about 1 run in 4 on master too (already parked); unrelated to either PR. |
+
+## v9.23 Change Summary — 2026-10-08
+
+**Adjustments works again, every reset is exact, and the AI buttons are there for everyone.** #326, #327.
+
+| Area | Change |
+| --- | --- |
+| **Brightness, measured** (#326) | Four bands 40/120/200/240: +65 gave 206/255/255/255 (±255 per unit, no preview while dragging) and its reset gave 40/89/89/89 (an inverse delta on clipped pixels). Now 81/161/241/255, previewed live, and a reset returns 40/120/200/240 exactly. |
+| **Adjustments session** (#326) | `src/adjust.rs` on the shared `tonal_preview` copy: `adjust_preview_set` recomputes all seven settings from the untouched copy; `adjust_commit` saves the current settings as ONE undo step and keeps the session, so every reset stays exact; `TonalPreview.committed` makes a cancel keep committed work. Brightness ±100 = ±64 levels. 9 Rust tests. |
+| **Panel** (#326) | Release = one undo step (no Apply button); each ↺ commits its reset; Reset commits the defaults; an outside undo returns the sliders to neutral; leaving the panel or switching photo commits anything still moving (`lib/pendingEdits`, awaited first by the switch). |
+| **Op-log / reload review** (#326) | Reviewed before publishing on the production build: a release survives a reload with no Apply; Levels + an adjustment survive a real photo switch and a reload; undo after the reload steps back to Levels. The first draft (preview until Apply) lost a released adjustment on reload — caught here and replaced by commit-on-release. |
+| **Levels** (#326) | A reset beside Black point, Midtones and White point, each independent. |
+| **Enhance › AI** (#327) | `openOffline` sub-tool flag: the tile opens with online features off (the default), both buttons show with the key badge, pressing one says why; 0 AI requests while off. OCR unchanged. |
+| **Engine** | **885,735 → 892,634 B** (+6,899): the adjustment session. |
+| **Gates** | cargo test 509/509 + tiles 685/685, clippy both, fmt; tsc 0, lint 0 errors / 55 warnings; unit 1,842/1,842; guardrails OK. |
+
+## v9.24 Change Summary — 2026-10-08
+
+**The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.** #335, #336.
+
+| Area | Change |
+| --- | --- |
+| **Histogram footer** (#336) | `basis-[calc(33.333%-13px)]`, 9rem floor, instead of a fixed `h-36`: chart 187 / 220 / 280 px at 800 / 900 / 1080 px windows — exactly Review's one-third slot (the fixed footer drew 110 at every size). |
+| **Mobile menu** (#335) | All 20 sheet cards one size: `height: 7em` (119 px), descriptions clamped to three lines with the full text as a title. Were 62–134 px; 0 overflow. |
+| **Marketing review** (#335) | Every page checked against v9.19–v9.23 and the app source. /image-compressor (toolPages, seo.ts) no longer claims a target-size search or "page-speed scores"; Features.md / featureCards / comingSoon describe Image weight, the preview row, the histogram footer, the Adjustments session, Levels' per-point resets and AI-for-everyone; remove-object says "on Pro". Architecture: as of v9.23, 893 KB engine, op log v11, 11 stores. |
+| **Gates** | CI 17/17 on both; photo-switch-cue + ui-night8-finish 15/15; unit 1,843/1,843; marketing tsc 0, build OK. No engine change (892,634 B). |
+
+## v9.25 Change Summary — 2026-10-08
+
+**Create AI Image makes pictures now.** #337.
+
+| Area | Change |
+| --- | --- |
+| **Backend** (#337) | `ai.generate` action + `aiJobs.startGenerateJob`; `ai_jobs.type` gains `generate`, optional `prompt` / `model` (additive). Calls `/v1/models/{owner}/{name}/predictions`, so no version hash to go stale; the existing webhook stores the image. Deployed to `brave-ant-608` before the client merged. |
+| **Plan check** (#337) | The allowance logic is one shared `chargeAiUse`: a free tier (cap 0) is refused on the server before any Replicate call, the same as background removal. |
+| **Models** (#337) | Flux Schnell, Flux Dev, Flux 1.1 Pro, Flux Kontext Pro, Stable Diffusion 3.5 Large, Ideogram v3 Turbo. Inputs from each model's published schema; references go as `input_image` / `image` / `style_reference_images` and never to a model that can't read them. |
+| **Client** (#337) | `useImageGeneration`: online-features gate, references downscaled and uploaded, job subscription with timeout; the result is added to the gallery as a File. The panel's "not connected" line is gone; the model dropdown is the shared `SelectField`. |
+| **Gates** | CI 17/17; tsc 0, convex tsc 0 (bar the existing `process` types), lint 0 errors; unit 1,843/1,843; guardrails OK. Signed-out check on a prod build: 6 models, Generate disabled empty / enabled with a prompt, pressing it says "needs sign-in and a Paid plan", 0 requests. No engine change (892,634 B). |
+
+## v9.26 Change Summary — 2026-10-08
+
+**A generated picture actually arrives.** #338.
+
+| Area | Change |
+| --- | --- |
+| **Webhook output host** (#338) | The first real generate job failed with "Rejected non-Replicate output host": Replicate returned the image from its Cloudflare R2 bucket (`ai-gateway-outputs.<account>.r2.cloudflarestorage.com`). The SSRF guard in `convex/http.ts` now also accepts that one bucket host, pinned with its account id — never `*.r2.cloudflarestorage.com`. Deployed to `brave-ant-608` before the merge. |
+| **Gates** | CI 17/17; convex tsc 0 (bar the existing `process` types). No client or engine change (892,634 B). |
+
+
+## v9.27 Change Summary — 2026-10-11
+
+**The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.** UI Nights 9–15 (#339–#345), pen selection (#317), browser coverage (#319) and keyboard actions (#346), published together.
+
+| Area | Change |
+| --- | --- |
+| **Gallery** | Rows scroll without overlapping at narrow widths; hover and focus controls belong to one photo. The count says how many photos are loaded and the 12-photo demo limit. |
+| **Previews** | Welcome Back, Shared and Batch wait for actual image decoding, preserve the last good preview during updates, and show a per-image failure state. Shared images can be retried. |
+| **Keyboard** | Enter and Space activate gallery Remove and Select. Remove opens confirmation; Select toggles the checkbox without opening a different photo. The tile itself still opens a photo. |
+| **Settings** | Named, linked tabs; Up/Down, Home and End navigation; readable help text in both themes. Losing access to an admin-only tab returns the visible pane, keyboard entry point and reopen action to General. Two rendered regression cases fail before the fix and pass afterward. |
+| **Pen** | An unfilled freehand stroke selects on its segments, not the empty area in its bounding box. Delete, undo and redo preserve that behavior. |
+| **Browser coverage** | Every eligible default browser spec runs in two CI shards, with a coverage check. Service worker and keyless builds remain separate. Existing v9.20 resize behavior gains regression coverage; it is not a new resize implementation. |
+| **Marketing and docs** | Feature descriptions, annual and October Trail Log totals and commit squares, the newest release kept visible in each summary, remaining multi-night work, README deployment instructions and the documentation index are current. Commit dates preserve the work done on Friday and Saturday; the release lands Sunday. |
+| **Validation** | Full scoped production QC passes all five sections. The combined release passes 133 browser cases; preflight passes 1,864 unit tests; the keyboard correction adds four cases proved red before the fix and green afterward. Keyless boot: 4 passes. Rust: 512 featureless / 688 tiles. TypeScript, lint (0 errors, 55 existing warnings), guardrails, builds and inert-class audit pass. [Implementation and validation report](UI_NIGHTS_09_15.md). |
+| **Release records** (10-11, after the tag) | GitHub Releases backfilled for v8.98, v9.2 and v9.19–v9.26, which were tagged but never published; every version tag now has a Release. `.codex/` is gitignored, since its config holds auth tokens. |
+| **Engine** | 892,634 → 892,897 B (+263), the pen hit-test branch. No saved-edit format, IndexedDB schema, authentication or billing change. Settings only normalizes the visible category; access rules and server calls are unchanged. |
+
+The historical cached-restore timing concern remains recorded in the implementation report; passing runs do not establish a flake rate. Authenticated Shared actions have source and boundary-test coverage, not a live-account release test.
+
+## v9.28 Change Summary — 2026-10-12
+
+**Things that load now hold their place instead of popping in.** UI Nights 16–18 (#349, #350, #353) and the Plan & Billing skeleton (#352), published together.
+
+| Area | Change |
+| --- | --- |
+| **Sign-in** | The sign-in or avatar button reserves its space while Clerk loads, at each of its five sizes. The gray placeholder appears only after 300 ms and leaves with Clerk if Clerk fails. |
+| **AI Usage** | While auth connects or usage is on its way, the pane shows the shape of the Usage limits card. Signed-in users no longer see "Sign in to see your usage" first. |
+| **Plan & Billing** | A skeleton of the Current plan row and the Pro card replaces the large spinner. Signed in and still connecting, it no longer flashes the sign-in copy. A build without cloud keys showed it loading for good, on the old spinner too; it now shows the sign-in copy at once. |
+| **Compare** | The original is decoded before it shows. Nothing for 300 ms, then a skeleton in the Original half; "Original unavailable" on a decode error or after 15 s, sized to that half. |
+| **Phone viewer** | Opening a photo shows a skeleton in that photo's own shape after 300 ms, then the photo lands in the same box. A missing original says "This photo couldn't be loaded." instead of spinning for good. A swipe never shows the new photo's name with the old picture. The phone boot screen is unchanged. |
+| **Tests** | 38 new unit cases across the four changes; the old code fails each red check. Three phone-grid browser specs now count the grid's own placeholders, not the header's sign-in skeleton, which CI's placeholder Clerk key keeps on screen. |
+| **Validation** | Browser checks: Compare and the phone viewer with decode slowed to 3 s and forced to fail; Plan & Billing in a keyless build and with auth that never connects, in dark and light themes. CI green on all four PRs. Combined master: 1,902 unit tests; TypeScript, lint (0 errors, 55 existing warnings), guardrails, build and inert-class audit pass. [Implementation report](UI_NIGHTS_16_19.md). |
+| **Engine** | Unchanged, 892,897 B. No saved-edit format, IndexedDB schema, authentication or billing change. |
+
+Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Billing skeletons giving way to real data. Night 19 (import preview, image info, narrow menu bar) is still to do.
+

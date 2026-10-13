@@ -347,6 +347,20 @@ pub(crate) fn composite_layers_into(
                 out.copy_from_slice(&only.buf.data);
                 return;
             }
+            // Live shapes used to force a full source-over blend over an empty
+            // output even when every source pixel is opaque. On a 12 MP photo
+            // that costs more than the pin/path itself. Keep translucent,
+            // styled and masked layers on the generic path; an opaque overlay
+            // rendered on opaque pixels is still opaque, so copying is exact.
+            if only.opacity == 1.0
+                && only.mask.is_none()
+                && only.overlay.is_none()
+                && only.buf.data.len() == n
+                && only.buf.data.chunks_exact(4).all(|px| px[3] == 255)
+            {
+                out.copy_from_slice(&render_layer(only, w, h, editing_shape_id, editing_text_id));
+                return;
+            }
         }
     }
 
@@ -2398,5 +2412,48 @@ mod tests {
             tail_margin(2),
             (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
         );
+    }
+}
+
+#[cfg(test)]
+mod opaque_annotation_composite_tests {
+    use super::*;
+    use crate::ImageHorseTool;
+
+    #[test]
+    fn overlay_fast_path_is_byte_identical_to_the_generic_compositor() {
+        for alpha in [255, 90, 0] {
+            let mut t = ImageHorseTool::new(64, 64);
+            let mut pixels = vec![170; 64 * 64 * 4];
+            for px in pixels.chunks_exact_mut(4) {
+                px[3] = alpha;
+            }
+            t.load_image(&pixels);
+            t.add_pin_annotation(5.0, 5.0, 29.0, 29.0, 12, "#ef4444", 0);
+            t.add_bezier_annotation(
+                &[10.0, 40.0, 20.0, 30.0, 30.0, 50.0, 50.0, 40.0],
+                "#00ff00",
+                3.0,
+                0,
+                "#000000",
+            );
+            for editing in [None, Some(1)] {
+                let mut fast = Vec::new();
+                let mut generic = Vec::new();
+                composite_layers_into(&mut fast, &t.layers, 64, 64, editing, None, None, None);
+                // A nonexistent hidden layer bypasses only the fast-path gate.
+                composite_layers_into(
+                    &mut generic,
+                    &t.layers,
+                    64,
+                    64,
+                    editing,
+                    None,
+                    None,
+                    Some(usize::MAX),
+                );
+                assert_eq!(fast, generic, "alpha={alpha}, editing={editing:?}");
+            }
+        }
     }
 }

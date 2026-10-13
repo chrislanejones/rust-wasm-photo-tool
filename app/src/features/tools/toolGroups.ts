@@ -123,6 +123,12 @@ interface SubToolBase {
    * which is why `networkFlagCoverage.contract.test.ts` exists.
    */
   requiresNetwork?: boolean;
+  /** Openable while online features are off (10-08): the panel shows its
+   *  buttons, and its handlers refuse the network call with a toast naming
+   *  the switch. Enhance › AI only — online features are OFF by default, so
+   *  without this nobody saw the AI buttons at all. Every request is still
+   *  gated; OCR keeps the plain disabled tile. */
+  openOffline?: boolean;
 }
 
 /** A sub-tool that resolves to something the app can actually do. */
@@ -187,7 +193,7 @@ const enhanceGroup: ToolGroupDefinition = {
   subTools: [
     {
       // ONE tile, was two. Compress and Resize both move the SAME two numbers —
-      // Web Performance Gain and PageSpeed Insights Score read dimensions AND
+      // Image weight and Smaller-than-upload read dimensions AND
       // format/quality together — so splitting them put the scores under one
       // tile and half their inputs under the other. Squoosh keeps the whole
       // pipeline on one panel for the same reason. Keeps the `compress` id
@@ -271,6 +277,7 @@ const enhanceGroup: ToolGroupDefinition = {
       // Replicate-backed: the image is uploaded and a model runs on it.
       tier: "pro",
       requiresNetwork: true,
+      openOffline: true,
     },
   ],
 };
@@ -470,7 +477,7 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["shape", "rectangle", "circle", "box", "hand-drawn"],
     },
     {
-      // `shapesMode: "pens"` is labeled "Pens" in toolModes.ts but carries a
+      // `shapesMode: "pens"` is labeled "Pins" in toolModes.ts but carries a
       // MapPin icon and drives PIN_LABELS (Numbers / Letters) — it is the
       // pin-drop feature, not the Bézier pen. The brief separates the two
       // correctly; the stale label is what made them look like one thing.

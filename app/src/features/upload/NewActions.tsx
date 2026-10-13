@@ -196,7 +196,7 @@ export function NewActions({
   const heicOn = useBetaOn("heic-import");
   // No image-load bar here. The gallery thumbnails ARE the progress: they
   // appear one per decoded photo, which is real per-item feedback rather than
-  // an aggregate. `useUIStore`'s isImageLoading/loadProgress still drive the
+  // an aggregate. `useUIStore`'s isImageLoading still drives the
   // page-top bar in AppShell; this dialog no longer subscribes to either, so
   // it also stops re-rendering on every 100ms tick of that fake interval.
   const inputRef = useRef<HTMLInputElement>(null);
@@ -557,6 +557,10 @@ export function NewActions({
                   onModelChange={setAiModel}
                   onBack={() => setAiMode(false)}
                   closable={inDialog}
+                  onGenerated={(file) => {
+                    onFiles([file]);
+                    onFilesAdded?.();
+                  }}
                 />
               </>
             ) : (

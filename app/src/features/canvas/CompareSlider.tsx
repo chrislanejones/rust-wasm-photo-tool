@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useOriginalImage } from "./useOriginalImage";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -46,6 +48,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
   // round trip to every stroke. Same revision AppShell's status bar reads.
   const layerRevision = useGalleryStore((s) => s.layerRevision);
   const photoBounds = usePhotoBounds(active ? toolRef : NO_TOOL, revision + layerRevision);
+  const original = useOriginalImage(beforeUrl, active);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [box, setBox] = useState<{
@@ -92,7 +95,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
       });
     };
     updateBox();
-    // Layout size changes (e.g. Apply Compression & Resize swaps dimensions).
+    // Layout size changes (e.g. an Apply Resize swaps dimensions).
     const ro = new ResizeObserver(updateBox);
     ro.observe(canvasEl);
     if (canvasEl.offsetParent) ro.observe(canvasEl.offsetParent);
@@ -152,7 +155,10 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
 
   const onPointerUp = useCallback(() => setDragging(false), []);
 
-  if (!active || !beforeUrl || !box) return null;
+  // Nothing during the grace: a fast original shows no placeholder at all.
+  // After it, the overlay opens with a skeleton where the original will be.
+  if (!active || !box) return null;
+  if (!original.ready && !original.failed && !original.showSkeleton) return null;
 
   // Over the whole canvas box, the original was stretched across the artboard
   // band on its half while the edit showed the band on the other — two sides
@@ -186,16 +192,50 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      {/* "Before" layer — original stretched to exactly the canvas's rendered box */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `url(${beforeUrl})`,
-          backgroundSize: "100% 100%",
-          backgroundRepeat: "no-repeat",
-          clipPath: `inset(0 ${100 - clipPercent}% 0 0)`,
-        }}
-      />
+      {/* "Before" layer — original stretched to exactly the canvas's rendered box.
+          Until it has decoded: a skeleton in the same clipped band, or, if it
+          is not coming, a plain statement of that. */}
+      {original.ready && beforeUrl ? (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${beforeUrl})`,
+            backgroundSize: "100% 100%",
+            backgroundRepeat: "no-repeat",
+            clipPath: `inset(0 ${100 - clipPercent}% 0 0)`,
+          }}
+        />
+      ) : original.failed ? (
+        // Sized to the Original half, not clipped from the whole box: centered
+        // on the full photo, the message sat on the divider and was cut in
+        // two ("Origina"). It fades with the side chip when the half is too
+        // narrow to hold it.
+        <div
+          data-testid="compare-original-failed"
+          className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden bg-bg-elevated pointer-events-none"
+          style={{ width: `${clipPercent}%` }}
+        >
+          <p
+            className="flex items-center gap-2 whitespace-nowrap text-xs text-text-secondary transition-opacity duration-150"
+            style={{ opacity: originalRoom ? 1 : 0 }}
+          >
+            <ImageOff className="size-4" aria-hidden />
+            Original unavailable
+          </p>
+        </div>
+      ) : (
+        <>
+          <Skeleton
+            decorative
+            data-testid="compare-original-skeleton"
+            className="absolute inset-0 size-full pointer-events-none"
+            style={{ clipPath: `inset(0 ${100 - clipPercent}% 0 0)` }}
+          />
+          <span role="status" className="sr-only">
+            Loading the original photo
+          </span>
+        </>
+      )}
 
       {/* Divider line */}
       <div

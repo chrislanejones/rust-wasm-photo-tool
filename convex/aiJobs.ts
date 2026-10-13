@@ -7,6 +7,8 @@ import {
 import { getUserId, requireUser, roleOf } from "./users";
 import { entitlementOf } from "./entitlement";
 import { aiCapsFor } from "./aiCaps";
+import type { MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 
 /* ── Per-tier AI job caps ──────────────────────────────────────────────────
  *
@@ -130,6 +132,48 @@ export const listForPhoto = query({
 // Called by the dispatch action. Doing this in one mutation keeps the
 // ownership check, usage increment, and insert in a single transaction.
 
+
+/** Check the user's AI allowance and count one use against it. Shared by
+ *  every job type, so a text-to-image job is metered and gated exactly like
+ *  background removal: a free tier (cap 0) is refused here, server-side.
+ *  Returns `now`, the timestamp the use was counted at. */
+async function chargeAiUse(ctx: MutationCtx, user: Doc<"users">): Promise<number> {
+  const entitlement = entitlementOf(user.tier, await roleOf(ctx, user), true);
+  const caps = aiCapsFor(user.tier, entitlement);
+
+  const cap = caps.daily;
+  if (cap === 0) {
+    throw new Error("AI tools require a paid plan");
+  }
+
+  // Roll both windows forward if they're stale, mirroring incrementUsage.
+  const now = Date.now();
+  const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
+  const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
+
+  if (day.used >= cap) {
+    throw new Error(`Daily AI limit reached (${cap}/day on ${user.tier})`);
+  }
+  const monthCap = caps.monthly;
+  if (month.used >= monthCap) {
+    throw new Error(
+      `Monthly AI limit reached (${monthCap}/month on ${user.tier})`,
+    );
+  }
+
+  // Both counters move in the same patch as the insert's transaction, so a
+  // job can never be created without being counted.
+  await ctx.db.patch(user._id, {
+    dailyUsage: day.used + 1,
+    usageResetAt: day.resetAt,
+    monthlyUsage: month.used + 1,
+    monthResetAt: month.resetAt,
+    updatedAt: now,
+  });
+
+  return now;
+}
+
 export const startJob = internalMutation({
   args: {
     photoKey: v.string(),
@@ -145,38 +189,7 @@ export const startJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const entitlement = entitlementOf(user.tier, await roleOf(ctx, user), true);
-    const caps = aiCapsFor(user.tier, entitlement);
-
-    const cap = caps.daily;
-    if (cap === 0) {
-      throw new Error("AI tools require a paid plan");
-    }
-
-    // Roll both windows forward if they're stale, mirroring incrementUsage.
-    const now = Date.now();
-    const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
-    const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
-
-    if (day.used >= cap) {
-      throw new Error(`Daily AI limit reached (${cap}/day on ${user.tier})`);
-    }
-    const monthCap = caps.monthly;
-    if (month.used >= monthCap) {
-      throw new Error(
-        `Monthly AI limit reached (${monthCap}/month on ${user.tier})`,
-      );
-    }
-
-    // Both counters move in the same patch as the insert's transaction, so a
-    // job can never be created without being counted.
-    await ctx.db.patch(user._id, {
-      dailyUsage: day.used + 1,
-      usageResetAt: day.resetAt,
-      monthlyUsage: month.used + 1,
-      monthResetAt: month.resetAt,
-      updatedAt: now,
-    });
+    const now = await chargeAiUse(ctx, user);
 
     const inputUrl = await ctx.storage.getUrl(args.inputStorageId);
     if (!inputUrl) throw new Error("Input image not found in storage");
@@ -203,6 +216,38 @@ export const startJob = internalMutation({
 });
 
 /** Attach the Replicate prediction id so the webhook can find this row. */
+/** Start a text-to-image job (New › Create AI Image). Same allowance as
+ *  every AI job; no input frame — the prompt and model are stored instead.
+ *  Reference images (if the model reads them) are resolved to URLs here. */
+export const startGenerateJob = internalMutation({
+  args: {
+    prompt: v.string(),
+    model: v.string(),
+    referenceStorageIds: v.array(v.id("_storage")),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = await chargeAiUse(ctx, user);
+    const referenceUrls: string[] = [];
+    for (const id of args.referenceStorageIds) {
+      const url = await ctx.storage.getUrl(id);
+      if (!url) throw new Error("Reference image not found in storage");
+      referenceUrls.push(url);
+    }
+    const jobId = await ctx.db.insert("ai_jobs", {
+      userId: user._id,
+      photoKey: `generate:${now}`,
+      type: "generate",
+      status: "running",
+      prompt: args.prompt,
+      model: args.model,
+      startedAt: now,
+      createdAt: now,
+    });
+    return { jobId, referenceUrls };
+  },
+});
+
 export const setReplicateId = internalMutation({
   args: { jobId: v.id("ai_jobs"), replicateId: v.string() },
   handler: async (ctx, args) => {

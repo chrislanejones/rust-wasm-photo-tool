@@ -15,6 +15,7 @@
 // instance. Over 30 runs each: this queue alone still failed 6/24, the engine
 // fix alone 11/30, both 0/30.
 import { setEngineDocument } from "@/lib/engineDocument";
+import { trackActivity } from "@/lib/activity";
 
 /** Options every document load takes.
  *
@@ -39,7 +40,9 @@ export interface LoadOpts {
 export function makeLoadQueue(): <T>(run: () => Promise<T>) => Promise<T> {
   let chain: Promise<unknown> = Promise.resolve();
   return <T,>(run: () => Promise<T>): Promise<T> => {
-    const next = chain.catch(() => undefined).then(run);
+    // Tracked for the status bar's loading indicator: queued time counts too,
+    // since the photo you asked for is not there yet either way.
+    const next = trackActivity(chain.catch(() => undefined).then(run));
     chain = next;
     return next;
   };

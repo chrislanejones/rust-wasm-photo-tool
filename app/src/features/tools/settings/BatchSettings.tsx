@@ -1289,6 +1289,7 @@ function TextBatchPanel({
           className="mb-2"
         />
         <textarea
+          aria-label="Overlay text"
           rows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}

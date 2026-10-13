@@ -36,7 +36,7 @@ export function useCanvasOps({
   activePhotoId: string | null;
   setHasBeenModified: (v: boolean) => void;
   setModifiedPhotos: (fn: (prev: Set<string>) => Set<string>) => void;
-  persistActiveCanvas: () => Promise<void>;
+  persistActiveCanvas: () => Promise<unknown>;
 }) {
   const handleResizeCanvas = useCallback(
     async (w: number, h: number) => {

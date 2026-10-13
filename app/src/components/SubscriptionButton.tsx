@@ -2,10 +2,11 @@
 // selected pane on the right). General (app preferences), Plan & Billing (Stripe
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 // Through lib/cloud, not convex/react: a keyless build must render this.
-import { useCloudAction as useAction, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
+import { useCloudAction as useAction, useCloudAuth, useCloudQuery as useQuery, useCloudMutation as useMutation } from "@/lib/cloud";
 import { toast } from "sonner";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { WINDOW_TITLE } from "@/lib/styles";
 import {
   Settings,
@@ -51,6 +52,9 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PAID_SIGNUP_ENABLED, PAID_SIGNUP_OFF_NOTE } from "@/lib/billing";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
+import { cn } from "@/lib/utils";
 import {
   DEFAULT_PREFERENCES,
   serializePreferences,
@@ -139,8 +143,10 @@ export function SubscriptionButton({
   // palette, a deep link) now goes through the same store actions instead of
   // the old one-shot request + grandfathered `image-horse:open-settings`
   // CustomEvent, both of which are gone.
+  const tabId = useId();
+  const panelId = `${tabId}-panel`;
   const open = useUIStore((s) => s.settingsOpen);
-  const tab = useUIStore((s) => s.settingsTab);
+  const storedTab = useUIStore((s) => s.settingsTab);
   const openSettings = useUIStore((s) => s.openSettings);
   const closeSettings = useUIStore((s) => s.closeSettings);
   const setTab = useUIStore((s) => s.setSettingsTab);
@@ -184,6 +190,9 @@ export function SubscriptionButton({
     "beta",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
+  // A category can disappear while Settings is open. Keep the selected pane,
+  // its label and the rail's Tab stop on an available category.
+  const tab = TAB_ORDER.includes(storedTab) ? storedTab : "general";
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] =
     TAB_ORDER.map((id) => ({
       id,
@@ -254,7 +263,13 @@ export function SubscriptionButton({
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const { isLoading: authLoading, isAuthenticated } = useCloudAuth();
   const me = useQuery(api.users.me, {});
+  // While auth connects, `me` can read null for a signed-in user, which would
+  // flash "Sign in to view…" before the plan arrives. Signed out, there is
+  // nothing to wait for: a keyless build's query never answers (lib/cloud),
+  // and waiting on it kept this pane loading for good.
+  const planLoading = authLoading || (isAuthenticated && me === undefined);
   const sub = useQuery(api.subscriptions.getByUser, {});
   const checkout = useAction(api.stripe.createCheckoutSession);
   const portal = useAction(api.stripe.createPortalSession);
@@ -311,26 +326,14 @@ export function SubscriptionButton({
 
           <div className="flex min-h-0 flex-1">
           {/* GNOME-style category rail (left) */}
-          <nav className="w-48 shrink-0 space-y-1 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                  tab === id
-                    ? "bg-bg-elevated text-text-primary"
-                    : "text-text-secondary hover:bg-bg-elevated/60"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </button>
-            ))}
-          </nav>
+          <SegmentedTabs
+            tabs={tabs} value={tab} onChange={setTab} label="Settings sections"
+            orientation="vertical" idPrefix={tabId} panelId={panelId}
+            className="w-48 shrink-0 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2"
+          />
 
           {/* Selected pane (right) */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div role="tabpanel" id={panelId} aria-labelledby={`${tabId}-${tab}`} tabIndex={0} className="flex-1 overflow-y-auto p-5">
             {tab === "general" ? (
               <GeneralPane
                 value={draft}
@@ -389,14 +392,9 @@ export function SubscriptionButton({
                 <h3 className="text-sm font-semibold text-text-primary">
                   Plan &amp; Billing
                 </h3>
-                {me === undefined ? (
-                  /* Plan & Billing is still loading — one larger spinner,
-                     centered above the panel body (replaces the small inline
-                     skeleton). */
-                  <div className="flex justify-center pt-1 pb-6">
-                    <Spinner className="size-8" aria-label="Loading your plan" />
-                  </div>
-                ) : me === null ? (
+                {planLoading ? (
+                  <PlanSkeleton />
+                ) : !isAuthenticated || me == null ? (
                   <p className="text-xs text-text-muted">
                     Sign in to view and manage your plan.
                   </p>
@@ -474,7 +472,7 @@ export function SubscriptionButton({
                       </p>
                     )}
                     {err && (
-                      <p className="text-2xs leading-relaxed text-red-400">{err}</p>
+                      <p role="alert" className="text-2xs leading-relaxed text-red-400">{err}</p>
                     )}
                   </>
                 )}
@@ -560,5 +558,42 @@ export function SubscriptionButton({
           : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
       </ConfirmDialog>
     </>
+  );
+}
+
+/** The loaded pane's shape: the Current plan row, then the Pro card (name and
+ *  price, the feature list, the action at the foot), so the plan arriving does
+ *  not move anything. This replaced a small inline skeleton that was only a
+ *  line or two tall; the spinner after it said "working" for what is a read.
+ *  The box is reserved at once; the gray bars wait out the 300 ms grace. One
+ *  announcement for the region; the bars are decorative. */
+function PlanSkeleton() {
+  const shown = useDelayedFlag(true);
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      data-testid="plan-skeleton"
+      data-shown={shown || undefined}
+      className={cn("space-y-4", !shown && "[&>*]:invisible")}
+    >
+      <span className="sr-only">Loading your plan…</span>
+      <div className="flex items-center justify-between text-xs">
+        <Skeleton decorative variant="line" className="w-20" />
+        <Skeleton decorative variant="block" className="h-5 w-14 rounded-full" />
+      </div>
+      <div className="rounded-lg border border-border p-4">
+        <div className="flex items-baseline justify-between">
+          <Skeleton decorative variant="line" className="w-10 text-sm" />
+          <Skeleton decorative variant="line" className="w-16 text-2xl" />
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {PRO_FEATURES.map((f) => (
+            <Skeleton key={f} decorative variant="line" className="w-3/4 text-2xs" />
+          ))}
+        </div>
+        <Skeleton decorative variant="block" className="mt-4 h-8 w-full rounded-lg" />
+      </div>
+    </div>
   );
 }

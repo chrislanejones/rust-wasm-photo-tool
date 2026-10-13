@@ -40,6 +40,9 @@ const MAX_STROKE_MS = 15_000;
 
 let strokeDepth = 0;
 let openedAt = 0;
+/** When the last real stroke ended (0 = never). Only a pointerup that closed
+ *  an open stroke moves it — window pointerup fires for button clicks too. */
+let lastStrokeEndAt = 0;
 let waiters: (() => void)[] = [];
 
 function release(): void {
@@ -58,7 +61,10 @@ export function strokeDown(): void {
  *  (window pointerup fires for clicks on buttons too); depth never goes
  *  negative, so stray ups cannot wedge the gate shut. */
 export function strokeUp(): void {
-  if (strokeDepth > 0) strokeDepth -= 1;
+  if (strokeDepth > 0) {
+    strokeDepth -= 1;
+    lastStrokeEndAt = Date.now();
+  }
   if (strokeDepth === 0) release();
 }
 
@@ -95,9 +101,43 @@ export function whenStrokeIdle(maxWaitMs = 20_000): Promise<void> {
   });
 }
 
+/**
+ * Resolves once no stroke is in flight AND none has ended in the last
+ * `quietMs` — i.e. the user has actually paused, not merely lifted the pen.
+ *
+ * WHY `whenStrokeIdle` IS NOT ENOUGH (10-07). The autosave timer arms at
+ * stroke end and fires `delay` later, which is exactly where the next stroke
+ * tends to begin. `whenStrokeIdle` only guarantees the capture does not START
+ * mid-stroke; once started, `capture_state()` PNG-encodes the composite, every
+ * undo snapshot and every layer — measured 1.1–1.6 s on the worker for a
+ * 2068×1556 document with two strokes — and a stroke that begins 100 ms later
+ * queues every `paint_move` behind it. That is the "wait to see my stroke"
+ * report. Requiring a quiet window means a burst of strokes defers the save
+ * until the burst is over, and `maxWaitMs` bounds the deferral the same way
+ * `whenStrokeIdle` bounds its wait: user data with no backup is never starved.
+ */
+export function whenStrokeQuiet(quietMs: number, maxWaitMs = 20_000): Promise<void> {
+  const deadline = Date.now() + maxWaitMs;
+  return new Promise((resolve) => {
+    const check = () => {
+      void whenStrokeIdle(Math.max(0, deadline - Date.now())).then(() => {
+        const now = Date.now();
+        const remaining = lastStrokeEndAt === 0 ? 0 : quietMs - (now - lastStrokeEndAt);
+        if (remaining <= 0 || now >= deadline) {
+          resolve();
+          return;
+        }
+        setTimeout(check, Math.min(remaining, deadline - now));
+      });
+    };
+    check();
+  });
+}
+
 /** Test hook: reset module state between cases. */
 export function resetStrokeGate(): void {
   strokeDepth = 0;
   openedAt = 0;
+  lastStrokeEndAt = 0;
   waiters = [];
 }

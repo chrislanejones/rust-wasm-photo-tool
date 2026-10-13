@@ -167,3 +167,72 @@ export async function getWebPerfMetrics(
     performanceGain: Math.round(gain),
   };
 }
+
+// ── Image weight — what Google's image audit actually checks (10-07) ────────
+//
+// There is no PageSpeed score for one image. Lighthouse's performance score is
+// built from page-load metrics (FCP, LCP, TBT, CLS, Speed Index —
+// developer.chrome.com/docs/lighthouse/performance/performance-scoring). What
+// it says about an IMAGE is the "Improve image delivery" insight
+// (devtools-frontend `models/trace/insights/ImageDelivery.ts`), and that is a
+// pass/fail rule, not a score:
+//
+//   flagged when  bytes / pixels > 2 · 1 / 12   (TARGET_BYTES_PER_PIXEL_AVIF)
+//            and  bytes − pixels / 6 > 4096     (BYTE_SAVINGS_THRESHOLD)
+//
+// so an image passes at `pixels / 6 + 4096` bytes or less. That is the limit
+// shown here, unclamped: `webTargetBytes` adds a 28 KB floor and a 1 MB cap for
+// the Auto Compress loop's sake, and quoting those as Google's limit is what
+// made a 256×256 image sitting exactly on the stated target read "263% used".
+//
+// The audit also flags an image wider than it is DISPLAYED (responsive size).
+// That depends on the page it lands on, which this panel cannot know, so it is
+// left out rather than guessed.
+
+/** The most a `w × h` image can weigh and still pass Google's image audit. */
+export function googleImageLimitBytes(w: number, h: number): number {
+  if (w <= 0 || h <= 0) return 0;
+  return Math.floor((w * h) / 6) + BYTE_SAVINGS_THRESHOLD;
+}
+
+export interface ImageWeight {
+  /** Estimated bytes of the pending output. */
+  projectedBytes: number;
+  /** Google's pass line for the output's pixel count. */
+  limitBytes: number;
+  pass: boolean;
+  /** Smaller than the ORIGINAL UPLOAD by this percent; negative = bigger. */
+  gainPercent: number;
+}
+
+/**
+ * The pending output's estimated weight against Google's limit.
+ *
+ * `relativeQuality` is the new quality as a percent of the quality the file
+ * is already stored at. It may exceed 100: re-encoding a q50 file at q90
+ * makes it BIGGER, and the old model clamped that to "no change", so raising
+ * quality moved neither number. The engine's model is linear in quality and
+ * clamps at 100, so anything above is applied here as the same linear factor.
+ */
+export async function getImageWeight(input: Omit<WebPerfInput, "quality"> & { relativeQuality: number }): Promise<ImageWeight> {
+  const mod = await importEngine();
+  const q = Math.max(1, Math.round(input.relativeQuality));
+  const [usedPct] = mod.web_perf_metrics(
+    input.curW,
+    input.curH,
+    input.curBytes,
+    input.origBytes,
+    input.newW,
+    input.newH,
+    Math.min(100, q),
+    formatCode(input.curMime),
+    formatCode(input.newFormat ?? input.curMime),
+  );
+  // `web_perf_metrics` returns projected / max(area / 6, 1) × 100.
+  const budget = Math.max(1, (input.newW * input.newH) / 6);
+  const projectedBytes = Math.round(((usedPct ?? 0) / 100) * budget * (q > 100 ? q / 100 : 1));
+  const limitBytes = googleImageLimitBytes(input.newW, input.newH);
+  const gainPercent =
+    input.origBytes > 0 && input.curBytes > 0 ? Math.round((1 - projectedBytes / input.origBytes) * 100) : 0;
+  return { projectedBytes, limitBytes, pass: input.curBytes > 0 && projectedBytes <= limitBytes, gainPercent };
+}

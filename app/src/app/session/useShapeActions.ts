@@ -85,11 +85,22 @@ export function useShapeActions(
     if (!es && !busy.current) setMode("none");
   }, [es, setMode]);
 
+  // Both hook results are fresh objects every render (`useCloneStamp` and
+  // `useDrawingTools` return literals), so a callback that lists them as
+  // dependencies is rebuilt every render, and an effect keyed on that
+  // callback runs every render. `follow` below was exactly that: one
+  // `get_shape_annotations` round trip per AppShell render, ~140 per brush
+  // stroke measured 10-07, all queued on the worker port ahead of the ink.
+  // The newest values are read through this ref instead.
+  const latest = useRef({ stamp, drawingTools });
+  latest.current = { stamp, drawingTools };
+
   const afterEngineChange = useCallback(async () => {
+    const { stamp, drawingTools } = latest.current;
     stamp.flushToCanvas();
     stamp.syncState();
     await drawingTools.refreshShapes();
-  }, [stamp, drawingTools]);
+  }, []);
 
   // The last shape list `follow` saw, and the run in flight (runs chain, so
   // two reads can never diff against the same baseline twice).
@@ -99,6 +110,7 @@ export function useShapeActions(
   /** Re-route the connectors of every box that moved since the last look. */
   const follow = useCallback(() => {
     const run = following.current.then(async () => {
+      const { stamp, drawingTools } = latest.current;
       const tool = stamp.toolRef.current;
       if (!tool) return;
       let now: ShapeMeta[];
@@ -120,7 +132,7 @@ export function useShapeActions(
     });
     following.current = run.catch(() => {});
     return run;
-  }, [stamp, drawingTools]);
+  }, []);
 
   useEffect(() => {
     void follow();

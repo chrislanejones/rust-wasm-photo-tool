@@ -28,7 +28,9 @@ test("a slow import shows skeleton tiles that turn into photos", async ({ page }
     const vis = (e: Element) => (e as HTMLElement).offsetParent !== null;
     const real = [...document.querySelectorAll('[aria-label^="Select photo"]')].find(vis);
     const skel = [...document.querySelectorAll('[data-testid="pending-import"]')].find(vis);
-    const r = (e?: Element) => (e ? { w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height) } : null);
+    // Layout footprint stays 96px while the existing entrance transform scales
+    // the painted thumbnail from 0.85. Compare layout, not an animation frame.
+    const r = (e?: Element) => (e ? { w: (e as HTMLElement).offsetWidth, h: (e as HTMLElement).offsetHeight } : null);
     return { real: r(real), skel: r(skel) };
   });
   expect(boxes.skel, "a skeleton tile is on screen").not.toBeNull();

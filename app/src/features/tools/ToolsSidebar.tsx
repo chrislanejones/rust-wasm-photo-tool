@@ -1,5 +1,6 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
+import type { MeasureApply } from "./settings/ResizeSettings";
 import { motion } from "framer-motion";
 import { slideFromLeft } from "@/lib/animations";
 import type {
@@ -11,7 +12,7 @@ import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
-import type { LevelsControls, PresetControls } from "@/hooks/useTransforms";
+import type { AdjustControls, LevelsControls, PresetControls } from "@/hooks/useTransforms";
 import { LevelsSettings } from "./settings/LevelsSettings";
 import { PresetsSettings } from "./settings/PresetsSettings";
 import { ToolGrid } from "./ToolGrid";
@@ -45,6 +46,8 @@ import type { Preferences } from "@/lib/preferences";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PerPhotoRegion } from "./PerPhotoRegion";
+import { HistogramFooter, type HistogramFooterProps } from "./HistogramFooter";
+import { HISTOGRAM_FOOTER_SUB_TOOLS } from "./histogramFooterTools";
 import { PhotoFooter } from "./PhotoFooter";
 
 /** Panels whose values belong to the open photo (skeleton plan §1): the rest —
@@ -131,20 +134,19 @@ interface ToolsSidebarProps {
   onRotate90Cw: () => void;
   /** "Resize Layer" — see `TransformCropSettingsProps.onResizeLayer`. */
   onResizeLayer?: () => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
-  onSaturation?: (factor: number) => void;
-  onShadows?: (amount: number) => void;
-  onHighlights?: (amount: number) => void;
-  onSharpen?: (amount: number) => void;
+
   /** Enhance › Levels: live preview and commit (useTransforms). */
   levels?: LevelsControls;
+  /** Enhance › Adjustments preview session. */
+  adjust?: AdjustControls;
   presets?: PresetControls;
   imageReady: boolean;
-  /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
-  onResize: (newW: number, newH: number, filter: number) => void;
+  /** The compression Apply (w, h, Rust resampling-filter code); resolves true when the stored file changed. */
+  onResize: (newW: number, newH: number, filter: number) => Promise<boolean> | void;
   /** "Apply Resize" — resample only, no re-compression. See AppShell. */
-  onResizeOnly: (newW: number, newH: number, filter: number) => void;
+  onResizeOnly: (newW: number, newH: number, filter: number) => Promise<boolean> | void;
+  /** Encode what Apply would write and count the bytes (Resize & Compress). */
+  measureApply?: MeasureApply;
   /** Photoshop-style Canvas Size resize (no resample) — Layer Settings tool. */
   onResizeCanvas: (w: number, h: number) => void;
   /** Deletes the artboard's Background layer outright. */
@@ -161,6 +163,7 @@ interface ToolsSidebarProps {
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
   undoCount: number;
   quality: number;
+  appliedQuality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   compressProgress: { completed: number; total: number };
@@ -184,7 +187,7 @@ interface ToolsSidebarProps {
   pickedColor?: string;
   /** Re-apply a color from the Color Picker history. */
   onPickColor?: (hex: string) => void;
-  onGlobalBlur?: (intensity: number) => void;
+
   // Shapes sub-mode
   shapesMode?: ShapesMode;
   onShapesModeChange?: (mode: ShapesMode) => void;
@@ -203,6 +206,8 @@ interface ToolsSidebarProps {
   syncState: () => void;
   /** Whether the current tier may use Replicate AI (Paid only). */
   aiEnabled?: boolean;
+  /** Enhance › Adjustments / Levels / Presets footer histogram. */
+  histogram?: HistogramFooterProps;
   /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
   onAIResult: (r: AIResultPixels) => void;
 }
@@ -231,17 +236,13 @@ export function ToolsSidebar({
   onFlipV,
   onRotate90Cw,
   onResizeLayer,
-  onBrightness,
-  onContrast,
-  onSaturation,
-  onShadows,
-  onHighlights,
-  onSharpen,
   levels,
+  adjust,
   presets,
   imageReady,
   onResize,
   onResizeOnly,
+  measureApply,
   onResizeCanvas,
   onRemoveCanvas,
   canRemoveCanvas,
@@ -254,6 +255,7 @@ export function ToolsSidebar({
   activePhotoId,
   undoCount,
   quality,
+  appliedQuality,
   onQualityChange,
   onQualityCommit,
   compressProgress,
@@ -269,7 +271,6 @@ export function ToolsSidebar({
   onSetColorPickerActive,
   pickedColor,
   onPickColor,
-  onGlobalBlur,
   shapesMode,
   onShapesModeChange,
   stampSubMode,
@@ -284,6 +285,7 @@ export function ToolsSidebar({
   flushToCanvas,
   syncState,
   aiEnabled = false,
+  histogram,
   onAIResult,
 }: ToolsSidebarProps) {
   // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
@@ -376,9 +378,14 @@ export function ToolsSidebar({
       </motion.div>
 
       <motion.div
-        layout
+        // "position", not `layout`: this body only needs to SLIDE when the
+        // sub-tool rows above change count. Full `layout` also animated its
+        // SIZE, by scaling the contents — with the histogram footer below it,
+        // a photo switch resized the body and every slider measured 49.94 px
+        // instead of 50 mid-animation (photo-switch C3, 10-08).
+        layout="position"
         // `pb-1.5`, not the full panel inset: a panel's last run of buttons
-        // (Apply Compression & Resize) sits the same 6px off
+        // (the Apply button) sits the same 6px off
         // the bottom edge that the master bar's own buttons sit off theirs, so
         // the two chrome edges agree instead of each picking a number
         // (Chris, 2026-09-11 — "follow the reference of top bar, button to
@@ -393,6 +400,7 @@ export function ToolsSidebar({
         <PerPhotoRegion enabled={!!subToolId && PER_PHOTO_SUB_TOOLS.has(subToolId)}>
         {activeTool === "compress" && (
           <ResizeSettings
+            key={`resize-${documentRevision}`}
             disabled={!imageReady}
             imageWidth={imageWidth}
             imageHeight={imageHeight}
@@ -402,10 +410,12 @@ export function ToolsSidebar({
             currentEncodeQuality={currentEncodeQuality}
             activePhotoId={activePhotoId}
             quality={quality}
+            appliedQuality={appliedQuality}
             onQualityChange={onQualityChange}
             onQualityCommit={onQualityCommit}
             onResize={onResize}
             onResizeOnly={onResizeOnly}
+            measureApply={measureApply}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             compressProgress={compressProgress}
@@ -482,18 +492,10 @@ export function ToolsSidebar({
             rendered the Adjustments panel. */}
         {activeTool === "effects" && effectsMode === "adjust" && (
           <EffectsSettings
-            settings={toolSettings}
-            onChange={onToolSettingsChange}
-            onBrightness={onBrightness}
-            onContrast={onContrast}
-            onGlobalBlur={onGlobalBlur}
-            onSaturation={onSaturation}
-            onShadows={onShadows}
-            onHighlights={onHighlights}
-            onSharpen={onSharpen}
+            adjust={adjust}
             imageReady={imageReady}
-            undoCount={undoCount}
             activePhotoId={activePhotoId}
+            undoCount={undoCount}
           />
         )}
 
@@ -579,6 +581,11 @@ export function ToolsSidebar({
         )}
         </PerPhotoRegion>
       </motion.div>
+      {/* Not gated on imageReady: hiding it mid-switch grew the scroll body,
+          dropped its scrollbar and widened every control (photo-switch C3). */}
+      {histogram && !!subToolId && HISTOGRAM_FOOTER_SUB_TOOLS.has(subToolId) && (
+        <HistogramFooter {...histogram} />
+      )}
 
       </div>
 

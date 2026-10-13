@@ -152,6 +152,17 @@ declare module "stamp_tool" {
     new_w: number,
     new_h: number,
   ): Uint8Array;
+  /** Stateless: resample with the kernel `resize_with_filter` uses for
+   *  `filter` (0 nearest, 2 Catmull-Rom, 3 Lanczos3, else bilinear). Empty on
+   *  a zero dimension or a short buffer. */
+  export function resize_pixels_filter(
+    pixels: Uint8Array,
+    old_w: number,
+    old_h: number,
+    new_w: number,
+    new_h: number,
+    filter: number,
+  ): Uint8Array;
 
   /**
    * Stateless: encode an RGBA pixel buffer as PNG bytes.
@@ -580,6 +591,36 @@ declare module "stamp_tool" {
     /** Recompute the preview from the copy — black/white 0..=255, gamma > 0.
      *  Never an undo step. `false` means there is no live preview (it was
      *  dropped because history moved), so begin again. */
+    /** Adjustments preview from the untouched copy (src/adjust.rs). */
+    adjust_preview_set(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
+    /** Save the settings as ONE undo step and KEEP the session (src/adjust.rs). */
+    adjust_commit(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
+    /** End the preview and bake as ONE undo step ("Adjustments"). */
+    adjust_apply(
+      brightness: number,
+      contrast: number,
+      saturation: number,
+      shadows: number,
+      highlights: number,
+      sharpen: number,
+      blur: number,
+    ): boolean;
     levels_preview_set(black: number, white: number, gamma: number): boolean;
     /** Close the preview and put the copy back. `true` when pixels changed. */
     tonal_preview_cancel(): boolean;

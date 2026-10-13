@@ -51,14 +51,10 @@ async function waitForCanvas(page: Page): Promise<void> {
   await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 30_000 });
   await expect
     .poll(
-      () =>
-        page.evaluate(
-          () => document.querySelector<HTMLCanvasElement>("canvas.main-canvas")?.width ?? 0,
-        ),
+      () => page.locator(".status-zoom", { hasText: "Photo:" }).first().innerText(),
       { timeout: 30_000 },
     )
-    .toBeGreaterThan(0);
-  await page.waitForTimeout(1200);
+    .toBe("Photo: 1200×900");
 }
 
 async function pickTool(page: Page, group: string, subTool: string): Promise<void> {
@@ -185,12 +181,34 @@ test("thirty fast drags in a row all land where they were drawn", async ({ page 
     starts.push([x, y]);
     await fastDrag(page, [x, y], [x + 150, y + 105]);
   }
-  await page.waitForTimeout(600); // the last press lands, then Enter commits it
-  await page.keyboard.press("Enter");
-
+  // The last press lands, THEN Enter commits it. This was a fixed 600 ms,
+  // a clock standing in for two states (Night 10-07 §3.2):
+  //
+  //   1. the press queue has drained: the other 29 are in the engine and the
+  //      30th is pending in the draw overlay — polled below;
+  //   2. the Enter listener is ATTACHED. It is bound in a useEffect keyed on
+  //      the edit state, which runs after the paint that shows the overlay,
+  //      so for about a frame the shape is visibly pending and Enter does
+  //      nothing (a real, tiny race: PARKING_LOT 10-07). Not observable from
+  //      the page, so Enter is pressed until the 30th commits. An Enter that
+  //      never commits still fails here.
   await expect
-    .poll(async () => (await engineShapes(page)).length, { message: "all thirty drags landed" })
-    .toBe(30);
+    .poll(
+      async () => ({
+        committed: (await engineShapes(page)).length,
+        pending: (await page.locator("[data-draw-overlay]").count()) > 0,
+      }),
+      { timeout: 60_000, message: "29 committed and the 30th pending before Enter" },
+    )
+    .toEqual({ committed: 29, pending: true });
+  await expect(async () => {
+    const pending = (await page.locator("[data-draw-overlay]").count()) > 0;
+    if (pending && (await engineShapes(page)).length < 30) await page.keyboard.press("Enter");
+    expect((await engineShapes(page)).length, "all thirty drags landed").toBe(30);
+  }).toPass({ timeout: 30_000, intervals: [250, 500, 1000] });
+
+  await page.waitForTimeout(500); // not a wait FOR anything: a double commit would show as 31 here
+  expect((await engineShapes(page)).length, "exactly thirty, no double commit").toBe(30);
   const shapes = (await engineShapes(page)) as unknown as Array<{ kind: number; x0: number; y0: number }>;
   shapes.forEach((s, i) => {
     expect(s.kind, `shape ${i} is the tile picked for it`).toBe(kinds[i % 4]);

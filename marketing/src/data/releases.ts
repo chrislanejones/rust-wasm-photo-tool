@@ -24,6 +24,118 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.28",
+    date: "2026-10-12",
+    headline: "Things that load now hold their place instead of popping in.",
+    entries: [
+      { tag: "ui", text: "The sign-in button and Settings › AI Usage keep their space while you sign in. Signed-in users no longer see \"Sign in\" first." },
+      { tag: "ui", text: "Plan & Billing shows the shape of your plan while it loads, instead of a spinner." },
+      { tag: "fix", text: "Compare shows the original only once it's ready, and says \"Original unavailable\" if it can't load." },
+      { tag: "fix", text: "On a phone, a photo you open shows a gray box its own shape until it arrives. A missing photo says so instead of spinning forever." },
+    ],
+  },
+  {
+    version: "v9.27",
+    date: "2026-10-11",
+    headline: "The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.",
+    entries: [
+      { tag: "feature", text: "Settings has named tabs you can move through with Up, Down, Home and End. Its help text is readable in both themes. If a section disappears while Settings is open, its pane and keyboard entry point return to General." },
+      { tag: "ui", text: "Gallery rows scroll without overlapping. Hover one photo and only its controls appear. The count shows your loaded photos and the 12-photo demo limit." },
+      { tag: "fix", text: "Welcome Back, Shared and Batch wait for previews to decode, keep the last good picture during an update, and show when an image fails. A shared image can be retried." },
+      { tag: "fix", text: "Enter and Space work on a gallery photo's Remove and Select buttons. Remove asks before deleting; Select keeps the photo you're editing open." },
+      { tag: "fix", text: "A freehand pen stroke selects where the ink is. Clicking empty space inside its bounds no longer picks it up." },
+      { tag: "infra", text: "Every browser test that can run in CI now runs on each pull request, split across two jobs." },
+    ],
+  },
+  {
+    version: "v9.26",
+    date: "2026-10-08",
+    headline: "A generated picture actually arrives.",
+    entries: [
+      { tag: "fix", text: "Create AI Image made the picture and then dropped it, because it came back from a storage address the server didn't recognize. It now lands in your gallery as a new image." },
+    ],
+  },
+  {
+    version: "v9.25",
+    date: "2026-10-08",
+    headline: "Create AI Image makes pictures now.",
+    entries: [
+      { tag: "feature", text: "Create AI Image works. Write a prompt, pick one of six models from the dropdown, and the picture lands in your gallery like an upload. It needs online features on and a Paid plan, and it tells you so before anything is sent." },
+    ],
+  },
+  {
+    version: "v9.24",
+    date: "2026-10-08",
+    headline: "The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.",
+    entries: [
+      { tag: "ui", text: "The histogram under Adjustments, Levels and Presets takes a third of the panel — the same height as Review's. It used to be a short strip." },
+      { tag: "ui", text: "On a phone, every card in the site menu is the same size." },
+      { tag: "fix", text: "Every page on the site was checked against the app. The compressor page no longer promises a feature it doesn't have, and the Architecture page is current." },
+    ],
+  },
+  {
+    version: "v9.23",
+    date: "2026-10-08",
+    headline: "Adjustments works again, every reset is exact, and the AI buttons are there for everyone.",
+    entries: [
+      { tag: "fix", text: "Brightness was far too strong — +65 turned most of a photo white — and its reset left a flat gray mess. It's a gentle lift now, and the reset puts back exactly what was there." },
+      { tag: "feature", text: "Adjustments update the photo as you drag. Letting go is one undo step, and each slider's reset is exact, however many changes came before." },
+      { tag: "ui", text: "Levels has a reset beside each of Black point, Midtones and White point." },
+      { tag: "ui", text: "Enhance › AI opens even with online features off, so everyone can see Remove Background and Remove Object. Pressing one tells you what it needs." },
+      { tag: "rust", text: "The engine works every adjustment out from the photo as it was when you opened the panel, so nothing piles up or clips along the way." },
+    ],
+  },
+  {
+    version: "v9.22",
+    date: "2026-10-08",
+    headline: "The histogram stays in view while you adjust, and Resize & Compress loses its box.",
+    entries: [
+      { tag: "feature", text: "Adjustments, Levels and Presets have the histogram pinned to the bottom of the panel. Drag any slider and watch it change, without scrolling." },
+      { tag: "perf", text: "Levels no longer draws a curve chart of its own, so it opens faster." },
+      { tag: "ui", text: "Google PageSpeed in Resize & Compress is an ordinary section now, not a box." },
+      { tag: "ui", text: "Method is a dropdown — the same one Font Family uses. Every dropdown in the app is that one." },
+      { tag: "fix", text: "Switching photos no longer shrinks the tool panel by a hair for a moment." },
+    ],
+  },
+  {
+    version: "v9.21",
+    date: "2026-10-08",
+    headline: "Resize & Compress reads top to bottom, WebP first, and the AI buttons show for everyone.",
+    entries: [
+      { tag: "ui", text: "Resize & Compress goes Resize, then Compress, then a Google PageSpeed box. Resize is Method, width and height, then Scale." },
+      { tag: "ui", text: "Quality has the same reset light as Scale, and dragging it no longer adds a step to History. Apply does." },
+      { tag: "feature", text: "The Google PageSpeed box shows what your photo would weigh as WebP, JPEG, PNG or AVIF — WebP lit first. It's a preview: Apply keeps your photo's format, and the Export dialog opens on the one you picked." },
+      { tag: "ui", text: "Enhance › AI shows Remove Background and Remove Object to every account, with a key in the corner. Without a Paid plan, pressing one tells you so." },
+      { tag: "fix", text: "The Download button says WebP, the way everything else does, instead of WEBP." },
+    ],
+  },
+  {
+    version: "v9.20",
+    date: "2026-10-07",
+    headline: "Resize & Compress tells the truth, and the status bar shows when something is loading.",
+    entries: [
+      { tag: "fix", text: "Resize lands on the size you type. Typing 128 used to give you 118, because the canvas border got shrunk into it." },
+      { tag: "fix", text: "The Quality slider saves the number it shows. Let go on 80 and you get 80, not 67." },
+      { tag: "fix", text: "Picking a resize method no longer turns a PNG into a JPEG, and picking PNG on its own lights up Apply." },
+      { tag: "feature", text: "Image weight replaces the PageSpeed score, which Google doesn't give single images. It's the real size of the file Apply would write — measured, not guessed — next to the limit Google's image check uses for that many pixels." },
+      { tag: "fix", text: "If a re-save would come out bigger than the file you have, Apply says so instead of quietly doing nothing." },
+      { tag: "ui", text: "No paragraphs on the Resize & Compress panel. Every explanation sits behind its lightbulb, and the button just says Apply until there's something to apply." },
+      { tag: "ui", text: "An hourglass and a small bar sit left of Undo in the status bar while anything is loading. They hold still if you've asked for less motion." },
+      { tag: "rust", text: "The engine gained one small resample function so the size readout can use the exact same resize Apply does. 355 bytes." },
+    ],
+  },
+  {
+    version: "v9.19",
+    date: "2026-10-07",
+    headline: "The brush keeps up again.",
+    entries: [
+      { tag: "perf", text: "Painting and Select had got slow. The app was redrawing itself about fifty times a second while you did nothing. It doesn't now — sitting still costs nothing, and a brush stroke causes about 8 redraws instead of 250." },
+      { tag: "perf", text: "Saving your work waits until the pen has been still for 2.5 seconds. It used to start right as your next stroke did, and on a big photo a save keeps the engine busy for a second or more." },
+      { tag: "perf", text: "The brush circle follows the mouse without redrawing the whole editor every time it moves." },
+      { tag: "infra", text: "Tested hard before shipping: twelve big photos, eight layers each, masks, forty shapes, twenty-five pins, undo and redo, switching photos and reloading — in real Chrome too." },
+    ],
+  },
+  {
     version: "v9.18",
     date: "2026-10-06",
     headline: "Connectors stay joined, circles stretch into ovals, and the gallery loads like the rest of the app.",

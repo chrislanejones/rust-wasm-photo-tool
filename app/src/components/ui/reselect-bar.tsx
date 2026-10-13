@@ -48,6 +48,7 @@ export interface ReselectBarProps {
   children?: ReactNode;
   /** Row color/dot variant — `.full-width-badge.type-*`. Default "redo". */
   type?: "undo" | "redo" | "current";
+  current?: boolean;
   /** Persistent-selection highlight (lists without selection just omit it). */
   selected?: boolean;
   onSelect: () => void;
@@ -59,6 +60,9 @@ export interface ReselectBarProps {
   onDuplicate?: () => void;
   /** aria-label for the duplicate button. Default "Duplicate". */
   duplicateLabel?: string;
+  /** F2 on the focused row. A rename that only answers a double-click has no
+   *  keyboard path at all (WCAG 2.1.1). Announced via `aria-keyshortcuts`. */
+  onRename?: () => void;
   disabled?: boolean;
   /** Title/tooltip for the row. */
   title?: string;
@@ -87,6 +91,7 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       actions,
       children,
       type = "redo",
+      current = false,
       selected = false,
       onSelect,
       onDelete,
@@ -95,6 +100,7 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       title,
       deleteLabel = "Delete",
       duplicateLabel = "Duplicate",
+      onRename,
       onMoveUp,
       onMoveDown,
       canMoveUp = true,
@@ -118,6 +124,9 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         // An icon-only button that only works with a mouse is half a control.
         e.preventDefault();
         onDuplicate();
+      } else if (e.key === "F2" && onRename) {
+        e.preventDefault();
+        onRename();
       }
     };
 
@@ -127,7 +136,9 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-pressed={selected}
+        aria-current={current ? "step" : undefined}
         aria-disabled={disabled || undefined}
+        aria-keyshortcuts={onRename ? "F2" : undefined}
         title={title}
         onClick={disabled ? undefined : onSelect}
         onKeyDown={onKeyDown}

@@ -144,7 +144,7 @@ export async function probe(page: Page) {
     const gallery = strip?.closest("[data-gallery-card]") as HTMLElement | null;
     // The card's own box: the bordered bar on desktop (the region's parent),
     // the region itself on the phone, where it fills the layer.
-    const cardBox = (gallery?.parentElement?.closest(".group") ?? gallery)?.getBoundingClientRect();
+    const cardBox = (gallery?.parentElement?.closest('[class~="group/bar"]') ?? gallery)?.getBoundingClientRect();
     // Chrome pieces = the inert-able elements inside the gallery card.
     const chrome = gallery ? [...gallery.querySelectorAll<HTMLElement>("[data-gallery-chrome]")] : [];
     return {

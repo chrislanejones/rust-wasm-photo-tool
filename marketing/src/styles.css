@@ -1843,6 +1843,14 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Every card in the sheet is the same box (Chris, 10-08: "make all boxes
+     the same size"). Measured at 390px they ran 62–134px tall — by how much
+     text each had, and whether it carried a group line. The height is a
+     three-line Tools card: group + title + a 3-line description (clamped
+     above). In em of the card's own text so it grows with a larger font
+     instead of clipping. */
+  height: 7em;
+  box-sizing: border-box;
   padding: var(--space-sm) var(--space-sm);
   border: var(--rule-hair) solid var(--color-rule);
   border-radius: var(--radius-sm);
@@ -1875,6 +1883,11 @@ a { color: inherit; }
   font-size: var(--text-xs);
   color: var(--color-ink-3);
   line-height: 1.4;
+  /* Three lines at most, so every card can be the same box (below). */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 /* Same signpost as the mega menu's: dashed, unfilled, full contrast. */
 .nav-sheet__card--more {

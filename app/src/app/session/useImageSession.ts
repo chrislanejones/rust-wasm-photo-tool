@@ -8,7 +8,7 @@
 // handleDuplicateSelected + selectedIds/clearSelection) intentionally stay in
 // AppShell — see PARKING_LOT.md. `loadPhotoFromEntry` + `activeIdRef` are
 // returned because the AppShell-resident handleDeleteSelected still uses them.
-import { beginPendingImports, reportSwitchFailure } from "./sessionFeedback";
+import { beginPendingImports, reportSwitchFailure, PhotoSaveError } from "./sessionFeedback";
 import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -31,12 +31,14 @@ import { HeicDecodeError, toDecodableFile } from "@/lib/importBoundary";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
-import { setEngineDocument } from "@/lib/engineDocument";
+import { commitPendingEdits } from "@/lib/pendingEdits";
+import { getEngineDocument, setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
-import { whenStrokeIdle } from "@/lib/strokeGate";
+import { whenStrokeQuiet } from "@/lib/strokeGate";
 import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
 import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
+import { writeEditArchive } from "./archiveSave";
 
 /**
  * How long the idle debounce waits before archiving — v8.35, and the number is
@@ -95,6 +97,17 @@ export function isDirty(
   return undoCount !== savedUndoCount;
 }
 
+/**
+ * How long the pen must have been still before the capture may start. The
+ * fast lane above fires 300 ms after a stroke — which, on a default import
+ * (the artboard border is an unrecorded edit, so the log never covers the
+ * document), is EVERY stroke: pen up, 300 ms, then 1–2 s of the worker
+ * PNG-encoding every snapshot while the next stroke's ink waits. The timer
+ * keeps its lane; the quiet window is the same for both, long enough that
+ * a save lands between bursts, not between strokes.
+ */
+export const AUTOSAVE_QUIET_MS = 2500;
+
 export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): number {
   // ⚠️ "The log is ACTIVE" is NOT the safety condition, and the first cut of
   // this function keyed on it and still lost the stroke. A fresh document's
@@ -143,6 +156,7 @@ export function useImageSession({
   const photos = useGalleryStore((s) => s.photos);
   const setPhotos = useGalleryStore((s) => s.setPhotos);
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const documentPhotoId = useGalleryStore((s) => s.documentPhotoId);
   const setActivePhotoId = useGalleryStore((s) => s.setActivePhotoId);
   const resumeManifest = useGalleryStore((s) => s.resumeManifest);
   const setResumeManifest = useGalleryStore((s) => s.setResumeManifest);
@@ -157,9 +171,7 @@ export function useImageSession({
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const maxPhotos = useGalleryStore((s) => s.maxPhotos);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
-  const startImageLoad = useUIStore((s) => s.startImageLoad);
   const setIsImageLoading = useUIStore((s) => s.setIsImageLoading);
-  const setLoadProgress = useUIStore((s) => s.setLoadProgress);
   const setShowUpload = useUIStore((s) => s.setShowUpload);
 
   // Set when a phone selected/added a photo without loading it into the engine;
@@ -180,10 +192,15 @@ export function useImageSession({
         engineDeferredRef.current = true;
         return Promise.resolve(false);
       }
-      startImageLoad();
-      return stamp.loadImageFromPixels(pixels, width, height, artboard, opts);
+      setIsImageLoading(true);
+      return stamp.loadImageFromPixels(pixels, width, height, artboard, opts).finally(() => {
+        const gallery = useGalleryStore.getState();
+        if ((!opts?.isCurrent || opts.isCurrent()) && gallery.activePhotoId === gallery.documentPhotoId) {
+          setIsImageLoading(false);
+        }
+      });
     },
-    [stamp, startImageLoad],
+    [stamp, setIsImageLoading],
   );
 
   /** Apply a finished AI image result (decoded RGBA) back to the canvas as the
@@ -254,7 +271,7 @@ export function useImageSession({
   hasBeenModifiedRef.current = hasBeenModified;
   const layerRevisionRef = useRef(layerRevision);
   layerRevisionRef.current = layerRevision;
-  const savingRef = useRef(false);
+  const savingRef = useRef<Promise<boolean> | null>(null);
   /** photoId → the engine's undo count when its archive was last written.
    *  Absent ≡ never written this session. Keyed per photo because gallery
    *  cycling switches documents under one hook instance. */
@@ -289,36 +306,26 @@ export function useImageSession({
       // change into a silently dropped save.
       const id = photoId ?? activeIdRef.current;
       const live = opts?.liveUndoCount;
-      if (!id || !stamp.toolRef.current) return;
+      if (!id || !stamp.toolRef.current) return false;
+      while (savingRef.current) {
+        if (!(await savingRef.current)) return false;
+      }
       const dirty =
         live === undefined
           ? dirtyRef.current
           : isDirty(live, savedUndoRef.current.get(id), hasBeenModifiedRef.current, layerRevisionRef.current);
-      if (!dirty) return;
-      if (savingRef.current) return; // never overlap two archive writes
-      savingRef.current = true;
+      if (!dirty) return true;
       // Read BEFORE the await: `savePhotoEdit` captures the engine's state at
       // its own moment, and an edit landing mid-write must leave the document
       // dirty rather than be marked saved by a write that predates it.
       const writtenAtUndoCount = live ?? stamp.state.undoCount;
-      try {
-        // In the document queue: the ownership check inside savePhotoEdit and
-        // its capture must not straddle a load (see LoadOpts.photoId).
-        const wrote = await stamp.serialize(() => savePhotoEdit(id, stamp.toolRef, opts));
-        // Only on a write the ownership guard actually allowed. A refused save
-        // returns false and must NOT move the saved point, or the next undo
-        // would compare against a write that never happened.
-        if (wrote !== false) savedUndoRef.current.set(id, writtenAtUndoCount);
-      } catch (err) {
-        // Never let an autosave failure surface as an unhandled rejection — but
-        // never swallow it either: the Diagnostics window is where it belongs.
-        logDiagnostic(
-          "CONSOLE",
-          `Autosave failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      } finally {
-        savingRef.current = false;
-      }
+      const write = writeEditArchive(id,
+        () => stamp.serialize(() => savePhotoEdit(id, stamp.toolRef, opts)),
+        () => savedUndoRef.current.set(id, writtenAtUndoCount),
+      );
+      savingRef.current = write;
+      try { return await write; }
+      finally { if (savingRef.current === write) savingRef.current = null; }
     },
     [stamp, savePhotoEdit],
   );
@@ -355,11 +362,21 @@ export function useImageSession({
   // brush to the 60 fps the worker measurably delivers logged-out. The wait is
   // bounded inside the gate — a stuck stroke can only delay a save, never
   // starve it.
+  //
+  // ⚠️ `whenStrokeQuiet(delay)`, not `whenStrokeIdle()` (10-07). Idle only
+  // meant "pointer is up right now" — the capture then started 2.5 s after a
+  // stroke, which is where the NEXT stroke begins, and held the worker for
+  // 1.1–1.6 s (measured: `capture_state` PNG-encodes every undo snapshot)
+  // while that stroke's `paint_move` calls queued behind it, logged out too.
+  // Quiet means no stroke has ended for `delay` ms, so a run of strokes
+  // defers the save until the run is over; the wait stays bounded inside the
+  // gate.
   useEffect(() => {
     if (!activePhotoId || !dirtyRef.current) return;
+    const delay = autosaveDelayMs(getOplogStats(), stamp.state.undoCount);
     const t = window.setTimeout(
-      () => void whenStrokeIdle().then(() => flushRef.current()),
-      autosaveDelayMs(getOplogStats(), stamp.state.undoCount),
+      () => void whenStrokeQuiet(AUTOSAVE_QUIET_MS).then(() => flushRef.current()),
+      delay,
     );
     return () => window.clearTimeout(t);
     // `layerRevision` is in here for its CHANGE, not its value — it is what
@@ -390,8 +407,8 @@ export function useImageSession({
   // saves off this. Inert unless USE_OPLOG_PERSISTENCE / ih_oplog_persist is
   // on AND the wasm build has the op-log surface.
   useEffect(() => {
-    setActiveOplogPhoto(activePhotoId);
-  }, [activePhotoId]);
+    setActiveOplogPhoto(getEngineDocument() ?? activePhotoId);
+  }, [activePhotoId, documentPhotoId]);
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
@@ -407,7 +424,7 @@ export function useImageSession({
       let working = getWorkingCopy(entry.originalKey);
       if (!working) {
         const original = await getOriginal(entry.originalKey);
-        if (!original) return;
+        if (!original) throw new Error("The original photo is unavailable on this device.");
         if (isCurrent && !isCurrent()) return;
         const file = new File([original.bytes], original.name, { type: original.mimeType });
         working = await makeWorkingCopy(file);
@@ -417,7 +434,7 @@ export function useImageSession({
       // Every load is normalized: when "Canvas on import" is on, a gallery
       // switch lands the photo on the same padded artboard as a fresh import
       // (border + backing), not just at native size.
-      await loadImageFromPixels(
+      const loaded = await loadImageFromPixels(
         working.pixels,
         working.width,
         working.height,
@@ -426,6 +443,7 @@ export function useImageSession({
           : undefined,
         { isCurrent, photoId: entry.id },
       );
+      if (!loaded && (!isCurrent || isCurrent())) throw new Error("The photo could not be loaded.");
       // Ownership is recorded INSIDE the load, in the document queue, the
       // moment the engine holds this photo (LoadOpts.photoId). It used to be
       // set here — first before the load finished, then after the await —
@@ -623,30 +641,21 @@ export function useImageSession({
       // (Ownership is set inside the load when it restores — LoadOpts.photoId.)
       if (!isCurrent()) return;
       if (restored) {
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
+        setIsImageLoading(false);
         return;
       }
 
       const saved = await loadPhotoEdit(entry.id);
       if (!isCurrent()) return;
       if (saved) {
-        setLoadProgress(20);
-        await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
+        const loaded = await stamp.loadFromSaved(saved, { isCurrent, photoId: entry.id });
+        if (!loaded && isCurrent()) throw new Error("The saved photo could not be restored.");
         if (!isCurrent()) return;
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
+
       } else {
-        void loadPhotoFromEntry(entry, isCurrent).catch(dropSuperseded);
+        await loadPhotoFromEntry(entry, isCurrent);
       }
+      if (isCurrent()) setIsImageLoading(false);
     },
     [stamp, loadPhotoEdit, loadPhotoFromEntry],
   );
@@ -663,26 +672,34 @@ export function useImageSession({
     const seq = ++selectSeqRef.current;
     const isCurrent = () => seq === selectSeqRef.current;
     setIsImageLoading(true);
-    setLoadProgress(8);
     void loadEngineIfWanted()
-      .catch((e) => console.error("WASM init failed after widening:", e))
-      .then(() => loadIntoEngine(entry, isCurrent));
+      .then(() => loadIntoEngine(entry, isCurrent))
+      .catch((err) => {
+        if (!isCurrent() || isSuperseded(err)) return;
+        setIsImageLoading(false);
+        reportSwitchFailure(entry.name, err, () => void handleSelectPhotoRef.current?.(entry));
+      });
   }, [editing, loadIntoEngine]);
 
   // ── Select photo ───────────────────────────────────────────────────────────
   const handleSelectPhoto = useCallback(
     async (entry: PhotoEntry) => {
-      // `activeIdRef`, not the React state: the state only moves after the
-      // outgoing save, so a click back to the photo you just left (A→B→A)
-      // matched it, returned without bumping the sequence, and B's switch
-      // finished — you clicked A and got B.
-      if (entry.id === (activeIdRef.current ?? activePhotoId)) return;
+      // The imperative request identity handles rapid navigation; failed
+      // requests remain retryable even when the thumbnail is already selected.
+      if (entry.id === (activeIdRef.current ?? activePhotoId) &&
+          useGalleryStore.getState().documentPhotoId === entry.id &&
+          !useUIStore.getState().isImageLoading) return;
 
       // Claim the latest selection. Any await below that resolves after a newer
       // click bails before touching the canvas, so highlight and pixels stay in sync.
       const seq = ++selectSeqRef.current;
       const isCurrent = () => seq === selectSeqRef.current;
+      const outgoing = getEngineDocument() ?? activePhotoId;
       activeIdRef.current = entry.id; // advance synchronously so cycling sees it
+      setIsImageLoading(true);
+      setActivePhotoId(entry.id);
+      useUIStore.setState({ photoSwitchError: null });
+      toast.dismiss("photo-switch-error");
 
       // Phone: record the selection, skip the engine. No save either — nothing
       // can have been edited. Widening loads this photo (effect below).
@@ -691,25 +708,17 @@ export function useImageSession({
         setHasBeenModified(false);
         setActivePhotoId(entry.id);
         setCompareActive(false);
+        setIsImageLoading(false);
         return;
       }
 
-      // Acknowledge the click NOW, before the save below. Saving a modified
-      // outgoing photo uploads its whole edit archive when signed in, which
-      // measured 2-4s on a 12-photo gallery — and for that entire window the
-      // thumbnail highlight didn't move, no spinner ran, and nothing else
-      // happened. Clicking a photo and watching the app ignore you for four
-      // seconds reads as "the gallery is broken", which is exactly how it was
-      // reported. The flag is idempotent and a superseded selection clears it
-      // on the way out, so setting it this early costs nothing.
-      //
-      // Both lines are needed. The bar's WIDTH is loadProgress, so raising the
-      // flag alone renders a zero-width bar — in the DOM, invisible on screen,
-      // which is indistinguishable from the bug. Seed a few percent so there is
-      // something to see while the save runs; the real steps (20 → 100) follow.
-      setIsImageLoading(true);
-      setLoadProgress(8);
       try {
+
+      // A failed switch can be abandoned by selecting the intact loaded photo.
+      if (outgoing === entry.id && useGalleryStore.getState().documentPhotoId === entry.id) {
+        setIsImageLoading(false);
+        return;
+      }
 
       // Persist the OUTGOING photo only if it was actually modified. This used
       // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
@@ -724,12 +733,14 @@ export function useImageSession({
       // was skipped and the edit was gone when you came back (e2e
       // photo-switch-state, "switch 0ms after release"). The worker answers
       // in order, so this read already includes that edit.
+      // A panel previewing an unapplied edit (Adjustments) bakes it NOW, on
+      // the outgoing photo, so the undo read and the save below include it.
+      await commitPendingEdits();
       const liveUndo = stamp.toolRef.current ? await stamp.toolRef.current.undo_count() : 0;
       if (
-        activePhotoId &&
+        outgoing &&
         (liveUndo > 0 || stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
       ) {
-        const outgoing = activePhotoId;
         setModifiedPhotos((prev) => {
           if (prev.has(outgoing)) return prev;
           const next = new Set(prev);
@@ -755,13 +766,15 @@ export function useImageSession({
           // the outgoing document while the UI has moved on. The archive bytes
           // are captured synchronously before the upload detaches, so the
           // upload cannot read a document that has since been replaced.
-          await flushEditArchive(outgoing, { detachCloudUpload: true, liveUndoCount: liveUndo });
+          if (!(await flushEditArchive(outgoing, { detachCloudUpload: true, liveUndoCount: liveUndo }))) {
+            const name = useGalleryStore.getState().photos.find((p) => p.id === outgoing)?.name ?? "current photo";
+            throw new PhotoSaveError(`The outgoing edits couldn't be saved (${name}). They are still in the canvas; select that photo to continue editing or try again.`);
+          }
         }
       }
       if (!isCurrent()) return; // a newer selection superseded this one
 
       setHasBeenModified(false);
-      setActivePhotoId(entry.id);
       setCompareActive(false);
       // Loading is already flagged above, ahead of the save's awaits — it has to
       // be, or the flag lands after the slow part it exists to cover. It still
@@ -771,6 +784,9 @@ export function useImageSession({
       // it doesn't falsely dot the newly-selected photo mid-transition.
 
       await loadIntoEngine(entry, isCurrent);
+      if (isCurrent()) {
+        setIsImageLoading(false);
+      }
       } catch (err) {
         // Superseded (a newer switch replaced the document) is "dropped".
         if (isSuperseded(err) || !isCurrent()) return;

@@ -24,12 +24,16 @@ import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { namePastedImage } from "@/lib/pastedImageName";
 import { shapeKindLabel } from "@/lib/perspectiveTarget";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { springStandard, instantTransition, fadeIn } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
+import { usePhotoSwitching } from "@/hooks/usePhotoSwitching";
+import { useDocumentQuality } from "./session/useDocumentQuality";
+import { ImageLoadingBar } from "@/components/ImageLoadingBar";
 import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
 import { MobileShell } from "@/features/mobile/MobileShellLazy";
 import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
+import { MasterBarFallback } from "@/components/master-bar/MasterBarFallback";
 // Code-split: the compact-mode master bar only loads the first time the window
 // goes ≤1000px, so desktop sessions never download its chunk.
 const MasterBar = lazy(() =>
@@ -96,6 +100,7 @@ import { isExportFormat, useDownloadFormat } from "./session/useDownloadFormat";
 import { usePluginDownload } from "./session/usePluginDownload";
 import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
+import { useResizeCompress } from "./session/useResizeCompress";
 import { ShapeActionsOverlay } from "@/features/canvas/ShapeActionsOverlay";
 import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
 import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
@@ -117,8 +122,7 @@ import { collectExtraRoots } from "@/lib/extraRoots";
 import {
   encodeRgba,
   EXT,
-  includeCanvasInExport,
-} from "@/lib/exportImage";
+  includeCanvasInExport, formatName } from "@/lib/exportImage";
 import { useZipExport } from "./session/useZipExport";
 import { useExportFileName } from "@/hooks/useExportFileName";
 import { pinLabelText } from "@/lib/pinLabel";
@@ -340,11 +344,7 @@ export function AppShell() {
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const isImageLoading = useUIStore((s) => s.isImageLoading);
-  const loadProgress = useUIStore((s) => s.loadProgress);
-  // finishImageLoad ends the fake-progress interval + hide-timer (both live in
-  // the UI store). startImageLoad + the raw progress setters moved into
-  // useImageSession along with the load callbacks that used them.
-  const finishImageLoad = useUIStore((s) => s.finishImageLoad);
+  const switching = usePhotoSwitching();
 
   // Item 2: Pan mode state
   const isPanning = useUIStore((s) => s.isPanning);
@@ -564,11 +564,6 @@ export function AppShell() {
     deletePhotoEdit,
   });
 
-  useEffect(() => {
-    if (stamp.state.ready && isImageLoading) {
-      finishImageLoad();
-    }
-  }, [stamp.state.ready, isImageLoading, finishImageLoad]);
 
   // ── Compare: fetch original from IndexedDB when slider activates ───────────
   const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
@@ -892,7 +887,7 @@ export function AppShell() {
   // snaps and then sets, so it needs the engine still holding the OUTGOING
   // value at Apply time. A live write makes undo restore what you just asked
   // for — which is exactly the bug this arrangement replaced.
-  const quality = useToolStore((s) => s.quality);
+  const quality = useDocumentQuality(stamp.state);
   const setQuality = useToolStore((s) => s.setQuality);
 
   const effectiveBrushSize = brushCursorSize({
@@ -904,7 +899,7 @@ export function AppShell() {
     stampSettings,
   });
 
-  const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
+  const { cursorRef, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
 
   // The live drag is a DRAFT and must not touch the engine.
@@ -938,37 +933,6 @@ export function AppShell() {
     [stamp],
   );
 
-  // Seed once per photo, then follow the engine. ONE effect, because the order
-  // matters and two effects raced.
-  //
-  // A fresh engine starts at its own default (75) and knows nothing about the
-  // remembered preference, so a sync-only effect would fire on load, see 75,
-  // and overwrite the user's saved setting — destroying the preference on
-  // every photo open. Seeding first, then following, is the whole reason this
-  // is one effect keyed on the photo rather than two independent ones.
-  //
-  // After the seed, the engine is authoritative: undo and redo move
-  // `exportQuality`, and the draft is pulled along. That is what makes undo
-  // VISIBLE, which is the entire point of ADR-031.
-  //
-  // ⚠️ When the archive learns to carry quality (the remaining half of
-  // ADR-031, needing archive v6), a RESTORED document must keep its own stored
-  // value and the seed must yield to it. Today no archive carries one, so
-  // seeding from the preference is both correct and what users already expect.
-  const qualitySeededForRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!activePhotoId || !stamp.state.ready || isImageLoading) return;
-    if (qualitySeededForRef.current !== activePhotoId) {
-      qualitySeededForRef.current = activePhotoId;
-      if (stamp.state.exportQuality !== quality) {
-        stamp.toolRef.current?.set_export_quality(quality);
-        stamp.syncState();
-      }
-      return;
-    }
-    setQuality(stamp.state.exportQuality);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePhotoId, stamp.state.ready, isImageLoading, stamp.state.exportQuality]);
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
@@ -1951,20 +1915,14 @@ export function AppShell() {
     closeImportDialog();
   }, [importImage, handleAddPhotos, closeImportDialog]);
 
+  // One signature for both histograms (Review's and the Enhance footer's):
+  // it changes whenever the pixels may have.
+  const histogramSignature = `${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`;
+
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
 
-  /**
-   * Apply Compression & Resize. Resamples the WASM canvas with the chosen
-   * filter, then re-encodes the (annotation-free) canvas buffer at the chosen
-   * format + quality and persists it as the photo's stored bytes — mirroring
-   * the Auto Compress pattern: putOriginal → deleteOriginal(old) → PhotoEntry
-   * update (byteSize / mimeType / dims / thumbnail). The StatusBar size label
-   * and the gallery tooltip both read from the entry, so they update on their
-   * own. Text annotations stay live overlays (not flattened), like
-   * Auto Compress.
-   */
   /**
    * Re-encode the active photo's CURRENT canvas (composited pixels, live text
    * left un-flattened) and store the new bytes + thumbnail + dims. Shared by
@@ -1974,7 +1932,7 @@ export function AppShell() {
   /**
    * @param opts.keepSourceEncoding  Re-encode in the photo's OWN format at full
    *   quality instead of the compression panel's format + quality slider. This
-   *   is what separates "Apply Resize" from "Apply Compression & Resize":
+   *   is what separates "Apply Resize" from the compression Apply:
    *   resizing changes how many pixels there are, and should not silently also
    *   change the file's type or push it through the quality slider. Falls back
    *   to the panel's format when the stored MIME is not one we re-encode to
@@ -1989,71 +1947,18 @@ export function AppShell() {
     quality,
   });
 
-  const handleApplyCompression = useCallback(
-    async (w: number, h: number, filter: number) => {
-      const origW = stamp.state.width;
-      const origH = stamp.state.height;
-      if (w !== origW || h !== origH) {
-        stamp.resizeWithFilter(w, h, filter);
-      } else {
-        // Quality/format-only apply: pixels are unchanged but the stored file
-        // is re-encoded — record a "Compress" entry so History reflects it.
-        //
-        // ADR-031: the quality goes WITH the step. Before that, this pushed a
-        // bare marker, so undo restored identical pixels and left the slider
-        // where it was — a step consumed, nothing reversed. The engine snaps
-        // the outgoing value and applies the incoming one, so undo returns the
-        // quality that was live before this Apply.
-        stamp.toolRef.current?.push_compress_marker(quality);
-        stamp.syncState();
-      }
-      setHasBeenModified(true);
-      if (activePhotoId) {
-        setModifiedPhotos((prev) =>
-          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-        );
-      }
-      // No instant badge estimate: the badge derives from the entry's sizes
-      // (lib/sizeDelta), which the re-encode below updates.
-
-      // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
-      await persistActiveCanvas();
-    },
-    [stamp, activePhotoId, quality, persistActiveCanvas],
-  );
-
-  /**
-   * "Apply Resize" — resample and nothing else.
-   *
-   * The panel's older button couples two decisions: how many pixels the image
-   * has, and how hard it is compressed. Wanting the first without the second
-   * meant accepting whatever the quality slider happened to sit at. This
-   * applies the resample (Rust `resize_with_filter`, same kernel) and persists
-   * in the photo's OWN format at full quality, so the only loss is the
-   * resample itself.
-   *
-   * Guarded on an actual dimension change: with w/h unchanged there is nothing
-   * to resample, and the compression path is the one that has a job to do.
-   */
-  const handleApplyResizeOnly = useCallback(
-    async (w: number, h: number, filter: number) => {
-      if (w < 1 || h < 1) return;
-      if (w === stamp.state.width && h === stamp.state.height) return;
-      stamp.resizeWithFilter(w, h, filter);
-      setHasBeenModified(true);
-      if (activePhotoId) {
-        setModifiedPhotos((prev) =>
-          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-        );
-      }
-      // No instant estimate here. The compression path can predict its own
-      // result from area x quality; a resize-only re-encode cannot be guessed
-      // that way (format efficiency dominates), and a wrong number that flashes
-      // for a moment is worse than the real one arriving a moment later.
-      await persistActiveCanvas({ keepSourceEncoding: true });
-    },
-    [stamp, activePhotoId, persistActiveCanvas, setHasBeenModified, setModifiedPhotos],
-  );
+  // Resize & Compress's two Apply handlers live in a session hook (10-07):
+  // photo-vs-document sizing and the save's kept-original outcome.
+  const { applyCompression: handleApplyCompression, applyResizeOnly: handleApplyResizeOnly, measureApply } =
+    useResizeCompress({
+      stamp,
+      photoBounds,
+      quality,
+      activePhotoId,
+      persistActiveCanvas,
+      setHasBeenModified,
+      setModifiedPhotos,
+    });
 
   /**
    * Photoshop-style **Canvas Size** apply (the "Resize canvas" control in Layer
@@ -2412,14 +2317,14 @@ export function AppShell() {
     onSpaceUp: () => setIsPanning(false),
   });
 
-  const hasImage = stamp.state.ready;
+  const hasImage = stamp.state.ready && !switching;
   // The top bar's Compare toggle: needs a loaded photo and its stored upload
   // baseline, and is off in the Batch editor (`emoji`), where edits hit every
   // photo at once and there is no single before/after. CompareSlider closes an
   // open overlay when Batch opens.
   const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
-  const canUndo = stamp.state.undoCount > 0;
-  const canRedo = stamp.state.redoCount > 0;
+  const canUndo = hasImage && stamp.state.undoCount > 0;
+  const canRedo = hasImage && stamp.state.redoCount > 0;
 
   return (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
@@ -2432,26 +2337,7 @@ export function AppShell() {
       >
         Skip to canvas
       </a>
-      <AnimatePresence>
-        {isImageLoading && (
-          <motion.div
-            variants={imageLoadBarFade}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed top-0 left-0 right-0 z-[var(--z-progress)] h-1 bg-bg-elevated"
-          >
-            <motion.div
-              className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
-              {...imageLoadBarProgress}
-              animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-              transition={
-                prefs.reduceMotion ? instantTransition : imageLoadBarProgress.transition
-              }
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ImageLoadingBar />
 
       {/* Narrow-window drawer scrim — dims the canvas behind an open side panel
           and click-to-closes it. Sits above the canvas (z 10) but below the top
@@ -2573,6 +2459,7 @@ export function AppShell() {
         open={showDiagnostics}
         onClose={() => setShowDiagnostics(false)}
         imageMeta={{
+          ready: stamp.state.ready,
           photoId: activePhotoId,
           name: activeEntry?.name,
           mimeType: activeEntry?.mimeType,
@@ -2688,12 +2575,12 @@ export function AppShell() {
             ? "Download SVG"
             : isOraDownload
               ? "Download ORA"
-              : (plugin.label ?? `Download ${effectiveExportFormat.toUpperCase()}`)
+              : (plugin.label ?? `Download ${formatName(effectiveExportFormat)}`)
         }
         svg={{ selected: activeIsSvg, all: svgAll }}
         onDownload={downloadFromDialog}
         zipFormat={exportFormat}
-        zipLabel={effectiveExportFormat.toUpperCase()}
+        zipLabel={formatName(effectiveExportFormat)}
         shareAction={
           <ShareButton
             exportPng={async () => {
@@ -2729,7 +2616,7 @@ export function AppShell() {
           a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
           hidden in this mode. Lazily loaded — Suspense sits outside
           AnimatePresence so the slide-out still works once the chunk is in. */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<MasterBarFallback />}>
         <AnimatePresence>
           {bp.dock && showTopBar && !startSurfaceOpen && (
             <MasterBar
@@ -2805,18 +2692,13 @@ export function AppShell() {
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
             onResizeLayer={pastePlacement.beginLayerResize}
-            onBrightness={stamp.adjustBrightness}
-            onContrast={stamp.adjustContrast}
-            onGlobalBlur={stamp.applyGlobalBlur}
-            onSaturation={stamp.adjustSaturation}
-            onShadows={stamp.adjustShadows}
-            onHighlights={stamp.adjustHighlights}
-            onSharpen={stamp.adjustSharpen}
             levels={stamp.levels}
+            adjust={stamp.adjust}
             presets={stamp.presets}
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}
+            measureApply={measureApply}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
             onRemoveCanvas={() => void handleRemoveCanvas()}
             canRemoveCanvas={backgroundLayerId !== undefined}
@@ -2832,6 +2714,7 @@ export function AppShell() {
             activePhotoId={activePhotoId}
             undoCount={stamp.state.undoCount}
             quality={quality}
+            appliedQuality={stamp.state.exportQuality}
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
             compressProgress={compressProgress}
@@ -2897,6 +2780,7 @@ export function AppShell() {
             flushToCanvas={stamp.flushToCanvas}
             syncState={stamp.syncState}
             aiEnabled={hasReplicateAI(effectiveUserMode)}
+            histogram={{ getHistogram, signature: histogramSignature, photoKey: activePhotoId ?? "" }}
             onAIResult={handleAIResult}
           />
         )}
@@ -3000,7 +2884,7 @@ export function AppShell() {
                           drawPreviewRef={drawPreviewRef}
                           hookResult={effectiveStamp}
                           brushDiameter={diameter}
-                          cursorPos={pos}
+                          cursorRef={cursorRef}
                           cursorVisible={visible}
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
@@ -3094,7 +2978,7 @@ export function AppShell() {
                       drawPreviewRef={drawPreviewRef}
                       hookResult={effectiveStamp}
                       brushDiameter={diameter}
-                      cursorPos={pos}
+                      cursorRef={cursorRef}
                       cursorVisible={visible}
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
@@ -3228,7 +3112,7 @@ export function AppShell() {
           </ContextMenuItem>
           <ContextMenuItem onClick={handleExport} disabled={!hasImage}>
             <Download className="h-4 w-4 mr-2" /> Export{" "}
-            {exportFormat.toUpperCase()}
+            {formatName(exportFormat)}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
           {photos.length > 1 && (
@@ -3339,7 +3223,7 @@ export function AppShell() {
             onMergeDown={stamp.mergeDown}
             onFlattenAll={stamp.flattenAll}
             getHistogram={getHistogram}
-            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
+            histogramSignature={histogramSignature}
             histogramPhotoKey={activePhotoId ?? ""}
           />
         )}
@@ -3377,10 +3261,9 @@ export function AppShell() {
           (activeTool === "ai" &&
             (eraserMode === "brush" || eraserMode === "magic"))) && (
           <div
+            ref={cursorRef}
             className="brush-cursor"
             style={{
-              left: pos.x,
-              top: pos.y,
               width: diameter,
               height: diameter,
             }}

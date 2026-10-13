@@ -7,6 +7,34 @@ import { SAVED_MS, useAsyncTask } from "./useAsyncTask";
 afterEach(() => vi.useRealTimers());
 
 describe("useAsyncTask", () => {
+  it("timeout invalidates the context and late progress cannot replace its persistent error", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useAsyncTask());
+    let ctx!: { setProgress: (p: number | null) => void; isCurrent: () => boolean };
+    let resolve!: () => void;
+    let work!: Promise<unknown>;
+    act(() => { work = result.current.run(c => { ctx = c; return new Promise<void>(r => { resolve = r; }); }, { timeoutMs: 10 }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(11); await work; });
+    expect(ctx.isCurrent()).toBe(false);
+    const error = result.current.error;
+    await act(async () => { ctx.setProgress(1); resolve(); });
+    expect(result.current.state).toBe("error");
+    expect(result.current.error).toBe(error);
+    expect(result.current.progress).toBeNull();
+  });
+
+  it("completed and failed contexts cannot restart progress", async () => {
+    const { result } = renderHook(() => useAsyncTask());
+    let ctx!: { setProgress: (p: number | null) => void; isCurrent: () => boolean };
+    await act(async () => { await result.current.run(async c => { ctx = c; return 1; }); });
+    act(() => { ctx.setProgress(0.5); });
+    expect(ctx.isCurrent()).toBe(false);
+    expect(result.current.state).toBe("ready");
+    await act(async () => { await result.current.run(async c => { ctx = c; throw new Error("failed"); }); });
+    act(() => { ctx.setProgress(0.5); });
+    expect(ctx.isCurrent()).toBe(false);
+    expect(result.current.state).toBe("error");
+  });
   it("processing, then ready", async () => {
     const { result } = renderHook(() => useAsyncTask());
     let resolve!: (v: number) => void;

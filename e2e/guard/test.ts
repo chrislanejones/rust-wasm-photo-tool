@@ -7,7 +7,23 @@ import { test as base, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { forbiddenRequestReason } from "./backend";
 
-export const test = base.extend<{ backendGuard: void }>({
+export const test = base.extend<{ backendGuard: void; cpuThrottle: void }>({
+  // E2E_CPU_THROTTLE=4 runs every test with the CPU slowed 4× (CDP), which is
+  // how a timing spec proves it waits on STATE rather than on a clock: a fixed
+  // wait that is long enough on a laptop is short at 4×. Unset = no throttle,
+  // so the normal suite and CI are unchanged. A spec that sets its own rate
+  // (gallery-loading-state at 30×) overrides it for that test.
+  cpuThrottle: [
+    async ({ page }, use) => {
+      const rate = Number(process.env.E2E_CPU_THROTTLE ?? 1);
+      if (rate > 1) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+      }
+      await use();
+    },
+    { auto: true },
+  ],
   backendGuard: [
     async ({ context }, use) => {
       const hits: string[] = [];

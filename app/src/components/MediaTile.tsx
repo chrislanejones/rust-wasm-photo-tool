@@ -5,11 +5,15 @@
 //             small to see on its own)
 // Used by the Welcome-back row and anywhere an icon needs to read at tile size.
 import type { ComponentType } from "react";
+import { ImageOff } from "lucide-react";
+import { DecodedImage } from "@/components/ui/decoded-image";
 import { cn } from "@/lib/utils";
 
 interface MediaTileProps {
   /** Photo thumbnail URL. */
   src?: string;
+  thumbBlob?: Blob;
+  alt?: string;
   /** "+N" overflow placeholder (when there's no src/icon). */
   count?: number;
   /** An icon rendered at the tile size. */
@@ -22,6 +26,8 @@ interface MediaTileProps {
 
 export function MediaTile({
   src,
+  thumbBlob,
+  alt = "Photo preview",
   count,
   icon: Icon,
   onClick,
@@ -38,14 +44,14 @@ export function MediaTile({
       title={title}
       className={cn(
         "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border",
-        src ? "" : "bg-bg-elevated text-text-secondary",
+        (src || thumbBlob) ? "" : "bg-bg-elevated text-text-secondary",
         interactive && "transition-colors hover:border-border-active",
         className,
       )}
       {...rest}
     >
-      {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
+      {src || thumbBlob ? (
+        <DecodedImage source={thumbBlob ?? src!} alt={alt} fallback={<span role="img" aria-label={`${alt} could not be displayed. Resume editing to open the photo.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
       ) : Icon ? (
         <Icon className="h-7 w-7" />
       ) : count != null ? (

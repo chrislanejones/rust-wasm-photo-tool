@@ -17,6 +17,8 @@ interface Props {
   /** The edited dot + reset, on the Scale row (ControlRow §9): W/H are
    *  per-photo values, and Scale is the row that reads them as one number. */
   edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
+  /** Put the Scale slider under width/height instead of above them. */
+  scaleLast?: boolean;
 }
 
 /**
@@ -36,15 +38,12 @@ export function DimensionFields({
   onPercentChange,
   onToggleLock,
   edited,
+  scaleLast = false,
 }: Props) {
 
-  return (
-    <div className="space-y-2.5">
-      {/* space-y-2.5, not 4: the slider box carries ~7px of thumb room below
-          the visible track, so 10px here lands the visual gap to width/height
-          at ~17 — the same distance the Method dropdown sits from Quality. */}
-      {/* Scale slider — proportional percent of the original dimensions. */}
-      <SizeSlider
+  // Scale — proportional percent of the original dimensions.
+  const scaleSlider = (
+    <SizeSlider
         label="Scale"
         value={widthPercent}
         onChange={onPercentChange}
@@ -54,7 +53,14 @@ export function DimensionFields({
         disabled={disabled}
         edited={edited}
       />
+  );
 
+  return (
+    <div className="space-y-2.5">
+      {/* space-y-2.5, not 4: the slider box carries ~7px of thumb room below
+          the visible track, so 10px here lands the visual gap to width/height
+          at ~17 — the same distance the Method dropdown sits from Quality. */}
+      {!scaleLast && scaleSlider}
       {/* Dimensions: width / height / lock-aspect on one row.
           The boxes are the shared NumberField, which owns the real
           <label htmlFor> this component used to spell out itself. */}
@@ -96,6 +102,7 @@ export function DimensionFields({
           )}
         </button>
       </div>
+      {scaleLast && scaleSlider}
     </div>
   );
 }

@@ -273,14 +273,14 @@ const CARD_COPY: Record<string, CardCopy> = {
     title: "Adjustments",
     plain: "Brightness, contrast, saturation, shadows, highlights, blur and sharpen.",
     detail:
-      "Enhance → Adjustments; each adjustment is its own undo snapshot. Change Brightness, Contrast or Saturation and a dot marks it on this photo, with a reset beside it.",
+      "Enhance → Adjustments. The photo updates as you drag and letting go is one undo step. Every slider has its own reset, and it puts back exactly what was there (src/adjust.rs).",
   },
   Levels: {
     group: "enhance",
     title: "Levels",
-    plain: "Black point, white point and midtones against a live histogram.",
+    plain: "Black point, white point and midtones, each with its own reset, over a live histogram.",
     detail:
-      "Preview from a copy of the layer through a 256-entry LUT so moves never compound; Apply is one undo step (src/levels.rs).",
+      "Preview from a copy of the layer through a 256-entry LUT so moves never compound; Apply is one undo step (src/levels.rs). No curve chart: the histogram is pinned under the panel.",
   },
   Presets: {
     group: "enhance",
@@ -292,16 +292,16 @@ const CARD_COPY: Record<string, CardCopy> = {
   Histogram: {
     group: "enhance",
     title: "Histogram",
-    plain: "A live RGB / luma scope while you work.",
+    plain: "A live RGB / luma scope while you work, pinned under Adjustments, Levels and Presets.",
     detail:
       "Computed in Rust (calculate_histogram) from the composite buffer — no offscreen-canvas sampling.",
   },
   "Resize & Compress": {
     group: "enhance",
     title: "Resize & Compress",
-    plain: "One panel for dimensions, format and quality, with the page-speed scores on top.",
+    plain: "Resize, then Compress, then what the file would weigh against Google's limit for that many pixels.",
     detail:
-      "Resampling fully in WASM; one Apply button named for what is pending. Dimensions-only re-saves in the photo's own format at full quality.",
+      "Resampling fully in WASM and lands on the exact size you type. Image weight is the measured file Apply would write; the WebP · JPEG · PNG · AVIF row is a preview, and Apply keeps the photo's own format.",
   },
   "Perspective / Distort / Skew": {
     group: "enhance",
@@ -334,6 +334,13 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain: "Start from nothing: a size preset and a white, black, hex or transparent background.",
     detail:
       "FHD / Square / Story / 4×6 / 5×7 / 8×10; the fill is generated in Rust (blank_png → codec::export_png).",
+  },
+  "Create AI Image": {
+    group: "edit",
+    title: "Create AI Image",
+    plain: "Describe a picture and get a new photo in your gallery. Six models to pick from; Paid, with online features on.",
+    detail:
+      "Flux Schnell / Dev / 1.1 Pro / Kontext Pro, Stable Diffusion 3.5 Large and Ideogram v3 Turbo on Replicate; references for the three that read them.",
   },
   "Pan (H or Space)": {
     group: "edit",
@@ -393,9 +400,9 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Multi-photo Gallery": {
     group: "export",
     title: "Multi-photo gallery",
-    plain: "Work on many photos at once: add, switch, duplicate, multi-select and export together.",
+    plain: "Work on many photos at once, with clear loading previews: add, switch, duplicate, multi-select and export together.",
     detail:
-      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read.",
+      "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read. Docked rows scroll without overlapping; hover reveals only that photo's controls. Welcome Back previews keep their space while loading and show a fallback if an image cannot be displayed.",
   },
   // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
   "Batch Crop": {
@@ -404,7 +411,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain:
       "Crop every open photo to the same shape at once. Tick the exceptions and they get a crop of their own.",
     detail:
-      "Batch › Crop. Main and Exceptions each keep their own ratio, and one press crops both. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all.",
+      "Batch › Crop. Main and Exceptions each keep their own ratio, and one press crops both. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all. Grid previews keep their space while loading, show when an image is unavailable, and keep the previous preview visible while an edit loads.",
   },
   "SVG → SVG": {
     group: "export",
@@ -441,7 +448,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain:
       "Share a link anyone can open. See how often it was viewed, and let it switch off after N views or on a date.",
     detail:
-      "Export → Share link uploads a flattened PNG; Settings → Shared lists every link. Each opening is stored as a time only.",
+      "Export → Share link uploads a flattened PNG; Settings → Shared lists every link. Each opening is stored as a time only. The public image shows a loading placeholder until it is ready, with Try again if it fails. List previews load near the viewport and keep the previous picture while a renewed image address loads.",
   },
   "Security tab": {
     group: "export",
@@ -477,8 +484,8 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Keyboard accessibility": {
     group: "privacy",
     title: "Keyboard accessibility",
-    plain: "Skip to canvas, labeled landmarks, named tool buttons, Escape closes dialogs.",
-    detail: "On top of the tool / number / Alt shortcuts.",
+    plain: "Skip to canvas, named controls, keyboard navigation in Settings, and readable help text in both themes.",
+    detail: "Enter or Space works on gallery tiles and their Remove/Select buttons; toggling a selection keeps the current photo open. Up/Down moves through Settings sections, Home/End jumps to the first or last, and Tab reaches the selected section. Escape closes dialogs. Muted help text and shortcut headings meet AA contrast in light and dark themes, alongside the tool / number / Alt shortcuts.",
   },
   "Keyboard Shortcut Modal": {
     group: "privacy",

@@ -4,6 +4,11 @@ import { api } from "../../../convex/_generated/api";
 import { cloudPhotosAllowed } from "@/hooks/useEditPersistence";
 import { useUIStore } from "@/stores/useUIStore";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { withTimeout } from "@/lib/withTimeout";
+
+/** The snapshot upload's backstop. It had none, so a stalled upload spun the
+ *  Share button for ever; the same minute the AI upload gets (useAIJob). */
+export const SHARE_UPLOAD_TIMEOUT_MS = 60_000;
 
 /** Build the public share URL for a token, anchored to wherever the app is
  *  served (origin + path, so it works on localhost and any deploy host).
@@ -63,11 +68,20 @@ export function useShare() {
         throw new Error("Online features are off, so nothing leaves this tab.");
       }
       const uploadUrl = await generateUploadUrl();
-      const resp = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": "image/png" },
-        body: input.blob,
-      });
+      // Cancelled, not abandoned, when the timer fires: an abandoned upload
+      // still lands in storage with nothing pointing at it (ADR-083).
+      const uploadAbort = new AbortController();
+      const resp = await withTimeout(
+        fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "image/png" },
+          body: input.blob,
+          signal: uploadAbort.signal,
+        }),
+        SHARE_UPLOAD_TIMEOUT_MS,
+        "Snapshot upload",
+        { abort: uploadAbort },
+      );
       if (!resp.ok) throw new Error(`Snapshot upload failed (${resp.status})`);
       const { storageId } = (await resp.json()) as { storageId: string };
 

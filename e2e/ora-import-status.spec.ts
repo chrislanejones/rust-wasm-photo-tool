@@ -20,7 +20,7 @@ async function blockExternalNetwork(page: Page): Promise<void> {
 async function openExportPane(page: Page) {
   await page.getByRole("button", { name: /^Settings/ }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Import / Export", exact: true }).click();
+  await dialog.getByRole("tab", { name: "Import / Export", exact: true }).click();
   return dialog;
 }
 

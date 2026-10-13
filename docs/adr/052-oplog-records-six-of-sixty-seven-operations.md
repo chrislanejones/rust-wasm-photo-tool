@@ -203,3 +203,10 @@ marked resolved).
   steps then, not 23). Caught in review and fixed before it shipped: the hook
   asks `has_selection()` and `snapshotBytes` adds W×H for it. Layer masks are
   still left out on both sides, because `Snapshot::bytes` leaves them out.
+
+## Outcome (10-13-2026): op-log undo now seeks by gesture
+
+ADR-088 (draft). One gesture that records several ops (a rounded rectangle is
+`ShapeAdd` + `ShapeCornerRadii`) now undoes in one press, in-session and after
+a reload. Op-log v12 adds `Op::SameGesture` at index 22. That clears the
+"recorded undo rewinds one op" blocker for recording the tonal sliders.

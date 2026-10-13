@@ -10,6 +10,7 @@ import {
   strokeUp,
   strokeActive,
   whenStrokeIdle,
+  whenStrokeQuiet,
   resetStrokeGate,
 } from "./strokeGate";
 
@@ -106,6 +107,75 @@ describe("the gate is actually wired", () => {
     expect(canvasArea).toMatch(/strokeDown\(\)/);
     expect(canvasArea).toMatch(/addEventListener\("pointerup", strokeUp\)/);
     const session = readFileSync(join(APP, "src/app/session/useImageSession.ts"), "utf8");
-    expect(session).toMatch(/whenStrokeIdle\(\)\.then\(\(\) => flushRef\.current\(\)\)/);
+    expect(session).toMatch(/whenStrokeQuiet\(AUTOSAVE_QUIET_MS\)\.then\(\(\) => flushRef\.current\(\)\)/);
+  });
+});
+
+// whenStrokeQuiet (10-07): "idle right now" was not enough. The autosave fired
+// `delay` after a stroke ended — where the next stroke begins — and its
+// `capture_state()` held the worker for over a second while that stroke's
+// `paint_move` calls queued behind it. Quiet = no stroke has ENDED for
+// `quietMs`, so a burst of strokes defers the save until the burst is over.
+describe("whenStrokeQuiet", () => {
+  it("resolves at once when no stroke has ever happened", async () => {
+    vi.useFakeTimers();
+    let done = false;
+    void whenStrokeQuiet(2500).then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).toBe(true);
+  });
+
+  it("waits out the quiet window after the last stroke end", async () => {
+    vi.useFakeTimers();
+    strokeDown();
+    strokeUp();
+    let done = false;
+    void whenStrokeQuiet(2500).then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(2400);
+    expect(done, "2.4 s of quiet is not 2.5 s").toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(done).toBe(true);
+  });
+
+  it("a stroke inside the window pushes the save out — a burst defers it", async () => {
+    vi.useFakeTimers();
+    strokeDown();
+    strokeUp();
+    let done = false;
+    void whenStrokeQuiet(2500).then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(2000);
+    strokeDown(); // the next stroke begins 2 s later, inside the window
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(done, "must hold while the new stroke is live").toBe(false);
+    strokeUp(); // ends at t=3.0 s → quiet until t=5.5 s
+    await vi.advanceTimersByTimeAsync(2400);
+    expect(done, "the window restarts from the NEW stroke's end").toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(done).toBe(true);
+  });
+
+  it("a button click (stray up) does not restart the window", async () => {
+    vi.useFakeTimers();
+    strokeDown();
+    strokeUp();
+    await vi.advanceTimersByTimeAsync(2000);
+    strokeUp(); // window pointerup for a button, no stroke open
+    let done = false;
+    void whenStrokeQuiet(2500).then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(done, "only a real stroke end moves the clock").toBe(true);
+  });
+
+  it("never waits past maxWaitMs — autosave is user data with no backup", async () => {
+    vi.useFakeTimers();
+    let done = false;
+    void whenStrokeQuiet(2500, 5000).then(() => (done = true));
+    // Strokes end every second, forever: the window never clears on its own.
+    for (let i = 0; i < 6; i++) {
+      strokeDown();
+      strokeUp();
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    expect(done, "the deadline must release it").toBe(true);
   });
 });
