@@ -4,6 +4,39 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — work left in worktrees after the 10-13 cleanup (10-13-2026)
+
+18 worktrees under `~/ai-repo` were removed on 10-13. The ones below were kept
+because they hold work that isn't on master, and a remote has a copy of none of
+it. Decide each one, then delete the worktree.
+
+| Worktree | Branch | What's only here | Decide |
+|---|---|---|---|
+| `save-cache` | `perf/undo-snapshot-png-cache` | **Uncommitted** engine change: `Snapshot.png_cache` (a `OnceCell`) so an autosave stops re-encoding the whole undo history as PNG. Measured on 10-05: 1.5 s per step on a 12 MP photo, 4–5 s after eight Pins. `src/history.rs` +31/−24, `src/lib.rs` +1. Its base is old (#301); it must be rebased past #356, which also changes `Snapshot`. | Finish it as its own engine PR (rust-wasm-loop), or drop it |
+| `night-1007` | `backup/ui-overlap-317-20261010` | Local backup of closed #317 (7 commits): resize stores the typed size, docked gallery tiles, pen hit-test on ink. 8 files still differ from master. | Check whether master got each fix some other way; then delete |
+| `night-1007-net` | `backup/ui-overlap-319-20261010` | Local backup of closed #319 (5 commits): every e2e spec runs in CI, CSS-warnings gate. 4 files still differ from master. | Same check as above |
+| `tonight-20261010` | `qc/tonight-20261010` | One local merge of #317 + #319, made for QC on 10-10. It contains no new work. | Delete once the two backups above are settled |
+
+Open-PR worktrees (#316, #318, #348, #354, #355, #356) can go as soon as each PR is merged.
+
+## OPEN — the tonal Presets op is still not recorded in the op log (10-13-2026)
+
+§4 of the 10-13 op-log night plan was skipped. #356 had already added one new op
+variant (`SameGesture`, index 22) and bumped the format to v12. Tonal ops now start at index 23 (ADR-070,
+as amended by #356). To avoid a second format bump, the Presets op should land in
+the same release as #356.
+
+## OPEN — the weekly scheduled gitleaks scan is red on a test fixture (10-13-2026)
+
+Master's Monday scheduled CI run is red on two jobs. `cargo audit` is the known one
+(parked 09-14, further down). The other is `Secret scan (gitleaks)`, red on the
+last three scheduled runs (09-28, 10-05, 10-12): the scheduled scan walks history,
+and `generic-api-key` matches the made-up Convex user id in
+`app/src/lib/storageOrphans.test.ts:34` (added in v9.16, `3564c39b`). It isn't a
+secret. Push and PR runs are green, so only the weekly run shows it. Fix with a
+narrow allowlist entry for that one test path in `.gitleaks.toml`, plus the sk_
+control matrix the file's header asks for. Don't widen the rule.
+
 ## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
 
 Found surveying skeleton gaps for UI Night 16. `useRealTier()`
