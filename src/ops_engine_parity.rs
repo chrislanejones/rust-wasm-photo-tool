@@ -1475,10 +1475,10 @@ fn a_rotated_warped_star_survives_persist_restore_byte_identical() {
     assert!(!t2.oplog_is_broken());
 }
 
-/// KNOWN GAP, not introduced here — reproduced here. See docs/PARKING_LOT.md,
-/// "one gesture can record several ops, and op-log undo rewinds only one".
+/// WAS a known gap (PARKING_LOT, "one gesture can record several ops, and
+/// op-log undo rewinds only one"); fixed by gesture markers, op-log v12.
 ///
-/// `try_oplog_undo` rewinds exactly ONE op per snapshot. A shape added with a
+/// `try_oplog_undo` used to rewind exactly ONE op per snapshot. A shape added with a
 /// non-default skipped field records ShapeAdd PLUS a side op for it
 /// (ShapeSloppiness since v7; ShapeRotation / ShapeStarPoints since v8) under
 /// the one "Add Shape" snapshot, so the first undo only rewinds the side op.
@@ -1486,7 +1486,6 @@ fn a_rotated_warped_star_survives_persist_restore_byte_identical() {
 /// nothing on screen, and every later undo lands one gesture late. Ignored
 /// until the log learns gesture boundaries; run with `--ignored` to see it.
 #[test]
-#[ignore = "known gap: several ops per snapshot (PARKING_LOT: one gesture can record several ops)"]
 fn one_undo_removes_a_seven_point_star() {
     let (mut t, _px) = seeded_tool(96, 80);
     t.set_oplog_undo(true);
@@ -1518,4 +1517,173 @@ fn one_undo_removes_a_seven_point_star() {
         "one undo removes the shape it added"
     );
     assert_eq!(composite_hash(&mut t), h0);
+}
+
+// ── One gesture, one undo (op-log v12) ──────────────────────────────────────
+//
+// A shape with a non-default skipped field records ShapeAdd PLUS a side op
+// under one snapshot. Undo must take the whole gesture back, on the op-log
+// path (a snapshot-path undo with a live log marks it broken, so
+// `!oplog_is_broken()` after the undo is the proof of which path ran), and
+// redo must bring it back byte-exact.
+
+#[allow(clippy::too_many_arguments)]
+fn add_shape(
+    t: &mut ImageHorseTool,
+    kind: u8,
+    sloppiness: u8,
+    star_points: u8,
+    rotation_deg: f64,
+    radii: &[u16],
+    at: (f64, f64),
+) -> u32 {
+    let id = t.add_shape_annotation_full(
+        kind,
+        at.0,
+        at.1,
+        at.0 + 40.0,
+        at.1 + 30.0,
+        "#e02020",
+        3.0,
+        0,
+        0,
+        "#000000",
+        "#000000",
+        0,
+        0,
+        sloppiness,
+        star_points,
+        rotation_deg,
+        radii,
+    );
+    t.recomposite();
+    id
+}
+
+/// Undo once, check the shape count and composite, check the op-log path
+/// survived; redo once, check it all came back.
+fn one_undo_one_redo(t: &mut ImageHorseTool, h_before: u64, n_before: usize) {
+    let h_after = composite_hash(t);
+    let n_after = t.shape_annotation_count();
+    assert!(t.undo());
+    assert_eq!(
+        t.shape_annotation_count(),
+        n_before,
+        "one undo takes the gesture back"
+    );
+    assert_eq!(composite_hash(t), h_before, "undo is byte-exact");
+    assert!(!t.oplog_is_broken(), "undo stayed on the op-log path");
+    assert!(t.redo());
+    assert_eq!(t.shape_annotation_count(), n_after);
+    assert_eq!(composite_hash(t), h_after, "redo is byte-exact");
+    assert!(!t.oplog_is_broken(), "redo stayed on the op-log path");
+}
+
+#[test]
+fn one_undo_removes_a_rounded_rectangle() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    one_undo_one_redo(&mut t, h0, 0);
+}
+
+#[test]
+fn one_undo_removes_a_rotated_sloppy_rectangle() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    add_shape(&mut t, 0, 40, 0, 30.0, &[], (10.0, 10.0));
+    one_undo_one_redo(&mut t, h0, 0);
+}
+
+#[test]
+fn one_undo_removes_only_the_duplicate() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let id = add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    let h1 = composite_hash(&mut t);
+    assert!(t.duplicate_shape_annotation(id, 20.0, 20.0) > 0);
+    t.recomposite();
+    one_undo_one_redo(&mut t, h1, 1);
+}
+
+#[test]
+fn three_gestures_undo_in_order() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (8.0, 8.0));
+    let ha = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[], (40.0, 30.0));
+    let hb = composite_hash(&mut t);
+    stroke(&mut t, (5.0, 70.0), (90.0, 70.0), "#2040e0");
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), hb, "first undo: the stroke");
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), ha, "second undo: B");
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h0, "third undo: A, whole");
+    assert_eq!(t.shape_annotation_count(), 0);
+    assert!(!t.oplog_is_broken());
+}
+
+#[test]
+fn undo_count_counts_gestures_not_ops() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    add_shape(&mut t, 9, 30, 7, 15.0, &[], (10.0, 10.0));
+    assert!(t.oplog_op_count() > 2, "one gesture, several ops");
+    assert_eq!(t.undo_count(), 1);
+}
+
+/// Persist, reload into a fresh engine (snapshot stack empty), undo once: the
+/// markers alone must find where the rounded rectangle's gesture began.
+#[test]
+fn after_a_reload_one_undo_still_removes_a_rounded_rectangle() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (5.0, 70.0), (90.0, 70.0), "#2040e0");
+    let h_stroke = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    let h_full = composite_hash(&mut t);
+    let total = t.oplog_op_count() as u32;
+    let frames = t.oplog_encoded_ops(0, total);
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, total));
+    assert_eq!(composite_hash(&mut t2), h_full);
+    assert_eq!(t2.undo_count(), 2, "two gestures after the reload");
+    assert!(t2.undo());
+    assert_eq!(t2.shape_annotation_count(), 0);
+    assert_eq!(composite_hash(&mut t2), h_stroke);
+    assert!(t2.redo());
+    assert_eq!(composite_hash(&mut t2), h_full);
+    assert!(!t2.oplog_is_broken());
+}
+
+/// A gesture that records nothing must not move the cursor, and must not eat
+/// the undo of the gesture before it.
+#[test]
+fn a_no_op_gesture_leaves_the_cursor_alone() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    let h1 = composite_hash(&mut t);
+    let c = t.oplog_cursor();
+    t.snap("Nothing");
+    t.recomposite();
+    assert_eq!(t.oplog_cursor(), c, "no op, no marker, no move");
+    assert!(t.undo(), "the empty step undoes");
+    assert_eq!(composite_hash(&mut t), h1);
+    assert_eq!(t.oplog_cursor(), c);
+    assert!(t.undo(), "and the shape is still one undo away");
+    assert_eq!(t.shape_annotation_count(), 0);
+    assert_eq!(composite_hash(&mut t), h0);
+    assert!(!t.oplog_is_broken());
 }
