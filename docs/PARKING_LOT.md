@@ -743,9 +743,14 @@ Narrowed on the branch, not fixed: the sync used to emit a redundant
 all four skipped fields are neutralized now, so a side-field-only change is
 exactly one op.
 
-**Masked in the running app today** by "in the running app, undo of ANY
-recorded edit breaks the op log" (below): a broken log falls back to snapshot
-undo, which is correct. Fix that entry and this one surfaces.
+**Masked in the running app until 10-11-2026** by "in the running app, undo of
+ANY recorded edit breaks the op log" (below): a broken log falls back to
+snapshot undo, which is correct. That entry is fixed, so this one is now LIVE
+in the app: the first Ctrl+Z after adding a sloppy, rotated or 7-point-star
+shape changes nothing on screen. `cargo test --features tiles -- --ignored
+one_undo_removes_a_seven_point_star` still fails the same way (re-run
+10-11-2026; see the entry's fix options — format-level, ADR material, not
+touched by that fix).
 
 Fix options, both format-level (ADR material): give the log gesture
 boundaries (a group marker per snapshot, and undo seeks to the group start),
@@ -951,7 +956,39 @@ on this evidence it would copy the un-undone document to the second device and
 hand it back to the first on the next pull — two devices disagreeing with the
 user instead of one. Fix and cover with a test before any sync code is written.
 
-## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+## FIXED 10-11-2026 — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+> **Fixed on `ccr-f9643a38-5maj0q` (10-11-2026).** The bisect below was run
+> and the flush path is innocent: run A replayed against the BUILT engine with
+> `blitLiveEngine`, `onOplogFlush` (and the save it schedules), the
+> diagnostics sampler and the whole `flushToCanvas` added one at a time stays
+> healthy every time — `app/src/lib/oplogFlushPath.test.ts`, kept as the
+> record. Every one of those calls is a read plus `recomposite()`, and
+> `oplog_engine_in_sync` recomposites before it hashes anyway, so there was
+> nothing for them to desync.
+>
+> **What broke it:** the engine's replay switch `oplog_use_for_undo` defaults
+> to OFF (it is the runtime verification switch; the app owns it), and the only
+> push — `set_oplog_undo(isOplogUndoEnabled())` inside `syncOplog` — ran from
+> `useDiagnosticsSampler`, i.e. ONLY while the Diagnostics window is open. In
+> an ordinary session the switch never reached the engine, `undo()` took the
+> snapshot path, and `restore_snapshot` marks a non-empty log broken. That is
+> row C exactly (cursor stays 1, status "broken"), and it is why runs A and B
+> replayed: they were taken at the console with Diagnostics open, which had
+> pushed the switch. "Breaks BETWEEN the edit and the undo" was the wrong
+> reading — it broke AT the undo, on the wrong path.
+>
+> **Fix:** `withOplogUndo` (`lib/tilesFlush.ts`) pushes the switch at every
+> `createLiveEngine` site in `useEngineCore`, chained beside `withHistoryForks`
+> — the same shape as the history-forks switch, and like `ih_tiles_flush` it
+> takes effect on the next load. No engine change, no format change, nothing
+> persisted changes. Pinned by `e2e/oplog-undo-through-ui.spec.ts`: a brush
+> stroke and a Levels apply through the real UI, Ctrl+Z, `oplog_is_broken()`
+> false and the cursor 1 → 0 (red on master, green with the push; 10× at 4× CPU
+> each). The engine-call ratchet moved 191 → 192 for the awaited push.
+>
+> **Now unmasked:** "one gesture can record several ops" (above) — see the
+> note added there.
 
 Found while testing the Levels tile, and **not caused by it**. Undo still shows
 the right pixels, so nothing is lost — but it always takes the snapshot path,
