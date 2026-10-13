@@ -12,7 +12,7 @@ Locally at 4× CPU (`E2E_CPU_THROTTLE=4`), 10 repeats: Add mask 10/10, but "a Re
 previews on a copy" failed 1/10. The spec was already in the old CI list, and nothing tonight
 touched it. Same treatment as G1/fast-drags: find the clock it waits on and make it wait on state.
 
-## FIXED 10-13-2026 (#PRNUM) — Enter in the first frame after a shape appears is dropped (10-07-2026)
+## FIXED 10-13-2026 (#356) — Enter in the first frame after a shape appears is dropped (10-07-2026)
 
 The listener is now a `useLayoutEffect`, so it is bound before the pending
 shape paints. Not "bind once at mount", the other candidate below: capture
@@ -710,7 +710,7 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## FIXED 10-13-2026 (#PRNUM, ADR-088) — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+## FIXED 10-13-2026 (#356, ADR-088) — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
 
 **Fixed by op-log v12.** `oplog_record` writes `Op::SameGesture` in front of
 the second and every later op of a gesture, and each snapshot remembers the
@@ -969,7 +969,7 @@ several ops under one snapshot (a box move plus every re-routed connector),
 so they deliberately send undo down the snapshot path, which marks the op log
 broken for the rest of the session. Since op-log v12 (ADR-088) one undo can
 take a multi-op gesture back, so both could stay on the op-log path. Not done
-in #PRNUM: each needs its own red test (a box with two connectors, moved,
+in #356: each needs its own red test (a box with two connectors, moved,
 then one Ctrl+Z) before the workaround comes out.
 
 ## FIXED 10-11-2026 — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
