@@ -1482,16 +1482,18 @@ textarea:focus-visible {
     -6px 0;
   background-color: #d0d0d0;
 }
-.import-preview img {
+.import-preview-box {
+  /* Sized inline from the decoded width/height (importPreviewBox), so the
+     frame has its final shape before the picture arrives. A grey skeleton
+     fills it only if the decode takes longer than the 300 ms grace. */
   display: block;
-  /* Taller than the old 140px: the frame no longer has to leave room beside
-     the image for the dimensions chip, so the preview can use the space. */
-  max-height: 200px;
   max-width: 100%;
-  width: auto;
-  height: auto;
+  overflow: hidden;
   border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.import-preview-box img {
+  display: block;
 }
 .import-preview-dims {
   /* Sits ON the image, bottom-right. It was `margin-left: auto` in the flex

@@ -19,9 +19,9 @@ Reserve the final footprint at once; paint the grey only after the grace.
 | **17** | Compare slider (`features/canvas/CompareSlider.tsx`) | Renders nothing until the original is read from IndexedDB; the before half can be blank until its CSS background decodes | **Done** (#350): decoded off-screen before reveal; skeleton clipped like the before layer; "Original unavailable" on failure or after 15 s |
 | **18** | Mobile full-screen viewer (`MobileShell.tsx` ~302) | Spinner at once, no grace; each swipe pops in | **Done** (#353): photo-shaped skeleton from the known size after the grace; "This photo couldn't be loaded." on failure |
 | 18 | Mobile boot (`MobileShell.tsx` ~441) | Logo + spinner | 3-column tile grid skeleton. **Chris's call**: the spinner doubles as the brand screen |
-| 19 | Import dialog preview (`ImportImageDialog.tsx`) | Bare `<img>`; the frame collapses, then grows | `DecodedImage` in a box reserved from the known width/height |
-| 19 | Diagnostics › Image meta EXIF | "reading…" text | `SkeletonText`. The hash stays "computing…": that is new work |
-| 19 | MasterBar lazy chunk (≤1000 px) | `Suspense fallback={null}`, the 252 px bar pops in | Optional: a sized fallback |
+| **19** | Import dialog preview (`ImportImageDialog.tsx`) | Bare `<img>`; the frame collapses, then grows | **Done**: `DecodedImage` in a box reserved from the known width/height |
+| **19** | Diagnostics › Image meta EXIF | "reading…" text | **Done**: `SkeletonText`. The hash stays "computing…": that is new work |
+| **19** | MasterBar lazy chunk (≤1000 px) | `Suspense fallback={null}`, the 252 px bar pops in | **Done**: `MasterBarFallback`, the bar's own box |
 
 ## Not in these nights
 
@@ -95,4 +95,26 @@ that counted every `.skeleton` on the page; CI's placeholder Clerk key never
 finishes loading. The specs now count the grid's own placeholders.
 Combined master: 1,902 unit tests; tsc, lint (0 errors, 55 warnings),
 guardrails, build and inert-class audit pass. Engine unchanged (892,897 B).
-Night 19 is still to do.
+
+## Night 19: Import preview, EXIF, master bar
+
+- **Import preview.** The box comes from the size the import already decoded:
+  200 px tall at most, never wider than the photo. `DecodedImage` paints into
+  it, a skeleton fills it only after the grace, and a failed decode says
+  "Preview unavailable" in the same box. Browser, 1200×900 paste: the box was
+  266.7×200 on the frame it appeared, before any `<img>`, and the picture
+  painted at exactly 266.7×200.
+- **Diagnostics EXIF.** "reading…" is now a three-line `SkeletonText`. The
+  space is held at once and the grey waits out the grace.
+- **Master bar.** `MasterBarFallback` holds the bar's box while the chunk
+  loads: the shell at once, seven slot blocks after the grace. Both now read
+  one class string, `MASTER_BAR_SHELL` in `constants.ts`, so the radius
+  ratchet still counts one `rounded-t-xl`, not two. Browser, chunk held 2 s:
+  the fallback sat at 8,8 and 252×50, and the bar replaced it at the same box.
+  On a first visit the "Compact version" notice covers that strip while the
+  chunk loads, so the fallback mostly shows on later visits with a cold cache.
+
+Tests: 14 new (7 import, 4 EXIF, 3 master bar). Against the old code, 10 of
+the 11 that can run there fail. Gates: tsc clean; lint 0 errors (55
+warnings); guardrails OK; 198 files / 1,916 unit tests; build and inert-class
+audit pass. Engine untouched (892,897 B).

@@ -30,6 +30,7 @@ import { MobileVersionNotice } from "@/components/MobileVersionNotice";
 import { CompactVersionNotice } from "@/components/CompactVersionNotice";
 import { MobileShell } from "@/features/mobile/MobileShellLazy";
 import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
+import { MasterBarFallback } from "@/components/master-bar/MasterBarFallback";
 // Code-split: the compact-mode master bar only loads the first time the window
 // goes ≤1000px, so desktop sessions never download its chunk.
 const MasterBar = lazy(() =>
@@ -2670,7 +2671,7 @@ export function AppShell() {
           a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
           hidden in this mode. Lazily loaded — Suspense sits outside
           AnimatePresence so the slide-out still works once the chunk is in. */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<MasterBarFallback />}>
         <AnimatePresence>
           {bp.dock && showTopBar && !startSurfaceOpen && (
             <MasterBar
