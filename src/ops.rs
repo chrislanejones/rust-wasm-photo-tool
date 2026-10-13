@@ -225,7 +225,21 @@ use serde::{Deserialize, Serialize};
 ///     `ShapeStarPoints` (index 21).
 ///   * `encode_annotations` gained a TWELFTH tuple element, read as a tail
 ///     after v9's, so an empty tail is a v9-or-older blob: square corners.
-pub const OP_FORMAT_VERSION: u8 = 11;
+///
+/// **12** — GESTURES (ADR-088). One undo press is one thing the user did, but
+/// one gesture can record several ops: a rounded rectangle is `ShapeAdd` +
+/// `ShapeCornerRadii` under one snapshot, and op-log undo used to rewind one
+/// op per press, so the first Ctrl+Z changed nothing on screen.
+///
+///   * One APPENDED unit variant, [`Op::SameGesture`] (index 22), written
+///     BEFORE the second and every later op of a gesture. A one-op gesture
+///     writes no marker at all, so its bytes are v11's exactly.
+///   * No existing variant changes or moves; no payload changes.
+///   * A v11-or-older log has no markers, and [`OpLog::gesture_undo_target`]
+///     reads that as one op per gesture — exactly how it always undid.
+///
+/// 10 stays ADR-070's reservation; nothing has ever written a 10.
+pub const OP_FORMAT_VERSION: u8 = 12;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -1009,6 +1023,21 @@ pub enum Op {
     /// `annotations::canonical_corner_radii`). Appended after
     /// [`Op::ShapeStarPoints`]; same rule, same reason.
     ShapeCornerRadii { id: u32, radii: [u16; 4] },
+    /// v12 (ADR-088) — the op AFTER this one belongs to the same gesture (the
+    /// same undo step) as the op BEFORE it. Changes nothing in the document.
+    ///
+    /// A continuation, not a begin or end marker, for three reasons:
+    ///   * a one-op gesture needs no marker, so the common case (a stroke, a
+    ///     Levels apply) is byte-identical to v11;
+    ///   * the marker and the op it joins are appended together, so a log
+    ///     persisted between any two appends is already correctly grouped
+    ///     (an end marker would be missing until the next gesture began);
+    ///   * an old log continued in a new build is unambiguous: unmarked ops
+    ///     are one step each, wherever they sit.
+    ///
+    /// Appended after [`Op::ShapeCornerRadii`]; same rule as every variant
+    /// since v2.
+    SameGesture,
 }
 
 impl Op {
@@ -1058,6 +1087,8 @@ impl Op {
             Op::ShapeStarPoints { .. } => "Edit Shape",
             // Also a restyle — the panel slider or the on-canvas corner dot.
             Op::ShapeCornerRadii { .. } => "Edit Shape",
+            // Never a step of its own: it only joins two ops into one.
+            Op::SameGesture => "Edit",
         }
     }
 }
@@ -1899,6 +1930,8 @@ pub fn apply(op: &Op, doc: &mut Document) {
                 sp.corner_radii = *radii;
             }
         }
+        // A grouping marker for undo; the document does not see it.
+        Op::SameGesture => {}
         Op::PerspectiveWarp { rect, quad } => {
             let (w, h) = (doc.width(), doc.height());
             if w == 0 || h == 0 {
@@ -2114,6 +2147,79 @@ impl OpLog {
             self.keyframes.push((self.ops.len(), self.live.clone()));
             self.prune_keyframes();
         }
+    }
+
+    // ── Gestures (ADR-088) ────────────────────────────────────────────────
+    //
+    // A gesture is one op, plus every op joined to it by a `SameGesture`
+    // written in front. Cursor positions the engine seeks to are always
+    // gesture boundaries, so these only ever walk whole gestures.
+
+    /// Where one undo press lands: the start of the gesture that ends at the
+    /// cursor. `None` at the start of the log.
+    pub fn gesture_undo_target(&self) -> Option<usize> {
+        let c = self.cursor;
+        if c == 0 {
+            return None;
+        }
+        let mut t = c - 1;
+        while t >= 2 && matches!(self.ops[t - 1], Op::SameGesture) {
+            t -= 2;
+        }
+        Some(t)
+    }
+
+    /// Where one redo press lands: the end of the gesture that starts at the
+    /// cursor. `None` at the end of the log.
+    pub fn gesture_redo_target(&self) -> Option<usize> {
+        let n = self.ops.len();
+        if self.cursor >= n {
+            return None;
+        }
+        let mut t = self.cursor + 1;
+        while t + 1 < n && matches!(self.ops[t], Op::SameGesture) {
+            t += 2;
+        }
+        Some(t)
+    }
+
+    /// Gestures in `ops[from..to]`: every op that is not a marker, less one
+    /// per marker (each one joins two ops into one gesture).
+    fn gestures_in(&self, from: usize, to: usize) -> usize {
+        let markers = self.ops[from..to]
+            .iter()
+            .filter(|op| matches!(op, Op::SameGesture))
+            .count();
+        (to - from) - 2 * markers
+    }
+
+    /// Undo presses available from the cursor.
+    pub fn gestures_before_cursor(&self) -> usize {
+        self.gestures_in(0, self.cursor)
+    }
+
+    /// Redo presses available from the cursor.
+    pub fn gestures_after_cursor(&self) -> usize {
+        self.gestures_in(self.cursor, self.ops.len())
+    }
+
+    /// One label per gesture, in order, with the index each one ENDS at —
+    /// the History panel's rows when the snapshot stack is empty (after a
+    /// reload). A gesture is named by its first op, which is the action the
+    /// user took; the ops joined after it are its details.
+    pub fn gesture_labels(&self) -> Vec<(usize, &'static str)> {
+        let mut out: Vec<(usize, &'static str)> = Vec::new();
+        let mut i = 0;
+        while i < self.ops.len() {
+            let label = self.ops[i].label();
+            let mut end = i + 1;
+            while end + 1 < self.ops.len() && matches!(self.ops[end], Op::SameGesture) {
+                end += 2;
+            }
+            out.push((end, label));
+            i = end;
+        }
+        out
     }
 
     /// Persistence generation — see the field doc.
@@ -2365,6 +2471,7 @@ mod tests {
                 id: 2,
                 radii: [4, 0, 12, 300],
             },
+            Op::SameGesture,
             Op::LayerMove {
                 layer: 0,
                 dx: -5,
@@ -3950,7 +4057,10 @@ mod v2_migration_tests {
     fn v9_round_trips_rotation_and_star_points() {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        assert_eq!(OP_FORMAT_VERSION, 11, "10 is ADR-070's, skipped (ADR-082)");
+        assert_eq!(
+            OP_FORMAT_VERSION, 12,
+            "10 is ADR-070's, skipped (ADR-082); 12 is gestures (ADR-088)"
+        );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
             shapes[0],
@@ -4091,6 +4201,7 @@ mod v2_migration_tests {
             21,
             "ShapeCornerRadii (v11, ADR-082)"
         );
+        assert_eq!(idx(&Op::SameGesture), 22, "SameGesture (v12, ADR-088)");
     }
 
     #[test]

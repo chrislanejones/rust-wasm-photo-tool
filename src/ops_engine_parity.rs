@@ -1666,6 +1666,50 @@ fn after_a_reload_one_undo_still_removes_a_rounded_rectangle() {
     assert!(!t2.oplog_is_broken());
 }
 
+/// An old (v11) log has no markers. It must keep opening, and undo exactly as
+/// it always did: one op per press.
+#[test]
+fn a_v11_log_without_markers_undoes_one_op_per_press() {
+    use crate::ops::{decode_op_frames, encode_op_frames, Op};
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    let total = t.oplog_op_count() as u32;
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+    // Strip the markers and stamp every frame v11, which is what a v9.28 build
+    // wrote for the same gesture.
+    let legacy: Vec<Op> = decode_op_frames(&t.oplog_encoded_ops(0, total))
+        .unwrap() // allow: rust-panic
+        .into_iter()
+        .filter(|op| !matches!(op, Op::SameGesture))
+        .collect();
+    assert_eq!(legacy.len(), 2, "ShapeAdd + ShapeCornerRadii");
+    let mut frames = encode_op_frames(&legacy);
+    let mut i = 0;
+    while i + 4 < frames.len() {
+        let n = u32::from_le_bytes(frames[i..i + 4].try_into().unwrap()) as usize; // allow: rust-panic
+        frames[i + 4] = 11;
+        i += 4 + n;
+    }
+
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, 2));
+    assert_eq!(t2.undo_count(), 2, "one op, one step, as before");
+    assert!(t2.undo());
+    assert_eq!(t2.oplog_cursor(), 1);
+    assert_eq!(
+        t2.shape_annotation_count(),
+        1,
+        "the first press only rewinds the side op"
+    );
+    assert!(t2.undo());
+    assert_eq!(t2.shape_annotation_count(), 0);
+    assert!(!t2.oplog_is_broken());
+}
+
 /// A gesture that records nothing must not move the cursor, and must not eat
 /// the undo of the gesture before it.
 #[test]

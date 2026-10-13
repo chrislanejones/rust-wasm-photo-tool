@@ -703,7 +703,18 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## OPEN — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+## FIXED 10-13-2026 (#PRNUM, ADR-088) — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+
+**Fixed by op-log v12.** `oplog_record` writes `Op::SameGesture` in front of
+the second and every later op of a gesture, and each snapshot remembers the
+op-log cursor it was taken at. Undo seeks back one GESTURE; after a reload
+(no snapshots) the markers alone find where it began. A one-op gesture writes
+no marker, so it is byte-identical to v11, and an old log with no markers
+still undoes one op per press. `one_undo_removes_a_seven_point_star` is
+un-ignored and passes, with twins for corner radii, rotation + sloppiness, a
+duplicate, a reload and a no-op gesture; `e2e/oplog-undo-shapes.spec.ts`
+drives it through the real UI. The original entry follows.
+
 
 **Pre-existing since v7 (sloppiness), widened by v9.** Reproduced at engine
 level by `ops_engine_parity::one_undo_removes_a_seven_point_star`, which is
@@ -943,6 +954,16 @@ edit → undo → reload. Vacuous-checks family 3.
 on this evidence it would copy the un-undone document to the second device and
 hand it back to the first on the next pull — two devices disagreeing with the
 user instead of one. Fix and cover with a test before any sync code is written.
+
+## OPEN — two shape edits still route undo to the snapshot path on purpose (10-13-2026)
+
+`move_shape_annotation` and `reroute_connector` (src/annotations.rs) record
+several ops under one snapshot (a box move plus every re-routed connector),
+so they deliberately send undo down the snapshot path, which marks the op log
+broken for the rest of the session. Since op-log v12 (ADR-088) one undo can
+take a multi-op gesture back, so both could stay on the op-log path. Not done
+in #PRNUM: each needs its own red test (a box with two connectors, moved,
+then one Ctrl+Z) before the workaround comes out.
 
 ## FIXED 10-11-2026 — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
 
