@@ -497,7 +497,7 @@ export function AISettings({
             </div>
           )}
           {lastType === "rembg" && phase === "done" && !error && (
-            <p className="text-2xs text-success">
+            <p role="status" className="text-2xs text-success">
               Background removed - applied to canvas.
             </p>
           )}
@@ -513,7 +513,7 @@ export function AISettings({
             </div>
           )}
           {lastType === "inpaint" && phase === "done" && !error && (
-            <p className="text-2xs text-success">
+            <p role="status" className="text-2xs text-success">
               Object removed - applied to canvas.
             </p>
           )}

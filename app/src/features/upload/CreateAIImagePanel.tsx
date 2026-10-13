@@ -212,6 +212,7 @@ export function CreateAIImagePanel({ model, onModelChange, onBack, closable = fa
           info="Say what the picture is of, then how it should look — subject first, then lighting, lens, medium, mood. Specific beats long."
         />
         <textarea
+          aria-label="Prompt"
           ref={promptRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}

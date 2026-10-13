@@ -1934,7 +1934,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
               {/* Textarea — rotates visually to match */}
               <textarea
-                data-text-overlay
+                data-text-overlay aria-label="Text"
                 ref={textareaRef}
                 value={textInput.text}
                 onChange={onTextChange}

@@ -101,6 +101,9 @@ export function MasterBar({
           label={t.label}
           onClick={() => onTab(t.id)}
           active={activeTab === t.id}
+          // Unlike New and Export these three are one-of-three, so the two
+          // that are off must say so too; IconButton omits the attribute.
+          aria-pressed={activeTab === t.id}
           standalone
           tooltip
         />

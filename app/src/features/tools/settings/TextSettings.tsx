@@ -477,6 +477,11 @@ export function TextSettings({
                         <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
                       </Button>
+                      {/* Always mounted, so the change is what gets announced:
+                          the label flip alone is not heard after the click. */}
+                      <span role="status" className="sr-only">
+                        {copied ? "Copied to clipboard" : ""}
+                      </span>
                     </div>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-theme-sidebar-border p-2 text-2xs text-theme-foreground leading-relaxed">
                       {textResult}

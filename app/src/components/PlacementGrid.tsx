@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { FieldLabel } from "@/components/ui/field-label";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 export type PlacementCell =
   | "top-left"
@@ -47,6 +48,8 @@ const CELLS: {
   { id: "bottom-right", label: "Bottom right", row: 2, numpad: "Numpad3" },
 ];
 
+const CELL_IDS = CELLS.map((c) => c.id);
+
 // Icon shows the vertical placement (top / middle / bottom row); the button's
 // column within the 3-wide grid gives the horizontal placement.
 const ROW_ICON = [
@@ -71,6 +74,14 @@ export function PlacementGrid({
   info?: ReactNode;
   numpadKeys?: boolean;
 }) {
+  // One of nine, so a named radio group: the lit cell was the only thing that
+  // said where the item sits, and a screen reader heard nine plain buttons.
+  const radio = useRadioGroup({
+    ids: CELL_IDS,
+    selected: value ?? undefined,
+    isDisabled: () => disabled,
+    onSelect: onChange,
+  });
   useEffect(() => {
     if (!numpadKeys || disabled) return;
     const onKey = (e: KeyboardEvent) => {
@@ -94,15 +105,16 @@ export function PlacementGrid({
     <div className="space-y-2">
       {label && <FieldLabel title={label} info={info} />}
       <div
-        role="group"
+        {...radio.groupProps}
         aria-label={label ?? "Placement"}
         className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]"
       >
-        {CELLS.map(({ id, label: cellLabel, row }) => {
+        {CELLS.map(({ id, label: cellLabel, row }, i) => {
           const Icon = ROW_ICON[row];
           return (
             <ToolButton
               key={id}
+              {...radio.itemProps(i)}
               active={value === id}
               disabled={disabled}
               title={cellLabel}
