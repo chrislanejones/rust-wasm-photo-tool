@@ -330,7 +330,8 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
  * is set in them and the card is mostly type, so the system fallback reads
  * as a different card. The script warns if they did not load.
  *
- * The line under the headline is the deck's first clause, up to the em dash.
+ * The line under the headline is the deck's first clause: up to the first
+ * sentence end or colon (older decks used an em dash; that still splits too).
  * The whole deck runs to four lines of mono at this size and crowds the
  * headline up into the wordmark. */
 const postCard = (post, plate) => `<!doctype html>
@@ -400,7 +401,7 @@ const postCard = (post, plate) => `<!doctype html>
     </div>
     <div class="words">
       <h1>${esc(post.headline)}</h1>
-      <p class="dek">${esc(post.deck.split(" — ")[0])} <span class="url">· imagehorse.app/blog</span></p>
+      <p class="dek">${esc(post.deck.split(/ — |(?<=[.:])\s/)[0])} <span class="url">· imagehorse.app/blog</span></p>
     </div>
   </div>
 </body></html>`;

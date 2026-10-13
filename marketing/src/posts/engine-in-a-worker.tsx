@@ -5,6 +5,11 @@
  * one thing it adds above that is `Topper`, the scene behind the shell's
  * headline, at the bottom of this file.
  *
+ * REWRITTEN 10-13-2026 at Chris's request, for a reader who is not deep in the
+ * stack: a tech manager, or someone two years in. Same measurements, same
+ * figures and tables, plainer words. The narration mp3 was re-recorded from
+ * the new text the same day (Ava, edge-tts 7.3.1).
+ *
  * Every figure in here is in the repository. The blocking times and the
  * round-trip numbers come from docs/engine-worker-feasibility.md and
  * docs/engine-worker-a11-0-finding.md; the invariant, the stage table and the
@@ -89,12 +94,9 @@ const overBudget = (p: Payload) =>
 export default function EngineInAWorker() {
   return (
     <>
-      {/* The receipts, before the argument. Every figure below came out of one
-          of these three documents, and they are linked rather than summarized
-          so a reader who doubts a number can go and check it. */}
       <p className="post__sourcenote">
-        Shipped as the default in v8.32 on September 18th, 2026. Everything measured below comes from the
-        repository's own records —{" "}
+        Shipped as the default in v8.32 on September 18th, 2026. Every measurement below comes from the
+        repository's own records:{" "}
         <a href={repoFile("docs/adr/024-engine-in-a-worker.md")} {...external}>
           ADR-024
         </a>
@@ -102,27 +104,37 @@ export default function EngineInAWorker() {
         <a href={repoFile("docs/engine-worker-feasibility.md")} {...external}>
           feasibility note
         </a>{" "}
-        that opened it, and the{" "}
+        that opened the question, and the{" "}
         <a href={repoFile("docs/engine-worker-a11-0-finding.md")} {...external}>
           transferred-canvas finding
         </a>{" "}
-        that closed the last objection to it.
+        that closed the last objection.
       </p>
-      <PostAudio src="/audio/engine-in-a-worker.mp3" minutes={15} />
+      <PostAudio src="/audio/engine-in-a-worker.mp3" minutes={16} />
 
       <p>
-        Until August, the engine that does the actual pixel work in Image Horse — <code>stamp_tool</code>,
-        compiled from Rust to WebAssembly — ran on the same thread as the interface. Every blur, every
-        export, every batch run competed with painting. A heavy operation blocked the main thread for{" "}
-        <span className="fig">129–137&nbsp;ms</span>, and strokes stuttered while it did.
+        Picture a Lowe's with one employee. He runs the register, answers the phone, restocks the
+        shelves, and walks you to aisle 14 for the rubber mallet, and he does all of it in order, one
+        thing at a time, so when somebody at the Pro desk asks him to cut forty pieces of lumber,
+        everyone in line at the register just stands there and waits. That's a browser tab. The one
+        employee is called the main thread, and until August he was also the one doing the heavy photo
+        work in Image Horse.
       </p>
 
       <p>
-        Image Horse already ran a worker. <code>codec.worker.ts</code> encodes WebP and JPEG off-thread,
-        and it works because what it sends across is small, or already shaped like a buffer. The engine
-        is a different animal. Its whole value on the render path is a <em>view straight into WASM
-        linear memory</em>, blitted to the canvas without a copy. This post is about what happens to
-        that view at a thread boundary, and what we did instead.
+        The heavy photo work is done by a program called <code>stamp_tool</code>, written in Rust and
+        compiled to run in the browser. Every blur, every export, every batch job ran on the same thread
+        that draws your brush strokes. A big operation froze the page for{" "}
+        <span className="fig">129–137&nbsp;ms</span>, and your stroke stuttered while it did.
+      </p>
+
+      <p>
+        The obvious fix is a second employee. Browsers have one, it's called a Web Worker, and Image
+        Horse already used one for squeezing photos into WebP and JPEG. That one works because what it's
+        handed is small, or already shaped like a plain block of bytes. The engine is a different animal.
+        The reason it's fast is that the screen reads straight out of the engine's memory, no copy in
+        between. This post is about what happens to that trick when you put a wall between the engine and
+        the screen, and what I did instead.
       </p>
 
       <figure className="post__figure">
@@ -130,9 +142,9 @@ export default function EngineInAWorker() {
         <figcaption className="post__caption post__caption--numbered">
           <span className="post__fignum">FIG 1</span>
           <span>
-            Where things live now. The engine, its linear memory and the canvas surface all sit in the
-            worker. Calls carry a request id and get a reply; the per-frame <em>blit</em> is
-            fire-and-forget and bypasses the queue.
+            Where things live now. The engine, its memory and the drawing surface all sit in the back
+            room. Requests go in with a ticket number and get an answer back; the per-frame{" "}
+            <em>blit</em>, the "put the picture on screen" call, skips the line entirely.
           </span>
         </figcaption>
       </figure>
@@ -140,13 +152,13 @@ export default function EngineInAWorker() {
       <h2 id="doors">Three doors, one wall</h2>
 
       <p>
-        There are exactly three ways a value gets from one thread to another, and <code>postMessage</code>{" "}
-        picks between them based on what you hand it.
+        There are exactly three ways to get something from one thread to another, and the browser picks
+        one based on what you hand it. Think of it as moving a filing cabinet to the back room.
       </p>
 
       <table className="spec">
         <caption className="spec__caption">
-          How each door behaves. Cost is on the <em>sending</em> thread.
+          How each door behaves. The cost lands on the <em>sending</em> side.
         </caption>
         <thead>
           <tr>
@@ -159,46 +171,45 @@ export default function EngineInAWorker() {
         <tbody>
           <tr>
             <th scope="row">Copy</th>
-            <td>Structured clone</td>
-            <td>∝ payload size</td>
-            <td className="muted">Yes — two independent values</td>
+            <td>Structured clone: photocopy every page</td>
+            <td>Grows with the size</td>
+            <td className="muted">Yes, two separate cabinets</td>
           </tr>
           <tr>
             <th scope="row">Move</th>
-            <td>Transfer list, 2nd argument</td>
+            <td>Transfer list: hand over the keys</td>
             <td>
-              <span className="fig">O(1)</span> — size-independent
+              <span className="fig">O(1)</span>, the same cost at any size
             </td>
-            <td className="muted">No — original is detached, throws on read</td>
+            <td className="muted">No, the old handle is dead and reading it throws</td>
           </tr>
           <tr>
             <th scope="row">Share</th>
             <td>
-              <code>SharedArrayBuffer</code>
+              <code>SharedArrayBuffer</code>: a joint account
             </td>
-            <td>O(1), once</td>
+            <td>Free after the first time</td>
             <td className="muted">
-              Yes — <em>same bytes</em>, both threads
+              Yes, <em>the same bytes</em>, seen from both rooms
             </td>
           </tr>
         </tbody>
       </table>
 
       <p>
-        Move is the door you want for anything big: ownership changes hands, nothing is copied. It works
-        by <em>detaching</em> the buffer — unhooking the memory from the sending realm and rehooking it
-        in the receiving one. And that is exactly where the engine hits a wall.
+        Move is the door you want for anything big: ownership changes hands and nothing gets copied. It
+        works by <em>detaching</em> the memory, unhooking it from the sender and rehooking it in the
+        receiver. And that's exactly where the engine hits a wall.
       </p>
 
       <p>
-        WebAssembly linear memory cannot be detached. When the engine creates a{" "}
-        <code>WebAssembly.Memory</code>, the spec stamps its buffer with an internal{" "}
-        <code>[[ArrayBufferDetachKey]]</code> that <code>postMessage</code> does not carry, so the
-        detach fails (
+        The engine's memory can't be detached. The spec stamps it with an internal mark that{" "}
+        <code>postMessage</code> can't carry, so the hand-off fails (
         <a href="https://github.com/whatwg/html/issues/4601" {...external}>
           whatwg/html&nbsp;#4601
         </a>
-        ). The engine's heap is not a buffer you may move. It is the running program's memory.
+        ). It's not a filing cabinet you can wheel down the hall. It's the floor the engine is standing
+        on.
       </p>
 
       <figure className="post__figure">
@@ -207,52 +218,48 @@ export default function EngineInAWorker() {
           <span className="post__fignum">FIG 2</span>
           <span>
             The three doors, and the wall. Copy duplicates and pays by the byte. Move is instant and
-            leaves the sender detached. Share is one block visible from both sides. WASM memory is
-            chained to its realm — it strains and snaps back.
+            leaves the sender empty-handed. Share is one block visible from both rooms. The engine's
+            memory is chained to its room: it strains and snaps back.
           </span>
         </figcaption>
       </figure>
 
-      {/* The browser-disagreement note is a callout rather than another
-          paragraph because it is the one thing here that will bite someone
-          who tests in a single browser — which is most people, most of the
-          time. A reader skimming the headings should still catch it. */}
       <aside className="post__callout">
         <p className="post__callout-title">The part that bites in review, not in dev</p>
         <p>
-          The browsers disagree about the failure. Firefox and Safari throw a <code>TypeError</code>.
-          Chrome has, since 2014, <strong>silently copied instead</strong> — behavior that predates
-          WebAssembly and survived because sites depend on it. So the naive port <em>appears to work</em>{" "}
-          in Chrome, at full copy cost, and hard-fails the moment anyone opens Safari.
+          The browsers don't agree on how to fail. Firefox and Safari throw an error. Chrome has, since
+          2014, <strong>quietly made a copy instead</strong>, a habit older than WebAssembly that survived
+          because sites depend on it. So the lazy version <em>looks like it works</em> in Chrome, at full
+          copying cost, right up until someone opens Safari and it falls over. It's the contractor who
+          says "yeah, that'll hold" and leaves before you put weight on it.
         </p>
       </aside>
 
       <h2 id="budgets">Why the pixels can't make the trip</h2>
 
       <p>
-        Fine — copy them, then. Copy is the default door and it is not free. Surma benchmarked
-        structured clone across five device and browser combinations and found the time tracks the size
-        of the payload almost exactly (
+        Fine, copy them then. Copying is the default door and it isn't free. Surma measured it across
+        five devices and browsers and found the time tracks the size of what you send almost exactly (
         <a href="https://surma.dev/things/is-postmessage-slow/" {...external}>
           Surma, <em>Is postMessage slow?</em>
         </a>
-        ). Two budgets fall out of it.
+        ). Two budgets fall out of that.
       </p>
 
       <table className="spec">
         <caption className="spec__caption">
-          Structured-clone budgets, derived from the RAIL guidelines. Safe even on slow devices.
+          How much you can copy per message and still feel smooth, even on a slow phone.
         </caption>
         <thead>
           <tr>
             <th scope="col">If you are…</th>
-            <th scope="col">Budget</th>
-            <th scope="col">Max payload</th>
+            <th scope="col">Time budget</th>
+            <th scope="col">Max size</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row">Responding to a user interaction</th>
+            <th scope="row">Responding to a click</th>
             <td>
               <span className="fig">100&nbsp;ms</span>
             </td>
@@ -261,7 +268,7 @@ export default function EngineInAWorker() {
             </td>
           </tr>
           <tr>
-            <th scope="row">Driving a JS animation frame</th>
+            <th scope="row">Drawing one frame of an animation</th>
             <td>
               <span className="fig">16&nbsp;ms</span>
             </td>
@@ -272,7 +279,7 @@ export default function EngineInAWorker() {
         </tbody>
       </table>
 
-      <p>Now put an Image Horse frame against that.</p>
+      <p>Now put one frame of an Image Horse photo against that.</p>
 
       <figure className="post__figure">
         {/* The dashed budget rule is positioned from the SAME formula the bars
@@ -335,15 +342,15 @@ export default function EngineInAWorker() {
           </table>
 
           <p className="scale__foot">
-            The rule sits at the 10&nbsp;KiB per-frame budget. Every bar past it is a frame you drop.
+            The line sits at the 10&nbsp;KiB per-frame budget. Every bar past it is a frame you drop.
           </p>
         </div>
         <figcaption className="post__caption post__caption--numbered">
           <span className="post__fignum">FIG 3</span>
           <span>
-            Copying pixels per stroke is off the table before we start. A single HD composite is 810× the
-            per-frame clone budget, and transferring is forbidden by the wall above. The pixels cannot
-            make that trip at all.
+            Copying the pixels on every stroke is off the table before we start. One HD frame is 810
+            times the per-frame budget, and handing them over is forbidden by the wall above. The
+            pixels can't make that trip at all.
           </span>
         </figcaption>
       </figure>
@@ -351,20 +358,19 @@ export default function EngineInAWorker() {
       <h2 id="canvas">So the canvas moved instead</h2>
 
       <p>
-        If the pixels can't come to the canvas, the canvas goes to the pixels.{" "}
-        <code>canvas.transferControlToOffscreen()</code> yields an <code>OffscreenCanvas</code>, which{" "}
-        <em>is</em> transferable. One message carries it into the worker, once per element, and from
-        then on the worker draws onto it directly. The element stays in the DOM, where CSS still sizes
-        it and overlays still align to it — the main thread simply can no longer get a 2D context from
-        it.
+        If the pixels can't come to the screen, the screen goes to the pixels. The browser lets you take
+        the drawing surface out of a canvas element (<code>transferControlToOffscreen()</code>) and hand{" "}
+        <em>that</em> to the back room. One message, once per canvas, and from then on the worker draws
+        onto it directly. The element stays on the page, where the layout still sizes it and the
+        overlays still line up with it. The front counter just can't draw on it anymore.
       </p>
 
       <p>
-        That sounds like more work and it is less: under this arrangement <code>flushToCanvas</code>{" "}
-        never crosses the boundary at all. The worst read-modify-write site disappears instead of
-        needing a careful rewrite, and every argument against moving the canvas was measured first —
-        zoom and pan survive the transfer 11/11 across four browsers, overlays stay pinned 9/9, and{" "}
-        <code>desynchronized</code> is honored 4/4.
+        That sounds like more work and it's less. The worst piece of code on the old path, the one that
+        read from the engine and wrote to the screen on every frame, doesn't need a careful rewrite. It
+        just disappears. And every argument against moving the canvas got measured before anyone
+        believed it: zoom and pan survived the move 11 out of 11 times across four browsers, the overlays
+        stayed pinned 9 out of 9, and the low-latency drawing mode kept working 4 out of 4.
       </p>
 
       <p>Three things had to move together for that to hold.</p>
@@ -380,40 +386,31 @@ export default function EngineInAWorker() {
         </thead>
         <tbody>
           <tr>
-            <th scope="row">Construction</th>
-            <td className="muted">
-              <code>new Tool(w, h)</code> on the main thread, then handed over
-            </td>
-            <td>
-              <code>createLiveEngine(&#123; width, height, pixels &#125;)</code> — built where it runs.
-              One engine, one op log.
-            </td>
+            <th scope="row">Building the engine</th>
+            <td className="muted">Built at the front counter, then handed over</td>
+            <td>Built in the back room, where it runs. One engine, one history.</td>
           </tr>
           <tr>
-            <th scope="row">Recomposite</th>
-            <td className="muted">main thread</td>
-            <td>worker</td>
+            <th scope="row">Combining the layers</th>
+            <td className="muted">front counter</td>
+            <td>back room</td>
           </tr>
           <tr>
-            <th scope="row">Canvas resize</th>
+            <th scope="row">Resizing the canvas</th>
             <td className="muted">
               <code>canvas.width = w</code>
             </td>
-            <td>
-              worker sets <code>OffscreenCanvas.width</code>
-            </td>
+            <td>the worker resizes the surface it owns</td>
           </tr>
           <tr>
-            <th scope="row">Blit</th>
-            <td className="muted">
-              zero-copy view → backbuffer → <code>putImageData</code>
-            </td>
-            <td>same code, worker-side, against its own memory</td>
+            <th scope="row">Putting the picture on screen</th>
+            <td className="muted">read engine memory → copy → draw</td>
+            <td>same code, in the back room, against its own memory</td>
           </tr>
           <tr>
-            <th scope="row">Crosses the boundary</th>
-            <td className="muted">—</td>
-            <td>one fire-and-forget message per frame</td>
+            <th scope="row">Crosses the wall</th>
+            <td className="muted">nothing</td>
+            <td>one "go" message per frame, and nobody waits for a reply</td>
           </tr>
         </tbody>
       </table>
@@ -423,25 +420,26 @@ export default function EngineInAWorker() {
         <figcaption className="post__caption post__caption--numbered">
           <span className="post__fignum">FIG 4</span>
           <span>
-            <strong>Yours to drive</strong> — play, scrub, or jump to any of the four beats. The
-            transfer, in four beats. The surface leaves the element and lands beside the engine; from
-            then on pixels flow memory → canvas without leaving the worker, and the only per-frame
-            traffic is a blit message that nobody waits for.
+            <strong>Yours to drive</strong>: play, scrub, or jump to any of the four beats. The surface
+            leaves the page element and lands next to the engine; from then on pixels flow memory →
+            screen without leaving the back room, and the only per-frame traffic is a "go" that nobody
+            waits on.
           </span>
         </figcaption>
       </figure>
 
       <p>
-        The worker-side blit is the same dozen lines the main thread used to run, and it carries the
-        same two warnings. The view has to be rebuilt on every call, because a <code>memory.grow()</code>{" "}
-        replaces the backing buffer and detaches every earlier view of it. And it copies into a private
-        backbuffer before <code>putImageData</code>, because a desynchronized present reading live WASM
-        memory is the Firefox garbage-after-five-strokes bug.
+        The back-room draw is the same dozen lines the front counter used to run, with the same two
+        warnings attached. It has to look up where the pixels are on every call, because when the engine
+        asks for more memory it gets a new block and every old pointer into the old one goes dead. And
+        it copies the pixels into a private buffer before drawing, because drawing straight out of live
+        memory while the engine is still writing to it is the "garbage after five strokes" bug Firefox
+        taught me about.
       </p>
 
       <pre className="post__code">
         <code>
-          <span className="tok-c">{"// engine.worker.ts — fire-and-forget, not routed through the queue"}</span>
+          <span className="tok-c">{"// engine.worker.ts: fire-and-forget, not routed through the queue"}</span>
           {"\n"}
           <span className="tok-k">function</span>
           {" blit() {\n  "}
@@ -461,26 +459,30 @@ export default function EngineInAWorker() {
       </pre>
 
       <p>
-        Notice what is <em>not</em> in there: no request id, no reply, no queue. A blit mutates nothing,
-        so ordering it behind pending work would delay the picture without buying any guarantee — and
-        the round trip it would add is the regression the whole arc exists to remove.
+        Notice what's <em>not</em> in there: no ticket number, no reply, no line to wait in. Drawing the
+        picture changes nothing about the photo, so making it wait behind pending edits would delay what
+        you see without protecting anything, and the round trip it would add is the exact lag this whole
+        project exists to remove.
       </p>
 
-      <h2 id="one-port">One port, in order</h2>
+      <h2 id="one-port">One line, in order</h2>
 
       <p>
-        Everything that <em>does</em> mutate the document goes through a single port and an explicit
-        FIFO queue. That is not caution for its own sake. Image Horse's undo history is an op log, and{" "}
-        <code>OpLog::append</code> records <em>arrival</em> order — no op carries a sequence number. So{" "}
-        <code>postMessage</code> order has to <em>be</em> append order, and it only is while every
-        mutation goes through one port, drained one at a time. A library that gives correct results with
-        no ordering promise between concurrent calls would silently corrupt history.
+        Everything that <em>does</em> change the photo goes through a single door and waits its turn in
+        a strict line. That's not caution for its own sake. Image Horse's undo history is a ledger of
+        edits, and the ledger records them <em>in the order they arrive</em>; no edit carries its own
+        number. So the order messages arrive in has to <em>be</em> the order in the ledger, and that's only
+        true while every edit goes through one door, one at a time. Picture a deli counter that hands out
+        tickets but has three windows calling numbers at once: everyone gets served, nobody gets served
+        in order, and now the ledger says you blurred the plate before you cropped the photo when you
+        did it the other way round, and undo quietly takes back the wrong thing.
       </p>
 
       <p>
-        Each request carries a monotonic id, so concurrent calls cannot take each other's answers; a
-        superseded request can be cancelled before it runs; and a Rust panic comes back as a rejection
-        instead of a hang. Those are exactly what the original spike lacked.
+        Each request carries a ticket number that only ever counts up, so two requests in flight can't
+        grab each other's answers; a request that's been overtaken can be canceled before it runs; and if
+        the engine crashes, the request fails loudly instead of hanging forever. The first rough draft of
+        this had none of those.
       </p>
 
       <figure className="post__figure">
@@ -488,36 +490,36 @@ export default function EngineInAWorker() {
         <figcaption className="post__caption post__caption--numbered">
           <span className="post__fignum">FIG 5</span>
           <span>
-            The gate that could say no. Mutations posted with no await land in the worker's queue in
-            post order and drain one at a time into the op log; a canceled id is rejected, not
-            skipped. Run for real against 16 concurrent mutations, the worker's log came out
-            byte-identical to the local engine's.
+            The gate that can say no. Edits sent without waiting land in the worker's line in the order
+            they were sent and drain one at a time into the ledger; a canceled ticket is refused, not
+            skipped. Run for real with 16 edits in flight at once, the back room's ledger came out
+            byte-for-byte identical to the old front-counter one.
           </span>
         </figcaption>
       </figure>
 
       <table className="spec">
         <caption className="spec__caption">
-          Gate 3, the concurrent burst: 16 mutations in flight at once, then 6 edits against their ids.
-          Awaiting each call would have proven nothing.
+          Gate 3, the pile-on: 16 edits fired at once without waiting, then 6 more aimed at their ticket
+          numbers. Waiting politely for each one would have proven nothing.
         </caption>
         <thead>
           <tr>
             <th scope="col">
               <span className="visually-hidden">Measurement</span>
             </th>
-            <th scope="col">Local engine</th>
-            <th scope="col">Worker engine</th>
+            <th scope="col">Front counter</th>
+            <th scope="col">Back room</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row">ids returned</th>
+            <th scope="row">ticket numbers returned</th>
             <td>1..16 in order</td>
             <td>1..16 in order</td>
           </tr>
           <tr>
-            <th scope="row">ops · bytes</th>
+            <th scope="row">edits · bytes</th>
             <td>
               <span className="fig">7 · 910</span>
             </td>
@@ -526,7 +528,7 @@ export default function EngineInAWorker() {
             </td>
           </tr>
           <tr>
-            <th scope="row">op-log SHA-256</th>
+            <th scope="row">ledger fingerprint</th>
             <td>
               <span className="fig">ea77112d…</span>
             </td>
@@ -538,63 +540,68 @@ export default function EngineInAWorker() {
       </table>
 
       <p>
-        Which makes the rule the wrong kind of thing to remember and the right kind of thing to test.{" "}
-        <code>engineOwnership.contract.test.ts</code> fails on a second writer to the live handle, on an
-        engine built outside the owner, and on an assignment that bypasses the seam. All three were
-        mutation-tested rather than assumed.
+        A rule like "all edits go through the one door" is the wrong kind of thing to remember and the
+        right kind of thing to test, so there's a test that fails if anyone opens a second door, builds
+        an engine somewhere else, or sneaks around the seam. All three were checked by breaking the code
+        on purpose and watching the test go red.
       </p>
 
       <p>
-        The rule also needed a correction, five days in, and the correction is the interesting half. Two
-        modules legitimately build their own engine — batch export, and the settings panel behind it —
-        for a document you are <em>not</em> editing. Routing those through the live port would put their
-        operations in the live document's log, so undo would replay edits to a photo nobody opened, and a
-        forty-photo batch would queue behind the one open image. The first version of the rule said
-        "every mutation", a structural test enforced exactly that, and the obvious way to make the test
-        pass was to introduce the bug.
+        The rule also needed a correction five days in, and the correction is the interesting half. Two
+        parts of the app legitimately build their own engine, batch export and the settings panel behind
+        it, for a photo you are <em>not</em> currently editing. Sending those through the main door would
+        put their edits in the open photo's ledger, so undo would replay changes to a photo you never
+        opened, and a forty-photo batch would stand in line behind your one open image. The first
+        version of the rule said "every edit," a test enforced exactly that, and the easiest way to make
+        the test pass was to introduce the bug. The rule had to get more specific, not the code more
+        obedient.
       </p>
 
       <p>
-        One more thing the port had to get right. The main thread's handle to the engine is a Proxy, and
-        a Proxy that answers every property lookup with a forwarding function would make every feature
-        detection in the app — <code>typeof t.remove_object === "function"</code> and three others —
-        answer <em>yes</em> on every build. So the worker enumerates its own engine's prototype at init
-        and sends the list back, and the proxy forwards only those names. A surface reported by the
-        engine itself cannot drift from the engine, and the control check — an absent method answering{" "}
-        <code>false</code> — is the row that proves the gate is live.
+        One more thing the door had to get right. The front counter talks to the engine through a
+        stand-in that forwards every call to the back room. A stand-in that says "sure, I have that" to
+        every question would make every "does this build support X?" check in the app answer yes, for
+        every X, forever. So at startup the worker reads the real engine's list of functions and sends it
+        over, and the stand-in forwards only those names. A list the engine wrote about itself can't
+        drift from the engine, and the test that asks for a function that doesn't exist and gets a "no"
+        back is the row that proves the gate is live.
       </p>
 
-      <h2 id="truthy">The truthy trap</h2>
+      <h2 id="truthy">The IOU problem</h2>
 
       <p>
-        Turning a synchronous read into an asynchronous one does not break loudly. That is the entire
-        difficulty. A guard like <code>if (!tool.has_source())</code> reads perfectly well after the
-        conversion, and if the <code>await</code> is missing the expression is now a promise — and a
-        promise is truthy. The guard stops guarding. Nothing throws, nothing logs, and the tool quietly
-        does the thing the guard existed to prevent.
-      </p>
-
-      <p>
-        The variants got worse the further in we went. <code>Array.from(promise)</code> is{" "}
-        <code>[]</code>, which is also truthy, so a <code>if (!m) throw</code> written specifically to
-        catch a cache miss could never fire — and the arithmetic downstream produced <code>NaN</code> for
-        an entire batch. <code>flatten_text_annotations</code> reports whether a layer had annotations to
-        bake; un-awaited it reads as true after the first layer, so every OpenRaster export would have
-        told you your redo history had been cleared.
+        Here's the part of this project that cost me the most sleep, and it never once produced an error
+        message. When a call moves to the back room, you no longer get the answer back immediately. You
+        get a promise, which is the JavaScript word for an IOU: "the answer is coming." If you've ever
+        looked at derivatives, you already know the trap. A futures contract for a thousand barrels of
+        oil is not a thousand barrels of oil, and if you check your warehouse by asking "do I have a
+        piece of paper about oil?" the answer is always yes. The Dutch found that one out with tulip
+        contracts in 1637 and it's been a reliable way to lose money ever since.
       </p>
 
       <p>
-        TypeScript does not save you here, and the reason is worth writing down. A function returning{" "}
-        <code>Promise&lt;number&gt;</code> is assignable to a slot declared <code>=&gt; void</code>. One
-        of the pen tool's commit handlers sat in exactly such a slot, so the conversion would have
-        typechecked cleanly while <code>typeof newId === "number"</code> silently went false and paths
-        stopped staying selected.
+        In code, a guard like <code>if (!tool.has_source())</code> reads fine after the move. But if the{" "}
+        <code>await</code> is missing, the thing being checked is now an IOU, and an IOU is never
+        "nothing," so the guard always passes. Nothing throws, nothing logs, and the tool quietly does
+        the exact thing the guard existed to prevent.
       </p>
 
-      {/* Pulled out of the paragraph above rather than repeated from it — the
-          sentence is the one line of this post that transfers to any codebase
-          doing the same migration, and it was doing no work buried at the end
-          of a paragraph about pen tools. */}
+      <p>
+        The variants got worse the deeper I went. Turn an IOU into a list and you get an empty list,
+        which also counts as "something," so a check written specifically to catch a missing value could
+        never fire, and the math downstream turned a whole batch into <code>NaN</code>. One engine call
+        reports whether a layer had text to bake in; un-awaited, it reads as "yes" after the first layer,
+        so every export would have told you your redo history had been thrown away.
+      </p>
+
+      <p>
+        TypeScript doesn't save you here, and the reason is worth writing down. A function that returns
+        an IOU-for-a-number is allowed to sit in a slot that says "returns nothing," because an IOU
+        you're going to ignore is, technically, nothing. One of the pen tool's handlers sat in exactly
+        that kind of slot, so the move would have type-checked clean while a <code>typeof id ===
+        "number"</code> check silently went false and pen paths stopped staying selected.
+      </p>
+
       <blockquote className="post__quote post__quote--pull">
         <p>
           A <code>void</code> return is not proof that nothing is consumed.
@@ -602,24 +609,22 @@ export default function EngineInAWorker() {
       </blockquote>
 
       <p>
-        So the conversions were ratcheted. A contract test pins the number of unconverted value-consuming
-        sites so it can only go down, an audit script — not a hand-written list — is the authority on
-        what is left, and every batch was mutation-tested: change the code so the bug is present again,
-        and confirm a test goes red. Twice the tests caught what the audit structurally could not see,
-        because the audit reads the text at the call site and a guard one line below is invisible to it.
+        So I ratcheted it, the same way I ratcheted the file sizes in{" "}
+        <a href="/blog/entropy-is-the-default">the entropy post</a>. A test pins the number of calls that
+        still read the answer the old way, and that number may only go down; a script, not a hand-written
+        list, is the authority on what's left; and every batch was checked by putting the bug back in
+        and confirming a test turned red. Twice the tests caught something the script structurally
+        couldn't see, because the script reads the line where the call is made, and a guard one line
+        below it is invisible from there.
       </p>
 
       <h2 id="numbers">The numbers</h2>
 
       <p>
-        Latency was never the obstacle. The feasibility night measured the boundary before anyone wrote
-        a line of migration, and the obstacle turned out to be structural.
+        Speed was never the obstacle. I measured the wall between the rooms before writing a line of the
+        move, and the real obstacle turned out to be a counting problem.
       </p>
 
-      {/* A real quotation from a real document, so it is marked up as one and
-          cited to the file it came from. It was written inline in an <em> at
-          first, which reads as emphasis rather than as someone else's sentence
-          — and this sentence is the whole finding. */}
       <blockquote className="post__quote" cite={repoFile("docs/engine-worker-feasibility.md")}>
         <p>Latency is not the obstacle. The obstacle is 117 synchronous reads.</p>
         <cite className="post__quote-cite">
@@ -639,40 +644,41 @@ export default function EngineInAWorker() {
         </thead>
         <tbody>
           <tr>
-            <th scope="row">Empty-payload round trip, 50 pings</th>
+            <th scope="row">Round trip to the back room and back, empty message, 50 tries</th>
             <td>
-              <span className="fig">0.100&nbsp;ms</span> median · 0.300 ms p95 ·{" "}
+              <span className="fig">0.100&nbsp;ms</span> median · 0.300 ms worst-of-20 ·{" "}
               <span className="muted">0.6% of a frame</span>
             </td>
           </tr>
           <tr>
-            <th scope="row">Cold sharpen on a 48 MB photo, main vs worker</th>
+            <th scope="row">Cold sharpen on a 48 MB photo, front counter vs back room</th>
             <td>
               468.6 ms → 483.6 ms (<span className="fig">1.03×</span>)
             </td>
           </tr>
           <tr>
-            <th scope="row">Per-frame flush, in worker vs main</th>
+            <th scope="row">Drawing one frame, back room vs front counter</th>
             <td>22.1 ms vs 23.9 ms</td>
           </tr>
           <tr>
-            <th scope="row">Worker warm-up, cold vs warmed before the flip</th>
+            <th scope="row">Back-room warm-up, cold vs warmed up ahead of time</th>
             <td>
               715.4 ms vs <span className="fig">392.1&nbsp;ms</span>
             </td>
           </tr>
           <tr>
-            <th scope="row">Engine call sites audited</th>
+            <th scope="row">Places in the app that call the engine</th>
             <td>
-              206 — 77 fire-and-forget · <span className="fig">117 value-consumed</span> · 12 hot-path
+              206 total: 77 don't need an answer · <span className="fig">117 read the answer</span> · 12 on
+              the hot path
             </td>
           </tr>
           <tr>
-            <th scope="row">SharedArrayBuffer, COOP/COEP, wasm threads</th>
-            <td className="muted">none needed — transfer-based, single instance per side</td>
+            <th scope="row">Shared memory, special headers, threaded WebAssembly</th>
+            <td className="muted">none needed</td>
           </tr>
           <tr>
-            <th scope="row">Main-thread blocking per heavy operation</th>
+            <th scope="row">Page freeze per heavy operation</th>
             <td>
               129–137 ms → <span className="fig">0</span>
             </td>
@@ -681,33 +687,33 @@ export default function EngineInAWorker() {
       </table>
 
       <p>
-        The third door — shared memory — was never opened. Cross-origin isolation was tested and would
-        have worked, but a worker that owns its own WASM instance and exchanges transferables needs none
-        of it, and this project had already tried WASM threads once and dropped them at 8–31× slower
-        than the scalar kernel. The simplest architecture that could work is the one that shipped.
+        The third door, shared memory, never got opened. It was tested and would have worked, but a back
+        room that owns its own engine and swaps ownership of a few big things needs none of it, and this
+        project had already tried multi-threaded WebAssembly once and dropped it at 8 to 31 times slower
+        than the plain version. The simplest setup that could work is the one that shipped.
       </p>
 
       <h2 id="stages">Six stages, each one shippable</h2>
 
       <p>
-        The plan was staged on purpose. Stages one and two introduce no worker and change no behavior at
-        all — they establish the single seam and remove the read-modify-write sites — and they were worth
-        shipping even if everything after them had been abandoned. That is the point of putting them
-        first. Stage three built the worker and left it switched off, and the build emitted no worker
-        chunk at all, because nothing imported it yet. That was written down as the honest status rather
-        than smoothed over.
+        The plan was staged on purpose. Stages one and two added no worker and changed nothing you could
+        see: they put every engine call behind a single door and removed the places that read and wrote
+        engine memory in the same breath. Those were worth shipping even if everything after them had
+        been abandoned, which is the point of doing them first. Stage three built the back room and left
+        it switched off, and the build didn't even include it, because nothing used it yet. That got
+        written down as the honest status rather than smoothed over.
       </p>
 
       <p>
-        Every stage was reversible by itself, and the whole arc sat behind a flag that stayed off for
-        five weeks. It became the default on September 18th, 2026, in v8.32.
+        Every stage could be undone on its own, and the whole thing sat behind a switch that stayed off
+        for five weeks. It became the default on September 18th, 2026, in v8.32.
       </p>
 
       <h2 id="see-it">See it yourself</h2>
 
       <p>
-        The wall is a claim from a 2019 spec thread, and browsers move. Paste this into the console of
-        any page, in each browser you care about.
+        The wall is a claim from a 2019 spec discussion, and browsers move. Paste this into the console
+        of any page, in each browser you care about, and see which door it takes.
       </p>
 
       <pre className="post__code">
@@ -720,7 +726,7 @@ export default function EngineInAWorker() {
           {" {\n  "}
           <span className="tok-c">{"// structuredClone uses the same transfer machinery as postMessage"}</span>
           {"\n  structuredClone(m.buffer, { transfer: [m.buffer] });\n  console.log("}
-          <span className="tok-s">"copied silently — byteLength still"</span>
+          <span className="tok-s">"copied silently, byteLength still"</span>
           {", m.buffer.byteLength);\n} "}
           <span className="tok-k">catch</span>
           {" (e) {\n  console.log("}
@@ -730,11 +736,11 @@ export default function EngineInAWorker() {
       </pre>
 
       <p>
-        And in the editor itself, the worker engine is the default for every document. Add{" "}
-        <code>?ih_engine_worker=0</code> to opt a tab back onto the main thread, run a blur on a big
-        photo in each, and watch the pointer. It takes effect on the next load, like every kill switch
-        in this app. It is there because a change this structural should be something you can undo from
-        your own browser without waiting for a release from us.
+        And in the editor itself, the back room is the default for every photo. Add{" "}
+        <code>?ih_engine_worker=0</code> to the URL to put a tab back on the front counter, run a blur
+        on a big photo in each, and watch the pointer. It takes effect on the next load, like every kill
+        switch in this app. It's there because a change this big should be something you can undo from
+        your own browser without waiting on me for a release.
       </p>
 
       <p className="post__actions">
