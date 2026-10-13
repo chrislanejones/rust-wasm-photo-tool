@@ -7,7 +7,7 @@
  * REWRITTEN 10-13-2026 at Chris's request, for a reader who is not deep in the
  * stack: a tech manager, or someone two years in whose first year was React
  * list tutorials. Same facts and same figures, plainer words. The narration
- * mp3 was re-recorded from the new text the same day (Ava, edge-tts 7.3.1).
+ * mp3 was re-recorded from the new text the same day (Emma, widened stereo, edge-tts 7.3.1).
  *
  * EVERY NUMBER HERE IS MEASURED, and each one can be checked against the
  * repository at the commit named beside it:
