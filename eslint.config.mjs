@@ -217,8 +217,10 @@ export default tseslint.config(
     // app/session/useZipExport.ts on the async grammar.
     // 3396 -> 3392: the Reselect d-pad left with useDuplicatePad; the shape
     // action bar mounts as one line (app/session/useShapeActions.ts).
+    // 3392 -> 3254 (#366): the Reselect pick handler moved to
+    // app/session/useReselectPick.ts, which also retargets Perspective.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3392 }] },
+    rules: { "max-lines": ["error", { max: 3254 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

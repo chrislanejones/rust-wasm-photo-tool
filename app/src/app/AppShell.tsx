@@ -91,6 +91,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
+import { useReselectPick } from "./session/useReselectPick";
 import { useShapeActions } from "./session/useShapeActions";
 import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
@@ -837,7 +838,6 @@ export function AppShell() {
   // overlay through this one-shot request (cleared as soon as it's consumed).
   // State lives in useAnnotationStore, not here — AppShell gains nothing new.
   const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
-  const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
   // Pen handlers live in their own session hook (#45) — one domain, one set
   // of dependencies, and AppShell is under a line cap it was already over.
   const {
@@ -1477,29 +1477,8 @@ export function AppShell() {
   const setSelectedObject = useAnnotationStore((s) => s.setSelectedObject);
   const bumpAnnotations = useAnnotationStore((s) => s.bumpAnnotations);
 
-  const handleSelectObject = useCallback(
-    (o: ReselectObject) => {
-      setSelectedObject(o);
-      if (o.type === "text") {
-        setActiveTool("text");
-        void textTool.selectAnnotation(o.id);
-        return;
-      }
-      // A Bézier pen path (kind 7) re-opens in the PenOverlay — switch to
-      // Paint → Pen so the overlay is mounted, then hand it the control points
-      // so the curve and its anchors come back editable. Routing it through
-      // drawingTools.selectShape (the rect-bbox editor) only hid the path.
-      const shape = drawingTools.shapes.find((s) => s.id === o.id);
-      if (shape?.kind === 7) {
-        setActiveTool("brush");
-        setBrushMode("pen");
-        requestPenEdit({ id: o.id, points: shape.points.flat() });
-        return;
-      }
-      void drawingTools.selectShape(o.id);
-    },
-    [textTool, drawingTools, setActiveTool, setBrushMode],
-  );
+  // Review → Reselect pick; with Perspective open it retargets the tool (#366).
+  const handleSelectObject = useReselectPick(textTool, drawingTools);
 
   // Place the selected object into one of the nine grid cells — Rust centers the
   // bbox in that ninth of the canvas (`align_annotation` with a cell mode); JS
