@@ -4,6 +4,58 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — the editor's Vercel project lost every deployment overnight (10-14-2026)
+
+At about 07:27 UTC on 10-14, `edit.imagehorse.app` returned 404 `DEPLOYMENT_NOT_FOUND`,
+and the `image-horse` project had **0 deployments**. The production branch was still
+`master`. Retention on the project reads previews 1 day, production 7 days, keep 10.
+With no production deployment left, Vercel made the **first branch push** production:
+`feat/oplog-tonal-presets` (#368, unmerged, op-log v13) went live at 07:43 UTC.
+
+| Question | State |
+|---|---|
+| Why did every deployment go? | Unknown. It fits the retention setting, but that isn't proven. |
+| Restore | A production deploy of `master` is Chris's call (auto mode refused it). |
+| Users who edited on v13 | Master can't read a v13 log. They fall back to the working copy (image kept, that session's undo lost). |
+| Guard | Any agent push to a branch can become production while the project is empty. |
+
+Also: #368's "Deploy sentinel" job went green on a re-run only because production
+was serving #368's own build. That green proves nothing about master.
+
+## OPEN — `storedBytes` undercounts past 2,000 rows per user (10-14-2026)
+
+`convex/storageQuota.ts` reads at most `SUM_ROW_CAP = 2_000` `photo_edits` rows and
+2,000 `shares` rows per user. Past that, extra rows count as 0 bytes and the quota
+fails **open** (more storage than the cap). Nothing is deleted. It only changes a
+decision for an account over 2,000 rows that is also near its cap: an average under
+2.56 MiB per row on paid (5 GiB ÷ 2,000) or 51.2 KiB per row on free. The biggest
+dev account has 32 edit rows and 2 share rows (10-14). It isn't #367's index swap. The fix is a per-user
+stored-bytes counter kept by `save` / `remove` / `shares.create` / `shares.remove`,
+plus a backfill (widen, migrate, narrow). Not urgent. `storageSweep` is safe: it
+deletes only `if (apply && complete)` (`convex/storageSweep.ts:98`).
+
+## OPEN — Create AI Image reference uploads are orphaned after every job (10-14-2026)
+
+`convex/aiJobs.ts` `startGenerateJob` resolves `referenceStorageIds` to URLs and never
+writes them to a row, so every reference upload becomes an orphan once the job ends.
+Only `storageSweep` (cron still commented out) can reclaim them. If they're ever
+stored on `ai_jobs`, the new field needs its own `by_*StorageId` index and a lookup
+in `discardFailedUpload` (ADR-089's pre-mortem).
+
+## OPEN — small leftovers from the 10-14 night (10-14-2026)
+
+| Item | Where | Owner |
+|---|---|---|
+| Preset sliders ignore ←/→. Each arrow step is too small to reach the next value, so it snaps back. Shapes › Points stays at 5 after five ArrowRight presses. PageUp and the preset buttons work. Since #242 (09-26). | `app/src/components/ui/size-slider.tsx` (`posToValue` / `valueToPos`) | Felix |
+| No Ctrl+Y for redo; only Ctrl+Shift+Z is bound, and the shortcut sheet says so. Windows users may expect Ctrl+Y. | `useKeyboardShortcuts.ts:308-312` | Chris's call |
+| Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
+| `select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load | `e2e/` | Tara |
+| `SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone | `app/src/` | Tara |
+| Record the five Adjustments sliders on `Op::TonalStack` (`adjust_commit` / `adjust_apply` are still unrecorded). Decide whether the history label stays "Preset". | engine, after #368 | Silas |
+| Capture a real v13 op-log fixture with a TonalStack frame once #368 ships | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
+| `docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix | — | at merge |
+| `github/codeql-action` 4.38.3 (#359) was left out of #370. It edits a workflow file, and this machine's gh token has no `workflow` scope. Merge #359 as-is. | — | Chris |
+
 ## OPEN — work left in worktrees after the 10-13 cleanup (10-13-2026)
 
 18 worktrees under `~/ai-repo` were removed on 10-13. The ones below were kept
@@ -39,14 +91,22 @@ This entry rode in on a docs-only branch (#357), not a master commit, because
 the git-routine gate treats every master commit as a release (README,
 Change-summary and Trail must be staged).
 
-## OPEN — the tonal Presets op is still not recorded in the op log (10-13-2026)
+## IN PR #368 (10-14) — the tonal Presets op is still not recorded in the op log (10-13-2026)
+
+#368 records a preset as `Op::TonalStack` at index 23 and bumps the format to **v13**,
+not v12. v12 had already deployed with #356, so it can't take an append (ADR-090).
 
 §4 of the 10-13 op-log night plan was skipped. #356 had already added one new op
 variant (`SameGesture`, index 22) and bumped the format to v12. Tonal ops now start at index 23 (ADR-070,
 as amended by #356). To avoid a second format bump, the Presets op should land in
 the same release as #356.
 
-## OPEN — the weekly scheduled gitleaks scan is red on a test fixture (10-13-2026)
+## IN PR #370 (10-14) — the weekly scheduled gitleaks scan is red on a test fixture (10-13-2026)
+
+#301 had already fixed the fixture; the finding lives in pushed commit `3564c39b`.
+#370 adds a `.gitleaksignore` that skips that one fingerprint. A full-history
+`workflow_dispatch` scan on #370 found 0 leaks (run 38530818024). It hasn't been run
+locally, because gitleaks isn't installed (`sudo apt install gitleaks`).
 
 Master's Monday scheduled CI run is red on two jobs. `cargo audit` is the known one
 (parked 09-14, further down). The other is `Secret scan (gitleaks)`, red on the
