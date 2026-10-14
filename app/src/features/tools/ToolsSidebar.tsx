@@ -328,6 +328,8 @@ export function ToolsSidebar({
       exit={embedded ? undefined : "exit"}
       role="region"
       aria-label="Tool options"
+      // While it can be closed, a pasted image dragged into it closes it.
+      data-paste-yields={closable ? "tools" : undefined}
       // Clicking in here operates ON the current selection — the pen's color
       // and Background controls live in this panel — so it must not count as
       // "clicked away" and end that selection. See PenOverlay's off-canvas

@@ -430,6 +430,8 @@ export function GalleryBar({
         }
         transition={reduceMotion ? instantTransition : springStandard}
         style={vertical ? undefined : { position: "relative" }}
+        // While it can be closed, a pasted image dragged into it closes it.
+        data-paste-yields={closable ? "gallery" : undefined}
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"

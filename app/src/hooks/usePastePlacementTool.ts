@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImageHorseTool } from "stamp_tool";
+import { importEngine } from "@/lib/engineGate";
 import type { ToolType } from "@/lib/types";
 
 export interface PastePlacementRect {
@@ -47,6 +48,12 @@ export function usePastePlacementTool({
   // destination layer, and Escape must remove it again, not leave an empty
   // "Pasted Image" layer behind. Cleared on commit.
   const onCancelRef = useRef<(() => void) | null>(null);
+  // The pasted bytes the preview is drawing from, kept so "Resize & Compress"
+  // can resample them down to the box. Null for "Resize Layer", whose source
+  // is the layer itself and lives in Rust.
+  const sourceRef = useRef<{ pixels: Uint8Array; w: number; h: number } | null>(null);
+  // Its size, as state, so the Resize & Compress button re-renders with it.
+  const [sourceSize, setSourceSize] = useState<{ w: number; h: number } | null>(null);
 
   const begin = useCallback(
     (
@@ -61,6 +68,9 @@ export function usePastePlacementTool({
       const canvas = canvasRef.current;
       if (!t || !canvas) return;
       onCancelRef.current = onCancel ?? null;
+      const bytes = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
+      sourceRef.current = { pixels: bytes, w: srcW, h: srcH };
+      setSourceSize({ w: srcW, h: srcH });
       // If the pasted image is larger than the canvas, scale the initial box
       // down to fit so the whole image is visible immediately rather than
       // silently clipping off-canvas.
@@ -70,7 +80,7 @@ export function usePastePlacementTool({
       const x = Math.round(destX - (width - srcW) / 2);
       const y = Math.round(destY - (height - srcH) / 2);
       t.begin_paste_preview(
-        new Uint8Array(pixels.buffer),
+        bytes,
         srcW,
         srcH,
         x,
@@ -122,6 +132,8 @@ export function usePastePlacementTool({
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
     onCancelRef.current = null; // layer-resize cancel leaves the layer as-is
+    sourceRef.current = null;
+    setSourceSize(null);
     // v8.37 — the ENGINE decides the seed rect and this overlay draws THAT.
     //
     // The engine seeds the preview at the active layer's CONTENT BOUNDS (the
@@ -159,6 +171,8 @@ export function usePastePlacementTool({
       // preview that does not exist.
       if (!t || !(await t.has_paste_preview())) return;
       onCancelRef.current = null;
+      sourceRef.current = null;
+      setSourceSize(null);
       t.commit_paste_preview(filter);
       setRect(null);
       flushToCanvas();
@@ -171,6 +185,8 @@ export function usePastePlacementTool({
     const t = toolRef.current;
     if (!t) return;
     t.cancel_paste_preview();
+    sourceRef.current = null;
+    setSourceSize(null);
     setRect(null);
     flushToCanvas();
     const cleanup = onCancelRef.current;
@@ -229,5 +245,87 @@ export function usePastePlacementTool({
     }
   }, [activeTool, commit]);
 
-  return { rect, begin, beginLayerResize, update, commit, cancel };
+  /**
+   * "Resize & Compress": throw away the pixels the box no longer shows. A 4K
+   * screenshot pasted onto a photo is fit-scaled on screen, but the preview
+   * still carries every source pixel, and each drag frame resamples all of
+   * them. This resamples the source ONCE, in the engine, and restarts the
+   * preview from the smaller bytes at the same center and rotation.
+   *
+   * Target: the box's own size when the box is already smaller than the
+   * source (bake what you see). When it isn't — a paste that fits 1:1 — the
+   * click halves it, so one click always does something and each click after
+   * halves again. Nothing is committed: Enter still places it, Escape still
+   * cancels (and still removes a "Stack as layer" layer).
+   */
+  const compress = useCallback(async () => {
+    const t = toolRef.current;
+    const src = sourceRef.current;
+    if (!t || !src || !rect) return;
+    const target = compressTarget(rect, src);
+    if (!target) return;
+    const { w, h } = target;
+    // Catmull-Rom (2): sharper than bilinear for a big step down.
+    const { resize_pixels_filter } = await importEngine();
+    const small = resize_pixels_filter(src.pixels, src.w, src.h, w, h, 2);
+    // The placement may have been committed or cancelled while we waited.
+    if (sourceRef.current !== src || small.length !== w * h * 4) return;
+    const x = Math.round(rect.x + (rect.width - w) / 2);
+    const y = Math.round(rect.y + (rect.height - h) / 2);
+    sourceRef.current = { pixels: small, w, h };
+    setSourceSize({ w, h });
+    t.begin_paste_preview(small, w, h, x, y, w, h);
+    t.set_paste_preview_rotation((rect.rotation * Math.PI) / 180);
+    setRect({ ...rect, x, y, width: w, height: h });
+    flushToCanvas();
+  }, [toolRef, rect, flushToCanvas]);
+
+  const canCompress = !!rect && !!sourceSize && compressTarget(rect, sourceSize) !== null;
+
+  return {
+    rect,
+    sourceSize,
+    begin,
+    beginLayerResize,
+    update,
+    commit,
+    cancel,
+    compress,
+    canCompress,
+  };
+}
+
+/** Smallest edge Resize & Compress will halve down to. */
+const MIN_COMPRESS_EDGE = 16;
+
+/**
+ * Where Resize & Compress resamples to, or null when it would not make the
+ * paste any smaller. Exported for the tests.
+ */
+export function compressTarget(
+  box: { width: number; height: number },
+  src: { w: number; h: number },
+): { w: number; h: number } | null {
+  if (box.width * box.height < src.w * src.h) return { w: box.width, h: box.height };
+  const w = Math.round(box.width / 2);
+  const h = Math.round(box.height / 2);
+  if (w < MIN_COMPRESS_EDGE || h < MIN_COMPRESS_EDGE) return null;
+  return { w, h };
+}
+
+/** The box's four corners in canvas px, turned about its center. */
+export function boxCorners(rect: PastePlacementRect): { x: number; y: number }[] {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const rad = (rect.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const hw = rect.width / 2;
+  const hh = rect.height / 2;
+  return [
+    [-hw, -hh],
+    [hw, -hh],
+    [hw, hh],
+    [-hw, hh],
+  ].map(([dx, dy]) => ({ x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }));
 }
