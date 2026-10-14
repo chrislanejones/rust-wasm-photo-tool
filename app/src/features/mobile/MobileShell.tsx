@@ -32,8 +32,10 @@ import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
+import { isImportableFile } from "@/lib/importBoundary";
+import { HEIC_ACCEPT } from "@/lib/heicImport";
+import { useBetaOn } from "@/hooks/useBetaOn";
 import { useViewerOriginal, viewerBox } from "@/features/mobile/useViewerOriginal";
-import { isSvgFile } from "@/lib/rasterizeSvg";
 import { extFromMime } from "@/lib/mimeExt";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { useThumbImage } from "@/features/gallery/useThumbImage";
@@ -349,6 +351,7 @@ export function MobileShell({
   onAddFiles,
   onRequestDelete,
 }: Props) {
+  const heicOn = useBetaOn("heic-import");
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
 
@@ -372,15 +375,13 @@ export function MobileShell({
     if (viewerId && !photos.some((p) => p.id === viewerId)) setViewerId(null);
   }, [viewerId, photos]);
 
-  // Same image filter as NewActions.processFiles: the mime check plus
-  // isSvgFile for .svg files whose source hands over an empty mime
-  // (handleAddPhotos rasterizes those at the boundary).
+  // Same image filter as NewActions.processFiles: the mime check plus .svg
+  // (and, Beta, .heic) files whose source hands over an empty mime
+  // (handleAddPhotos converts those at the boundary).
   const handlePicked = useCallback(
     (list: FileList | null) => {
       if (!list) return;
-      const images = Array.from(list).filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
-      );
+      const images = Array.from(list).filter(isImportableFile);
       if (images.length) onAddFiles(images);
     },
     [onAddFiles],
@@ -475,7 +476,9 @@ export function MobileShell({
               Add Images
             </Button>
             <p className="text-xs text-text-secondary">
-              Supports PNG, JPG, GIF, WebP, AVIF, SVG
+              {heicOn
+                ? "Supports PNG, JPG, GIF, WebP, AVIF, HEIC, SVG"
+                : "Supports PNG, JPG, GIF, WebP, AVIF, SVG"}
             </p>
           </div>
         </div>
@@ -522,7 +525,7 @@ export function MobileShell({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.svg"
+        accept={heicOn ? `image/*,.svg,${HEIC_ACCEPT}` : "image/*,.svg"}
         multiple
         className="hidden"
         onChange={(e) => {

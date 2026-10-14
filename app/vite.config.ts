@@ -138,7 +138,14 @@ const swPlugins = (): PluginOption[] => {
         // version.json could never disagree with the precached JS, which is
         // the exact skew the guard exists to catch. (.json is outside the
         // globPatterns already; the ignore pins it against future edits.)
-        globIgnores: ["**/version.json"],
+        //
+        // The libheif chunk (HEIC import Beta, ADR-087) is ignored for a
+        // different reason: at ~2 MB it is bigger than most of the app, and the
+        // whole point of loading it behind a dynamic import inside the codec
+        // worker (lib/heicCodec.ts) is that a session which never opens a HEIC
+        // never fetches it. Precaching it would hand that 2 MB to EVERY visitor
+        // at install time and undo the split.
+        globIgnores: ["**/version.json", "**/libheif-bundle-*.js"],
         // SPA shell. Share links are `?v=<token>` on this same shell
         // (App.tsx), not server-rendered routes — no denylist needed.
         navigateFallback: "/index.html",

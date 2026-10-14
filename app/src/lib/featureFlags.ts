@@ -36,6 +36,7 @@
 import { isWebBudgetEnabled } from "@/lib/webPerf";
 import { isExifRustEnabled } from "@/lib/exif/rust";
 import { isHistoryForksEnabled } from "@/lib/historyForks";
+import { isHeicImportEnabled } from "@/lib/heicImport";
 import { isOplogPersistenceEnabled } from "@/lib/oplogPersistence";
 import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
@@ -180,6 +181,20 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
       label: "Keep the steps you undo",
       blurb:
         "Undo a few steps and then make a different edit, and the steps you undid are kept as a branch under History instead of thrown away. Click one to go back to it. Branches live in memory only, and on large photos there is often no room to keep one.",
+    },
+  },
+  {
+    key: "ih_heic_import",
+    label: "HEIC import (ADR-087)",
+    kind: "optin",
+    isOn: isHeicImportEnabled,
+    effect: "A .heic/.heif/.hif is decoded by libheif (LGPL-3.0, WASM) in the codec worker and re-encoded to WebP at the import boundary, EXIF carried over with Orientation reset to 1. libheif is a ~2 MB chunk fetched the first time a HEIC arrives, never otherwise. Safari decodes natively and skips it. Off: a .heic is filtered out or fails to decode exactly as before, and libheif is never requested.",
+    source: "lib/heicImport.ts",
+    beta: {
+      id: "heic-import",
+      label: "Open iPhone photos (HEIC)",
+      blurb:
+        "Open the .heic photos an iPhone takes. They open like any other photo, camera info and all, and save as WebP. The first one takes a moment: a 2 MB decoder downloads then, and only then.",
     },
   },
   {
