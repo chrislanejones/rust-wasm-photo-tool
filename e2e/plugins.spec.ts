@@ -54,7 +54,7 @@ async function openSettingsTab(page: Page, tab: string) {
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
   const dialog = page.getByRole("dialog").filter({ hasText: "Settings" }).first();
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByRole("button", { name: tab, exact: true }).click();
+  await dialog.getByRole("tab", { name: tab, exact: true }).click();
   return dialog;
 }
 

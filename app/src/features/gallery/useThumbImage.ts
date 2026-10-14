@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
 
 /**
  * How long a decode may take before a tile admits it is waiting.
@@ -36,8 +37,7 @@ export interface ThumbViewInput {
 
 /**
  * The whole decision, as a pure function of three strings — extracted so the
- * truth table can be tested without a renderer, which this repo has no
- * dependency for.
+ * truth table can be tested independently of the rendered presentation.
  *
  * ⚠️ `shownUrl` is deliberately NOT compared against `url`. That is the point.
  * A tile mid-edit has `shownUrl` = the previous URL and `url` = the new one,
@@ -77,13 +77,19 @@ export function thumbViewState({ url, shownUrl, failedUrl }: ThumbViewInput): {
  * load that already happened cannot be erased, and a load that belongs to an
  * old URL cannot be counted for a new one.
  */
-export function useThumbImage(thumbBlob: Blob): ThumbImage {
+// Gallery callers already have a region deadline; independent resource images
+// opt into their own timeout rather than racing that existing state machine.
+export function useThumbImage(thumbBlob: Blob | string, timeoutMs?: number): ThumbImage {
   const [url, setUrl] = useState("");
 
   // Created and revoked in ONE effect. Creating in a memo and revoking in an
   // effect revokes a URL the next render is still using, which is its own
   // long-standing bug class in this repo.
   useEffect(() => {
+    if (typeof thumbBlob === "string") {
+      setUrl(thumbBlob);
+      return;
+    }
     const next = URL.createObjectURL(thumbBlob);
     setUrl(next);
     return () => URL.revokeObjectURL(next);
@@ -106,31 +112,37 @@ export function useThumbImage(thumbBlob: Blob): ThumbImage {
     const probe = new Image();
     let live = true;
     probe.decoding = "async";
+    let settled = false;
+    const finish = (failed: boolean) => {
+      if (!live || settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      if (failed) setFailedUrl(url);
+      else setShownUrl(url);
+    };
+    const timeout = timeoutMs === undefined ? undefined : window.setTimeout(() => finish(true), timeoutMs);
     probe.onload = () => {
-      if (live) setShownUrl(url);
+      // A load event can precede decode. Keep the previous pixels until the
+      // browser can paint the replacement; older engines lack decode().
+      if (typeof probe.decode === "function") probe.decode().then(() => finish(false), () => finish(true));
+      else finish(false);
     };
-    probe.onerror = () => {
-      if (live) setFailedUrl(url);
-    };
+    probe.onerror = () => finish(true);
     probe.src = url;
     return () => {
       live = false;
+      window.clearTimeout(timeout);
       probe.onload = null;
       probe.onerror = null;
     };
-  }, [url]);
+  }, [url, timeoutMs]);
 
   const view = thumbViewState({ url, shownUrl, failedUrl });
 
   // Armed only while there is nothing to show, and never re-armed for a later
   // edit — the previous thumbnail covers that wait, so an edit must not be
   // able to flash a placeholder over a picture that is already on screen.
-  const [graceOver, setGraceOver] = useState(false);
-  useEffect(() => {
-    if (!view.pending) return;
-    const t = window.setTimeout(() => setGraceOver(true), THUMB_SKELETON_DELAY_MS);
-    return () => window.clearTimeout(t);
-  }, [view.pending]);
+  const graceOver = useDelayedFlag(view.pending, THUMB_SKELETON_DELAY_MS);
 
   return { ...view, showSkeleton: view.pending && graceOver };
 }

@@ -6,8 +6,7 @@
 // /zustand) and is the first slice of slimming the 3k-line AppShell down.
 //
 // Boot/lifecycle flags (booting, firstRun), the image-load indicator
-// (isImageLoading/loadProgress + the fake-progress interval, encapsulated in the
-// startImageLoad/finishImageLoad action pair), the A/B compare view state
+// (isImageLoading, owned by the document loading session), the A/B compare view state
 // (compareActive/originalUrl), the spacebar pan flag (isPanning), and the
 // resolved auth tier (userMode/authResolved/devTierOverride) also live here now —
 // evicted from AppShell's local useState in the stage-1 dismantle.
@@ -25,12 +24,6 @@ import {
 import { idbStorage } from "./storage/idbStorage";
 import type { UserMode } from "@/components/StatusBar";
 import type { SettingsTab } from "@/components/SubscriptionButton";
-
-// Module-scoped handles for the fake image-load progress interval and the
-// hide-after-finish timer. Kept out of store state (they're imperative timer
-// ids, not render inputs) — mirrors the loadIntervalRef AppShell used to hold.
-let loadInterval: ReturnType<typeof setInterval> | null = null;
-let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
 const MASTER_TABS = ["tools", "gallery", "review"] as const;
@@ -112,7 +105,8 @@ interface UIState {
   firstRun: boolean;
   // Image-load indicator (top progress bar + New/Upload spinners).
   isImageLoading: boolean;
-  loadProgress: number;
+  /** Recoverable failure of the selected photo load; session-only. */
+  photoSwitchError: string | null;
   // A/B compare: the "before" original blob URL, whether the slider is on, and
   // where the divider sits (0..1). The handle position lives here rather than in
   // CompareSlider's own useState so it survives a CanvasArea remount and so the
@@ -157,11 +151,6 @@ interface UIState {
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
   setIsImageLoading: (v: SetArg<boolean>) => void;
-  setLoadProgress: (v: SetArg<number>) => void;
-  /** Begin the fake-progress indicator: reset to 0, tick up toward 90%. */
-  startImageLoad: () => void;
-  /** Finish it: snap to 100%, then hide + reset after a short beat. */
-  finishImageLoad: () => void;
   setOriginalUrl: (v: SetArg<string | null>) => void;
   setCompareActive: (v: SetArg<boolean>) => void;
   setComparePosition: (v: SetArg<number>) => void;
@@ -229,7 +218,7 @@ export const useUIStore = create<UIState>()(
       booting: true,
       firstRun: true,
       isImageLoading: false,
-      loadProgress: 0,
+      photoSwitchError: null,
       originalUrl: null,
       compareActive: false,
       comparePosition: 0.5,
@@ -288,33 +277,6 @@ export const useUIStore = create<UIState>()(
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
       setIsImageLoading: (v) =>
         set((s) => ({ isImageLoading: resolveSet(v, s.isImageLoading) })),
-      setLoadProgress: (v) =>
-        set((s) => ({ loadProgress: resolveSet(v, s.loadProgress) })),
-      startImageLoad: () => {
-        if (loadInterval) clearInterval(loadInterval);
-        if (finishTimer) {
-          clearTimeout(finishTimer);
-          finishTimer = null;
-        }
-        set({ isImageLoading: true, loadProgress: 0 });
-        loadInterval = setInterval(() => {
-          set((s) => ({
-            loadProgress: s.loadProgress >= 90 ? 90 : s.loadProgress + Math.random() * 15,
-          }));
-        }, 100);
-      },
-      finishImageLoad: () => {
-        if (loadInterval) {
-          clearInterval(loadInterval);
-          loadInterval = null;
-        }
-        set({ loadProgress: 100 });
-        if (finishTimer) clearTimeout(finishTimer);
-        finishTimer = setTimeout(() => {
-          set({ isImageLoading: false, loadProgress: 0 });
-          finishTimer = null;
-        }, 500);
-      },
       setOriginalUrl: (v) => set((s) => ({ originalUrl: resolveSet(v, s.originalUrl) })),
       setCompareActive: (v) =>
         set((s) => {

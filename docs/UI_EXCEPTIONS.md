@@ -17,6 +17,14 @@ a bug that was quieted.
 This file is the registry. **An exception is allowed. An undocumented one is
 not.**
 
+UI State v4 audit (10-08-2026): no new visual exception and no raised lint or
+guardrail baseline. The eight remaining `direct-document-reads` are in
+`features/canvas/CanvasArea.tsx` and describe the outgoing canvas geometry while it
+remains visible under the transition veil. Document actions are locked and sidebar
+readouts use the loaded-document accessor. Retain this measured floor until that
+geometry can safely be moved; do not hide additional readouts behind this exception.
+Diagnostics image metadata now uses the same accessor, including late hash isolation.
+
 ## 1. The two kinds
 
 | Kind | How it looks | Scope |
@@ -155,7 +163,6 @@ reasons, not a number.
 | `components/ColorPickerDialog.tsx` | 1 | swatch "+" circle | "Save to palette": a 28px dashed circle that sits in the swatch row as one of the swatches. No primitive is round. | 10-06-2026 |
 | `components/ColorSwatchGrid.tsx` | 1 | swatch "+" circle | "Pick a custom color": the same circle, same reason. | 10-06-2026 |
 | `components/DimensionFields.tsx` | 1 | aspect lock | A 34×34 toggle sized to the two `NumberField`s beside it. `ToggleButtonGroup` is a 38px pill and `Button` has no square toggle size; adding one is a primitive change for one caller. | 10-06-2026 |
-| `components/SubscriptionButton.tsx` | 1 | the Settings rail | The Settings modal's vertical tab list. `segmented-tabs` is horizontal. It wants its own primitive (`role="tablist"`, arrow keys), which is a separate change. | 10-06-2026 |
 | `features/canvas/GridThumbnails.tsx` | 1 | thumbnail overlay | The Batch grid tile: the whole photo is the hit area. | 10-06-2026 |
 | `features/canvas/HistogramView.tsx` | 1 | HistogramView | The RGB / Luma pair is styled by the component's inline `CSSProperties`, like the rest of the histogram. Moving it means moving the whole view to classes. | 10-06-2026 |
 | `features/canvas/ShapeActionsOverlay.tsx` | 1 | canvas overlay | Connector ports, positioned on the shape in canvas coordinates. | 10-06-2026 |
@@ -164,3 +171,6 @@ reasons, not a number.
 | `features/mobile/MobileShell.tsx` | 1 | thumbnail | The phone grid tile is itself the button. | 10-06-2026 |
 | `features/tools/settings/StampSettings.tsx` | 1 | StampSettings | Each stamp preset is drawn in its own stamp color (inline style per preset): a preview of the stamp, not a button style. | 10-06-2026 |
 | `features/upload/CreateAIImagePanel.tsx` | 1 | thumbnail overlay | The "×" on a reference image tile. | 10-06-2026 |
+
+Night 14 (10-09-2026): the Settings rail now uses the vertical variant of
+`ui/segmented-tabs`; its raw-button exception is retired (14 → 13).

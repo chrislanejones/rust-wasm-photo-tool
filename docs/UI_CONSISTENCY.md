@@ -149,7 +149,8 @@ Import these. Do not re-implement them.
 | Segmented / single-select | `ui/tool-button-group` |
 | Independent toggles | `ui/toggle-button-group` |
 | Tool mode switch | `ui/tool-mode-toggle` (wraps `tool-button-group`) |
-| Overlay tabs | `ui/segmented-tabs` |
+| Overlay / Settings tabs | `ui/segmented-tabs` (vertical variant: roving arrows, Home/End, linked panel) |
+| Decoded resource images | `ui/decoded-image`, over `useThumbImage` and `ui/skeleton` |
 | Cards as a radio group | none — `ui/radio-cards` lost its last caller and was deleted 10-05-2026 (fallow: unused file) |
 | On/off switch | `ui/switch` |
 | Modal | `ui/dialog` |
@@ -383,6 +384,15 @@ Known exception: export quality is seeded from the previous photo until edit
 archives carry it (AppShell quality seed). Guides are cleared rather than
 reloaded until they are persisted per photo (`useGuidesStore` TODO).
 
+**Night 13 audit (10-09-2026, master 315e857f):** still true. `SavedEdit`
+and the version-1 `CapturedState` omit export quality; changing only the seed
+would replace a preference with an engine default, not recover saved quality.
+ADR-031's persisted-format work is separate (also proposed in draft #329).
+Guide positions likewise have no saved field; clearing them prevents coordinates
+from one photo appearing on another. Guide color remains an app preference.
+The gallery caption names the collection (`12 photos · 12 max`); the Tools
+footer names the active photo (`3 of 12 · filename`).
+
 ## 10. One async grammar (Plan C §3, 10-05-2026)
 
 Every flow that waits — AI result, background removal, export, Download All,
@@ -434,3 +444,44 @@ Where each flow stands (10-05-2026):
 | Batch passes | failures counted in the end toast |
 | Settings sync | already the reference (`lib/sync/status.ts`): own states, retry, timeouts |
 | Edit backup | a failed cloud upload holds "Not backed up — saved on this device" in the status bar until the next upload lands |
+
+
+## UI Night 14 follow-up (10-09-2026)
+
+The four new media consumers share `ui/decoded-image`; resource identity belongs
+to the caller's React key, and a changed blob for that identity retains its last
+decoded pixels. It introduces no second loading state machine or shimmer. Lazy
+share previews only start their loader near the viewport. Each independent image
+loading region has one status; the existing gallery card retains its aggregate
+announcement. A processing operation continues to show its source and progress.
+
+Settings uses the vertical `segmented-tabs` variant with one Tab stop and linked
+panel semantics. Muted text now clears AA on secondary/tertiary/elevated surfaces
+in both themes (minimum 4.68:1 light, 4.79:1 dark); shortcut group headings use the
+secondary text role. Ratchets tighten: spacing 42 → 41, raw buttons 14 → 13;
+radius remains 22. Measured by `e2e/ui-night14-accessibility.spec.ts` and the AST
+counter, not rounded assumptions.
+
+## UI State Consistency v4 (10-08-2026)
+
+Requested gallery identity and loaded engine identity are distinct. `usePhotoSwitching`
+locks document actions immediately; `useLoadedDocument` returns null while loading,
+while identities differ, or when the engine explicitly reports unready. Global
+preferences remain available. Readouts show neutral values first, with existing
+300 ms skeletons for slow transitions. Time passing never unlocks an outgoing document.
+
+Quality drafts reset from the loaded document and its history revision. Apply uses
+the displayed draft; successful engine synchronization publishes the committed value.
+Temporary refinement and lasso sessions end on document changes. Mask editing requires
+an actual active-layer mask and exits when that mask is removed or undone.
+
+An archive write must finish successfully before switching away from unsaved edits.
+Save failures remain visible until a matching write succeeds; returning to the loaded
+photo preserves recoverable edits. Cloud backup and local save are separate outcomes.
+Async contexts expire on completion, failure and timeout; late progress and downloads
+cannot revive them. OpenRaster currently cannot cancel its underlying import, so its
+timeout communicates that limitation honestly.
+
+See [the seven audit records](ui-state-v4/07-audit.md) for regression coverage,
+screenshots, measurements, dependencies and remaining limits. Guardrail
+`legacy-photo-loading` prevents obsolete timer-based completion state returning.

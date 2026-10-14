@@ -104,8 +104,20 @@ function isAllowedReplicateHost(urlStr: string): boolean {
   if (url.protocol !== "https:") return false;
   const host = url.hostname.toLowerCase();
   const allowed = ["replicate.delivery", "replicate.com"];
-  return allowed.some((d) => host === d || host.endsWith(`.${d}`));
+  if (allowed.some((d) => host === d || host.endsWith(`.${d}`))) return true;
+  // Replicate also hands back outputs from its own Cloudflare R2 bucket —
+  // first seen 10-08 on a text-to-image job (#337), refused here, so the job
+  // failed after it had already been paid for. Pinned to that ONE bucket host
+  // (the R2 account id is part of it), never `*.r2.cloudflarestorage.com`:
+  // anyone can own an R2 bucket, and this guard exists so a result URL can
+  // only point at Replicate's storage. If Replicate moves buckets, jobs fail
+  // loudly with this host in the error, which is the cue to add it.
+  return REPLICATE_R2_OUTPUT_HOSTS.includes(host);
 }
+
+const REPLICATE_R2_OUTPUT_HOSTS = [
+  "ai-gateway-outputs.0d37909e38d3e99c29fa2cd343ac421a.r2.cloudflarestorage.com",
+];
 
 /**
  * Replicate completion webhook.

@@ -94,7 +94,7 @@
   --border-active: #c98f3f;
   --text-primary: #2a2622;
   --text-secondary: #5c554c;
-  --text-muted: #8a8175;
+  --text-muted: #6b6258;
   /* Light-mode accent = deeper warm tan (not the dark-mode cream): cream is
      illegible as text / a slider thumb / a thin line on light surfaces. Used
      for --accent + --primary so all fills, text-primary, and the range thumb
@@ -211,7 +211,7 @@
   --border-active: #fcdfc2;
   --text-primary: #eeeeee;
   --text-secondary: #b4b4b4;
-  --text-muted: #8a8a8a;
+  --text-muted: #969696;
   --accent: #fcdfc2;
   --accent-foreground: #3a3128;
   --accent-dim: rgba(252, 223, 194, 0.15);
@@ -346,9 +346,9 @@
      dark (14.70:1 / 11.11:1).
 
      Likewise --color-theme-sidebar-muted is --muted-foreground, NOT the
-     name-matching --text-muted: that one is #8a8175 in light and measures
-     **3.65:1** on the sidebar, which fails AA for the `text-xs` helper line it
-     would have colored. --muted-foreground is 6.99:1 light / 8.56:1 dark.
+     name-matching --text-muted: before Night 14 that was #8a8175 in light
+     and measured **3.65:1** on the sidebar. Night 14 darkens muted text; the
+     sidebar retains its already-legible role. --muted-foreground is 6.99:1 light / 8.56:1 dark.
      The token whose NAME matches is not always the token whose CONTRAST does.
 
      The five `bg-theme-accent` references moved to `bg-theme-muted` instead of
@@ -1482,16 +1482,18 @@ textarea:focus-visible {
     -6px 0;
   background-color: #d0d0d0;
 }
-.import-preview img {
+.import-preview-box {
+  /* Sized inline from the decoded width/height (importPreviewBox), so the
+     frame has its final shape before the picture arrives. A grey skeleton
+     fills it only if the decode takes longer than the 300 ms grace. */
   display: block;
-  /* Taller than the old 140px: the frame no longer has to leave room beside
-     the image for the dimensions chip, so the preview can use the space. */
-  max-height: 200px;
   max-width: 100%;
-  width: auto;
-  height: auto;
+  overflow: hidden;
   border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.import-preview-box img {
+  display: block;
 }
 .import-preview-dims {
   /* Sits ON the image, bottom-right. It was `margin-left: auto` in the flex
@@ -2695,7 +2697,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--accent);
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 

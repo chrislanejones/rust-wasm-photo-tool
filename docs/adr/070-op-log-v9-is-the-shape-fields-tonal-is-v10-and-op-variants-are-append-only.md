@@ -1,6 +1,14 @@
 # ADR-070: Op-log v9 is the shape fields alone, the tonal adjustments are v10, and `Op` variants are append-only
 Date: 2026-09-24   Amended: 09-30-2026   Status: proposed   Relates to: ADR-060, ADR-066, ADR-069, ADR-059 (#187)
 
+## Amendment, 10-13-2026 (ADR-088, draft)
+
+`Op::SameGesture` took **index 22** in op-log **v12**: a unit marker that joins
+an op to the gesture before it, so one undo takes back the whole gesture.
+`op_variant_indices_are_append_only` pins 22. Version 10 is still never
+written and stays ADR-070's. The tonal ops now start at **index 23**, and ship
+in the next number after 12, or ride v12 if they land in the same release.
+
 ## Amendment, 10-05-2026 (ADR-082, draft)
 
 Shape corner radii took **v11** as decision 4 directs, and appended

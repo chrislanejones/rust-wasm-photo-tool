@@ -209,3 +209,13 @@ describe("the loading mark (Plan A §4.1)", () => {
     expect(mark!.textContent).toContain("Loading IMG_0427.jpg");
   });
 });
+
+
+it("leaves the existing gallery region in charge of its deadline", () => {
+  const { container, onPendingChange } = renderThumb();
+  act(() => vi.advanceTimersByTime(15_001));
+  // Without a region's capped context, a gallery tile still reports pending.
+  // The independent media deadline must not race the card's cap/logging.
+  expect(container.querySelector(".skeleton")).toBeTruthy();
+  expect(onPendingChange).not.toHaveBeenCalledWith("p1", false);
+});

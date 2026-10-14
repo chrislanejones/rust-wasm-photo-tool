@@ -13,6 +13,7 @@
 //    the panel called the Apply done. It is a toast now, and the handlers
 //    return whether the stored file changed so the panel only clears what was
 //    actually applied.
+import { isPhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useCallback, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { PhotoBounds } from "@/hooks/usePhotoBounds";
@@ -71,17 +72,18 @@ export function useResizeCompress({
    *  it is what a lossy export will use. Resolves `true` when it applied. */
   const applyCompression = useCallback(
     async (w: number, h: number, filter: number): Promise<boolean> => {
+      if (isPhotoSwitching()) return false;
       const entry = useGalleryStore.getState().photos.find((p) => p.id === activePhotoId);
       const own = formatFromMime(entry?.mimeType ?? "");
       const lossy = own !== null && own !== "png";
       const resized = w !== photoW || h !== photoH;
       if (resized) resizePhotoTo(w, h, filter);
-      const recordQuality = () => {
-        stamp.toolRef.current?.push_compress_marker(quality);
-        stamp.syncState();
+      const recordQuality = async () => {
+        await stamp.toolRef.current?.push_compress_marker(quality);
+        await stamp.syncState();
       };
       if (!lossy && !resized) {
-        recordQuality();
+        await recordQuality();
         return true;
       }
       // A resize always writes (see `allowGrow`), so the canvas and the
@@ -90,10 +92,16 @@ export function useResizeCompress({
         lossy ? { allowGrow: resized, format: own } : { allowGrow: true, keepSourceEncoding: true },
       );
       report(out);
+      if (isPhotoSwitching() || useGalleryStore.getState().activePhotoId !== activePhotoId) return false;
       if (out.status === "saved") {
         // The Compress step is recorded only for a compression that landed —
         // an undo step for a file that never changed undoes nothing.
-        if (!resized) recordQuality();
+        if (!resized) await recordQuality();
+        else {
+          // Resize already captured the previous quality in its snapshot.
+          await stamp.toolRef.current?.set_export_quality(quality);
+          await stamp.syncState();
+        }
         markModified();
         return true;
       }
@@ -105,6 +113,7 @@ export function useResizeCompress({
   /** Dimensions only, re-saved in the photo's own format and quality. */
   const applyResizeOnly = useCallback(
     async (w: number, h: number, filter: number): Promise<boolean> => {
+      if (isPhotoSwitching()) return false;
       if (w < 1 || h < 1 || (w === photoW && h === photoH)) return false;
       resizePhotoTo(w, h, filter);
       markModified();
@@ -121,7 +130,9 @@ export function useResizeCompress({
   // kernel by the engine's own stateless resample, then `encodeForApply` —
   // the function Apply itself calls. Null when it cannot be measured.
   const capRef = useRef<{ key: string; pixels: Uint8Array; w: number; h: number } | null>(null);
-  const docKey = `${activePhotoId}:${stamp.state.undoCount}:${stamp.state.width}x${stamp.state.height}`;
+  const revision = useGalleryStore((s) => s.documentRevision);
+  const layerRevision = useGalleryStore((s) => s.layerRevision);
+  const docKey = `${activePhotoId}:${revision}:${layerRevision}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}`;
   const measureApply = useCallback(
     async (req: {
       w: number;
@@ -132,6 +143,9 @@ export function useResizeCompress({
       keepSourceEncoding: boolean;
       format?: ExportFormat;
     }): Promise<{ bytes: number; kept: boolean } | null> => {
+      const currentRevision = useGalleryStore.getState().documentRevision;
+      const isCurrent = () => !isPhotoSwitching() && useGalleryStore.getState().activePhotoId === activePhotoId && useGalleryStore.getState().documentRevision === currentRevision;
+      if (!isCurrent()) return null;
       const tool = stamp.toolRef.current;
       const entry = useGalleryStore.getState().photos.find((p) => p.id === activePhotoId);
       if (!tool || !entry || req.w < 1 || req.h < 1) return null;
@@ -141,6 +155,7 @@ export function useResizeCompress({
       let cap = capRef.current;
       if (!cap || cap.key !== docKey) {
         const c = await tool.capture_composite_excluding_background();
+        if (!isCurrent()) { c.free(); return null; }
         cap = { key: docKey, pixels: c.rgba, w: c.width, h: c.height };
         c.free();
         capRef.current = cap;
@@ -160,6 +175,7 @@ export function useResizeCompress({
         format: req.format,
       });
       // Mirrors `allowGrow`: only a same-size re-encode can be declined.
+      if (!isCurrent()) return null;
       return { bytes: r.blob.size, kept: r.kept && req.w === photoW && req.h === photoH };
     },
     [stamp, activePhotoId, docKey, photoW, photoH],

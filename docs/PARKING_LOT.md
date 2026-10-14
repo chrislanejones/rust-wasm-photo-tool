@@ -4,17 +4,57 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — UI Night 8 PR 1 leftovers: three things the gallery skeleton work surfaced (10-06-2026)
+## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+Found surveying skeleton gaps for UI Night 16. `useRealTier()`
+(`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,
+and `userModeForTier(null)` maps that to `loggedIn` (`app/AppShell.tsx`, the
+mode watcher). So a paid user briefly sees the logged-in gallery limit (24
+instead of 100) in "N photos · N max", and every other tier gate reads the
+lower tier for the same beat. Not a UI-night fix: the honest version is a
+"tier pending" user mode that the gates and the count can each read, which
+touches AppShell and gating semantics. Once that exists, GalleryCount can
+show a `Skeleton variant="line"` the width of a `TinyNumberBox` for the max.
+
+## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
+
+Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
+Add mask button after `location.hash = "#/tool/layers"` (shard 2/2; passed on the run before).
+Locally at 4× CPU (`E2E_CPU_THROTTLE=4`), 10 repeats: Add mask 10/10, but "a Refine slider
+previews on a copy" failed 1/10. The spec was already in the old CI list, and nothing tonight
+touched it. Same treatment as G1/fast-drags: find the clock it waits on and make it wait on state.
+
+## FIXED 10-13-2026 (#356) — Enter in the first frame after a shape appears is dropped (10-07-2026)
+
+The listener is now a `useLayoutEffect`, so it is bound before the pending
+shape paints. Not "bind once at mount", the other candidate below: capture
+listeners fire in registration order, and ShapeActionsOverlay's mid-drag
+Escape (drop the connector, keep the edit) only works because it registers
+after this one and stops it. `fast-drags-are-not-dropped` 20/20 at 4x CPU.
+
+
+Found making `fast-drags-are-not-dropped` wait on state instead of a clock (Night 10-07 PR 3).
+`useDrawingTools` binds its Enter/Escape/Delete listener in a `useEffect` keyed on `editState`. A
+`useEffect` runs AFTER the paint, so for about a frame the drawn shape is visibly pending in the
+overlay and Enter does nothing. Measured: 2 of 20 runs at 4× CPU pressed Enter inside that window
+and the 30th shape never committed. A person is unlikely to hit it (Enter within ~16 ms of release),
+a script or a fast keyboard user can. Candidate fix: bind the listener once, reading `editStateRef`
+(it already does), or `useLayoutEffect`. Not done: no product change in a test-stability PR.
+
+## Addressed in UI Night 9 draft #339 — gallery leftovers (10-06-2026)
 
 Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
 All three are on master as well — checked against a master build — so none is
 in that diff.
 
+UI Nights 9–15 (10-09-2026) reproduced and addressed these on the review stack;
+see [the run report](UI_NIGHTS_09_15.md). They are not yet merged.
+
 | What | Where | Notes |
 | --- | --- | --- |
 | The docked vertical gallery's tiles OVERLAP with 12 photos at 1000×800 | `GalleryBar` vertical grid | Rows measure ~61 px for ~87 px tiles, so each row covers the one above. Same picture on a master build. |
 | Hovering the gallery BAR shows every tile's Remove and Select buttons | `Thumb` uses `group-hover:`, and the bar's own wrapper is also `.group` (for its close button) | Tailwind's `group-hover` matches ANY `.group` ancestor. Needs a named group (`group/tile`). |
-| `gallery-loading-state` G1 fails about 1 run in 2 on master too | `e2e/gallery-loading-state.spec.ts:70` | "the mark sits on a gallery tile: Received null" at 30× CPU. Already known as flaky under load; measured 1/2 on master and 1/2 on the branch. |
+| `gallery-loading-state` G1 observation | `e2e/gallery-loading-state.spec.ts` | Addressed in draft #339: tile-scoped MutationObserver samples and readiness waits. This branch retains that version instead of #319's older driver polling. |
 
 ## FIXED 10-05-2026 — five main-suite e2e specs were red on master (10-05-2026)
 
@@ -57,7 +97,7 @@ quota. These are the holes that feed the sweep, left out of that diff:
 
 | What | Where | Effect |
 | --- | --- | --- |
-| The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch` | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
+| ~~The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch`~~ **FIXED 10-07-2026 (Night 10-07 PR 2): `lib/withTimeout` aborts the upload's `AbortController`; edit, AI and share uploads all use it. ⚠️ STILL OPEN, the other half: a size-scaled timeout. 108 of the 167 orphans were archives over 30 MiB, which cannot upload in 8 s on most links. They used to land as orphans; now they are cancelled. Either way a big photo never backs up. Chris's call.** | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
 | `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
 | The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
 | `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
@@ -178,7 +218,12 @@ must be conservative: a photo whose real edge is a flat white line (a white
 background, a scan) would pass the same test. `uploadKey`, where present, is
 the untouched upload and gives the true aspect ratio to check against.
 
-## OPEN — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+## FIXED in v9.20 (#322) — Resize's width field sizes the artboard, not the photo: ask for 800, get 790 (09-28-2026)
+
+> The current `useResizeCompress` session hook already maps photo sizes through
+> `lib/resizeTarget.documentSizeForPhoto`. Draft #317 keeps browser regressions
+> for 256→200 and 1600→800; its older AppShell handlers and duplicate utility
+> are omitted when rebasing onto the UI Nights stack.
 
 Found user-testing v9.3 (#259/#260), and the same on master, so not a regression.
 The width field shows the PHOTO's width (1600 for a 1600×1200 upload), but Apply
@@ -295,12 +340,16 @@ lines.
 | ~~**20 bare `<kbd>` in 6 files still ride the legacy element rule** (3px radius)~~ **DONE 10-06-2026 (UI Night 8): every one moved to `ui/kbd`, ReviewPanel's 2 too, and the `kbd {}` rule is deleted.**: ShortcutModal ×3, StatusBar ×1, ToolGrid ×1, LayerSettings ×6, PerspectiveSettings ×1, SelectSettings ×8 | those files; styles.css `kbd {}` | Mechanical move to `ui/kbd`, 1px radius change each. Delete the CSS rule with the last one |
 | **`ToolButtonGroup`'s own `label` prop is a second spelling of `ControlRow`'s label slot**, 12 call sites in 7 files (RulersGridsPane, BatchSettings ×2, LayerSettings, ShapeSettings, TextSettings ×4, CreateAIImagePanel, NewActions ×2) | ui/tool-button-group.tsx | Same look (text-2xs muted, 8px gap), so moving them is pixel-safe; but it is 7 files outside tonight's three. Then the prop can go |
 | **`FieldLabel` is `ControlRow` without the control**, info on the right instead of beside the label; 5 uses in 3 files | ui/field-label.tsx | Folding it changes where the lightbulb sits. A look decision |
-| **The color picker dialog's saved-palette swatches are still silent** — `Swatch` takes a `radio` prop now, and only `ColorSwatchGrid` passes it | ColorPickerDialog.tsx:277 | Same fix as the grid; the dialog is not a tool panel |
+| ~~**The color picker dialog's saved-palette swatches are still silent**~~ **ALREADY FIXED (found 10-13-2026, UI Night 20): a named radio group via `useRadioGroup`.** — `Swatch` takes a `radio` prop now, and only `ColorSwatchGrid` passes it | ColorPickerDialog.tsx:277 | Same fix as the grid; the dialog is not a tool panel |
 | **`aria-valuetext` on sliders could not be verified by probe.** It is in the DOM (`aria-valuetext="20"` on a track at 75), but Chromium 153's CDP `valuetext` ignores `aria-valuetext` even on a pure `role="slider"` div (control case: reports `""`), so the probe cannot see it either way | ui/size-slider.tsx | One real screen-reader pass (NVDA or VoiceOver) settles it |
 | **Paint's `erase` mode is still an orphan** (no tile, ORPHAN O-1) and was left on the old grammar on purpose | PaintSettings.tsx `case "erase"` | Reviving or deleting it is a product call, not a layout one |
 | **Stroke Stabilizer now sits in a collapsed Advanced section** in Paint, Blur and both Eraser modes. Its closed summary says the level ("Stabilizer: Med"), so ON is never hidden | StabilizerRow.tsx `AdvancedStabilizer` | Chris to confirm this is where it belongs. If not, `defaultOpen` on `AdvancedSection` is the one-word revert |
 
-## OPEN — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+## FIXED — every app build warns `Unexpected token Delim('*')` from a class in a COMMENT (09-24-2026)
+
+> **The three comments were reworded before 10-07 (master builds clean). Night 10-07 PR 3 keeps it at zero:**
+> `scripts/css-build-warnings.sh` fails CI's `web` job on any "warning while optimizing generated CSS";
+> proven red by re-adding the class to a comment.
 
 Found during the Select morning run (live tolerance). `pnpm run build` prints
 "Found 1 warning while optimizing generated CSS" for `.z-\[var\(--z-\*\)\]
@@ -438,11 +487,11 @@ how something looks or need a decision:
 | `--focus-ring` = `--text-primary` in both themes | styles.css | "neutral ink" focus may be meant to track text, or not |
 | Modal surfaces use `rounded-2xl` (4) and `rounded-xl` (3) | AppShell, ResumeContent, UploadDialog, MobileShell vs ShareViewer, SubscriptionButton, dialog.tsx | Picking one changes the other three/four |
 | ~~Plain inputs with NO focus ring (`inputCls`)~~ | BatchSettings:788, AIRenamePanel:213, SuperUserPane:110/119 | **MEASURED FALSE 09-24-2026 (UI Night 2).** They have the house ring: keyboard focus on Batch › Rename paints `outline: dashed 2px` in `--focus-ring`, from the unlayered global `input:focus-visible` rule in styles.css, and no scoped rule removes it (only `input[type=range]` opts out). AI Rename's `inputCls` is the same string byte for byte. Pinned by `e2e/ui-night2-controls.spec.ts`. Adopting FIELD_NUMERIC is now purely a look decision (Night 5), not an a11y fix |
-| Two hand-built modals: own Escape handler, no focus trap | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
+| ~~Two hand-built modals: own Escape handler, no focus trap~~ **ALREADY FIXED (found 10-13-2026, UI Night 20): UploadDialog is on `ui/dialog` (Night 5) and the restore confirm is `ConfirmDialog`.** | UploadDialog.tsx:58, SubscriptionButton restore confirm | Moving to ui/dialog is an a11y fix with a visible radius/header change |
 | ToggleButtonGroup: 9 of 11 callers are single-select and compute `active` by hand; `icon` is required, so GeneralPane passes placeholder icons with `noIcons` | GeneralPane, SecurityPane, AppearancePane, LayersCanvasPane, SuperUserPane | Needs a `value`/`onChange` mode + optional icon — API change |
 | ~~**Only 2 of 43 segmented-control call sites expose selection state; 38 are silent and should not be**~~ **RESOLVED 09-24-2026 (UI Night 2):** 36 SELECT sites are named radio groups, 4 TOGGLE sites carry `aria-pressed` (2 already did; TopBar and ReviewPanel are new), 3 ACTION rows stay silent, see docs/UI_CONSISTENCY.md §7. The `value`/`onChange` API row above still stands. (3 more are action rows, where silence is right). `ToggleButtonGroup` emits no `aria-pressed`/`aria-checked` ever (14 sites); `ToolButtonGroup` emits it only for tiles carrying their own `active` — deliberately, so a plain action is never announced "not pressed" — which leaves its SELECT mode silent (24 of its 29 sites). `ToolModeToggle` passes `value=`, so it inherits the silence. The tree holds 12 real `aria-pressed` attributes. Measured 09-23-2026 | ui/toggle-button-group.tsx, ui/tool-button-group.tsx:108; Sync switch (v8.85) and privacy switch (v8.89) both on the first | WCAG 2.1 AA, not tidiness. Coupled to the `value`/`onChange` API change above; upstream of both sits "should the settings pairs be `ui/switch` at all?". `radio-cards` and `segmented-tabs` already do it right and are the two least-used primitives. See docs/UI_INVENTORY.md Findings 1–2 |
 | **RATCHETED 09-29-2026 (UI Night 7): `ui-raw-button` baseline 37 in 28 files** (grew 34 → 37 in Night 6: `GalleryThumbMark` ×2, `StatusBar` ×1). Paying it down is still open. Original row: **Raw `<button>` baseline for Night 7's ratchet: 35 outside `components/ui/`, in 27 files** (**34 in 26 after Night 3**: `SizeSlider:97`'s preset buttons moved into `ui/preset-row`) (JSX elements counted by AST, not grep lines; was 37 in 27 files before Night 2 converted GalleryBar's two strip-scroll arrows to `Button size="tiny"`, the only two that matched a variant with zero visual change). Measured 09-24-2026 | app/src | **The primitives cannot absorb the rest without new `Button` variants**, and Night 2 added none (a variant is a design decision, not a one-off prop). By what each one needs: **ghost** small text action, 6 (DiagnosticLogOverlay:90, FeatureFlagsPanel:65, ResourceMonitor:198, PerspectiveActionBar:135, TextSettings:449, BatchSettings:656) · **link**, 2 (OnlineFeaturesOffNotice:17, TransformCropSettings:306) · **accent CTA**, 1 (ResumeContent:54) · **brand CTA on raw palette colors**, 3 (SubscriptionButton:414 `bg-zinc-800`, :428 and TextSettings:424 `bg-purple-600`; R4 violations guardrails cannot see, it counts hex) · **secondary large** (text-sm / font-medium / text-secondary), 3 (ResumeContent:61, DevTestsPane:22, StoragePane:103) · **small ghost icon**, 3 (ImageMetaPanel:66/121, CreateAIImagePanel:242) · **pill toggle** with a solid-primary on state, 3 (DimensionFields:71, NewActions:478, BatchSettings:819) · **small bordered**, 1 (ResourceMonitor:129). Bespoke and correctly not a `Button`, 13: swatch "+" circles (ColorPickerDialog:293, ColorSwatchGrid:72), SizeSlider:97 presets, info triggers that want `ui/info-tooltip` (AIUsagePane:111, GalleryCount:47), canvas/thumbnail overlays (DuplicatePadOverlay:112, GridThumbnails:130, MobileShell:67, GalleryBar:268/278), the Settings category rail (SubscriptionButton:296), HistogramView:271, StampSettings:189 |
-| **Two more silent exclusive choices, outside Night 1's 43**: HistogramView's RGB / Luma pair (raw buttons, inline styles, `mode === m`, no state exposed) and the Settings category rail (the current tab has no `aria-current` or `aria-selected`). Found 09-24-2026 during the raw-button census | features/canvas/HistogramView.tsx:271, components/SubscriptionButton.tsx:296 | HistogramView is a canvas panel (Night 3). The rail is a tab list or a nav with `aria-current`, a decision about the Settings dialog's structure |
+| ~~**Two more silent exclusive choices, outside Night 1's 43**~~ **DONE 10-13-2026 (UI Night 20): HistogramView is a named radio group; the Settings rail was already `SegmentedTabs`.**: HistogramView's RGB / Luma pair (raw buttons, inline styles, `mode === m`, no state exposed) and the Settings category rail (the current tab has no `aria-current` or `aria-selected`). Found 09-24-2026 during the raw-button census | features/canvas/HistogramView.tsx:271, components/SubscriptionButton.tsx:296 | HistogramView is a canvas panel (Night 3). The rail is a tab list or a nav with `aria-current`, a decision about the Settings dialog's structure |
 | **`ToggleButtonGroup`'s pill buttons compute `outline: dashed 3px`, offset 0, on keyboard focus**, where the global `button:focus-visible` rule says 2px, offset 2px. Same before and after Night 2 (measured on both builds); no matched stylesheet rule sets 3px, so it comes from somewhere the CSS-rule inspector does not show (framer-motion `motion.button` is the suspect) | ui/toggle-button-group.tsx | Harmless (still visible, still the focus color) but it is two focus-ring geometries in one app. Find the source before Night 5 touches focus |
 | **FROZEN 09-29-2026 (UI Night 7): `ui-radius` baseline 52** (26 bare `rounded`, 15 `rounded-xl`, 6 `rounded-2xl`, 2 `rounded-[inherit]`, 3 directional) — it can no longer grow; the sweep itself still changes pixels and stays parked. Original row: **`rounded` (60 uses) and `rounded-xl` (18) resolve to Tailwind defaults, not house tokens** — and `rounded` duplicates `rounded-sm`'s 4px by a different route. 78 of 221 radius uses bypass `--radius*` with nothing noticing | app/src, everywhere | A sweep changes pixels in 75 files. Wider than the `rounded-2xl`/`rounded-xl` modal row above, which it subsumes. See docs/UI_CONSISTENCY.md §2 |
 | **`scripts/inert-class-audit.mjs` prints "colour-utility candidates"** — British spelling in tool output, against the house rule. Found 09-23-2026 while writing docs/UI_INVENTORY.md, which quotes that line verbatim | scripts/inert-class-audit.mjs | One word. Deferred off the Night 1 docs branch because it is a script change, not a docs one — and fixing it desyncs the verbatim quote in UI_INVENTORY §1, so the two move together |
@@ -545,7 +594,10 @@ Related but separate: this is the same family as the op-log version collision �
 two branches moving one counter independently, where only the merge order
 decides which value survives.
 
-## OPEN — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+## FIXED 10-07-2026 (Night 10-07 PR 3) — the guardrails table in docs/CI.md has drifted from the script (09-20-2026)
+
+> **Deleted, not regenerated:** docs/CI.md now points at `./scripts/guardrails.sh`, which prints every
+> check with its baseline. A second copy of the numbers is what drifted.
 
 Noticed while checking whether any doc repeated the false "runs in CI" skip
 message. It does not — the three matched-pair checks are not documented at all
@@ -566,7 +618,12 @@ and docs are Dara's, not a CI change. The right fix is probably to stop
 hand-copying baselines into prose at all and have the doc point at the script,
 since a number duplicated in two files drifts by default.
 
-## OPEN — "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+## CLOSED 10-07-2026 — NOT REPRODUCED as a stuck value: "Photo:" in the status bar read the DOCUMENT size after Resume editing (2026-09-18)
+
+> **Night 10-07 (#317):** 4/4 runs (6000×4000 PNG → 2048×1365, reload → Resume, with and without
+> an edit) settle on `Photo: 2048×1365` within 750 ms. One run showed `2068×1385` for under 750 ms
+> first: the documented "fall back to the document until the engine answers" flash, not a stuck
+> value. The 09-27 `usePhotoBounds` revision fix (a photo LOAD now re-asks) is the likely closer.
 
 Seen once, while smoke-testing the undo readout (feat/statusbar-quiet), not
 investigated. Production build, demo mode, a 6000×4000 PNG (the demo downscale
@@ -638,7 +695,12 @@ config only declares globals for `app/src`. That is 9 errors in
 `gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
 `marketing/**` block with node and browser globals would make this gate real.
 
-## OPEN — a commit click can leave a stray rectangle behind (2026-09-18)
+## CLOSED 10-07-2026 — NOT REPRODUCED: a commit click can leave a stray rectangle behind (2026-09-18)
+
+> **Night 10-07 (#317):** the exact repro below is now e2e/shape-commit-no-stray, and it is green
+> 12/12 on master `20418196` (keyboard and track-click restyle, 1× and 4× CPU, `mouse.click`).
+> #304 rebuilt the press handling on `PressQueue`, which targets the race hypothesized below;
+> likely the reason, not isolated. The spec stays as the guard.
 
 **Pre-existing — reproduced on a master-based production build**, found while
 smoke-testing shape rotation. Not caused by feat/shapes-triangle-rotate.
@@ -660,7 +722,18 @@ fast click's mouse-up can arrive first and return early, leaving `isDrawing`
 stuck; the next mouse move then extends a rubber band from the stale start. A
 simpler three-click sequence did NOT reproduce, so isolate before fixing.
 
-## OPEN — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+## FIXED 10-13-2026 (#356, ADR-088) — one gesture can record several ops, and op-log undo rewinds only one (2026-09-18)
+
+**Fixed by op-log v12.** `oplog_record` writes `Op::SameGesture` in front of
+the second and every later op of a gesture, and each snapshot remembers the
+op-log cursor it was taken at. Undo seeks back one GESTURE; after a reload
+(no snapshots) the markers alone find where it began. A one-op gesture writes
+no marker, so it is byte-identical to v11, and an old log with no markers
+still undoes one op per press. `one_undo_removes_a_seven_point_star` is
+un-ignored and passes, with twins for corner radii, rotation + sloppiness, a
+duplicate, a reload and a no-op gesture; `e2e/oplog-undo-shapes.spec.ts`
+drives it through the real UI. The original entry follows.
+
 
 **Pre-existing since v7 (sloppiness), widened by v9.** Reproduced at engine
 level by `ops_engine_parity::one_undo_removes_a_seven_point_star`, which is
@@ -688,16 +761,25 @@ Narrowed on the branch, not fixed: the sync used to emit a redundant
 all four skipped fields are neutralized now, so a side-field-only change is
 exactly one op.
 
-**Masked in the running app today** by "in the running app, undo of ANY
-recorded edit breaks the op log" (below): a broken log falls back to snapshot
-undo, which is correct. Fix that entry and this one surfaces.
+**Masked in the running app until 10-11-2026** by "in the running app, undo of
+ANY recorded edit breaks the op log" (below): a broken log falls back to
+snapshot undo, which is correct. That entry is fixed, so this one is now LIVE
+in the app: the first Ctrl+Z after adding a sloppy, rotated or 7-point-star
+shape changes nothing on screen. `cargo test --features tiles -- --ignored
+one_undo_removes_a_seven_point_star` still fails the same way (re-run
+10-11-2026; see the entry's fix options — format-level, ADR material, not
+touched by that fix).
 
 Fix options, both format-level (ADR material): give the log gesture
 boundaries (a group marker per snapshot, and undo seeks to the group start),
 or record a shape's skipped fields in ONE appended op on add
 (`ShapeAddStyled`) instead of ShapeAdd + N side ops.
 
-## OPEN — pen polylines hit-test as their whole bbox since #172 (2026-09-18)
+## FIXED 10-07-2026 (#317) — pen polylines hit-test as their whole bbox since #172 (2026-09-18)
+
+> **Fixed in #317:** an UNFILLED polyline joins the edges branch (`matches!(kind, 6 | 8..=40)`
+> under `fill_kind == 0`), which is what the TS port already did. #60 hash updated in the same
+> commit with the reason. tests/polyline_hit_test.rs: the (150,30) probe misses, ink hits.
 
 `shape_annotation_at`'s docstring says polylines hit by "distance to the
 stroke", and before #172 they did: `if kind 2|4 {…} else if kind 6 {…}`. The
@@ -892,7 +974,49 @@ on this evidence it would copy the un-undone document to the second device and
 hand it back to the first on the next pull — two devices disagreeing with the
 user instead of one. Fix and cover with a test before any sync code is written.
 
-## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+## OPEN — two shape edits still route undo to the snapshot path on purpose (10-13-2026)
+
+`move_shape_annotation` and `reroute_connector` (src/annotations.rs) record
+several ops under one snapshot (a box move plus every re-routed connector),
+so they deliberately send undo down the snapshot path, which marks the op log
+broken for the rest of the session. Since op-log v12 (ADR-088) one undo can
+take a multi-op gesture back, so both could stay on the op-log path. Not done
+in #356: each needs its own red test (a box with two connectors, moved,
+then one Ctrl+Z) before the workaround comes out.
+
+## FIXED 10-11-2026 — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+> **Fixed on `ccr-f9643a38-5maj0q` (10-11-2026).** The bisect below was run
+> and the flush path is innocent: run A replayed against the BUILT engine with
+> `blitLiveEngine`, `onOplogFlush` (and the save it schedules), the
+> diagnostics sampler and the whole `flushToCanvas` added one at a time stays
+> healthy every time — `app/src/lib/oplogFlushPath.test.ts`, kept as the
+> record. Every one of those calls is a read plus `recomposite()`, and
+> `oplog_engine_in_sync` recomposites before it hashes anyway, so there was
+> nothing for them to desync.
+>
+> **What broke it:** the engine's replay switch `oplog_use_for_undo` defaults
+> to OFF (it is the runtime verification switch; the app owns it), and the only
+> push — `set_oplog_undo(isOplogUndoEnabled())` inside `syncOplog` — ran from
+> `useDiagnosticsSampler`, i.e. ONLY while the Diagnostics window is open. In
+> an ordinary session the switch never reached the engine, `undo()` took the
+> snapshot path, and `restore_snapshot` marks a non-empty log broken. That is
+> row C exactly (cursor stays 1, status "broken"), and it is why runs A and B
+> replayed: they were taken at the console with Diagnostics open, which had
+> pushed the switch. "Breaks BETWEEN the edit and the undo" was the wrong
+> reading — it broke AT the undo, on the wrong path.
+>
+> **Fix:** `withOplogUndo` (`lib/tilesFlush.ts`) pushes the switch at every
+> `createLiveEngine` site in `useEngineCore`, chained beside `withHistoryForks`
+> — the same shape as the history-forks switch, and like `ih_tiles_flush` it
+> takes effect on the next load. No engine change, no format change, nothing
+> persisted changes. Pinned by `e2e/oplog-undo-through-ui.spec.ts`: a brush
+> stroke and a Levels apply through the real UI, Ctrl+Z, `oplog_is_broken()`
+> false and the cursor 1 → 0 (red on master, green with the push; 10× at 4× CPU
+> each). The engine-call ratchet moved 191 → 192 for the awaited push.
+>
+> **Now unmasked:** "one gesture can record several ops" (above) — see the
+> note added there.
 
 Found while testing the Levels tile, and **not caused by it**. Undo still shows
 the right pixels, so nothing is lost — but it always takes the snapshot path,
@@ -4217,3 +4341,34 @@ on touch, which is most of the phone surface, and the two densest files
 | **`px-2.5` pair**: ui/status-note's SuccessCallout and AI Rename's warning box share it | status-note.tsx, AIRenamePanel.tsx | Move both together (to px-2 or px-3) |
 | **`ui-spacing` 42** is mostly dialog chrome (`px-5`, `py-2.5`) and the button `large` size's `py-2.5` | ui/dialog, ui/button, TopBar, SubscriptionButton | Each is a primitive; changing it resizes every caller |
 
+
+- **Stale comment in `NewActions.tsx`** (10-08, after v9.25): the header block
+  still says "Generate is STILL disabled (see GENERATE_BLOCKED_REASON)". #337
+  removed that constant and Generate runs now. Comment-only fix.
+
+
+## UI Nights 9–15 follow-ups (10-09-2026)
+
+- Export-quality restoration needs persisted quality in capture/saved edits and
+  archive compatibility work (ADR-031, draft #329). The UI run does not migrate
+  data or claim per-photo quality persistence.
+- Guide positions have no persisted owner. They still clear on photo switch;
+  guide color is an app preference. Persisting positions remains separate work.
+- Trash/purge and per-photo cloud backup/conflict state remain separate backend
+  projects. No UI-night change presents unwired actions or fabricated state.
+- Drafts #317 and #319 now target Night 15. #317 keeps the independent pen
+  hit-test fix and browser guards; #319 keeps full CI coverage and drag-readiness
+  checks. Both inherit the stack's gallery fixes and newer loading observations.
+- The Night 14 stack addresses the muted-text and Settings-rail rows above;
+  their implementation is pending review, not a master release.
+
+
+## PR overlap review (10-10-2026)
+
+- The 4× CPU run of `fast-drags-are-not-dropped` exposed a startup wait that
+  accepted an empty canvas, then slept 1.2 seconds before probing the engine.
+  The corrected test waits for the imported fixture's actual photo dimensions;
+  the 4× run passes. This fixes the test's startup assumption. The separate
+  first-frame Enter-listener product race remains open above.
+- Regenerated marketing Trail Log data totals 832 merged commits. Unmerged
+  draft work is excluded, and v9.26 stays the latest release.

@@ -20,6 +20,9 @@ import { Clock3 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { api } from "../../../convex/_generated/api";
 import { PaneHeading } from "@/components/ui/pane-heading";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayedFlag } from "@/hooks/usePhotoSwitching";
+import { cn } from "@/lib/utils";
 
 interface Meter {
   label: string;
@@ -44,8 +47,12 @@ function untilText(resetsAt: number, now: number): string {
 }
 
 export function AIUsagePane() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const usage = useQuery(api.aiJobs.usage, isAuthenticated ? {} : "skip");
+  // While auth is still connecting `isAuthenticated` is false, which used to
+  // show a signed-in user "Sign in to see your usage" for a beat. Connecting
+  // and an in-flight query are both "your usage has not arrived yet".
+  const loading = authLoading || (isAuthenticated && usage === undefined);
 
   /* One `now` for the whole pane, held in state rather than read during
    * render. Two reasons, and the second is the one that matters:
@@ -92,16 +99,15 @@ export function AIUsagePane() {
         machine and is never counted here.
       </PaneHeading>
 
-      {!isAuthenticated ? (
+      {loading ? (
+        <UsageSkeleton />
+      ) : !isAuthenticated ? (
         <p className="rounded-lg bg-card p-4 text-xs leading-relaxed text-text-muted">
           Sign in to see your usage. The AI passes need an account because they
           run on someone else's hardware and cost money per run; every other
           tool works signed out.
         </p>
-      ) : usage === undefined ? (
-        // `undefined` is "in flight", distinct from `null` ("signed out").
-        <p className="rounded-lg bg-card p-4 text-xs text-text-muted">Loading your usage…</p>
-      ) : usage === null || usage.daily.cap === 0 ? (
+      ) : usage == null || usage.daily.cap === 0 ? (
         <p className="rounded-lg bg-card p-4 text-xs leading-relaxed text-text-muted">
           Your plan does not include AI passes. Upgrading adds background
           removal, object removal and text extraction.
@@ -127,6 +133,35 @@ export function AIUsagePane() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The Usage limits card's shape — a title, then the Today and This month
+ *  meters (label line, bar) — so the arriving card does not move the pane. The
+ *  box is reserved at once; the grey bars wait out the 300 ms grace. One
+ *  announcement for the region; the bars are decorative. */
+function UsageSkeleton() {
+  const shown = useDelayedFlag(true);
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      data-testid="usage-skeleton"
+      data-shown={shown || undefined}
+      className={cn("space-y-3 rounded-lg bg-card p-4", !shown && "[&>*]:invisible")}
+    >
+      <span className="sr-only">Loading your usage…</span>
+      <Skeleton decorative variant="line" className="w-24 text-sm" />
+      <div className="space-y-3">
+        {[0, 1].map((i) => (
+          <div key={i} className="space-y-1.5 py-1">
+            <Skeleton decorative variant="line" className="w-28 text-sm" />
+            <Skeleton decorative variant="block" className="h-2 w-full rounded-full" />
+          </div>
+        ))}
+      </div>
+      <Skeleton decorative variant="line" className="mt-4 w-3/4 text-xs" />
     </div>
   );
 }

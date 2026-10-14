@@ -125,6 +125,30 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(poly, 50, 50)).toBe(-1); // interior, not near either
   });
 
+  it("an L-shaped pen stroke misses 100px from its ink, as the engine now does (Night 10-07)", () => {
+    // Same probe as tests/polyline_hit_test.rs: the engine answered with the
+    // padded bbox until its kind-6 arm was revived, the port never did.
+    const l = [
+      shape({
+        id: 12,
+        kind: 6,
+        x0: 20,
+        y0: 20,
+        x1: 180,
+        y1: 180,
+        stroke_width: 4,
+        points: [
+          [20, 20],
+          [20, 180],
+          [180, 180],
+        ],
+      }),
+    ];
+    expect(shapeAnnotationAt(l, 150, 30)).toBe(-1);
+    expect(shapeAnnotationAt(l, 20, 100)).toBe(12);
+    expect(shapeAnnotationAt(l, 31, 60)).toBe(-1); // just past pad + 4
+  });
+
   it("hit-tests an unfilled diamond (8) along its four edges only", () => {
     // pad 6 → tolerance 10. The top→right edge runs (50,0)→(100,50); its
     // 45° diagonal puts the center ~35px from every edge, so the hollow

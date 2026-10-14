@@ -24,6 +24,56 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.28",
+    date: "2026-10-12",
+    headline: "Things that load now hold their place instead of popping in.",
+    entries: [
+      { tag: "ui", text: "The sign-in button and Settings › AI Usage keep their space while you sign in. Signed-in users no longer see \"Sign in\" first." },
+      { tag: "ui", text: "Plan & Billing shows the shape of your plan while it loads, instead of a spinner." },
+      { tag: "fix", text: "Compare shows the original only once it's ready, and says \"Original unavailable\" if it can't load." },
+      { tag: "fix", text: "On a phone, a photo you open shows a gray box its own shape until it arrives. A missing photo says so instead of spinning forever." },
+    ],
+  },
+  {
+    version: "v9.27",
+    date: "2026-10-11",
+    headline: "The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.",
+    entries: [
+      { tag: "feature", text: "Settings has named tabs you can move through with Up, Down, Home and End. Its help text is readable in both themes. If a section disappears while Settings is open, its pane and keyboard entry point return to General." },
+      { tag: "ui", text: "Gallery rows scroll without overlapping. Hover one photo and only its controls appear. The count shows your loaded photos and the 12-photo demo limit." },
+      { tag: "fix", text: "Welcome Back, Shared and Batch wait for previews to decode, keep the last good picture during an update, and show when an image fails. A shared image can be retried." },
+      { tag: "fix", text: "Enter and Space work on a gallery photo's Remove and Select buttons. Remove asks before deleting; Select keeps the photo you're editing open." },
+      { tag: "fix", text: "A freehand pen stroke selects where the ink is. Clicking empty space inside its bounds no longer picks it up." },
+      { tag: "infra", text: "Every browser test that can run in CI now runs on each pull request, split across two jobs." },
+    ],
+  },
+  {
+    version: "v9.26",
+    date: "2026-10-08",
+    headline: "A generated picture actually arrives.",
+    entries: [
+      { tag: "fix", text: "Create AI Image made the picture and then dropped it, because it came back from a storage address the server didn't recognize. It now lands in your gallery as a new image." },
+    ],
+  },
+  {
+    version: "v9.25",
+    date: "2026-10-08",
+    headline: "Create AI Image makes pictures now.",
+    entries: [
+      { tag: "feature", text: "Create AI Image works. Write a prompt, pick one of six models from the dropdown, and the picture lands in your gallery like an upload. It needs online features on and a Paid plan, and it tells you so before anything is sent." },
+    ],
+  },
+  {
+    version: "v9.24",
+    date: "2026-10-08",
+    headline: "The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.",
+    entries: [
+      { tag: "ui", text: "The histogram under Adjustments, Levels and Presets takes a third of the panel — the same height as Review's. It used to be a short strip." },
+      { tag: "ui", text: "On a phone, every card in the site menu is the same size." },
+      { tag: "fix", text: "Every page on the site was checked against the app. The compressor page no longer promises a feature it doesn't have, and the Architecture page is current." },
+    ],
+  },
+  {
     version: "v9.23",
     date: "2026-10-08",
     headline: "Adjustments works again, every reset is exact, and the AI buttons are there for everyone.",

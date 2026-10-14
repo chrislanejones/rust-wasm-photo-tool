@@ -114,7 +114,7 @@ export function Queue({ animate = true }: { animate?: boolean }) {
           : t < 3.0
             ? `queued in post order · cancel(${CANCELED}) received before it ran`
             : `appended: ${logged}${rejected ? " · rejected: 1 (canceled)" : ""}`;
-      const sha = done ? "oplog sha256 ea77112d… — byte-identical to the local engine" : "";
+      const sha = done ? "oplog sha256 ea77112d… byte-identical to the local engine" : "";
       if (footRef.current && footRef.current.textContent !== foot) footRef.current.textContent = foot;
       if (shaRef.current && shaRef.current.textContent !== sha) shaRef.current.textContent = sha;
     };

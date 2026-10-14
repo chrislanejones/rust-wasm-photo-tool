@@ -123,7 +123,12 @@ const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   // met the diagram shapes on master (11..=40 were taken); it turns with the
   // rest and is a ring while unfilled, as the circle is. Port + test ("an
   // unfilled oval (41) is a ring…") updated FIRST.
-  shape_annotation_at: "31c2e04289aa4ab2",
+  // 31c2e04289aa4ab2 → f5506804647c2272 (2026-10-07): an unfilled pen
+  // polyline (6) joins the edges branch, so its distance-to-segments arm
+  // runs again — dead since #172, which left a polyline on the padded bbox.
+  // The port always had it (unfilled only); case "an L-shaped pen stroke…"
+  // added FIRST, then this hash.
+  shape_annotation_at: "f5506804647c2272",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

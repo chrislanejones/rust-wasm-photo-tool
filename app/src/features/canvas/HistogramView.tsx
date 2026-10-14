@@ -1,5 +1,7 @@
+import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 const BIN = 256;
 const LEN = BIN * 4;
@@ -12,6 +14,8 @@ interface Props {
   photoKey: string;
   active: boolean;
 }
+
+const HISTOGRAM_MODES = ["rgb", "luma"] as const;
 
 function reducedMotion(): boolean {
   return (
@@ -26,12 +30,19 @@ export function HistogramView({
   photoKey,
   active,
 }: Props) {
+  const switching = usePhotoSwitching();
   const plotRef = useRef<HTMLCanvasElement | null>(null);
   const targetRef = useRef<Float32Array | null>(null);
   const dispRef = useRef<Float32Array>(new Float32Array(LEN));
   const rafRef = useRef<number | null>(null);
   const photoKeyRef = useRef<string | null>(null);
   const [mode, setMode] = useState<HistMode>("rgb");
+  const modeRadio = useRadioGroup({
+    ids: HISTOGRAM_MODES,
+    selected: mode,
+    isDisabled: () => false,
+    onSelect: setMode,
+  });
   const [empty, setEmpty] = useState(false);
 
   const draw = useCallback(() => {
@@ -160,8 +171,10 @@ export function HistogramView({
     draw();
   }, [draw]);
 
-  const sample = useCallback(async () => {
+  const sample = useCallback(async (isCurrent: () => boolean) => {
+    if (!isCurrent() || isPhotoSwitching()) return false;
     const raw = await getHistogram();
+    if (!isCurrent() || isPhotoSwitching()) return false;
     if (!raw || raw.length < LEN) return false;
 
     let total = 0;
@@ -178,10 +191,19 @@ export function HistogramView({
     return true;
   }, [getHistogram]);
 
+  useEffect(() => {
+    if (switching) {
+      targetRef.current = null;
+      dispRef.current.fill(0);
+      cancelAnim();
+      draw();
+    }
+  }, [switching, cancelAnim, draw]);
+
   // Drop bars immediately when switching photos, and keep them down
   // until a valid Rust histogram is available for the new image.
   useEffect(() => {
-    if (!active) return;
+    if (!active || switching) return;
 
     const reduce = reducedMotion();
     const switchedPhoto = photoKeyRef.current !== photoKey;
@@ -194,7 +216,7 @@ export function HistogramView({
       if (reduce) settle();
       else animate();
     }
-  }, [active, photoKey, animate, settle, cancelAnim]);
+  }, [active, switching, photoKey, animate, settle, cancelAnim]);
 
   // Only raise bars when the backing image is actually ready enough
   // for Rust to return a valid histogram. The parent-controlled
@@ -216,8 +238,9 @@ export function HistogramView({
     const tryOnce = async () => {
       if (cancelled) return;
 
-      if (await sample()) {
-        if (cancelled) return;
+      const sampled = await sample(() => !cancelled);
+      if (cancelled) return;
+      if (sampled) {
         setEmpty(false);
         cancelAnim();
         if (reduce) settle();
@@ -242,7 +265,7 @@ export function HistogramView({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [active, signature, sample, animate, settle, cancelAnim]);
+  }, [active, switching, signature, sample, animate, settle, cancelAnim]);
 
   useEffect(() => {
     draw();
@@ -264,13 +287,17 @@ export function HistogramView({
 
   return (
     <div style={WRAP}>
-      <canvas ref={plotRef} style={PLOT} />
+      <canvas ref={plotRef} hidden={switching} style={PLOT} />
       <div style={emptyStyle(empty)}>No image to analyze</div>
-      <div style={MODES}>
-        {(["rgb", "luma"] as const).map((m) => (
+      {/* One of two, so a named radio group: the lit pill was the only thing
+          saying which channel was drawn, and a screen reader heard two plain
+          buttons. Arrow keys move and select (useRadioGroup). */}
+      <div style={MODES} {...modeRadio.groupProps} aria-label="Histogram channels">
+        {HISTOGRAM_MODES.map((m, i) => (
           <button
             key={m}
             type="button"
+            {...modeRadio.itemProps(i)}
             style={modeBtn(mode === m)}
             onClick={() => setMode(m)}
           >

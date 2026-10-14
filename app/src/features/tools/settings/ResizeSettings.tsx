@@ -1,5 +1,5 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Scaling, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
@@ -84,6 +84,8 @@ interface ResizeSettingsProps {
   currentEncodeQuality?: number;
   activePhotoId: string | null;
   quality: number;
+  /** Committed engine value, distinct from the slider draft. */
+  appliedQuality: number;
   onQualityChange: (q: number) => void;
   /** Fired on slider RELEASE — commits the quality as one undo step.
    *  ADR-031: `onQualityChange` is the live draft and records nothing. */
@@ -114,6 +116,7 @@ export function ResizeSettings({
   currentEncodeQuality,
   activePhotoId,
   quality,
+  appliedQuality,
   onQualityChange,
   onResize,
   onResizeOnly,
@@ -128,7 +131,6 @@ export function ResizeSettings({
   // Sub-mode lives in the tool store (like Paint's brushMode) so the command
   // palette's registry-derived `mode.compress.*` entries can deep-link to a
   // sub-mode. Was panel-local useState before Session 2.1.
-  const baseQualityRef = useRef(quality);
 
   // Whether the browser can really encode the chosen format. `undefined` until
   // the one-pixel probe resolves — the note simply stays hidden until then
@@ -162,10 +164,6 @@ export function ResizeSettings({
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
   }, [imageWidth, imageHeight, activePhotoId]);
-  useEffect(() => {
-    baseQualityRef.current = quality;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed per photo only
-  }, [activePhotoId]);
 
   const handleWidthChange = useCallback(
     (val: string) => {
@@ -219,7 +217,7 @@ export function ResizeSettings({
   // format itself is chosen at export — so picking one is never a change to
   // apply. Method is the resample kernel only. Quality has no undo step of
   // its own any more; Apply records it.
-  const qualityChanged = quality !== baseQualityRef.current;
+  const qualityChanged = quality !== appliedQuality;
   const compressionChanged = qualityChanged;
   const pending = dimensionsChanged || compressionChanged;
 
@@ -233,7 +231,7 @@ export function ResizeSettings({
 
   const [applying, setApplying] = useState(false);
   const handleApply = async () => {
-    if (!pending || applying) return;
+    if (disabled || !pending || applying) return;
     setApplying(true);
     try {
       const filter = FILTER_CODE[method];
@@ -241,7 +239,7 @@ export function ResizeSettings({
         await onResizeOnly(newW, newH, filter);
         return;
       }
-      if ((await onResize(newW, newH, filter)) !== false) baseQualityRef.current = quality;
+      await onResize(newW, newH, filter);
     } finally {
       setApplying(false);
     }
@@ -276,7 +274,7 @@ export function ResizeSettings({
   const [measured, setMeasured] = useState<{ key: string; bytes: number } | null>(null);
   const measureKey = `${activePhotoId}:${currentByteSize}:${newW}x${newH}:${method}:${effectiveFormat}:${quality}`;
   useEffect(() => {
-    if (!measureApply || currentByteSize <= 0) return;
+    if (disabled || !measureApply || currentByteSize <= 0) return;
     let alive = true;
     const t = window.setTimeout(() => {
       void measureApply({
@@ -298,7 +296,7 @@ export function ResizeSettings({
       window.clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measureKey carries every input
-  }, [measureKey, measureApply]);
+  }, [disabled, measureKey, measureApply]);
 
   const isMeasured = measured?.key === measureKey;
   const bytes = isMeasured && measured ? measured.bytes : (weight?.projectedBytes ?? 0);
@@ -382,7 +380,7 @@ export function ResizeSettings({
             disabled={disabled}
             edited={{
               isEdited: qualityChanged,
-              onReset: () => onQualityChange(baseQualityRef.current),
+              onReset: () => onQualityChange(appliedQuality),
               disabled,
             }}
           />

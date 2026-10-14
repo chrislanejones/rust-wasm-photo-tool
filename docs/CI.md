@@ -22,10 +22,12 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 | Job | What it does | Mirrors |
 | --- | --- | --- |
 | `rust` | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, then `wasm-pack build` | Vercel's Rust build |
-| `web` | Typecheck (`tsc -b`) + `pnpm build:all` (WASM + editor app) | Vercel's app build |
+| `web` | Typecheck (`tsc -b`), `pnpm lint`, `pnpm build:all` (WASM + editor app) with **zero CSS optimizer warnings** ([`scripts/css-build-warnings.sh`](../scripts/css-build-warnings.sh)), then the unit suite | Vercel's app build |
+| `service-worker-e2e` | The SW lifecycle, no-SW-by-default specs and keyless boot | — |
+| `e2e` | Every spec under the default Playwright config, in 2 shards. `scripts/e2e-coverage-check.mjs` checks that every eligible file is included; SW, keyless boot and archived sweeps have separate handling | — |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
 | `convex` | `pnpm test:convex` (backend suite on `convex-test`, no deployment needed), then `convex codegen` + a `_generated` drift check | — |
-| `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` export | The manual check that caught the five-week featureless-prod bug |
+| `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and checks content types, the 800,000-byte floor, required exports and the build-info SHA256 | The manual check that caught the five-week featureless-prod bug |
 
 Build/quality jobs are skipped on the weekly cron (`if: github.event_name != 'schedule'`) — no point rebuilding when nothing changed.
 
@@ -57,7 +59,7 @@ The `guardrails` job runs static checks over the source with ripgrep, from
 It is not a pass/fail gate on zero, though — it is a **baseline ratchet**. Each
 check carries a recorded count and the build fails when that count goes **up**.
 New violations are blocked from today; the existing ones are counted and can
-only be paid down. Only one of the six checks is actually at zero.
+only be paid down. Several are at zero; `as-any` was the first.
 
 That design exists because the two obvious options were both wrong. Leaving the
 job `continue-on-error` — which is how it started — meant it reported violations
@@ -65,14 +67,14 @@ and failed nothing, which is advisory theater. Flipping it straight to blocking
 was impossible with 112 pre-existing violations, and widening the exclude globs
 to go green is the ratchet anti-pattern the playbook forbids.
 
-| Check | Pattern (scope) | Escape hatch | Baseline |
-| --- | --- | --- | --- |
-| Raw colors | `(bg\|text\|border\|ring)-(zinc\|neutral\|gray\|slate\|stone)-NNN`, `text-white`, `bg-white` in `app/src` | `// allow: raw-color` | 26 |
-| Off-scale type / faux weights | `text-[NNpx]`, `font-medium`, `font-black` | — | 9 |
-| Raw z-index | `z-10..z-100`, `z-[N…]` | — | 4 |
-| `as any` | `\bas any\b` (excl. `*.d.ts`) | import real types | **0 — a true hard gate** |
-| Rust panics / unsafe | `.unwrap()`, `.expect(`, `panic!`, `unsafe ` in `src/*.rs` | `// allow: rust-panic` | 67 |
-| a11y | `role="button"` without `aria-label` | add `aria-label` | 5 |
+**The checks and their baselines live in the script, and only there.** This
+file used to carry a table of them; it listed six checks with 09-20 numbers
+while the script grew to seventeen, so it was deleted rather than regenerated
+(Night 10-07). Run it and it prints every check with its count and baseline:
+
+```bash
+./scripts/guardrails.sh
+```
 
 **A baseline raised in a diff is the one thing to challenge in review.** Raising
 it to go green is precisely the move the script exists to prevent, and it says so
@@ -111,7 +113,7 @@ satisfy it — `command -v rg` has to find an executable.
 Installed as **native git hooks** in [`.githooks/`](../.githooks), enabled through `core.hooksPath`. No dependency, no package manager.
 
 - **`pre-commit`** — `cargo fmt --check` on staged Rust.
-- **`pre-push`** — mirrors the blocking CI jobs: `cargo fmt --check`, `cargo clippy -D warnings`, `tsc -b`, and the UploadThing secret-leak guard. Uses only local tools, no ripgrep.
+- **`pre-push`** — mirrors the blocking CI jobs: `cargo fmt --check`, `cargo clippy --all-targets --features tiles -D warnings`, `cargo test --features tiles`, `tsc -b`, and the UploadThing secret-leak guard. Uses only local tools, no ripgrep.
 
 `core.hooksPath` is per-clone local config and is not committed, so enable it once on a fresh clone:
 
@@ -127,7 +129,7 @@ Bypass a single run with `git commit --no-verify` / `git push --no-verify`. Pair
 
 Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
-- Require status checks before merging — required: `rust`, `web`, `marketing`, `convex`.
+- Require status checks before merging — required: `Rust / WASM`, `Frontend (typecheck + build)`, `Marketing build (mirrors Vercel /marketing root)`, `Convex (codegen + typecheck + drift)`, `E2E (every spec, shard 1/2)` and `E2E (every spec, shard 2/2)`. Both browser shards must pass.
 - Don't require `guardrails`, `cargo-audit`, `pnpm-audit`, `secrets` or `codeql` until their baselines are clean.
 - Require branches to be up to date before merging.
 

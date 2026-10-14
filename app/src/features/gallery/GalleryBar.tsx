@@ -12,6 +12,7 @@ import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
 import { useActivityWhile } from "@/lib/activity";
+import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
@@ -375,6 +376,7 @@ export function GalleryBar({
   // The gallery is the one surface that can show the gap, because it lights the
   // photo you asked for while the canvas still holds the previous one.
   const switching = usePhotoSwitching();
+  const switchError = useUIStore((s) => s.photoSwitchError);
 
   // ONE busy flag for the gallery. Thirty tiles each announcing "Loading" is a
   // screen reader reading out a list of boxes, which is why the tile
@@ -431,7 +433,7 @@ export function GalleryBar({
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "group pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+            : "group/bar pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
         }
       >
         {/* Hover the bar and a close appears top-left; the top bar's Gallery
@@ -589,7 +591,16 @@ export function GalleryBar({
                     // pictures. Now 20px both ways, with the side padding
                     // raised to match so the left column is not tighter to the
                     // panel edge than it is to its neighbour.
-                    "grid w-full grid-cols-2 content-start items-start gap-x-5 gap-y-5 overflow-y-auto px-3 pt-3 pb-3"
+                    //
+                    // `auto-rows-max` is the THIRD, and closes the overlap
+                    // (Night 10-07). This grid's height is fixed by its
+                    // minmax(0,1fr) row, and each tile is overflow-hidden, so
+                    // its automatic minimum is 0: with 12 photos the plain
+                    // `auto` rows were squeezed to fit the column (61px rows
+                    // under 91px tiles, each row covering the one above)
+                    // instead of overflowing into the scroll. max-content
+                    // rows are sized by the tile and the grid scrolls.
+                    "grid w-full grid-cols-2 auto-rows-max content-start items-start gap-x-5 gap-y-5 overflow-y-auto px-3 pt-3 pb-3"
                   : "flex gap-2 overflow-x-auto py-1.5 px-2"
               }
               style={{ scrollbarWidth: "none" }}
@@ -599,7 +610,7 @@ export function GalleryBar({
                   key={entry.id}
                   entry={entry}
                   onPendingChange={gallery.reportPending}
-                  loading={switching && entry.id === activeId}
+                  loading={switching && !switchError && entry.id === activeId}
                   index={i}
                   isActive={entry.id === activeId}
                   onSelect={() => onSelect(entry)}

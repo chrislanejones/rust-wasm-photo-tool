@@ -11454,3 +11454,73 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Enhance › AI** (#327) | `openOffline` sub-tool flag: the tile opens with online features off (the default), both buttons show with the key badge, pressing one says why; 0 AI requests while off. OCR unchanged. |
 | **Engine** | **885,735 → 892,634 B** (+6,899): the adjustment session. |
 | **Gates** | cargo test 509/509 + tiles 685/685, clippy both, fmt; tsc 0, lint 0 errors / 55 warnings; unit 1,842/1,842; guardrails OK. |
+
+## v9.24 Change Summary — 2026-10-08
+
+**The histogram is the size you'd expect, the phone menu lines up, and the site says what the app does.** #335, #336.
+
+| Area | Change |
+| --- | --- |
+| **Histogram footer** (#336) | `basis-[calc(33.333%-13px)]`, 9rem floor, instead of a fixed `h-36`: chart 187 / 220 / 280 px at 800 / 900 / 1080 px windows — exactly Review's one-third slot (the fixed footer drew 110 at every size). |
+| **Mobile menu** (#335) | All 20 sheet cards one size: `height: 7em` (119 px), descriptions clamped to three lines with the full text as a title. Were 62–134 px; 0 overflow. |
+| **Marketing review** (#335) | Every page checked against v9.19–v9.23 and the app source. /image-compressor (toolPages, seo.ts) no longer claims a target-size search or "page-speed scores"; Features.md / featureCards / comingSoon describe Image weight, the preview row, the histogram footer, the Adjustments session, Levels' per-point resets and AI-for-everyone; remove-object says "on Pro". Architecture: as of v9.23, 893 KB engine, op log v11, 11 stores. |
+| **Gates** | CI 17/17 on both; photo-switch-cue + ui-night8-finish 15/15; unit 1,843/1,843; marketing tsc 0, build OK. No engine change (892,634 B). |
+
+## v9.25 Change Summary — 2026-10-08
+
+**Create AI Image makes pictures now.** #337.
+
+| Area | Change |
+| --- | --- |
+| **Backend** (#337) | `ai.generate` action + `aiJobs.startGenerateJob`; `ai_jobs.type` gains `generate`, optional `prompt` / `model` (additive). Calls `/v1/models/{owner}/{name}/predictions`, so no version hash to go stale; the existing webhook stores the image. Deployed to `brave-ant-608` before the client merged. |
+| **Plan check** (#337) | The allowance logic is one shared `chargeAiUse`: a free tier (cap 0) is refused on the server before any Replicate call, the same as background removal. |
+| **Models** (#337) | Flux Schnell, Flux Dev, Flux 1.1 Pro, Flux Kontext Pro, Stable Diffusion 3.5 Large, Ideogram v3 Turbo. Inputs from each model's published schema; references go as `input_image` / `image` / `style_reference_images` and never to a model that can't read them. |
+| **Client** (#337) | `useImageGeneration`: online-features gate, references downscaled and uploaded, job subscription with timeout; the result is added to the gallery as a File. The panel's "not connected" line is gone; the model dropdown is the shared `SelectField`. |
+| **Gates** | CI 17/17; tsc 0, convex tsc 0 (bar the existing `process` types), lint 0 errors; unit 1,843/1,843; guardrails OK. Signed-out check on a prod build: 6 models, Generate disabled empty / enabled with a prompt, pressing it says "needs sign-in and a Paid plan", 0 requests. No engine change (892,634 B). |
+
+## v9.26 Change Summary — 2026-10-08
+
+**A generated picture actually arrives.** #338.
+
+| Area | Change |
+| --- | --- |
+| **Webhook output host** (#338) | The first real generate job failed with "Rejected non-Replicate output host": Replicate returned the image from its Cloudflare R2 bucket (`ai-gateway-outputs.<account>.r2.cloudflarestorage.com`). The SSRF guard in `convex/http.ts` now also accepts that one bucket host, pinned with its account id — never `*.r2.cloudflarestorage.com`. Deployed to `brave-ant-608` before the merge. |
+| **Gates** | CI 17/17; convex tsc 0 (bar the existing `process` types). No client or engine change (892,634 B). |
+
+
+## v9.27 Change Summary — 2026-10-11
+
+**The gallery loads steadily, Settings works from the keyboard, and a pen stroke selects on its ink.** UI Nights 9–15 (#339–#345), pen selection (#317), browser coverage (#319) and keyboard actions (#346), published together.
+
+| Area | Change |
+| --- | --- |
+| **Gallery** | Rows scroll without overlapping at narrow widths; hover and focus controls belong to one photo. The count says how many photos are loaded and the 12-photo demo limit. |
+| **Previews** | Welcome Back, Shared and Batch wait for actual image decoding, preserve the last good preview during updates, and show a per-image failure state. Shared images can be retried. |
+| **Keyboard** | Enter and Space activate gallery Remove and Select. Remove opens confirmation; Select toggles the checkbox without opening a different photo. The tile itself still opens a photo. |
+| **Settings** | Named, linked tabs; Up/Down, Home and End navigation; readable help text in both themes. Losing access to an admin-only tab returns the visible pane, keyboard entry point and reopen action to General. Two rendered regression cases fail before the fix and pass afterward. |
+| **Pen** | An unfilled freehand stroke selects on its segments, not the empty area in its bounding box. Delete, undo and redo preserve that behavior. |
+| **Browser coverage** | Every eligible default browser spec runs in two CI shards, with a coverage check. Service worker and keyless builds remain separate. Existing v9.20 resize behavior gains regression coverage; it is not a new resize implementation. |
+| **Marketing and docs** | Feature descriptions, annual and October Trail Log totals and commit squares, the newest release kept visible in each summary, remaining multi-night work, README deployment instructions and the documentation index are current. Commit dates preserve the work done on Friday and Saturday; the release lands Sunday. |
+| **Validation** | Full scoped production QC passes all five sections. The combined release passes 133 browser cases; preflight passes 1,864 unit tests; the keyboard correction adds four cases proved red before the fix and green afterward. Keyless boot: 4 passes. Rust: 512 featureless / 688 tiles. TypeScript, lint (0 errors, 55 existing warnings), guardrails, builds and inert-class audit pass. [Implementation and validation report](UI_NIGHTS_09_15.md). |
+| **Release records** (10-11, after the tag) | GitHub Releases backfilled for v8.98, v9.2 and v9.19–v9.26, which were tagged but never published; every version tag now has a Release. `.codex/` is gitignored, since its config holds auth tokens. |
+| **Engine** | 892,634 → 892,897 B (+263), the pen hit-test branch. No saved-edit format, IndexedDB schema, authentication or billing change. Settings only normalizes the visible category; access rules and server calls are unchanged. |
+
+The historical cached-restore timing concern remains recorded in the implementation report; passing runs do not establish a flake rate. Authenticated Shared actions have source and boundary-test coverage, not a live-account release test.
+
+## v9.28 Change Summary — 2026-10-12
+
+**Things that load now hold their place instead of popping in.** UI Nights 16–18 (#349, #350, #353) and the Plan & Billing skeleton (#352), published together.
+
+| Area | Change |
+| --- | --- |
+| **Sign-in** | The sign-in or avatar button reserves its space while Clerk loads, at each of its five sizes. The gray placeholder appears only after 300 ms and leaves with Clerk if Clerk fails. |
+| **AI Usage** | While auth connects or usage is on its way, the pane shows the shape of the Usage limits card. Signed-in users no longer see "Sign in to see your usage" first. |
+| **Plan & Billing** | A skeleton of the Current plan row and the Pro card replaces the large spinner. Signed in and still connecting, it no longer flashes the sign-in copy. A build without cloud keys showed it loading for good, on the old spinner too; it now shows the sign-in copy at once. |
+| **Compare** | The original is decoded before it shows. Nothing for 300 ms, then a skeleton in the Original half; "Original unavailable" on a decode error or after 15 s, sized to that half. |
+| **Phone viewer** | Opening a photo shows a skeleton in that photo's own shape after 300 ms, then the photo lands in the same box. A missing original says "This photo couldn't be loaded." instead of spinning for good. A swipe never shows the new photo's name with the old picture. The phone boot screen is unchanged. |
+| **Tests** | 38 new unit cases across the four changes; the old code fails each red check. Three phone-grid browser specs now count the grid's own placeholders, not the header's sign-in skeleton, which CI's placeholder Clerk key keeps on screen. |
+| **Validation** | Browser checks: Compare and the phone viewer with decode slowed to 3 s and forced to fail; Plan & Billing in a keyless build and with auth that never connects, in dark and light themes. CI green on all four PRs. Combined master: 1,902 unit tests; TypeScript, lint (0 errors, 55 existing warnings), guardrails, build and inert-class audit pass. [Implementation report](UI_NIGHTS_16_19.md). |
+| **Engine** | Unchanged, 892,897 B. No saved-edit format, IndexedDB schema, authentication or billing change. |
+
+Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Billing skeletons giving way to real data. Night 19 (import preview, image info, narrow menu bar) is still to do.
+

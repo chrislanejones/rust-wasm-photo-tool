@@ -738,6 +738,13 @@ pub struct ImageHorseTool {
     /// consistent. Off = snapshot undo exactly as today.
     #[cfg(feature = "tiles")]
     oplog_use_for_undo: bool,
+    /// Ops recorded since the last `snap()` — the gesture in progress
+    /// (ADR-088). `oplog_record` writes `Op::SameGesture` in front of every op
+    /// after the first, which is what lets one undo take the whole gesture
+    /// back even after a reload, when no snapshot survives to say where it
+    /// began.
+    #[cfg(feature = "tiles")]
+    oplog_gesture_ops: u32,
     /// In-flight paint/erase stroke being recorded: (painted polyline, brush).
     #[cfg(feature = "tiles")]
     rec_stroke: Option<(Vec<(f64, f64)>, crate::ops::Brush)>,
@@ -813,6 +820,10 @@ impl ImageHorseTool {
             selection: self.selection.clone(),
             selection_only: false,
             export_quality: self.export_quality,
+            #[cfg(feature = "tiles")]
+            oplog_cursor: self.oplog.as_ref().map(|l| l.cursor()),
+            #[cfg(not(feature = "tiles"))]
+            oplog_cursor: None,
         }
     }
 
@@ -825,7 +836,12 @@ impl ImageHorseTool {
     /// safe moment to lazily capture the log's base document.
     fn snap(&mut self, label: &str) {
         #[cfg(feature = "tiles")]
-        self.oplog_maybe_start();
+        {
+            self.oplog_maybe_start();
+            // A snapshot is a gesture boundary: whatever records next starts
+            // a new undo step.
+            self.oplog_gesture_ops = 0;
+        }
         let s = self.make_snapshot(label);
         self.hist.push(s);
     }
@@ -1113,6 +1129,8 @@ impl ImageHorseTool {
             oplog_broken: false,
             #[cfg(feature = "tiles")]
             oplog_use_for_undo: false,
+            #[cfg(feature = "tiles")]
+            oplog_gesture_ops: 0,
             #[cfg(feature = "tiles")]
             rec_stroke: None,
             #[cfg(feature = "tiles")]
@@ -1584,7 +1602,14 @@ impl ImageHorseTool {
             return;
         }
         if let Some(log) = self.oplog.as_mut() {
+            // The one place an op enters the log, so the one place that knows
+            // it is inside a gesture (ADR-088). The marker and the op go in
+            // together: a log persisted between any two calls is grouped.
+            if self.oplog_gesture_ops > 0 {
+                log.append(crate::ops::Op::SameGesture);
+            }
             log.append(op);
+            self.oplog_gesture_ops = self.oplog_gesture_ops.saturating_add(1);
         }
     }
 
@@ -1674,94 +1699,159 @@ impl ImageHorseTool {
     }
 
     /// Op-log undo: verify sync, keep the snapshot stacks aligned, seek the
-    /// cursor back one, and restore the log's document into the engine.
+    /// cursor back ONE GESTURE (ADR-088), and restore the log's document into
+    /// the engine.
     /// Returns false (leaving snapshot undo to handle it) when the log is
     /// absent/broken/at-base, a transient edit is open, or — the safety net
-    /// — the sync check fails (which also breaks the log for the session).
+    /// — the sync check fails or the snapshot stack and the log disagree
+    /// about where the gesture began (either one also breaks the log).
     #[cfg(feature = "tiles")]
     fn try_oplog_undo(&mut self) -> bool {
-        if self.oplog_broken || !self.oplog_in_scope() {
-            return false;
-        }
-        if self.editing_text_id.is_some()
-            || self.editing_shape_id.is_some()
-            || self.move_preview.is_some()
-            || self.paste_preview.is_some()
-        {
-            return false;
-        }
-        let Some(log) = self.oplog.as_ref() else {
+        let Some(target) = self.oplog_step_target(true) else {
             return false;
         };
-        if log.cursor() == 0 {
-            return false;
-        }
-        if !self.oplog_engine_in_sync() {
-            self.oplog_broken = true;
-            return false;
-        }
-        // Keep the snapshot stacks moving in lockstep (each recorded op
-        // pushed exactly one snapshot). The log is authoritative for PIXELS,
-        // so the restored layers are discarded — but it records no non-pixel
-        // parameter, and the snapshot is the only thing carrying one. Taking
+        // Keep the snapshot stacks moving in lockstep (one snapshot ↔ one
+        // gesture). The log is authoritative for PIXELS, so the restored
+        // layers are discarded — but it records no non-pixel parameter, and
+        // the snapshot is the only thing carrying one. Taking
         // `export_quality` off it here is what makes ADR-031 hold on this path
-        // as well as the snapshot path; discarding the whole restore silently
-        // dropped it, and the unit tests could not see that because a bare
-        // test tool has no started log and never reaches this branch.
+        // as well as the snapshot path.
         let current = self.make_snapshot("Current State");
         if let Some(snap) = self.hist.undo(current) {
             self.export_quality = snap.export_quality;
         }
-        // Re-acquire: the `log` borrow from the guard above ended at the
-        // `&mut self` calls in between, which is the only reason this was ever
-        // an unwrap. Falling back to `false` routes the caller to snapshot
-        // undo — the graceful path that already exists — instead of panicking
-        // and taking the WASM instance down mid-edit.
-        let Some(log) = self.oplog.as_mut() else {
-            return false;
-        };
-        let n = log.cursor() - 1;
-        log.seek(n);
-        self.oplog_restore_into_engine();
-        true
+        self.oplog_seek_to(target)
     }
 
     /// Op-log redo — mirror of [`try_oplog_undo`].
     #[cfg(feature = "tiles")]
     fn try_oplog_redo(&mut self) -> bool {
-        if self.oplog_broken || !self.oplog_in_scope() {
-            return false;
-        }
-        if self.editing_text_id.is_some()
-            || self.editing_shape_id.is_some()
-            || self.move_preview.is_some()
-            || self.paste_preview.is_some()
-        {
-            return false;
-        }
-        let Some(log) = self.oplog.as_ref() else {
+        let Some(target) = self.oplog_step_target(false) else {
             return false;
         };
-        if log.cursor() >= log.len() {
-            return false;
-        }
-        if !self.oplog_engine_in_sync() {
-            self.oplog_broken = true;
-            return false;
-        }
         // Mirror of the undo path above: pixels come from the log, non-pixel
         // parameters come from the snapshot (ADR-031).
         let current = self.make_snapshot("Current State");
         if let Some(snap) = self.hist.redo(current) {
             self.export_quality = snap.export_quality;
         }
-        // Re-acquire + graceful bail — mirror of try_oplog_undo.
+        self.oplog_seek_to(target)
+    }
+
+    /// Where one undo (`back`) or redo press should seek the log, or `None`
+    /// to hand the press to snapshot undo.
+    ///
+    /// Two sources, which must agree (ADR-088):
+    ///   * the snapshot about to be popped remembers the cursor it was taken
+    ///     at. Exact, and the only source that knows a gesture recorded
+    ///     NOTHING (its cursor is the current one: the log must not move);
+    ///   * the log's `SameGesture` markers. The only source after a reload or
+    ///     past the snapshot cap, when there is no snapshot to ask.
+    /// A snapshot with no cursor (injected by a session restore) defers to the
+    /// markers. Any other disagreement means the stacks drifted: the log is
+    /// marked broken and snapshot undo takes over, as it always has.
+    #[cfg(feature = "tiles")]
+    fn oplog_step_target(&mut self, back: bool) -> Option<usize> {
+        if self.oplog_broken || !self.oplog_in_scope() {
+            return None;
+        }
+        if self.editing_text_id.is_some()
+            || self.editing_shape_id.is_some()
+            || self.move_preview.is_some()
+            || self.paste_preview.is_some()
+        {
+            return None;
+        }
+        let snap_cursor = if back {
+            self.hist.undo_stack.back().map(|s| s.oplog_cursor)
+        } else {
+            self.hist.redo_stack.last().map(|s| s.oplog_cursor)
+        };
+        {
+            let log = self.oplog.as_ref()?;
+            let at_edge = if back {
+                log.cursor() == 0
+            } else {
+                log.cursor() >= log.len()
+            };
+            // Nothing to rewind in the log, and no empty step to pop either.
+            if at_edge && snap_cursor != Some(Some(log.cursor())) {
+                return None;
+            }
+        }
+        // The sync check recomposites, which can record the open gesture's
+        // last ops — so both sources are read AFTER it.
+        if !self.oplog_engine_in_sync() {
+            self.oplog_broken = true;
+            return None;
+        }
+        let log = self.oplog.as_ref()?;
+        let cursor = log.cursor();
+        let marker = if back {
+            log.gesture_undo_target()
+        } else {
+            log.gesture_redo_target()
+        };
+        match snap_cursor {
+            // A step that recorded nothing. Empty only if the snapshot really
+            // is the live document: a resize snaps and records no op, and an
+            // empty log rebases onto the result, so "in sync" proves nothing
+            // here. Anything else goes to snapshot undo, which is always right.
+            Some(Some(t)) if t == cursor => {
+                let snap = if back {
+                    self.hist.undo_stack.back()
+                } else {
+                    self.hist.redo_stack.last()
+                };
+                if snap.is_some_and(|s| self.snapshot_is_live(s)) {
+                    Some(t)
+                } else {
+                    None
+                }
+            }
+            Some(Some(t)) if Some(t) == marker => Some(t),
+            Some(Some(_)) => {
+                self.oplog_broken = true;
+                None
+            }
+            Some(None) | None => marker,
+        }
+    }
+
+    /// Does `snap` hold exactly the live document: size, layer stack, pixels,
+    /// masks and annotation counts? Only asked of a step that recorded no op,
+    /// on an undo or redo press, so the full compare is affordable.
+    #[cfg(feature = "tiles")]
+    fn snapshot_is_live(&self, snap: &Snapshot) -> bool {
+        snap.width == self.width
+            && snap.height == self.height
+            && snap.layers.len() == self.layers.len()
+            && snap.layers.iter().zip(&self.layers).all(|(a, b)| {
+                a.visible == b.visible
+                    && a.opacity == b.opacity
+                    && a.buf.width == b.buf.width
+                    && a.buf.height == b.buf.height
+                    && a.buf.data == b.buf.data
+                    && a.mask == b.mask
+                    && a.text_annotations.len() == b.text_annotations.len()
+                    && a.shape_annotations.len() == b.shape_annotations.len()
+            })
+    }
+
+    /// Seek the log to `target` and bring the engine along. The press that
+    /// got here ended any gesture in progress.
+    #[cfg(feature = "tiles")]
+    fn oplog_seek_to(&mut self, target: usize) -> bool {
+        self.oplog_gesture_ops = 0;
+        // Re-acquired, not unwrapped: falling back to `false` routes the
+        // caller to snapshot undo instead of panicking mid-edit.
         let Some(log) = self.oplog.as_mut() else {
             return false;
         };
-        let n = log.cursor() + 1;
-        log.seek(n);
-        self.oplog_restore_into_engine();
+        if log.cursor() != target {
+            log.seek(target);
+            self.oplog_restore_into_engine();
+        }
         true
     }
 
@@ -2181,6 +2271,7 @@ impl ImageHorseTool {
         log.seek(cursor as usize);
         self.oplog = Some(log);
         self.oplog_broken = false;
+        self.oplog_gesture_ops = 0;
         self.rec_stroke = None;
         self.rec_effect = None;
         self.oplog_restore_into_engine();
@@ -2406,7 +2497,9 @@ impl ImageHorseTool {
         #[cfg(feature = "tiles")]
         if self.oplog_use_for_undo && !self.oplog_broken && self.oplog_in_scope() {
             if let Some(log) = self.oplog.as_ref() {
-                return self.hist.undo_count().max(log.cursor());
+                // Gestures, not ops (ADR-088): a rounded rectangle is two ops
+                // and one press.
+                return self.hist.undo_count().max(log.gestures_before_cursor());
             }
         }
         self.hist.undo_count()
@@ -2417,7 +2510,7 @@ impl ImageHorseTool {
         #[cfg(feature = "tiles")]
         if self.oplog_use_for_undo && !self.oplog_broken && self.oplog_in_scope() {
             if let Some(log) = self.oplog.as_ref() {
-                return self.hist.redo_count().max(log.len() - log.cursor());
+                return self.hist.redo_count().max(log.gestures_after_cursor());
             }
         }
         self.hist.redo_count()
@@ -2440,13 +2533,21 @@ impl ImageHorseTool {
         {
             if let Some(log) = self.oplog.as_ref() {
                 if !log.is_empty() {
-                    let mut parts: Vec<String> = log.ops()[..log.cursor()]
-                        .iter()
-                        .map(|op| format!("undo:{}", op.label()))
-                        .collect();
-                    parts.push("current:Current State".to_string());
-                    for op in &log.ops()[log.cursor()..] {
-                        parts.push(format!("redo:{}", op.label()));
+                    // One row per gesture, so the panel matches the undo
+                    // depth now that a press can span several ops (ADR-088).
+                    let cursor = log.cursor();
+                    let mut parts: Vec<String> = Vec::new();
+                    let mut placed = false;
+                    for (end, label) in log.gesture_labels() {
+                        if !placed && end > cursor {
+                            parts.push("current:Current State".to_string());
+                            placed = true;
+                        }
+                        let side = if end <= cursor { "undo" } else { "redo" };
+                        parts.push(format!("{side}:{label}"));
+                    }
+                    if !placed {
+                        parts.push("current:Current State".to_string());
                     }
                     return parts.join("|");
                 }

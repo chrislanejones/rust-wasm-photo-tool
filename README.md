@@ -39,6 +39,9 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
+- **[UI Nights 9–15](docs/UI_NIGHTS_09_15.md)** — gallery, preview loading and Settings accessibility improvements shipped in v9.27.
+- **[UI Nights 16–19](docs/UI_NIGHTS_16_19.md)** — loading skeletons for sign-in, AI Usage, Compare, Plan & Billing and the phone viewer, shipped in v9.28.
+- **[Next UI pass](docs/ui-state-v4/08-v927-integration.md)** — photo switching, document controls, Pen/Pins, masks, history and error feedback, under review against v9.27.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 
@@ -64,11 +67,12 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 
 ## The marketing site
 
-`marketing/` — the five-page site at **[imagehorse.app](https://imagehorse.app/)**:
-home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
+`marketing/` — the site at **[imagehorse.app](https://imagehorse.app/)**:
+home, tool pages, architecture, features, pricing, Trail Log and what is in the works. Vite + React 19 + react-router,
 plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
-Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what
-points the deploy at `marketing/dist` instead of the app.
+The marketing Vercel project uses Root Directory `marketing` and
+`marketing/vercel.json`, publishing `marketing/dist`. The root `vercel.json`
+builds the editor at **edit.imagehorse.app**. See [marketing/README.md](marketing/README.md).
 
 ```bash
 pnpm run dev:marketing      # local
@@ -86,22 +90,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.23 — 2026-10-08
+### v9.28 — 2026-10-12
 
-**Adjustments works again, every reset is exact, and the AI buttons are there for everyone.**
+**Things that load now hold their place instead of popping in.**
 
-Brightness was badly off. Nudge it to +65 and three of four test grays went
-to pure white, and its reset turned what was left into one flat gray. Now the
-photo changes as you drag, letting go is one undo step, and each slider's
-reset puts back exactly what was there — because every change is worked out
-from the photo as it was when you opened the panel. +65 is a lift now, not a
-blowout.
+The sign-in button and Settings › AI Usage reserve their space while you sign
+in, so a signed-in user no longer sees "Sign in" first. Plan & Billing shows
+the shape of your plan instead of a spinner. Compare waits until the original
+is ready, then shows it; if it can't load, it says "Original unavailable". On
+a phone, opening a photo shows a gray box the shape of that photo until it
+arrives, and a missing photo says so instead of spinning forever.
 
-Levels has a reset beside each of its three points. Enhance › AI opens even
-with online features off, so you can see Remove Background and Remove
-Object; pressing one tells you what it needs.
+A fast load shows none of this: nothing appears for the first 300 ms.
 
-Engine 885,735 → 892,634 bytes, for the adjustment session.
+[UI Nights 16–19](docs/UI_NIGHTS_16_19.md) records the work and validation.
+The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
+commit squares.
 
 
 ## License

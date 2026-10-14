@@ -163,6 +163,7 @@ interface ToolsSidebarProps {
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
   undoCount: number;
   quality: number;
+  appliedQuality: number;
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   compressProgress: { completed: number; total: number };
@@ -254,6 +255,7 @@ export function ToolsSidebar({
   activePhotoId,
   undoCount,
   quality,
+  appliedQuality,
   onQualityChange,
   onQualityCommit,
   compressProgress,
@@ -398,6 +400,7 @@ export function ToolsSidebar({
         <PerPhotoRegion enabled={!!subToolId && PER_PHOTO_SUB_TOOLS.has(subToolId)}>
         {activeTool === "compress" && (
           <ResizeSettings
+            key={`resize-${documentRevision}`}
             disabled={!imageReady}
             imageWidth={imageWidth}
             imageHeight={imageHeight}
@@ -407,6 +410,7 @@ export function ToolsSidebar({
             currentEncodeQuality={currentEncodeQuality}
             activePhotoId={activePhotoId}
             quality={quality}
+            appliedQuality={appliedQuality}
             onQualityChange={onQualityChange}
             onQualityCommit={onQualityCommit}
             onResize={onResize}

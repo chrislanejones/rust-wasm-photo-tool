@@ -273,9 +273,9 @@ export const ROUTES: readonly Route[] = [
     to: "/image-compressor",
     ogImage: "/og/image-compressor.png",
     label: "Image compressor",
-    title: "Image compressor — hit a target file size in your browser",
+    title: "Image compressor — see the size Google checks, in your browser",
     description:
-      "Compress to an exact file size or a percentage in WebP, AVIF, JPEG or PNG. Runs on your own machine, shows the page-speed effect, and does whole folders at once.",
+      "Resize and compress on your own machine, and see what the file will weigh against Google PageSpeed's limit before you save it. WebP, JPEG, PNG or AVIF, and whole galleries at once.",
     sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
     toolPage: true,
   },

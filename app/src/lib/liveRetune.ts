@@ -32,6 +32,8 @@ export interface LiveRetuneOptions<V, R> {
   run: (value: V) => Promise<R>;
   /** The answer to the newest value asked for. */
   onResult: (result: R, value: V) => void;
+  onStart?: () => void;
+  onError?: (error: unknown, value: V) => void;
   /** Nothing pending and nothing in flight — the slider has settled. */
   onIdle?: () => void;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -52,14 +54,16 @@ export function createLiveRetune<V, R>(opts: LiveRetuneOptions<V, R>): LiveRetun
     const job = ready;
     ready = null;
     inFlight = true;
+    opts.onStart?.();
     opts
       .run(job.value)
       .then(
         (r) => {
           if (job.seq === seq) opts.onResult(r, job.value);
         },
-        () => {
+        (err) => {
           // A failed run shows nothing new; the next tick or click retries.
+          if (job.seq === seq) opts.onError?.(err, job.value);
         },
       )
       .finally(() => {

@@ -14,14 +14,9 @@
 // each per-photo panel (Chris, 10-02-2026). That is why the gate here is still
 // per-tool while the name is now on every tool: a brush panel has no values to
 // lock to a photo, but the card it sits in is still looking at one.
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useDelayedFlag, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
-import { logDiagnostic } from "@/lib/diagnosticsLog";
-
-/** A switch that never ends must not lock the panel forever (a load that
- *  failed, an original that went missing). Past this, unlock and log. */
-const SWITCH_LOCK_MAX_MS = 15_000;
 
 export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean; children: ReactNode }) {
   const photos = useGalleryStore((s) => s.photos);
@@ -30,16 +25,9 @@ export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean
 
   const switching = usePhotoSwitching();
   const slow = useDelayedFlag(switching, 300);
-  const stuck = useDelayedFlag(switching, SWITCH_LOCK_MAX_MS);
-  useEffect(() => {
-    if (stuck) {
-      logDiagnostic(
-        "CONSOLE",
-        `Photo switch to ${activePhotoId} did not finish in ${SWITCH_LOCK_MAX_MS / 1000}s — panel unlocked`,
-      );
-    }
-  }, [stuck, activePhotoId]);
-  const locked = switching && !stuck;
+  // Time passing cannot make the outgoing document safe to edit. Recovery
+  // stays available in the gallery and the persistent switch-error message.
+  const locked = switching;
 
   // No active photo, nothing to lock to — and the announcement below would
   // have no name to read out.
@@ -52,11 +40,6 @@ export function PerPhotoRegion({ enabled = true, children }: { enabled?: boolean
       data-switch-skeleton={(locked && slow) || undefined}
       className="per-photo-region"
     >
-      {locked && slow && (
-        <span role="status" className="sr-only">
-          {`Loading ${name}…`}
-        </span>
-      )}
       {children}
     </div>
   );

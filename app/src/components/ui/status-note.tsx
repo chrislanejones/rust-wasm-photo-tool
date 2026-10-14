@@ -4,9 +4,24 @@
 import * as React from "react";
 
 /** A failure message under a panel action. Plain text, no box: an error is
- *  read once and acted on, and a red box in a dense panel reads as a control. */
-export function ErrorNote({ children }: { children: React.ReactNode }) {
-  return <p className="text-2xs text-destructive leading-relaxed">{children}</p>;
+ *  read once and acted on, and a red box in a dense panel reads as a control.
+ *
+ *  Rendered only when something failed, so it is an alert: a screen reader
+ *  heard nothing when a run failed, while a sighted user saw red text.
+ *  `polite` is for a validation line that flips while someone types, which
+ *  must not interrupt every keystroke. */
+export function ErrorNote({
+  children,
+  polite = false,
+}: {
+  children: React.ReactNode;
+  polite?: boolean;
+}) {
+  return (
+    <p role={polite ? "status" : "alert"} className="text-2xs text-destructive leading-relaxed">
+      {children}
+    </p>
+  );
 }
 
 /** Why a control is off right now — "Drag a crop box on the canvas first."
