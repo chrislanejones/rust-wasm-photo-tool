@@ -1770,3 +1770,274 @@ fn undo_of_a_resize_after_a_stroke_puts_both_back_in_order() {
     assert!(t.undo());
     assert_eq!(composite_hash(&mut t), h0, "then the stroke");
 }
+
+// ── Presets: the first tonal op (op-log v13, issue #37) ────────────────────
+//
+// ADR-055 left `preset_apply` unrecorded: it snapped "Preset" and wrote the
+// five filters straight into the layer, so the next undo found a log that
+// disagreed with the engine, marked it broken, and fell back to whole-image
+// snapshots for the rest of the session. `Op::TonalStack` records it. The
+// proof of which undo path ran is the same as for gestures above: a snapshot
+// undo with a live log sets `oplog_is_broken()`, so it must stay false, and
+// the cursor must move.
+
+/// Vivid's five values, in the units ADR-055 pins (shadows and highlights are
+/// absolute 8-bit, so tens, not fractions). Order: brightness, contrast,
+/// saturation, shadows, highlights — `preset_apply`'s argument order.
+const VIVID: (f64, f64, f64, f64, f64) = (0.04, 1.35, 1.25, 12.0, 8.0);
+const FADE: (f64, f64, f64, f64, f64) = (0.06, 0.72, 0.85, 0.0, 0.0);
+
+fn preset(t: &mut ImageHorseTool, p: (f64, f64, f64, f64, f64)) -> bool {
+    let changed = t.preset_apply(p.0, p.1, p.2, p.3, p.4);
+    t.recomposite();
+    changed
+}
+
+#[test]
+fn a_preset_records_one_op_and_undo_stays_on_the_oplog_path() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+
+    // Hover first, the way the panel does: the preview must record nothing.
+    assert!(t.tonal_preview_begin());
+    assert!(t.preset_preview_set(FADE.0, FADE.1, FADE.2, FADE.3, FADE.4));
+    assert!(t.preset_preview_set(VIVID.0, VIVID.1, VIVID.2, VIVID.3, VIVID.4));
+    assert!(preset(&mut t, VIVID));
+    let h1 = composite_hash(&mut t);
+    assert_ne!(h0, h1, "the preset changed the photo");
+
+    assert_eq!(
+        t.oplog_op_count(),
+        1,
+        "the hover recorded nothing; apply recorded one"
+    );
+    assert_eq!(t.oplog_cursor(), 1);
+    assert_eq!(t.undo_count(), 1);
+    assert!(
+        !t.oplog_is_broken(),
+        "recording a preset leaves the log healthy"
+    );
+
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h0, "undo is byte-exact");
+    assert!(!t.oplog_is_broken(), "undo stayed on the op-log path");
+    assert_eq!(t.oplog_cursor(), 0, "the undo seeked the log");
+    assert_eq!(t.oplog_op_count(), 1, "the op stays as the redo tail");
+
+    assert!(t.redo());
+    assert_eq!(composite_hash(&mut t), h1, "redo is byte-exact");
+    assert!(!t.oplog_is_broken(), "redo stayed on the op-log path");
+    assert_eq!(t.oplog_cursor(), 1);
+}
+
+/// The DEFAULT document (Canvas + Photo, ADR-016): the content layer has a
+/// transparent frame around the photo, which is exactly where a replay that
+/// walked different pixels than the live filters would show up.
+#[test]
+fn a_preset_on_the_default_artboard_document_undoes_on_the_oplog_path() {
+    let (mut t, _px) = artboard_tool(64, 48, 12);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    assert!(preset(&mut t, VIVID));
+    let h1 = composite_hash(&mut t);
+    assert_eq!(t.oplog_op_count(), 1);
+    assert!(!t.oplog_is_broken());
+
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h0, "undo is byte-exact");
+    assert!(!t.oplog_is_broken(), "undo stayed on the op-log path");
+    assert!(t.redo());
+    assert_eq!(composite_hash(&mut t), h1, "redo is byte-exact");
+    assert!(!t.oplog_is_broken());
+    assert_eq!(t.layer_count(), 2, "the Canvas is still the Canvas");
+}
+
+/// A preset between two strokes: three gestures, undone in order, all on the
+/// log, and the log's own composite equals the engine's at every step.
+#[test]
+fn a_preset_between_strokes_undoes_in_order() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let h0 = composite_hash(&mut t);
+    stroke(&mut t, (5.0, 10.0), (90.0, 30.0), "#2040e0");
+    let h1 = composite_hash(&mut t);
+    assert!(preset(&mut t, FADE));
+    let h2 = composite_hash(&mut t);
+    stroke(&mut t, (5.0, 70.0), (90.0, 50.0), "#e02020");
+    assert_eq!(t.oplog_op_count(), 3);
+    assert_eq!(t.undo_count(), 3);
+
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h2, "first undo: the second stroke");
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h1, "second undo: the preset");
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h0, "third undo: the first stroke");
+    assert!(!t.oplog_is_broken(), "every undo stayed on the op-log path");
+}
+
+/// Persist, reload into a fresh engine (snapshot stack empty, so undo runs
+/// from the log alone), undo, redo. This is the case snapshot undo can never
+/// cover: before #37 a preset in the log made `oplog_restore` replay a log
+/// that did not contain it.
+#[test]
+fn after_a_reload_a_preset_still_undoes_and_redoes() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (5.0, 70.0), (90.0, 70.0), "#2040e0");
+    let h_stroke = composite_hash(&mut t);
+    assert!(preset(&mut t, VIVID));
+    let h_full = composite_hash(&mut t);
+    assert!(!t.oplog_is_broken());
+
+    let total = t.oplog_op_count() as u32;
+    let frames = t.oplog_encoded_ops(0, total);
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, total));
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_full,
+        "the restored document wears the preset, byte-exact"
+    );
+    assert_eq!(t2.undo_count(), 2, "stroke + preset after the reload");
+    assert!(t2.undo());
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_stroke,
+        "post-reload undo, byte-exact"
+    );
+    assert!(!t2.oplog_is_broken());
+    assert!(t2.redo());
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_full,
+        "post-reload redo, byte-exact"
+    );
+    assert!(!t2.oplog_is_broken());
+}
+
+/// A preset that changes nothing costs no undo step, so it must not record an
+/// op either: an op with no snapshot would break the one-op-one-step lockstep.
+#[test]
+fn an_identity_preset_records_nothing() {
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (5.0, 10.0), (90.0, 30.0), "#2040e0");
+    assert!(!preset(&mut t, (0.0, 1.0, 1.0, 0.0, 0.0)));
+    assert_eq!(t.oplog_op_count(), 1, "only the stroke");
+    assert_eq!(t.undo_count(), 1);
+    assert!(!t.oplog_is_broken());
+}
+
+/// Old saves keep working. A log written by a v12 build (v9.28 + #356) holds
+/// a stroke, a two-op rounded rectangle joined by a `SameGesture` marker, and
+/// a Levels apply, every frame stamped 12. The new build must open it and
+/// undo it gesture by gesture, byte-exact, on the op-log path.
+#[test]
+fn a_v12_log_without_tonal_ops_still_opens_and_undoes() {
+    use crate::ops::{decode_op_frames, encode_op_frames};
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (5.0, 70.0), (90.0, 70.0), "#2040e0");
+    let h1 = composite_hash(&mut t);
+    add_shape(&mut t, 0, 0, 0, 0.0, &[6, 6, 6, 6], (10.0, 10.0));
+    let h2 = composite_hash(&mut t);
+    assert!(t.levels_apply(24, 210, 1.35));
+    let h3 = composite_hash(&mut t);
+    let total = t.oplog_op_count() as u32;
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+
+    let ops = decode_op_frames(&t.oplog_encoded_ops(0, total)).unwrap(); // allow: rust-panic
+    assert!(
+        ops.iter().any(|op| matches!(op, Op::SameGesture)),
+        "the fixture carries a v12 gesture marker"
+    );
+    let mut frames = encode_op_frames(&ops);
+    let mut i = 0;
+    while i + 4 < frames.len() {
+        let n = u32::from_le_bytes(frames[i..i + 4].try_into().unwrap()) as usize; // allow: rust-panic
+        frames[i + 4] = 12;
+        i += 4 + n;
+    }
+
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, total));
+    assert_eq!(
+        composite_hash(&mut t2),
+        h3,
+        "the v12 log replays byte-exact"
+    );
+    assert_eq!(t2.undo_count(), 3, "stroke, rectangle, levels");
+    assert!(t2.undo());
+    assert_eq!(composite_hash(&mut t2), h2, "undo the levels");
+    assert!(t2.undo());
+    assert_eq!(composite_hash(&mut t2), h1, "undo the whole rectangle");
+    assert!(!t2.oplog_is_broken());
+}
+
+/// The live preset and the op it records produce the same pixels, on both
+/// document shapes. Both call `presets::apply_stack`; this pins what could
+/// still differ — which bytes each one walks.
+#[test]
+fn tonal_stack_replay_matches_live_preset_apply() {
+    let (mut t, px) = seeded_tool(64, 64);
+    assert!(preset(&mut t, VIVID));
+    let mut doc = seeded_doc(&px, 64, 64);
+    apply(
+        &Op::TonalStack {
+            brightness: VIVID.0,
+            contrast: VIVID.1,
+            highlights: VIVID.4,
+            shadows: VIVID.3,
+            saturation: VIVID.2,
+        },
+        &mut doc,
+    );
+    assert_flat_identical(&t.composite_cache, &doc.composite_flat(), 64, "preset");
+
+    // The artboard document: the log's own live composite after recording.
+    let (mut a, _px) = artboard_tool(64, 48, 12);
+    a.set_oplog_undo(true);
+    assert!(preset(&mut a, VIVID));
+    let replay = a.oplog.as_ref().unwrap().live_document().composite_flat(); // allow: rust-panic
+    assert_flat_identical(&a.composite_cache, &replay, a.width(), "preset on canvas");
+}
+
+/// The op carries the values exactly as `preset_apply` received them — the
+/// ADR-055 units, never normalized — and is written as v13.
+#[test]
+fn the_recorded_tonal_stack_carries_the_units_untouched() {
+    use crate::ops::{decode_op_frames, OP_FORMAT_VERSION};
+    let (mut t, _px) = seeded_tool(32, 32);
+    t.set_oplog_undo(true);
+    assert!(preset(&mut t, VIVID));
+    let frames = t.oplog_encoded_ops(0, 1);
+    assert_eq!(frames[4], 13, "a preset frame is stamped v13");
+    assert_eq!(OP_FORMAT_VERSION, 13);
+    let ops = decode_op_frames(&frames).unwrap(); // allow: rust-panic
+    assert_eq!(
+        ops,
+        vec![Op::TonalStack {
+            brightness: 0.04,
+            contrast: 1.35,
+            highlights: 8.0,
+            shadows: 12.0,
+            saturation: 1.25,
+        }],
+        "shadows 12 is twelve 8-bit levels, not 12/255"
+    );
+    assert_eq!(
+        ops[0].label(),
+        "Preset",
+        "the History panel row after a reload"
+    );
+}
