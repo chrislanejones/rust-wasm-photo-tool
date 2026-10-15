@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.30",
+    date: "2026-10-15",
+    headline: "The freezes are gone.",
+    entries: [
+      { tag: "perf", text: "Autosave no longer re-encodes your whole undo history after every edit. The fifth paste into a big photo went from a 4.1 second freeze to 0.6 seconds, and the editor no longer slows down the longer you work." },
+      { tag: "rust", text: "Autosave re-encodes only the layers whose pixels changed. With five big screenshots stacked, a save went from 909 ms to 284 ms." },
+      { tag: "perf", text: "Dragging a layer's opacity on big screenshots draws once per burst instead of once per tick. The screen catches up about 1 second after you let go, down from 9." },
+      { tag: "fix", text: "A shape stays on screen when you press Apply, Cancel or Duplicate, instead of vanishing until the engine catches up." },
+      { tag: "ui", text: "The Diagnostics window is gone. Feature flags and current image info moved to Settings, and telemetry prints to the browser console." },
+    ],
+  },
+  {
     version: "v9.29",
     date: "2026-10-14",
     headline: "Paste stays out of your way, and undo takes back one thing at a time.",

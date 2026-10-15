@@ -11544,3 +11544,19 @@ Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Bill
 
 Not in this release: #367 (indexed storage-ref checks) is waiting on a token scope to push. No imagehorse-qc pass yet on #371, #368 or #372.
 
+## v9.30 Change Summary — 2026-10-15
+
+**The freezes are gone.** Everything merged since v9.29: #373, #374, #375, #376, #377. Each one started from a freeze Chris hit on 10-14: adding an image, drawing a rectangle, or dragging a layer's opacity on big screenshots.
+
+| Area | Change |
+| --- | --- |
+| **Autosave** | After every edit, autosave PNG-encoded **every undo snapshot again**, so each edit made the next save slower and every engine call waited behind it. Each snapshot is now encoded once and cached, and the autosave uses fast deflate (exports keep Balanced). Fifth paste into a 2048 px photo: **4.1 s → 0.61 s** (#373). |
+| **Autosave, layers** | A save re-encodes only the layers whose pixels changed. Each PNG is kept beside a fingerprint of the pixels it came from, so a stale layer can't be saved by a missed dirty flag. Five 3759×1304 layers: save **909 → 284 ms**; after an opacity drag **398 → 159 ms** (#377). |
+| **Opacity drag** | Each slider tick queued a full recomposite of every layer, and nothing merged them. The worker now draws once per burst, and a waiting draw still runs before anything that reads the composite (magic wand, lasso, Smart Brush, histogram). Five big screenshots, 60-step drag: screen caught up **9.2 s → 0.9 s** after release (#376, #377). |
+| **Shapes** | Apply, Cancel and Duplicate cleared the shape's overlay before the engine had drawn it, so the shape vanished for as long as the engine queue took. The overlay now stays until the engine draws the shape (#375). |
+| **Diagnostics** | The Alt+Delete window is gone. Its Resources tab ran about 14 engine calls every frame while open. Feature flags moved to **Settings › Feature Flags**, image info to **Settings › Current Image**, and telemetry prints to the browser console with tags like `[WASM_ENGINE]` (#374). |
+| **Import** | The import choices read **Add to Layer** and **Add Image to Gallery**. Dropping an image clears the drag overlay and no longer navigates the tab away. Holding Space to pan no longer sticks if the window loses focus (#373). |
+| **Validation** | Combined master: 2,010 unit tests in 218 files; TypeScript, lint (0 errors, 52 existing warnings), guardrails and production build pass; cargo fmt passes. Per PR: clippy -D warnings with and without tiles, 743 engine tests, e2e save/reload specs 8/8. CI green on every PR. |
+| **Engine** | 895,885 → **901,221 B** (+5,336). No op log, archive format, IndexedDB schema, authentication or billing change. |
+
+Not in this release: no imagehorse-qc pass yet on these engine and canvas changes.

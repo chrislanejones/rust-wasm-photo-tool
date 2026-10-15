@@ -90,20 +90,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.29 — 2026-10-14
+### v9.30 — 2026-10-15
 
-**Paste stays out of your way, and undo takes back one thing at a time.**
+**The freezes are gone.**
 
-Pasting an image asks one question: stack it as a layer, or make a new
-gallery image. The pasted box sits under the Tools, Gallery and Review panels,
-pushing it into a panel closes that panel, and a Resize & Compress bar shrinks
-a huge screenshot before you place it.
-
-One Ctrl+Z now undoes one thing you did, presets included, and it still works
-after a reload. Switching photos keeps your unsaved edits and waits for the
-next photo to be ready. Perspective keeps its target when you pick an object
-from Review's list. A cloud upload that times out is cancelled instead of
-left behind in storage. Screen readers pick up 15 things they missed before.
+Autosave used to re-encode your whole undo history after every edit, so the
+editor got slower the longer you worked: up to 4 seconds of hourglass after a
+paste. It now encodes each step once, and only the layers that changed. Dragging
+a layer's opacity on big screenshots used to queue a full redraw per tick and
+leave you waiting about 9 seconds after you let go. Now it draws once per burst
+and catches up in about 1 second. A shape no longer vanishes for a few seconds
+when you press Apply. The Diagnostics window is gone. Its feature flags and
+image info moved to Settings, and telemetry prints to the browser console.
 
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
 commit squares.
