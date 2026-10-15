@@ -90,20 +90,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.28 — 2026-10-12
+### v9.29 — 2026-10-14
 
-**Things that load now hold their place instead of popping in.**
+**Paste stays out of your way, and undo takes back one thing at a time.**
 
-The sign-in button and Settings › AI Usage reserve their space while you sign
-in, so a signed-in user no longer sees "Sign in" first. Plan & Billing shows
-the shape of your plan instead of a spinner. Compare waits until the original
-is ready, then shows it; if it can't load, it says "Original unavailable". On
-a phone, opening a photo shows a gray box the shape of that photo until it
-arrives, and a missing photo says so instead of spinning forever.
+Pasting an image asks one question: stack it as a layer, or make a new
+gallery image. The pasted box sits under the Tools, Gallery and Review panels,
+pushing it into a panel closes that panel, and a Resize & Compress bar shrinks
+a huge screenshot before you place it.
 
-A fast load shows none of this: nothing appears for the first 300 ms.
+One Ctrl+Z now undoes one thing you did, presets included, and it still works
+after a reload. Switching photos keeps your unsaved edits and waits for the
+next photo to be ready. Perspective keeps its target when you pick an object
+from Review's list. A cloud upload that times out is cancelled instead of
+left behind in storage. Screen readers pick up 15 things they missed before.
 
-[UI Nights 16–19](docs/UI_NIGHTS_16_19.md) records the work and validation.
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
 commit squares.
 

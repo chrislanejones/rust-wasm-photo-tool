@@ -24,6 +24,23 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.29",
+    date: "2026-10-14",
+    headline: "Paste stays out of your way, and undo takes back one thing at a time.",
+    entries: [
+      { tag: "feature", text: "Pasting an image asks one question: stack it as a layer, or make a new gallery image. The pasted box sits under the Tools, Gallery and Review panels, and pushing it into a panel closes that panel." },
+      { tag: "feature", text: "A Resize & Compress bar under a pasted image shows its pixel size and shrinks a huge screenshot before you place it." },
+      { tag: "fix", text: "One Ctrl+Z undoes one thing you did. A rounded rectangle or a star no longer needs several presses, and the first one isn't a dud." },
+      { tag: "rust", text: "Presets are recorded in the op log, so undo after a preset steps back exactly, even after a reload, instead of falling back to whole-image snapshots." },
+      { tag: "fix", text: "Picking an object from Review's list while Perspective, Skew or Distort is open points the tool at that object, instead of opening the Shapes editor." },
+      { tag: "fix", text: "Switching photos keeps your unsaved edits and waits until the next photo is ready." },
+      { tag: "fix", text: "A cloud backup, AI upload or share that times out is cancelled, so it no longer leaves a file behind in storage." },
+      { tag: "ui", text: "The import preview, the EXIF readout and the menu bar on a narrow window hold their place while they load." },
+      { tag: "ui", text: "Screen readers pick up 15 things they missed before, including the histogram and placement-grid choices and whether Move and the menu-bar tabs are on." },
+      { tag: "infra", text: "Seven dependency updates, including three.js 0.186 on this site." },
+    ],
+  },
+  {
     version: "v9.28",
     date: "2026-10-12",
     headline: "Things that load now hold their place instead of popping in.",
