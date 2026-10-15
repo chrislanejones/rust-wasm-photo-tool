@@ -1,11 +1,16 @@
 //! Color presets: one named stack of the tonal filters the engine already has.
 //!
-//! A PRESET IS NOT A NEW OPERATION. Each one is a set of values for five
-//! filters in `filters` — the same functions the Adjustments sliders call — so
-//! a preset adds no pixel math, no `Op` variant and nothing for the op log to
-//! version. What it adds is ONE undo step: the Quick Adjust grid it grew out of
-//! called `adjust_brightness` and then `adjust_contrast`, each snapshotting, so
-//! one click cost two undos and neither half meant anything alone.
+//! A PRESET IS NOT NEW PIXEL MATH. Each one is a set of values for five
+//! filters in `filters` — the same functions the Adjustments sliders call. What
+//! it adds is ONE undo step: the Quick Adjust grid it grew out of called
+//! `adjust_brightness` and then `adjust_contrast`, each snapshotting, so one
+//! click cost two undos and neither half meant anything alone.
+//!
+//! IT IS RECORDED (op-log v13, issue #37). `preset_apply` appends one
+//! `Op::TonalStack` carrying the five values exactly as passed, and replay calls
+//! [`apply_stack`] on the same bytes. Until v13 it recorded nothing, so the
+//! next undo broke the log for the session (ADR-052, ADR-055). The preview
+//! (`preset_preview_set`) still records nothing and touches no history.
 //!
 //! ORDER IS PART OF THE DEFINITION. Tone first, color last: brightness and
 //! contrast set the overall curve, highlights and shadows recover its ends, and
@@ -120,10 +125,11 @@ impl ImageHorseTool {
         false
     }
 
-    /// Commit a preset to the active layer as ONE undo step. An open preview is
-    /// put back first, so the stack applies to the untouched pixels exactly
-    /// once rather than on top of what the hover already drew. Returns whether
-    /// pixels changed (the caller should flush).
+    /// Commit a preset to the active layer as ONE undo step and ONE recorded
+    /// `Op::TonalStack`. An open preview is put back first, so the stack applies
+    /// to the untouched pixels exactly once rather than on top of what the
+    /// hover already drew. Returns whether pixels changed (the caller should
+    /// flush). An identity stack snaps nothing and records nothing.
     pub fn preset_apply(
         &mut self,
         brightness: f64,
@@ -147,6 +153,17 @@ impl ImageHorseTool {
         if let Some(layer) = self.layers.get_mut(self.active) {
             apply_stack(&mut layer.buf.data, &stack);
         }
+        // After the pixels, like `levels_apply`: the log's sync check compares
+        // against the engine, so the op must describe what is already there.
+        // Values untouched — the op carries the stack's own units.
+        #[cfg(feature = "tiles")]
+        self.oplog_record(crate::ops::Op::TonalStack {
+            brightness,
+            contrast,
+            highlights,
+            shadows,
+            saturation,
+        });
         true
     }
 }

@@ -210,3 +210,14 @@ ADR-088 (draft). One gesture that records several ops (a rounded rectangle is
 `ShapeAdd` + `ShapeCornerRadii`) now undoes in one press, in-session and after
 a reload. Op-log v12 adds `Op::SameGesture` at index 22. That clears the
 "recorded undo rewinds one op" blocker for recording the tonal sliders.
+
+## Outcome (10-14-2026): presets are recorded; the sliders are next, on the same op
+
+ADR-090 (draft). Enhance › Presets now records one `Op::TonalStack` at index
+23, op-log **v13**, so a preset no longer breaks the log. Ctrl+Z and
+Ctrl+Shift+Z stay on the op-log path, byte-exact, in-session and after a
+reload. That is the first piece of part 3. The five Adjustments sliders
+(brightness, contrast, saturation, shadows, highlights) are the same five
+filters and will record on the same variant in a later session, with no new
+index and no new format number. Sharpen, whole-image blur and the rest of the
+67 are still unrecorded.

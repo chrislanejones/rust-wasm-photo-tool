@@ -135,3 +135,16 @@ once too often.
 Early warning sign: a diff that adds a line to `apply_stack` which is not a
 call to `crate::filters::*`, or a new `*_preview_begin` export next to
 `tonal_preview_begin`.
+
+## Outcome (10-14-2026): presets are recorded (ADR-090)
+
+Alternative 1 is now taken, for the reason that alternative gave: recorded
+undo is sound since op-log v12 (#351, #356). `preset_apply` records one
+`Op::TonalStack { brightness, contrast, highlights, shadows, saturation }`
+(index 23, op-log **v13**). Its values are exactly what the panel passed, in
+this ADR's units: shadows and highlights stay absolute 8-bit and nothing is
+normalized. Replay calls the same `apply_stack`, so "a preset is its filters,
+in order" now holds for the log too. The preview slot is unchanged: hovering
+still records nothing and costs no undo step. The five sliders come later on
+the same variant. The "Presets break the op log" consequence above no longer
+applies.
