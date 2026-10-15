@@ -74,7 +74,7 @@ function setup() {
     await vi.waitFor(() => expect(hits.length).toBeGreaterThan(i));
     hits[i].resolve(id);
   };
-  return { result, hits, added, answer, rerender };
+  return { result, hits, added, answer, rerender, tool };
 }
 
 describe("a press the engine is still answering", () => {
@@ -250,3 +250,43 @@ describe("a press the engine is still answering", () => {
     expect(result.current.editState).toBeNull();
   });
 });
+
+describe("Apply while the engine is busy", () => {
+  // Clearing the overlay before the engine had drawn the committed shape left
+  // nothing on screen for as long as the queue took: a triangle gone on Apply,
+  // a rectangle back ten seconds later (10-14-2026).
+  it("keeps the shape on screen until the engine has drawn it", async () => {
+    const { result, answer, tool } = setup();
+    let down!: Promise<void>;
+    act(() => {
+      down = result.current.onMouseDown(ev(10, 10));
+    });
+    act(() => {
+      result.current.onMouseMove(ev(60, 50));
+      result.current.onMouseUp();
+    });
+    await act(async () => {
+      await answer(0, -1);
+      await down;
+    });
+    expect(result.current.editState).not.toBeNull();
+
+    const drawn = deferred<string>();
+    tool.get_shape_annotations = () => drawn.promise; // the engine is still busy
+    let applied!: Promise<void>;
+    act(() => {
+      applied = result.current.commitEdit();
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(result.current.editState).not.toBeNull(); // still drawn by the overlay
+
+    await act(async () => {
+      drawn.resolve("[]");
+      await applied;
+    });
+    expect(result.current.editState).toBeNull(); // the engine has it now
+  });
+});
+

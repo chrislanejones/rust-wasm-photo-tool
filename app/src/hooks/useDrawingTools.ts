@@ -220,9 +220,10 @@ export function useDrawingTools({
     const es = editStateRef.current;
     if (!es) return;
     editStateRef.current = null;
-    setEditState(null);
+    // Overlay stays until the engine draws the shape (cleared first, shapes vanished on Apply).
+    const done = () => setEditState((cur) => (cur === es ? null : cur));
     const tool = toolRef.current;
-    if (!tool) return;
+    if (!tool) return done();
     const s = settingsRef.current;
     // Existing-shape edits keep the shape's own style; new shapes read the
     // current toolbar settings live — except the TYPE, which every pending
@@ -264,7 +265,7 @@ export function useDrawingTools({
       if (!editDirtyRef.current) {
         tool.set_editing_shape(-1);
         flushToCanvas();
-        await refreshShapes();
+        await refreshShapes().then(done);
         return;
       }
       tool.update_shape_annotation(
@@ -321,7 +322,7 @@ export function useDrawingTools({
     }
     flushToCanvas();
     syncState();
-    await refreshShapes();
+    await refreshShapes().then(done); // the port is FIFO: the blit above has landed
   }, [toolRef, flushToCanvas, syncState, refreshShapes]);
 
   /** Escape: drop the pending edit. For an existing-shape edit this also
@@ -329,12 +330,11 @@ export function useDrawingTools({
   const cancelEdit = useCallback(() => {
     const es = editStateRef.current;
     editStateRef.current = null;
-    setEditState(null);
-    if (es?.editId != null) {
-      toolRef.current?.set_editing_shape(-1);
-      flushToCanvas();
-    }
-  }, [toolRef, flushToCanvas]);
+    if (es?.editId == null || !toolRef.current) return setEditState(null);
+    toolRef.current.set_editing_shape(-1); // overlay stays until the un-hide is drawn
+    flushToCanvas();
+    void refreshShapes().finally(() => setEditState((cur) => (cur === es ? null : cur)));
+  }, [toolRef, flushToCanvas, refreshShapes]);
 
   /** Load an existing live shape into the edit overlay so it can be moved,
    *  resized, or re-angled. The committed shape is suppressed from the Rust
