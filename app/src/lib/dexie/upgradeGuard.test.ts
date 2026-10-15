@@ -26,10 +26,9 @@
 // outside Dexie has to know this.
 //
 // Harness: node + fake-indexeddb (vitest.setup.ts), same as the adapter tests.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/lib/dexie/db";
-import { clearDiagnostics, getDiagnostics } from "@/lib/diagnosticsLog";
 
 const DB_NAME = "image-horse-dexie";
 /** db.ts declares `.version(2)`; Dexie stores that as IDB version 20. */
@@ -63,11 +62,16 @@ function deleteDatabase(): Promise<void> {
  *  schedule, so awaiting the opening promise alone is not enough. */
 const settle = (ms = 80) => new Promise((r) => setTimeout(r, ms));
 
+// logDiagnostic prints to the console now; collect its INDEXEDDB lines.
+let consoleLines: string[] = [];
 function indexedDbLogs(): string {
-  return getDiagnostics()
-    .filter((e) => e.source === "INDEXEDDB")
-    .map((e) => e.message)
+  return consoleLines
+    .filter((l) => l.startsWith("[INDEXEDDB] "))
+    .map((l) => l.slice("[INDEXEDDB] ".length).replace(/ \([\d.]+ ms\)$/, ""))
     .join(" ");
+}
+function clearDiagnostics(): void {
+  consoleLines = [];
 }
 
 /** A stale tab from the previous release: a database at Dexie v1 (IDB 10) built
@@ -89,12 +93,18 @@ function openStaleV1Tab(): Promise<IDBDatabase> {
 }
 
 beforeEach(async () => {
+  for (const level of ["info", "debug"] as const) {
+    vi.spyOn(console, level).mockImplementation((line: unknown) => {
+      consoleLines.push(String(line));
+    });
+  }
   if (db.isOpen()) db.close();
   await deleteDatabase();
   clearDiagnostics();
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   if (db.isOpen()) db.close();
   await deleteDatabase();
 });

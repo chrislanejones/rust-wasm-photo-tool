@@ -177,9 +177,7 @@ export function useGalleryLoading({
     if (!active) return;
     const t = window.setTimeout(() => {
       setPhase((p) => (p === "idle" ? p : "capped"));
-      // console.warn rather than logDiagnostic: the app's console capture
-      // (installConsoleCapture) mirrors it into the Diagnostics log anyway, and
-      // a warning is something an e2e run can actually observe.
+      // console.warn: a warning is something an e2e run can actually observe.
       console.warn(`Gallery thumbnails did not finish loading in ${GALLERY_LOADING_MAX_MS / 1000}s — gallery unlocked`);
     }, GALLERY_LOADING_MAX_MS);
     return () => window.clearTimeout(t);

@@ -391,13 +391,12 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       run: () => ui().setShowShortcutModal(true),
     },
     {
-      id: "action.diagnostics",
-      label: "Toggle Diagnostics",
+      id: "action.current-image",
+      label: "Current image info",
       group: "actions",
-      keywords: ["debug", "performance", "logs", "monitor"],
+      keywords: ["diagnostics", "exif", "metadata", "dimensions", "hash"],
       icon: Activity,
-      shortcut: "Alt+Del",
-      run: () => ui().setShowDiagnostics((v) => !v),
+      run: () => openSettingsTab("image"),
     },
   );
 

@@ -34,7 +34,7 @@ import { commitPendingEdits } from "@/lib/pendingEdits";
 import { getEngineDocument, setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
 import { whenStrokeQuiet } from "@/lib/strokeGate";
-import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
+import type { OplogStats } from "@/lib/oplogStats";
 import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
 import { writeEditArchive } from "./archiveSave";
@@ -117,9 +117,9 @@ export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): nu
   // means an unrecorded edit exists somewhere in this document's history, and
   // from that moment the archive is the only thing that can restore it.
   //
-  // Stats lag one flush at worst (they are published by `syncOplog` after each
-  // flush, and every stroke end flushes); a stale-low `ops` fails toward the
-  // fast lane, which costs one extra IDB write. The slow lane requires proof.
+  // A stale-low `ops`, or no stats at all (today's only caller passes null),
+  // fails toward the fast lane, which costs one extra IDB write. The slow lane
+  // requires proof.
   const logCoversDocument =
     !!stats && stats.supported && stats.active && !stats.broken && stats.ops >= undoCount;
   return logCoversDocument ? 2500 : 300;
@@ -372,7 +372,9 @@ export function useImageSession({
   // gate.
   useEffect(() => {
     if (!activePhotoId || !dirtyRef.current) return;
-    const delay = autosaveDelayMs(getOplogStats(), stamp.state.undoCount);
+    // No coverage reading exists at runtime (only the removed Diagnostics sampler
+    // ever produced one), so this is the fast lane: what every session got.
+    const delay = autosaveDelayMs(null, stamp.state.undoCount);
     const t = window.setTimeout(
       () => void whenStrokeQuiet(AUTOSAVE_QUIET_MS).then(() => flushRef.current()),
       delay,

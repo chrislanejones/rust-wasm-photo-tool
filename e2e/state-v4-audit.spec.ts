@@ -51,16 +51,17 @@ for (const layout of [
   }
 }
 
-test("diagnostics image metadata stays neutral while switching documents", async ({ page }) => {
+test("Current Image metadata stays neutral while switching documents", async ({ page }) => {
   await page.route("**/*", route => /^(?:https?:\/\/(?:localhost|127\.0\.0\.1)[:/]|blob:|data:)/.test(route.request().url()) ? route.continue() : route.abort());
   await page.goto("/");
   await page.locator('input[type="file"]').first().setInputFiles(fixtures);
   await expect(page.locator(".per-photo-name")).toContainText("1 of 2");
   await expect(page.locator('[data-document-locked="true"]')).toHaveCount(0);
-  await page.keyboard.press("Alt+Delete");
-  const dialog = page.getByRole("dialog", { name: "Diagnostics Window" });
+  // Settings › Current Image (the Alt+Delete Diagnostics window until 10-14-2026).
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  const dialog = page.getByRole("dialog", { name: /Settings/ });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("tab", { name: "Current Image Meta", exact: true }).click();
+  await dialog.getByRole("tab", { name: "Current Image", exact: true }).click();
   const size = dialog.getByText("Current size", { exact: true }).locator("..");
   const dimensions = () => page.locator("canvas.main-canvas").evaluate((canvas: HTMLCanvasElement) => `${canvas.width} × ${canvas.height}`);
   await expect(size).toContainText(await dimensions());

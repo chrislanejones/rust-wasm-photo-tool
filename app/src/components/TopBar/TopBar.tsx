@@ -1,4 +1,5 @@
 // app/src/components/TopBar/TopBar.tsx
+import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { motion } from "framer-motion";
 import { slideFromTop, springStandard, instantTransition } from "@/lib/animations";
 import { PANEL_OPEN_GUTTER, BP_COMPACT, BP_TIGHT } from "@/lib/layout";
@@ -82,6 +83,8 @@ interface TopBarProps {
   superUser?: SuperUserControls | null;
   /** Live-tool access for the Settings → Import / Export (.ora) tab. */
   openRaster: OpenRasterControls;
+  /** Settings › Current Image. */
+  imageMeta?: ImageMeta;
 }
 
 export function TopBar({
@@ -111,6 +114,7 @@ export function TopBar({
   general,
   superUser,
   openRaster,
+  imageMeta,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
@@ -332,6 +336,7 @@ export function TopBar({
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
+                  imageMeta={imageMeta}
                   grouped={!compact}
                 />
                 <UserMenu grouped={!compact} />

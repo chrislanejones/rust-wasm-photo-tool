@@ -168,7 +168,7 @@ export function liveEnginePort(): EngineWorkerClient | null {
  *
  * `Tool` is passed in rather than imported here so the local path keeps using
  * the module the caller already initialized — the same instance whose
- * `memory` it hands to `registerWasmMemory` for the zero-copy blit.
+ * `memory` it hands to the zero-copy blit.
  *
  * ⚠️ WITH THE FLAG ON, THE LOCAL BRANCH NEVER RUNS, which is the point: no
  * second `ImageHorseTool`, no second op log, no doubled image memory.
