@@ -75,6 +75,7 @@ import { autoCompressedPatch } from "@/lib/sizeDelta";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
 import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
+import { PastePlacementBar } from "@/features/canvas/PastePlacementBar";
 import { FirstRunScreen } from "@/features/upload/FirstRunScreen";
 import { NewActions } from "@/features/upload/NewActions";
 import { ResumeContent } from "@/features/upload/ResumeContent";
@@ -1630,7 +1631,7 @@ export function AppShell() {
    */
   // ── Drag / paste image import ────────────────────────────────────────────
   // A dropped or pasted image doesn't act immediately — it opens a choice
-  // dialog (New layer / Onto image / To gallery). `isDraggingImage` drives the
+  // dialog (Stack as layer / New gallery image). `isDraggingImage` drives the
   // full-window drop affordance; `importImage` holds the decoded image + a File
   // (for the gallery path) + a preview URL while the dialog is open.
   const [isDraggingImage, setIsDraggingImage] = useState(false);
@@ -1866,7 +1867,7 @@ export function AppShell() {
     // and `begin` reads the engine, so there is no capture to tear — the id is
     // simply needed before the placement box can be told what to remove on Esc.
     const layerId = await stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
-    // Same movable/resizable placement as "Merge into layer" — `begin` scales
+    // A movable/resizable placement box — `begin` scales
     // the box down to fit when the image is bigger than the canvas, so an
     // oversized paste stays fully visible and resizable instead of baking in
     // at 1:1 and permanently clipping at the layer edges. Escape aborts the
@@ -1877,16 +1878,6 @@ export function AppShell() {
     toast.success("Pasted on a new layer — Enter places it, Esc cancels");
     closeImportDialog();
   }, [importImage, importDest, stamp, pastePlacement, closeImportDialog]);
-  const importOntoLayer = useCallback(() => {
-    const img = importImage;
-    if (!img) return;
-    const { x, y } = importDest(img.w, img.h);
-    // Seed a movable/resizable placement instead of baking the pixels in
-    // immediately — the bounding-box overlay takes over the canvas; Enter,
-    // clicking away, or switching tools commits it (Escape cancels).
-    pastePlacement.begin(img.pixels, img.w, img.h, x, y);
-    closeImportDialog();
-  }, [importImage, importDest, pastePlacement, closeImportDialog]);
   const importToGallery = useCallback(() => {
     const img = importImage;
     if (!img) return;
@@ -2402,6 +2393,7 @@ export function AppShell() {
 
       {/* Drag-an-image-anywhere affordance + the import choice dialog. */}
       <ImageDropOverlay show={isDraggingImage} />
+      <PastePlacementBar {...pastePlacement} onCompress={() => void pastePlacement.compress()} canvasRef={canvasRef} />
       <ImportImageDialog
         open={importImage !== null}
         onOpenChange={(o) => {
@@ -2413,7 +2405,6 @@ export function AppShell() {
         canUseLayers={TIERS[effectiveUserMode].layersPerImage > 0}
         hasActivePhoto={activePhotoId !== null}
         onNewLayer={importToNewLayer}
-        onOntoLayer={importOntoLayer}
         onAddToGallery={importToGallery}
       />
 

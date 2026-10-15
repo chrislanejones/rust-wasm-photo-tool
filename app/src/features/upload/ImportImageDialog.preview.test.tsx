@@ -34,7 +34,6 @@ function open(w: number, h: number) {
       canUseLayers
       hasActivePhoto
       onNewLayer={() => {}}
-      onOntoLayer={() => {}}
       onAddToGallery={() => {}}
     />,
   );
