@@ -29,10 +29,6 @@ export const GROUPS: Group[] = [
     blurb: "Real work, already in the repo, with a branch or a decision behind it.",
     items: [
       {
-        name: "Multi-night editor work",
-        body: "The next seven-night pass is built and under review: steadier photo switching, faster Pen and Pins, clearer selection and mask sessions, and failed saves you can retry. It still needs its release checks. The gallery, preview-loading and Settings keyboard pass has landed; its changes are in the Trail Log.",
-      },
-      {
         name: "Photoshop files, in and out",
         body: "Open a .psd with its layers, and save your work as one. The plugin is built and public, and Settings → Plugins takes it from a file or a link. What is left is a real place to get it, instead of a raw file in a repo.",
       },
