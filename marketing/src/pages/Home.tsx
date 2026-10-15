@@ -290,7 +290,7 @@ export default function Home() {
           </div>
 
           <p className="runs__note">
-            The whole editor is about <span className="fig">350&nbsp;KB</span> to download &mdash;
+            The whole editor is about <span className="fig">1&nbsp;MB</span> to download &mdash;
             smaller than most of the photos you&rsquo;ll open in it. After that, your computer does
             the work.
           </p>

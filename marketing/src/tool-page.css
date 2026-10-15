@@ -71,10 +71,14 @@
   padding: 14px 22px;
   border: var(--rule-hair) solid transparent;
   border-radius: var(--radius-pill);
+  max-width: 100%;
   font-size: var(--text-ui);
-  line-height: 1;
+  /* A label that doesn't fit wraps instead of running off a phone screen:
+     /what-is-ora's "The full guide: history, compatibility, round-trips →"
+     was 422 px wide on a 390 px screen, cut off mid-word (10-15-2026). One
+     line still fits in min-height at 1.2. */
+  line-height: 1.2;
   text-decoration: none;
-  white-space: nowrap;
   transition: background-color var(--dur-micro) var(--ease-out),
               border-color var(--dur-micro) var(--ease-out);
 }
