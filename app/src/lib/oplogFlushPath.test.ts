@@ -37,8 +37,7 @@ import {
   setOplogCodecs,
 } from "@/lib/oplogPersistence";
 import { blitLiveEngine } from "@/lib/engine/port";
-import { syncOplog, tryTilesFlush, withOplogUndo } from "@/lib/tilesFlush";
-import { registerOplogStats, registerTilesDirtyCount } from "@/lib/resourceMonitor";
+import { withOplogUndo } from "@/lib/tilesFlush";
 
 const REPO = path.resolve(__dirname, "../../..");
 const WASM = path.join(REPO, "pkg/stamp_tool_bg.wasm");
@@ -171,16 +170,9 @@ async function persist(t: Engine): Promise<void> {
   await flushPendingOplogSave(t);
 }
 
-/** `useDiagnosticsSampler.collect`, as it runs while the Diagnostics window is
- *  open: the tile round trip and the ten op-log reads (which include the
- *  `set_oplog_undo` push). */
-async function sampleDiagnostics(t: Engine): Promise<void> {
-  registerTilesDirtyCount(await tryTilesFlush(t));
-  registerOplogStats(await syncOplog(t));
-}
-
 async function flushToCanvas(t: Engine): Promise<void> {
-  await sampleDiagnostics(t);
+  // The app's flush, as it is with the Diagnostics sampler gone (10-14-2026):
+  // persistence, then the blit. The replay switch comes from `withOplogUndo`.
   await persist(t);
   blit(t);
 }
@@ -234,14 +226,6 @@ describe.skipIf(!hasOplog)("op-log undo survives the app's flush path (the PARKI
     expect(await db.oplogManifests.get("p1"), "the save landed").toMatchObject({ opCount: 1, stale: false });
     expectRecorded(t, "A+persist");
     expectReplayedUndo(t, "A+persist");
-  });
-
-  it("run A + the diagnostics sampler (tiles flush + op-log reads)", async () => {
-    const t = await make();
-    stroke(t);
-    await sampleDiagnostics(t);
-    expectRecorded(t, "A+sampler");
-    expectReplayedUndo(t, "A+sampler");
   });
 
   it("run A + the whole flushToCanvas, at paint_down and at paint_up like usePaintTool", async () => {

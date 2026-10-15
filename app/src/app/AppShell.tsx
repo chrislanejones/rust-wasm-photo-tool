@@ -4,6 +4,7 @@
 //   Item 4: PgUp/PgDn gallery cycling
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
+import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
@@ -138,8 +139,6 @@ import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
-import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
-import { installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -782,8 +781,6 @@ export function AppShell() {
   const setShowShortcutModal = useUIStore((s) => s.setShowShortcutModal);
   const showCelebration = useUIStore((s) => s.showCelebration);
   const setShowCelebration = useUIStore((s) => s.setShowCelebration);
-  const showDiagnostics = useUIStore((s) => s.showDiagnostics);
-  const setShowDiagnostics = useUIStore((s) => s.setShowDiagnostics);
 
   // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
   useEffect(() => {
@@ -813,9 +810,6 @@ export function AppShell() {
   useEffect(() => {
     if (!bp.dock) setCompactNoticeDismissed(false);
   }, [bp.dock]);
-  useEffect(() => {
-    installConsoleCapture();
-  }, []);
   const deleteAllOpen = useUIStore((s) => s.deleteAllOpen);
   const setDeleteAllOpen = useUIStore((s) => s.setDeleteAllOpen);
   // Per-image + selected delete confirmations (mirror the Delete All dialog).
@@ -2256,8 +2250,6 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowShortcutModal,
-    // Diagnostics Window (Alt+Delete) is always available — not gated.
-    setShowDiagnostics,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
@@ -2291,6 +2283,38 @@ export function AppShell() {
   const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
   const canUndo = hasImage && stamp.state.undoCount > 0;
   const canRedo = hasImage && stamp.state.redoCount > 0;
+
+  // Settings › Current Image (was the Alt+Delete Diagnostics window, 10-14-2026).
+  const imageMeta: ImageMeta = {
+    ready: stamp.state.ready,
+    photoId: activePhotoId,
+    name: activeEntry?.name,
+    mimeType: activeEntry?.mimeType,
+    origWidth: activeEntry?.origWidth,
+    origHeight: activeEntry?.origHeight,
+    currentWidth: stamp.state.width,
+    currentHeight: stamp.state.height,
+    originalByteSize: activeEntry?.originalByteSize,
+    currentByteSize: activeEntry?.byteSize,
+    originalKey: activeEntry?.originalKey,
+    uploadKey: activeEntry?.uploadKey,
+    undoCount: stamp.state.undoCount,
+    redoCount: stamp.state.redoCount,
+    modified:
+      activePhotoId != null &&
+      (modifiedPhotos.has(activePhotoId) ||
+        hasBeenModified ||
+        stamp.state.undoCount > 0),
+    // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
+    // an EMPTY typed array, not a throw. Its consumer
+    // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
+    // than `!png` alone, which is the only reason that would have degraded
+    // safely instead of hashing a zero-byte buffer.
+    getCanvasPng: async () => {
+      const t = stamp.toolRef.current;
+      return t ? new Uint8Array(await t.export_png()) : null;
+    },
+  };
 
   return (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
@@ -2420,41 +2444,6 @@ export function AppShell() {
           shares its z-layer so it covers every panel. */}
       <MultiTabScreen open={isStaleTab} onUseHere={claimTabHere} />
 
-      {/* Diagnostics Window (Alt+Delete) is always available. */}
-      <DiagnosticLogOverlay
-        open={showDiagnostics}
-        onClose={() => setShowDiagnostics(false)}
-        imageMeta={{
-          ready: stamp.state.ready,
-          photoId: activePhotoId,
-          name: activeEntry?.name,
-          mimeType: activeEntry?.mimeType,
-          origWidth: activeEntry?.origWidth,
-          origHeight: activeEntry?.origHeight,
-          currentWidth: stamp.state.width,
-          currentHeight: stamp.state.height,
-          originalByteSize: activeEntry?.originalByteSize,
-          currentByteSize: activeEntry?.byteSize,
-          originalKey: activeEntry?.originalKey,
-          uploadKey: activeEntry?.uploadKey,
-          undoCount: stamp.state.undoCount,
-          redoCount: stamp.state.redoCount,
-          modified:
-            activePhotoId != null &&
-            (modifiedPhotos.has(activePhotoId) ||
-              hasBeenModified ||
-              stamp.state.undoCount > 0),
-          // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
-          // an EMPTY typed array, not a throw. Its consumer
-          // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
-          // than `!png` alone, which is the only reason that would have degraded
-          // safely instead of hashing a zero-byte buffer.
-          getCanvasPng: async () => {
-            const t = stamp.toolRef.current;
-            return t ? new Uint8Array(await t.export_png()) : null;
-          },
-        }}
-      />
 
       <Toaster />
 
@@ -2597,6 +2586,7 @@ export function AppShell() {
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
+                  imageMeta={imageMeta}
                   // Standalone: the master bar is one flat row with no pills now, so
                   // each control carries its own fill (same as the compact top bar).
                   grouped={false}
@@ -2637,6 +2627,7 @@ export function AppShell() {
             general={general}
             superUser={superUser}
             openRaster={openRaster}
+            imageMeta={imageMeta}
           />
         )}
       </AnimatePresence>

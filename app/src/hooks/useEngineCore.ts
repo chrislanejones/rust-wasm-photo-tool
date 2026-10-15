@@ -18,15 +18,11 @@
 // shape includes the source.
 import { dropSuperseded } from "@/lib/engine/superseded";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDiagnosticsSampler } from "./useDiagnosticsSampler";
 import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
-import {
-  registerWasmMemory,
-} from "@/lib/resourceMonitor";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
 import {
   blitLiveEngine,
@@ -433,8 +429,6 @@ export function useEngineCore(
     });
   }, []);
 
-  const sampleDiagnostics = useDiagnosticsSampler(toolRef);
-
   const flushToCanvas = useCallback(() => {
     const t = toolRef.current;
     const canvas = canvasRef.current;
@@ -449,11 +443,9 @@ export function useEngineCore(
     // The local/worker choice is inside `blitLiveEngine`, not here. The contract
     // test allows exactly two modules to read the flag, and a call site that
     // branches on it has re-exposed the choice Stage 3.5 exists to hide.
-    // Only when the Diagnostics window is open — see useDiagnosticsSampler.
-    sampleDiagnostics(t);
     void onOplogFlush(t);
     blitLiveEngine(t, canvas, wasmMemoryRef.current, backbufferRef);
-  }, [canvasRef, sampleDiagnostics]);
+  }, [canvasRef]);
 
   const getCanvasCoords = useCallback(
     (e: MouseEvent<HTMLCanvasElement> | globalThis.MouseEvent) => {
@@ -485,7 +477,6 @@ export function useEngineCore(
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
-      registerWasmMemory(wasmExports.memory);
       // Skew guard (no-op in default builds): stale cached WASM/JS must not
       // start real work silently — see lib/pwa/skew.ts.
       void checkBuildSkew("engine-init");
@@ -557,7 +548,6 @@ export function useEngineCore(
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
-      registerWasmMemory(wasmExports.memory);
       // Skew guard (no-op in default builds): stale cached WASM/JS must not
       // start real work silently — see lib/pwa/skew.ts.
       void checkBuildSkew("engine-init");
@@ -648,7 +638,6 @@ export function useEngineCore(
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
-      registerWasmMemory(wasmExports.memory);
       // Skew guard (no-op in default builds): stale cached WASM/JS must not
       // start real work silently — see lib/pwa/skew.ts.
       void checkBuildSkew("engine-init");
@@ -695,7 +684,6 @@ export function useEngineCore(
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
-      registerWasmMemory(wasmExports.memory);
       // Skew guard (no-op in default builds): stale cached WASM/JS must not
       // start real work silently — see lib/pwa/skew.ts.
       void checkBuildSkew("engine-init");

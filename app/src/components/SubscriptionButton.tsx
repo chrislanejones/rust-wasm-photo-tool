@@ -25,7 +25,7 @@ import {
   Puzzle,
   Check,
   ExternalLink,
-} from "lucide-react";
+ Flag, Image as ImageIcon } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import {
   Dialog,
@@ -43,6 +43,9 @@ import { SecurityPane } from "@/components/SecurityPane";
 import { SyncPane } from "@/components/SyncPane";
 import { SharedPane } from "@/components/SharedPane";
 import { BetaPane } from "@/components/BetaPane";
+import { FeatureFlagsPanel } from "@/components/FeatureFlagsPanel";
+import type { ImageMeta } from "@/components/ImageMetaPanel";
+import { CurrentImagePane } from "@/components/CurrentImagePane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { PluginsPane } from "@/components/PluginsPane";
@@ -81,6 +84,8 @@ export type SettingsTab =
   | "export"
   | "plugins"
   | "beta"
+  | "flags"
+  | "image"
   | "storage"
   | "billing"
   | "aiusage"
@@ -125,6 +130,8 @@ interface Props {
   superUser?: SuperUserControls | null;
   /** Live-tool access for the Import / Export (.ora) tab. */
   openRaster: OpenRasterControls;
+  /** Settings › Current Image: what the Alt+Delete window used to show. */
+  imageMeta?: ImageMeta;
   /** The cog sits inside a group pill (both bars do this now), so it must be
    *  transparent at rest and let the pill's fill through rather than carrying
    *  its own. See `IconButton`'s `standalone`. */
@@ -135,6 +142,7 @@ export function SubscriptionButton({
   general,
   superUser,
   openRaster,
+  imageMeta,
   grouped = false,
 }: Props) {
   // Open state + active pane live in useUIStore, not here. The URL mirrors the
@@ -170,6 +178,8 @@ export function SubscriptionButton({
     export: Package,
     plugins: Puzzle,
     beta: Beaker,
+    flags: Flag,
+    image: ImageIcon,
     storage: Cloud,
     billing: CreditCard,
     aiusage: Gauge,
@@ -188,6 +198,8 @@ export function SubscriptionButton({
     "billing",
     "aiusage",
     "beta",
+    "flags",
+    "image",
     ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
   // A category can disappear while Settings is open. Keep the selected pane,
@@ -382,6 +394,11 @@ export function SubscriptionButton({
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (
               <AIUsagePane />
+            ) : tab === "image" ? (
+              <CurrentImagePane active={open && tab === "image"} imageMeta={imageMeta} />
+            ) : tab === "flags" ? (
+              /* Moved here from the Diagnostics window (10-14-2026). */
+              <FeatureFlagsPanel active={open && tab === "flags"} />
             ) : tab === "beta" ? (
               /* Switches commit as pressed (see BetaPane), so no Apply. */
               <BetaPane />

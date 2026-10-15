@@ -55,7 +55,6 @@ interface KeyboardShortcutOptions {
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowDiagnostics?: React.Dispatch<React.SetStateAction<boolean>>;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset?: () => void;
@@ -139,7 +138,6 @@ export function useKeyboardShortcuts({
   setShowGallery,
   setShowHistory,
   setShowShortcutModal,
-  setShowDiagnostics,
   onZoomIn,
   onZoomOut,
   onZoomReset,
@@ -399,12 +397,6 @@ export function useKeyboardShortcuts({
           return;
         }
 
-        // Alt+Delete -> diagnostics log overlay
-        if (e.code === "Delete") {
-          e.preventDefault();
-          setShowDiagnostics?.((v) => !v);
-          return;
-        }
         if (e.shiftKey) {
           if (e.code === "KeyE") {
             e.preventDefault();
@@ -507,7 +499,7 @@ export function useKeyboardShortcuts({
   }, [
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
-    setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
+    setShowHistory, setShowShortcutModal, onZoomIn,
     onZoomOut, onZoomReset, onGroupChange, onToggleCompare, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
     onLayerToFront, onLayerToBack,

@@ -37,7 +37,7 @@ import { isWebBudgetEnabled } from "@/lib/webPerf";
 import { isExifRustEnabled } from "@/lib/exif/rust";
 import { isHistoryForksEnabled } from "@/lib/historyForks";
 import { isOplogPersistenceEnabled } from "@/lib/oplogPersistence";
-import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
+import { isOplogUndoEnabled } from "@/lib/tilesFlush";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import { isSelectionBoolEnabled } from "@/lib/selectionBool";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
@@ -77,14 +77,6 @@ export interface FeatureFlag {
 }
 
 export const FEATURE_FLAGS: FeatureFlag[] = [
-  {
-    key: "ih_tiles_flush",
-    label: "Tile flush",
-    kind: "kill",
-    isOn: isTilesFlushEnabled,
-    effect: "Dirty-tile canvas flush. Off falls back to full-frame blits — slower, never wrong.",
-    source: "lib/tilesFlush.ts",
-  },
   {
     key: "ih_oplog_undo",
     label: "Op-log undo",

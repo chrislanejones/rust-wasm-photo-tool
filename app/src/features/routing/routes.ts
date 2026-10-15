@@ -97,6 +97,8 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   billing: "Plan & Billing",
   aiusage: "AI Usage",
   beta: "Beta",
+  flags: "Feature Flags",
+  image: "Current Image",
   superuser: "Super User",
 };
 
