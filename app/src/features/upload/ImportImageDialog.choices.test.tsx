@@ -24,11 +24,11 @@ function open(hasActivePhoto: boolean) {
 }
 
 describe("import choices", () => {
-  it("offers Stack as layer and New gallery image, and nothing that merges", () => {
+  it("offers Add to Layer and Add Image to Gallery, and nothing that merges", () => {
     open(true);
     const tiles = screen.getAllByRole("button").map((b) => b.textContent ?? "");
-    expect(tiles.some((t) => t.includes("Stack as layer"))).toBe(true);
-    expect(tiles.some((t) => t.includes("New gallery image"))).toBe(true);
+    expect(tiles.some((t) => t.includes("Add to Layer"))).toBe(true);
+    expect(tiles.some((t) => t.includes("Add Image to Gallery"))).toBe(true);
     expect(tiles.some((t) => /merge/i.test(t))).toBe(false);
     expect(screen.queryByText(/merge/i)).toBeNull();
   });

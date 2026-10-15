@@ -115,8 +115,8 @@ export function useTransforms(engine: EngineCore) {
   // ── Cross-photo copy / paste ──────────────────────────────────────────────
   /**
    * Extracts a rectangular region as a plain Uint8ClampedArray (RGBA).
-   * Pass the result to `pasteRegion` on a different tool instance to
-   * composite content between photos.
+   * Nothing consumes it yet; its old partner, `pasteRegion`, baked pixels into
+   * the active layer for "Merge into layer" and was removed with it (10-14-2026).
    */
   // ADR-024 Stage 3.5 (a8). NOTE: this is a SPEC AWAITING A CONSUMER, not a
   // live path — `git log --all -G "\.copyRegion\("` returns no commits, so
@@ -130,27 +130,6 @@ export function useTransforms(engine: EngineCore) {
       return new Uint8ClampedArray(await t.copy_region(x, y, w, h));
     },
     [toolRef],
-  );
-
-  /**
-   * Alpha-composites `pixels` (srcW × srcH RGBA) onto the current image at
-   * (destX, destY).  Automatically pushes an undo snapshot.
-   */
-  const pasteRegion = useCallback(
-    (
-      pixels: Uint8ClampedArray,
-      srcW: number,
-      srcH: number,
-      destX: number,
-      destY: number,
-    ) => {
-      const t = toolRef.current;
-      if (!t) return;
-      t.paste_region(new Uint8Array(pixels.buffer), srcW, srcH, destX, destY);
-      flushToCanvas();
-      syncState();
-    },
-    [toolRef, flushToCanvas, syncState],
   );
 
   // ── Geometric transforms ──────────────────────────────────────────────────
@@ -743,7 +722,6 @@ export function useTransforms(engine: EngineCore) {
   return useMemo(
     () => ({
       copyRegion,
-      pasteRegion,
       flipHorizontal,
       flipVertical,
       rotate90Cw,
@@ -766,7 +744,6 @@ export function useTransforms(engine: EngineCore) {
     }),
     [
       copyRegion,
-      pasteRegion,
       flipHorizontal,
       flipVertical,
       rotate90Cw,

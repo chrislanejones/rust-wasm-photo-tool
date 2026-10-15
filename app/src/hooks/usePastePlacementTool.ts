@@ -44,7 +44,7 @@ export function usePastePlacementTool({
   activeTool,
 }: Opts) {
   const [rect, setRect] = useState<PastePlacementRect | null>(null);
-  // Cleanup for an aborted placement — "Stack as layer" pre-creates the
+  // Cleanup for an aborted placement — "Add to Layer" pre-creates the
   // destination layer, and Escape must remove it again, not leave an empty
   // "Pasted Image" layer behind. Cleared on commit.
   const onCancelRef = useRef<(() => void) | null>(null);
@@ -256,7 +256,7 @@ export function usePastePlacementTool({
    * source (bake what you see). When it isn't — a paste that fits 1:1 — the
    * click halves it, so one click always does something and each click after
    * halves again. Nothing is committed: Enter still places it, Escape still
-   * cancels (and still removes a "Stack as layer" layer).
+   * cancels (and still removes a "Add to Layer" layer).
    */
   const compress = useCallback(async () => {
     const t = toolRef.current;

@@ -17,6 +17,24 @@ pub fn export_png(buf: &ImageBuffer) -> Vec<u8> {
     output
 }
 
+/// Encode as PNG with the `Fast` deflate (fdeflate) instead of the default
+/// `Balanced`. For the autosave path only: `capture_state` encodes the canvas,
+/// every layer and every new undo snapshot after each edit, and at `Balanced` that
+/// held the engine worker for 1–4 s per save on a 2048 px document (measured
+/// 10-14-2026). Still a standard PNG that every decoder reads; the files are
+/// somewhat larger. User-facing exports keep [`export_png`].
+pub fn export_png_fast(buf: &ImageBuffer) -> Vec<u8> {
+    let mut output = Vec::new();
+    let mut encoder = png::Encoder::new(&mut output, buf.width, buf.height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder.set_compression(png::Compression::Fast);
+    if let Ok(mut writer) = encoder.write_header() {
+        let _ = writer.write_image_data(&buf.data);
+    }
+    output
+}
+
 /// Decode PNG bytes to straight (non-premultiplied) RGBA8 pixels, normalizing
 /// whatever color type the source PNG actually uses (RGB, RGBA, indexed,
 /// grayscale, grayscale+alpha, 16-bit…) — the inverse of `export_png`, which

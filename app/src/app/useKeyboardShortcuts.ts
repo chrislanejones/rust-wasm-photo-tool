@@ -487,9 +487,12 @@ export function useKeyboardShortcuts({
 
     // Alt-Tab with H down means the keyup goes to another window. Without this
     // the hold never ends and pan is stuck on until H is pressed again.
+    // A held Space has the same problem: its keyup lands in the other window,
+    // spaceHeldRef stays true, and the hand cursor never goes away.
     const handleBlur = () => {
-      if (handDownAtRef.current === null) return;
+      if (handDownAtRef.current === null && !spaceHeldRef.current) return;
       handDownAtRef.current = null;
+      spaceHeldRef.current = false;
       syncPan();
     };
 

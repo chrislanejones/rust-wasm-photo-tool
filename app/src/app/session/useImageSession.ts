@@ -306,8 +306,14 @@ export function useImageSession({
       const id = photoId ?? activeIdRef.current;
       const live = opts?.liveUndoCount;
       if (!id || !stamp.toolRef.current) return false;
+      // Wait for any write already in flight, but don't inherit its verdict.
+      // This used to `return false` when the earlier write failed, so one
+      // refused autosave (say, the debounce firing mid-switch) made the photo
+      // switch give up without trying, and the user got "The outgoing edits
+      // couldn't be saved" for edits nothing had attempted to save (10-14-2026).
+      // The dirty check below decides afresh: a failed write leaves it dirty.
       while (savingRef.current) {
-        if (!(await savingRef.current)) return false;
+        await savingRef.current;
       }
       const dirty =
         live === undefined
