@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router";
 import Nav from "./components/Nav";
 import NajiBanner from "./components/NajiBanner";
+import { MiniPlayer, NarrationProvider } from "./components/Narration";
 import useHead from "./useHead";
 import { trackPageView } from "./lib/analytics";
 import { PAGE_ROUTES } from "./routes";
@@ -93,7 +94,8 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    // Above the routes so a narration survives a page change (Narration.tsx).
+    <NarrationProvider>
       <a className="skip" href="#main">
         Skip to content
       </a>
@@ -112,11 +114,12 @@ export default function App() {
           ))}
         </Routes>
       </Suspense>
+      <MiniPlayer />
       {paletteMounted && (
         <Suspense fallback={null}>
           <CommandPalette open={searchOpen} onClose={closeSearch} />
         </Suspense>
       )}
-    </>
+    </NarrationProvider>
   );
 }
