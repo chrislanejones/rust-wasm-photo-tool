@@ -569,6 +569,9 @@ pub struct ImageHorseTool {
     /// Cached composite of all visible layers; `data_ptr`/`data_len` expose
     /// this to JS for a zero-copy blit. Rebuilt by `recomposite()`.
     composite_cache: Vec<u8>,
+    /// PNGs the last `capture_state` encoded, reused while their pixels are
+    /// unchanged — see `capture::SavePngs`.
+    save_pngs: std::cell::RefCell<crate::capture::SavePngs>,
     /// Tile-engine mirror of `composite_cache`, single-document-layer scope
     /// only (see `tiles_flush`). Feature-gated (`tiles`) and NOT part of the
     /// default wasm build — see the `tiles`/`ops` module comments above.
@@ -1075,6 +1078,7 @@ impl ImageHorseTool {
             width,
             height,
             composite_cache: Vec::new(),
+            save_pngs: Default::default(),
             #[cfg(feature = "tiles")]
             tile_buf: crate::tiles::TileBuffer::new(width, height),
             hist: History::new(),
