@@ -166,6 +166,54 @@ async function storedQuad(page: Page, id: number): Promise<number[]> {
 
 const IDENTITY = [0, 0, 1, 0, 1, 1, 0, 1];
 
+/** Keep the engine's flattened composite in the page, for a later diff. */
+async function snapshotComposite(page: Page): Promise<void> {
+  await installEngineProbe(page);
+  await page.evaluate(async () => {
+    const w = window as unknown as {
+      __probeTool: { get_image_data(): Uint8Array | Promise<Uint8Array> };
+      __compositeBefore?: Uint8Array;
+    };
+    w.__compositeBefore = Uint8Array.from(await w.__probeTool.get_image_data());
+  });
+}
+
+/**
+ * Pixels that differ from the snapshot OUTSIDE `box` (image px, grown by
+ * `margin` for the stroke). Read in the page so 256 KB never crosses the wire.
+ */
+async function compositeChangesOutside(
+  page: Page,
+  box: { x0: number; y0: number; x1: number; y1: number },
+  margin: number,
+): Promise<number> {
+  return page.evaluate(
+    async ({ box, margin }) => {
+      const w = window as unknown as {
+        __probeTool: { get_image_data(): Uint8Array | Promise<Uint8Array> };
+        __compositeBefore: Uint8Array;
+      };
+      // One RGBA pixel per 32-bit word, so a pixel compares in one test.
+      const after = new Uint32Array(Uint8Array.from(await w.__probeTool.get_image_data()).buffer);
+      const before = new Uint32Array(w.__compositeBefore.buffer);
+      if (after.length !== before.length) return -1;
+      const width = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!.width;
+      const height = after.length / width;
+      const inX = (x: number) => x >= Math.min(box.x0, box.x1) - margin && x <= Math.max(box.x0, box.x1) + margin;
+      const inY = (y: number) => y >= Math.min(box.y0, box.y1) - margin && y <= Math.max(box.y0, box.y1) + margin;
+      let changed = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const outside = !(inX(x) && inY(y));
+          if (outside && after[y * width + x] !== before[y * width + x]) changed++;
+        }
+      }
+      return changed;
+    },
+    { box, margin },
+  );
+}
+
 test.describe("Perspective reaches the objects the app draws", () => {
   test("a square can be warped, and the box can be canceled", async ({ page }) => {
     await blockExternalNetwork(page);
@@ -255,5 +303,78 @@ test.describe("Perspective reaches the objects the app draws", () => {
     await page.getByTestId("perspective-actions").getByRole("button", { name: /Cancel/ }).click();
     await page.waitForTimeout(300);
     await expect(page.getByTestId("perspective-overlay")).toHaveCount(0);
+  });
+
+  // #366: with Perspective open, picking an object from Review → Reselect
+  // used to hand it to the Shapes editor and leave Perspective with no
+  // target, so Apply fell through to the destructive pixel warp. The pick
+  // must POINT PERSPECTIVE AT THE OBJECT instead, and the warp must land on
+  // the shape's vectors, not its pixels.
+  test("picking a shape from Review's list keeps Perspective and warps its vectors", async ({
+    page,
+  }) => {
+    await blockExternalNetwork(page);
+    await page.goto("/");
+    await importFixture(page);
+
+    await pickTool(page, "Create", "Shapes");
+    await dragOnCanvas(page, { x: 60, y: 60 }, { x: 180, y: 180 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(400);
+    const shapes = await engineShapes(page);
+    expect(shapes.length, "the square was drawn").toBeGreaterThan(0);
+    const square = shapes[shapes.length - 1];
+    const bboxBefore = [square.x0, square.y0, square.x1, square.y1];
+
+    await pickTool(page, "Edit", "Perspective");
+    await expect(page.getByTestId("perspective-overlay")).toBeVisible();
+    // Nothing is targeted yet: the box is the pixel box.
+    await expect(page.getByText(/Warping\s*Square/i)).toHaveCount(0);
+    await snapshotComposite(page);
+
+    // ── pick the square from Review's list, not from the canvas ────────────
+    await page.getByRole("button", { name: "Review", exact: true }).first().click();
+    const row = page.getByTitle("Reselect Square #1", { exact: true });
+    await expect(row, "the Reselect list shows the square").toBeVisible();
+    await row.click();
+    await page.waitForTimeout(300);
+
+    // Still Perspective, and it now names the square as its target.
+    await expect(page.getByTestId("perspective-overlay")).toBeVisible();
+    await expect(page.getByTestId("perspective-actions")).toBeVisible();
+    await expect(page.getByText(/Warping\s*Square/i)).toBeVisible();
+
+    // ── drag the target's top-left corner inward and Apply ──────────────────
+    const canvasBox = await page.locator("canvas.main-canvas").boundingBox();
+    if (!canvasBox) throw new Error("no canvas box");
+    const scale = canvasBox.width / (await page.evaluate(
+      () => document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!.width,
+    ));
+    const tl = {
+      x: canvasBox.x + Math.min(square.x0, square.x1) * scale,
+      y: canvasBox.y + Math.min(square.y0, square.y1) * scale,
+    };
+    await page.mouse.move(tl.x, tl.y);
+    await page.mouse.down();
+    await page.mouse.move(tl.x + 40 * scale, tl.y, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    await page.getByTestId("perspective-actions").getByRole("button", { name: /Apply/ }).click();
+    await page.waitForTimeout(500);
+
+    // The warp is stored ON THE SHAPE: its corner points moved off identity…
+    const quad = await storedQuad(page, square.id);
+    expect(quad.length, "the engine answered for this shape").toBe(8);
+    expect(quad, "the shape's corner points carry the warp").not.toEqual(IDENTITY);
+    // …its geometry is untouched…
+    const after = (await engineShapes(page)).find((s) => s.id === square.id)!;
+    expect([after.x0, after.y0, after.x1, after.y1], "still the same shape").toEqual(
+      bboxBefore,
+    );
+    // …and no raster pixel outside the shape changed (a pixel warp would).
+    expect(
+      await compositeChangesOutside(page, square, 8),
+      "the raster composite outside the shape is unchanged",
+    ).toBe(0);
   });
 });
