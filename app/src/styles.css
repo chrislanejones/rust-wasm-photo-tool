@@ -2949,3 +2949,6 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
 @media (max-width: 599px) {
   .boot-shell { display: none; }
 }
+/* An applied shape the engine has not drawn yet: shown, never clickable — its
+   handles use inline pointer-events, so only !important reaches them. */
+[data-draw-overlay][data-settling] * { pointer-events: none !important; }

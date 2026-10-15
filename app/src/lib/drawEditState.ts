@@ -61,6 +61,9 @@ export interface DrawEditState {
   /** When set, we're editing an EXISTING live shape annotation (this id)
    *  rather than creating a new one. Commit calls update_shape_annotation. */
   editId?: number;
+  /** Applied and waiting for the engine to draw it: still shown, but clicks
+   *  pass through to the canvas (useDrawingTools `settlingEdit`). */
+  settling?: boolean;
   /** Snapshot of the shape's own kind + style, used when re-selecting an
    *  existing shape so the overlay preview renders with the shape's real
    *  style rather than the current toolbar settings. New shapes leave this
