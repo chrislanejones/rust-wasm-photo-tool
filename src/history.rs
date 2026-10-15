@@ -57,9 +57,29 @@ pub struct Snapshot {
     /// `0` is the document as it was loaded. Minted whether or not history
     /// forks are on, so turning the Beta on mid-session anchors correctly.
     pub node: u64,
+    /// The flattened PNG of this snapshot, encoded once on first request and
+    /// reused by every later save. A snapshot's pixels never change after it is
+    /// pushed, so re-encoding the whole undo stack on each autosave (what
+    /// `capture_state` did) made every save slower than the last: 1.0 s after
+    /// one paste, 4.1 s after five (10-14-2026). The two places that do edit a
+    /// stored snapshot (`push_annotation_to_*_snapshot`, session restore) clear
+    /// it. Empty for every freshly built snapshot.
+    pub png: std::cell::OnceCell<Vec<u8>>,
 }
 
 impl Snapshot {
+    /// The flattened PNG, encoded on first use and cached (see `png`).
+    pub fn encoded_png(&self) -> &[u8] {
+        self.png.get_or_init(|| {
+            let data = composite_layers(&self.layers, self.width, self.height, None, None);
+            codec::export_png_fast(&ImageBuffer {
+                width: self.width,
+                height: self.height,
+                data,
+            })
+        })
+    }
+
     /// Approximate heap bytes this snapshot holds. The dominant cost is each
     /// layer's pixel buffer (width·height·4); the annotation vecs are negligible
     /// by comparison, so they're omitted. The selection adds 1 byte/px when
@@ -620,18 +640,11 @@ impl ImageHorseTool {
     }
 
     pub fn get_undo_snapshot_png(&self, index: usize) -> Vec<u8> {
-        match self.hist.undo_stack.get(index) {
-            None => Vec::new(),
-            Some(snap) => {
-                let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
-                let tmp = ImageBuffer {
-                    width: snap.width,
-                    height: snap.height,
-                    data,
-                };
-                codec::export_png(&tmp)
-            }
-        }
+        self.hist
+            .undo_stack
+            .get(index)
+            .map(|snap| snap.encoded_png().to_vec())
+            .unwrap_or_default()
     }
 
     pub fn get_undo_snapshot_label(&self, index: usize) -> String {
@@ -643,18 +656,11 @@ impl ImageHorseTool {
     }
 
     pub fn get_redo_snapshot_png(&self, index: usize) -> Vec<u8> {
-        match self.hist.redo_stack.get(index) {
-            None => Vec::new(),
-            Some(snap) => {
-                let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
-                let tmp = ImageBuffer {
-                    width: snap.width,
-                    height: snap.height,
-                    data,
-                };
-                codec::export_png(&tmp)
-            }
-        }
+        self.hist
+            .redo_stack
+            .get(index)
+            .map(|snap| snap.encoded_png().to_vec())
+            .unwrap_or_default()
     }
 
     pub fn get_redo_snapshot_label(&self, index: usize) -> String {
@@ -677,6 +683,7 @@ impl ImageHorseTool {
         let node = self.hist.mint_node();
         self.hist.undo_stack.push_back(Snapshot {
             node,
+            png: Default::default(),
             // Reconstructed from the op log — it rebuilds a document, it does
             // not change a setting, so it carries the live quality (ADR-031).
             export_quality: self.export_quality,
@@ -698,6 +705,7 @@ impl ImageHorseTool {
         let node = self.hist.mint_node();
         self.hist.redo_stack.push(Snapshot {
             node,
+            png: Default::default(),
             export_quality: self.export_quality,
             label: label.to_string(),
             layers: vec![layer],
@@ -802,6 +810,7 @@ impl ImageHorseTool {
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
             Some(snap) => {
+                snap.png.take(); // its pixels change: the cached PNG is stale
                 let a = snap.active;
                 match snap.layers.get_mut(a) {
                     Some(layer) => {
@@ -876,6 +885,7 @@ impl ImageHorseTool {
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,
             Some(snap) => {
+                snap.png.take(); // its pixels change: the cached PNG is stale
                 let a = snap.active;
                 match snap.layers.get_mut(a) {
                     Some(layer) => {
@@ -901,6 +911,7 @@ mod branch_budget_tests {
     fn snap(label: &str, px: usize) -> Snapshot {
         Snapshot {
             node: 0,
+            png: Default::default(),
             label: label.to_string(),
             layers: vec![Layer::from_snapshot_pixels(
                 &vec![0u8; px],

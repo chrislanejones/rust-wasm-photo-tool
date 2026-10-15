@@ -1,5 +1,5 @@
 // The paste-placement bounding box: move by the body, resize by the eight
-// handles, rotate by the knob off the east edge. Shared by "Stack as layer"
+// handles, rotate by the knob off the east edge. Shared by "Add to Layer"
 // and "Resize Layer" (both `usePastePlacementTool`).
 //
 // The box sits UNDER the Tools, Gallery and Review panels, never over them.

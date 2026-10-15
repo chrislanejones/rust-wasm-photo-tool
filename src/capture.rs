@@ -124,21 +124,28 @@ impl ImageHorseTool {
         f.u32(CAPTURE_VERSION);
         f.u32(self.width());
         f.u32(self.height());
-        f.bytes(&self.export_png());
+        // The autosave encoder: `Fast` deflate (see `codec::export_png_fast`).
+        f.bytes(&crate::codec::export_png_fast(&crate::ImageBuffer {
+            width: self.width(),
+            height: self.height(),
+            data: self.get_image_data(),
+        }));
 
+        // Snapshot PNGs come from each snapshot's cache, so a save encodes only
+        // the snapshots taken since the last one, not the whole stack again.
         let undo = self.undo_snapshot_count();
         f.u32(undo as u32);
-        for i in 0..undo {
+        for (i, snap) in self.hist.undo_stack.iter().enumerate() {
             f.str(&self.get_undo_snapshot_label(i));
-            f.bytes(&self.get_undo_snapshot_png(i));
+            f.bytes(snap.encoded_png());
             f.str(&self.get_undo_snapshot_annotations(i));
         }
 
         let redo = self.redo_snapshot_count();
         f.u32(redo as u32);
-        for i in 0..redo {
+        for (i, snap) in self.hist.redo_stack.iter().enumerate() {
             f.str(&self.get_redo_snapshot_label(i));
-            f.bytes(&self.get_redo_snapshot_png(i));
+            f.bytes(snap.encoded_png());
             f.str(&self.get_redo_snapshot_annotations(i));
         }
 
@@ -149,8 +156,8 @@ impl ImageHorseTool {
         f.str(&layers_json);
         let layer_count = self.layer_count();
         f.u32(layer_count as u32);
-        for i in 0..layer_count {
-            f.bytes(&self.get_layer_png(i));
+        for (i, layer) in self.layers.iter().enumerate().take(layer_count) {
+            f.bytes(&crate::codec::export_png_fast(&layer.buf));
             f.str(&self.get_layer_text_annotations(i));
             f.str(&self.get_layer_shape_annotations(i));
         }
@@ -620,8 +627,16 @@ mod capture_tests {
         assert_eq!(r.u32(), t.width(), "canvas width");
         assert_eq!(r.u32(), t.height(), "canvas height");
 
+        // The autosave encodes with `Fast` deflate, so the bytes differ from the
+        // `Balanced` getters; the PICTURE must not. Compare decoded pixels.
+        let same_pixels = |a: &[u8], b: &[u8], what: &str| {
+            let (pa, wa, ha) = crate::codec::decode_png(a).unwrap(); // allow: rust-panic
+            let (pb, wb, hb) = crate::codec::decode_png(b).unwrap(); // allow: rust-panic
+            assert_eq!((wa, ha), (wb, hb), "{what}: size");
+            assert!(pa == pb, "{what}: pixels must match the getter's");
+        };
         let png = r.blob();
-        assert_eq!(png, &t.export_png()[..], "canvas PNG must match the getter");
+        same_pixels(png, &t.export_png(), "canvas PNG");
         assert_eq!(&png[..4], &[0x89, b'P', b'N', b'G'], "and be a real PNG");
 
         let undo = r.u32() as usize;
@@ -656,7 +671,7 @@ mod capture_tests {
         let layers = r.u32() as usize;
         assert_eq!(layers, t.layer_count(), "layer count");
         for i in 0..layers {
-            assert_eq!(r.blob(), &t.get_layer_png(i)[..]);
+            same_pixels(r.blob(), &t.get_layer_png(i), "layer PNG");
             assert_eq!(r.text(), t.get_layer_text_annotations(i));
             assert_eq!(r.text(), t.get_layer_shape_annotations(i));
         }
@@ -673,6 +688,59 @@ mod capture_tests {
             r.p,
             blob.len(),
             "frame must be fully consumed — no trailing bytes"
+        );
+    }
+
+    /// A snapshot is encoded once. The first capture fills each snapshot's PNG
+    /// cache; the second reuses it and produces the identical frame. Before the
+    /// cache, every save re-encoded the whole undo stack and got slower with
+    /// each edit (1.0 s after one paste, 4.1 s after five, 10-14-2026).
+    #[test]
+    fn capture_state_encodes_each_snapshot_once() {
+        let mut t = ImageHorseTool::new(24, 16);
+        t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.add_layer("a");
+        t.add_layer("b");
+        assert!(t.undo_snapshot_count() >= 2, "the adds took snapshots");
+        assert!(
+            t.hist.undo_stack.iter().all(|s| s.png.get().is_none()),
+            "nothing is encoded before a save"
+        );
+        let first = t.capture_state();
+        assert!(
+            t.hist.undo_stack.iter().all(|s| s.png.get().is_some()),
+            "a save leaves every snapshot's PNG cached"
+        );
+        assert_eq!(
+            first,
+            t.capture_state(),
+            "the cached save is byte-identical"
+        );
+    }
+
+    /// Editing a stored snapshot (a session restore adds its text) clears the
+    /// cache, so the next save draws the text instead of the stale picture.
+    #[test]
+    fn editing_a_stored_snapshot_clears_its_png() {
+        let mut t = ImageHorseTool::new(64, 32);
+        t.load_image(&solid(64, 32, [10, 20, 30, 255]));
+        t.add_layer("a");
+        let before = t.get_undo_snapshot_png(0);
+        assert!(
+            t.hist.undo_stack[0].png.get().is_some(),
+            "cached by the read"
+        );
+        assert!(t.push_annotation_to_undo_snapshot(
+            0, "Hi", 20.0, 255, 255, 255, true, 4, 4, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, ""
+        ));
+        assert!(
+            t.hist.undo_stack[0].png.get().is_none(),
+            "the edit cleared it"
+        );
+        assert_ne!(
+            before,
+            t.get_undo_snapshot_png(0),
+            "the text is in the new PNG"
         );
     }
 

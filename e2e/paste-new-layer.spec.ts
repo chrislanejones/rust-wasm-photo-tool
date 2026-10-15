@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pasting onto an open photo (Chris, 10-14-2026):
-//   1. the dialog offers Stack as layer and New gallery image, no Merge
+//   1. the dialog offers Add to Layer and Add Image to Gallery, no Merge
 //   2. the pasted box sits UNDER the Tools / Gallery / Review panels
 //   3. dragging the box into a panel closes that panel
 //   4. a Resize & Compress bar hangs under the box and shrinks the paste's
@@ -68,7 +68,7 @@ async function stackAsLayer(page: Page): Promise<void> {
   const dialog = page.getByRole("dialog", { name: "Add this image" });
   await dialog.waitFor({ state: "visible" });
   await expect(dialog.getByRole("button", { name: /merge/i })).toHaveCount(0);
-  await dialog.getByRole("button", { name: /Stack as layer/ }).click();
+  await dialog.getByRole("button", { name: /Add to Layer/ }).click();
   await dialog.waitFor({ state: "hidden" });
 }
 

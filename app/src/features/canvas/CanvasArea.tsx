@@ -1,6 +1,7 @@
 // ===== FILE: app/src/features/canvas/CanvasArea.tsx =====
 // Item 2: Spacebar pan (Photoshop-style hand tool)
 // Item 3: Alt+Scroll zoom fix (zoom transform now uses panOffset)
+import { useCanvasPanDrag } from "./useCanvasPanDrag";
 import React, {
   useCallback,
   useEffect,
@@ -479,8 +480,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     // Item 2: Pan offset state
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-    const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-    const [isDraggingPan, setIsDraggingPan] = useState(false);
 
     // ── The main canvas's LAYOUT size (CSS px, pre-transform) ────────────────
     // `.main-canvas` is CSS-fit-scaled (max-width/max-height), so its layout
@@ -721,45 +720,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       [],
     );
 
-    const handlePanMouseDown = useCallback(
-      (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (isPanning) {
-          e.preventDefault();
-          e.stopPropagation();
-          panStartRef.current = {
-            x: e.clientX,
-            y: e.clientY,
-            ox: panOffset.x,
-            oy: panOffset.y,
-          };
-          setIsDraggingPan(true);
-          return;
-        }
-      },
-      [isPanning, panOffset],
-    );
-
-    const handlePanMouseMove = useCallback(
-      (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (isDraggingPan && panStartRef.current) {
-          const dx = e.clientX - panStartRef.current.x;
-          const dy = e.clientY - panStartRef.current.y;
-          setPanOffset({
-            x: panStartRef.current.ox + dx,
-            y: panStartRef.current.oy + dy,
-          });
-          return;
-        }
-      },
-      [isDraggingPan],
-    );
-
-    const handlePanMouseUp = useCallback(() => {
-      if (isDraggingPan) {
-        setIsDraggingPan(false);
-        panStartRef.current = null;
-      }
-    }, [isDraggingPan]);
+    const panDrag = useCanvasPanDrag(isPanning, panOffset, setPanOffset);
+    const { isDraggingPan, onMouseDown: handlePanMouseDown, onMouseMove: handlePanMouseMove, onMouseUp: handlePanMouseUp } = panDrag;
 
     // ── Crop handle drag ───────────────────────────────────────────────
     const cropDragRef = useRef<{

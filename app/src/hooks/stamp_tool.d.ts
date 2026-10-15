@@ -507,13 +507,6 @@ declare module "stamp_tool" {
       h: number,
       include_background: boolean,
     ): Uint8Array;
-    paste_region(
-      pixels: Uint8Array,
-      src_w: number,
-      src_h: number,
-      dest_x: number,
-      dest_y: number,
-    ): void;
     flip_horizontal(): void;
     flip_vertical(): void;
     rotate_90_cw(): void;

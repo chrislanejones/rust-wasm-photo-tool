@@ -1622,16 +1622,9 @@ export function AppShell() {
     redStampTool,
   });
 
-  /**
-   * Paste a bitmap from the clipboard into the **active layer**, centered on the
-   * canvas. Accepts either the `clipboardData.items` from a native paste event
-   * or, when called without them, falls back to the async Clipboard API (for an
-   * explicit button/menu invocation). Decodes the image to RGBA and composites
-   * it via the active-layer `paste_region` (one "Paste" history entry in Rust).
-   */
   // ── Drag / paste image import ────────────────────────────────────────────
   // A dropped or pasted image doesn't act immediately — it opens a choice
-  // dialog (Stack as layer / New gallery image). `isDraggingImage` drives the
+  // dialog (Add to Layer / Add Image to Gallery). `isDraggingImage` drives the
   // full-window drop affordance; `importImage` holds the decoded image + a File
   // (for the gallery path) + a preview URL while the dialog is open.
   const [isDraggingImage, setIsDraggingImage] = useState(false);
@@ -1811,10 +1804,13 @@ export function AppShell() {
       if (depth === 0) setIsDraggingImage(false);
     };
     const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e) || e.defaultPrevented) return; // a drop zone took it
-      e.preventDefault(); // stop the browser from navigating to the image
+      if (!isFileDrag(e)) return;
+      // Clear the overlay FIRST: a drop a zone took used to return here with it
+      // still up, and the drag affordance stayed on screen.
       depth = 0;
       setIsDraggingImage(false);
+      if (e.defaultPrevented) return; // a drop zone took it
+      e.preventDefault(); // stop the browser from navigating to the image
       // isSvgFile catches .svg drops whose source hands over an empty mime.
       const files = Array.from(e.dataTransfer?.files ?? []).filter(
         (f) => f.type.startsWith("image/") || isSvgFile(f),
@@ -1824,7 +1820,7 @@ export function AppShell() {
         return;
       }
       // A STACK OF IMAGES NEVER ASKS. "Add this image" offers a single-image
-      // choice (stack as layer / merge into layer / new gallery image) and can
+      // choice (add to layer / add image to gallery) and can
       // only carry one file, so a multi-file drop used to keep files[0] and
       // silently discard the rest. Two or more now go straight to the gallery
       // regardless of whether the gallery is empty or already has photos —

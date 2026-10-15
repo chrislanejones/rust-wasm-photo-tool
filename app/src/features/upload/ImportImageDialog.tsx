@@ -56,7 +56,7 @@ interface Props {
  *
  * There used to be a third tile, "Merge into layer", which baked the image
  * straight into the current layer's pixels. It was destructive, confusing next
- * to "Stack as layer", and froze up on big images, so it was removed: a new
+ * to "Add to Layer", and froze up on big images, so it was removed: a new
  * layer is the one way onto the canvas (Chris, 10-14-2026).
  */
 export function ImportImageDialog({
@@ -136,14 +136,14 @@ export function ImportImageDialog({
         <DialogFooter className="flex-row gap-2">
           <ActionTile
             icon={Layers}
-            label="Stack as layer"
+            label="Add to Layer"
             disabled={!canUseLayers || !hasActivePhoto}
             title={newLayerTitle}
             onClick={onNewLayer}
           />
           <ActionTile
             icon={Images}
-            label="New gallery image"
+            label="Add Image to Gallery"
             title="Add as a new, separate image in the gallery — unrelated to the image you're editing"
             onClick={onAddToGallery}
           />
