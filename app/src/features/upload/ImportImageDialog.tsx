@@ -22,14 +22,22 @@ const PREVIEW_MAX_H = 200;
  * the ratio through `aspect-ratio`). Reserving it up front is what stops the
  * frame collapsing to its padding and then growing when the `<img>` arrives.
  * Unknown dimensions get a square.
+ *
+ * The width is `min(<px>, 100%)`, not a bare pixel width. The dialog lays its
+ * content out as a grid, and a fixed width becomes that column's minimum: a
+ * 3759×1304 screenshot asked for 577 px in a 512 px dialog and pushed Close and
+ * "Add Image to Gallery" off its right edge (10-15-2026). The percentage takes
+ * the box out of the column's minimum, so the dialog's width wins.
  */
 function importPreviewBox(w: number, h: number): CSSProperties {
-  if (!(w > 0 && h > 0)) return { width: PREVIEW_MAX_H, aspectRatio: "1 / 1" };
+  if (!(w > 0 && h > 0)) return { width: fitWidth(PREVIEW_MAX_H), aspectRatio: "1 / 1" };
   return {
-    width: Math.min(w, (PREVIEW_MAX_H * w) / h),
+    width: fitWidth(Math.min(w, (PREVIEW_MAX_H * w) / h)),
     aspectRatio: `${w} / ${h}`,
   };
 }
+
+const fitWidth = (px: number) => `min(${px}px, 100%)`;
 
 interface Props {
   open: boolean;
