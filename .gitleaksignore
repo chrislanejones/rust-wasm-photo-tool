@@ -1,0 +1,13 @@
+# Gitleaks fingerprints to skip, one per line: commit:file:rule-id:line.
+#
+# Each entry names ONE finding in ONE historical commit. Nothing here widens a
+# rule or allowlists a path, so the same value committed anywhere else, or in
+# any new commit, still fails the scan. Prefer fixing the source; only a
+# finding that lives in pushed history (which we never rewrite) belongs here.
+
+# v9.16 (3564c39b), app/src/lib/storageOrphans.test.ts:34: a made-up Convex
+# `photoKey` in a unit-test fixture, not a credential. generic-api-key matches it on entropy (3.92) because the field
+# name ends in "Key". #301 (0d69fb72) already replaced the value with
+# "photo-key-1", so the current tree scans clean. Only the weekly scheduled run
+# still went red, because it walks the full history and finds this one commit.
+3564c39bab7b0a6800290c670b5e158a550e67ac:app/src/lib/storageOrphans.test.ts:generic-api-key:34
