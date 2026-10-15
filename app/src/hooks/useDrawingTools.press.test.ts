@@ -55,6 +55,7 @@ function setup() {
       return added.length;
     },
     get_shape_annotations: async () => "[]",
+    width: async () => 100,
   };
   const { result, rerender } = renderHook(
     ({ shape }: { shape: "rect" | "star" }) =>
@@ -280,13 +281,52 @@ describe("Apply while the engine is busy", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 20));
     });
-    expect(result.current.editState).not.toBeNull(); // still drawn by the overlay
+    expect(result.current.editState).toBeNull(); // no longer editable...
+    expect(result.current.settlingEdit?.settling).toBe(true); // ...but still drawn
 
     await act(async () => {
       drawn.resolve("[]");
       await applied;
     });
-    expect(result.current.editState).toBeNull(); // the engine has it now
+    expect(result.current.settlingEdit).toBeNull(); // the engine has it now
+  });
+
+  it("the shape being applied cannot be applied again by the next press", async () => {
+    // CI caught it: a re-render copied the still-drawn shape back into the
+    // live edit, so the next drag's press committed it AGAIN instead of
+    // starting a new shape — three rects drew as two.
+    const { result, answer, tool, added, rerender } = setup();
+    let down!: Promise<void>;
+    act(() => {
+      down = result.current.onMouseDown(ev(10, 10));
+    });
+    act(() => {
+      result.current.onMouseMove(ev(30, 30));
+      result.current.onMouseUp();
+    });
+    await act(async () => {
+      await answer(0, -1);
+      await down;
+    });
+    const drawn = deferred<string>();
+    tool.get_shape_annotations = () => drawn.promise;
+    act(() => {
+      void result.current.commitEdit();
+    });
+    rerender({ shape: "rect" });
+    act(() => {
+      down = result.current.onMouseDown(ev(60, 60));
+    });
+    act(() => {
+      result.current.onMouseMove(ev(90, 90));
+      result.current.onMouseUp();
+    });
+    await act(async () => {
+      await answer(1, -1);
+      await down;
+      drawn.resolve("[]");
+    });
+    expect(added).toEqual([[10, 10, 30, 30]]); // A once, not twice
+    expect(result.current.editState?.start).toEqual({ x: 60, y: 60 }); // B is the live edit
   });
 });
-

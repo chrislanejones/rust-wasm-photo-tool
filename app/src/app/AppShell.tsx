@@ -2879,7 +2879,7 @@ export function AppShell() {
                           pastePlacementRect={pastePlacement.rect}
                           onPastePlacementChange={pastePlacement.update}
                           colorPickerActive={colorPickerActive}
-                          drawEditState={drawingTools.editState}
+                          drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                           onDrawEditChange={drawingTools.updateEditGeometry}
                           drawSettings={{
                             strokeColor: toolSettings.strokeColor,
@@ -3006,7 +3006,7 @@ export function AppShell() {
                       pastePlacementRect={pastePlacement.rect}
                       onPastePlacementChange={pastePlacement.update}
                       colorPickerActive={colorPickerActive}
-                      drawEditState={drawingTools.editState}
+                      drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                       onDrawEditChange={drawingTools.updateEditGeometry}
                       drawSettings={{
                         strokeColor: toolSettings.strokeColor,
