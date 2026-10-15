@@ -43,24 +43,31 @@ const box = () => screen.getByTestId("import-preview-box");
 describe("import preview", () => {
   it("reserves the photo's box before anything has decoded", () => {
     open(1080, 720);
-    expect(box().style.width).toBe("300px");
+    expect(box().style.width).toBe("min(300px, 100%)");
     expect(box().style.aspectRatio).toBe("1080 / 720");
     expect(screen.queryByRole("img", { name: "Image to import" })).toBeNull();
   });
 
   it("never grows a small image past its own width", () => {
     open(120, 80);
-    expect(box().style.width).toBe("120px");
+    expect(box().style.width).toBe("min(120px, 100%)");
   });
 
   it("a tall image is capped at 200 px high", () => {
     open(1000, 4000);
-    expect(box().style.width).toBe("50px");
+    expect(box().style.width).toBe("min(50px, 100%)");
+  });
+
+  it("a wide screenshot is capped by the dialog, not just by its height", () => {
+    // 3759×1304 at 200 px tall is 577 px wide, wider than the 512 px dialog.
+    // A bare "577px" pushed Close and the second tile off the dialog's edge.
+    open(3759, 1304);
+    expect(box().style.width).toMatch(/^min\(576\.\d+px, 100%\)$/);
   });
 
   it("unknown dimensions get a square", () => {
     open(0, 0);
-    expect(box().style.width).toBe("200px");
+    expect(box().style.width).toBe("min(200px, 100%)");
     expect(box().style.aspectRatio).toBe("1 / 1");
   });
 
