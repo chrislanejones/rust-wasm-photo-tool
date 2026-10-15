@@ -27,6 +27,7 @@
  */
 
 import type { CSSProperties } from "react";
+import { Link } from "react-router";
 
 import { external, repoFile } from "../config";
 import { Queue, Scene } from "./engine-in-a-worker.figures";
@@ -610,7 +611,7 @@ export default function EngineInAWorker() {
 
       <p>
         So I ratcheted it, the same way I ratcheted the file sizes in{" "}
-        <a href="/blog/entropy-is-the-default">the entropy post</a>. A test pins the number of calls that
+        <Link to="/blog/entropy-is-the-default">the entropy post</Link>. A test pins the number of calls that
         still read the answer the old way, and that number may only go down; a script, not a hand-written
         list, is the authority on what's left; and every batch was checked by putting the bug back in
         and confirming a test turned red. Twice the tests caught something the script structurally
