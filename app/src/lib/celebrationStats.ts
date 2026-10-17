@@ -3,8 +3,8 @@
 // Shipping stats for the in-app celebration popper (Ctrl/Cmd + \), derived
 // from marketing/src/data/releases.ts — the hand-written trail log.
 //
-// October 2026: 142 entries across 24 releases,
-// against 1180 all-time. Latest release v9.30 (2026-10-15).
+// October 2026: 144 entries across 25 releases,
+// against 1182 all-time. Latest release v9.31 (2026-10-16).
 //
 // The headline numbers are ENTRIES and RELEASES, never the feature count. A
 // month can ship more than the one before it and carry fewer `feature` tags —
@@ -33,11 +33,11 @@ export interface CelebrationStats {
 
 export const CELEBRATION_STATS: CelebrationStats = {
   month: "October",
-  monthShipped: 142,
-  releases: 24,
-  allTime: 1180,
+  monthShipped: 144,
+  releases: 25,
+  allTime: 1182,
   monthPct: 12,
   features: 27,
-  fixes: 40,
-  latestVersion: "v9.30",
+  fixes: 42,
+  latestVersion: "v9.31",
 };

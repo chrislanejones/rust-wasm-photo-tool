@@ -147,7 +147,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "annotate",
     title: "Shapes",
     plain:
-      "Rectangles, circles, lines, diamonds, triangles and stars — firm, or hand-drawn with the Sloppiness slider. Pick how many points the star has, and turn any shape by its handle.",
+      "Rectangles, circles, lines, diamonds, triangles and stars — firm, or hand-drawn with the Sloppiness slider. Pick how many points the star has — arrow keys change the focused Points slider one point at a time — and turn any shape by its handle.",
     detail:
       "Rendered in WASM; Create → Shapes, with Arrow and Pins as their own sub-tools. Rotation is an angle beside the upright box, so a turned shape stays crisp and keeps its fill; Shift snaps to 15°.",
   },

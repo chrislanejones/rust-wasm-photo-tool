@@ -90,18 +90,14 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.30 — 2026-10-15
+### v9.31 — 2026-10-16
 
-**The freezes are gone.**
+**Preset sliders respond to every arrow press.**
 
-Autosave used to re-encode your whole undo history after every edit, so the
-editor got slower the longer you worked: up to 4 seconds of hourglass after a
-paste. It now encodes each step once, and only the layers that changed. Dragging
-a layer's opacity on big screenshots used to queue a full redraw per tick and
-leave you waiting about 9 seconds after you let go. Now it draws once per burst
-and catches up in about 1 second. A shape no longer vanishes for a few seconds
-when you press Apply. The Diagnostics window is gone. Its feature flags and
-image info moved to Settings, and telemetry prints to the browser console.
+In Shapes, one Right or Up arrow moves Points from 5 to 6; Left or Down
+moves it back to 5. Preset sliders change the setting by one within their
+allowed range. Holding an arrow updates the value as it repeats, and sliders
+with a commit callback commit the final value once when the key is released.
 
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
 commit squares.

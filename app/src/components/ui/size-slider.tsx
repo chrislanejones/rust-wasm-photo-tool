@@ -11,7 +11,7 @@
 // now carries the same text the value slot shows, so what is heard is what
 // is seen.
 import { strokeDown } from "@/lib/strokeGate";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { ControlRow } from "@/components/ui/control-row";
 import { PresetRow } from "@/components/ui/preset-row";
 
@@ -82,6 +82,7 @@ type SizeSliderProps = PlainSliderProps | DotsSliderProps;
 export function SizeSlider(props: SizeSliderProps) {
   const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit, edited } = props;
   const display = valueDisplay ?? `${value}${unit}`;
+  const keyboardValue = useRef<number | null>(null);
 
   // A slider drag counts as a stroke for the autosave gate (lib/strokeGate):
   // releasing Quality records a history step, and the save it woke held the
@@ -125,6 +126,25 @@ export function SizeSlider(props: SizeSliderProps) {
                 value={Math.round(valueToPos(value, presets))}
                 disabled={disabled}
                 onChange={(e) => onChange(posToValue(Number(e.target.value), presets))}
+                onKeyDown={(e) => {
+                  const delta = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1
+                    : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+                  if (!delta) return;
+                  // Native arrows step the track, which can round back to the
+                  // same setting. Step the actual value instead.
+                  e.preventDefault();
+                  if (disabled) return;
+                  const next = Math.max(presets[0], Math.min(presets[presets.length - 1], value + delta));
+                  if (next === value) return;
+                  keyboardValue.current = next;
+                  onChange(next);
+                }}
+                onKeyUp={(e) => {
+                  if (!["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown"].includes(e.key)) return;
+                  const next = keyboardValue.current;
+                  keyboardValue.current = null;
+                  if (!disabled && next !== null) onCommit?.(next);
+                }}
                 // The input's value is a TRACK POSITION here, not the setting:
                 // committing it raw stored 67 for a knob sitting on the 80
                 // preset (10-07). Commit the same mapped value onChange sends.

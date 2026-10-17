@@ -11560,3 +11560,16 @@ Not in this release: #367 (indexed storage-ref checks) is waiting on a token sco
 | **Engine** | 895,885 → **901,221 B** (+5,336). No op log, archive format, IndexedDB schema, authentication or billing change. |
 
 Not in this release: no imagehorse-qc pass yet on these engine and canvas changes.
+
+
+## v9.31 Change Summary — 2026-10-16
+
+**Preset sliders respond to every arrow press.**
+
+| Area | Change |
+| --- | --- |
+| **Keyboard** | Preset-based SizeSlider controls now change the actual setting by one for each arrow press, clamped to the first and last presets. Shapes → Points goes from 5 to 6 with Right or Up, and back to 5 with Left or Down. Native track increments previously rounded back to the same setting. |
+| **Commit** | Controls with `onCommit` commit the final changed setting on arrow-key release, once per hold rather than per repeat. Disabled controls ignore arrow input. |
+| **Interaction** | Pointer dragging, preset buttons, accessible labels and `aria-valuetext` are preserved. |
+| **Validation** | 123 UI Vitest tests pass, including regression cases for Points, both arrow axes, bounds, disabled input, repeated keys and preset buttons. TypeScript passes; lint reports 0 errors and 52 existing warnings. |
+| **Scope** | SizeSlider and its keyboard tests; release documentation and generated marketing data. No Rust engine or WASM changes. |

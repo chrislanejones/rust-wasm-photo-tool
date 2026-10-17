@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.31",
+    date: "2026-10-16",
+    headline: "Preset sliders respond to every arrow press.",
+    entries: [
+      { tag: "fix", text: "In Shapes, one Right or Up arrow moves Points from 5 to 6; Left or Down moves it back to 5. Preset sliders now change the setting by one, within their allowed range." },
+      { tag: "fix", text: "Sliders that commit changes on release now commit the final value when you release an arrow key, once after a held key finishes repeating." },
+    ],
+  },
+  {
     version: "v9.30",
     date: "2026-10-15",
     headline: "The freezes are gone.",
