@@ -64,7 +64,6 @@ interface UIState {
   compactNoticeDismissed: boolean;
   showShortcutModal: boolean;
   showCelebration: boolean;
-  showDiagnostics: boolean;
   deleteAllOpen: boolean;
   /** Id of the photo awaiting per-image delete confirmation (null = closed). */
   deletePhotoId: string | null;
@@ -134,7 +133,6 @@ interface UIState {
   setCompactNoticeDismissed: (v: SetArg<boolean>) => void;
   setShowShortcutModal: (v: SetArg<boolean>) => void;
   setShowCelebration: (v: SetArg<boolean>) => void;
-  setShowDiagnostics: (v: SetArg<boolean>) => void;
   setDeleteAllOpen: (v: SetArg<boolean>) => void;
   setDeletePhotoId: (v: SetArg<string | null>) => void;
   setDeleteSelectedOpen: (v: SetArg<boolean>) => void;
@@ -203,7 +201,6 @@ export const useUIStore = create<UIState>()(
       compactNoticeDismissed: false,
       showShortcutModal: false,
       showCelebration: false,
-      showDiagnostics: false,
       deleteAllOpen: false,
       deletePhotoId: null,
       deleteSelectedOpen: false,
@@ -245,8 +242,6 @@ export const useUIStore = create<UIState>()(
         set((s) => ({ showShortcutModal: resolveSet(v, s.showShortcutModal) })),
       setShowCelebration: (v) =>
         set((s) => ({ showCelebration: resolveSet(v, s.showCelebration) })),
-      setShowDiagnostics: (v) =>
-        set((s) => ({ showDiagnostics: resolveSet(v, s.showDiagnostics) })),
       setDeleteAllOpen: (v) =>
         set((s) => ({ deleteAllOpen: resolveSet(v, s.deleteAllOpen) })),
       setDeletePhotoId: (v) =>

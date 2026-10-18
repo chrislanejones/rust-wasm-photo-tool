@@ -239,7 +239,26 @@ use serde::{Deserialize, Serialize};
 ///     reads that as one op per gesture — exactly how it always undid.
 ///
 /// 10 stays ADR-070's reservation; nothing has ever written a 10.
-pub const OP_FORMAT_VERSION: u8 = 12;
+///
+/// **13** — the TONAL STACK (issue #37, ADR-090). A color preset used to snap
+/// and write pixels with no op, so the next undo found a log that disagreed
+/// with the engine and broke it for the session (ADR-052, ADR-055).
+///
+///   * One APPENDED variant, [`Op::TonalStack`] (index 23), recorded by
+///     `preset_apply`. Its five f64s are the stack's own units, untouched.
+///   * No existing variant changes or moves; no payload changes; the
+///     annotation tuple gains no element.
+///   * **Why a new number and not an append to 12.** 12 was live when this
+///     was written. A frame stamped 12 must mean "only words a 12 reader
+///     knows": a deployed 12 build that met index 23 under a 12 stamp would
+///     fail with `OpError::Decode`, the error a torn or corrupt frame gives,
+///     where a 13 stamp fails as `UnsupportedVersion(13)`. Today both reach
+///     JS as the same `false` from `oplog_restore` and the same fallback to
+///     the working copy, so the data outcome is identical. The number keeps
+///     the version byte the one compatibility gate, and keeps "newer than
+///     me" distinguishable from "damaged" for any reader that later needs to
+///     tell them apart.
+pub const OP_FORMAT_VERSION: u8 = 13;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -1038,6 +1057,28 @@ pub enum Op {
     /// Appended after [`Op::ShapeCornerRadii`]; same rule as every variant
     /// since v2.
     SameGesture,
+    /// v13 (issue #37) — the first TONAL op: a color preset, recorded as the
+    /// five values `presets::apply_stack` takes, in the units ADR-055 pins and
+    /// passed through untouched. brightness is a −1..1 fraction; contrast and
+    /// saturation are factors (1 = identity); highlights and shadows are
+    /// ABSOLUTE 8-bit (−255..=255), so `12.0` means twelve levels, not 12%.
+    /// Nothing is normalized on the way in or out: apply calls the same
+    /// `apply_stack` the live `preset_apply` called, on the same bytes.
+    ///
+    /// Fields are in the stack's APPLY order (tone first, color last), which
+    /// is also their wire order. The five Adjustments sliders are the same
+    /// filters and will record on this variant later; a component at its
+    /// identity is skipped exactly as `apply_stack` skips it.
+    ///
+    /// Appended after [`Op::SameGesture`] (index 23); same rule as every
+    /// variant since v2.
+    TonalStack {
+        brightness: f64,
+        contrast: f64,
+        highlights: f64,
+        shadows: f64,
+        saturation: f64,
+    },
 }
 
 impl Op {
@@ -1089,6 +1130,8 @@ impl Op {
             Op::ShapeCornerRadii { .. } => "Edit Shape",
             // Never a step of its own: it only joins two ops into one.
             Op::SameGesture => "Edit",
+            // The snapshot path's label for the same action (`snap("Preset")`).
+            Op::TonalStack { .. } => "Preset",
         }
     }
 }
@@ -1932,6 +1975,34 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         // A grouping marker for undo; the document does not see it.
         Op::SameGesture => {}
+        Op::TonalStack {
+            brightness,
+            contrast,
+            highlights,
+            shadows,
+            saturation,
+        } => {
+            let stack = crate::presets::PresetStack {
+                brightness: *brightness,
+                contrast: *contrast,
+                saturation: *saturation,
+                shadows: *shadows,
+                highlights: *highlights,
+            };
+            if stack.is_identity() {
+                return;
+            }
+            // Flat, through the SAME `apply_stack` the live `preset_apply`
+            // runs over `layer.buf.data`, so replay walks exactly the bytes
+            // the live path walked (the content layer is W×H, with no tile
+            // padding). One W×H copy per replayed op: replay only, never the
+            // flush path. Not `map_pixels_mut`: the filters are SIMD slices,
+            // and a per-pixel closure would be a second implementation.
+            let (w, h) = (doc.width(), doc.height());
+            let mut flat = doc.pixels_flat();
+            crate::presets::apply_stack(&mut flat, &stack);
+            doc.pixels.blit_from_flat(&flat, w, h);
+        }
         Op::PerspectiveWarp { rect, quad } => {
             let (w, h) = (doc.width(), doc.height());
             if w == 0 || h == 0 {
@@ -2472,6 +2543,13 @@ mod tests {
                 radii: [4, 0, 12, 300],
             },
             Op::SameGesture,
+            Op::TonalStack {
+                brightness: 0.04,
+                contrast: 1.35,
+                highlights: 8.0,
+                shadows: 12.0,
+                saturation: 1.25,
+            },
             Op::LayerMove {
                 layer: 0,
                 dx: -5,
@@ -4058,8 +4136,8 @@ mod v2_migration_tests {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
         assert_eq!(
-            OP_FORMAT_VERSION, 12,
-            "10 is ADR-070's, skipped (ADR-082); 12 is gestures (ADR-088)"
+            OP_FORMAT_VERSION, 13,
+            "10 is ADR-070's, skipped (ADR-082); 12 is gestures (ADR-088); 13 is the tonal stack (#37)"
         );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
@@ -4202,6 +4280,17 @@ mod v2_migration_tests {
             "ShapeCornerRadii (v11, ADR-082)"
         );
         assert_eq!(idx(&Op::SameGesture), 22, "SameGesture (v12, ADR-088)");
+        assert_eq!(
+            idx(&Op::TonalStack {
+                brightness: 0.0,
+                contrast: 1.0,
+                highlights: 0.0,
+                shadows: 0.0,
+                saturation: 1.0,
+            }),
+            23,
+            "TonalStack (v13, issue #37)"
+        );
     }
 
     #[test]

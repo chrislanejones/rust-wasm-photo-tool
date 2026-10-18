@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Images, Layers, ImagePlus } from "lucide-react";
+import { Images, Layers } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,22 @@ const PREVIEW_MAX_H = 200;
  * the ratio through `aspect-ratio`). Reserving it up front is what stops the
  * frame collapsing to its padding and then growing when the `<img>` arrives.
  * Unknown dimensions get a square.
+ *
+ * The width is `min(<px>, 100%)`, not a bare pixel width. The dialog lays its
+ * content out as a grid, and a fixed width becomes that column's minimum: a
+ * 3759×1304 screenshot asked for 577 px in a 512 px dialog and pushed Close and
+ * "Add Image to Gallery" off its right edge (10-15-2026). The percentage takes
+ * the box out of the column's minimum, so the dialog's width wins.
  */
 function importPreviewBox(w: number, h: number): CSSProperties {
-  if (!(w > 0 && h > 0)) return { width: PREVIEW_MAX_H, aspectRatio: "1 / 1" };
+  if (!(w > 0 && h > 0)) return { width: fitWidth(PREVIEW_MAX_H), aspectRatio: "1 / 1" };
   return {
-    width: Math.min(w, (PREVIEW_MAX_H * w) / h),
+    width: fitWidth(Math.min(w, (PREVIEW_MAX_H * w) / h)),
     aspectRatio: `${w} / ${h}`,
   };
 }
+
+const fitWidth = (px: number) => `min(${px}px, 100%)`;
 
 interface Props {
   open: boolean;
@@ -43,7 +51,6 @@ interface Props {
   /** Whether an image is currently open (the layer actions need one). */
   hasActivePhoto: boolean;
   onNewLayer: () => void;
-  onOntoLayer: () => void;
   onAddToGallery: () => void;
 }
 
@@ -51,9 +58,14 @@ interface Props {
  * Choice dialog shown after an image is dropped or pasted into the app. Mirrors
  * the Download dialog exactly — same Dialog primitives, the same stacked
  * `ActionTile` footer, matching header/body/footer structure — and asks where
- * the image should go: its own new layer, on top of the current image, or as a
- * new gallery image. Layer actions are gated by tier (login/paid) and by having
- * an image open; disabled tiles explain why via their tooltip.
+ * the image should go: its own new layer, or a new gallery image. The layer
+ * action is gated by tier (login/paid) and by having an image open; a disabled
+ * tile explains why via its tooltip.
+ *
+ * There used to be a third tile, "Merge into layer", which baked the image
+ * straight into the current layer's pixels. It was destructive, confusing next
+ * to "Add to Layer", and froze up on big images, so it was removed: a new
+ * layer is the one way onto the canvas (Chris, 10-14-2026).
  */
 export function ImportImageDialog({
   open,
@@ -64,7 +76,6 @@ export function ImportImageDialog({
   canUseLayers,
   hasActivePhoto,
   onNewLayer,
-  onOntoLayer,
   onAddToGallery,
 }: Props) {
   const newLayerTitle = !hasActivePhoto
@@ -72,9 +83,6 @@ export function ImportImageDialog({
     : !canUseLayers
       ? "Log in to use layers"
       : "Stack it above the current layer as its own new layer — non-destructive, keeps both images separately editable";
-  const ontoTitle = hasActivePhoto
-    ? "Merge it directly into the current layer's pixels — destructive, can't be un-stacked later"
-    : "Open an image first";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,12 +99,8 @@ export function ImportImageDialog({
                 <strong className="font-semibold text-text-secondary">
                   new layer
                 </strong>{" "}
-                you can move and edit separately, permanently{" "}
-                <strong className="font-semibold text-text-secondary">
-                  merge
-                </strong>{" "}
-                it into the layer you&rsquo;re already editing, or keep it apart
-                as a new image in your gallery.
+                you can move and edit separately, or keep it apart as a new
+                image in your gallery.
               </>
             ) : (
               <>
@@ -104,8 +108,7 @@ export function ImportImageDialog({
                 <strong className="font-semibold text-text-secondary">
                   gallery
                 </strong>{" "}
-                to start editing. (Open an image first to stack or merge it onto
-                a layer.)
+                to start editing. (Open an image first to stack it as a layer.)
               </>
             )}
           </DialogDescription>
@@ -141,21 +144,14 @@ export function ImportImageDialog({
         <DialogFooter className="flex-row gap-2">
           <ActionTile
             icon={Layers}
-            label="Stack as layer"
+            label="Add to Layer"
             disabled={!canUseLayers || !hasActivePhoto}
             title={newLayerTitle}
             onClick={onNewLayer}
           />
           <ActionTile
-            icon={ImagePlus}
-            label="Merge into layer"
-            disabled={!hasActivePhoto}
-            title={ontoTitle}
-            onClick={onOntoLayer}
-          />
-          <ActionTile
             icon={Images}
-            label="New gallery image"
+            label="Add Image to Gallery"
             title="Add as a new, separate image in the gallery — unrelated to the image you're editing"
             onClick={onAddToGallery}
           />

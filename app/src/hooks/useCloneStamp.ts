@@ -95,7 +95,6 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
 
   const {
     copyRegion,
-    pasteRegion,
     flipHorizontal,
     flipVertical,
     rotate90Cw,
@@ -290,7 +289,6 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     generateThumbnail,
     generateThumbnailUrl,
     copyRegion,
-    pasteRegion,
     flipHorizontal,
     flipVertical,
     rotate90Cw,

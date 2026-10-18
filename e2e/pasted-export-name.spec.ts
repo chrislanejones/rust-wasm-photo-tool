@@ -13,7 +13,7 @@ import { join } from "node:path";
 // `lib/pastedImageName.ts` renames generic clipboard names at every paste entry
 // point; this spec drives the real surfaces end to end:
 //   1. start screen Ctrl+V          (NewActions)
-//   2. editor Ctrl+V → "New gallery image"   (AppShell → import dialog)
+//   2. editor Ctrl+V → "Add Image to Gallery"   (AppShell → import dialog)
 //   3. control: a REAL filename pasted keeps it — without this, a rename that
 //      turned EVERY paste into `pasted` would pass 1 and 2 too
 //
@@ -90,7 +90,7 @@ async function pasteIntoEditorAsNewImage(page: Page, name: string): Promise<void
   await pastePng(page, name);
   const dialog = page.getByRole("dialog", { name: "Add this image" });
   await dialog.waitFor({ state: "visible" });
-  await dialog.getByRole("button", { name: /New gallery image/ }).click();
+  await dialog.getByRole("button", { name: /Add Image to Gallery/ }).click();
   await dialog.waitFor({ state: "hidden" });
   await waitForCanvas(page);
 }

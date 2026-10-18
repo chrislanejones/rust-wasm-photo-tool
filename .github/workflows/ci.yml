@@ -207,20 +207,20 @@ jobs:
       # convex-test's in-memory backend. Needs no deployment, so it runs on
       # fork PRs too, unlike the codegen step below.
       - run: pnpm test:convex
-      # `convex codegen` runs Convex's OWN TypeScript check (correct runtime type
-      # environment — plain `tsc` falsely reports `process`/global errors on
-      # backend code) AND regenerates convex/_generated. It connects to the
-      # deployment, so it needs CONVEX_DEPLOY_KEY; the step is skipped on fork
-      # PRs where the secret isn't available.
-      - name: Convex codegen + typecheck + drift
+      # TypeScript and Node types are root dev dependencies, so backend
+      # typechecking also runs without deployment credentials (including forks).
+      - run: pnpm exec tsc --project convex/tsconfig.json
+      # Code generation connects to a deployment. Only this drift check needs
+      # CONVEX_DEPLOY_KEY; tests and typechecking above always run.
+      - name: Convex codegen + drift
         if: env.CONVEX_DEPLOY_KEY != ''
         run: |
-          pnpm exec convex codegen
+          pnpm exec convex codegen --typecheck enable
           git diff --exit-code convex/_generated \
             || { echo "::error::convex/_generated is stale — run 'pnpm exec convex codegen' and commit"; exit 1; }
       - name: Skipped (no CONVEX_DEPLOY_KEY)
         if: env.CONVEX_DEPLOY_KEY == ''
-        run: echo "Skipping Convex checks — add the CONVEX_DEPLOY_KEY repo secret to enable."
+        run: echo "Skipping Convex codegen drift check — add CONVEX_DEPLOY_KEY to enable. Tests and typecheck ran above."
 
   # Convex functions do not reach production by merging. Nothing in this
   # workflow pushed them until now: the job above runs `convex codegen`, which
@@ -357,10 +357,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v4.38.2
+      - uses: github/codeql-action/init@v4.38.3
         with:
           language: javascript-typescript
-      - uses: github/codeql-action/analyze@v4.38.2
+      - uses: github/codeql-action/analyze@v4.38.3
 
   # ---------- Static guardrails (from docs/ci-guardrails.md (git history; moved out of the repo 2026-09-17)) ----------
   # BLOCKING as of the night-repair pass. These ran under `continue-on-error`

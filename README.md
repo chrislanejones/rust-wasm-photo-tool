@@ -90,20 +90,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.28 — 2026-10-12
+### v9.31 — 2026-10-16
 
-**Things that load now hold their place instead of popping in.**
+**Preset sliders respond to every arrow press.**
 
-The sign-in button and Settings › AI Usage reserve their space while you sign
-in, so a signed-in user no longer sees "Sign in" first. Plan & Billing shows
-the shape of your plan instead of a spinner. Compare waits until the original
-is ready, then shows it; if it can't load, it says "Original unavailable". On
-a phone, opening a photo shows a gray box the shape of that photo until it
-arrives, and a missing photo says so instead of spinning forever.
+In Shapes, one Right or Up arrow moves Points from 5 to 6; Left or Down
+moves it back to 5. Preset sliders change the setting by one within their
+allowed range. Holding an arrow updates the value as it repeats, and sliders
+with a commit callback commit the final value once when the key is released.
 
-A fast load shows none of this: nothing appears for the first 300 ms.
-
-[UI Nights 16–19](docs/UI_NIGHTS_16_19.md) records the work and validation.
 The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
 commit squares.
 

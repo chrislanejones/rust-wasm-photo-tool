@@ -11524,3 +11524,52 @@ The historical cached-restore timing concern remains recorded in the implementat
 
 Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Billing skeletons giving way to real data. Night 19 (import preview, image info, narrow menu bar) is still to do.
 
+## v9.29 Change Summary — 2026-10-14
+
+**Paste stays out of your way, and undo takes back one thing at a time.** Everything merged since v9.28: the document-state pass (#348), the upload abort (#318), op-log undo on everywhere (#351) and per gesture (#356), UI Nights 19 and 20 (#354, #355), the blog rewrite (#364, #365), and the 10-14 batch (#368, #369, #370, #371, #372, #357, #359).
+
+| Area | Change |
+| --- | --- |
+| **Paste** | "Add this image" offers **Stack as layer** or **New gallery image**. Merge into layer is gone: it was destructive, looked like Stack, and froze on big images. The pasted box sits under Tools, Gallery and Review instead of over them; push it into a panel and that panel closes, and the top bar or Alt+T / G / R brings it back. A **Resize & Compress** bar under the box shows the paste's pixel size and shrinks it to the box (or to half) before you place it (#372). |
+| **Undo** | Op-log undo now runs in every session, not only while Diagnostics is open (#351). One press undoes one gesture: a rounded rectangle, a star or a duplicate used to need several presses, the first doing nothing visible (#356, op log **v11 → v12**). Enhance › Presets is recorded as one `Op::TonalStack`, so undo after a preset stays exact, in-session and after a reload, instead of falling back to whole-image snapshots (#368, op log **v12 → v13**, ADR-090). |
+| **Perspective** | With Perspective, Skew or Distort open, picking an object from Review › Reselect points the tool at that object and the panel names it. Before, the pick opened the Shapes editor and Apply had no target (#371). |
+| **Switching photos** | The incoming photo stays locked until its engine document is ready; edits on the photo you leave are kept. Pen previews, pins, selection and mask sessions, save failures and quality readouts were made consistent through the switch (#348). |
+| **Cloud uploads** | A backup upload past 8 s, an AI upload past 60 s and a share snapshot past 60 s are now **aborted**, not abandoned. Abandoned uploads finished anyway and left files nothing could delete: 167 of 207 on dev (#318). |
+| **Loading** | The import dialog preview, Diagnostics › EXIF and the narrow-window menu bar hold their place while loading, with a skeleton after 300 ms and a message on failure (#354). That finishes the UI Nights 16–19 plan. |
+| **Accessibility** | 15 gaps a screen reader couldn't hear or reach: the histogram RGB/Luma and 3×3 placement choices are named radio groups with arrow keys, toggles report pressed state, and failures and fields are announced (#355). |
+| **Dependencies** | three 0.186.1 and @types/three 0.186.0 on the marketing site; @radix-ui dialog 1.2.0, slot 1.4.0, switch 1.3.8; @playwright/test 1.64.0; codeql-action 4.38.3. One gitleaks history finding is skipped by fingerprint (#370, #359). |
+| **Docs** | 10-14 QC report: op-log undo holds through a reload (#369). Parking lot updated (#357). Three blog posts rewritten in plain English, with narration re-recorded (#364, #365). |
+| **Validation** | Combined master: 2,008 unit tests in 217 files; TypeScript, lint (0 errors, 52 existing warnings), guardrails and production build pass; Rust fmt, all-targets clippy and 738 engine tests pass. CI green on every PR. |
+| **Engine** | 892,897 → **895,885 B** (+2,988). Op log **v11 → v13**: a tab still running an older build can't read logs this version writes and falls back to its working copy. No IndexedDB schema, authentication or billing change. |
+
+Not in this release: #367 (indexed storage-ref checks) is waiting on a token scope to push. No imagehorse-qc pass yet on #371, #368 or #372.
+
+## v9.30 Change Summary — 2026-10-15
+
+**The freezes are gone.** Everything merged since v9.29: #373, #374, #375, #376, #377. Each one started from a freeze Chris hit on 10-14: adding an image, drawing a rectangle, or dragging a layer's opacity on big screenshots.
+
+| Area | Change |
+| --- | --- |
+| **Autosave** | After every edit, autosave PNG-encoded **every undo snapshot again**, so each edit made the next save slower and every engine call waited behind it. Each snapshot is now encoded once and cached, and the autosave uses fast deflate (exports keep Balanced). Fifth paste into a 2048 px photo: **4.1 s → 0.61 s** (#373). |
+| **Autosave, layers** | A save re-encodes only the layers whose pixels changed. Each PNG is kept beside a fingerprint of the pixels it came from, so a stale layer can't be saved by a missed dirty flag. Five 3759×1304 layers: save **909 → 284 ms**; after an opacity drag **398 → 159 ms** (#377). |
+| **Opacity drag** | Each slider tick queued a full recomposite of every layer, and nothing merged them. The worker now draws once per burst, and a waiting draw still runs before anything that reads the composite (magic wand, lasso, Smart Brush, histogram). Five big screenshots, 60-step drag: screen caught up **9.2 s → 0.9 s** after release (#376, #377). |
+| **Shapes** | Apply, Cancel and Duplicate cleared the shape's overlay before the engine had drawn it, so the shape vanished for as long as the engine queue took. The overlay now stays until the engine draws the shape (#375). |
+| **Diagnostics** | The Alt+Delete window is gone. Its Resources tab ran about 14 engine calls every frame while open. Feature flags moved to **Settings › Feature Flags**, image info to **Settings › Current Image**, and telemetry prints to the browser console with tags like `[WASM_ENGINE]` (#374). |
+| **Import** | The import choices read **Add to Layer** and **Add Image to Gallery**. Dropping an image clears the drag overlay and no longer navigates the tab away. Holding Space to pan no longer sticks if the window loses focus (#373). |
+| **Validation** | Combined master: 2,010 unit tests in 218 files; TypeScript, lint (0 errors, 52 existing warnings), guardrails and production build pass; cargo fmt passes. Per PR: clippy -D warnings with and without tiles, 743 engine tests, e2e save/reload specs 8/8. CI green on every PR. |
+| **Engine** | 895,885 → **901,221 B** (+5,336). No op log, archive format, IndexedDB schema, authentication or billing change. |
+
+Not in this release: no imagehorse-qc pass yet on these engine and canvas changes.
+
+
+## v9.31 Change Summary — 2026-10-16
+
+**Preset sliders respond to every arrow press.**
+
+| Area | Change |
+| --- | --- |
+| **Keyboard** | Preset-based SizeSlider controls now change the actual setting by one for each arrow press, clamped to the first and last presets. Shapes → Points goes from 5 to 6 with Right or Up, and back to 5 with Left or Down. Native track increments previously rounded back to the same setting. |
+| **Commit** | Controls with `onCommit` commit the final changed setting on arrow-key release, once per hold rather than per repeat. Disabled controls ignore arrow input. |
+| **Interaction** | Pointer dragging, preset buttons, accessible labels and `aria-valuetext` are preserved. |
+| **Validation** | 123 UI Vitest tests pass, including regression cases for Points, both arrow axes, bounds, disabled input, repeated keys and preset buttons. TypeScript passes; lint reports 0 errors and 52 existing warnings. |
+| **Scope** | SizeSlider and its keyboard tests; release documentation and generated marketing data. No Rust engine or WASM changes. |

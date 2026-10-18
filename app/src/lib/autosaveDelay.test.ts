@@ -5,7 +5,7 @@
 // before the fix: stamp → refresh inside the debounce → the stroke is gone.
 import { describe, it, expect } from "vitest";
 import { autosaveDelayMs } from "@/app/session/useImageSession";
-import type { OplogStats } from "@/lib/resourceMonitor";
+import type { OplogStats } from "@/lib/oplogStats";
 
 const base: OplogStats = {
   supported: true, active: true, broken: false, ops: 3, cursor: 3,

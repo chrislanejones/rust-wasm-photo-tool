@@ -169,6 +169,8 @@ export function useDrawingTools({
   const [editState, setEditState] = useState<DrawEditState | null>(null);
   const editStateRef = useRef<DrawEditState | null>(null);
   editStateRef.current = editState;
+  // A committed edit, drawn (click-through) until the engine has drawn it — never live again.
+  const [settlingEdit, setSettlingEdit] = useState<DrawEditState | null>(null);
   // Fresh settings for commit-time reads from stable callbacks.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -183,30 +185,33 @@ export function useDrawingTools({
   // opening, and reading it from below its own declaration is needlessly
   // fragile.
   const prevStyleSettingsRef = useRef(settings);
-
   // Live shape annotations (for the Reselect list + canvas hit-test).
   const [shapes, setShapes] = useState<ShapeMeta[]>([]);
-  // Mirror for callbacks that must read the CURRENT draw order without being
-  // re-created on every refresh (`moveShape`, and the keydown effect that
-  // calls it). Same reason `editStateRef` exists beside `editState`.
+  // Mirror for callbacks that read the CURRENT draw order without being re-created
+  // on every refresh (`moveShape`, its keydown effect); like `editStateRef`.
   const shapesRef = useRef<ShapeMeta[]>([]);
   useEffect(() => {
     shapesRef.current = shapes;
   }, [shapes]);
-  // ADR-024 Stage 3.5. `try/catch` keeps working around the await: a rejected
-  // engine call lands in the same catch that a malformed JSON string does, and
-  // the fallback is the same empty list.
+  // ADR-024 Stage 3.5: a rejected engine call and malformed JSON share the
+  // catch below and its empty-list fallback.
   const refreshShapes = useCallback(async () => {
     const tool = toolRef.current;
-    if (!tool) {
-      setShapes([]);
-      return;
-    }
+    if (!tool) return setShapes([]);
     try {
       setShapes(JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[]);
     } catch {
       setShapes([]);
     }
+  }, [toolRef]);
+
+  // width() is outside the worker's BLIT_CAN_WAIT_FOR, so its reply means any owed blit has drawn.
+  const settle = useCallback((es: DrawEditState) => {
+    const ghost = { ...es, settling: true };
+    setEditState(null);
+    setSettlingEdit(ghost);
+    return async () => (await toolRef.current?.width(),
+      setSettlingEdit((cur) => (cur === ghost ? null : cur)));
   }, [toolRef]);
 
   /**
@@ -220,9 +225,9 @@ export function useDrawingTools({
     const es = editStateRef.current;
     if (!es) return;
     editStateRef.current = null;
-    setEditState(null);
+    const settled = settle(es); // cleared before the engine drew it, shapes vanished on Apply
     const tool = toolRef.current;
-    if (!tool) return;
+    if (!tool) return settled();
     const s = settingsRef.current;
     // Existing-shape edits keep the shape's own style; new shapes read the
     // current toolbar settings live — except the TYPE, which every pending
@@ -231,16 +236,13 @@ export function useDrawingTools({
     const strokeColor = es.style?.strokeColor ?? s.strokeColor;
     const strokeWidth = es.style?.strokeWidth ?? s.strokeWidth;
     const arrowStyle = es.style?.arrowStyle ?? s.arrowStyle;
-    // Preserve the shape's real kind across an edit (e.g. a pin = kind 5 is
-    // shown as a circle handle but must commit as a pin).
+    // Keep the real kind across an edit (a pin = kind 5 shows as a circle handle, commits as a pin).
     const kind =
       es.style?.kindByte ??
       (es.kind === "arrow" ? 4 : (SHAPE_NAME_KIND[shapeName] ?? 0));
     const arrowByte = arrowStyle === "double" ? 1 : 0;
-    // Interior fill — every shape with an interior takes it (FILLABLE_KINDS);
-    // the line and the arrow/pin kinds commit fill_kind 0. Existing-shape edits
-    // keep the shape's captured fill (so move/resize doesn't swap it to the
-    // panel's current fill); new shapes read the live panel — like strokeColor.
+    // Interior fill (FILLABLE_KINDS; line/arrow/pin commit 0). Edits keep the captured
+    // fill so move/resize doesn't swap it; new shapes read the live panel, like strokeColor.
     const fillMode = es.style?.fillMode ?? s.fillMode;
     const fillColor = es.style?.fillColor ?? s.fillColor;
     const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
@@ -252,10 +254,7 @@ export function useDrawingTools({
     const fill2Hex = fillColor2 ?? "#000000";
     const fillAngle = gradientAngle ?? 0;
     const fillBlockVal = fillBlock ?? 16;
-    // Stroke sloppiness — reselected shapes keep their captured value, new
-    // shapes read the panel live. New shapes use the live panel value so the
-    // just-drawn shape has sloppiness, but would also pick any unsaved panel
-    // change (like strokeColor).
+    // Sloppiness: reselected shapes keep theirs, new shapes read the panel live (like strokeColor).
     const sloppiness = es.style?.sloppiness ?? s.sloppiness ?? 0;
     const { starPoints, cornerRadii } = pendingStarAndCorners(es, s, kind, shapeName);
     const rotation = normalizeDeg(es.rotation ?? 0);
@@ -264,7 +263,7 @@ export function useDrawingTools({
       if (!editDirtyRef.current) {
         tool.set_editing_shape(-1);
         flushToCanvas();
-        await refreshShapes();
+        await refreshShapes().then(settled);
         return;
       }
       tool.update_shape_annotation(
@@ -321,20 +320,20 @@ export function useDrawingTools({
     }
     flushToCanvas();
     syncState();
-    await refreshShapes();
-  }, [toolRef, flushToCanvas, syncState, refreshShapes]);
+    await refreshShapes().then(settled);
+  }, [toolRef, flushToCanvas, syncState, refreshShapes, settle]);
 
   /** Escape: drop the pending edit. For an existing-shape edit this also
    *  un-hides the committed shape (clears the Rust editing flag) and repaints. */
   const cancelEdit = useCallback(() => {
     const es = editStateRef.current;
     editStateRef.current = null;
-    setEditState(null);
-    if (es?.editId != null) {
-      toolRef.current?.set_editing_shape(-1);
-      flushToCanvas();
-    }
-  }, [toolRef, flushToCanvas]);
+    if (es?.editId == null || !toolRef.current) return setEditState(null);
+    const settled = settle(es); // drawn until the un-hide is
+    toolRef.current.set_editing_shape(-1);
+    flushToCanvas();
+    void refreshShapes().finally(settled);
+  }, [toolRef, flushToCanvas, refreshShapes, settle]);
 
   /** Load an existing live shape into the edit overlay so it can be moved,
    *  resized, or re-angled. The committed shape is suppressed from the Rust
@@ -939,6 +938,7 @@ export function useDrawingTools({
     applyCrop,
     clearCropSelection: () => setCropSelection(null),
     editState,
+    settlingEdit,
     updateEditGeometry,
     commitEdit,
     cancelEdit,

@@ -34,5 +34,5 @@ Refresh [src/data/featureCards.ts](src/data/featureCards.ts) and
 `/in-the-works` and the home page. Completed work belongs in the Trail Log;
 work still under review stays in the register.
 
-Latest: **v9.27 — 10-11-2026**, gallery and preview loading, Settings keyboard
-navigation, gallery keyboard actions and freehand stroke selection.
+Latest: **v9.31 — 2026-10-16**, preset slider arrow keys change the setting
+by one, including Shapes → Points, and commit the final value on key release.

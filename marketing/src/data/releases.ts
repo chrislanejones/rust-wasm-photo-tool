@@ -24,6 +24,44 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.31",
+    date: "2026-10-16",
+    headline: "Preset sliders respond to every arrow press.",
+    entries: [
+      { tag: "fix", text: "In Shapes, one Right or Up arrow moves Points from 5 to 6; Left or Down moves it back to 5. Preset sliders now change the setting by one, within their allowed range." },
+      { tag: "fix", text: "Sliders that commit changes on release now commit the final value when you release an arrow key, once after a held key finishes repeating." },
+    ],
+  },
+  {
+    version: "v9.30",
+    date: "2026-10-15",
+    headline: "The freezes are gone.",
+    entries: [
+      { tag: "perf", text: "Autosave no longer re-encodes your whole undo history after every edit. The fifth paste into a big photo went from a 4.1 second freeze to 0.6 seconds, and the editor no longer slows down the longer you work." },
+      { tag: "rust", text: "Autosave re-encodes only the layers whose pixels changed. With five big screenshots stacked, a save went from 909 ms to 284 ms." },
+      { tag: "perf", text: "Dragging a layer's opacity on big screenshots draws once per burst instead of once per tick. The screen catches up about 1 second after you let go, down from 9." },
+      { tag: "fix", text: "A shape stays on screen when you press Apply, Cancel or Duplicate, instead of vanishing until the engine catches up." },
+      { tag: "ui", text: "The Diagnostics window is gone. Feature flags and current image info moved to Settings, and telemetry prints to the browser console." },
+    ],
+  },
+  {
+    version: "v9.29",
+    date: "2026-10-14",
+    headline: "Paste stays out of your way, and undo takes back one thing at a time.",
+    entries: [
+      { tag: "feature", text: "Pasting an image asks one question: stack it as a layer, or make a new gallery image. The pasted box sits under the Tools, Gallery and Review panels, and pushing it into a panel closes that panel." },
+      { tag: "feature", text: "A Resize & Compress bar under a pasted image shows its pixel size and shrinks a huge screenshot before you place it." },
+      { tag: "fix", text: "One Ctrl+Z undoes one thing you did. A rounded rectangle or a star no longer needs several presses, and the first one isn't a dud." },
+      { tag: "rust", text: "Presets are recorded in the op log, so undo after a preset steps back exactly, even after a reload, instead of falling back to whole-image snapshots." },
+      { tag: "fix", text: "Picking an object from Review's list while Perspective, Skew or Distort is open points the tool at that object, instead of opening the Shapes editor." },
+      { tag: "fix", text: "Switching photos keeps your unsaved edits and waits until the next photo is ready." },
+      { tag: "fix", text: "A cloud backup, AI upload or share that times out is cancelled, so it no longer leaves a file behind in storage." },
+      { tag: "ui", text: "The import preview, the EXIF readout and the menu bar on a narrow window hold their place while they load." },
+      { tag: "ui", text: "Screen readers pick up 15 things they missed before, including the histogram and placement-grid choices and whether Move and the menu-bar tabs are on." },
+      { tag: "infra", text: "Seven dependency updates, including three.js 0.186 on this site." },
+    ],
+  },
+  {
     version: "v9.28",
     date: "2026-10-12",
     headline: "Things that load now hold their place instead of popping in.",

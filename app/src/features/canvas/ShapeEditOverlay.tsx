@@ -693,6 +693,7 @@ export function ShapeEditOverlay({
   return (
     <svg
       data-draw-overlay
+      data-settling={drawEditState.settling || undefined}
       style={{
         position: "fixed",
         inset: 0,

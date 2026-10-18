@@ -309,6 +309,8 @@ export function ReviewPanel({
       animate={embedded ? undefined : "visible"}
       exit={embedded ? undefined : "exit"}
       aria-label="Review"
+      // While it can be closed, a pasted image dragged into it closes it.
+      data-paste-yields={closable ? "review" : undefined}
       className={
         embedded
           ? // Compact master-bar content box: flush below the 48px chrome.

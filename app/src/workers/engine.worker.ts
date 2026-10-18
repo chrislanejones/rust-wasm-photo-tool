@@ -31,6 +31,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import { staleCanvasReason, NO_CANVAS } from "@/lib/engine/canvasGeneration";
 import { engineSurfaceOf } from "@/lib/engine/engineSurface";
 import { isCaptureStruct, marshalCapture } from "@/lib/engine/captureMarshal";
+import { createBlitCoalescer } from "@/lib/engine/blitCoalescer";
 
 export interface EngineRequest {
   /** Monotonic per-port. Echoed back so a reply cannot be mismatched. */
@@ -130,6 +131,10 @@ async function drain() {
         reply({ id: req.id, ok: false, error: stale });
         continue;
       }
+
+      // A coalesced blit still owed draws BEFORE anything that might read the
+      // composite it refreshes — see `lib/engine/blitCoalescer.ts`.
+      blits.beforeCall(req.method);
 
       const fn = (tool as unknown as Record<string, unknown>)[req.method];
       if (typeof fn !== "function") {
@@ -260,6 +265,9 @@ function blit(): void {
   const composed = tool.get_image_data();
   ctx.putImageData(new ImageData(new Uint8ClampedArray(composed), w, h), 0, 0);
 }
+
+/** Blits arrive one per input event; this draws once per burst. */
+const blits = createBlitCoalescer(blit);
 
 /** The wasm module, kept so a `reinit` can build a second engine without
  *  re-importing. `import()` caches, so this is clarity rather than speed. */
@@ -401,7 +409,7 @@ self.onmessage = async (e: MessageEvent) => {
       break;
 
     case "blit":
-      blit();
+      blits.request();
       break;
 
     case "cancel":

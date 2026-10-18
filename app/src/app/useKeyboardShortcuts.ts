@@ -55,7 +55,6 @@ interface KeyboardShortcutOptions {
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowDiagnostics?: React.Dispatch<React.SetStateAction<boolean>>;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset?: () => void;
@@ -139,7 +138,6 @@ export function useKeyboardShortcuts({
   setShowGallery,
   setShowHistory,
   setShowShortcutModal,
-  setShowDiagnostics,
   onZoomIn,
   onZoomOut,
   onZoomReset,
@@ -399,12 +397,6 @@ export function useKeyboardShortcuts({
           return;
         }
 
-        // Alt+Delete -> diagnostics log overlay
-        if (e.code === "Delete") {
-          e.preventDefault();
-          setShowDiagnostics?.((v) => !v);
-          return;
-        }
         if (e.shiftKey) {
           if (e.code === "KeyE") {
             e.preventDefault();
@@ -487,9 +479,12 @@ export function useKeyboardShortcuts({
 
     // Alt-Tab with H down means the keyup goes to another window. Without this
     // the hold never ends and pan is stuck on until H is pressed again.
+    // A held Space has the same problem: its keyup lands in the other window,
+    // spaceHeldRef stays true, and the hand cursor never goes away.
     const handleBlur = () => {
-      if (handDownAtRef.current === null) return;
+      if (handDownAtRef.current === null && !spaceHeldRef.current) return;
       handDownAtRef.current = null;
+      spaceHeldRef.current = false;
       syncPan();
     };
 
@@ -504,7 +499,7 @@ export function useKeyboardShortcuts({
   }, [
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
-    setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
+    setShowHistory, setShowShortcutModal, onZoomIn,
     onZoomOut, onZoomReset, onGroupChange, onToggleCompare, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
     onLayerToFront, onLayerToBack,

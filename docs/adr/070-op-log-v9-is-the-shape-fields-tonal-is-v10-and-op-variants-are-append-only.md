@@ -1,6 +1,14 @@
 # ADR-070: Op-log v9 is the shape fields alone, the tonal adjustments are v10, and `Op` variants are append-only
 Date: 2026-09-24   Amended: 09-30-2026   Status: proposed   Relates to: ADR-060, ADR-066, ADR-069, ADR-059 (#187)
 
+## Amendment, 10-14-2026 (ADR-090, draft)
+
+The first tonal op is **`Op::TonalStack` at index 23**, op-log **v13**. It
+is one variant carrying five values, not decision 4's six per-slider ops, and
+presets record it first. v12 was already deployed, so the op took a new
+number instead of riding v12. `op_variant_indices_are_append_only` pins 23.
+10 stays reserved and unwritten.
+
 ## Amendment, 10-13-2026 (ADR-088, draft)
 
 `Op::SameGesture` took **index 22** in op-log **v12**: a unit marker that joins

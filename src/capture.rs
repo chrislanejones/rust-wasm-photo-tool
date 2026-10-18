@@ -124,21 +124,32 @@ impl ImageHorseTool {
         f.u32(CAPTURE_VERSION);
         f.u32(self.width());
         f.u32(self.height());
-        f.bytes(&self.export_png());
+        // The autosave encoder: `Fast` deflate (see `codec::export_png_fast`),
+        // and only for pixels that changed since the last save (`SavePngs`).
+        let mut pngs = self.save_pngs.borrow_mut();
+        let mut kept = SavePngs::default();
+        let composite = crate::ImageBuffer {
+            width: self.width(),
+            height: self.height(),
+            data: self.get_image_data(),
+        };
+        f.bytes(kept.png(&mut pngs, None, &composite));
 
+        // Snapshot PNGs come from each snapshot's cache, so a save encodes only
+        // the snapshots taken since the last one, not the whole stack again.
         let undo = self.undo_snapshot_count();
         f.u32(undo as u32);
-        for i in 0..undo {
+        for (i, snap) in self.hist.undo_stack.iter().enumerate() {
             f.str(&self.get_undo_snapshot_label(i));
-            f.bytes(&self.get_undo_snapshot_png(i));
+            f.bytes(snap.encoded_png());
             f.str(&self.get_undo_snapshot_annotations(i));
         }
 
         let redo = self.redo_snapshot_count();
         f.u32(redo as u32);
-        for i in 0..redo {
+        for (i, snap) in self.hist.redo_stack.iter().enumerate() {
             f.str(&self.get_redo_snapshot_label(i));
-            f.bytes(&self.get_redo_snapshot_png(i));
+            f.bytes(snap.encoded_png());
             f.str(&self.get_redo_snapshot_annotations(i));
         }
 
@@ -149,8 +160,8 @@ impl ImageHorseTool {
         f.str(&layers_json);
         let layer_count = self.layer_count();
         f.u32(layer_count as u32);
-        for i in 0..layer_count {
-            f.bytes(&self.get_layer_png(i));
+        for (i, layer) in self.layers.iter().enumerate().take(layer_count) {
+            f.bytes(kept.png(&mut pngs, Some(layer.id), &layer.buf));
             f.str(&self.get_layer_text_annotations(i));
             f.str(&self.get_layer_shape_annotations(i));
         }
@@ -163,7 +174,96 @@ impl ImageHorseTool {
         for snapshot in &self.hist.redo_stack {
             f.u32(snapshot.export_quality as u32);
         }
+        // Only what this save used survives, so a deleted layer's PNG goes too.
+        *pngs = kept;
         f.0
+    }
+}
+
+/// The PNGs the last save wrote, keyed by layer id (`None` = the flattened
+/// canvas), each beside the [`PixelPrint`] of the pixels it was encoded from.
+///
+/// WHY. Autosave re-encoded the canvas and EVERY layer on every save, so its
+/// cost grew with the layer count: five 3759×1304 screenshot layers took
+/// ~0.7 s on the engine worker after a single opacity change, and nothing
+/// queued behind it could run (measured 10-15-2026). Most saves change one
+/// layer or none — an opacity, a rename, a shape — so most encodes produced
+/// the bytes the previous save already had.
+///
+/// WHY A FINGERPRINT AND NOT A DIRTY FLAG. Layer pixels are written from ~70
+/// sites in 14 files, and a flag one of them forgets saves a STALE layer —
+/// silently, into IndexedDB, which has no backup. Hashing the pixels cannot
+/// miss a writer: it reads what is there. It costs a few ms per layer against
+/// ~115 ms per encode.
+///
+/// A list, not a map: a document holds a handful of layers, and a `HashMap`
+/// keyed this way compiled to +4.8 KB of wasm for no measurable gain.
+#[derive(Default)]
+pub(crate) struct SavePngs(Vec<(Option<u32>, PixelPrint, Vec<u8>)>);
+
+impl SavePngs {
+    /// `buf`'s PNG: moved over from `prev` when the pixels match what it was
+    /// encoded from, encoded fresh otherwise. Kept in `self` either way.
+    fn png(&mut self, prev: &mut SavePngs, key: Option<u32>, buf: &crate::ImageBuffer) -> &[u8] {
+        let print = PixelPrint::of(buf);
+        let png = match prev.0.iter().position(|(k, ..)| *k == key) {
+            Some(i) if prev.0[i].1 == print => prev.0.swap_remove(i).2,
+            _ => crate::codec::export_png_fast(buf),
+        };
+        self.0.push((key, print, png));
+        &self.0[self.0.len() - 1].2
+    }
+
+    #[cfg(test)]
+    fn get(&self, key: Option<u32>) -> Option<&[u8]> {
+        self.0
+            .iter()
+            .find(|(k, ..)| *k == key)
+            .map(|(.., png)| &png[..])
+    }
+}
+
+/// Dimensions plus two 64-bit lanes over the RGBA bytes, eight at a time.
+///
+/// Each lane's step — xor the word in, multiply by an odd constant, rotate —
+/// is a bijection of the state for a given word, so two buffers that differ
+/// in ONE word always end in different states: a single edited run of pixels
+/// can never collide, by construction rather than by odds. Several scattered
+/// differences cancelling in both lanes at once is the only way to collide,
+/// ~2^-128 for edits that are not built to do it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct PixelPrint {
+    width: u32,
+    height: u32,
+    len: usize,
+    a: u64,
+    b: u64,
+}
+
+impl PixelPrint {
+    pub(crate) fn of(buf: &crate::ImageBuffer) -> Self {
+        let (mut a, mut b) = (0x243F_6A88_85A3_08D3u64, 0x1319_8A2E_0370_7344u64);
+        let mut mix = |w: u64| {
+            a = (a ^ w).wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(29);
+            b = (b ^ w).wrapping_mul(0xC2B2_AE3D_27D4_EB4F).rotate_left(41);
+        };
+        let words = buf.data.chunks_exact(8);
+        let tail = words.remainder();
+        for w in words {
+            mix(u64::from_le_bytes(w.try_into().unwrap_or([0; 8])));
+        }
+        if !tail.is_empty() {
+            let mut last = [0u8; 8];
+            last[..tail.len()].copy_from_slice(tail);
+            mix(u64::from_le_bytes(last));
+        }
+        PixelPrint {
+            width: buf.width,
+            height: buf.height,
+            len: buf.data.len(),
+            a,
+            b,
+        }
     }
 }
 
@@ -620,8 +720,16 @@ mod capture_tests {
         assert_eq!(r.u32(), t.width(), "canvas width");
         assert_eq!(r.u32(), t.height(), "canvas height");
 
+        // The autosave encodes with `Fast` deflate, so the bytes differ from the
+        // `Balanced` getters; the PICTURE must not. Compare decoded pixels.
+        let same_pixels = |a: &[u8], b: &[u8], what: &str| {
+            let (pa, wa, ha) = crate::codec::decode_png(a).unwrap(); // allow: rust-panic
+            let (pb, wb, hb) = crate::codec::decode_png(b).unwrap(); // allow: rust-panic
+            assert_eq!((wa, ha), (wb, hb), "{what}: size");
+            assert!(pa == pb, "{what}: pixels must match the getter's");
+        };
         let png = r.blob();
-        assert_eq!(png, &t.export_png()[..], "canvas PNG must match the getter");
+        same_pixels(png, &t.export_png(), "canvas PNG");
         assert_eq!(&png[..4], &[0x89, b'P', b'N', b'G'], "and be a real PNG");
 
         let undo = r.u32() as usize;
@@ -656,7 +764,7 @@ mod capture_tests {
         let layers = r.u32() as usize;
         assert_eq!(layers, t.layer_count(), "layer count");
         for i in 0..layers {
-            assert_eq!(r.blob(), &t.get_layer_png(i)[..]);
+            same_pixels(r.blob(), &t.get_layer_png(i), "layer PNG");
             assert_eq!(r.text(), t.get_layer_text_annotations(i));
             assert_eq!(r.text(), t.get_layer_shape_annotations(i));
         }
@@ -673,6 +781,192 @@ mod capture_tests {
             r.p,
             blob.len(),
             "frame must be fully consumed — no trailing bytes"
+        );
+    }
+
+    /// A snapshot is encoded once. The first capture fills each snapshot's PNG
+    /// cache; the second reuses it and produces the identical frame. Before the
+    /// cache, every save re-encoded the whole undo stack and got slower with
+    /// each edit (1.0 s after one paste, 4.1 s after five, 10-14-2026).
+    #[test]
+    fn capture_state_encodes_each_snapshot_once() {
+        let mut t = ImageHorseTool::new(24, 16);
+        t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.add_layer("a");
+        t.add_layer("b");
+        assert!(t.undo_snapshot_count() >= 2, "the adds took snapshots");
+        assert!(
+            t.hist.undo_stack.iter().all(|s| s.png.get().is_none()),
+            "nothing is encoded before a save"
+        );
+        let first = t.capture_state();
+        assert!(
+            t.hist.undo_stack.iter().all(|s| s.png.get().is_some()),
+            "a save leaves every snapshot's PNG cached"
+        );
+        assert_eq!(
+            first,
+            t.capture_state(),
+            "the cached save is byte-identical"
+        );
+    }
+
+    /// The canvas PNG and every layer PNG out of a frame, in order.
+    fn frame_pngs(blob: &[u8]) -> (Vec<u8>, Vec<Vec<u8>>) {
+        let mut r = Read { b: blob, p: 16 };
+        let canvas = r.blob().to_vec();
+        for _ in 0..2 {
+            for _ in 0..r.u32() {
+                r.text();
+                r.blob();
+                r.text();
+            }
+        }
+        r.text(); // live text
+        r.text(); // live shapes
+        r.text(); // layer JSON
+        let layers = (0..r.u32())
+            .map(|_| {
+                let png = r.blob().to_vec();
+                r.text();
+                r.text();
+                png
+            })
+            .collect();
+        (canvas, layers)
+    }
+
+    fn pixels(png: &[u8]) -> Vec<u8> {
+        crate::codec::decode_png(png).unwrap().0 // allow: rust-panic
+    }
+
+    /// The safety half of the save cache: a layer whose pixels changed is
+    /// re-encoded even when the write went straight into the buffer, past
+    /// every setter — the case a dirty flag would miss and save stale.
+    #[test]
+    fn a_changed_layer_is_never_saved_from_the_cache() {
+        let mut t = ImageHorseTool::new(24, 16);
+        t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.add_layer("top");
+        t.capture_state();
+        t.layers[1].buf.data[5 * 4] = 200; // one byte, written behind the engine's back
+        let (canvas, layers) = frame_pngs(&t.capture_state());
+        assert_eq!(
+            pixels(&layers[1]),
+            t.layers[1].buf.data,
+            "the new pixels, not the cached ones"
+        );
+        assert_eq!(
+            pixels(&layers[0]),
+            t.layers[0].buf.data,
+            "the untouched layer still right"
+        );
+        assert_eq!(
+            pixels(&canvas),
+            t.get_image_data(),
+            "and the canvas follows"
+        );
+    }
+
+    /// The speed half: an unchanged layer's PNG is the SAME allocation the
+    /// last save made, moved over rather than encoded again.
+    #[test]
+    fn an_unchanged_layer_reuses_its_png() {
+        let mut t = ImageHorseTool::new(24, 16);
+        t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.add_layer("top");
+        let id = Some(t.layers[0].id);
+        let first = t.capture_state();
+        let ptr = t.save_pngs.borrow().get(id).map(<[u8]>::as_ptr);
+        t.set_layer_opacity(t.layers[1].id, 0.5); // a property, not pixels
+        let second = t.capture_state();
+        assert_eq!(
+            t.save_pngs.borrow().get(id).map(<[u8]>::as_ptr),
+            ptr,
+            "moved, not re-encoded"
+        );
+        assert_eq!(
+            frame_pngs(&first).1,
+            frame_pngs(&second).1,
+            "same layer bytes"
+        );
+    }
+
+    /// Only what a save used is kept, so a deleted layer's PNG is freed.
+    #[test]
+    fn a_deleted_layer_leaves_the_cache() {
+        let mut t = ImageHorseTool::new(24, 16);
+        t.load_image(&solid(24, 16, [10, 20, 30, 255]));
+        t.add_layer("gone");
+        let gone = t.layers[1].id;
+        t.capture_state();
+        assert!(t.save_pngs.borrow().get(Some(gone)).is_some());
+        assert!(t.remove_layer(gone));
+        t.capture_state();
+        assert!(t.save_pngs.borrow().get(Some(gone)).is_none());
+        assert_eq!(
+            t.save_pngs.borrow().0.len(),
+            t.layer_count() + 1,
+            "layers + canvas"
+        );
+    }
+
+    /// Any one changed byte changes the print — every position, including the
+    /// tail that does not fill a whole 8-byte word.
+    #[test]
+    fn every_single_byte_change_changes_the_print() {
+        let base = crate::ImageBuffer {
+            width: 3,
+            height: 3,
+            data: (0..36).collect(),
+        };
+        let print = super::PixelPrint::of(&base);
+        for i in 0..base.data.len() {
+            for flip in [1u8, 0x80, 0xff] {
+                let mut b = crate::ImageBuffer {
+                    width: 3,
+                    height: 3,
+                    data: base.data.clone(),
+                };
+                b.data[i] ^= flip;
+                assert_ne!(super::PixelPrint::of(&b), print, "byte {i} ^ {flip:#x}");
+            }
+        }
+        let wider = crate::ImageBuffer {
+            width: 9,
+            height: 1,
+            data: base.data.clone(),
+        };
+        assert_ne!(
+            super::PixelPrint::of(&wider),
+            print,
+            "same bytes, other shape"
+        );
+    }
+
+    /// Editing a stored snapshot (a session restore adds its text) clears the
+    /// cache, so the next save draws the text instead of the stale picture.
+    #[test]
+    fn editing_a_stored_snapshot_clears_its_png() {
+        let mut t = ImageHorseTool::new(64, 32);
+        t.load_image(&solid(64, 32, [10, 20, 30, 255]));
+        t.add_layer("a");
+        let before = t.get_undo_snapshot_png(0);
+        assert!(
+            t.hist.undo_stack[0].png.get().is_some(),
+            "cached by the read"
+        );
+        assert!(t.push_annotation_to_undo_snapshot(
+            0, "Hi", 20.0, 255, 255, 255, true, 4, 4, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, ""
+        ));
+        assert!(
+            t.hist.undo_stack[0].png.get().is_none(),
+            "the edit cleared it"
+        );
+        assert_ne!(
+            before,
+            t.get_undo_snapshot_png(0),
+            "the text is in the new PNG"
         );
     }
 

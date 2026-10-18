@@ -4,6 +4,7 @@
 //   Item 4: PgUp/PgDn gallery cycling
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
+import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
@@ -75,6 +76,7 @@ import { autoCompressedPatch } from "@/lib/sizeDelta";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
 import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
+import { PastePlacementBar } from "@/features/canvas/PastePlacementBar";
 import { FirstRunScreen } from "@/features/upload/FirstRunScreen";
 import { NewActions } from "@/features/upload/NewActions";
 import { ResumeContent } from "@/features/upload/ResumeContent";
@@ -91,6 +93,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
+import { useReselectPick } from "./session/useReselectPick";
 import { useShapeActions } from "./session/useShapeActions";
 import { useUndoDepth } from "./session/useUndoDepth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
@@ -136,8 +139,6 @@ import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
-import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
-import { installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -780,8 +781,6 @@ export function AppShell() {
   const setShowShortcutModal = useUIStore((s) => s.setShowShortcutModal);
   const showCelebration = useUIStore((s) => s.showCelebration);
   const setShowCelebration = useUIStore((s) => s.setShowCelebration);
-  const showDiagnostics = useUIStore((s) => s.showDiagnostics);
-  const setShowDiagnostics = useUIStore((s) => s.setShowDiagnostics);
 
   // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
   useEffect(() => {
@@ -811,9 +810,6 @@ export function AppShell() {
   useEffect(() => {
     if (!bp.dock) setCompactNoticeDismissed(false);
   }, [bp.dock]);
-  useEffect(() => {
-    installConsoleCapture();
-  }, []);
   const deleteAllOpen = useUIStore((s) => s.deleteAllOpen);
   const setDeleteAllOpen = useUIStore((s) => s.setDeleteAllOpen);
   // Per-image + selected delete confirmations (mirror the Delete All dialog).
@@ -837,7 +833,6 @@ export function AppShell() {
   // overlay through this one-shot request (cleared as soon as it's consumed).
   // State lives in useAnnotationStore, not here — AppShell gains nothing new.
   const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
-  const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
   // Pen handlers live in their own session hook (#45) — one domain, one set
   // of dependencies, and AppShell is under a line cap it was already over.
   const {
@@ -1477,29 +1472,8 @@ export function AppShell() {
   const setSelectedObject = useAnnotationStore((s) => s.setSelectedObject);
   const bumpAnnotations = useAnnotationStore((s) => s.bumpAnnotations);
 
-  const handleSelectObject = useCallback(
-    (o: ReselectObject) => {
-      setSelectedObject(o);
-      if (o.type === "text") {
-        setActiveTool("text");
-        void textTool.selectAnnotation(o.id);
-        return;
-      }
-      // A Bézier pen path (kind 7) re-opens in the PenOverlay — switch to
-      // Paint → Pen so the overlay is mounted, then hand it the control points
-      // so the curve and its anchors come back editable. Routing it through
-      // drawingTools.selectShape (the rect-bbox editor) only hid the path.
-      const shape = drawingTools.shapes.find((s) => s.id === o.id);
-      if (shape?.kind === 7) {
-        setActiveTool("brush");
-        setBrushMode("pen");
-        requestPenEdit({ id: o.id, points: shape.points.flat() });
-        return;
-      }
-      void drawingTools.selectShape(o.id);
-    },
-    [textTool, drawingTools, setActiveTool, setBrushMode],
-  );
+  // Review → Reselect pick; with Perspective open it retargets the tool (#366).
+  const handleSelectObject = useReselectPick(textTool, drawingTools);
 
   // Place the selected object into one of the nine grid cells — Rust centers the
   // bbox in that ninth of the canvas (`align_annotation` with a cell mode); JS
@@ -1642,16 +1616,9 @@ export function AppShell() {
     redStampTool,
   });
 
-  /**
-   * Paste a bitmap from the clipboard into the **active layer**, centered on the
-   * canvas. Accepts either the `clipboardData.items` from a native paste event
-   * or, when called without them, falls back to the async Clipboard API (for an
-   * explicit button/menu invocation). Decodes the image to RGBA and composites
-   * it via the active-layer `paste_region` (one "Paste" history entry in Rust).
-   */
   // ── Drag / paste image import ────────────────────────────────────────────
   // A dropped or pasted image doesn't act immediately — it opens a choice
-  // dialog (New layer / Onto image / To gallery). `isDraggingImage` drives the
+  // dialog (Add to Layer / Add Image to Gallery). `isDraggingImage` drives the
   // full-window drop affordance; `importImage` holds the decoded image + a File
   // (for the gallery path) + a preview URL while the dialog is open.
   const [isDraggingImage, setIsDraggingImage] = useState(false);
@@ -1831,10 +1798,13 @@ export function AppShell() {
       if (depth === 0) setIsDraggingImage(false);
     };
     const onDrop = (e: DragEvent) => {
-      if (!isFileDrag(e) || e.defaultPrevented) return; // a drop zone took it
-      e.preventDefault(); // stop the browser from navigating to the image
+      if (!isFileDrag(e)) return;
+      // Clear the overlay FIRST: a drop a zone took used to return here with it
+      // still up, and the drag affordance stayed on screen.
       depth = 0;
       setIsDraggingImage(false);
+      if (e.defaultPrevented) return; // a drop zone took it
+      e.preventDefault(); // stop the browser from navigating to the image
       // isSvgFile catches .svg drops whose source hands over an empty mime.
       const files = Array.from(e.dataTransfer?.files ?? []).filter(
         (f) => f.type.startsWith("image/") || isSvgFile(f),
@@ -1844,7 +1814,7 @@ export function AppShell() {
         return;
       }
       // A STACK OF IMAGES NEVER ASKS. "Add this image" offers a single-image
-      // choice (stack as layer / merge into layer / new gallery image) and can
+      // choice (add to layer / add image to gallery) and can
       // only carry one file, so a multi-file drop used to keep files[0] and
       // silently discard the rest. Two or more now go straight to the gallery
       // regardless of whether the gallery is empty or already has photos —
@@ -1887,7 +1857,7 @@ export function AppShell() {
     // and `begin` reads the engine, so there is no capture to tear — the id is
     // simply needed before the placement box can be told what to remove on Esc.
     const layerId = await stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
-    // Same movable/resizable placement as "Merge into layer" — `begin` scales
+    // A movable/resizable placement box — `begin` scales
     // the box down to fit when the image is bigger than the canvas, so an
     // oversized paste stays fully visible and resizable instead of baking in
     // at 1:1 and permanently clipping at the layer edges. Escape aborts the
@@ -1898,16 +1868,6 @@ export function AppShell() {
     toast.success("Pasted on a new layer — Enter places it, Esc cancels");
     closeImportDialog();
   }, [importImage, importDest, stamp, pastePlacement, closeImportDialog]);
-  const importOntoLayer = useCallback(() => {
-    const img = importImage;
-    if (!img) return;
-    const { x, y } = importDest(img.w, img.h);
-    // Seed a movable/resizable placement instead of baking the pixels in
-    // immediately — the bounding-box overlay takes over the canvas; Enter,
-    // clicking away, or switching tools commits it (Escape cancels).
-    pastePlacement.begin(img.pixels, img.w, img.h, x, y);
-    closeImportDialog();
-  }, [importImage, importDest, pastePlacement, closeImportDialog]);
   const importToGallery = useCallback(() => {
     const img = importImage;
     if (!img) return;
@@ -2290,8 +2250,6 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowShortcutModal,
-    // Diagnostics Window (Alt+Delete) is always available — not gated.
-    setShowDiagnostics,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
@@ -2325,6 +2283,38 @@ export function AppShell() {
   const canCompare = hasImage && !!activeOriginalKey && activeTool !== "emoji";
   const canUndo = hasImage && stamp.state.undoCount > 0;
   const canRedo = hasImage && stamp.state.redoCount > 0;
+
+  // Settings › Current Image (was the Alt+Delete Diagnostics window, 10-14-2026).
+  const imageMeta: ImageMeta = {
+    ready: stamp.state.ready,
+    photoId: activePhotoId,
+    name: activeEntry?.name,
+    mimeType: activeEntry?.mimeType,
+    origWidth: activeEntry?.origWidth,
+    origHeight: activeEntry?.origHeight,
+    currentWidth: stamp.state.width,
+    currentHeight: stamp.state.height,
+    originalByteSize: activeEntry?.originalByteSize,
+    currentByteSize: activeEntry?.byteSize,
+    originalKey: activeEntry?.originalKey,
+    uploadKey: activeEntry?.uploadKey,
+    undoCount: stamp.state.undoCount,
+    redoCount: stamp.state.redoCount,
+    modified:
+      activePhotoId != null &&
+      (modifiedPhotos.has(activePhotoId) ||
+        hasBeenModified ||
+        stamp.state.undoCount > 0),
+    // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
+    // an EMPTY typed array, not a throw. Its consumer
+    // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
+    // than `!png` alone, which is the only reason that would have degraded
+    // safely instead of hashing a zero-byte buffer.
+    getCanvasPng: async () => {
+      const t = stamp.toolRef.current;
+      return t ? new Uint8Array(await t.export_png()) : null;
+    },
+  };
 
   return (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
@@ -2423,6 +2413,7 @@ export function AppShell() {
 
       {/* Drag-an-image-anywhere affordance + the import choice dialog. */}
       <ImageDropOverlay show={isDraggingImage} />
+      <PastePlacementBar {...pastePlacement} onCompress={() => void pastePlacement.compress()} canvasRef={canvasRef} />
       <ImportImageDialog
         open={importImage !== null}
         onOpenChange={(o) => {
@@ -2434,7 +2425,6 @@ export function AppShell() {
         canUseLayers={TIERS[effectiveUserMode].layersPerImage > 0}
         hasActivePhoto={activePhotoId !== null}
         onNewLayer={importToNewLayer}
-        onOntoLayer={importOntoLayer}
         onAddToGallery={importToGallery}
       />
 
@@ -2454,41 +2444,6 @@ export function AppShell() {
           shares its z-layer so it covers every panel. */}
       <MultiTabScreen open={isStaleTab} onUseHere={claimTabHere} />
 
-      {/* Diagnostics Window (Alt+Delete) is always available. */}
-      <DiagnosticLogOverlay
-        open={showDiagnostics}
-        onClose={() => setShowDiagnostics(false)}
-        imageMeta={{
-          ready: stamp.state.ready,
-          photoId: activePhotoId,
-          name: activeEntry?.name,
-          mimeType: activeEntry?.mimeType,
-          origWidth: activeEntry?.origWidth,
-          origHeight: activeEntry?.origHeight,
-          currentWidth: stamp.state.width,
-          currentHeight: stamp.state.height,
-          originalByteSize: activeEntry?.originalByteSize,
-          currentByteSize: activeEntry?.byteSize,
-          originalKey: activeEntry?.originalKey,
-          uploadKey: activeEntry?.uploadKey,
-          undoCount: stamp.state.undoCount,
-          redoCount: stamp.state.redoCount,
-          modified:
-            activePhotoId != null &&
-            (modifiedPhotos.has(activePhotoId) ||
-              hasBeenModified ||
-              stamp.state.undoCount > 0),
-          // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
-          // an EMPTY typed array, not a throw. Its consumer
-          // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
-          // than `!png` alone, which is the only reason that would have degraded
-          // safely instead of hashing a zero-byte buffer.
-          getCanvasPng: async () => {
-            const t = stamp.toolRef.current;
-            return t ? new Uint8Array(await t.export_png()) : null;
-          },
-        }}
-      />
 
       <Toaster />
 
@@ -2631,6 +2586,7 @@ export function AppShell() {
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
+                  imageMeta={imageMeta}
                   // Standalone: the master bar is one flat row with no pills now, so
                   // each control carries its own fill (same as the compact top bar).
                   grouped={false}
@@ -2671,6 +2627,7 @@ export function AppShell() {
             general={general}
             superUser={superUser}
             openRaster={openRaster}
+            imageMeta={imageMeta}
           />
         )}
       </AnimatePresence>
@@ -2922,7 +2879,7 @@ export function AppShell() {
                           pastePlacementRect={pastePlacement.rect}
                           onPastePlacementChange={pastePlacement.update}
                           colorPickerActive={colorPickerActive}
-                          drawEditState={drawingTools.editState}
+                          drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                           onDrawEditChange={drawingTools.updateEditGeometry}
                           drawSettings={{
                             strokeColor: toolSettings.strokeColor,
@@ -3049,7 +3006,7 @@ export function AppShell() {
                       pastePlacementRect={pastePlacement.rect}
                       onPastePlacementChange={pastePlacement.update}
                       colorPickerActive={colorPickerActive}
-                      drawEditState={drawingTools.editState}
+                      drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                       onDrawEditChange={drawingTools.updateEditGeometry}
                       drawSettings={{
                         strokeColor: toolSettings.strokeColor,

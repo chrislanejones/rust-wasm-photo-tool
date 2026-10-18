@@ -26,7 +26,7 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 | `service-worker-e2e` | The SW lifecycle, no-SW-by-default specs and keyless boot | — |
 | `e2e` | Every spec under the default Playwright config, in 2 shards. `scripts/e2e-coverage-check.mjs` checks that every eligible file is included; SW, keyless boot and archived sweeps have separate handling | — |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
-| `convex` | `pnpm test:convex` (backend suite on `convex-test`, no deployment needed), then `convex codegen` + a `_generated` drift check | — |
+| `convex` | Backend regression tests (`pnpm test:convex`) and typecheck always run; `convex codegen` + a `_generated` drift check run with deployment credentials | — |
 | `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and checks content types, the 800,000-byte floor, required exports and the build-info SHA256 | The manual check that caught the five-week featureless-prod bug |
 
 Build/quality jobs are skipped on the weekly cron (`if: github.event_name != 'schedule'`) — no point rebuilding when nothing changed.
@@ -135,7 +135,7 @@ Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
 ## Setup notes
 
-- **`CONVEX_DEPLOY_KEY` secret** — the `convex` job's codegen/drift step only runs when this repo secret is set (Settings → Secrets and variables → Actions). Use a Convex **preview/CI** deploy key, never prod. Without it the job prints "skipped" and stays green.
+- **`CONVEX_DEPLOY_KEY` secret** — the `convex` job's codegen/drift step only runs when this repo secret is set (Settings → Secrets and variables → Actions). Use a Convex **preview/CI** deploy key, never prod. Without it only codegen/drift is skipped; backend tests and typechecking still run.
 - **Native secret scanning + push protection** — enable under **Settings → Code security**; free for public repos, and it blocks secrets *before* they are pushed, complementing the `gitleaks` history scan.
 
 ## Troubleshooting
@@ -146,7 +146,7 @@ Once the build jobs are green twice, in **Settings → Branches → `master`**:
 
 **A guardrail fails on a legitimate exception.** Add an `# allow: <tag>` comment at the use site. Don't expand the exclude globs.
 
-**The `convex` job is skipped.** It needs `CONVEX_DEPLOY_KEY` — see Setup notes.
+**The Convex codegen drift check is skipped.** It needs `CONVEX_DEPLOY_KEY` — see Setup notes. Backend tests and typechecking do not need this secret.
 
 **`deploy-sentinel` fails after a green build.** The build was fine and the *deploy* is wrong — usually a Cargo feature set in the root `vercel.json` that doesn't match `build:wasm`. Check the served wasm's size and exports, not the local one.
 

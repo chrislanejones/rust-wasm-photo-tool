@@ -569,6 +569,9 @@ pub struct ImageHorseTool {
     /// Cached composite of all visible layers; `data_ptr`/`data_len` expose
     /// this to JS for a zero-copy blit. Rebuilt by `recomposite()`.
     composite_cache: Vec<u8>,
+    /// PNGs the last `capture_state` encoded, reused while their pixels are
+    /// unchanged — see `capture::SavePngs`.
+    save_pngs: std::cell::RefCell<crate::capture::SavePngs>,
     /// Tile-engine mirror of `composite_cache`, single-document-layer scope
     /// only (see `tiles_flush`). Feature-gated (`tiles`) and NOT part of the
     /// default wasm build — see the `tiles`/`ops` module comments above.
@@ -812,6 +815,7 @@ impl ImageHorseTool {
     fn make_snapshot(&self, label: &str) -> Snapshot {
         Snapshot {
             node: self.hist.current_node(), // the live document's identity
+            png: Default::default(),
             label: label.to_string(),
             layers: self.layers.clone(),
             active: self.active,
@@ -1074,6 +1078,7 @@ impl ImageHorseTool {
             width,
             height,
             composite_cache: Vec::new(),
+            save_pngs: Default::default(),
             #[cfg(feature = "tiles")]
             tile_buf: crate::tiles::TileBuffer::new(width, height),
             hist: History::new(),
@@ -2732,27 +2737,6 @@ impl ImageHorseTool {
         let composite =
             composite_layers(layers, iw, ih, self.editing_shape_id, self.editing_text_id);
         transform::copy_region(&composite, iw as i32, ih as i32, x, y, w, h)
-    }
-
-    pub fn paste_region(
-        &mut self,
-        pixels: &[u8],
-        src_w: u32,
-        src_h: u32,
-        dest_x: i32,
-        dest_y: i32,
-    ) {
-        self.snap("Paste");
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            pixels,
-            src_w,
-            src_h,
-            dest_x,
-            dest_y,
-        );
     }
 
     // ── Resize ───────────────────────────────────────────────────────────
@@ -4463,18 +4447,6 @@ mod layer_tests {
         // Move green to the bottom → red now on top.
         t.move_layer(top, 0);
         assert_eq!(px(&t, 0, 0), [255, 0, 0, 255]);
-    }
-
-    #[test]
-    fn paste_region_targets_active_layer() {
-        let mut t = ImageHorseTool::new(4, 4);
-        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
-        t.add_layer("paste-target");
-        // Paste a 2x2 white block at (0,0) into the active (transparent) layer.
-        t.paste_region(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0);
-        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255]);
-        // Outside the paste, the black background shows through.
-        assert_eq!(px(&t, 3, 3), [0, 0, 0, 255]);
     }
 }
 

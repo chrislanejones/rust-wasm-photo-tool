@@ -44,7 +44,6 @@ import {
 } from "@/lib/dexie/db";
 import { USE_OPLOG_PERSISTENCE } from "@/lib/dexie/flags";
 import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
-import { registerOplogPersistStats } from "@/lib/resourceMonitor";
 import { whenStrokeQuiet } from "@/lib/strokeGate";
 
 const BRANCH = "main";
@@ -347,15 +346,6 @@ async function invalidatePersistedLog(photoId: string, reason: string): Promise<
     const m = await db.oplogManifests.get(photoId);
     if (!m || m.stale) return;
     await db.oplogManifests.put({ ...m, stale: true, updatedAt: Date.now() });
-    registerOplogPersistStats({
-      photoId,
-      source: "retired",
-      ops: m.opCount,
-      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
-      chunks: m.chunkCount,
-      stale: true,
-      at: Date.now(),
-    });
     console.warn(
       `[oplog-persist] log no longer describes photo ${photoId} (${reason}) — persisted log marked stale; resume falls back to the working copy`,
     );
@@ -648,15 +638,6 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
       cursor,
     };
     invalidated.delete(photoId); // healthy again; a later break re-marks it
-    registerOplogPersistStats({
-      photoId,
-      source: "saved",
-      ops: len,
-      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
-      chunks: manifest.chunkCount,
-      stale: false,
-      at: Date.now(),
-    });
   }
 }
 
@@ -747,15 +728,6 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
       generation: await tool.oplog_generation(),
       cursor,
     };
-    registerOplogPersistStats({
-      photoId,
-      source: "restored",
-      ops: m.opCount,
-      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
-      chunks: m.chunkCount,
-      stale: false,
-      at: Date.now(),
-    });
     return "restored";
   } catch (e) {
     if (!warnedRestoreFailure) {

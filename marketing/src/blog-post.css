@@ -170,7 +170,8 @@
 }
 .post-audio__play:hover { background: var(--color-accent-soft); }
 .post-audio__play:focus-visible,
-.post-audio__seek:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.narration-range:focus-visible,
+.narration-icon-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .post-audio__play svg { width: 20px; height: 20px; fill: currentColor; }
 .post-audio__body { flex: 1; min-width: 0; }
 .post-audio__label {
@@ -186,7 +187,9 @@
   color: var(--color-ink-3);
   font-variant-numeric: tabular-nums;
 }
-.post-audio__seek {
+/* The seek bar and the volume bar: a hairline the accent fills. Shared by
+   the post player and the mini player (Narration.tsx). */
+.narration-range {
   flex: 1;
   min-width: 0;
   height: 4px;
@@ -194,22 +197,88 @@
   border-radius: var(--radius-pill);
   background: linear-gradient(
     to right,
-    var(--color-accent) var(--post-audio-fill, 0%),
-    var(--color-rule) var(--post-audio-fill, 0%)
+    var(--color-accent) var(--narration-fill, 0%),
+    var(--color-rule) var(--narration-fill, 0%)
   );
   cursor: pointer;
 }
-.post-audio__seek::-webkit-slider-thumb {
+.narration-range::-webkit-slider-thumb {
   appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: var(--color-ink);
 }
-.post-audio__seek::-moz-range-thumb {
+.narration-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border: 0;
   border-radius: 50%;
   background: var(--color-ink);
 }
+
+/* Mute button + level. */
+.narration-icon-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-ink-2);
+  cursor: pointer;
+}
+.narration-icon-btn:hover { background: var(--color-paper-3); color: var(--color-ink); }
+.narration-icon-btn svg { width: 18px; height: 18px; }
+.narration-volume { flex: none; display: flex; align-items: center; gap: 2px; }
+.narration-volume__slider { flex: none; width: 72px; }
+/* On a phone the hardware buttons set the level (iOS ignores it anyway), so
+   the slider gives its room back to the seek bar; mute stays. */
+@media (max-width: 560px) {
+  .narration-volume__slider { display: none; }
+}
+
+/* ── mini player ─────────────────────────────────────────────────────────
+   Docked at the bottom of every page but the narration's own post while a
+   narration is loaded. Same pill as the post player, floated. */
+.mini-player {
+  position: fixed;
+  inset-inline: var(--space-md);
+  bottom: var(--space-md);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+  box-shadow: var(--shadow-float);
+  animation: mini-player-in 0.24s ease-out;
+}
+.mini-player__play { width: 40px; height: 40px; }
+.mini-player__body { flex: 1; min-width: 0; }
+.mini-player__title {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.mini-player__title:hover { text-decoration: underline; }
+@keyframes mini-player-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-player { animation: none; }
+}
+/* Room under the last line of the page, so the docked player never sits on
+   top of the footer. */
+body:has(.mini-player) { padding-bottom: 5.5rem; }
