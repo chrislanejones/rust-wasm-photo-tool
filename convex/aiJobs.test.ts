@@ -1,9 +1,11 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { fileIdsOf } from "./testAccount";
 import { findOrphans } from "./storageOrphans";
+
+afterEach(() => vi.unstubAllEnvs());
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -20,14 +22,13 @@ async function setup() {
 }
 
 describe("generate reference ownership", () => {
-  test.each(["running", "done", "failed"] as const)("%s jobs protect all three references from discard and sweep", async status => {
+  test("running jobs protect all three references from discard and sweep", async () => {
+    const status = "running";
     const { t, refs, owner } = await setup();
     const { jobId, referenceUrls } = await owner.mutation(internal.aiJobs.startGenerateJob, {
       prompt: "Test", model: "test/model", referenceStorageIds: refs,
     });
     expect(referenceUrls).toHaveLength(3);
-    if (status === "done") await t.mutation(internal.aiJobs.completeJob, { jobId });
-    if (status === "failed") await t.mutation(internal.aiJobs.failJob, { jobId, error: "provider refused" });
     const job = await t.run(ctx => ctx.db.get(jobId));
     expect(job?.status).toBe(status);
     expect(fileIdsOf("ai_jobs", job!)).toEqual(refs);
@@ -39,6 +40,71 @@ describe("generate reference ownership", () => {
     }
     const files = refs.map(_id => ({ _id, _creationTime: 0, size: 1 }));
     expect(findOrphans(files, [job], Date.now(), 0).orphans).toEqual([]);
+  });
+
+  test.each(["succeeded", "failed", "cancelled", "timed out"])("%s releases all reference files, including repeated callbacks", async status => {
+    const { t, refs, owner } = await setup();
+    const { jobId } = await owner.mutation(internal.aiJobs.startGenerateJob, {
+      prompt: "Test", model: "test/model", referenceStorageIds: refs,
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (status === "succeeded") await t.mutation(internal.aiJobs.completeJob, { jobId });
+      else await t.mutation(internal.aiJobs.failJob, { jobId, error: status });
+    }
+    expect(fileIdsOf("ai_jobs", (await t.run(ctx => ctx.db.get(jobId)))!)).toEqual([]);
+    expect(await t.run(ctx => ctx.db.system.query("_storage").collect())).toEqual([]);
+  });
+
+  test.each([
+    ["succeeded", ""], ["failed", "provider error"],
+    ["canceled", "cancelled"], ["failed", "Prediction timed out"],
+  ])("signed %s webhook (%s) releases references", async (status, error) => {
+    const { t, refs, owner } = await setup();
+    const { jobId } = await owner.mutation(internal.aiJobs.startGenerateJob, {
+      prompt: "Test", model: "test/model", referenceStorageIds: refs,
+    });
+    await t.mutation(internal.aiJobs.setReplicateId, { jobId, replicateId: "prediction" });
+    const secret = new TextEncoder().encode("test-only-webhook-key");
+    vi.stubEnv("REPLICATE_WEBHOOK_SIGNING_SECRET", btoa(String.fromCharCode(...secret)));
+    const body = JSON.stringify({ id: "prediction", status, error, output: [] });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`event.${timestamp}.${body}`));
+    const response = await t.fetch("/replicate-webhook", {
+      method: "POST", body, headers: {
+        "webhook-id": "event", "webhook-timestamp": timestamp,
+        "webhook-signature": `v1,${btoa(String.fromCharCode(...new Uint8Array(signature)))}`,
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(await t.run(ctx => ctx.db.system.query("_storage").collect())).toEqual([]);
+  });
+
+  test("another running job retains a shared reference until its own completion", async () => {
+    const { t, refs, owner } = await setup();
+    const start = () => owner.mutation(internal.aiJobs.startGenerateJob, {
+      prompt: "Test", model: "test/model", referenceStorageIds: [refs[0], refs[0]],
+    });
+    const first = await start();
+    const second = await start();
+    await t.mutation(internal.aiJobs.completeJob, { jobId: first.jobId });
+    expect(await t.run(ctx => ctx.db.system.get(refs[0]))).not.toBeNull();
+    await t.mutation(internal.aiJobs.failJob, { jobId: second.jobId, error: "cancelled" });
+    expect(await t.run(ctx => ctx.db.system.get(refs[0]))).toBeNull();
+  });
+
+  test("a saved archive and the job output survive reference cleanup", async () => {
+    const { t, refs, owner } = await setup();
+    const { jobId } = await owner.mutation(internal.aiJobs.startGenerateJob, {
+      prompt: "Test", model: "test/model", referenceStorageIds: refs,
+    });
+    await owner.mutation(api.photoEdits.save, {
+      photoKey: "shared", storageId: refs[0], canvasW: 1, canvasH: 1,
+    });
+    await t.mutation(internal.aiJobs.completeJob, { jobId, outputStorageId: refs[1] });
+    expect(await t.run(ctx => ctx.db.system.get(refs[0]))).not.toBeNull();
+    expect(await t.run(ctx => ctx.db.system.get(refs[1]))).not.toBeNull();
+    expect(await t.run(ctx => ctx.db.system.get(refs[2]))).toBeNull();
   });
 
   test("missing references roll back the job and usage, and uploaded siblings can be discarded", async () => {

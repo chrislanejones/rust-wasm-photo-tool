@@ -8,6 +8,7 @@ import { getUserId, requireUser, roleOf } from "./users";
 import { entitlementOf } from "./entitlement";
 import { aiCapsFor } from "./aiCaps";
 import type { MutationCtx } from "./_generated/server";
+import { deleteStoredFile, isStoredFileReferenced } from "./storedFiles";
 import type { Doc } from "./_generated/dataModel";
 
 /* ── Per-tier AI job caps ──────────────────────────────────────────────────
@@ -217,8 +218,7 @@ export const startJob = internalMutation({
 
 /** Start a text-to-image job (New › Create AI Image). Same allowance as
  *  every AI job; no input frame — the prompt and model are stored instead.
- *  Reference images stay attached to the job, including terminal jobs, just
- *  like input/mask/output frames. Cleanup can then see their ownership. */
+ *  Reference ownership lasts until the job reaches a terminal state. */
 export const startGenerateJob = internalMutation({
   args: {
     prompt: v.string(),
@@ -275,6 +275,21 @@ export const findByReplicateId = internalQuery({
   },
 });
 
+/** Release only reference inputs; output/input/mask retention is separate (#203).
+ * Clear ownership before checking all indexes, in the same transaction. Other
+ * jobs and saved documents still protect shared files. Repeats are harmless. */
+async function releaseReferences(ctx: MutationCtx, job: Doc<"ai_jobs">) {
+  const refs = new Set([job.referenceStorageId1, job.referenceStorageId2, job.referenceStorageId3]);
+  await ctx.db.patch(job._id, {
+    referenceStorageId1: undefined,
+    referenceStorageId2: undefined,
+    referenceStorageId3: undefined,
+  });
+  for (const id of refs) {
+    if (id && !(await isStoredFileReferenced(ctx, id))) await deleteStoredFile(ctx, id);
+  }
+}
+
 /** Mark a job done. Image models pass outputStorageId; text models pass output. */
 export const completeJob = internalMutation({
   args: {
@@ -283,12 +298,15 @@ export const completeJob = internalMutation({
     output: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job || job.status === "done" || job.status === "failed") return;
     await ctx.db.patch(args.jobId, {
       status: "done",
       outputStorageId: args.outputStorageId,
       output: args.output,
       completedAt: Date.now(),
     });
+    await releaseReferences(ctx, job);
   },
 });
 
@@ -296,10 +314,13 @@ export const completeJob = internalMutation({
 export const failJob = internalMutation({
   args: { jobId: v.id("ai_jobs"), error: v.string() },
   handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job || job.status === "done" || job.status === "failed") return;
     await ctx.db.patch(args.jobId, {
       status: "failed",
       error: args.error,
       completedAt: Date.now(),
     });
+    await releaseReferences(ctx, job);
   },
 });

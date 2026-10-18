@@ -13,6 +13,15 @@ import { join } from "node:path";
 //      selected pixels, as one undo step, and hands over to the mask brush
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Optional stress mode keeps the normal CI run fast while making the requested
+// 4x CPU verification reproducible on Chromium.
+test.beforeEach(async ({ page }) => {
+  if (process.env.IH_CPU_THROTTLE) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.IH_CPU_THROTTLE) });
+  }
+});
+
 const FIXTURE_PNG = join(__dirname, "fixtures", "sky-building.png");
 
 async function blockExternalNetwork(page: Page): Promise<void> {
@@ -43,13 +52,12 @@ async function importFixture(page: Page): Promise<void> {
       { timeout: 30_000 },
     )
     .toBeGreaterThan(0);
-  await page.waitForTimeout(1000);
 }
 
 /** The engine, reached through the React fiber tree (the canvas lives in a
  *  worker, so there is no 2D context to read). Parked on `window.__ihTool`. */
 async function exposeEngine(page: Page): Promise<void> {
-  const found = await page.evaluate(() => {
+  await expect.poll(() => page.evaluate(() => {
     const root = document.querySelector("#root") as unknown as Record<string, unknown>;
     const key = Object.keys(root).find((k) => k.startsWith("__reactContainer"))!;
     type Fiber = { child?: Fiber; sibling?: Fiber; memoizedState?: unknown };
@@ -71,8 +79,7 @@ async function exposeEngine(page: Page): Promise<void> {
     walk(root[key] as Fiber, 0);
     (window as unknown as { __ihTool: unknown }).__ihTool = tool;
     return !!tool;
-  });
-  expect(found, "engine handle reachable").toBe(true);
+  }), { message: "engine handle reachable", timeout: 30_000 }).toBe(true);
 }
 
 async function engine(page: Page): Promise<{ selected: number; undo: number }> {

@@ -39,3 +39,17 @@ export async function deleteStoredFiles(
   }
   return out;
 }
+
+/** Indexed ownership check shared by failed uploads and terminal AI cleanup. */
+export async function isStoredFileReferenced(ctx: MutationCtx, id: Id<"_storage">): Promise<boolean> {
+  return Boolean(
+    (await ctx.db.query("photo_edits").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
+    (await ctx.db.query("shares").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_inputStorageId", (q) => q.eq("inputStorageId", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_outputStorageId", (q) => q.eq("outputStorageId", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_maskStorageId", (q) => q.eq("maskStorageId", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId1", (q) => q.eq("referenceStorageId1", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId2", (q) => q.eq("referenceStorageId2", id)).first()) ??
+    (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId3", (q) => q.eq("referenceStorageId3", id)).first()),
+  );
+}

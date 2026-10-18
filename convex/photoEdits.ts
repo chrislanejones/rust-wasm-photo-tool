@@ -3,7 +3,7 @@ import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
 import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
-import { deleteStoredFiles } from "./storedFiles";
+import { deleteStoredFiles, isStoredFileReferenced } from "./storedFiles";
 import type { DeletedFiles } from "./testAccount";
 
 /** Delete one edit: its archive file and its row, in the caller's transaction.
@@ -78,15 +78,7 @@ export const discardFailedUpload = mutation({
     await requireUser(ctx);
     const id = args.storageId;
 
-    const referenced =
-      (await ctx.db.query("photo_edits").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
-      (await ctx.db.query("shares").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_inputStorageId", (q) => q.eq("inputStorageId", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_outputStorageId", (q) => q.eq("outputStorageId", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_maskStorageId", (q) => q.eq("maskStorageId", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId1", (q) => q.eq("referenceStorageId1", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId2", (q) => q.eq("referenceStorageId2", id)).first()) ??
-      (await ctx.db.query("ai_jobs").withIndex("by_referenceStorageId3", (q) => q.eq("referenceStorageId3", id)).first());
+    const referenced = await isStoredFileReferenced(ctx, id);
     if (referenced) return { deleted: false, reason: "referenced" };
 
     await ctx.storage.delete(id);

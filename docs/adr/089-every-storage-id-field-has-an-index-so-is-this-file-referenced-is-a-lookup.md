@@ -40,3 +40,14 @@ obvious candidate; today they are never written to a row) without an index,
 exactly as before. The indexes were right; the list was the weak point.
 Early warning sign to watch for: `grep -c 'v.id("_storage")' convex/schema.ts`
 differs from the number of lookups in `discardFailedUpload` (today 5 = 5).
+
+
+### Reference-input follow-up (unmerged, 2026-10-18)
+
+#381 adds three scalar reference slots and an equality index for each. The
+shared `isStoredFileReferenced` helper now supplies all eight lookups to failed
+upload cleanup and terminal-job reference cleanup. Completion/failure clears
+reference ownership and checks remaining owners in the same transaction. It
+preserves the newly attached output even when that output shares a reference ID.
+Provider cancellation and timeout failures use the same terminal path; a local
+browser timeout does not establish that the provider has stopped reading inputs.

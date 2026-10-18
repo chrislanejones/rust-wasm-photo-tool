@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SubscriptionButton } from "./SubscriptionButton";
 import type { GeneralControls } from "./GeneralPane";
@@ -53,8 +53,10 @@ it("keeps a labelled panel and one reachable tab after the admin category disapp
   expect(screen.getByRole("tabpanel", { name: "Appearance" })).toBeTruthy();
 });
 
-it("reopens a stale unavailable category on a real available tab", async () => {
-  await act(async () => { useUIStore.getState().closeSettings(); });
+it("reopens a stale unavailable category on a real available tab", () => {
+  // No component is mounted yet: this synchronous store setup needs no
+  // async act queue (which can stall under the full suite's worker load).
+  useUIStore.getState().closeSettings();
   render(<SubscriptionButton general={general} openRaster={openRaster} />);
   fireEvent.click(screen.getByRole("button", { name: "Settings", exact: true }));
   expect(useUIStore.getState().settingsTab).toBe("general");
