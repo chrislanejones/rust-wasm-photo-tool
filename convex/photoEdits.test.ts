@@ -118,6 +118,11 @@ const REFERENCES: ReadonlyArray<{
       filler: (u) => job(u, {}),
       ref: (u, id) => job(u, { maskStorageId: id }),
     },
+    ...["referenceStorageId1", "referenceStorageId2", "referenceStorageId3"].map((field) => ({
+      field: `ai_jobs.${field}`,
+      filler: (u: Id<"users">) => job(u, {}),
+      ref: (u: Id<"users">, id: Id<"_storage">) => job(u, { [field]: id }),
+    })),
   ];
 })();
 

@@ -138,10 +138,13 @@ async function keptCounts(ctx: QueryCtx, userId: Id<"users">): Promise<Record<Ke
 
 // ── Record deleters for the tables with no app delete path of their own ───────
 
-/** An AI job's input, mask and output frames, then the row. The app never
+/** An AI job's input, mask, output and reference frames, then the row. The app never
  *  deletes AI jobs, so this is the only path that does. */
 async function deleteAiJobRecord(ctx: MutationCtx, job: Doc<"ai_jobs">): Promise<DeletedFiles> {
-  const freed = await deleteStoredFiles(ctx, [job.inputStorageId, job.maskStorageId, job.outputStorageId]);
+  const freed = await deleteStoredFiles(ctx, [
+    job.inputStorageId, job.maskStorageId, job.outputStorageId,
+    job.referenceStorageId1, job.referenceStorageId2, job.referenceStorageId3,
+  ]);
   await ctx.db.delete(job._id);
   return freed;
 }

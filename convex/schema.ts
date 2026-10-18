@@ -242,6 +242,11 @@ export default defineSchema({
     maskStorageId: v.optional(v.id("_storage")),
     /** Result frame written back by the webhook (image models). */
     outputStorageId: v.optional(v.id("_storage")),
+    /** Generate accepts at most three references. Scalar slots allow indexed
+     *  membership checks by discardFailedUpload; old jobs omit them. */
+    referenceStorageId1: v.optional(v.id("_storage")),
+    referenceStorageId2: v.optional(v.id("_storage")),
+    referenceStorageId3: v.optional(v.id("_storage")),
     /** Non-image output (e.g. OCR text / alt text). */
     output: v.optional(v.any()),
     error: v.optional(v.string()),
@@ -255,5 +260,8 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_inputStorageId", ["inputStorageId"])
     .index("by_outputStorageId", ["outputStorageId"])
-    .index("by_maskStorageId", ["maskStorageId"]),
+    .index("by_maskStorageId", ["maskStorageId"])
+    .index("by_referenceStorageId1", ["referenceStorageId1"])
+    .index("by_referenceStorageId2", ["referenceStorageId2"])
+    .index("by_referenceStorageId3", ["referenceStorageId3"]),
 });

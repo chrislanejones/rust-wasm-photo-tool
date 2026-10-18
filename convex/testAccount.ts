@@ -111,7 +111,7 @@ export function resolveTestAccount(
 export const FILE_FIELDS = {
   photo_edits: ["storageId"],
   shares: ["storageId"],
-  ai_jobs: ["inputStorageId", "maskStorageId", "outputStorageId"],
+  ai_jobs: ["inputStorageId", "maskStorageId", "outputStorageId", "referenceStorageId1", "referenceStorageId2", "referenceStorageId3"],
 } as const;
 
 export type FileTable = keyof typeof FILE_FIELDS;

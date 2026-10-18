@@ -34,13 +34,18 @@ stored-bytes counter kept by `save` / `remove` / `shares.create` / `shares.remov
 plus a backfill (widen, migrate, narrow). Not urgent. `storageSweep` is safe: it
 deletes only `if (apply && complete)` (`convex/storageSweep.ts:98`).
 
-## OPEN — Create AI Image reference uploads are orphaned after every job (10-14-2026)
+## IN REVIEW — Create AI Image reference uploads are orphaned after every job (10-14-2026)
 
 `convex/aiJobs.ts` `startGenerateJob` resolves `referenceStorageIds` to URLs and never
 writes them to a row, so every reference upload becomes an orphan once the job ends.
 Only `storageSweep` (cron still commented out) can reclaim them. If they're ever
 stored on `ai_jobs`, the new field needs its own `by_*StorageId` index and a lookup
 in `discardFailedUpload` (ADR-089's pre-mortem).
+
+The 10-17 `fix/ai-reference-lifetime-20261017` branch adds three indexed scalar
+reference slots, guarded cleanup of partial upload batches, and account-wipe
+coverage. It depends on #367. See [AI reference storage](AI-reference-storage.md)
+for retention and deployment details. No live cleanup or deployment was run.
 
 ## OPEN — small leftovers from the 10-14 night (10-14-2026)
 

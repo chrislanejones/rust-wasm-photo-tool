@@ -215,10 +215,10 @@ export const startJob = internalMutation({
   },
 });
 
-/** Attach the Replicate prediction id so the webhook can find this row. */
 /** Start a text-to-image job (New › Create AI Image). Same allowance as
  *  every AI job; no input frame — the prompt and model are stored instead.
- *  Reference images (if the model reads them) are resolved to URLs here. */
+ *  Reference images stay attached to the job, including terminal jobs, just
+ *  like input/mask/output frames. Cleanup can then see their ownership. */
 export const startGenerateJob = internalMutation({
   args: {
     prompt: v.string(),
@@ -227,6 +227,9 @@ export const startGenerateJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    if (args.referenceStorageIds.length > 3) {
+      throw new Error("At most three reference images are supported");
+    }
     const now = await chargeAiUse(ctx, user);
     const referenceUrls: string[] = [];
     for (const id of args.referenceStorageIds) {
@@ -241,6 +244,9 @@ export const startGenerateJob = internalMutation({
       status: "running",
       prompt: args.prompt,
       model: args.model,
+      referenceStorageId1: args.referenceStorageIds[0],
+      referenceStorageId2: args.referenceStorageIds[1],
+      referenceStorageId3: args.referenceStorageIds[2],
       startedAt: now,
       createdAt: now,
     });
@@ -248,6 +254,7 @@ export const startGenerateJob = internalMutation({
   },
 });
 
+/** Attach the Replicate prediction id so the webhook can find this row. */
 export const setReplicateId = internalMutation({
   args: { jobId: v.id("ai_jobs"), replicateId: v.string() },
   handler: async (ctx, args) => {

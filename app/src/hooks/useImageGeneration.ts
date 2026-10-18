@@ -27,6 +27,7 @@ async function downscalePng(file: File, edge: number): Promise<Blob> {
 
 export function useImageGeneration(onImage: (file: File) => void) {
   const generateUploadUrl = useCloudMutation(api.ai.generateUploadUrl);
+  const discardFailedUpload = useCloudMutation(api.photoEdits.discardFailedUpload);
   const generate = useCloudAction(api.ai.generate);
   /** null signed out; `daily.cap > 0` ⇔ a plan that includes AI (Paid). */
   const usage = useCloudQuery(api.aiJobs.usage, {});
@@ -82,12 +83,13 @@ export function useImageGeneration(onImage: (file: File) => void) {
       }
       setError(null);
       setPhase("sending");
+      const referenceStorageIds: Id<"_storage">[] = [];
       try {
-        const referenceStorageIds: Id<"_storage">[] = [];
         for (const f of req.references) {
           const png = await downscalePng(f, req.referenceEdge);
           const uploadUrl = await generateUploadUrl();
           const resp = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "image/png" }, body: png });
+          if (!resp.ok) throw new Error(`Reference upload failed (${resp.status})`);
           const { storageId } = (await resp.json()) as { storageId: Id<"_storage"> };
           referenceStorageIds.push(storageId);
         }
@@ -102,11 +104,17 @@ export function useImageGeneration(onImage: (file: File) => void) {
         setJobId(id);
         setPhase("running");
       } catch (e) {
+        // A partial upload batch or rejected dispatch leaves known IDs behind.
+        // The server refuses IDs already attached to a job, including a job
+        // whose action failed after the transaction committed.
+        for (const storageId of referenceStorageIds) {
+          void discardFailedUpload({ storageId }).catch(() => { /* sweep can retry */ });
+        }
         setError(e instanceof Error ? e.message.replace(/^.*Uncaught Error: /, "") : String(e));
         setPhase("error");
       }
     },
-    [generateUploadUrl, generate],
+    [generateUploadUrl, generate, discardFailedUpload],
   );
 
   return { run, phase, error, canGenerate, signedIn: usage !== null && usage !== undefined };

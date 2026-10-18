@@ -474,6 +474,9 @@ editing path.
 
 ---
 
+Create AI Image reference ownership and the pending indexed cleanup extension
+are documented in [AI reference storage](AI-reference-storage.md).
+
 ## The op-log pipeline (live since v7.36)
 
 Shipped ON by default 2026-07-17 after the four-check A/B (flags-OFF
