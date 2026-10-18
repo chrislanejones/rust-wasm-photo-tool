@@ -92,3 +92,16 @@ No test consumes these yet. They are data. The natural first consumer is a
 the keyframe PNG to the real `oplog_restore` and assert the document comes
 back — which is the check that would have caught the v8 collision. Writing it
 belongs to the v9 session, against the renumbered code.
+
+## v13 preset (2026-10-17)
+
+`v13-preset.frames.bin`, `v13-preset.annotations.bin` and `v13-preset.base.png`
+were read from IndexedDB after importing `checker.png` and clicking Vivid on
+production master `d486fd4b`. The sidecar records SHA-256 hashes and the browser's
+composite hash. `tests/oplog_v13_fixture_resume.rs` verifies that v14 still opens
+these bytes, undoes/redoes the preset, and can continue with Adjustments.
+
+The capture recipe is `capture-v13.spec.ts`, run from the repository root with
+`pnpm exec playwright test --config tests/fixtures/oplog/capture-v13.config.ts`.
+It deliberately checks for v13 bytes and must not be used to overwrite this
+historical fixture after production advances.

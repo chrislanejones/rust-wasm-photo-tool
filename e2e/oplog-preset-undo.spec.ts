@@ -165,7 +165,7 @@ test("a preset clicked in the panel is one recorded op, and undo/redo stay on th
   // (PresetsSettings: Vivid = brightness 0, contrast 1.5, saturation 1.35,
   // shadows 0, highlights 10 — absolute 8-bit levels, not a fraction).
   const frame = await recordedFrame(page);
-  expect(frame.version, "written as op-log v13").toBe(13);
+  expect(frame.version, "written as op-log v14; preset payload unchanged").toBe(14);
   expect(frame.variant, "Op::TonalStack is index 23").toBe(23);
   expect(frame.values, "brightness, contrast, highlights, shadows, saturation").toEqual([0, 1.5, 10, 0, 1.35]);
 

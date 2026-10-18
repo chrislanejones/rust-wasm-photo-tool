@@ -51,8 +51,8 @@ in `discardFailedUpload` (ADR-089's pre-mortem).
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
 | `select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load | `e2e/` | Tara |
 | `SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone | `app/src/` | Tara |
-| Record the five Adjustments sliders on `Op::TonalStack` (`adjust_commit` / `adjust_apply` are still unrecorded). Decide whether the history label stays "Preset". | engine, after #368 | Silas |
-| Capture a real v13 op-log fixture with a TonalStack frame once #368 ships | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
+| IN REVIEW on `feat/adjustments-oplog-20261017`: record all seven Adjustments settings with exact session resets. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md) explains why cumulative `TonalStack` cannot represent them; label stays "Adjustments". | engine, after #368 | Silas |
+| Captured 10-17 from production master d486fd4: real v13 TonalStack frame, base PNG, annotations and browser hash; included in the Adjustments branch with a compatibility test | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
 | `docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix | — | at merge |
 | `github/codeql-action` 4.38.3 (#359) was left out of #370. It edits a workflow file, and this machine's gh token has no `workflow` scope. Merge #359 as-is. | — | Chris |
 
