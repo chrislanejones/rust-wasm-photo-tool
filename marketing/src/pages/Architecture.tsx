@@ -150,7 +150,7 @@ const GROUPS: Group[] = [
     surface: "net",
     items: [
       ["Stripe webhook", "subscription changes → subscriptions", "pro"],
-      ["Replicate webhook", "AI complete → ai_jobs.status", "pro"],
+      ["Replicate webhook", "AI complete → status + guarded reference cleanup", "pro"],
     ],
   },
 ];

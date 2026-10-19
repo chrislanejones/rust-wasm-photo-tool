@@ -340,7 +340,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     title: "Create AI Image",
     plain: "Describe a picture and get a new photo in your gallery. Six models to pick from; Paid, with online features on.",
     detail:
-      "Flux Schnell / Dev / 1.1 Pro / Kontext Pro, Stable Diffusion 3.5 Large and Ideogram v3 Turbo on Replicate; references for the three that read them.",
+      "Flux Schnell / Dev / 1.1 Pro / Kontext Pro, Stable Diffusion 3.5 Large and Ideogram v3 Turbo on Replicate; references for the three that read them. Finished jobs release reference uploads unless another record still uses them.",
   },
   "Pan (H or Space)": {
     group: "edit",

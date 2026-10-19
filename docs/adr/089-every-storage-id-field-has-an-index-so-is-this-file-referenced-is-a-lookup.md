@@ -1,5 +1,5 @@
 # ADR-089: Every storage-id field has an index, so "is this file referenced?" is a lookup
-Date: 2026-10-14   Status: draft   Relates to: ADR-083
+Date: 2026-10-14   Status: accepted (v9.32, 2026-10-18)   Relates to: ADR-083
 
 ## Context
 
@@ -42,7 +42,7 @@ Early warning sign to watch for: `grep -c 'v.id("_storage")' convex/schema.ts`
 differs from the number of lookups in `discardFailedUpload` (today 5 = 5).
 
 
-### Reference-input follow-up (unmerged, 2026-10-18)
+### Reference-input follow-up (v9.32, 2026-10-18)
 
 #381 adds three scalar reference slots and an equality index for each. The
 shared `isStoredFileReferenced` helper now supplies all eight lookups to failed

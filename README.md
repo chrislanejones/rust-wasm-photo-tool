@@ -90,17 +90,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.31 — 2026-10-16
+### v9.32 — 2026-10-18
 
-**Preset sliders respond to every arrow press.**
+**Saves keep their files. AI reference uploads get cleaned up.**
 
-In Shapes, one Right or Up arrow moves Points from 5 to 6; Left or Down
-moves it back to 5. Preset sliders change the setting by one within their
-allowed range. Holding an arrow updates the value as it repeats, and sliders
-with a commit callback commit the final value once when the key is released.
+Retrying a cloud save keeps the archive it was asked to save. Failed-upload
+cleanup checks references through indexes, so a file stays protected even when
+its record is past row 2,000. Create AI Image keeps reference inputs while a job
+runs, then removes them when the job finishes unless another record uses them.
 
-The [Trail Log](https://imagehorse.app/trail-log) has the release notes and
-commit squares.
+Details: [Change Summary](docs/Change-summary.md) ·
+[AI reference storage](docs/AI-reference-storage.md) ·
+[storage-reference indexes](docs/adr/089-every-storage-id-field-has-an-index-so-is-this-file-referenced-is-a-lookup.md).
+The [Trail Log](https://imagehorse.app/trail-log) has release notes and commit squares.
 
 
 ## License

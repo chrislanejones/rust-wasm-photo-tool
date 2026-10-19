@@ -11573,3 +11573,17 @@ Not in this release: no imagehorse-qc pass yet on these engine and canvas change
 | **Interaction** | Pointer dragging, preset buttons, accessible labels and `aria-valuetext` are preserved. |
 | **Validation** | 123 UI Vitest tests pass, including regression cases for Points, both arrow axes, bounds, disabled input, repeated keys and preset buttons. TypeScript passes; lint reports 0 errors and 52 existing warnings. |
 | **Scope** | SizeSlider and its keyboard tests; release documentation and generated marketing data. No Rust engine or WASM changes. |
+
+
+## v9.32 Change Summary — 2026-10-18
+
+**Saves keep their files. AI reference uploads get cleaned up.**
+
+| Area | Change |
+| --- | --- |
+| Save safety (#367) | Retrying a save with the same storage ID keeps its archive. Failed-upload cleanup uses indexed ownership checks instead of the first 2,000 rows. The upload abort path stays intact. |
+| AI reference inputs (#381) | Jobs retain up to three indexed references while running. Completion, failure, provider cancellation and provider-reported timeout release those inputs; shared archives, outputs and other jobs' files survive. Partial upload failures offer known files to guarded cleanup. |
+| Backend | Eight additive storage-reference indexes. Backend tests and typechecks run in CI without deployment credentials. No backfill or sweep activation. |
+| Test reliability | Refine waits for its engine handle; SubscriptionButton avoids an unnecessary async wait before render. No timeout increase. |
+| Verification | Full feature-branch CI green; 35 backend tests, 2,023 frontend tests and 713 Rust tests pass. Removing AI cleanup fails 10 tests; restoring the capped save scans fails 5; removing the same-file guard fails 4. Refine: 80/80 at 4× CPU. |
+| Scope | No engine, operation-log format, IndexedDB, authentication or billing change. WASM remains 901,221 bytes. The v14 Adjustments proposal is not part of this release. |

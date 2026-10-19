@@ -1,6 +1,6 @@
 # Create AI Image reference storage
 
-Branch review, 2026-10-17. Depends on #367; not deployed.
+Released in v9.32, 2026-10-18, with #367 and #381.
 
 `startGenerateJob` used to resolve reference uploads to URLs without storing
 their IDs. No row owned those files, so cleanup could delete a running job's

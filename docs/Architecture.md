@@ -474,7 +474,7 @@ editing path.
 
 ---
 
-Create AI Image reference ownership and the pending indexed cleanup extension
+Create AI Image reference ownership and transactional terminal-job cleanup
 are documented in [AI reference storage](AI-reference-storage.md).
 
 ## The op-log pipeline (live since v7.36)
