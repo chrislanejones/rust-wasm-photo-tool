@@ -11583,6 +11583,7 @@ Not in this release: no imagehorse-qc pass yet on these engine and canvas change
 | --- | --- |
 | Save safety (#367) | Retrying a save with the same storage ID keeps its archive. Failed-upload cleanup uses indexed ownership checks instead of the first 2,000 rows. The upload abort path stays intact. |
 | AI reference inputs (#381) | Jobs retain up to three indexed references while running. Completion, failure, provider cancellation and provider-reported timeout release those inputs; shared archives, outputs and other jobs' files survive. Partial upload failures offer known files to guarded cleanup. |
+| Deployment verification | Test/spec files are excluded from callable-module checks; a missing application module still fails. Two regression tests run in CI. |
 | Backend | Eight additive storage-reference indexes. Backend tests and typechecks run in CI without deployment credentials. No backfill or sweep activation. |
 | Test reliability | Refine waits for its engine handle; SubscriptionButton avoids an unnecessary async wait before render. No timeout increase. |
 | Verification | Full feature-branch CI green; 35 backend tests, 2,023 frontend tests and 713 Rust tests pass. Removing AI cleanup fails 10 tests; restoring the capped save scans fails 5; removing the same-file guard fails 4. Refine: 80/80 at 4× CPU. |

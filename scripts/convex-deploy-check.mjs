@@ -65,7 +65,9 @@ const NO_CALLABLE_EXPORTS = new Set([
 
 function repoModules() {
   return readdirSync(CONVEX_DIR)
-    .filter((f) => f.endsWith(".ts"))
+    // Convex test/spec files exercise functions locally; they register no
+    // production endpoints and must not be required by function-spec.
+    .filter((f) => f.endsWith(".ts") && !/\.(test|spec)\.ts$/.test(f))
     .map((f) => f.replace(/\.ts$/, ""))
     .filter((m) => !NOT_A_MODULE.has(m) && !NO_CALLABLE_EXPORTS.has(m))
     .sort();
@@ -89,7 +91,7 @@ const REQUIRED_SCOPES = "deployment:deploy + deployment:data:view";
 
 function convex(args) {
   try {
-    return execFileSync("npx", ["convex", ...args, ...PROD], {
+    return execFileSync("pnpm", ["exec", "convex", ...args, ...PROD], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       maxBuffer: 32 * 1024 * 1024,

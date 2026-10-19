@@ -97,7 +97,7 @@ Latest release below. Full dated history → **[docs/Change-summary.md](docs/Cha
 Retrying a cloud save keeps the archive it was asked to save. Failed-upload
 cleanup checks references through indexes, so a file stays protected even when
 its record is past row 2,000. Create AI Image keeps reference inputs while a job
-runs, then removes them when the job finishes unless another record uses them.
+runs, then removes them when the job finishes unless another record still uses them.
 
 Details: [Change Summary](docs/Change-summary.md) ·
 [AI reference storage](docs/AI-reference-storage.md) ·

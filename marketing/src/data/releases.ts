@@ -30,7 +30,7 @@ export const RELEASES: Release[] = [
     entries: [
       { tag: "fix", text: "Retrying a cloud save keeps its archive. Cleanup checks references through indexes, so files stay protected beyond the first 2,000 rows." },
       { tag: "fix", text: "Create AI Image keeps reference uploads while a job runs and cleans them up when it finishes. Files used by another record stay put." },
-      { tag: "infra", text: "Backend regression tests run in CI without deployment credentials. Eight additive indexes; the orphan-sweep cron stays off." },
+      { tag: "infra", text: "Backend regression tests run in CI without deployment credentials. Eight additive indexes; deployment checks distinguish test files from live functions. The orphan-sweep cron stays off." },
     ],
   },
   {

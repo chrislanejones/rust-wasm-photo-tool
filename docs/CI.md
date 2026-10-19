@@ -167,3 +167,5 @@ agreed on 823,503 B and Vercel alone produced 823,479 B, which is how its `/rust
 nothing to break the tie: CI says one number, production says another, and
 neither is obviously the odd one out. When that happens, reproduce locally first
 — the laptop is now the third opinion.
+
+The Convex deployment verifier excludes `.test.ts` and `.spec.ts` files from callable modules. Its two offline Node regression tests run before backend tests in CI and prove that missing application modules still block deployment verification.
