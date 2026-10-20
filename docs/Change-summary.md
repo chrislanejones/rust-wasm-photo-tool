@@ -11588,3 +11588,18 @@ Not in this release: no imagehorse-qc pass yet on these engine and canvas change
 | Test reliability | Refine waits for its engine handle; SubscriptionButton avoids an unnecessary async wait before render. No timeout increase. |
 | Verification | Full feature-branch CI green; 35 backend tests, 2,023 frontend tests and 713 Rust tests pass. Removing AI cleanup fails 10 tests; restoring the capped save scans fails 5; removing the same-file guard fails 4. Refine: 80/80 at 4× CPU. |
 | Scope | No engine, operation-log format, IndexedDB, authentication or billing change. WASM remains 901,221 bytes. The v14 Adjustments proposal is not part of this release. |
+
+
+## v9.33 Change Summary — 2026-10-19
+
+**Adjustments undo survives a reload. The status bar trims itself near compact.**
+
+| Area | Change |
+| --- | --- |
+| Adjustments undo (#382) | Absolute Adjustments sessions are recorded in the op log (format v14, index 24). All seven panel controls and their exact resets survive undo, redo and reload. Preset payloads and pixels are unchanged. ADR-091 documents the session base and memory cost. |
+| Status bar | Hints drop in steps as the window narrows, leftmost first: tool hints go below **1320 px**, one rotating hint below **1160 px**, then the compact bar below 1000 px. `Alt+/` and `Alt+,` stay pinned. The hint area clips instead of pushing the readouts off the edge. |
+| Verification | 2,023 frontend tests, TypeScript, lint (0 errors), guardrails pass. #382 CI green (19 checks). Removing the recorder fails four parity tests; a production-captured v13 IndexedDB fixture restores byte-exactly. |
+| Engine | 901,221 → **901,943 B** (+722). No pixel kernel or display flush change. |
+
+Not in this release: no imagehorse-qc pass yet on the op-log change; the status bar was not checked in a browser.
+

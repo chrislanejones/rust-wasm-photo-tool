@@ -77,6 +77,18 @@ const TOOL_SLOTS_DESKTOP = 2;
 const BASE_SLOTS_DESKTOP = 2;
 const BASE_SLOTS_COMPACT = 1;
 
+/** The approach to compact. The bar doesn't jump from six slots to two at
+ *  BP_COMPACT: the readouts on the right keep their width, so the hints give
+ *  way first, FIRST slots first (the tool's own, then a pool hint), leaving
+ *  the locked tail where it always is.
+ *
+ *      ≥ HINTS_FULL_MIN      tool ×2 + pool ×2 + locked ×2
+ *      ≥ HINTS_TRIMMED_MIN   pool ×2 + locked ×2          (tool hints off)
+ *      ≥ BP_COMPACT          pool ×1 + locked ×2          (one pool hint off)
+ *      < BP_COMPACT          pool ×1 + locked ×1          (compact, as before) */
+const HINTS_FULL_MIN = 1320;
+const HINTS_TRIMMED_MIN = 1160;
+
 const MARKETING_URL = "https://imagehorse.app";
 
 /** After this long the brand's words slide away and only the horse stays —
@@ -155,7 +167,13 @@ export function StatusBar({
   //     shortcuts forever.
   // The LOCKED TAIL participates in neither. `Alt+/` is last at every size;
   // `Alt+,` follows it on desktop only.
-  const { compact } = useBreakpoint();
+  const { compact, width } = useBreakpoint();
+  const showToolHints = !compact && width >= HINTS_FULL_MIN;
+  const poolSlots = compact
+    ? BASE_SLOTS_COMPACT
+    : width >= HINTS_TRIMMED_MIN
+      ? BASE_SLOTS_DESKTOP
+      : BASE_SLOTS_COMPACT;
   const locked: ShortcutHint[] = compact
     ? [PINNED_SHORTCUTS]
     : [PINNED_SHORTCUTS, PINNED_COMMANDS];
@@ -174,7 +192,7 @@ export function StatusBar({
 
   // Tool slots first — desktop only. Compact drops them (see the slot map).
   const dynamic: ShortcutHint[] = [];
-  if (!compact) {
+  if (showToolHints) {
     if (activeToolHint) dynamic.push(activeToolHint);
     if (activeToolHint2 && !dynamic.some((d) => d.label === activeToolHint2.label)) {
       dynamic.push(activeToolHint2);
@@ -185,9 +203,7 @@ export function StatusBar({
   // Then the rotating pool. A tool with fewer than two shortcuts leaves its
   // slot free and the pool takes it, so the row is never short — the same
   // fall-through the second tool slot has always had.
-  const fillTo = compact
-    ? BASE_SLOTS_COMPACT
-    : TOOL_SLOTS_DESKTOP + BASE_SLOTS_DESKTOP;
+  const fillTo = showToolHints ? TOOL_SLOTS_DESKTOP + poolSlots : poolSlots;
   for (let i = 0; dynamic.length < fillTo && i < BASE_HINTS.length; i++) {
     const h = BASE_HINTS[(cycle + i) % BASE_HINTS.length];
     if (!dynamic.some((d) => d.label === h.label)) dynamic.push(h);

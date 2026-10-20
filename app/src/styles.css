@@ -1861,6 +1861,11 @@ html.reduce-motion .status-loading-bar::after {
   flex: 1;
   justify-content: center;
   gap: 6px;
+  /* Backstop for the widths between the trim steps in StatusBar.tsx: clip
+     rather than push the readouts off the right edge. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .status-right {

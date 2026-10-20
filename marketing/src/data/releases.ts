@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.33",
+    date: "2026-10-19",
+    headline: "Adjustments undo survives a reload. The status bar trims itself near compact.",
+    entries: [
+      { tag: "feature", text: "Adjustments sessions are recorded in the operation log. All seven controls and their exact resets come back through undo, redo and reload." },
+      { tag: "ui", text: "The status bar drops hints in steps as the window narrows, tool hints first, so it never reaches compact overfull. The two pinned shortcuts stay put." },
+      { tag: "rust", text: "Operation log format v14. Engine 901,221 to 901,943 B (+722); no pixel kernel change." },
+    ],
+  },
+  {
     version: "v9.32",
     date: "2026-10-18",
     headline: "Saves keep their files. AI reference uploads get cleaned up.",
