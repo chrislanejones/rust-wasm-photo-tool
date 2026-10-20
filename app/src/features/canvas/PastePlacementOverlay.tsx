@@ -5,6 +5,7 @@
 // The box sits UNDER the Tools, Gallery and Review panels, never over them.
 // Drag it into one and that panel closes (its own X would do the same; the top
 // bar brings it back), so a big paste never fights the chrome for the screen.
+// The Shapes edit box does the same; both use ./panelYield.
 //
 // Floats independent of `activeTool` (same pattern as the shape/arrow edit
 // overlay) — a pasted image can be adjusted no matter what tool is selected.
@@ -15,53 +16,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { boxCorners, type PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { cornerDelta, lockAxisDelta } from "@/lib/aspectLock";
-import { useUIStore } from "@/stores/useUIStore";
-
-/** Attribute a floating panel carries while it can be closed. Its value says
- *  which panel; see `closePanel` below. */
-const PASTE_YIELDS_ATTR = "data-paste-yields";
-
-function closePanel(which: string | null) {
-  const ui = useUIStore.getState();
-  if (which === "tools") ui.setShowTools(false);
-  else if (which === "gallery") ui.setShowGallery(false);
-  else if (which === "review") ui.setShowHistory(false);
-}
-
-/** Close every closable panel the box (in SCREEN px) runs into. Panels the
- *  box already overlapped when the drag began are left alone: a paste that is
- *  fit to the canvas can start partly under one, and that is not a push. */
-function closePanelsHitBy(
-  corners: { x: number; y: number }[],
-  pointer: { x: number; y: number },
-  spared: Set<Element>,
-) {
-  const xs = corners.map((p) => p.x);
-  const ys = corners.map((p) => p.y);
-  const box = { l: Math.min(...xs), r: Math.max(...xs), t: Math.min(...ys), b: Math.max(...ys) };
-  for (const el of document.querySelectorAll(`[${PASTE_YIELDS_ATTR}]`)) {
-    const p = el.getBoundingClientRect();
-    const pointerIn =
-      pointer.x >= p.left && pointer.x <= p.right && pointer.y >= p.top && pointer.y <= p.bottom;
-    const boxIn = box.l < p.right && box.r > p.left && box.t < p.bottom && box.b > p.top;
-    if (pointerIn || (boxIn && !spared.has(el))) closePanel(el.getAttribute(PASTE_YIELDS_ATTR));
-  }
-}
-
-/** The panels the box already overlaps, so a drag that starts there doesn't
- *  close them on its first frame. */
-function panelsUnder(corners: { x: number; y: number }[]): Set<Element> {
-  const hit = new Set<Element>();
-  const xs = corners.map((p) => p.x);
-  const ys = corners.map((p) => p.y);
-  for (const el of document.querySelectorAll(`[${PASTE_YIELDS_ATTR}]`)) {
-    const p = el.getBoundingClientRect();
-    if (Math.min(...xs) < p.right && Math.max(...xs) > p.left && Math.min(...ys) < p.bottom && Math.max(...ys) > p.top) {
-      hit.add(el);
-    }
-  }
-  return hit;
-}
+import { closePanelsHitBy, panelsUnder } from "./panelYield";
 
 interface Props {
   rect: PastePlacementRect;

@@ -39,7 +39,9 @@ import {
 import { tooSmallForActions } from "@/lib/shapePorts";
 import { useToolStore } from "@/stores/useToolStore";
 import { ROTATE_CURSOR } from "./canvasCursor";
+import { closePanelsHitBy, panelsUnder, screenCorners } from "./panelYield";
 import { arrowGeometry, sloppyShapePath } from "./shapeOverlayPath";
+import { shapeFillPreview } from "./shapeFillPreview";
 
 /** Live stroke/shape settings — read at render so panel tweaks update the
  *  pending shape immediately (same values commitEdit reads at commit). */
@@ -56,8 +58,6 @@ export interface ShapeDrawSettings {
     fillColor2: string;
     gradientAngle: number;
 }
-
-
 
 interface Props {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -107,6 +107,7 @@ export function ShapeEditOverlay({
     corner?: CornerHandle;
     startRadii?: CornerRadii;
     shape?: ShapeName;
+    spared: Set<Element>; // panels already under the shape at grab
   } | null>(null);
 
   const onDrawEditChangeRef = useRef(onDrawEditChange);
@@ -117,6 +118,12 @@ export function ShapeEditOverlay({
       const drag = drawDragRef.current;
       const cb = onDrawEditChangeRef.current;
       if (!drag || !cb) return;
+      // Move/resize frames: apply, then close any panel the shape ran into.
+      const emit = (s: Point, end: Point, rotation?: number, shape?: ShapeName) => {
+        cb(s, end, rotation, shape);
+        const at = { x: e.clientX, y: e.clientY };
+        closePanelsHitBy(screenCorners(s, end, drag.startRotation, drag), at, drag.spared);
+      };
       let dx = (e.clientX - drag.startX) / drag.scaleX;
       let dy = (e.clientY - drag.startY) / drag.scaleY;
       const g = drag.startGeom;
@@ -153,7 +160,7 @@ export function ShapeEditOverlay({
         const ry = round ? Math.min(w0, h0) : h0;
         let rx = Math.max(1, (round ? ry : w0) - ldx);
         if (e.shiftKey && Math.abs(rx - ry) < 8 / drag.scaleX) rx = ry;
-        cb({ x: c.x - rx, y: c.y - ry }, { x: c.x + rx, y: c.y + ry }, undefined, "oval");
+        emit({ x: c.x - rx, y: c.y - ry }, { x: c.x + rx, y: c.y + ry }, undefined, "oval");
         return;
       }
       if (drag.mode === "rotate") {
@@ -188,7 +195,7 @@ export function ShapeEditOverlay({
         const { dx: mdx, dy: mdy } = e.shiftKey
           ? lockAxisDelta(dx, dy)
           : { dx, dy };
-        cb({ x: g.sx + mdx, y: g.sy + mdy }, { x: g.ex + mdx, y: g.ey + mdy });
+        emit({ x: g.sx + mdx, y: g.sy + mdy }, { x: g.ex + mdx, y: g.ey + mdy });
         return;
       }
       if (drag.mode === "endpoint") {
@@ -200,13 +207,13 @@ export function ShapeEditOverlay({
           const p = e.shiftKey
             ? lockPointToAxis(g.ex, g.ey, free.x, free.y)
             : free;
-          cb(p, { x: g.ex, y: g.ey });
+          emit(p, { x: g.ex, y: g.ey });
         } else {
           const free = { x: g.ex + dx, y: g.ey + dy };
           const p = e.shiftKey
             ? lockPointToAxis(g.sx, g.sy, free.x, free.y)
             : free;
-          cb({ x: g.sx, y: g.sy }, p);
+          emit({ x: g.sx, y: g.sy }, p);
         }
         return;
       }
@@ -258,7 +265,7 @@ export function ShapeEditOverlay({
         { x: ax + (g.ex - ax) * kx, y: ay + (g.ey - ay) * ky },
         drag.startRotation,
       );
-      cb(pinned.start, pinned.end);
+      emit(pinned.start, pinned.end);
     };
     const onUp = () => { drawDragRef.current = null; };
     window.addEventListener("pointermove", onMove);
@@ -281,6 +288,13 @@ export function ShapeEditOverlay({
       e.stopPropagation();
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
+      const frame = {
+        scaleX: rect.width / canvas.width,
+        scaleY: rect.height / canvas.height,
+        originX: rect.left,
+        originY: rect.top,
+      };
+      const startRotation = drawEditState.rotation ?? 0;
       drawDragRef.current = {
         mode,
         handle,
@@ -292,14 +306,14 @@ export function ShapeEditOverlay({
           ex: drawEditState.end.x,
           ey: drawEditState.end.y,
         },
-        scaleX: rect.width / canvas.width,
-        scaleY: rect.height / canvas.height,
-        startRotation: drawEditState.rotation ?? 0,
-        originX: rect.left,
-        originY: rect.top,
+        ...frame,
+        startRotation,
         corner: corner?.handle,
         startRadii: corner?.radii,
         shape: corner?.shape,
+        spared: panelsUnder(
+          screenCorners(drawEditState.start, drawEditState.end, startRotation, frame),
+        ),
       };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
@@ -384,46 +398,7 @@ export function ShapeEditOverlay({
   // reselected shape previews its fill too. Every shape that encloses an area
   // gets one (`shapeCanFill`); the line is the one that does not.
   const fillCfg = eff;
-  let fillAttr = "none";
-  let gradientDef: React.ReactNode = null;
-  if (fillCfg && shapeCanFill(shape)) {
-    if (fillCfg.fillMode === "solid") {
-      fillAttr = fillCfg.fillColor;
-    } else if (fillCfg.fillMode === "gradient") {
-      fillAttr = "url(#draw-fill-grad)";
-      const ang = ((fillCfg.gradientAngle ?? 0) * Math.PI) / 180;
-      const dx = 0.5 * Math.cos(ang);
-      const dy = 0.5 * Math.sin(ang);
-      gradientDef = (
-        <defs>
-          <linearGradient
-            id="draw-fill-grad"
-            x1={0.5 - dx} y1={0.5 - dy} x2={0.5 + dx} y2={0.5 + dy}
-          >
-            <stop offset="0%" stopColor={fillCfg.fillColor} />
-            <stop offset="100%" stopColor={fillCfg.fillColor2} />
-          </linearGradient>
-        </defs>
-      );
-    } else if (fillCfg.fillMode === "pixelate") {
-      // A true live mosaic isn't practical in SVG — preview a checker
-      // hint; the real pixelation is applied to the pixels on commit.
-      fillAttr = "url(#draw-fill-pixelate)";
-      gradientDef = (
-        <defs>
-          <pattern
-            id="draw-fill-pixelate"
-            width="8" height="8"
-            patternUnits="userSpaceOnUse"
-          >
-            <rect width="8" height="8" fill="rgba(120,120,120,0.4)" />
-            <rect width="4" height="4" fill="rgba(40,40,40,0.5)" />
-            <rect x="4" y="4" width="4" height="4" fill="rgba(40,40,40,0.5)" />
-          </pattern>
-        </defs>
-      );
-    }
-  }
+  const { fill: fillAttr, defs: gradientDef } = shapeFillPreview(fillCfg, shapeCanFill(shape));
 
   // Move handle (line + dot above the box) — same geometry as the
   // text overlay's "balloon string".
@@ -700,7 +675,9 @@ export function ShapeEditOverlay({
         width: "100vw",
         height: "100vh",
         pointerEvents: "none",
-        zIndex: 45,
+        // UNDER the Tools / Gallery / Review panels, like the paste box (it
+        // was 45, over Tools). Drag the shape into one and it closes.
+        zIndex: "var(--z-topbar)",
         overflow: "hidden",
       }}
     >

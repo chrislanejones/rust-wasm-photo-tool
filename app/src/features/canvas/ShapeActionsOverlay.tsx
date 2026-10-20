@@ -247,7 +247,7 @@ export function ShapeActionsOverlay({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: isDup ? "pointer" : "crosshair",
-                zIndex: 46,
+                zIndex: "var(--z-topbar)",
                 boxShadow: "0 1px 3px rgba(0,0,0,.35)",
               }}
             >
@@ -300,7 +300,7 @@ export function ShapeActionsOverlay({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                zIndex: 47,
+                zIndex: "var(--z-topbar)",
                 boxShadow: "0 1px 3px rgba(0,0,0,.35)",
               }}
             >
@@ -319,7 +319,7 @@ export function ShapeActionsOverlay({
             width: "100vw",
             height: "100vh",
             pointerEvents: "none",
-            zIndex: 45,
+            zIndex: "var(--z-topbar)",
           }}
         >
           {following.map(({ c, live }) => {
@@ -352,7 +352,7 @@ export function ShapeActionsOverlay({
             width: "100vw",
             height: "100vh",
             pointerEvents: "none",
-            zIndex: 46,
+            zIndex: "var(--z-topbar)",
           }}
         >
           {/* Every other box's ports, so you can see where a drop lands. */}
