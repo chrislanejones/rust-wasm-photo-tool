@@ -548,3 +548,14 @@ they can be described accurately.
   self-test that says it agrees with the CPU reference. Nothing consumes it.
   [ADR-030](adr/030-webgpu-runs-in-js-not-in-the-crate.md) is still **draft**,
   and it is the decision that would have to be Accepted first.
+
+
+### Annotation rendering experiments
+
+The [annotation benchmark report](benchmarks/README.md) compares full-frame,
+tiled and opt-in dirty-region rendering at 10, 100 and 500 annotations. The
+`dirty-regions` Cargo feature exposes a research prototype, not an editor
+render mode. Callers provide all old/new ink bounds; unsupported scenes fall
+back to full recomposition. Its persistent scratch buffer costs four bytes
+per canvas pixel. Normal builds exclude the prototype. Browser drag timings
+measure the SVG overlay separately from engine commits.

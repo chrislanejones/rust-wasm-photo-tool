@@ -4,6 +4,42 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Annotation performance and editing work (2026-10-20)
+
+Work is on `feat/annotation-performance-baseline`. The benchmark and prototype
+are implemented; the four user-facing milestones remain open. Results,
+measurement limits and reproduction commands are in the
+[benchmark report](benchmarks/README.md).
+
+- [x] Benchmark 10, 100 and 500 annotations. The engine harness measures
+  direct shape/arrow raster batches, recomposition, commit cost and memory at
+  1200×800 and 4000×3000. Six browser cases measure paced pointer-to-DOM and
+  following-frame-opportunity latency, local/worker round trips and main-thread
+  JS heap; they verify real drag, commit and undo. Physical display latency
+  and total browser/GPU memory are outside these measurements. Run
+  `pnpm run build:wasm`, then
+  `pnpm --silent run bench:annotations > /tmp/annotation-baseline.json`
+  with other builds/tests stopped. Recorded samples:
+  [engine baseline](benchmarks/annotations-baseline.json).
+- [x] Prototype dirty-region rendering. The `dirty-regions` Cargo feature adds
+  an explicit-damage compositor with conservative full-frame fallbacks.
+  Eighteen WASM cases compare exact pixels and timing against full-frame and
+  tiled paths; native tests cover old/new bounds, overlapping/translucent
+  objects, text shadows, clipping, undo, recording and unsupported states.
+  The current `tiles_flush` runs **after** full recomposition; it is not a
+  dirty-region compositor and is no longer called by the normal editor.
+  Automatic invalidation and production integration are still pending.
+- [ ] Smart Callouts: anchored arrows, numbered markers and editable labels.
+  Existing pins/arrows are primitives, not completion of this milestone.
+- [ ] Annotation alignment and multi-select. Existing single-object alignment
+  is not multi-select; grouped changes must be undoable as one action.
+- [ ] Screenshot comparison with a difference visualization and attached
+  annotations. Existing before/after comparison is not this feature.
+- [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
+  checks high/low contrast edges, equal-luminance color edges, gaps, soft
+  boundaries, image borders, zoom, fast strokes and undo. Automated kernel
+  tests do not constitute human sign-off.
+
 ## OPEN — the editor's Vercel project lost every deployment overnight (10-14-2026)
 
 At about 07:27 UTC on 10-14, `edit.imagehorse.app` returned 404 `DEPLOYMENT_NOT_FOUND`,

@@ -45,6 +45,10 @@ threads = ["dep:wasm-bindgen-rayon", "dep:rayon"]
 # `ih_smart_edge`.
 patchmatch = []
 
+# Measurement-only annotation compositor. Never enabled by build-wasm.sh's
+# default feature set and not wired to the editor's normal flush path.
+dirty-regions = []
+
 [dependencies]
 wasm-bindgen = "0.2.108"
 png = "0.18"
@@ -73,6 +77,11 @@ criterion = { version = "0.8", default-features = false }
 name = "tiles"
 harness = false
 required-features = ["tiles"]
+
+[[bench]]
+name = "annotation_regions"
+harness = false
+required-features = ["dirty-regions"]
 
 # Scalar vs. rayon-parallel blur, native target (OS threads — see the doc
 # comment at the top of benches/blur_threads.rs for what this can and can't

@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.34",
+    date: "2026-10-20",
+    headline: "Annotation benchmarks and an opt-in rendering prototype.",
+    entries: [
+      { tag: "infra", text: "Repeatable benchmarks cover 10, 100 and 500 annotations, including browser drag timing, rasterization, recomposition and memory." },
+      { tag: "rust", text: "An experimental dirty-region renderer is compared with full-frame and tiled paths, with pixel-parity tests and recorded scratch-buffer costs. It is disabled in the production editor." },
+    ],
+  },
+  {
     version: "v9.33",
     date: "2026-10-19",
     headline: "Adjustments undo survives a reload. The status bar trims itself near compact.",

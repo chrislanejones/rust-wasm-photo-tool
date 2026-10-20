@@ -90,18 +90,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.33 — 2026-10-19
+### v9.34 — 2026-10-20
 
-**Adjustments undo survives a reload. The status bar trims itself near compact.**
+**Annotation benchmarks and an opt-in dirty-region rendering prototype.**
 
-Adjustments sessions are now recorded in the operation log, so all seven panel
-controls and their exact resets come back through undo, redo and reload. The
-status bar no longer arrives at compact width overfull: the tool's own hints go
-first, then one rotating hint, and the two pinned shortcuts stay put.
+Reproducible engine and browser benchmarks now cover 10, 100 and 500
+annotations. Recorded results compare full-frame, tiled and experimental
+region rendering, with pixel-parity checks and memory costs. The prototype is
+not enabled in the editor; automatic invalidation and broader scene support
+remain future work.
 
-Details: [Change Summary](docs/Change-summary.md) ·
-[ADR-091](docs/adr/INDEX.md). The [Trail Log](https://imagehorse.app/trail-log)
-has release notes and commit squares.
+Results and reproduction: [Annotation benchmarks](docs/benchmarks/README.md).
+Full release notes: [Change Summary](docs/Change-summary.md) ·
+[Trail Log](https://imagehorse.app/trail-log).
 
 
 ## License

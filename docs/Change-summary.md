@@ -11603,3 +11603,24 @@ Not in this release: no imagehorse-qc pass yet on these engine and canvas change
 
 Not in this release: no imagehorse-qc pass yet on the op-log change; the status bar was not checked in a browser.
 
+
+
+## v9.34 Change Summary — 2026-10-20
+
+**Measure annotation rendering before changing the production path.**
+
+| Area | Change |
+| --- | --- |
+| Benchmarks | Repeatable mixed-annotation engine fixtures at 10, 100 and 500 annotations on 1200×800 and 4000×3000 canvases; separate rasterization, recomposition, flush, commit and memory measurements. Six browser cases measure pointer-to-SVG and the following animation-frame opportunity in local and worker modes. |
+| Prototype | Opt-in `dirty-regions` Cargo feature, with explicit caller-supplied old/new ink bounds and conservative full-frame fallback. Seven regression tests cover alpha overlap, clipping, text shadows, deletion, undo and unsupported scenes. |
+| Results | At 500 annotations on 1200×800, measured render+flush medians were 30.61 ms full-frame, 47.09 ms tiled and 8.47 ms experimental region rendering. All 18 engine scenarios match final pixels. This is a fixture result, not a production drag-speed claim. |
+| Memory | The prototype retains an additional full-canvas scratch buffer: 3.66 MiB or 45.78 MiB at the two sizes. Recorded WASM capacity and process memory are distinguished from live allocations. |
+| Scope | Production engine remains 901,943 B; the prototype is disabled in normal builds. Smart Callouts, alignment/multi-select, screenshot comparison and human Smart Brush testing remain open. No storage format, authentication or billing changes. |
+
+See [the benchmark report](benchmarks/README.md) for raw results, reproduction,
+validation and limitations. Browser measurements are DOM/RAF timing, not
+physical display latency; the current editor does not use the tiled flush path.
+
+Release checks: 2,023 frontend tests, 35 backend tests, 725 Rust tests and 21
+production-build browser checks pass. TypeScript, lint (0 errors, 52 existing
+warnings), guardrails and both builds pass. [QC evidence](qc/release-v934.md).

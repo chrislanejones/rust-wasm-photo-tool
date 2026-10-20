@@ -18,7 +18,11 @@
 
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "dirty-regions")]
+mod annotation_region;
 mod annotations;
+#[cfg(feature = "dirty-regions")]
+pub use annotation_region::AnnotationRegionPrototype;
 mod capture;
 mod codec;
 mod core;
