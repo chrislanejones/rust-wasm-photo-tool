@@ -516,6 +516,14 @@ trip). ADRs [003](adr/003-operation-log-undo.md) ·
 
 ---
 
+### Pending review: recorded Adjustments sessions
+
+The 10-17 branch records each Adjustments release and reset as one operation,
+including sharpen and blur. It preserves the untouched session base during
+replay and keeps the existing filter order. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md)
+describes format v14, backward compatibility, and its memory cost. This is not
+yet a production release.
+
 ## Planned (not yet in the diagram above)
 
 Nothing in this section is live in a default build. The two entries that used

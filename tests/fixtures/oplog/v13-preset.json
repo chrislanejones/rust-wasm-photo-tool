@@ -1,0 +1,15 @@
+{
+  "source": "https://edit.imagehorse.app/",
+  "commit": "d486fd4bac01cb4a24589a95ad008dfbe79c1b26",
+  "capturedAt": "2026-10-18T03:25:36.479Z",
+  "method": "Browse checker.png → Enhance → Presets → Vivid; raw IndexedDB after autosave",
+  "width": 276,
+  "height": 276,
+  "cursor": 1,
+  "compositeHash": "bd54e6beec882e34",
+  "sha256": {
+    "v13-preset.frames.bin": "5acf9ac154b6fb8124368c364cc06503bea2dba06b9d26d9bde309de039fa3ff",
+    "v13-preset.annotations.bin": "79511289246a3544b4d18ee0f873dd6b6dc9528864503fade028b51efa53d649",
+    "v13-preset.base.png": "e7b5f46fb31d99dc00deb18f6b9d24dcb462fc9fa91f1aae8cd71ac78b8ac174"
+  }
+}
