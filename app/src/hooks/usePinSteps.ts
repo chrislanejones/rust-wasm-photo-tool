@@ -132,7 +132,8 @@ export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Optio
         text.trim(), s.fontSize, tr, tg, tb, s.fontWeight === "bold",
         Math.round(at.x), Math.round(at.y), 0,
         BG_KIND[s.bgKind] ?? 0, br, bg, bb, Math.round(Math.max(0, Math.min(100, s.bgOpacity)) * 2.55),
-        Math.max(0, Math.round(s.bgPadding)), Math.max(0, Math.round(s.bgCornerRadius)), 0,
+        Math.max(0, Math.round(s.bgPadding)), Math.max(0, Math.round(s.bgCornerRadius)),
+        ((Math.round(s.bgTail) % 360) + 360) % 360, // the bubble tail, as the Text tool sends it
         s.textFontId ?? "",
       );
       const label = (await readTexts(tool)).find((t) => t.id === labelId);
