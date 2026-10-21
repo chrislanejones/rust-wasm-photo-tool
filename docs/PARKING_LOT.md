@@ -30,7 +30,7 @@ measurement limits and reproduction commands are in the
   dirty-region compositor and is no longer called by the normal editor.
   Automatic invalidation and production integration are still pending.
 - [ ] Smart Callouts: anchored arrows, numbered markers and editable labels.
-  **v1 built 10-21** (branch `claude/exciting-bardeen-gaqu3k`, not merged): Pins ›
+  **v1 shipped in v9.35 (10-21, #390)**: Pins ›
   Drop: Callout places pin + label + leader as one undo step; the leader follows
   the pin and the label (Text tool) and survives reload; deleting the pin takes
   all three. Joined by geometry (`lib/callouts.ts`), no format change. Pins

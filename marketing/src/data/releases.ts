@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.35",
+    date: "2026-10-21",
+    headline: "Shape drags keep up, pins renumber themselves, and Smart Callouts.",
+    entries: [
+      { tag: "perf", text: "Dragging a shape's edit box takes about 6 ms from pointer to screen, down from 21. The editor no longer re-renders on every move." },
+      { tag: "feature", text: "Numbered pins close the gap when one is deleted. The Pins panel's Next field inserts a step anywhere, and Renumber tidies the sequence. Each is one undo step." },
+      { tag: "feature", text: "Smart Callout: a pin, a label and a leader in one click and one Ctrl+Z. The leader follows the pin or the label and survives a reload." },
+      { tag: "rust", text: "Four new engine calls, no format change. Engine 901,943 to 904,742 B (+2,799)." },
+    ],
+  },
+  {
     version: "v9.34",
     date: "2026-10-20",
     headline: "Annotation benchmarks and an opt-in rendering prototype.",

@@ -5,7 +5,7 @@
 // /trail-log: the release log counts releases, git counts the work that went
 // into them.
 //
-// 896 commits across 125 active days, 2026-02-25 → 2026-10-20.
+// 897 commits across 126 active days, 2026-02-25 → 2026-10-21.
 
 export const COMMITS: Record<string, number> = {
   "2026-02-25": 2,
@@ -133,4 +133,5 @@ export const COMMITS: Record<string, number> = {
   "2026-10-18": 3,
   "2026-10-19": 2,
   "2026-10-20": 1,
+  "2026-10-21": 1,
 };

@@ -11624,3 +11624,21 @@ physical display latency; the current editor does not use the tiled flush path.
 Release checks: 2,023 frontend tests, 35 backend tests, 725 Rust tests and 21
 production-build browser checks pass. TypeScript, lint (0 errors, 52 existing
 warnings), guardrails and both builds pass. [QC evidence](qc/release-v934.md).
+
+
+## v9.35 Change Summary — 2026-10-21
+
+**Shape drags keep up, pins renumber themselves, and Smart Callouts.**
+
+| Area | Change |
+| --- | --- |
+| Drag latency (#390) | A shape-handle drag writes a small store that only the edit box and its action bar read, so AppShell no longer re-renders per move. React's edit state catches up once, on release. Enter mid-drag commits what is on screen; Ctrl+Z mid-drag still drops it. |
+| Drag numbers | Event → DOM at 100 annotations: **20.7 → 5.7 ms** unthrottled, **93.8 → 17.1 ms** at 4× CPU. Flat across 10, 100 and 500. The app's own share went from 13.7 to 1.4 ms. Before/after JSON is in `docs/benchmarks/browser-annotations-2026-10-21/`. |
+| Numbered pins | Deleting a pin closes the gap (1, 2, 3, 4 − 2 → 1, 2, 3). The Pins panel's **Next** field inserts a step at any number, digits or letters. **Renumber** closes every gap and is disabled when there are none. One sequence per layer. Each call is one undo step. |
+| Smart Callout v1 | Pins › Drop: **Callout**. A click opens a label box; Enter places the pin, the label and the leader as one undo step. The leader follows the pin or the label, survives a reload, and deleting the pin takes all three. They are joined by geometry, as connectors are, so nothing new is stored. |
+| Engine | Four new calls: `insert_pin_annotation`, `remove_pin_annotation`, `renumber_pins`, `continue_step`. No op-log or storage format change. 901,943 → **904,742 B** (+2,799). |
+| Verification | #390 CI green (19 checks). 2,042 frontend tests, the Rust suite and featureless clippy pass. New: `tests/pin_steps.rs` (13), `tests/smart_callout.rs` (3), and three e2e specs (drag stays out of React, pin steps, smart callout). |
+
+Not in this release: no imagehorse-qc pass yet on the engine API change. A
+Callout sub-tool of its own, and following a label moved by Align or Placement,
+are open in PARKING_LOT.

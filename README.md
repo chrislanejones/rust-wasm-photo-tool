@@ -90,17 +90,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.34 — 2026-10-20
+### v9.35 — 2026-10-21
 
-**Annotation benchmarks and an opt-in dirty-region rendering prototype.**
+**Shape drags keep up, pins renumber themselves, and Smart Callouts.**
 
-Reproducible engine and browser benchmarks now cover 10, 100 and 500
-annotations. Recorded results compare full-frame, tiled and experimental
-region rendering, with pixel-parity checks and memory costs. The prototype is
-not enabled in the editor; automatic invalidation and broader scene support
-remain future work.
+Dragging a shape's edit box now takes about 6 ms from pointer to screen, down
+from 21. The editor no longer re-renders on every move. Numbered pins close
+the gap when one is deleted. The Pins panel's Next field inserts a step
+anywhere, and Renumber tidies the whole sequence. A Smart Callout is a pin, a
+label and a leader placed in one click and undone in one Ctrl+Z. The leader
+follows the pin or the label when either moves, and it survives a reload.
 
-Results and reproduction: [Annotation benchmarks](docs/benchmarks/README.md).
+How the 21 ms was found: [Where the drag's 21 ms goes](docs/benchmarks/README.md#where-the-drags-21-ms-goes).
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
 
