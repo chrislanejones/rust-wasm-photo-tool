@@ -4,6 +4,11 @@ import type { ImageHorseTool } from "../pkg/stamp_tool";
 export interface DragSample {
   eventToDomMs: number;
   eventToFrameOpportunityMs: number;
+  /** Event timestamp → the first pointermove listener runs: the browser's
+   *  input queue (Chrome dispatches continuous input aligned to frames). */
+  eventToDispatchMs: number;
+  /** First listener → observed overlay DOM update: the app's own work. */
+  dispatchToDomMs: number;
 }
 
 declare global {
@@ -61,28 +66,54 @@ export async function screenPoint(page: Page, x: number, y: number) {
   }, [x, y]);
 }
 
-export async function observeDrag(page: Page) {
-  await page.evaluate(() => {
-    const overlay = document.querySelector("svg[data-draw-overlay]");
+export async function observeDrag(page: Page, selector = "svg[data-draw-overlay]") {
+  await page.evaluate((selector) => {
+    const overlay = document.querySelector(selector);
     if (!overlay) throw new Error("No editable shape overlay");
     window.__annotationDragSamples = [];
-    let pending: number | null = null;
+    let pending: { start: number; dispatch: number } | null = null;
+    // Capture on window: the first listener to see the event, before the app's.
     window.addEventListener("pointermove", (event) => {
-      if (event.buttons === 1) pending = event.timeStamp;
+      if (event.buttons === 1) pending = { start: event.timeStamp, dispatch: performance.now() };
     }, true);
     new MutationObserver(() => {
       if (pending === null) return;
-      const start = pending;
+      const { start, dispatch } = pending;
       pending = null;
-      const eventToDomMs = performance.now() - start;
+      const dom = performance.now();
       // A RAF is a rendering opportunity, not proof that the display has
       // presented pixels. Keep that distinction in the exported metric name.
       requestAnimationFrame(() => {
         window.__annotationDragSamples.push({
-          eventToDomMs,
+          eventToDomMs: dom - start,
           eventToFrameOpportunityMs: performance.now() - start,
+          eventToDispatchMs: dispatch - start,
+          dispatchToDomMs: dom - dispatch,
         });
       });
     }).observe(overlay, { attributes: true, childList: true, subtree: true });
+  }, selector);
+}
+
+// The floor no overlay can beat: the same paced Playwright drag on an empty
+// page whose one SVG rect is written straight from a pointermove listener.
+// What it measures is the browser's input queue plus the harness itself.
+export async function measureEmptyOverlayFloor(page: Page, steps: number) {
+  await page.goto("about:blank");
+  await page.setContent('<svg data-floor style="position:fixed;inset:0;width:100vw;height:100vh"><rect width="4" height="4"/></svg>');
+  await page.evaluate(() => {
+    const rect = document.querySelector("svg[data-floor] rect")!;
+    window.addEventListener("pointermove", (e) => {
+      if (e.buttons === 1) rect.setAttribute("x", String(e.clientX));
+    });
   });
+  await observeDrag(page, "svg[data-floor]");
+  await page.mouse.move(100, 100);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(100 + i * 2, 100);
+    await page.waitForFunction(expected => window.__annotationDragSamples.length === expected, i);
+  }
+  await page.mouse.up();
+  return page.evaluate(() => window.__annotationDragSamples);
 }

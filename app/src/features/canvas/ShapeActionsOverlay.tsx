@@ -47,6 +47,7 @@ import {
   type Pt,
 } from "@/lib/shapePorts";
 import type { ShapeActionMode } from "@/stores/useToolStore";
+import { useLiveEditState } from "@/lib/liveEditGeometry";
 
 interface Props {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -86,7 +87,7 @@ const X_PX = 18;
 
 export function ShapeActionsOverlay({
   canvasRef,
-  editState,
+  editState: committedEditState,
   mode,
   gap,
   boxy,
@@ -103,6 +104,8 @@ export function ShapeActionsOverlay({
   onToggleDisconnect,
   onDisconnect,
 }: Props) {
+  // Follows a box drag move by move (lib/liveEditGeometry), not on release.
+  const editState = useLiveEditState(committedEditState);
   // Connect drag: the port it started from (IMAGE px) and the pointer (SCREEN).
   const [drag, setDrag] = useState<{ from: Pt; at: Pt } | null>(null);
   const dragRef = useRef(drag);

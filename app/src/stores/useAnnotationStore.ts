@@ -5,6 +5,8 @@
 import { create } from "zustand";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { type SetArg, resolveSet } from "./_shared";
+import type { PinSequence } from "@/lib/pinSteps";
+import type { Pt } from "@/lib/callouts";
 
 export type { ReselectObject };
 
@@ -41,6 +43,29 @@ interface AnnotationState {
   // Written only by useDrawingTools, from its own edit state.
   editingShapeKind: number | null;
   setEditingShapeKind: (kind: number | null) => void;
+
+  // Numbered steps (lib/pinSteps.ts). The active layer's pin sequence and the
+  // Renumber action are published by hooks/usePinSteps for the Pins panel —
+  // the panel cannot reach the engine, and AppShell gains no new props.
+  // `pinNext` is the panel's Next field: the number the next pin takes, null
+  // for "after the last".
+  pinSequence: PinSequence;
+  setPinSequence: (seq: PinSequence) => void;
+  pinNext: number | null;
+  setPinNext: (n: number | null) => void;
+  renumberPins: (() => void) | null;
+  setRenumberPins: (fn: (() => void) | null) => void;
+
+  // Smart Callout v1 (lib/callouts.ts). `calloutMode` is the Pins panel's
+  // Drop: Pin / Callout toggle; a Callout click parks its point in
+  // `pendingCallout` for the label input (CalloutLabelInput), whose Enter
+  // calls `commitCallout` — published by hooks/usePinSteps, like Renumber.
+  calloutMode: boolean;
+  setCalloutMode: (on: boolean) => void;
+  pendingCallout: Pt | null;
+  setPendingCallout: (p: Pt | null) => void;
+  commitCallout: ((p: Pt, text: string) => void) | null;
+  setCommitCallout: (fn: ((p: Pt, text: string) => void) | null) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -60,4 +85,18 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
 
   editingShapeKind: null,
   setEditingShapeKind: (kind) => set({ editingShapeKind: kind }),
+
+  pinSequence: { max: 0, gaps: false },
+  setPinSequence: (seq) => set({ pinSequence: seq }),
+  pinNext: null,
+  setPinNext: (n) => set({ pinNext: n }),
+  renumberPins: null,
+  setRenumberPins: (fn) => set({ renumberPins: fn }),
+
+  calloutMode: false,
+  setCalloutMode: (on) => set({ calloutMode: on, pendingCallout: null }),
+  pendingCallout: null,
+  setPendingCallout: (p) => set({ pendingCallout: p }),
+  commitCallout: null,
+  setCommitCallout: (fn) => set({ commitCallout: fn }),
 }));

@@ -59,6 +59,80 @@ not a physical display presentation timestamp. Each step waits for the
 observed update; the test measures paced latency rather than burst coalescing
 or sustained frame throughput. Five warmups precede 30 recorded samples.
 
+## Where the drag's 21 ms goes
+
+Measured 10-21 on a 4-core Xeon container (Chromium 141, production build,
+placeholder keys). v9.34's numbers came from Chromium 156 on another machine;
+compare within one run, not across them. The harness now records when the
+first `pointermove` listener runs (a window capture listener), which splits
+event → DOM into the browser's input queue and the app's own work, and it
+repeats the paced drag on an empty page whose one SVG rect is written straight
+from a `pointermove` listener — the floor no overlay can beat.
+
+Medians of 30 moves at 100 annotations, local engine, before the fix:
+
+| | Unthrottled | 4× CPU |
+| --- | ---: | ---: |
+| Event → first listener (input queue) | 7.5 | 8.8 |
+| First listener → overlay DOM (the app) | 13.7 | 83.7 |
+| **Event → overlay DOM** | **20.7** | **93.8** |
+| Empty-overlay floor, event → DOM | 6.8 | 12.0 |
+
+The suspects, in the plan's order:
+
+- **Waiting for a requestAnimationFrame: no**, not in the app. The input
+  queue is ~7 ms because Chrome dispatches continuous input aligned to frames;
+  the empty overlay pays it too. Nothing in the app can remove it.
+- **React re-rendering more than the overlay: yes — the whole 14 ms.** Each
+  move called `useDrawingTools.updateEditGeometry` → `setEditState`, state that
+  lives in AppShell, so every move re-rendered AppShell and everything under
+  it that is not memoized: 70 React commits for 35 moves. A `pointermove`
+  update is a continuous-priority render, so it ran in a task after the event
+  (30 of 30 moves) and the DOM write landed after the frame the event belonged
+  to. Moving the same geometry through a store only the two overlays read
+  took the app's share from 13.7 to 1.4 ms with nothing else changed, which is
+  the attribution.
+- **Geometry per shape: no.** Flat across 10/100/500, as v9.34 found.
+- **The harness: partly.** The floor is ~7 ms unthrottled. The plan's "under
+  8 ms event → DOM" bar is only just above it, so the app's own share
+  (first listener → DOM) is reported beside it.
+
+The fix (lib/liveEditGeometry.ts): a drag writes its geometry to a small
+external store that only the edit box and its action bar subscribe to
+(`useSyncExternalStore`). An update from an event listener is a sync-lane
+render, so the box is written inside the event's own task. React's edit state
+catches up once, on release, in the same commit that empties the store, so
+nothing jumps back. Enter or Escape mid-drag take the in-flight geometry with
+them. The engine was not touched during a drag before and is not now.
+
+After, same run, same harness ([before](browser-annotations-2026-10-21/before/),
+[after](browser-annotations-2026-10-21/after/)):
+
+| Annotations | Mode | Event → DOM before | after | App share before | after | 4× CPU before | after |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | local | 21.8 | 5.9 | 13.0 | 1.3 | 80.4 | 18.3 |
+| 100 | local | 20.7 | 5.7 | 13.7 | 1.4 | 93.8 | 17.1 |
+| 500 | local | 21.4 | 6.4 | 14.1 | 1.3 | 90.3 | 18.9 |
+| 10 | worker | 23.0 | 5.0 | 12.6 | 1.6 | 95.6 | 17.0 |
+| 100 | worker | 23.6 | 6.1 | 14.8 | 1.5 | 82.4 | 18.7 |
+| 500 | worker | 21.3 | 5.9 | 14.2 | 1.3 | 100.9 | 18.0 |
+
+Event → following frame opportunity went from ~25 ms to ~6 ms (100, local):
+the write now lands before the frame instead of after it. The input queue
+also shrank (7.5 → 4.1 ms) because the main thread is free when input
+arrives. At 4× CPU the app's share is still ~7 ms; most of what is left is
+both overlays reading the canvas rect, which a later pass could cache for the
+drag. The Corner-radius dot still writes the panel's tool settings per move
+and so still re-renders the editor; it is not on this path.
+
+`e2e/shape-drag-stays-out-of-react.spec.ts` checks the property rather than a
+clock: every move's DOM write must land before a message posted from the
+first listener, so a drag routed back through AppShell state fails it on any
+machine.
+
+To reproduce: `ANNOTATION_BROWSER_CPU=4` throttles the page through DevTools,
+and file names gain a `-cpu4` suffix.
+
 A minimal `width()` call measures the local/worker round trip. Main-thread
 JavaScript heap usage is reported separately; it excludes worker heaps, WASM
 and GPU memory. Node results report WASM allocated capacity and process RSS,

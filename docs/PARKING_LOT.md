@@ -30,7 +30,20 @@ measurement limits and reproduction commands are in the
   dirty-region compositor and is no longer called by the normal editor.
   Automatic invalidation and production integration are still pending.
 - [ ] Smart Callouts: anchored arrows, numbered markers and editable labels.
-  Existing pins/arrows are primitives, not completion of this milestone.
+  **v1 built 10-21** (branch `claude/exciting-bardeen-gaqu3k`, not merged): Pins ›
+  Drop: Callout places pin + label + leader as one undo step; the leader follows
+  the pin and the label (Text tool) and survives reload; deleting the pin takes
+  all three. Joined by geometry (`lib/callouts.ts`), no format change. Pins
+  renumber themselves (delete closes the gap, Next inserts, Renumber). Left
+  open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
+  deleting the label or leader alone leaves the others as plain objects, the
+  leader is an arrow, not a plain line, and a label moved by Align or
+  Placement should follow (any refresh of the Text tool's list is diffed) but
+  only Text tool drags are tested.
+- [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
+  now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
+  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The Corner-radius
+  dot drag still writes panel settings per move and was left as is.
 - [ ] Annotation alignment and multi-select. Existing single-object alignment
   is not multi-select; grouped changes must be undoable as one action.
 - [ ] Screenshot comparison with a difference visualization and attached
