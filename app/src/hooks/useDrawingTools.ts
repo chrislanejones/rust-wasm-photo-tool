@@ -12,6 +12,7 @@ import { normalizeDeg } from "@/lib/shapeRotation";
 import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
 import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
 import { PressQueue } from "@/lib/pressQueue";
+import { liveDragActive, takeLiveEdit } from "@/lib/liveEditGeometry";
 import {
   drawnShapeFor,
   editStateFromShape,
@@ -30,8 +31,7 @@ import {
 // The drawing stack's types and pure helpers live in lib/drawEditState.ts and
 // are re-exported here, so every existing `@/hooks/useDrawingTools` import
 // keeps working unchanged.
-export type { Point };
-export type { CropSelection, DrawEditState, ShapeMeta, ShapeStylePatch } from "@/lib/drawEditState";
+export type { CropSelection, DrawEditState, Point, ShapeMeta, ShapeStylePatch } from "@/lib/drawEditState";
 export { pendingShapeType, panelStylePatch } from "@/lib/drawEditState";
 
 interface UseDrawingToolsOptions {
@@ -222,7 +222,7 @@ export function useDrawingTools({
    * pending, so every trigger can call it unconditionally.
    */
   const commitEdit = useCallback(async () => {
-    const es = editStateRef.current;
+    const es = takeLiveEdit(editStateRef.current, editDirtyRef); // a drag in flight included
     if (!es) return;
     editStateRef.current = null;
     const settled = settle(es); // cleared before the engine drew it, shapes vanished on Apply
@@ -326,7 +326,7 @@ export function useDrawingTools({
   /** Escape: drop the pending edit. For an existing-shape edit this also
    *  un-hides the committed shape (clears the Rust editing flag) and repaints. */
   const cancelEdit = useCallback(() => {
-    const es = editStateRef.current;
+    const es = takeLiveEdit(editStateRef.current);
     editStateRef.current = null;
     if (es?.editId == null || !toolRef.current) return setEditState(null);
     const settled = settle(es); // drawn until the un-hide is
@@ -642,7 +642,7 @@ export function useDrawingTools({
         // shape stayed on screen — "undo skipped one". So the pending change
         // is the step: discard it (same as Escape) and stop the engine undo.
         // A clean re-selection has no pending change and falls through.
-        if (es.editId == null || editDirtyRef.current) {
+        if (es.editId == null || editDirtyRef.current || liveDragActive()) {
           e.preventDefault();
           e.stopImmediatePropagation();
           cancelEdit();

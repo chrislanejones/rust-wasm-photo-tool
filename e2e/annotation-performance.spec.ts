@@ -1,5 +1,5 @@
 import { test, expect } from "./guard/test";
-import { installAnnotationProbe, observeDrag, screenPoint } from "./annotation-benchmark-harness";
+import { installAnnotationProbe, measureEmptyOverlayFloor, observeDrag, screenPoint } from "./annotation-benchmark-harness";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,7 +8,9 @@ import { createHash } from "node:crypto";
 // Opt-in measurements, not wall-clock CI thresholds. Run without competing
 // builds/tests: ANNOTATION_BROWSER_BENCH=1 pnpm exec playwright test
 // e2e/annotation-performance.spec.ts --workers=1
+// ANNOTATION_BROWSER_CPU=4 slows the page's CPU fourfold (DevTools throttling).
 test.skip(process.env.ANNOTATION_BROWSER_BENCH !== "1", "Opt-in performance measurement");
+const CPU_SLOWDOWN = Number(process.env.ANNOTATION_BROWSER_CPU ?? 1);
 
 function stats(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -40,6 +42,8 @@ for (const worker of [false, true]) {
         await expect(page.locator("canvas.main-canvas")).toBeVisible();
         await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
         await installAnnotationProbe(page);
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
         expect(page.workers().some(w => w.url().includes("engine.worker"))).toBe(worker);
         await page.evaluate(async (count) => {
           const tool = window.__annotationTool;
@@ -112,15 +116,19 @@ for (const worker of [false, true]) {
         await expect.poll(() => page.evaluate(async () =>
           JSON.parse(await window.__annotationTool.get_shape_annotations()).at(-1).x0
         )).toBe(before.at(-1).x0);
-        const cdp = await page.context().newCDPSession(page);
         await cdp.send("Performance.enable");
         const { metrics } = await cdp.send("Performance.getMetrics");
+        // Last, because it leaves the editor: the same paced drag on an empty page.
+        const floorSamples = (await measureEmptyOverlayFloor(page, 35)).slice(5);
         const report = {
-          count, worker, renderPath: "full", width: 1200, height: 800,
+          count, worker, cpuSlowdown: CPU_SLOWDOWN, renderPath: "full", width: 1200, height: 800,
           browser: page.context().browser()?.version(), capturedAt: new Date().toISOString(),
           fixtureWasmSha256: createHash("sha256").update(readFileSync("pkg/stamp_tool_bg.wasm")).digest("hex"),
           eventToDom: stats(dragSamples.map(s => s.eventToDomMs)),
           eventToFrameOpportunity: stats(dragSamples.map(s => s.eventToFrameOpportunityMs)),
+          eventToDispatch: stats(dragSamples.map(s => s.eventToDispatchMs)),
+          dispatchToDom: stats(dragSamples.map(s => s.dispatchToDomMs)),
+          emptyOverlayFloorEventToDom: stats(floorSamples.map(s => s.eventToDomMs)),
           engineWidthRoundTrip: stats(rpcSamples),
           mainThreadJsHeapUsedBytes: metrics.find(m => m.name === "JSHeapUsedSize")?.value,
           notes: [
@@ -132,6 +140,8 @@ for (const worker of [false, true]) {
             "width() measures a minimal engine/worker round trip, not pure serialization overhead.",
             "JS heap excludes worker heaps, WASM memory and GPU allocations; engine capacity is in the Node benchmark.",
             "Fixture objects occupy the right side so the measured shape has an unobstructed drag target.",
+            "eventToDispatch is the browser's input queue (event timestamp to the first window capture listener); dispatchToDom is the app's own work.",
+            "emptyOverlayFloorEventToDom repeats the paced drag on an empty page whose SVG is written straight from a pointermove listener: the floor no overlay can beat.",
           ],
         };
         expect(dragSamples).toHaveLength(30);
@@ -140,7 +150,7 @@ for (const worker of [false, true]) {
         if (process.env.ANNOTATION_BROWSER_OUTPUT) {
           mkdirSync(process.env.ANNOTATION_BROWSER_OUTPUT, { recursive: true });
           writeFileSync(resolve(process.env.ANNOTATION_BROWSER_OUTPUT,
-            `${count}-${worker ? "worker" : "local"}.json`), JSON.stringify(report, null, 2) + "\n");
+            `${count}-${worker ? "worker" : "local"}${CPU_SLOWDOWN === 1 ? "" : `-cpu${CPU_SLOWDOWN}`}.json`), JSON.stringify(report, null, 2) + "\n");
         }
       });
     }
