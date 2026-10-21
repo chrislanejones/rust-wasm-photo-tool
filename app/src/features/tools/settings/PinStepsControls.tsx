@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { ListOrdered, MapPin, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TextField } from "@/components/ui/number-field";
 import { pinLabelText } from "@/lib/pinLabel";
@@ -40,6 +41,20 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
 
   return (
     <div className="flex flex-col gap-1.5">
+      <SectionHeader
+        title="Steps"
+        info={
+          <>
+            Steps renumber themselves: delete a pin and the rest close up; set
+            Next to a number already used to insert a step there. Only pins on
+            the active layer count as one sequence; a pin on another layer
+            keeps its number. A Callout is a pin with a label joined by a
+            leader: type the label and press Enter. Drag the pin or the label
+            and the leader follows; delete the pin and all three go. The label
+            uses the Text tool&apos;s font, size and color.
+          </>
+        }
+      />
       <ToolButtonGroup
         aria-label="Drop"
         options={DROP}
@@ -69,15 +84,6 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
           <ListOrdered aria-hidden /> Renumber
         </Button>
       </div>
-      <p className="text-2xs text-theme-muted-foreground">
-        Steps renumber themselves: delete a pin and the rest close up; set Next
-        to a number already used to insert a step there. Only pins on the
-        active layer count as one sequence; a pin on another layer keeps its
-        number. A Callout is a pin with a label joined by a leader: type the
-        label and press Enter. Drag the pin or the label and the leader
-        follows; delete the pin and all three go. The label uses the Text
-        tool&apos;s font, size and color.
-      </p>
     </div>
   );
 }
