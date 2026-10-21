@@ -438,6 +438,14 @@ export function useDrawingTools({
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
 
+  // Pins: drop (at the Next number), delete, Renumber, Smart Callouts — usePinSteps.
+  const afterPinChange = useCallback(async () => {
+    flushToCanvas();
+    syncState();
+    await refreshShapes();
+  }, [flushToCanvas, syncState, refreshShapes]);
+  const { dropPin, removePin } = usePinSteps({ toolRef, settingsRef, shapes, afterChange: afterPinChange });
+
   /** Delete a live shape (from the Reselect list X). One history step. */
   const removeShape = useCallback(
     async (id: number) => {
@@ -448,8 +456,9 @@ export function useDrawingTools({
         setEditState(null);
         tool.set_editing_shape(-1);
       }
-      // A pin closes the gap it leaves (usePinSteps); anything else just goes.
-      if (shapesRef.current.some((s) => s.id === id && s.kind === 5)) tool.remove_pin_annotation(id);
+      // A pin closes the gap it leaves, and takes a callout's leader and label
+      // with it (usePinSteps); anything else just goes.
+      if (shapesRef.current.some((s) => s.id === id && s.kind === 5)) await removePin(id);
       else tool.remove_shape_annotation(id);
       // A deleted shape can't stay the Align target.
       useAnnotationStore
@@ -461,16 +470,8 @@ export function useDrawingTools({
       syncState();
       await refreshShapes();
     },
-    [toolRef, flushToCanvas, syncState, refreshShapes],
+    [toolRef, flushToCanvas, syncState, refreshShapes, removePin],
   );
-
-  // Pins: drop (inserting at the panel's Next number) and Renumber — usePinSteps.
-  const afterPinChange = useCallback(async () => {
-    flushToCanvas();
-    syncState();
-    await refreshShapes();
-  }, [flushToCanvas, syncState, refreshShapes]);
-  const { dropPin } = usePinSteps({ toolRef, settingsRef, shapes, afterChange: afterPinChange });
 
   // Refresh the shape list after any external history change (undo/redo/jump
   // restore a different shape overlay). Same event the text tool listens to.

@@ -752,6 +752,9 @@ pub struct ImageHorseTool {
     /// began.
     #[cfg(feature = "tiles")]
     oplog_gesture_ops: u32,
+    /// Set by `continue_step`: the next `snap()` joins the step in progress
+    /// instead of pushing one. Cleared by that snap or the next recomposite.
+    join_next_step: bool,
     /// In-flight paint/erase stroke being recorded: (painted polyline, brush).
     #[cfg(feature = "tiles")]
     rec_stroke: Option<(Vec<(f64, f64)>, crate::ops::Brush)>,
@@ -843,6 +846,10 @@ impl ImageHorseTool {
     /// point: every recordable edit snaps BEFORE mutating, so this is the one
     /// safe moment to lazily capture the log's base document.
     fn snap(&mut self, label: &str) {
+        // `continue_step`: this change belongs to the step already open.
+        if std::mem::take(&mut self.join_next_step) {
+            return;
+        }
         #[cfg(feature = "tiles")]
         {
             self.oplog_maybe_start();
@@ -1140,6 +1147,7 @@ impl ImageHorseTool {
             oplog_use_for_undo: false,
             #[cfg(feature = "tiles")]
             oplog_gesture_ops: 0,
+            join_next_step: false,
             #[cfg(feature = "tiles")]
             rec_stroke: None,
             #[cfg(feature = "tiles")]
@@ -1328,6 +1336,9 @@ impl ImageHorseTool {
     /// calls this before each zero-copy blit so the canvas reflects the full
     /// visible layer stack (pixels + overlays + opacity).
     pub fn recomposite(&mut self) {
+        // A `continue_step` that no change consumed must not leak into a
+        // later, unrelated one.
+        self.join_next_step = false;
         // Reuse the cache allocation across frames; take it out so we can pass
         // it as `&mut` alongside the immutable layer borrow.
         let mut cache = std::mem::take(&mut self.composite_cache);

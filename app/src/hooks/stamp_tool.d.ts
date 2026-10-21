@@ -1356,6 +1356,10 @@ declare module "stamp_tool" {
       color_hex: string,
       label_kind: number,
     ): number;
+    /** The next call that would push an undo step joins the one in progress
+     *  instead (a Smart Callout's pin, label and leader are one step). The
+     *  next recomposite clears it if nothing consumed it. */
+    continue_step(): void;
     /** Delete pin `id`; the active layer's pins above it move down one.
      *  Pushes "Delete Pin"; false (no step) when `id` is not a pin there. */
     remove_pin_annotation(id: number): boolean;

@@ -2,18 +2,29 @@
 // action come from useAnnotationStore (published by hooks/usePinSteps); the
 // rules are lib/pinSteps.ts.
 import { useState } from "react";
-import { ListOrdered } from "lucide-react";
+import { ListOrdered, MapPin, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TextField } from "@/components/ui/number-field";
 import { pinLabelText } from "@/lib/pinLabel";
 import { nextPinNumber, parsePinLabel } from "@/lib/pinSteps";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+
+// Smart Callout v1 rides the Pins tab rather than being its own sub-tool:
+// the Shapes sub-mode reaches useDrawingTools through AppShell, which gains
+// nothing new. Callout = pin + label + leader (lib/callouts.ts).
+const DROP = [
+  { id: "pin", label: "Pin", icon: MapPin },
+  { id: "callout", label: "Callout", icon: MessageSquareText },
+] as const;
 
 export function PinStepsControls({ letters }: { letters: boolean }) {
   const { max, gaps } = useAnnotationStore((s) => s.pinSequence);
   const pinNext = useAnnotationStore((s) => s.pinNext);
   const setPinNext = useAnnotationStore((s) => s.setPinNext);
   const renumber = useAnnotationStore((s) => s.renumberPins);
+  const callout = useAnnotationStore((s) => s.calloutMode);
+  const setCallout = useAnnotationStore((s) => s.setCalloutMode);
   const next = nextPinNumber(max, pinNext);
   const shown = pinLabelText(next, letters ? 1 : 0);
   // What is being typed; the field shows the live Next value otherwise.
@@ -29,6 +40,12 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
 
   return (
     <div className="flex flex-col gap-1.5">
+      <ToolButtonGroup
+        aria-label="Drop"
+        options={DROP}
+        value={callout ? "callout" : "pin"}
+        onChange={(id) => setCallout(id === "callout")}
+      />
       <div className="flex items-end gap-2">
         <TextField
           label="Next"
@@ -56,7 +73,10 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
         Steps renumber themselves: delete a pin and the rest close up; set Next
         to a number already used to insert a step there. Only pins on the
         active layer count as one sequence; a pin on another layer keeps its
-        number.
+        number. A Callout is a pin with a label joined by a leader: type the
+        label and press Enter. Drag the pin or the label and the leader
+        follows; delete the pin and all three go. The label uses the Text
+        tool&apos;s font, size and color.
       </p>
     </div>
   );

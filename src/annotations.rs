@@ -1732,6 +1732,15 @@ impl ImageHorseTool {
     // `ShapeEdit` (a number is an ordinary `ShapeParams` field) and ADR-088's
     // gesture marker groups them. No format change.
 
+    /// The next call that would push an undo step joins the step in progress
+    /// instead — so a pin, its leader and its label (a Smart Callout) added
+    /// or deleted by three calls are one Ctrl+Z, and on the op log one
+    /// gesture (ADR-088). Call it right before that call; the next
+    /// recomposite clears it if nothing consumed it.
+    pub fn continue_step(&mut self) {
+        self.join_next_step = true;
+    }
+
     /// Delete pin `id` and close the gap it leaves: every pin on the active
     /// layer numbered above it moves down one. One "Delete Pin" step. Returns
     /// false, pushing nothing, when `id` is not a pin on the active layer.
