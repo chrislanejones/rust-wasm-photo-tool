@@ -5,6 +5,7 @@
 import { create } from "zustand";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { type SetArg, resolveSet } from "./_shared";
+import type { PinSequence } from "@/lib/pinSteps";
 
 export type { ReselectObject };
 
@@ -41,6 +42,18 @@ interface AnnotationState {
   // Written only by useDrawingTools, from its own edit state.
   editingShapeKind: number | null;
   setEditingShapeKind: (kind: number | null) => void;
+
+  // Numbered steps (lib/pinSteps.ts). The active layer's pin sequence and the
+  // Renumber action are published by hooks/usePinSteps for the Pins panel —
+  // the panel cannot reach the engine, and AppShell gains no new props.
+  // `pinNext` is the panel's Next field: the number the next pin takes, null
+  // for "after the last".
+  pinSequence: PinSequence;
+  setPinSequence: (seq: PinSequence) => void;
+  pinNext: number | null;
+  setPinNext: (n: number | null) => void;
+  renumberPins: (() => void) | null;
+  setRenumberPins: (fn: (() => void) | null) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -60,4 +73,11 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
 
   editingShapeKind: null,
   setEditingShapeKind: (kind) => set({ editingShapeKind: kind }),
+
+  pinSequence: { max: 0, gaps: false },
+  setPinSequence: (seq) => set({ pinSequence: seq }),
+  pinNext: null,
+  setPinNext: (n) => set({ pinNext: n }),
+  renumberPins: null,
+  setRenumberPins: (fn) => set({ renumberPins: fn }),
 }));

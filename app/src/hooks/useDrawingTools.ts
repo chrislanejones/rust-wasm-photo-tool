@@ -12,6 +12,7 @@ import { normalizeDeg } from "@/lib/shapeRotation";
 import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
 import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
 import { PressQueue } from "@/lib/pressQueue";
+import { usePinSteps } from "@/hooks/usePinSteps";
 import { liveDragActive, takeLiveEdit } from "@/lib/liveEditGeometry";
 import {
   drawnShapeFor,
@@ -447,7 +448,9 @@ export function useDrawingTools({
         setEditState(null);
         tool.set_editing_shape(-1);
       }
-      tool.remove_shape_annotation(id);
+      // A pin closes the gap it leaves (usePinSteps); anything else just goes.
+      if (shapesRef.current.some((s) => s.id === id && s.kind === 5)) tool.remove_pin_annotation(id);
+      else tool.remove_shape_annotation(id);
       // A deleted shape can't stay the Align target.
       useAnnotationStore
         .getState()
@@ -461,37 +464,13 @@ export function useDrawingTools({
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
 
-  /** Drop an auto-sequenced callout pin at `p`. The sequence index = (max
-   *  existing pin index on this photo) + 1, so it resets per photo when the
-   *  shape list is reloaded. Diameter follows the Stroke Width slider; the
-   *  label style (number vs letter) follows the Pins tab toggle. Pins are a
-   *  filled circle bbox + label (Rust kind 5). */
-  const dropPin = useCallback(
-    async (p: Point) => {
-      const tool = toolRef.current;
-      if (!tool) return;
-      const s = settingsRef.current;
-      // Map the 1-10 stroke-width slider to a callout-sized disc radius.
-      const r = 8 + s.strokeWidth * 3;
-      let maxNum = 0;
-      try {
-        for (const sh of JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[]) {
-          if (sh.kind === 5 && sh.number > maxNum) maxNum = sh.number;
-        }
-      } catch {
-        /* ignore parse errors — start from 1 */
-      }
-      const labelKind = s.pinLabel === "letters" ? 1 : 0;
-      tool.add_pin_annotation(
-        p.x - r, p.y - r, p.x + r, p.y + r,
-        maxNum + 1, s.strokeColor, labelKind,
-      );
-      flushToCanvas();
-      syncState();
-      await refreshShapes();
-    },
-    [toolRef, flushToCanvas, syncState, refreshShapes],
-  );
+  // Pins: drop (inserting at the panel's Next number) and Renumber — usePinSteps.
+  const afterPinChange = useCallback(async () => {
+    flushToCanvas();
+    syncState();
+    await refreshShapes();
+  }, [flushToCanvas, syncState, refreshShapes]);
+  const { dropPin } = usePinSteps({ toolRef, settingsRef, shapes, afterChange: afterPinChange });
 
   // Refresh the shape list after any external history change (undo/redo/jump
   // restore a different shape overlay). Same event the text tool listens to.

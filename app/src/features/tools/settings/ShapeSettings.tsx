@@ -31,6 +31,7 @@ import type { DiagramShapeName } from "@/lib/types";
 import { isDiagramKind } from "@/lib/diagramShapes";
 import { DIAGRAM_SHAPE_GROUPS } from "./diagramShapeIcons";
 import { ControlRow } from "@/components/ui/control-row";
+import { PinStepsControls } from "./PinStepsControls";
 
 // Six, laid out 3 × 2 — the same grid as Select → Selection, so the two
 // "row of tiles" panels read as one family.
@@ -264,6 +265,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       onChange({ ...settings, pinLabel: id as "numbers" | "letters" })
                     }
                   />
+
+                  {/* Next number (insert a step) and Renumber. */}
+                  <PinStepsControls letters={settings.pinLabel === "letters"} />
 
                   {/* Pin size — reuses the Stroke Width slider. */}
                   <SizeSlider

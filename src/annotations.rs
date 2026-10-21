@@ -1723,6 +1723,99 @@ impl ImageHorseTool {
         true
     }
 
+    // ── Numbered steps (pins, kind 5) ───────────────────────────────────
+    //
+    // A photo's pins are ONE sequence per layer: numbers and letters alike
+    // (`label_kind` only picks how a number is drawn), and a pin on another
+    // layer is not part of it. Each call below is one `snap`, so however many
+    // pins it renumbers is one undo step; the op log records each as a plain
+    // `ShapeEdit` (a number is an ordinary `ShapeParams` field) and ADR-088's
+    // gesture marker groups them. No format change.
+
+    /// Delete pin `id` and close the gap it leaves: every pin on the active
+    /// layer numbered above it moves down one. One "Delete Pin" step. Returns
+    /// false, pushing nothing, when `id` is not a pin on the active layer.
+    pub fn remove_pin_annotation(&mut self, id: u32) -> bool {
+        let Some(number) = self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .find(|s| s.id == id && s.kind == 5)
+            .map(|s| s.number)
+        else {
+            return false;
+        };
+        self.snap("Delete Pin");
+        let shapes = &mut self.layers[self.active].shape_annotations;
+        shapes.retain(|s| s.id != id);
+        for s in shapes
+            .iter_mut()
+            .filter(|s| s.kind == 5 && s.number > number)
+        {
+            s.number -= 1;
+        }
+        if self.editing_shape_id == Some(id) {
+            self.editing_shape_id = None;
+        }
+        true
+    }
+
+    /// Drop a pin numbered `number` (1 or more) on the active layer, moving
+    /// every pin already at or above that number up one — inserting a step.
+    /// A number past the last pin is a plain drop. One "Add Pin" step.
+    pub fn insert_pin_annotation(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        number: u32,
+        color_hex: &str,
+        label_kind: u8,
+    ) -> u32 {
+        let number = number.max(1);
+        let id = self.add_pin_annotation(x0, y0, x1, y1, number, color_hex, label_kind);
+        for s in self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .filter(|s| s.kind == 5 && s.id != id && s.number >= number)
+        {
+            s.number += 1;
+        }
+        id
+    }
+
+    /// Renumber the active layer's pins 1, 2, 3… in the order they are
+    /// numbered now, closing every gap; equal numbers keep their draw order.
+    /// Returns how many pins changed. One "Renumber Pins" step, or none when
+    /// nothing would change.
+    pub fn renumber_pins(&mut self) -> u32 {
+        let shapes = &self.layers[self.active].shape_annotations;
+        // A pin's new number is its rank by (number, draw index), so a tie
+        // keeps draw order. Quadratic, and pins per layer are a handful —
+        // cheaper in the binary than a sort.
+        let key = |i: usize| (shapes[i].number, i);
+        let pins: Vec<usize> = (0..shapes.len()).filter(|&i| shapes[i].kind == 5).collect();
+        let changes: Vec<(usize, u32)> = pins
+            .iter()
+            .map(|&i| {
+                (
+                    i,
+                    1 + pins.iter().filter(|&&j| key(j) < key(i)).count() as u32,
+                )
+            })
+            .filter(|&(i, n)| shapes[i].number != n)
+            .collect();
+        if changes.is_empty() {
+            return 0;
+        }
+        self.snap("Renumber Pins");
+        let shapes = &mut self.layers[self.active].shape_annotations;
+        for &(i, n) in &changes {
+            shapes[i].number = n;
+        }
+        changes.len() as u32
+    }
+
     /// Move the shape `id` to index `to` within the ACTIVE layer's shape list,
     /// sliding everything between it and the destination along. Returns false
     /// (changing nothing) when the id is not on the active layer or the move
