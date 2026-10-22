@@ -6,7 +6,7 @@ import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
-import { rerouteCallouts } from "@/hooks/usePinSteps";
+import { removeText, rerouteCallouts } from "@/hooks/usePinSteps";
 
 interface TextInput {
   screenX: number;
@@ -258,7 +258,7 @@ export function useTextTool({
     if (!ti.text.trim()) {
       // Empty text — if we were editing an existing annotation, remove it.
       if (editingId !== null) {
-        tool.remove_text_annotation(editingId);
+        await removeText(tool, editingId); // a callout's label takes the callout
         // A deleted text can't stay the Align target.
         useAnnotationStore
           .getState()
@@ -866,7 +866,15 @@ export function useTextTool({
     [active, toolRef, canvasRef, hoveredAnnotationId],
   );
 
+  /** Reselect's ✕ on a text row (a callout's label takes the callout). */
+  const deleteAnnotation = useCallback(async (id: number) => {
+    if (toolRef.current) await removeText(toolRef.current, id);
+    flushToCanvas();
+    syncState();
+    useAnnotationStore.getState().bumpAnnotations(); // the lists re-read
+  }, [toolRef, flushToCanvas, syncState]);
   return {
+    deleteAnnotation,
     textInput,
     textareaRef,
     onCanvasClick,

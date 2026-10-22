@@ -206,3 +206,36 @@ test("clicking away with a label typed places it there and starts the next", asy
   await expect(input).toHaveCount(0);
   expect(await counts(page)).toEqual([2, 1]);
 });
+
+// Night 10-22: deleting a callout's label or its leader on its own used to
+// leave the other two behind as plain objects. Any part takes the whole
+// callout now, in one undo step — from Review › Reselect's ✕ and from
+// emptying the label in the Text tool.
+for (const part of ["Text #1", "Arrow #1"]) {
+  test(`deleting the callout's ${part === "Text #1" ? "label" : "leader"} alone deletes all three — one undo puts them back`, async ({ page }) => {
+    await open(page);
+    await placeCallout(page, "Crack");
+    await page.getByRole("button", { name: "Review", exact: true }).first().click();
+    await page.getByRole("button", { name: `Delete ${part}`, exact: true }).click();
+    await expect.poll(() => counts(page)).toEqual([0, 0]);
+    await key(page, "Control+z");
+    await expect.poll(() => callout(page).then((c) => c?.counts)).toEqual([2, 1]);
+  });
+}
+
+test("emptying the callout's label in the Text tool deletes all three", async ({ page }) => {
+  await open(page);
+  await placeCallout(page, "Crack");
+  const placed = (await callout(page))!;
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  const at = await screenPoint(page, placed.label.x + 10, placed.label.y + 8);
+  await page.mouse.click(at.x, at.y);
+  const textarea = page.locator("textarea").first();
+  await expect(textarea).toHaveValue("Crack");
+  await textarea.fill("");
+  const away = await screenPoint(page, 1100, 850);
+  await page.mouse.click(away.x, away.y);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => counts(page)).toEqual([0, 0]);
+});

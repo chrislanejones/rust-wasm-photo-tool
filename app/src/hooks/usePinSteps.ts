@@ -63,6 +63,32 @@ async function readTexts(tool: ImageHorseTool): Promise<CalloutText[]> {
   }
 }
 
+/** Delete the whole callout that `part` belongs to — its pin, its leader or
+ *  its label — as ONE undo step (the pin's gap closes, as for any pin).
+ *  Deleting a leader or a label alone used to leave the other two behind as
+ *  plain objects. False, deleting nothing, when `part` is in no callout. */
+export async function removeCalloutOf(
+  tool: ImageHorseTool,
+  part: { shape?: number; text?: number },
+): Promise<boolean> {
+  const c = findCallouts(await readShapes(tool), await readTexts(tool)).find(
+    (c) => c.pin === part.shape || c.leader === part.shape || c.label === part.text,
+  );
+  if (!c) return false;
+  tool.remove_pin_annotation(c.pin);
+  tool.continue_step();
+  tool.remove_shape_annotation(c.leader);
+  tool.continue_step();
+  tool.remove_text_annotation(c.label);
+  useAnnotationStore.getState().bumpAnnotations(); // the Text tool's list
+  return true;
+}
+
+/** Delete text `id`, or the whole callout when it is a callout's label. */
+export async function removeText(tool: ImageHorseTool, id: number): Promise<void> {
+  if (!(await removeCalloutOf(tool, { text: id }))) tool.remove_text_annotation(id);
+}
+
 /** Redraw the leaders whose pin or label moved between `before` and `now`.
  *  No undo step of its own: it rides the move's. True when one was redrawn. */
 export async function rerouteCallouts(
@@ -157,14 +183,7 @@ export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Optio
     async (id: number) => {
       const tool = toolRef.current;
       if (!tool) return;
-      const callout = findCallouts(await readShapes(tool), await readTexts(tool)).find((c) => c.pin === id);
-      tool.remove_pin_annotation(id);
-      if (!callout) return;
-      tool.continue_step();
-      tool.remove_shape_annotation(callout.leader);
-      tool.continue_step();
-      tool.remove_text_annotation(callout.label);
-      useAnnotationStore.getState().bumpAnnotations(); // the Text tool's list
+      if (!(await removeCalloutOf(tool, { shape: id }))) tool.remove_pin_annotation(id);
     },
     [toolRef],
   );

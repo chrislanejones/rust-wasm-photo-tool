@@ -131,3 +131,54 @@ test("Enter pressed mid-drag commits the box where it is on screen", async ({ pa
   near(Math.min(shapes[0].x0, shapes[0].x1), 200 + 30 / scale);
   near(Math.min(shapes[0].y0, shapes[0].y1), 200 + 40 / scale);
 });
+
+// Night 10-22: the corner-radius dot used to write the panel's radii on every
+// move, which reached a RESELECTED shape's box only through a React effect a
+// task later. It now writes lib/liveEditGeometry like the body drag; the panel
+// takes the radius once, on release.
+test("a corner-dot drag on a reselected shape writes the box in each move's own task", async ({ page }) => {
+  await openWithPendingRect(page);
+  await page.keyboard.press("Enter");
+  await expect(page.locator("svg[data-draw-overlay]")).toHaveCount(0);
+  const top = await screenPoint(page, 350, 200); // the top edge: reselects
+  await page.mouse.click(top.x, top.y);
+  await expect(page.locator("svg[data-draw-overlay]")).toBeVisible();
+  const dot = (await page.locator('[data-shape-radius-handle="0"]').boundingBox())!;
+  const at = { x: dot.x + dot.width / 2, y: dot.y + dot.height / 2 };
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  // The first few px round to radius 0 and write nothing, so there is no DOM
+  // change to time: move past that before the probe starts counting.
+  await page.mouse.move(at.x + 4, at.y + 4);
+  await page.evaluate(() => {
+    window.__moves = [];
+    let cur: { inTask: boolean | null } | null = null;
+    window.addEventListener("pointermove", (e) => {
+      if (e.buttons !== 1) return;
+      const move = { inTask: null as boolean | null };
+      cur = move;
+      window.__moves.push(move);
+      const ch = new MessageChannel();
+      ch.port1.onmessage = () => { if (move.inTask === null) move.inTask = false; };
+      ch.port2.postMessage(0);
+    }, true);
+    new MutationObserver(() => {
+      if (cur && cur.inTask === null) cur.inTask = true;
+    }).observe(document.querySelector("svg[data-draw-overlay]")!, { attributes: true, subtree: true });
+  });
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(at.x + 4 + i * 3, at.y + 4 + i * 3);
+    await expect.poll(() => page.evaluate((i) => window.__moves[i - 1]?.inTask ?? null, i)).not.toBeNull();
+  }
+  await page.mouse.up();
+  const moves = await page.evaluate(() => window.__moves.map((m) => m.inTask));
+  expect(moves).toHaveLength(12);
+  expect(moves.filter((inTask) => inTask !== true)).toEqual([]);
+  // Enter straight after release: the radius must not be lost to the panel
+  // patch, which is a passive effect and can land after the keypress.
+  await page.keyboard.press("Enter");
+  await expect(page.locator("svg[data-draw-overlay]")).toHaveCount(0);
+  const radii = await page.evaluate(async () =>
+    JSON.parse(await window.__annotationTool.get_shape_annotations()).at(-1).cornerRadii as number[]);
+  expect(radii.every((r) => r > 0), `committed radii ${radii}`).toBe(true);
+});
