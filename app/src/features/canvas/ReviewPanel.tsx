@@ -41,6 +41,8 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { useToolStore } from "@/stores/useToolStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { reselectMultiProps } from "./reselectMulti";
 import type { SelectionCombineMode } from "@/lib/selectionBool";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { TIERS } from "@/lib/tiers";
@@ -282,6 +284,7 @@ export function ReviewPanel({
   // Shape ids in draw order (bottom → top) — `objects` carries shapes in the
   // order `get_shape_annotations()` returns them, which IS the z-order.
   const shapeIds = objects.filter((o) => o.type === "shape").map((o) => o.id);
+  const picked = useAnnotationStore((s) => s.picked);
 
   // ── Combine ──────────────────────────────────────────────────────────────
   // Read straight from the store rather than threaded as props: the field is
@@ -455,7 +458,7 @@ export function ReviewPanel({
                     // numbered and these now read the same way down the list.
                     index={oIdx + 1}
                     label={o.label}
-                    onSelect={() => onSelectObject(o)}
+                    {...reselectMultiProps(picked, o, () => onSelectObject(o))}
                     onDelete={() => onDeleteObject(o)}
                     // No Duplicate or d-pad here any more: select the shape
                     // and the action bar under it duplicates and connects

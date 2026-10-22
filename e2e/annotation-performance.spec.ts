@@ -155,3 +155,81 @@ for (const worker of [false, true]) {
       });
     }
 }
+
+// Multi-select (Night 10-22): a GROUP drag at 100 annotations with 20 picked.
+// The drag writes one offset to lib/liveEditGeometry and only the selection
+// overlay re-renders, so event → DOM should sit where the one-shape drag does.
+test("group drag: 100 annotations, 20 picked, local", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await page.route("**/*", (route) => {
+    const url = new URL(route.request().url());
+    return ["localhost", "127.0.0.1"].includes(url.hostname) || ["blob:", "data:"].includes(url.protocol)
+      ? route.continue() : route.abort();
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem("ih_engine_worker", "0");
+    localStorage.setItem("image-horse-prefs", JSON.stringify({ canvasArtboard: false }));
+  });
+  const wasm = await import(pathToFileURL(resolve("pkg/stamp_tool.js")).href);
+  await wasm.default({ module_or_path: readFileSync("pkg/stamp_tool_bg.wasm") });
+  const png = Buffer.from(wasm.blank_png(1200, 800, 240, 240, 240, 255));
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({ name: "annotation-benchmark.png", mimeType: "image/png", buffer: png });
+  await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
+  await installAnnotationProbe(page);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
+  await page.evaluate(async () => {
+    const tool = window.__annotationTool;
+    // 80 on the right, as in the one-shape bench; 20 in a 5 × 4 grid on the
+    // left — the ones the marquee will pick.
+    for (let i = 0; i < 100; i++) {
+      const left = i < 20;
+      const x = left ? 30 + (i % 5) * 70 : 500 + (i * 137) % 600;
+      const y = left ? 40 + Math.floor(i / 5) * 90 : 20 + (i * 83) % 700;
+      if (i % 4 === 3) {
+        await tool.restore_text_annotation(`L${i + 1}`, 20, 40, 40, 40, false,
+          x, y, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false, 0, 0, 0, 0,
+          0, 0, 0, "", 0, 0, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]));
+      } else if (i % 4 === 2) {
+        await tool.restore_pin_annotation(x, y, x + 40, y + 40, i + 1, 220, 50, 50, 0);
+      } else {
+        await tool.restore_shape_annotation(0, x, y, x + 50, y + 40, 220, 50, 50, 3, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 5, 0, new Uint16Array(4));
+      }
+    }
+    await tool.recomposite();
+    await tool.clear_history();
+  });
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Select objects", exact: true }).first().click();
+  const m0 = await screenPoint(page, 10, 10);
+  const m1 = await screenPoint(page, 420, 430);
+  await page.mouse.move(m0.x, m0.y);
+  await page.mouse.down();
+  await page.mouse.move(m1.x, m1.y, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByTestId("multi-select-bar")).toContainText("20 selected");
+  const start = await screenPoint(page, 55, 60); // inside the first picked rect
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  // Past the 3 px click slop first, so every sampled move writes a frame.
+  await page.mouse.move(start.x + 4, start.y + 4);
+  await observeDrag(page, "svg[data-multi-select-overlay]");
+  for (let i = 1; i <= 35; i++) {
+    await page.mouse.move(start.x + 4 + i * 2, start.y + 4);
+    await page.waitForFunction(expected => window.__annotationDragSamples.length === expected, i);
+  }
+  await page.mouse.up();
+  const dragSamples = await page.evaluate(() => window.__annotationDragSamples.slice(5));
+  const report = {
+    count: 100, picked: 20, worker: false, cpuSlowdown: CPU_SLOWDOWN,
+    eventToDom: stats(dragSamples.map(s => s.eventToDomMs)),
+    eventToDispatch: stats(dragSamples.map(s => s.eventToDispatchMs)),
+    dispatchToDom: stats(dragSamples.map(s => s.dispatchToDomMs)),
+  };
+  expect(dragSamples).toHaveLength(30);
+  await info.attach("annotation-group-drag", { body: JSON.stringify(report, null, 2), contentType: "application/json" });
+  console.log("GROUP_DRAG", JSON.stringify({ ...report, eventToDom: { ...report.eventToDom, samplesMs: undefined },
+    eventToDispatch: { ...report.eventToDispatch, samplesMs: undefined }, dispatchToDom: { ...report.dispatchToDom, samplesMs: undefined } }));
+});

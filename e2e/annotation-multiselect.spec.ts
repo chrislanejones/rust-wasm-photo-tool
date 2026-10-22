@@ -299,10 +299,37 @@ test("Ctrl+A picks the layer's annotations, arrows nudge them, Esc lets go", asy
   const before = await layer(page);
   await key(page, "ArrowRight");
   await key(page, "Shift+ArrowDown");
-  const after = await layer(page);
   const r0 = before.shapes.find((s) => s.id === ids[0])!;
-  const r1 = after.shapes.find((s) => s.id === ids[0])!;
-  expect([r1.x0 - r0.x0, r1.y0 - r0.y0]).toEqual([1, 10]);
+  await expect.poll(async () => {
+    const r1 = (await layer(page)).shapes.find((s) => s.id === ids[0])!;
+    return [r1.x0 - r0.x0, r1.y0 - r0.y0];
+  }).toEqual([1, 10]);
   await key(page, "Escape");
   await expect(bar(page)).toHaveCount(0);
+});
+
+test("Shift-click rows in the Reselect list: checks, a screen-reader 'selected', the same bar", async ({ page }) => {
+  await open(page);
+  await seed(page, [{ rect: [100, 100, 80, 80] }, { rect: [300, 100, 80, 80] }, { rect: [500, 100, 80, 80] }]);
+  // A nudge publishes the seeded objects to the lists, the way any edit does.
+  await createTool(page, "Select objects");
+  await key(page, "Control+a");
+  await expect(bar(page)).toContainText("3 selected");
+  await key(page, "ArrowRight");
+  await expect.poll(() => layer(page).then((l) => l.shapes[0].x0)).toBe(101);
+  await key(page, "Escape");
+  await expect(bar(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "Review", exact: true }).first().click();
+  const row = (n: number) => page.getByTitle(`Reselect Square #${n}`, { exact: true });
+  await expect(row(1)).toBeVisible();
+  await row(1).click({ modifiers: ["Shift"] });
+  await row(3).click({ modifiers: ["Shift"] });
+  await expect(bar(page)).toContainText("2 selected");
+  await expect(row(1).locator('input[type="checkbox"]')).toBeChecked();
+  await expect(row(2).locator('input[type="checkbox"]')).not.toBeChecked();
+  await expect(row(3)).toHaveAccessibleName(/selected/);
+  await expect(row(2)).not.toHaveAccessibleName(/selected/);
+  await row(3).click({ modifiers: ["Shift"] });
+  await expect(bar(page)).toContainText("1 selected");
+  await expect(row(1).locator('input[type="checkbox"]')).toHaveCount(0);
 });
