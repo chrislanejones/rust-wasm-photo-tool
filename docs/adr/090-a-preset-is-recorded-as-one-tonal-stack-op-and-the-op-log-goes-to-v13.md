@@ -41,6 +41,8 @@ markers) fixed that and are live, so issue #37 can start, with presets first.
 
 ## Consequences
 
+The proposed reuse for Adjustments below was superseded by [ADR-091](091-adjustments-record-absolute-sessions-in-oplog-v14.md): the slider session has a different filter order and replaces absolute settings on an untouched base.
+
 + A preset is one Ctrl+Z on the op-log path, in-session and after a reload,
   byte-exact (`ops_engine_parity.rs`, `e2e/oplog-preset-undo.spec.ts`).
 + The five Adjustments sliders are the same five filters, so they can record

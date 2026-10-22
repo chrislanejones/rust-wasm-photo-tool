@@ -2021,8 +2021,10 @@ fn the_recorded_tonal_stack_carries_the_units_untouched() {
     t.set_oplog_undo(true);
     assert!(preset(&mut t, VIVID));
     let frames = t.oplog_encoded_ops(0, 1);
-    assert_eq!(frames[4], 13, "a preset frame is stamped v13");
-    assert_eq!(OP_FORMAT_VERSION, 13);
+    assert_eq!(
+        frames[4], OP_FORMAT_VERSION,
+        "frames use the current format"
+    );
     let ops = decode_op_frames(&frames).unwrap(); // allow: rust-panic
     assert_eq!(
         ops,
@@ -2040,4 +2042,168 @@ fn the_recorded_tonal_stack_carries_the_units_untouched() {
         "Preset",
         "the History panel row after a reload"
     );
+}
+
+// Adjustments replaces absolute settings on a session base. Presets' cumulative
+// TonalStack cannot encode that operation (clipping has no exact inverse).
+const ADJUST_IDENTITY: [f64; 7] = [0.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0];
+
+fn adjust_release(t: &mut ImageHorseTool, a: [f64; 7]) -> u64 {
+    assert!(t.adjust_commit(a[0], a[1], a[2], a[3], a[4], a[5], a[6]));
+    t.recomposite();
+    assert!(!t.oplog_is_broken());
+    let replay = t
+        .oplog
+        .as_ref()
+        .expect("recorded log") // allow: rust-panic
+        .live_document()
+        .composite_flat();
+    assert_flat_identical(
+        &t.composite_cache,
+        &replay,
+        t.width(),
+        "Adjustments release",
+    );
+    composite_hash(t)
+}
+
+fn restored_tool(t: &ImageHorseTool) -> ImageHorseTool {
+    let (w, h) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+    let mut restored = ImageHorseTool::new(w, h);
+    restored.set_oplog_undo(true);
+    assert!(restored.oplog_restore(
+        &t.oplog_keyframe_pixels_rgba(0),
+        w,
+        h,
+        &t.oplog_keyframe_annotations(0),
+        &t.oplog_encoded_ops(0, t.oplog_op_count() as u32),
+        t.oplog_cursor() as u32,
+    ));
+    restored
+}
+
+#[test]
+fn adjustments_releases_reset_and_reload_preserve_every_undo_step() {
+    for artboard in [false, true] {
+        let (mut t, _) = if artboard {
+            artboard_tool(32, 24, 8)
+        } else {
+            seeded_tool(32, 24)
+        };
+        t.set_oplog_undo(true);
+        let mut hashes = vec![composite_hash(&mut t)];
+        assert!(t.tonal_preview_begin());
+        // Deliberate clipping, followed by a change to every filter (including
+        // sharpen/blur), followed by exact reset and another release.
+        for a in [
+            [100.0, 300.0, 100.0, 0.0, 0.0, 0.0, 0.0],
+            [35.0, 140.0, 65.0, 25.0, -30.0, 20.0, 5.0],
+            ADJUST_IDENTITY,
+            [-20.0, 80.0, 130.0, -10.0, 40.0, 0.0, 0.0],
+        ] {
+            hashes.push(adjust_release(&mut t, a));
+        }
+        assert_eq!(hashes[3], hashes[0], "reset is exact even after clipping");
+        assert_eq!(t.oplog_op_count(), 4);
+        assert_eq!(t.undo_count(), 4);
+        let mut t = restored_tool(&t);
+        assert_eq!(composite_hash(&mut t), hashes[4]);
+        for expected in hashes[..4].iter().rev() {
+            assert!(t.undo());
+            assert_eq!(&composite_hash(&mut t), expected);
+            assert!(
+                !t.oplog_is_broken(),
+                "snapshot fallback cannot satisfy this"
+            );
+        }
+        for expected in &hashes[1..] {
+            assert!(t.redo());
+            assert_eq!(&composite_hash(&mut t), expected);
+            assert!(!t.oplog_is_broken());
+        }
+    }
+}
+
+#[test]
+fn adjustments_preview_identity_duplicate_and_apply_record_only_commits() {
+    let (mut t, _) = seeded_tool(32, 24);
+    t.set_oplog_undo(true);
+    assert!(t.tonal_preview_begin());
+    assert!(t.adjust_preview_set(70.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+    assert_eq!(t.oplog_op_count(), 0);
+    assert!(!t.adjust_commit(0.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+    assert!(t.adjust_apply(30.0, 110.0, 120.0, 5.0, 10.0, 0.0, 0.0));
+    t.recomposite();
+    assert!(!t.tonal_preview_active());
+    assert_eq!(t.oplog_op_count(), 1);
+    let frames = t.oplog_encoded_ops(0, 1);
+    assert_eq!((frames[4], frames[5]), (14, 24), "append-only wire index");
+    let ops = crate::ops::decode_op_frames(&frames).expect("frames"); // allow: rust-panic
+    assert_eq!(ops[0].label(), "Adjustments");
+    assert_eq!(
+        ops[0],
+        Op::Adjustments {
+            new_session: true,
+            brightness: 30.0,
+            contrast: 110.0,
+            saturation: 120.0,
+            shadows: 5.0,
+            highlights: 10.0,
+            sharpen: 0.0,
+            blur: 0.0,
+        }
+    );
+    assert!(t.tonal_preview_begin());
+    adjust_release(&mut t, [20.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0]);
+    assert!(!t.adjust_apply(20.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0));
+    assert_eq!(
+        t.oplog_op_count(),
+        2,
+        "Apply doesn't duplicate the last release"
+    );
+    assert!(!restored_tool(&t).oplog_is_broken());
+}
+
+#[test]
+fn adjustments_new_sessions_and_branches_capture_the_current_pixels() {
+    let (mut t, _) = seeded_tool(32, 24);
+    t.set_oplog_undo(true);
+    assert!(t.tonal_preview_begin());
+    let first = adjust_release(&mut t, [30.0, 120.0, 80.0, 5.0, 10.0, 0.0, 0.0]);
+    t.tonal_preview_cancel();
+    stroke(&mut t, (2.0, 5.0), (28.0, 20.0), "#2040e0");
+    let painted = composite_hash(&mut t);
+    assert!(t.tonal_preview_begin());
+    let final_hash = adjust_release(&mut t, [-20.0, 90.0, 150.0, 0.0, 0.0, 0.0, 0.0]);
+    let mut r = restored_tool(&t);
+    assert_eq!(composite_hash(&mut r), final_hash);
+    assert!(r.undo());
+    assert_eq!(composite_hash(&mut r), painted);
+    assert!(r.undo());
+    assert_eq!(composite_hash(&mut r), first);
+    assert!(r.tonal_preview_begin());
+    let branched = adjust_release(&mut r, [15.0, 100.0, 100.0, 0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(r.oplog_op_count(), 2, "new release replaces the redo tail");
+    assert_eq!(composite_hash(&mut restored_tool(&r)), branched);
+}
+
+#[test]
+fn adjustments_session_survives_keyframes_and_keyframe_pruning() {
+    let (mut t, _) = seeded_tool(8, 8);
+    t.set_oplog_undo(true);
+    assert!(t.tonal_preview_begin());
+    let mut hashes = vec![composite_hash(&mut t)];
+    // More than the resident keyframe budget, while never leaving this session.
+    for i in 0..300 {
+        hashes.push(adjust_release(
+            &mut t,
+            [f64::from(i % 90 + 1), 120.0, 80.0, 0.0, 0.0, 0.0, 0.0],
+        ));
+    }
+    let mut r = restored_tool(&t);
+    for expected in hashes[..300].iter().rev() {
+        assert!(r.undo());
+        assert_eq!(&composite_hash(&mut r), expected);
+        assert!(!r.oplog_is_broken());
+    }
 }

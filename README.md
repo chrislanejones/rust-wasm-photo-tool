@@ -90,19 +90,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.32 — 2026-10-18
+### v9.35 — 2026-10-21
 
-**Saves keep their files. AI reference uploads get cleaned up.**
+**Shape drags keep up, pins renumber themselves, and Smart Callouts.**
 
-Retrying a cloud save keeps the archive it was asked to save. Failed-upload
-cleanup checks references through indexes, so a file stays protected even when
-its record is past row 2,000. Create AI Image keeps reference inputs while a job
-runs, then removes them when the job finishes unless another record still uses them.
+Dragging a shape's edit box now takes about 6 ms from pointer to screen, down
+from 21. The editor no longer re-renders on every move. Numbered pins close
+the gap when one is deleted. The Pins panel's Next field inserts a step
+anywhere, and Renumber tidies the whole sequence. A Smart Callout is a pin, a
+label and a leader placed in one click and undone in one Ctrl+Z. The leader
+follows the pin or the label when either moves, and it survives a reload.
 
-Details: [Change Summary](docs/Change-summary.md) ·
-[AI reference storage](docs/AI-reference-storage.md) ·
-[storage-reference indexes](docs/adr/089-every-storage-id-field-has-an-index-so-is-this-file-referenced-is-a-lookup.md).
-The [Trail Log](https://imagehorse.app/trail-log) has release notes and commit squares.
+How the 21 ms was found: [Where the drag's 21 ms goes](docs/benchmarks/README.md#where-the-drags-21-ms-goes).
+Full release notes: [Change Summary](docs/Change-summary.md) ·
+[Trail Log](https://imagehorse.app/trail-log).
 
 
 ## License

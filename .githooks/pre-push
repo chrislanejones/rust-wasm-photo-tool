@@ -20,21 +20,22 @@ set -e
 echo "• cargo fmt --check"
 cargo fmt --all --check || { echo "✗ run: cargo fmt"; exit 1; }
 
-# --features tiles, MATCHING CI. Without it this line silently skips every
+# Exercise tiles (as CI does) plus the opt-in dirty-region prototype.
+# Without tiles this line silently skips every
 # file gated `#[cfg(all(test, feature = "tiles"))]` — including
 # src/ops_engine_parity.rs, whose `mod` declaration carries the gate so the
 # file itself shows no `cfg(test)` to grep for. On 2026-09-10 an engine
 # signature change left two call sites in that file stale: this hook passed,
 # and CI went red on a plain compile error the hook had never compiled.
-echo "• cargo clippy -D warnings (--features tiles)"
-cargo clippy --all-targets --features tiles -- -D warnings
+echo "• cargo clippy -D warnings (--features tiles,dirty-regions)"
+cargo clippy --all-targets --features tiles,dirty-regions -- -D warnings
 
 # cargo test was MISSING ENTIRELY, while this file's own header claims to
 # mirror the blocking CI jobs. CI runs it; a hook that lints but never builds
 # the test targets cannot catch a broken test file. ~24s warm, which is the
 # price of not finding out from CI three minutes later.
-echo "• cargo test --features tiles"
-cargo test --features tiles
+echo "• cargo test --features tiles,dirty-regions"
+cargo test --features tiles,dirty-regions
 
 echo "• tsc typecheck (stamp-tool)"
 pnpm --filter stamp-tool exec tsc -b

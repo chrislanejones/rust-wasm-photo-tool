@@ -516,6 +516,14 @@ trip). ADRs [003](adr/003-operation-log-undo.md) ·
 
 ---
 
+### Pending review: recorded Adjustments sessions
+
+The 10-17 branch records each Adjustments release and reset as one operation,
+including sharpen and blur. It preserves the untouched session base during
+replay and keeps the existing filter order. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md)
+describes format v14, backward compatibility, and its memory cost. This is not
+yet a production release.
+
 ## Planned (not yet in the diagram above)
 
 Nothing in this section is live in a default build. The two entries that used
@@ -540,3 +548,14 @@ they can be described accurately.
   self-test that says it agrees with the CPU reference. Nothing consumes it.
   [ADR-030](adr/030-webgpu-runs-in-js-not-in-the-crate.md) is still **draft**,
   and it is the decision that would have to be Accepted first.
+
+
+### Annotation rendering experiments
+
+The [annotation benchmark report](benchmarks/README.md) compares full-frame,
+tiled and opt-in dirty-region rendering at 10, 100 and 500 annotations. The
+`dirty-regions` Cargo feature exposes a research prototype, not an editor
+render mode. Callers provide all old/new ink bounds; unsupported scenes fall
+back to full recomposition. Its persistent scratch buffer costs four bytes
+per canvas pixel. Normal builds exclude the prototype. Browser drag timings
+measure the SVG overlay separately from engine commits.

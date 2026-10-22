@@ -317,6 +317,12 @@ export default function Architecture() {
             </p>
           </div>
 
+          <p className="arch-plane__foot">
+            Annotation rendering has repeatable benchmarks at 10, 100 and 500 annotations.
+            An opt-in dirty-region prototype is compared with full-frame and tiled rendering,
+            including pixel parity and memory costs. It is disabled in the production editor.
+          </p>
+
           <div className="arch-seam" aria-hidden="true">
             <span className="arch-seam__rule" />
             <span className="arch-seam__label">sever here — the editor still works</span>

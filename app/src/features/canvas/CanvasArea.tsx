@@ -24,6 +24,7 @@ import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { PerspectiveLayer } from "./PerspectiveLayer";
 import { ShapeEditOverlay, type ShapeDrawSettings } from "./ShapeEditOverlay";
+import { CalloutLabelInput } from "./CalloutLabelInput";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { ObjectRemovalOverlay } from "./ObjectRemovalOverlay";
 import { LassoOverlay } from "./LassoOverlay";
@@ -1337,6 +1338,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             onDrawEditChange={onDrawEditChange}
           />
         )}
+        <CalloutLabelInput canvasRef={canvasRef} />
 
         {/* Brush-size ring — only for the size-based brush tools: Paint's four
             brushes, and the Eraser tool's two canvas-brush modes (brush + Magic

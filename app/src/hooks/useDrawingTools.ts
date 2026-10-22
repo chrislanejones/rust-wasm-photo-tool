@@ -12,6 +12,8 @@ import { normalizeDeg } from "@/lib/shapeRotation";
 import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
 import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
 import { PressQueue } from "@/lib/pressQueue";
+import { usePinSteps } from "@/hooks/usePinSteps";
+import { liveDragActive, takeLiveEdit } from "@/lib/liveEditGeometry";
 import {
   drawnShapeFor,
   editStateFromShape,
@@ -30,8 +32,7 @@ import {
 // The drawing stack's types and pure helpers live in lib/drawEditState.ts and
 // are re-exported here, so every existing `@/hooks/useDrawingTools` import
 // keeps working unchanged.
-export type { Point };
-export type { CropSelection, DrawEditState, ShapeMeta, ShapeStylePatch } from "@/lib/drawEditState";
+export type { CropSelection, DrawEditState, Point, ShapeMeta, ShapeStylePatch } from "@/lib/drawEditState";
 export { pendingShapeType, panelStylePatch } from "@/lib/drawEditState";
 
 interface UseDrawingToolsOptions {
@@ -222,7 +223,7 @@ export function useDrawingTools({
    * pending, so every trigger can call it unconditionally.
    */
   const commitEdit = useCallback(async () => {
-    const es = editStateRef.current;
+    const es = takeLiveEdit(editStateRef.current, editDirtyRef); // a drag in flight included
     if (!es) return;
     editStateRef.current = null;
     const settled = settle(es); // cleared before the engine drew it, shapes vanished on Apply
@@ -326,7 +327,7 @@ export function useDrawingTools({
   /** Escape: drop the pending edit. For an existing-shape edit this also
    *  un-hides the committed shape (clears the Rust editing flag) and repaints. */
   const cancelEdit = useCallback(() => {
-    const es = editStateRef.current;
+    const es = takeLiveEdit(editStateRef.current);
     editStateRef.current = null;
     if (es?.editId == null || !toolRef.current) return setEditState(null);
     const settled = settle(es); // drawn until the un-hide is
@@ -437,6 +438,14 @@ export function useDrawingTools({
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
 
+  // Pins: drop (at the Next number), delete, Renumber, Smart Callouts — usePinSteps.
+  const afterPinChange = useCallback(async () => {
+    flushToCanvas();
+    syncState();
+    await refreshShapes();
+  }, [flushToCanvas, syncState, refreshShapes]);
+  const { dropPin, removePin } = usePinSteps({ toolRef, settingsRef, shapes, afterChange: afterPinChange });
+
   /** Delete a live shape (from the Reselect list X). One history step. */
   const removeShape = useCallback(
     async (id: number) => {
@@ -447,7 +456,10 @@ export function useDrawingTools({
         setEditState(null);
         tool.set_editing_shape(-1);
       }
-      tool.remove_shape_annotation(id);
+      // A pin closes the gap it leaves, and takes a callout's leader and label
+      // with it (usePinSteps); anything else just goes.
+      if (shapesRef.current.some((s) => s.id === id && s.kind === 5)) await removePin(id);
+      else tool.remove_shape_annotation(id);
       // A deleted shape can't stay the Align target.
       useAnnotationStore
         .getState()
@@ -458,39 +470,7 @@ export function useDrawingTools({
       syncState();
       await refreshShapes();
     },
-    [toolRef, flushToCanvas, syncState, refreshShapes],
-  );
-
-  /** Drop an auto-sequenced callout pin at `p`. The sequence index = (max
-   *  existing pin index on this photo) + 1, so it resets per photo when the
-   *  shape list is reloaded. Diameter follows the Stroke Width slider; the
-   *  label style (number vs letter) follows the Pins tab toggle. Pins are a
-   *  filled circle bbox + label (Rust kind 5). */
-  const dropPin = useCallback(
-    async (p: Point) => {
-      const tool = toolRef.current;
-      if (!tool) return;
-      const s = settingsRef.current;
-      // Map the 1-10 stroke-width slider to a callout-sized disc radius.
-      const r = 8 + s.strokeWidth * 3;
-      let maxNum = 0;
-      try {
-        for (const sh of JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[]) {
-          if (sh.kind === 5 && sh.number > maxNum) maxNum = sh.number;
-        }
-      } catch {
-        /* ignore parse errors — start from 1 */
-      }
-      const labelKind = s.pinLabel === "letters" ? 1 : 0;
-      tool.add_pin_annotation(
-        p.x - r, p.y - r, p.x + r, p.y + r,
-        maxNum + 1, s.strokeColor, labelKind,
-      );
-      flushToCanvas();
-      syncState();
-      await refreshShapes();
-    },
-    [toolRef, flushToCanvas, syncState, refreshShapes],
+    [toolRef, flushToCanvas, syncState, refreshShapes, removePin],
   );
 
   // Refresh the shape list after any external history change (undo/redo/jump
@@ -642,7 +622,7 @@ export function useDrawingTools({
         // shape stayed on screen — "undo skipped one". So the pending change
         // is the step: discard it (same as Escape) and stop the engine undo.
         // A clean re-selection has no pending change and falls through.
-        if (es.editId == null || editDirtyRef.current) {
+        if (es.editId == null || editDirtyRef.current || liveDragActive()) {
           e.preventDefault();
           e.stopImmediatePropagation();
           cancelEdit();

@@ -4,6 +4,55 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Annotation performance and editing work (2026-10-20)
+
+Work is on `feat/annotation-performance-baseline`. The benchmark and prototype
+are implemented; the four user-facing milestones remain open. Results,
+measurement limits and reproduction commands are in the
+[benchmark report](benchmarks/README.md).
+
+- [x] Benchmark 10, 100 and 500 annotations. The engine harness measures
+  direct shape/arrow raster batches, recomposition, commit cost and memory at
+  1200×800 and 4000×3000. Six browser cases measure paced pointer-to-DOM and
+  following-frame-opportunity latency, local/worker round trips and main-thread
+  JS heap; they verify real drag, commit and undo. Physical display latency
+  and total browser/GPU memory are outside these measurements. Run
+  `pnpm run build:wasm`, then
+  `pnpm --silent run bench:annotations > /tmp/annotation-baseline.json`
+  with other builds/tests stopped. Recorded samples:
+  [engine baseline](benchmarks/annotations-baseline.json).
+- [x] Prototype dirty-region rendering. The `dirty-regions` Cargo feature adds
+  an explicit-damage compositor with conservative full-frame fallbacks.
+  Eighteen WASM cases compare exact pixels and timing against full-frame and
+  tiled paths; native tests cover old/new bounds, overlapping/translucent
+  objects, text shadows, clipping, undo, recording and unsupported states.
+  The current `tiles_flush` runs **after** full recomposition; it is not a
+  dirty-region compositor and is no longer called by the normal editor.
+  Automatic invalidation and production integration are still pending.
+- [ ] Smart Callouts: anchored arrows, numbered markers and editable labels.
+  **v1 shipped in v9.35 (10-21, #390)**: Pins ›
+  Drop: Callout places pin + label + leader as one undo step; the leader follows
+  the pin and the label (Text tool) and survives reload; deleting the pin takes
+  all three. Joined by geometry (`lib/callouts.ts`), no format change. Pins
+  renumber themselves (delete closes the gap, Next inserts, Renumber). Left
+  open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
+  deleting the label or leader alone leaves the others as plain objects, the
+  leader is an arrow, not a plain line, and a label moved by Align or
+  Placement should follow (any refresh of the Text tool's list is diffed) but
+  only Text tool drags are tested.
+- [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
+  now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
+  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The Corner-radius
+  dot drag still writes panel settings per move and was left as is.
+- [ ] Annotation alignment and multi-select. Existing single-object alignment
+  is not multi-select; grouped changes must be undoable as one action.
+- [ ] Screenshot comparison with a difference visualization and attached
+  annotations. Existing before/after comparison is not this feature.
+- [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
+  checks high/low contrast edges, equal-luminance color edges, gaps, soft
+  boundaries, image borders, zoom, fast strokes and undo. Automated kernel
+  tests do not constitute human sign-off.
+
 ## OPEN — the editor's Vercel project lost every deployment overnight (10-14-2026)
 
 At about 07:27 UTC on 10-14, `edit.imagehorse.app` returned 404 `DEPLOYMENT_NOT_FOUND`,
@@ -52,8 +101,8 @@ remains disabled. Input/mask/output retention (row 203) is documented, not built
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
 | `select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load | `e2e/` | Tara |
 | `SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone | `app/src/` | Tara |
-| Record the five Adjustments sliders on `Op::TonalStack` (`adjust_commit` / `adjust_apply` are still unrecorded). Decide whether the history label stays "Preset". | engine, after #368 | Silas |
-| Capture a real v13 op-log fixture with a TonalStack frame once #368 ships | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
+| IN REVIEW on `feat/adjustments-oplog-20261017`: record all seven Adjustments settings with exact session resets. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md) explains why cumulative `TonalStack` cannot represent them; label stays "Adjustments". | engine, after #368 | Silas |
+| Captured 10-17 from production master d486fd4: real v13 TonalStack frame, base PNG, annotations and browser hash; included in the Adjustments branch with a compatibility test | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
 | `docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix | — | at merge |
 | `github/codeql-action` 4.38.3 (#359) was left out of #370. It edits a workflow file, and this machine's gh token has no `workflow` scope. Merge #359 as-is. | — | Chris |
 

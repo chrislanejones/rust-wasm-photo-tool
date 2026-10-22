@@ -24,6 +24,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.35",
+    date: "2026-10-21",
+    headline: "Shape drags keep up, pins renumber themselves, and Smart Callouts.",
+    entries: [
+      { tag: "perf", text: "Dragging a shape's edit box takes about 6 ms from pointer to screen, down from 21. The editor no longer re-renders on every move." },
+      { tag: "feature", text: "Numbered pins close the gap when one is deleted. The Pins panel's Next field inserts a step anywhere, and Renumber tidies the sequence. Each is one undo step." },
+      { tag: "feature", text: "Smart Callout: a pin, a label and a leader in one click and one Ctrl+Z. The leader follows the pin or the label and survives a reload." },
+      { tag: "rust", text: "Four new engine calls, no format change. Engine 901,943 to 904,742 B (+2,799)." },
+    ],
+  },
+  {
+    version: "v9.34",
+    date: "2026-10-20",
+    headline: "Annotation benchmarks and an opt-in rendering prototype.",
+    entries: [
+      { tag: "infra", text: "Repeatable benchmarks cover 10, 100 and 500 annotations, including browser drag timing, rasterization, recomposition and memory." },
+      { tag: "rust", text: "An experimental dirty-region renderer is compared with full-frame and tiled paths, with pixel-parity tests and recorded scratch-buffer costs. It is disabled in the production editor." },
+    ],
+  },
+  {
+    version: "v9.33",
+    date: "2026-10-19",
+    headline: "Adjustments undo survives a reload. The status bar trims itself near compact.",
+    entries: [
+      { tag: "feature", text: "Adjustments sessions are recorded in the operation log. All seven controls and their exact resets come back through undo, redo and reload." },
+      { tag: "ui", text: "The status bar drops hints in steps as the window narrows, tool hints first, so it never reaches compact overfull. The two pinned shortcuts stay put." },
+      { tag: "rust", text: "Operation log format v14. Engine 901,221 to 901,943 B (+722); no pixel kernel change." },
+    ],
+  },
+  {
     version: "v9.32",
     date: "2026-10-18",
     headline: "Saves keep their files. AI reference uploads get cleaned up.",

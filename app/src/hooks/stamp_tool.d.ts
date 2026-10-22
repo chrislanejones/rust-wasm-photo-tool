@@ -1348,6 +1348,24 @@ declare module "stamp_tool" {
       color_hex: string,
       label_kind: number,
     ): number;
+    /** Drop a pin numbered `number`; the active layer's pins at or above it
+     *  move up one (inserting a step). Pushes "Add Pin". tests/pin_steps.rs. */
+    insert_pin_annotation(
+      x0: number, y0: number, x1: number, y1: number,
+      number: number,
+      color_hex: string,
+      label_kind: number,
+    ): number;
+    /** The next call that would push an undo step joins the one in progress
+     *  instead (a Smart Callout's pin, label and leader are one step). The
+     *  next recomposite clears it if nothing consumed it. */
+    continue_step(): void;
+    /** Delete pin `id`; the active layer's pins above it move down one.
+     *  Pushes "Delete Pin"; false (no step) when `id` is not a pin there. */
+    remove_pin_annotation(id: number): boolean;
+    /** Renumber the active layer's pins 1, 2, 3… in numbered order. Returns
+     *  how many changed; pushes "Renumber Pins" only when that is not 0. */
+    renumber_pins(): number;
     /** Restore a persisted pin WITHOUT pushing history. Color is raw r,g,b. */
     restore_pin_annotation(
       x0: number, y0: number, x1: number, y1: number,

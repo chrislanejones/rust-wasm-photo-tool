@@ -9,6 +9,7 @@
     "build": "pnpm --filter stamp-tool build",
     "build:marketing": "pnpm --filter photo-horse-marketing build",
     "build:wasm": "./scripts/build-wasm.sh",
+    "bench:annotations": "node scripts/annotation-benchmark.mjs",
     "build:all": "pnpm run build:wasm && pnpm run build",
     "lint": "eslint app/src eslint.config.mjs",
     "lint:fix": "eslint app/src eslint.config.mjs --fix",

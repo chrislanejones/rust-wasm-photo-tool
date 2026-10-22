@@ -258,7 +258,12 @@ use serde::{Deserialize, Serialize};
 ///     the version byte the one compatibility gate, and keeps "newer than
 ///     me" distinguishable from "damaged" for any reader that later needs to
 ///     tell them apart.
-pub const OP_FORMAT_VERSION: u8 = 13;
+///
+/// **14** — Adjustments sessions (ADR-091). One appended variant at index 24
+/// carries the panel's seven settings and whether this starts a new session.
+/// Replay keeps the untouched session pixels, so successive releases and
+/// resets do not compound clipped filters. v13 TonalStack bytes are unchanged.
+pub const OP_FORMAT_VERSION: u8 = 14;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -1066,9 +1071,9 @@ pub enum Op {
     /// `apply_stack` the live `preset_apply` called, on the same bytes.
     ///
     /// Fields are in the stack's APPLY order (tone first, color last), which
-    /// is also their wire order. The five Adjustments sliders are the same
-    /// filters and will record on this variant later; a component at its
-    /// identity is skipped exactly as `apply_stack` skips it.
+    /// is also their wire order. Adjustments has a different filter order and
+    /// session semantics, so it uses its own variant rather than changing
+    /// these already-persisted semantics.
     ///
     /// Appended after [`Op::SameGesture`] (index 23); same rule as every
     /// variant since v2.
@@ -1078,6 +1083,20 @@ pub enum Op {
         highlights: f64,
         shadows: f64,
         saturation: f64,
+    },
+    /// v14 (ADR-091): absolute panel values, recomputed from the untouched
+    /// session base. `new_session` captures the current pixels before applying
+    /// the first release; later releases reuse that base, including resets.
+    /// Appended at index 24. A release is one op and one "Adjustments" undo.
+    Adjustments {
+        new_session: bool,
+        brightness: f64,
+        contrast: f64,
+        saturation: f64,
+        shadows: f64,
+        highlights: f64,
+        sharpen: f64,
+        blur: f64,
     },
 }
 
@@ -1132,6 +1151,7 @@ impl Op {
             Op::SameGesture => "Edit",
             // The snapshot path's label for the same action (`snap("Preset")`).
             Op::TonalStack { .. } => "Preset",
+            Op::Adjustments { .. } => "Adjustments",
         }
     }
 }
@@ -1614,6 +1634,9 @@ pub struct Document {
     /// The artboard fill under `pixels`, when the document has one. `None` for
     /// a single-layer (`load_image`) document.
     pub canvas: Option<CanvasParams>,
+    /// Runtime replay pixels, shared by cloned keyframes. Persistence restores from op 0, where
+    /// the first Adjustments op reconstructs it; no pixel payload is encoded.
+    adjustment_base: Option<std::sync::Arc<[u8]>>,
 }
 
 impl Document {
@@ -1623,6 +1646,7 @@ impl Document {
             texts: Vec::new(),
             shapes: Vec::new(),
             canvas: None,
+            adjustment_base: None,
         }
     }
 
@@ -1749,6 +1773,9 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
 /// Apply a single op to a document. Pixel ops route through the engine's own
 /// kernels (see the module doc, "Apply fidelity").
 pub fn apply(op: &Op, doc: &mut Document) {
+    if !matches!(op, Op::Adjustments { .. } | Op::SameGesture) {
+        doc.adjustment_base = None;
+    }
     match op {
         Op::FillRegion { rect, color } => {
             let c = [color.r, color.g, color.b, color.a];
@@ -1975,6 +2002,36 @@ pub fn apply(op: &Op, doc: &mut Document) {
         }
         // A grouping marker for undo; the document does not see it.
         Op::SameGesture => {}
+        Op::Adjustments {
+            new_session,
+            brightness,
+            contrast,
+            saturation,
+            shadows,
+            highlights,
+            sharpen,
+            blur,
+        } => {
+            if *new_session || doc.adjustment_base.is_none() {
+                doc.adjustment_base = Some(doc.pixels_flat().into());
+            }
+            let Some(base) = &doc.adjustment_base else {
+                return;
+            };
+            let (w, h) = (doc.width(), doc.height());
+            let mut flat = base.to_vec();
+            let settings = crate::adjust::Adjust::new(
+                *brightness,
+                *contrast,
+                *saturation,
+                *shadows,
+                *highlights,
+                *sharpen,
+                *blur,
+            );
+            crate::adjust::adjust_in_place(&mut flat, w, h, &settings);
+            doc.pixels.blit_from_flat(&flat, w, h);
+        }
         Op::TonalStack {
             brightness,
             contrast,
@@ -2549,6 +2606,16 @@ mod tests {
                 highlights: 8.0,
                 shadows: 12.0,
                 saturation: 1.25,
+            },
+            Op::Adjustments {
+                new_session: true,
+                brightness: 65.0,
+                contrast: 180.0,
+                saturation: 45.0,
+                shadows: 30.0,
+                highlights: -20.0,
+                sharpen: 15.0,
+                blur: 5.0,
             },
             Op::LayerMove {
                 layer: 0,
@@ -4136,8 +4203,8 @@ mod v2_migration_tests {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
         assert_eq!(
-            OP_FORMAT_VERSION, 13,
-            "10 is ADR-070's, skipped (ADR-082); 12 is gestures (ADR-088); 13 is the tonal stack (#37)"
+            OP_FORMAT_VERSION, 14,
+            "14 adds Adjustments sessions (ADR-091); earlier op indices stay fixed"
         );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(

@@ -11588,3 +11588,57 @@ Not in this release: no imagehorse-qc pass yet on these engine and canvas change
 | Test reliability | Refine waits for its engine handle; SubscriptionButton avoids an unnecessary async wait before render. No timeout increase. |
 | Verification | Full feature-branch CI green; 35 backend tests, 2,023 frontend tests and 713 Rust tests pass. Removing AI cleanup fails 10 tests; restoring the capped save scans fails 5; removing the same-file guard fails 4. Refine: 80/80 at 4× CPU. |
 | Scope | No engine, operation-log format, IndexedDB, authentication or billing change. WASM remains 901,221 bytes. The v14 Adjustments proposal is not part of this release. |
+
+
+## v9.33 Change Summary — 2026-10-19
+
+**Adjustments undo survives a reload. The status bar trims itself near compact.**
+
+| Area | Change |
+| --- | --- |
+| Adjustments undo (#382) | Absolute Adjustments sessions are recorded in the op log (format v14, index 24). All seven panel controls and their exact resets survive undo, redo and reload. Preset payloads and pixels are unchanged. ADR-091 documents the session base and memory cost. |
+| Status bar | Hints drop in steps as the window narrows, leftmost first: tool hints go below **1320 px**, one rotating hint below **1160 px**, then the compact bar below 1000 px. `Alt+/` and `Alt+,` stay pinned. The hint area clips instead of pushing the readouts off the edge. |
+| Verification | 2,023 frontend tests, TypeScript, lint (0 errors), guardrails pass. #382 CI green (19 checks). Removing the recorder fails four parity tests; a production-captured v13 IndexedDB fixture restores byte-exactly. |
+| Engine | 901,221 → **901,943 B** (+722). No pixel kernel or display flush change. |
+
+Not in this release: no imagehorse-qc pass yet on the op-log change; the status bar was not checked in a browser.
+
+
+
+## v9.34 Change Summary — 2026-10-20
+
+**Measure annotation rendering before changing the production path.**
+
+| Area | Change |
+| --- | --- |
+| Benchmarks | Repeatable mixed-annotation engine fixtures at 10, 100 and 500 annotations on 1200×800 and 4000×3000 canvases; separate rasterization, recomposition, flush, commit and memory measurements. Six browser cases measure pointer-to-SVG and the following animation-frame opportunity in local and worker modes. |
+| Prototype | Opt-in `dirty-regions` Cargo feature, with explicit caller-supplied old/new ink bounds and conservative full-frame fallback. Seven regression tests cover alpha overlap, clipping, text shadows, deletion, undo and unsupported scenes. |
+| Results | At 500 annotations on 1200×800, measured render+flush medians were 30.61 ms full-frame, 47.09 ms tiled and 8.47 ms experimental region rendering. All 18 engine scenarios match final pixels. This is a fixture result, not a production drag-speed claim. |
+| Memory | The prototype retains an additional full-canvas scratch buffer: 3.66 MiB or 45.78 MiB at the two sizes. Recorded WASM capacity and process memory are distinguished from live allocations. |
+| Scope | Production engine remains 901,943 B; the prototype is disabled in normal builds. Smart Callouts, alignment/multi-select, screenshot comparison and human Smart Brush testing remain open. No storage format, authentication or billing changes. |
+
+See [the benchmark report](benchmarks/README.md) for raw results, reproduction,
+validation and limitations. Browser measurements are DOM/RAF timing, not
+physical display latency; the current editor does not use the tiled flush path.
+
+Release checks: 2,023 frontend tests, 35 backend tests, 725 Rust tests and 21
+production-build browser checks pass. TypeScript, lint (0 errors, 52 existing
+warnings), guardrails and both builds pass. [QC evidence](qc/release-v934.md).
+
+
+## v9.35 Change Summary — 2026-10-21
+
+**Shape drags keep up, pins renumber themselves, and Smart Callouts.**
+
+| Area | Change |
+| --- | --- |
+| Drag latency (#390) | A shape-handle drag writes a small store that only the edit box and its action bar read, so AppShell no longer re-renders per move. React's edit state catches up once, on release. Enter mid-drag commits what is on screen; Ctrl+Z mid-drag still drops it. |
+| Drag numbers | Event → DOM at 100 annotations: **20.7 → 5.7 ms** unthrottled, **93.8 → 17.1 ms** at 4× CPU. Flat across 10, 100 and 500. The app's own share went from 13.7 to 1.4 ms. Before/after JSON is in `docs/benchmarks/browser-annotations-2026-10-21/`. |
+| Numbered pins | Deleting a pin closes the gap (1, 2, 3, 4 − 2 → 1, 2, 3). The Pins panel's **Next** field inserts a step at any number, digits or letters. **Renumber** closes every gap and is disabled when there are none. One sequence per layer. Each call is one undo step. |
+| Smart Callout v1 | Pins › Drop: **Callout**. A click opens a label box; Enter places the pin, the label and the leader as one undo step. The leader follows the pin or the label, survives a reload, and deleting the pin takes all three. They are joined by geometry, as connectors are, so nothing new is stored. |
+| Engine | Four new calls: `insert_pin_annotation`, `remove_pin_annotation`, `renumber_pins`, `continue_step`. No op-log or storage format change. 901,943 → **904,742 B** (+2,799). |
+| Verification | #390 CI green (19 checks). 2,042 frontend tests, the Rust suite and featureless clippy pass. New: `tests/pin_steps.rs` (13), `tests/smart_callout.rs` (3), and three e2e specs (drag stays out of React, pin steps, smart callout). |
+
+Not in this release: no imagehorse-qc pass yet on the engine API change. A
+Callout sub-tool of its own, and following a label moved by Align or Placement,
+are open in PARKING_LOT.

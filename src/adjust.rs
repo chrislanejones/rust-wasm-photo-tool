@@ -197,6 +197,20 @@ impl ImageHorseTool {
             layer.buf.data.copy_from_slice(&p.base);
             adjust_in_place(&mut layer.buf.data, w, h, &a);
         }
+        // A release replaces the previous settings on p.base. It cannot be
+        // encoded as a cumulative TonalStack: clipping is not invertible and
+        // the two panels' filter orders differ. Record the session explicitly.
+        #[cfg(feature = "tiles")]
+        self.oplog_record(crate::ops::Op::Adjustments {
+            new_session: p.committed.is_none(),
+            brightness: a.brightness,
+            contrast: a.contrast,
+            saturation: a.saturation,
+            shadows: a.shadows,
+            highlights: a.highlights,
+            sharpen: a.sharpen,
+            blur: a.blur,
+        });
         p.committed = if a.is_identity() { None } else { Some(a) };
         p.generation = self.hist.generation;
         self.tonal_preview = Some(p);

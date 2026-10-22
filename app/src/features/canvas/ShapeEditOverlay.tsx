@@ -1,18 +1,14 @@
 // The Shapes tool's live edit box — preview, dashed bbox, move/resize/rotate
 // handles — for a shape or arrow that is drawn but not yet committed.
 //
-// Lifted out of CanvasArea when rotation landed (the Perspective precedent:
-// a feature that doubles a block inside that file moves the block out and
-// lowers the file's max-lines cap in the same change). Behavior is unchanged
-// apart from what rotation added; the geometry math lives in
-// lib/shapeRotation.ts so it can be tested without a DOM.
+// Lifted out of CanvasArea when rotation landed; the geometry math lives in
+// lib/shapeRotation.ts so it can be tested without a DOM. A handle drag runs
+// through lib/liveEditGeometry, not AppShell state: only this box and its
+// action bar re-render per move, and React's edit state catches up on release.
 //
-// ── Shape/arrow edit overlay: SVG preview + dashed bbox + handles ──
-// Rendered while a drawn shape/arrow is pending (Figma-style edit
-// box). All sizes for grab targets are in SCREEN px so handles stay
-// grabbable at any zoom; geometry maps through the canvas rect like
-// the crop/text overlays. The preview is clipped to the canvas box
-// to match Rust's raster clipping at commit.
+// All sizes for grab targets are in SCREEN px so handles stay grabbable at any
+// zoom; geometry maps through the canvas rect like the crop/text overlays. The
+// preview is clipped to the canvas box to match Rust's raster clipping at commit.
 import React, { useCallback, useEffect, useRef } from "react";
 import { pendingShapeType } from "@/hooks/useDrawingTools";
 import type { DrawEditState, Point } from "@/hooks/useDrawingTools";
@@ -37,6 +33,7 @@ import {
   toLocalDelta,
 } from "@/lib/shapeRotation";
 import { tooSmallForActions } from "@/lib/shapePorts";
+import { moveLiveGeometry, setLiveGeometry, takeLiveGeometry, useLiveEditState } from "@/lib/liveEditGeometry";
 import { useToolStore } from "@/stores/useToolStore";
 import { ROTATE_CURSOR } from "./canvasCursor";
 import { closePanelsHitBy, panelsUnder, screenCorners } from "./panelYield";
@@ -71,10 +68,11 @@ interface Props {
 
 export function ShapeEditOverlay({
   canvasRef,
-  drawEditState,
+  drawEditState: committedEditState,
   drawSettings,
   onDrawEditChange,
 }: Props) {
+  const drawEditState = useLiveEditState(committedEditState); // + the drag in flight
   // Read here rather than threaded through `drawSettings`, which AppShell
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
@@ -116,7 +114,7 @@ export function ShapeEditOverlay({
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const drag = drawDragRef.current;
-      const cb = onDrawEditChangeRef.current;
+      const cb = onDrawEditChangeRef.current ? moveLiveGeometry : null;
       if (!drag || !cb) return;
       // Move/resize frames: apply, then close any panel the shape ran into.
       const emit = (s: Point, end: Point, rotation?: number, shape?: ShapeName) => {
@@ -267,12 +265,17 @@ export function ShapeEditOverlay({
       );
       emit(pinned.start, pinned.end);
     };
-    const onUp = () => { drawDragRef.current = null; };
+    const onUp = () => { // React catches up once, in the commit that empties the store
+      const g = drawDragRef.current && takeLiveGeometry();
+      drawDragRef.current = null;
+      if (g) onDrawEditChangeRef.current?.(g.start, g.end, g.rotation, g.shape);
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (drawDragRef.current) setLiveGeometry(null);
     };
   }, []);
 
