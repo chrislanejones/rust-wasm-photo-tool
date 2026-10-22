@@ -13,7 +13,7 @@ import { useUIStore } from "@/stores/useUIStore";
 
 /** Attribute a floating panel carries while it can be closed. Its value says
  *  which panel; see `closePanel` below. */
-export const PANEL_YIELDS_ATTR = "data-paste-yields";
+const PANEL_YIELDS_ATTR = "data-paste-yields";
 
 type Pt = { x: number; y: number };
 
