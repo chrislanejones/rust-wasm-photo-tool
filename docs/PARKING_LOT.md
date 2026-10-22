@@ -33,17 +33,20 @@ measurement limits and reproduction commands are in the
   **v1 shipped in v9.35 (10-21, #390)**: Pins ›
   Drop: Callout places pin + label + leader as one undo step; the leader follows
   the pin and the label (Text tool) and survives reload; deleting the pin takes
-  all three. Joined by geometry (`lib/callouts.ts`), no format change. Pins
+  all three, and since 10-22 so does deleting the label or the leader
+  (Reselect ✕, or emptying the label). Joined by geometry (`lib/callouts.ts`), no format change. Pins
   renumber themselves (delete closes the gap, Next inserts, Renumber). Left
   open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
-  deleting the label or leader alone leaves the others as plain objects, the
-  leader is an arrow, not a plain line, and a label moved by Align or
+  the leader is an arrow, not a plain line, and a label moved by Align or
   Placement should follow (any refresh of the Text tool's list is diffed) but
   only Text tool drags are tested.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
-  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The Corner-radius
-  dot drag still writes panel settings per move and was left as is.
+  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
+  dot followed on 10-22: it writes `liveEditGeometry` too and the panel takes the
+  radius on release. `takeLiveEdit` folds the dot's radii into a commit, so Enter
+  right after release keeps them (tested); Enter MID dot-drag takes the same path
+  but is not tested on its own.
 - [ ] Annotation alignment and multi-select. Existing single-object alignment
   is not multi-select; grouped changes must be undoable as one action.
 - [ ] Screenshot comparison with a difference visualization and attached
