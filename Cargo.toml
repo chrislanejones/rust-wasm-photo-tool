@@ -181,3 +181,7 @@ required-features = ["tiles"]
 [[test]]
 name = "smart_callout"
 required-features = ["tiles"]
+
+[[test]]
+name = "annotation_group"
+required-features = ["tiles"]

@@ -88,3 +88,31 @@ export function useLiveEditState(es: DrawEditState): DrawEditState {
   const g = useSyncExternalStore(subscribe, snapshot, snapshot);
   return useMemo(() => applyLiveGeometry(es, g), [es, g]);
 }
+
+// ── A multi-select group drag (Night 10-22) ─────────────────────────────────
+// The same idea for several objects at once: while the group is dragged only
+// its overlay follows, as one translate in IMAGE px, and the engine moves the
+// objects once, on release (`move_annotations`). Only the selection overlay
+// subscribes.
+let groupOffset: Point | null = null;
+const groupListeners = new Set<() => void>();
+
+export function setLiveGroupOffset(next: Point | null): void {
+  if (next === groupOffset) return;
+  groupOffset = next;
+  for (const fn of groupListeners) fn();
+}
+
+function subscribeGroup(fn: () => void) {
+  groupListeners.add(fn);
+  return () => {
+    groupListeners.delete(fn);
+  };
+}
+
+const groupSnapshot = () => groupOffset;
+
+/** The group drag in flight, or null. */
+export function useLiveGroupOffset(): Point | null {
+  return useSyncExternalStore(subscribeGroup, groupSnapshot, groupSnapshot);
+}

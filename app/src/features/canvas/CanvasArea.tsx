@@ -22,6 +22,7 @@ import { SwitchLoadingVeil } from "./SwitchLoadingVeil";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
+import { AnnotationSelectionLayer } from "./AnnotationSelectionLayer";
 import { PerspectiveLayer } from "./PerspectiveLayer";
 import { ShapeEditOverlay, type ShapeDrawSettings } from "./ShapeEditOverlay";
 import { CalloutLabelInput } from "./CalloutLabelInput";
@@ -1182,6 +1183,16 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             imgH={imgH}
             annotations={annotations ?? []}
             shapes={shapes ?? []}
+            activeLayerId={hookResult.state.activeLayerId}
+          />
+        )}
+
+        {canvasRef.current && (
+          <AnnotationSelectionLayer
+            toolRef={hookResult.toolRef}
+            canvasEl={canvasRef.current}
+            flushToCanvas={hookResult.flushToCanvas}
+            syncState={hookResult.syncState}
             activeLayerId={hookResult.state.activeLayerId}
           />
         )}
