@@ -63,8 +63,21 @@ measurement limits and reproduction commands are in the
     (one engine move, by design — the drag stays out of React).
   - Hit-testing for picks is by box, so an unfilled shape is picked by its
     empty middle too (the single-shape click uses the engine's outline ring).
-- [ ] Screenshot comparison with a difference visualization and attached
-  annotations. Existing before/after comparison is not this feature.
+- [x] Screenshot comparison (Night 10-23). Right-click a gallery photo →
+  Compare with this, or the top bar's Compare with another photo…: the open
+  photo (B) shows every changed pixel tinted, with Overlay, Side by side,
+  Blink and Slider views, a Sensitivity slider, a "N changes" list that zooms
+  to each, and Mark changes (a box and a numbered pin per change, pins after
+  B's last, ONE undo step). The diff is `src/image_diff.rs` in the engine
+  worker (2880×1800 in 19 ms, docs/benchmarks); annotations on either photo
+  never count. e2e/screenshot-compare.spec.ts. Left open:
+  - No scaling or auto-alignment: photos of different sizes compare their
+    top-left overlap, and the Slider view stretches A over B's box.
+  - A is compared from its stored ORIGINAL, so edits made to A since upload
+    (a crop, a brush) are not part of the comparison.
+  - The top bar has a separate button, not a Compare ▾ menu (no dropdown
+    primitive in the repo; one is a new dependency).
+  - Phone: out of scope (the phone does not load the engine).
 - [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
   checks high/low contrast edges, equal-luminance color edges, gaps, soft
   boundaries, image borders, zoom, fast strokes and undo. Automated kernel

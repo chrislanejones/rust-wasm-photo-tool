@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Zap, Trash2, ImageOff } from "lucide-react";
+import { Check, Zap, Trash2, ImageOff, GitCompareArrows } from "lucide-react";
 import { springPop, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusMark } from "@/components/ui/status-mark";
 import { formatBytes } from "@/lib/format";
@@ -92,8 +94,12 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
   const meta = [formatBytes(entry.byteSize), dims].filter(Boolean).join(" · ");
 
   return (
+    // Right-click: "Compare with this" (Night 10-23) — the open photo against
+    // this one. Not offered on the open photo itself.
+    <ContextMenu>
     <Tooltip>
       <TooltipTrigger asChild>
+        <ContextMenuTrigger asChild disabled={isActive}>
         <motion.div
           data-id={entry.id}
           whileHover="hover"
@@ -342,11 +348,18 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         <Check className="h-3 w-3" />
       </button>
         </motion.div>
+        </ContextMenuTrigger>
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs leading-snug">
         <p className="font-semibold">{entry.name}</p>
         {meta && <p className="text-text-muted">{meta}</p>}
       </TooltipContent>
     </Tooltip>
+    <ContextMenuContent>
+      <ContextMenuItem onSelect={() => useScreenshotCompareStore.getState().start(entry.id)}>
+        <GitCompareArrows aria-hidden className="size-4" /> Compare with this
+      </ContextMenuItem>
+    </ContextMenuContent>
+    </ContextMenu>
   );
 }

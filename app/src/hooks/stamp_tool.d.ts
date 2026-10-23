@@ -1677,6 +1677,16 @@ declare module "stamp_tool" {
     /** Copy the picked objects offset together; pin copies number after the
      *  last pin. Returns the new shape ids, then the new text ids. */
     duplicate_annotations(shape_ids: Uint32Array, text_ids: Uint32Array, dx: number, dy: number): Uint32Array;
+    /** Screenshot compare: diff photo A (RGBA `aw`×`ah`) against this
+     *  document's PHOTO layer (annotations never count), over the top-left
+     *  overlap. `[w, h, n, (x, y, w, h, px)×n, mask bits…]`: boxes in
+     *  document px, the mask one bit per overlap pixel from the photo's
+     *  top-left. Pushes nothing. */
+    compare_photo(a: Uint8Array, aw: number, ah: number, tolerance: number, merge_px: number, min_area: number): Uint32Array;
+    /** Box (`pad` px out) + numbered pin (diameter `pin`, continuing the
+     *  layer's sequence) per x,y,w,h quad. ONE "Mark Changes" step. Returns
+     *  rect id, pin id per region; empty (no step) when there is none. */
+    mark_regions(regions: Uint32Array, color_hex: string, stroke_width: number, pad: number, pin: number): Uint32Array;
     /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
      *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
      *  hand-circle hits on its outline RING only (the empty middle is a miss,

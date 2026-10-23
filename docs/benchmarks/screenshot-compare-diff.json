@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-23T03:00:58.312Z",
+  "node": "v24.21.0",
+  "platform": "linux 6.18.33.2-microsoft-standard-WSL2",
+  "cpu": "Intel(R) Core(TM) Ultra 7 165H",
+  "wasmBytes": 935825,
+  "results": [
+    {
+      "width": 1440,
+      "height": 900,
+      "regions": 3,
+      "samples": 20,
+      "medianMs": 3.7,
+      "p95Ms": 4.1,
+      "minMs": 3.5
+    },
+    {
+      "width": 2880,
+      "height": 1800,
+      "regions": 3,
+      "samples": 20,
+      "medianMs": 15.3,
+      "p95Ms": 17.5,
+      "minMs": 14.6
+    },
+    {
+      "width": 4000,
+      "height": 3000,
+      "regions": 3,
+      "samples": 20,
+      "medianMs": 34.9,
+      "p95Ms": 37.4,
+      "minMs": 34.2
+    }
+  ]
+}
