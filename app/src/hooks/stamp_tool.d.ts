@@ -1646,6 +1646,37 @@ declare module "stamp_tool" {
      *  its own — it rides the box edit that just snapped, so one undo puts the
      *  box and its connectors back. False when `id` is not an arrow. */
     reroute_connector(id: number, x0: number, y0: number, x1: number, y1: number): boolean;
+    // ── Several at once (multi-select). Each is ONE undo step, and one
+    //    op-log gesture; shapes and texts are two id lists. ──
+    /** Move every picked object by (dx, dy). False, no step, when nothing
+     *  matches or the delta is under half a pixel. */
+    move_annotations(shape_ids: Uint32Array, text_ids: Uint32Array, dx: number, dy: number): boolean;
+    /** Align the picked GROUPS to the selection's bounds. Objects sharing a
+     *  group key (a callout's three parts) move as one box. `edge` ∈ left,
+     *  centerH, right, top, middleV, bottom. Rotated shapes use their rotated
+     *  box. False, no step, below two groups or when already aligned. */
+    align_annotations(
+      shape_ids: Uint32Array,
+      shape_groups: Uint32Array,
+      text_ids: Uint32Array,
+      text_groups: Uint32Array,
+      edge: string,
+    ): boolean;
+    /** Equal GAPS between three or more groups' boxes along `axis` ("h" | "v");
+     *  the first and last stay put. False, no step, below three groups. */
+    distribute_annotations(
+      shape_ids: Uint32Array,
+      shape_groups: Uint32Array,
+      text_ids: Uint32Array,
+      text_groups: Uint32Array,
+      axis: string,
+    ): boolean;
+    /** Delete the picked objects; the pins left close up once. Returns how
+     *  many went (0 = no step). */
+    remove_annotations(shape_ids: Uint32Array, text_ids: Uint32Array): number;
+    /** Copy the picked objects offset together; pin copies number after the
+     *  last pin. Returns the new shape ids, then the new text ids. */
+    duplicate_annotations(shape_ids: Uint32Array, text_ids: Uint32Array, dx: number, dy: number): Uint32Array;
     /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
      *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
      *  hand-circle hits on its outline RING only (the empty middle is a miss,

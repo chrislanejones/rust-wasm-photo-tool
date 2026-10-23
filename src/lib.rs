@@ -18,6 +18,7 @@
 
 use wasm_bindgen::prelude::*;
 
+mod annotation_group;
 #[cfg(feature = "dirty-regions")]
 mod annotation_region;
 mod annotations;

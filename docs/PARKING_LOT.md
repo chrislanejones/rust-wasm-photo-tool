@@ -35,11 +35,31 @@ measurement limits and reproduction commands are in the
   the pin and the label (Text tool) and survives reload; deleting the pin takes
   all three, and since 10-22 so does deleting the label or the leader
   (Reselect ✕, or emptying the label). Joined by geometry (`lib/callouts.ts`), no format change. Pins
-  renumber themselves (delete closes the gap, Next inserts, Renumber). Left
-  open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
-  the leader is an arrow, not a plain line, and a label moved by Align or
-  Placement should follow (any refresh of the Text tool's list is diffed) but
-  only Text tool drags are tested.
+  renumber themselves (delete closes the gap, Next inserts, Renumber).
+  **Night 10-23**: a label moved by Align ▾ (alone and in a group), by the Text
+  tool's Placement and by an arrow-key nudge is now tested to keep its leader
+  joined in one undo step (e2e/callout-leader.spec.ts) — all four already
+  followed, nothing needed fixing. The Pins panel has **Leader: Line · Arrow**
+  (Line by default): a line leader is the Line shape (kind 2), because
+  `arrow_style` has no "no head" value and adding one would be a format
+  change; callouts made before keep their arrow. Left open:
+  - A Callout sub-tool entry of its own (needs AppShell's `penMode` line).
+  - **Undoing a text's Placement with the Text tool open breaks the op log**,
+    callout or not. Repro: add a plain text, open it, Placement › Bottom right,
+    Escape, Ctrl+Z → `oplog_status()` reads "broken — snapshot undo has taken
+    over" (the same Placement undone with Pins open does not break it). After a
+    reload, the snapshot steps undo falls back to drop the layer's SHAPES: one
+    Ctrl+Z on a placed callout's label restores the label and loses its pin and
+    leader. Callout-leader.spec's Placement case stops before that undo.
+  - Leaving the Text tool for Pins right after a Placement pushes an undo step
+    that records no op (`undo_count` +1, op count unchanged), so the next
+    Ctrl+Z appears to do nothing.
+  - Multi-select's Align ▾ menu opens below the selection: with the selection
+    near the bottom of the canvas it lands under the gallery strip, where it
+    cannot be clicked.
+  - An app build from before 10-23 reads a line-leader callout as a plain line
+    and a pin (the leader does not follow there). Only matters with two app
+    versions open on one photo; noted, not fixed.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
   [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
@@ -47,8 +67,25 @@ measurement limits and reproduction commands are in the
   radius on release. `takeLiveEdit` folds the dot's radii into a commit, so Enter
   right after release keeps them (tested); Enter MID dot-drag takes the same path
   but is not tested on its own.
-- [ ] Annotation alignment and multi-select. Existing single-object alignment
-  is not multi-select; grouped changes must be undoable as one action.
+- [x] Annotation alignment and multi-select (Night 10-22). Shift-click with
+  any annotation tool, Create › Select objects (click, marquee, drag), Ctrl+A,
+  arrows, Esc; an "N selected" bar with Align ▾ (to the selection's bounds;
+  one object keeps "to the canvas"), Distribute ▾ (equal gaps, 3+), Duplicate,
+  Delete. Every action is one engine call and one undo step, before and after
+  a reload (`src/annotation_group.rs`, e2e/annotation-multiselect.spec.ts).
+  A callout picks and aligns as one box; a connector between picked boxes
+  moves with them, one left behind re-routes in the same step. Left open:
+  - Resizing a group (out of scope by plan).
+  - Select objects has no panel of its own: it shows whichever Shapes panel
+    was last open (it shares the Shapes tool and carries no mode).
+  - Shift-clicking a second shape while the first is open in the edit box
+    does not add the open one; the edit box stays up.
+  - Reselect rows Shift-click exact objects; they do not pull in a callout's
+    other parts the way a canvas pick does.
+  - During a group drag only the outlines move; the objects jump on release
+    (one engine move, by design — the drag stays out of React).
+  - Hit-testing for picks is by box, so an unfilled shape is picked by its
+    empty middle too (the single-shape click uses the engine's outline ring).
 - [ ] Screenshot comparison with a difference visualization and attached
   annotations. Existing before/after comparison is not this feature.
 - [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
