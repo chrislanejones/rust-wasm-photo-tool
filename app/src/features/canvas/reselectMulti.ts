@@ -13,7 +13,14 @@ export function reselectMultiProps(picked: Picked, o: ReselectObject, open: () =
       if (pickedCount(picked)) setPicked(NONE);
       open();
     },
-    onShiftSelect: () => setPicked((p) => toggle(p, o.type, o.id)),
+    // Like a canvas Shift-click: adding a callout part adds the whole
+    // callout; taking one out takes out just that object.
+    onShiftSelect: () =>
+      setPicked((p) => {
+        if (has(p, o.type, o.id)) return toggle(p, o.type, o.id);
+        const grow = useAnnotationStore.getState().expandPick;
+        return grow ? grow(toggle(p, o.type, o.id)) : toggle(p, o.type, o.id);
+      }),
     checked: pickedCount(picked) > 1 ? has(picked, o.type, o.id) : undefined,
   };
 }
