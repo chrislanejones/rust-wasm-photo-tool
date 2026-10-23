@@ -333,3 +333,73 @@ test("Shift-click rows in the Reselect list: checks, a screen-reader 'selected',
   await expect(bar(page)).toContainText("1 selected");
   await expect(row(1).locator('input[type="checkbox"]')).toHaveCount(0);
 });
+
+// ── Night 10-23: the three leftovers from #392 a person hits ────────────────
+
+test("Shift-click a second shape while one is open in the edit box: both picked, the box closes", async ({ page }) => {
+  await open(page);
+  const ids = await seed(page, [{ rect: [100, 100, 120, 80] }, { rect: [400, 120, 100, 100] }]);
+  await createTool(page, "Shapes");
+  const a = await screenPoint(page, 100, 140); // the first frame's left edge
+  await page.mouse.click(a.x, a.y);
+  await expect(page.locator("svg[data-draw-overlay]")).toBeVisible();
+  const b = await screenPoint(page, 400, 170);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(b.x, b.y);
+  await page.keyboard.up("Shift");
+  await expect(bar(page)).toContainText("2 selected");
+  expect(await picked(page)).toEqual(ids.map((id) => `shape${id}`).sort());
+  await expect(page.locator("svg[data-draw-overlay]")).toHaveCount(0);
+});
+
+test("an unfilled shape is picked by its outline, not its empty middle", async ({ page }) => {
+  await open(page);
+  const [frame, inner] = await seed(page, [{ rect: [100, 100, 500, 400] }, { rect: [500, 380, 60, 60] }]);
+  await createTool(page, "Select objects");
+  // The empty middle of the big frame: nothing there, so nothing is picked.
+  const mid = await screenPoint(page, 300, 250);
+  await page.mouse.click(mid.x, mid.y);
+  await expect(bar(page)).toHaveCount(0);
+  // Its outline picks it.
+  const edge = await screenPoint(page, 100, 250);
+  await page.mouse.click(edge.x, edge.y);
+  await expect(bar(page)).toContainText("1 selected");
+  expect(await picked(page)).toEqual([`shape${frame}`]);
+  // Shift on the small frame drawn inside the big one adds the small one,
+  // not the big one again.
+  const small = await screenPoint(page, 560, 410);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(small.x, small.y);
+  await page.keyboard.up("Shift");
+  expect(await picked(page)).toEqual([`shape${frame}`, `shape${inner}`].sort());
+});
+
+test("Shift-click a callout's pin row in Reselect: the whole callout, as on the canvas", async ({ page }) => {
+  await open(page);
+  await createTool(page, "Pins");
+  await page.getByRole("radio", { name: "Callout", exact: true }).click();
+  const c = await screenPoint(page, 600, 300);
+  await page.mouse.click(c.x, c.y);
+  const input = page.getByRole("textbox", { name: "Callout label" });
+  await input.fill("Crack");
+  await input.press("Enter");
+  await page.getByRole("radio", { name: "Pin", exact: true }).click();
+  // The label lands in the engine after Enter: wait for the whole callout.
+  await expect.poll(async () => {
+    const l = await layer(page);
+    return findCallouts(l.shapes, l.texts).length;
+  }).toBe(1);
+  const l = await layer(page);
+  const [callout] = findCallouts(l.shapes, l.texts);
+  await page.getByRole("button", { name: "Review", exact: true }).first().click();
+  const pinRow = page.getByTitle("Reselect Pin 1", { exact: true });
+  await expect(pinRow).toBeVisible();
+  await pinRow.click({ modifiers: ["Shift"] });
+  await expect(bar(page)).toContainText("3 selected");
+  expect(await picked(page)).toEqual(
+    [`shape${callout.pin}`, `shape${callout.leader}`, `text${callout.label}`].sort(),
+  );
+  // Taking a part out takes out just that part, as a canvas Shift-click does.
+  await pinRow.click({ modifiers: ["Shift"] });
+  await expect(bar(page)).toContainText("2 selected");
+});
