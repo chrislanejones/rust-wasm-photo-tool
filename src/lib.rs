@@ -35,6 +35,7 @@ mod effects;
 pub mod exif;
 mod fonts;
 mod history;
+pub mod image_diff;
 mod layer;
 mod levels;
 mod livewire;
