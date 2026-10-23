@@ -384,9 +384,13 @@ test("Shift-click a callout's pin row in Reselect: the whole callout, as on the 
   await input.fill("Crack");
   await input.press("Enter");
   await page.getByRole("radio", { name: "Pin", exact: true }).click();
+  // The label lands in the engine after Enter: wait for the whole callout.
+  await expect.poll(async () => {
+    const l = await layer(page);
+    return findCallouts(l.shapes, l.texts).length;
+  }).toBe(1);
   const l = await layer(page);
   const [callout] = findCallouts(l.shapes, l.texts);
-  expect(callout).toBeTruthy();
   await page.getByRole("button", { name: "Review", exact: true }).first().click();
   const pinRow = page.getByTitle("Reselect Pin 1", { exact: true });
   await expect(pinRow).toBeVisible();
