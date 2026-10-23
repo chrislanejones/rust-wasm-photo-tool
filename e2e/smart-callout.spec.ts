@@ -210,8 +210,9 @@ test("clicking away with a label typed places it there and starts the next", asy
 // Night 10-22: deleting a callout's label or its leader on its own used to
 // leave the other two behind as plain objects. Any part takes the whole
 // callout now, in one undo step — from Review › Reselect's ✕ and from
-// emptying the label in the Text tool.
-for (const part of ["Text #1", "Arrow #1"]) {
+// emptying the label in the Text tool. (Since 10-23 a new callout's leader is
+// a plain line by default, so Reselect lists it as "Line #1".)
+for (const part of ["Text #1", "Line #1"]) {
   test(`deleting the callout's ${part === "Text #1" ? "label" : "leader"} alone deletes all three — one undo puts them back`, async ({ page }) => {
     await open(page);
     await placeCallout(page, "Crack");

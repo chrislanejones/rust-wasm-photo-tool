@@ -9,7 +9,8 @@
 // toggle on Callout a click parks its point for the label input, whose Enter
 // adds pin, label and leader as ONE step (`continue_step`); deleting a pin
 // takes its leader and label with it, and a moved pin redraws its leader. A
-// moved label is followed from useTextTool, through `rerouteCallouts`.
+// moved label is followed from useTextTool, through `rerouteCallouts`. The
+// panel's Leader toggle picks a line (default) or an arrow for a new callout.
 import { useCallback, useEffect, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -19,6 +20,7 @@ import {
   defaultLabelAt,
   findCallouts,
   leaderFor,
+  LEADER_KIND,
   type CalloutLayer,
   type CalloutText,
   type Pt,
@@ -39,6 +41,9 @@ const BG_KIND = { none: 0, rect: 1, bubble: 2 } as const;
 
 const hexRgb = (hex: string) =>
   [0, 2, 4].map((i) => parseInt(hex.replace("#", "").slice(i, i + 2), 16) || 0);
+
+const rgbHex = (r: number, g: number, b: number) =>
+  `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("")}`;
 
 /** A pin's box at `p`: the 1-10 Stroke Width slider maps to a callout-sized
  *  disc radius. */
@@ -90,15 +95,40 @@ export async function removeText(tool: ImageHorseTool, id: number): Promise<void
 }
 
 /** Redraw the leaders whose pin or label moved between `before` and `now`.
- *  No undo step of its own: it rides the move's. True when one was redrawn. */
+ *  No undo step of its own: it rides the move's. True when one was redrawn.
+ *
+ *  An arrow leader goes through `reroute_connector`, which takes no step. A
+ *  line leader cannot (the engine re-routes arrows only), so it is rewritten
+ *  whole by `update_shape_annotation` — its own style read back, the new ends
+ *  — right after `continue_step`, which makes that edit join the step the
+ *  move opened instead of pushing one. Both are sent in the same tick, so no
+ *  recomposite can clear the join between them. */
 export async function rerouteCallouts(
   tool: ImageHorseTool,
   before: CalloutLayer,
   now: CalloutLayer,
 ): Promise<boolean> {
   const moves = calloutsToFollow(before, now);
-  for (const m of moves) await tool.reroute_connector(m.id, m.x0, m.y0, m.x1, m.y1);
-  return moves.length > 0;
+  if (!moves.length) return false;
+  const lines = moves.some((m) => now.shapes.find((s) => s.id === m.id)?.kind === LEADER_KIND.line)
+    ? await readShapes(tool)
+    : [];
+  for (const m of moves) {
+    const line = lines.find((s) => s.id === m.id && s.kind === LEADER_KIND.line);
+    if (!line) {
+      await tool.reroute_connector(m.id, m.x0, m.y0, m.x1, m.y1);
+      continue;
+    }
+    const fill = rgbHex(line.fill_r, line.fill_g, line.fill_b);
+    tool.continue_step();
+    await tool.update_shape_annotation(
+      m.id, LEADER_KIND.line, m.x0, m.y0, m.x1, m.y1,
+      rgbHex(line.r, line.g, line.b), line.stroke_width, line.arrow_style,
+      line.fill_kind, fill, fill, line.fill_angle, line.fill_block,
+      line.sloppiness ?? 0, 0, 0, new Uint16Array(4),
+    );
+  }
+  return true;
 }
 
 export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Options) {
@@ -165,9 +195,11 @@ export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Optio
       const label = (await readTexts(tool)).find((t) => t.id === labelId);
       if (label) {
         const l = leaderFor(pin, label);
+        // The panel's Leader toggle: a plain line (default) or an arrow.
+        const kind = LEADER_KIND[useAnnotationStore.getState().calloutLeader];
         tool.continue_step();
         tool.add_shape_annotation(
-          4, l.x0, l.y0, l.x1, l.y1, s.strokeColor, 3, 0, 0, "#000000", "#000000", 0, 0, 0, 0, 0, new Uint16Array(4),
+          kind, l.x0, l.y0, l.x1, l.y1, s.strokeColor, 3, 0, 0, "#000000", "#000000", 0, 0, 0, 0, 0, new Uint16Array(4),
         );
       }
       done();
