@@ -90,18 +90,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.35 — 2026-10-21
+### v9.36 — 2026-10-22
 
-**Shape drags keep up, pins renumber themselves, and Smart Callouts.**
+**Pick several annotations and move them as one.**
 
-Dragging a shape's edit box now takes about 6 ms from pointer to screen, down
-from 21. The editor no longer re-renders on every move. Numbered pins close
-the gap when one is deleted. The Pins panel's Next field inserts a step
-anywhere, and Renumber tidies the whole sequence. A Smart Callout is a pin, a
-label and a leader placed in one click and undone in one Ctrl+Z. The leader
-follows the pin or the label when either moves, and it survives a reload.
+Shift-click shapes, text, pins or callouts, or drag a box around them with
+the new Create › Select objects pointer. Ctrl+A picks every annotation on the
+layer. The group drags, nudges with the arrow keys (Shift for 10 px), aligns,
+spreads out evenly, duplicates and deletes together, and every one of those
+is a single Ctrl+Z, even after a reload. A callout's pin, leader and label
+stay together. The Reselect list takes Shift-click too. Also: a shape's edit
+box no longer draws over the side panels, and five dependency bumps.
 
-How the 21 ms was found: [Where the drag's 21 ms goes](docs/benchmarks/README.md#where-the-drags-21-ms-goes).
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
 

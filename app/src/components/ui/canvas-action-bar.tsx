@@ -71,11 +71,14 @@ export function CanvasActionBarButton({
   disabled,
   pressed,
   title,
+  role,
   className,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  /** "menuitem" when the button is one choice of a menu row in the bar. */
+  role?: "menuitem";
   /** A toggle's state (aria-pressed + the hover tint held on). Omit for a
    *  plain button. */
   pressed?: boolean;
@@ -87,6 +90,7 @@ export function CanvasActionBarButton({
   return (
     <button
       type="button"
+      role={role}
       onClick={onClick}
       disabled={disabled}
       aria-pressed={pressed}

@@ -47,8 +47,25 @@ measurement limits and reproduction commands are in the
   radius on release. `takeLiveEdit` folds the dot's radii into a commit, so Enter
   right after release keeps them (tested); Enter MID dot-drag takes the same path
   but is not tested on its own.
-- [ ] Annotation alignment and multi-select. Existing single-object alignment
-  is not multi-select; grouped changes must be undoable as one action.
+- [x] Annotation alignment and multi-select (Night 10-22). Shift-click with
+  any annotation tool, Create › Select objects (click, marquee, drag), Ctrl+A,
+  arrows, Esc; an "N selected" bar with Align ▾ (to the selection's bounds;
+  one object keeps "to the canvas"), Distribute ▾ (equal gaps, 3+), Duplicate,
+  Delete. Every action is one engine call and one undo step, before and after
+  a reload (`src/annotation_group.rs`, e2e/annotation-multiselect.spec.ts).
+  A callout picks and aligns as one box; a connector between picked boxes
+  moves with them, one left behind re-routes in the same step. Left open:
+  - Resizing a group (out of scope by plan).
+  - Select objects has no panel of its own: it shows whichever Shapes panel
+    was last open (it shares the Shapes tool and carries no mode).
+  - Shift-clicking a second shape while the first is open in the edit box
+    does not add the open one; the edit box stays up.
+  - Reselect rows Shift-click exact objects; they do not pull in a callout's
+    other parts the way a canvas pick does.
+  - During a group drag only the outlines move; the objects jump on release
+    (one engine move, by design — the drag stays out of React).
+  - Hit-testing for picks is by box, so an unfilled shape is picked by its
+    empty middle too (the single-shape click uses the engine's outline ring).
 - [ ] Screenshot comparison with a difference visualization and attached
   annotations. Existing before/after comparison is not this feature.
 - [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person

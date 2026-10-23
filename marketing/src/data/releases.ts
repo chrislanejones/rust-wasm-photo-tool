@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.36",
+    date: "2026-10-22",
+    headline: "Pick several annotations and move them as one.",
+    entries: [
+      { tag: "feature", text: "Multi-select: Shift-click annotations or drag a box with Create › Select objects, then move, nudge, align, distribute, duplicate or delete them together. Each is one Ctrl+Z, even after a reload." },
+      { tag: "feature", text: "A callout's pin, leader and label move as one, a connector between picked boxes follows them, and the Reselect list takes Shift-click." },
+      { tag: "fix", text: "A shape's edit box no longer draws over the side panels; dragging a shape into a panel closes it, as a pasted image does." },
+      { tag: "infra", text: "Five dependency bumps in one lockfile change, plus the CodeQL action." },
+      { tag: "rust", text: "Five new engine calls, no format change. Engine 904,742 to 923,141 B (+18,399)." },
+    ],
+  },
+  {
     version: "v9.35",
     date: "2026-10-21",
     headline: "Shape drags keep up, pins renumber themselves, and Smart Callouts.",
