@@ -35,11 +35,31 @@ measurement limits and reproduction commands are in the
   the pin and the label (Text tool) and survives reload; deleting the pin takes
   all three, and since 10-22 so does deleting the label or the leader
   (Reselect ✕, or emptying the label). Joined by geometry (`lib/callouts.ts`), no format change. Pins
-  renumber themselves (delete closes the gap, Next inserts, Renumber). Left
-  open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
-  the leader is an arrow, not a plain line, and a label moved by Align or
-  Placement should follow (any refresh of the Text tool's list is diffed) but
-  only Text tool drags are tested.
+  renumber themselves (delete closes the gap, Next inserts, Renumber).
+  **Night 10-23**: a label moved by Align ▾ (alone and in a group), by the Text
+  tool's Placement and by an arrow-key nudge is now tested to keep its leader
+  joined in one undo step (e2e/callout-leader.spec.ts) — all four already
+  followed, nothing needed fixing. The Pins panel has **Leader: Line · Arrow**
+  (Line by default): a line leader is the Line shape (kind 2), because
+  `arrow_style` has no "no head" value and adding one would be a format
+  change; callouts made before keep their arrow. Left open:
+  - A Callout sub-tool entry of its own (needs AppShell's `penMode` line).
+  - **Undoing a text's Placement with the Text tool open breaks the op log**,
+    callout or not. Repro: add a plain text, open it, Placement › Bottom right,
+    Escape, Ctrl+Z → `oplog_status()` reads "broken — snapshot undo has taken
+    over" (the same Placement undone with Pins open does not break it). After a
+    reload, the snapshot steps undo falls back to drop the layer's SHAPES: one
+    Ctrl+Z on a placed callout's label restores the label and loses its pin and
+    leader. Callout-leader.spec's Placement case stops before that undo.
+  - Leaving the Text tool for Pins right after a Placement pushes an undo step
+    that records no op (`undo_count` +1, op count unchanged), so the next
+    Ctrl+Z appears to do nothing.
+  - Multi-select's Align ▾ menu opens below the selection: with the selection
+    near the bottom of the canvas it lands under the gallery strip, where it
+    cannot be clicked.
+  - An app build from before 10-23 reads a line-leader callout as a plain line
+    and a pin (the leader does not follow there). Only matters with two app
+    versions open on one photo; noted, not fixed.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
   [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
