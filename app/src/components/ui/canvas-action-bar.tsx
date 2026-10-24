@@ -48,6 +48,12 @@ export function CanvasActionBar({ x, y, label, children, ...rest }: CanvasAction
         left,
         top,
         transform: "translateX(-50%)",
+        // Its own width, wherever it hangs. A fixed box is shrink-to-fit
+        // against the room right of `left`, so an anchor near the right edge
+        // squeezed the bar (labels wrapped, a range input shrank to a dot) and
+        // the clamp above then measured the squeezed size (compare bar at
+        // 800%, user tests 10-23 C7).
+        width: "max-content",
         zIndex: "var(--z-canvas-overlay)",
         pointerEvents: "none",
       }}

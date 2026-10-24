@@ -26,7 +26,10 @@ import {
   ZoomOut,
   Undo2,
   Redo2,
+  GitCompareArrows,
 } from "lucide-react";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
 import { IconButton } from "@/components/ui/icon-button";
 import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
@@ -116,6 +119,9 @@ export function TopBar({
   openRaster,
   imageMeta,
 }: TopBarProps) {
+  const photoCount = useGalleryStore((s) => s.photos.length);
+  const comparingOther = useScreenshotCompareStore((s) => s.otherId !== null);
+  const setComparePicker = useScreenshotCompareStore((s) => s.setPickerOpen);
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below
@@ -318,6 +324,19 @@ export function TopBar({
                     label: compareActive ? "Hide A/B Compare" : "A/B Compare",
                     shortcut: "Alt + C",
                   }}
+                />
+                {/* Screenshot compare (Night 10-23): the open photo against
+                    another one. A button of its own rather than a Compare ▾
+                    menu: the repo has no dropdown primitive, and the A/B
+                    toggle's Alt + C and pressed state stay as they were. */}
+                <IconButton
+                  icon={GitCompareArrows}
+                  label="Compare with another photo…"
+                  onClick={() => setComparePicker(true)}
+                  active={comparingOther}
+                  disabled={photoCount < 2}
+                  standalone={compact}
+                  tooltip={{ label: "Compare with another photo…" }}
                 />
                 <IconButton
                   icon={ArrowDownFromLine}

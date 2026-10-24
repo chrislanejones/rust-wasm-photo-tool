@@ -175,6 +175,10 @@
      invisible over a pale photo. Every one of them already sits on a dark
      scrim or a drop shadow for exactly that reason. */
   --on-photo: #ffffff;
+  /* Screenshot compare's tint and change outlines (Night 10-23). Also drawn
+     on a photo, so also one value for both themes: 4.6:1 on white and 4.57:1
+     on black, so it passes 3:1 on a light screenshot and a dark one alike. */
+  --compare-tint: #db2777;
 
   --confirm: #3a3128;
   --confirm-foreground: #ffffff;
