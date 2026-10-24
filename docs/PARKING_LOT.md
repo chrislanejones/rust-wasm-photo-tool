@@ -183,7 +183,8 @@ remains disabled. Input/mask/output retention (row 203) is documented, not built
 | Item | Where | Owner |
 |---|---|---|
 | Preset sliders ignore ←/→. Each arrow step is too small to reach the next value, so it snaps back. Shapes › Points stays at 5 after five ArrowRight presses. PageUp and the preset buttons work. Since #242 (09-26). | `app/src/components/ui/size-slider.tsx` (`posToValue` / `valueToPos`) | Felix |
-| No Ctrl+Y for redo; only Ctrl+Shift+Z is bound, and the shortcut sheet says so. Windows users may expect Ctrl+Y. | `useKeyboardShortcuts.ts:308-312` | Chris's call |
+| ~~No Ctrl+Y for redo; only Ctrl+Shift+Z is bound, and the shortcut sheet says so. Windows users may expect Ctrl+Y.~~ **FIXED 10-23-2026 (Night 10-23 §3): Ctrl+Y and Cmd+Y redo wherever Ctrl+Shift+Z does; inside a text field they stay the browser's. On the shortcut sheet and in Keyboard-Shortcuts.md; e2e/redo-ctrl-y.spec.ts.** | `useKeyboardShortcuts.ts` (`isRedoY`) | Chris's call |
+| `smart-callout.spec.ts:176` ("…still does after a reload") flaked once under load: the pin landed at y 601, not 600, after a 200 px drag. 3 / 3 alone. Found 10-23-2026 during Night 10-23 §3; unrelated to Ctrl+Y | `e2e/smart-callout.spec.ts:176`, pin drag rounding | Tara |
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
 | `select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load | `e2e/` | Tara |
 | `SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone | `app/src/` | Tara |

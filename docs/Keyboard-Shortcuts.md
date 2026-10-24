@@ -59,6 +59,7 @@ Reset Zoom — that is a different chord.)
 | ------------------ | ------ |
 | `Ctrl + Z`         | Undo |
 | `Ctrl + Shift + Z` | Redo |
+| `Ctrl + Y`         | Redo (the Windows chord; `Cmd + Y` on a Mac). Inside a text field it stays the browser's |
 | `Ctrl + C`         | Copy selection / canvas |
 | `Ctrl + Shift + C` | Copy to clipboard |
 | `Ctrl + V`         | Paste image into the active layer |

@@ -412,6 +412,101 @@ describe("Ctrl+C never steals a text box's native copy", () => {
   });
 });
 
+/** Ctrl+Y (or Cmd+Y), dispatched from `target`; returns the event so a test
+ *  can read whether the handler cancelled it. */
+function pressCtrlY(target: EventTarget = window, mods: KeyboardEventInit = { ctrlKey: true }) {
+  const evt = new KeyboardEvent("keydown", {
+    key: "y",
+    code: "KeyY",
+    bubbles: true,
+    cancelable: true,
+    ...mods,
+  });
+  act(() => {
+    target.dispatchEvent(evt);
+  });
+  return evt;
+}
+
+describe("Ctrl+Y redoes, as Ctrl+Shift+Z does", () => {
+  // Windows users reach for Ctrl+Y (PARKING_LOT 10-14). Ctrl+Shift+Z keeps
+  // working; Ctrl+Y is a second way in, not a replacement.
+  it("Ctrl+Y calls onRedo and cancels the browser default", () => {
+    const p = baseProps();
+    mount(p);
+    const evt = pressCtrlY();
+    expect(p.onRedo).toHaveBeenCalledTimes(1);
+    expect(p.onUndo).not.toHaveBeenCalled();
+    expect(evt.defaultPrevented).toBe(true);
+  });
+
+  it("Cmd+Y calls onRedo on a Mac", () => {
+    const p = baseProps();
+    mount(p);
+    pressCtrlY(window, { metaKey: true });
+    expect(p.onRedo).toHaveBeenCalledTimes(1);
+  });
+
+  it("Ctrl+Shift+Z still calls onRedo", () => {
+    const p = baseProps();
+    mount(p);
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Z", ctrlKey: true, shiftKey: true, bubbles: true }),
+      );
+    });
+    expect(p.onRedo).toHaveBeenCalledTimes(1);
+  });
+
+  it("Ctrl+Shift+Y is not redo", () => {
+    const p = baseProps();
+    mount(p);
+    pressCtrlY(window, { ctrlKey: true, shiftKey: true });
+    expect(p.onRedo).not.toHaveBeenCalled();
+  });
+
+  it("a bare Y is not redo", () => {
+    const p = baseProps();
+    mount(p);
+    pressCtrlY(window, {});
+    expect(p.onRedo).not.toHaveBeenCalled();
+  });
+
+  it("redoes from a focused slider, as Ctrl+Shift+Z does", () => {
+    const p = baseProps();
+    mount(p);
+    const range = document.createElement("input");
+    range.type = "range";
+    document.body.appendChild(range);
+    pressCtrlY(range);
+    expect(p.onRedo).toHaveBeenCalledTimes(1);
+    range.remove();
+  });
+
+  it.each([
+    ["an <input>", () => document.createElement("input")],
+    ["a <textarea>", () => document.createElement("textarea")],
+  ])("leaves Ctrl+Y to the browser inside %s", (_name, make) => {
+    const p = baseProps();
+    mount(p);
+    const field = make();
+    document.body.appendChild(field);
+    const evt = pressCtrlY(field);
+    expect(p.onRedo).not.toHaveBeenCalled();
+    expect(evt.defaultPrevented).toBe(false);
+    field.remove();
+  });
+
+  it("does nothing while a photo is switching", () => {
+    useUIStore.setState({ isImageLoading: true });
+    const p = baseProps();
+    mount(p);
+    const evt = pressCtrlY();
+    expect(p.onRedo).not.toHaveBeenCalled();
+    expect(evt.defaultPrevented).toBe(true);
+  });
+});
+
 describe("H is the hand key: hold pans while held, tap latches, Space still works", () => {
   // `timeStamp` cannot be passed to the KeyboardEvent constructor, so it is
   // pinned on the instance. The handler reads e.timeStamp on BOTH the keydown

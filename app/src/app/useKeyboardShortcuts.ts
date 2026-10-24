@@ -97,6 +97,12 @@ interface KeyboardShortcutOptions {
   onSpaceUp?: () => void;
 }
 
+/** Ctrl+Y (Cmd+Y on a Mac): the Windows redo, a second way in beside
+ *  Ctrl+Shift+Z. Shift+Y is not it. Read by `key`, as Ctrl+Z is, so the
+ *  letter follows the keyboard layout. */
+const isRedoY = (e: KeyboardEvent): boolean =>
+  (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "y" || e.key === "Y");
+
 /** `<input>` types that are controls rather than text fields. Ctrl+Z while
  *  one has focus is the app's undo — see the guard in `handleKeyDown`. */
 const NON_TEXT_INPUT_TYPES: ReadonlySet<string> = new Set([
@@ -204,6 +210,9 @@ export function useKeyboardShortcuts({
             if (e.shiftKey) onRedo();
             else onUndo();
           }
+        } else if (isRedoY(e)) {
+          e.preventDefault();
+          if (!isPhotoSwitching()) onRedo();
         }
         return;
       }
@@ -309,6 +318,11 @@ export function useKeyboardShortcuts({
             if (e.shiftKey) onRedo();
             else onUndo();
           }
+          return;
+        }
+        if (isRedoY(e)) {
+          e.preventDefault();
+          if (!isPhotoSwitching()) onRedo();
           return;
         }
         if (e.code === "KeyC") {
