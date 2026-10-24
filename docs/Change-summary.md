@@ -11662,3 +11662,25 @@ are open in PARKING_LOT.
 Not in this release: the corner-radius dot drag and callout delete fix (#393),
 screenshot compare (#394) and three multi-select fixes (#395) are still open
 PRs.
+
+## v9.37 Change Summary — 2026-10-24
+
+**Compare two screenshots and pin every change.**
+
+| Area | Change |
+| --- | --- |
+| Screenshot compare (#394) | Right-click a gallery photo → **Compare with this**, or the top bar's **Compare with another photo…**. The open photo shows every changed pixel tinted. Views: Overlay, Side by side, Blink and Slider. A Sensitivity slider, and an "N changes" list that zooms to each change. |
+| Mark changes (#394) | A box and a numbered pin on every change, numbered after the photo's last pin. One Ctrl+Z, before and after a reload. Annotations on either photo never count as a change. |
+| Compare bar (#394) | Stays clickable over the gallery, over its own Side by side and Slider views, and while zoomed in. Done or Esc puts the photo back where it was. |
+| Ctrl+Y (#396) | Ctrl+Y (Cmd+Y on a Mac) redoes, next to Ctrl+Shift+Z. In a text field it stays the browser's. |
+| Callout leaders (#397) | A leader follows its callout through Align (one or a group), Placement and arrow-key nudges, in one undo step. Pins › Drop: Callout has **Leader: Line · Arrow**, default Line. Callouts you already made keep their arrow. |
+| Annotations (#393) | Dragging a corner-radius dot no longer re-renders the editor on every move. Deleting any part of a callout deletes the whole callout. |
+| Multi-select (#395) | Shift-click in the Shapes tool adds to the pick instead of reopening one edit box. An unfilled shape is picked by its outline, not its empty middle. A Reselect row adds the whole callout. |
+| Tests (#398) | Two flaky tests now wait on state instead of timing: 80 / 80 runs at 4x CPU throttle, 5 / 5 full unit runs. |
+| Engine | Two new calls, `compare_photo` and `mark_regions` (src/image_diff.rs). 2880 × 1800 diffs in **15.3 ms** median. No op-log or storage format change. 923,141 → **935,825 B** (+12,684). |
+| Verification | CI green on every PR. All six merged into one build first: tsc, lint (0 errors), guardrails, **2,079 / 2,079** unit tests and **210** e2e passed. QC on its production build, logged out: boot, import, Ctrl+Y, both leader kinds, group Align with a callout, the shared action bars, reload and resume, keyboard access. All passed. |
+
+Not in this release: undoing a text Placement with the Text tool open can
+break the op log; a JPEG re-save can show one false change; ADR-092 (line
+leaders reuse the Line shape) is still a draft. All three are in PARKING_LOT.
+

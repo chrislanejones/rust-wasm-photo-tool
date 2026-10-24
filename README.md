@@ -90,17 +90,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.36 — 2026-10-22
+### v9.37 — 2026-10-24
 
-**Pick several annotations and move them as one.**
+**Compare two screenshots and pin every change.**
 
-Shift-click shapes, text, pins or callouts, or drag a box around them with
-the new Create › Select objects pointer. Ctrl+A picks every annotation on the
-layer. The group drags, nudges with the arrow keys (Shift for 10 px), aligns,
-spreads out evenly, duplicates and deletes together, and every one of those
-is a single Ctrl+Z, even after a reload. A callout's pin, leader and label
-stay together. The Reselect list takes Shift-click too. Also: a shape's edit
-box no longer draws over the side panels, and five dependency bumps.
+Right-click a photo in the gallery and pick Compare with this. Every pixel that
+changed between the two gets a tint, and you can flip between Overlay, Side by
+side, Blink and Slider. The change list zooms to each one. Mark changes drops a
+box and a numbered pin on every change, and one Ctrl+Z takes them all back.
+Also: Ctrl+Y redoes, a callout's leader can be a plain line, leaders follow
+Align and Placement, and three multi-select fixes.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

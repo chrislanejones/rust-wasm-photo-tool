@@ -24,6 +24,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.37",
+    date: "2026-10-24",
+    headline: "Compare two screenshots and pin every change.",
+    entries: [
+      { tag: "feature", text: "Screenshot compare: right-click a gallery photo and pick Compare with this. Every changed pixel is tinted, with Overlay, Side by side, Blink and Slider views and a list that zooms to each change." },
+      { tag: "feature", text: "Mark changes puts a box and a numbered pin on every change, and one Ctrl+Z takes them all back, even after a reload." },
+      { tag: "feature", text: "Ctrl+Y (Cmd+Y on a Mac) redoes, next to Ctrl+Shift+Z." },
+      { tag: "feature", text: "A callout's leader can be a plain line or an arrow, and it follows the callout through Align, Placement and arrow-key nudges." },
+      { tag: "fix", text: "Shift-click in the Shapes tool adds to the pick, an unfilled shape is picked by its outline, and deleting any part of a callout deletes all of it." },
+      { tag: "infra", text: "Two flaky tests now wait on state instead of timing." },
+      { tag: "rust", text: "Two new engine calls for the screenshot diff, 15.3 ms at 2880 × 1800. Engine 923,141 to 935,825 B (+12,684)." },
+    ],
+  },
+  {
     version: "v9.36",
     date: "2026-10-22",
     headline: "Pick several annotations and move them as one.",
