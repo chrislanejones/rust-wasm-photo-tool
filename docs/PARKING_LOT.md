@@ -4,6 +4,37 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
+
+- **C13, a JPEG re-save of text in a saturated color shows a false change.**
+  The default sensitivity (50, tolerance 28) stays. Measured: the fixture
+  `a.png` re-saved at q82, q80, q75 and q70 shows **0 changes** at 50 (and at
+  45/40/35/30), so a q82 case on the fixture would be green before and after
+  any change and proves nothing. A 1440×900 settings page with pure-blue
+  (#0000ff) bold nav text, re-saved at q82, shows 3 changes at 50, 2 at 45,
+  1 at 40, 1 at 35 and **still 1 at 30** (tolerance 38): the nav text, where
+  JPEG's 4:2:0 chroma subsampling smears color across the glyph edges. No
+  small default change reaches 0, while the known pair keeps 3 changes at
+  IoU ≥ 0.89 all the way down to 20. The fix belongs in the engine
+  (`src/image_diff.rs`): compare luma at the full tolerance and chroma at a
+  looser one, or over 2×2 blocks, then add a saturated-text q82 pair to
+  `e2e/fixtures/compare/make-fixtures.mjs`. The repro page is a dozen lines;
+  rebuild it from this note.
+- **Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
+  (a hand pan with H/Space survives Alt+0 too). Left alone: the pan is
+  CanvasArea's local state, `handleZoomReset` lives in `useCanvasActions` and
+  cannot reach it without a new prop through AppShell or moving the pan into
+  a store, and no test covers Alt+0 today. Compare no longer depends on it:
+  Done/Esc put back the view from before the first zoom-to-change. A
+  "reset view" that zeroes the pan wants its own session and its own spec.
+- **C20 (odd), pins sit on the box's top-left corner**, over the first letter
+  of the change. Untouched.
+- **`smart-callout.spec.ts` "the leader follows the pin and the label, and
+  still does after a reload" flakes**: the dragged pin lands 1 px off in y
+  (599 or 601 vs 600). 1 of 3 runs on the #394 base code with none of the
+  10-23 fixes applied, 1 of 2 with them. Drag rounding after the reload, not
+  the compare bar.
+
 ## OPEN — Annotation performance and editing work (2026-10-20)
 
 Work is on `feat/annotation-performance-baseline`. The benchmark and prototype
@@ -63,8 +94,21 @@ measurement limits and reproduction commands are in the
     (one engine move, by design — the drag stays out of React).
   - Hit-testing for picks is by box, so an unfilled shape is picked by its
     empty middle too (the single-shape click uses the engine's outline ring).
-- [ ] Screenshot comparison with a difference visualization and attached
-  annotations. Existing before/after comparison is not this feature.
+- [x] Screenshot comparison (Night 10-23). Right-click a gallery photo →
+  Compare with this, or the top bar's Compare with another photo…: the open
+  photo (B) shows every changed pixel tinted, with Overlay, Side by side,
+  Blink and Slider views, a Sensitivity slider, a "N changes" list that zooms
+  to each, and Mark changes (a box and a numbered pin per change, pins after
+  B's last, ONE undo step). The diff is `src/image_diff.rs` in the engine
+  worker (2880×1800 in 19 ms, docs/benchmarks); annotations on either photo
+  never count. e2e/screenshot-compare.spec.ts. Left open:
+  - No scaling or auto-alignment: photos of different sizes compare their
+    top-left overlap, and the Slider view stretches A over B's box.
+  - A is compared from its stored ORIGINAL, so edits made to A since upload
+    (a crop, a brush) are not part of the comparison.
+  - The top bar has a separate button, not a Compare ▾ menu (no dropdown
+    primitive in the repo; one is a new dependency).
+  - Phone: out of scope (the phone does not load the engine).
 - [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
   checks high/low contrast edges, equal-luminance color edges, gaps, soft
   boundaries, image borders, zoom, fast strokes and undo. Automated kernel
