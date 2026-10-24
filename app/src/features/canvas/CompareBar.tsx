@@ -23,6 +23,8 @@ import { changesCount, paintMask, regionLabel, type DiffRegion, type ScreenshotD
 import { CompareSlider } from "./CompareSlider";
 import { ComparePicker } from "./ComparePicker";
 import { useCanvasBox } from "./useCanvasBox";
+import { useOpenCanvasArea } from "./useOpenCanvasArea";
+import type { ScreenBox } from "./panelYield";
 
 interface CompareBarProps {
   canvasEl: HTMLCanvasElement | null;
@@ -171,14 +173,24 @@ function SideBySide({ cmp, bUrl, docW, docH }: { cmp: ScreenshotCompare; bUrl: s
   );
 }
 
+/** Room the bar, the size line and the change list take under the anchor. */
+const STACK_PX = 150;
+
 /** Where the bar hangs: under the canvas, centered, like the other canvas
- *  bars — kept far enough up the window that the size line and the change
- *  list fit below it. `box` changes with zoom, pan and resizes, which is
- *  when this has to move. */
-function barAnchor(canvasEl: HTMLCanvasElement | null, box: ScreenRect | null) {
-  if (!canvasEl || !box) return null;
+ *  bars — but inside `area`, the part of the canvas area no panel covers. The
+ *  bars all sit under the Tools, Gallery and Review panels, and this one is
+ *  how you leave compare, so it goes where the panels are not (C3: the
+ *  right-click way in leaves the Gallery strip open over the canvas's foot).
+ *  Centered on the part of the photo that is in view, not on the whole
+ *  canvas, which at 800% is mostly off-screen (C7). Kept far enough up that
+ *  the size line and the change list fit below it. `box` changes with zoom,
+ *  pan and resizes, `area` with the panels, which is when this has to move. */
+function barAnchor(canvasEl: HTMLCanvasElement | null, box: ScreenRect | null, area: ScreenBox | null) {
+  if (!canvasEl || !box || !area) return null;
   const r = canvasEl.getBoundingClientRect();
-  return { x: r.left + r.width / 2, y: Math.max(8, Math.min(r.bottom + 14, window.innerHeight - 150)) };
+  const [l, rr] = [Math.max(r.left, area.l), Math.min(r.right, area.r)];
+  const x = rr > l ? (l + rr) / 2 : (area.l + area.r) / 2;
+  return { x, y: Math.max(area.t + 8, Math.min(r.bottom + 14, area.b - STACK_PX)) };
 }
 
 export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revision: undoCount, onFocusRegion }: CompareBarProps) {
@@ -193,6 +205,7 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
   const focused = useScreenshotCompareStore((s) => s.focused);
   const setFocused = useScreenshotCompareStore((s) => s.setFocused);
   const box = useCanvasBox(canvasEl, cmp.active);
+  const area = useOpenCanvasArea(canvasEl, cmp.active);
   const [listOpen, setListOpen] = useState(false);
   const [showA, setShowA] = useState(false);
   // Asked when blink starts, not at mount: the Reduce Motion setting can
@@ -233,7 +246,7 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
 
   if (!cmp.active) return <ComparePicker />;
 
-  const anchor = barAnchor(canvasEl, box);
+  const anchor = barAnchor(canvasEl, box, area);
   const { diff, bounds } = cmp;
   const n = diff?.regions.length ?? 0;
   const photoRect =
@@ -263,77 +276,83 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
           source={{ url: cmp.a.url, left: "A", right: "B" }}
         />
       )}
+      {/* The bars sit over the four views (--z-compare): Side by side covers the
+          whole canvas area and the Slider the photo, and from either a person
+          must reach the other views and Done (C15, C16). Still under the
+          panels, like every canvas bar. */}
       {anchor && (
-        <CanvasActionBar x={anchor.x} y={anchor.y} label="Compare" data-testid="compare-bar">
-          <div role="group" aria-label="View" className="flex items-center gap-0.5">
-            {VIEWS.map(({ view: v, label, Icon }) => (
-              <CanvasActionBarButton key={v} onClick={() => setView(v)} pressed={view === v} title={label}>
-                <Icon aria-hidden className="size-4" />
-                {view === v && label}
-              </CanvasActionBarButton>
-            ))}
-          </div>
-          {view === "blink" && still && (
-            <CanvasActionBarButton onClick={() => setShowA((v) => !v)} pressed={showA} title={showA ? "Show B" : "Show A"}>
-              {showA ? "Showing A" : "Showing B"}
-            </CanvasActionBarButton>
-          )}
-          <label className="flex items-center gap-1 px-1 text-xs text-theme-foreground">
-            Sensitivity
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={sensitivity}
-              onChange={(e) => setSensitivity(Number(e.target.value))}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="w-20"
-              aria-valuetext={`${sensitivity} of 100`}
-            />
-          </label>
-          {n > 0 ? (
-            <CanvasActionBarButton onClick={() => setListOpen((v) => !v)} pressed={listOpen} title={`${status}: list them`}>
-              <List aria-hidden className="size-4" /> {status}
-            </CanvasActionBarButton>
-          ) : (
-            <CanvasActionBarText>{status}</CanvasActionBarText>
-          )}
-          <CanvasActionBarButton onClick={() => void cmp.mark()} disabled={!n || cmp.marking} title="Mark changes">
-            <MapPin aria-hidden className="size-4" /> Mark changes
-          </CanvasActionBarButton>
-          <CanvasActionBarButton onClick={stop} title="Done">
-            <X aria-hidden className="size-4" /> Done
-          </CanvasActionBarButton>
-        </CanvasActionBar>
-      )}
-      {anchor && cmp.sizesLine && (
-        <CanvasActionBar x={anchor.x} y={anchor.y + 46} label="Size note">
-          <span data-testid="compare-sizes" className="px-2 text-xs text-theme-muted-foreground">
-            {cmp.sizesLine}
-          </span>
-        </CanvasActionBar>
-      )}
-      {anchor && listOpen && diff && n > 0 && (
-        <CanvasActionBar x={anchor.x} y={anchor.y + (cmp.sizesLine ? 88 : 46)} label="Changes">
-          <ul aria-label="Changes" className="flex max-w-[80vw] flex-wrap items-center gap-1">
-            {diff.regions.map((r, i) => (
-              <li key={i}>
-                <CanvasActionBarButton
-                  onClick={() => {
-                    setFocused(i);
-                    onFocusRegion?.(r);
-                  }}
-                  pressed={focused === i}
-                  title={regionLabel(i, n, r)}
-                >
-                  <span data-testid="compare-region" data-box={`${r.x},${r.y},${r.w},${r.h}`}>
-                    {i + 1}
-                  </span>
+        <div className="absolute left-0 top-0" style={{ zIndex: "var(--z-topbar)" }}>
+          <CanvasActionBar x={anchor.x} y={anchor.y} label="Compare" data-testid="compare-bar">
+            <div role="group" aria-label="View" className="flex items-center gap-0.5">
+              {VIEWS.map(({ view: v, label, Icon }) => (
+                <CanvasActionBarButton key={v} onClick={() => setView(v)} pressed={view === v} title={label}>
+                  <Icon aria-hidden className="size-4" />
+                  {view === v && label}
                 </CanvasActionBarButton>
-              </li>
-            ))}
-          </ul>
-        </CanvasActionBar>
+              ))}
+            </div>
+            {view === "blink" && still && (
+              <CanvasActionBarButton onClick={() => setShowA((v) => !v)} pressed={showA} title={showA ? "Show B" : "Show A"}>
+                {showA ? "Showing A" : "Showing B"}
+              </CanvasActionBarButton>
+            )}
+            <label className="flex items-center gap-1 px-1 text-xs text-theme-foreground">
+              Sensitivity
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={sensitivity}
+                onChange={(e) => setSensitivity(Number(e.target.value))}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="w-20"
+                aria-valuetext={`${sensitivity} of 100`}
+              />
+            </label>
+            {n > 0 ? (
+              <CanvasActionBarButton onClick={() => setListOpen((v) => !v)} pressed={listOpen} title={`${status}: list them`}>
+                <List aria-hidden className="size-4" /> {status}
+              </CanvasActionBarButton>
+            ) : (
+              <CanvasActionBarText>{status}</CanvasActionBarText>
+            )}
+            <CanvasActionBarButton onClick={() => void cmp.mark()} disabled={!n || cmp.marking} title="Mark changes">
+              <MapPin aria-hidden className="size-4" /> Mark changes
+            </CanvasActionBarButton>
+            <CanvasActionBarButton onClick={stop} title="Done">
+              <X aria-hidden className="size-4" /> Done
+            </CanvasActionBarButton>
+          </CanvasActionBar>
+          {cmp.sizesLine && (
+            <CanvasActionBar x={anchor.x} y={anchor.y + 46} label="Size note">
+              <span data-testid="compare-sizes" className="px-2 text-xs text-theme-muted-foreground">
+                {cmp.sizesLine}
+              </span>
+            </CanvasActionBar>
+          )}
+          {listOpen && diff && n > 0 && (
+            <CanvasActionBar x={anchor.x} y={anchor.y + (cmp.sizesLine ? 88 : 46)} label="Changes">
+              <ul aria-label="Changes" className="flex max-w-[80vw] flex-wrap items-center gap-1">
+                {diff.regions.map((r, i) => (
+                  <li key={i}>
+                    <CanvasActionBarButton
+                      onClick={() => {
+                        setFocused(i);
+                        onFocusRegion?.(r);
+                      }}
+                      pressed={focused === i}
+                      title={regionLabel(i, n, r)}
+                    >
+                      <span data-testid="compare-region" data-box={`${r.x},${r.y},${r.w},${r.h}`}>
+                        {i + 1}
+                      </span>
+                    </CanvasActionBarButton>
+                  </li>
+                ))}
+              </ul>
+            </CanvasActionBar>
+          )}
+        </div>
       )}
     </>
   );

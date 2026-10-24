@@ -4,6 +4,37 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
+
+- **C13, a JPEG re-save of text in a saturated color shows a false change.**
+  The default sensitivity (50, tolerance 28) stays. Measured: the fixture
+  `a.png` re-saved at q82, q80, q75 and q70 shows **0 changes** at 50 (and at
+  45/40/35/30), so a q82 case on the fixture would be green before and after
+  any change and proves nothing. A 1440×900 settings page with pure-blue
+  (#0000ff) bold nav text, re-saved at q82, shows 3 changes at 50, 2 at 45,
+  1 at 40, 1 at 35 and **still 1 at 30** (tolerance 38): the nav text, where
+  JPEG's 4:2:0 chroma subsampling smears color across the glyph edges. No
+  small default change reaches 0, while the known pair keeps 3 changes at
+  IoU ≥ 0.89 all the way down to 20. The fix belongs in the engine
+  (`src/image_diff.rs`): compare luma at the full tolerance and chroma at a
+  looser one, or over 2×2 blocks, then add a saturated-text q82 pair to
+  `e2e/fixtures/compare/make-fixtures.mjs`. The repro page is a dozen lines;
+  rebuild it from this note.
+- **Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
+  (a hand pan with H/Space survives Alt+0 too). Left alone: the pan is
+  CanvasArea's local state, `handleZoomReset` lives in `useCanvasActions` and
+  cannot reach it without a new prop through AppShell or moving the pan into
+  a store, and no test covers Alt+0 today. Compare no longer depends on it:
+  Done/Esc put back the view from before the first zoom-to-change. A
+  "reset view" that zeroes the pan wants its own session and its own spec.
+- **C20 (odd), pins sit on the box's top-left corner**, over the first letter
+  of the change. Untouched.
+- **`smart-callout.spec.ts` "the leader follows the pin and the label, and
+  still does after a reload" flakes**: the dragged pin lands 1 px off in y
+  (599 or 601 vs 600). 1 of 3 runs on the #394 base code with none of the
+  10-23 fixes applied, 1 of 2 with them. Drag rounding after the reload, not
+  the compare bar.
+
 ## OPEN — Annotation performance and editing work (2026-10-20)
 
 Work is on `feat/annotation-performance-baseline`. The benchmark and prototype

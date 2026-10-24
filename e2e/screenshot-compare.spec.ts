@@ -1,5 +1,5 @@
 import { test, expect } from "./guard/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { installAnnotationProbe } from "./annotation-benchmark-harness";
@@ -25,9 +25,14 @@ const tile = (page: Page, file: string) =>
 
 type Shape = { id: number; kind: number; number: number; x0: number; y0: number; x1: number; y1: number };
 
+/** The window the 10-23 user tests ran in (Chrome, 1689 × 922). */
+const USER_WINDOW = { width: 1689, height: 922 };
+/** A common laptop window: the photo fills it down to the bar. */
+const LAPTOP_WINDOW = { width: 1366, height: 768 };
+
 /** Import B and A, and open B. */
-async function open(page: Page, b: string, a: string, width: number) {
-  await page.setViewportSize({ width: 1600, height: 1100 });
+async function open(page: Page, b: string, a: string, width: number, viewport = { width: 1600, height: 1100 }) {
+  await page.setViewportSize(viewport);
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
     return ["localhost", "127.0.0.1"].includes(url.hostname) || ["blob:", "data:"].includes(url.protocol)
@@ -187,4 +192,133 @@ test("Blink under reduced motion does not animate; Show A swaps by hand", async 
   expect(seen).toEqual(["hidden"]);
   await bar(page).getByRole("button", { name: "Show A" }).click();
   await expect(a).toHaveCSS("visibility", "visible");
+});
+
+// ── Reachability (user tests 10-23: C3, C7, C8, C15, C16) ───────────────────
+// `toBeVisible` passes for a button something else is painted over, so these
+// ask the page what a click at the button's middle would land on.
+
+/** What a person's click at the middle of `loc` would hit: "itself", or
+ *  where it lands instead. */
+async function hitAt(loc: Locator): Promise<string> {
+  return loc.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return `off-screen at ${Math.round(x)}, ${Math.round(y)}`;
+    const hit = document.elementFromPoint(x, y);
+    if (hit && el.contains(hit)) return "itself";
+    const tag = (e: Element | null) =>
+      e ? `${e.tagName.toLowerCase()}${e.getAttribute("data-testid") ? `[data-testid=${e.getAttribute("data-testid")}]` : ""}${typeof e.className === "string" && e.className ? `.${e.className.split(/\s+/).slice(0, 4).join(".")}` : ""}` : "nothing";
+    const owner = hit?.closest("[data-paste-yields], [aria-label], [data-testid]");
+    return `${tag(hit)} in ${tag(owner ?? null)}`;
+  });
+}
+
+/** Every button on the Compare bar takes a click. */
+async function expectBarReachable(page: Page) {
+  const buttons = bar(page).getByRole("button");
+  const n = await buttons.count();
+  expect(n).toBeGreaterThanOrEqual(6);
+  for (let i = 0; i < n; i++) {
+    const b = buttons.nth(i);
+    // Polled: a panel opening or closing slides for a moment.
+    await expect.poll(() => hitAt(b), { message: `bar button "${await b.getAttribute("title")}"` }).toBe("itself");
+  }
+}
+
+const canvasBox = (page: Page) => page.locator("canvas.main-canvas").boundingBox();
+
+test("C3: with the gallery open (the right-click way in), every button on the bar takes a click", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960, USER_WINDOW);
+  await compareWith(page, "a.png");
+  await expect(page.locator('[data-paste-yields="gallery"]')).toBeVisible();
+  await expectBarReachable(page);
+  // C19: and with the Review panel open beside it too.
+  await key(page, "Alt+r");
+  await expect(page.locator('[data-paste-yields="review"]')).toBeVisible();
+  await expectBarReachable(page);
+  await bar(page).getByRole("button", { name: "Blink", exact: true }).click();
+  await expect(bar(page).getByRole("button", { name: "Blink", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await bar(page).getByRole("button", { name: "Done" }).click();
+  await expect(bar(page)).toHaveCount(0);
+});
+
+for (const [finding, view] of [["C15", "Side by side"], ["C16", "Slider"]] as const) {
+  test(`${finding}: from ${view}, the other views and Done take a click`, async ({ page }) => {
+    await open(page, "b.png", "a.png", 960, LAPTOP_WINDOW);
+    await compareWith(page, "a.png");
+    await key(page, "Alt+g"); // gallery closed: this is about the view, not C3
+    await expect(page.locator('[data-paste-yields="gallery"]')).toHaveCount(0);
+    await bar(page).getByRole("button", { name: view, exact: true }).click();
+    await expect(view === "Slider" ? page.locator("div.cursor-col-resize") : page.getByTestId("compare-side-a")).toBeVisible();
+    await expectBarReachable(page);
+    await bar(page).getByRole("button", { name: "Overlay", exact: true }).click();
+    await expect(page.getByTestId("compare-tint")).toBeVisible();
+    await bar(page).getByRole("button", { name: view, exact: true }).click();
+    await bar(page).getByRole("button", { name: "Done" }).click();
+    await expect(bar(page)).toHaveCount(0);
+  });
+}
+
+test("C7: zoomed into a change, the bar keeps its size inside the window and every change takes a click", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960, USER_WINDOW);
+  await compareWith(page, "a.png");
+  await key(page, "Alt+g");
+  await expect(page.locator('[data-paste-yields="gallery"]')).toHaveCount(0);
+  await bar(page).getByRole("button", { name: /changes?: list them/ }).click();
+  const pill = bar(page).getByRole("group", { name: "Compare" });
+  const before = (await pill.boundingBox())!;
+  const changes = page.getByRole("list", { name: "Changes" }).getByRole("button");
+  await changes.nth(1).click();
+  await expect(changes.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await canvasBox(page))!.width).toBeGreaterThan(960 * 2);
+  const after = (await pill.boundingBox())!;
+  expect(Math.abs(after.width - before.width), `bar width ${before.width} → ${after.width}`).toBeLessThanOrEqual(2);
+  expect(Math.abs(after.height - before.height), `bar height ${before.height} → ${after.height}`).toBeLessThanOrEqual(2);
+  expect(after.x).toBeGreaterThanOrEqual(0);
+  expect(after.x + after.width).toBeLessThanOrEqual(USER_WINDOW.width);
+  expect(after.y + after.height).toBeLessThanOrEqual(USER_WINDOW.height);
+  await expectBarReachable(page);
+  for (let i = 0; i < 3; i++) await expect.poll(() => hitAt(changes.nth(i)), { message: `change ${i + 1}` }).toBe("itself");
+  await changes.nth(2).click();
+  await expect(changes.nth(2)).toHaveAttribute("aria-pressed", "true");
+});
+
+test("C8: leaving compare (Done or Esc) puts the photo back where it was before zooming to a change", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960, USER_WINDOW);
+  // Measured, and checked, with the gallery open: the strip changes the
+  // canvas area, so the photo's home moves with it. Closed while zoomed, so
+  // this is about the pan, not about reaching the bar (C3).
+  const home = (await canvasBox(page))!;
+  const expectHome = async () => {
+    await expect(page.locator('[data-paste-yields="gallery"]')).toBeVisible();
+    await expect.poll(async () => {
+      const r = (await canvasBox(page))!;
+      return [r.x, r.y, r.width, r.height].map((v, i) => Math.abs(v - [home.x, home.y, home.width, home.height][i]) <= 1);
+    }).toEqual([true, true, true, true]);
+  };
+  const zoomToChange = async (i: number) => {
+    await key(page, "Alt+g");
+    await expect(page.locator('[data-paste-yields="gallery"]')).toHaveCount(0);
+    await bar(page).getByRole("button", { name: /changes?: list them/ }).click();
+    await page.getByRole("list", { name: "Changes" }).getByRole("button").nth(i).click();
+    await expect.poll(async () => (await canvasBox(page))!.width).toBeGreaterThan(home.width * 2);
+  };
+
+  // The user's path: zoom to a change, Alt+0 (zoom only), then Done.
+  await compareWith(page, "a.png");
+  await zoomToChange(1);
+  await key(page, "Alt+0");
+  await bar(page).getByRole("button", { name: "Done" }).click({ timeout: 5000 });
+  await expect(bar(page)).toHaveCount(0);
+  await key(page, "Alt+g");
+  await expectHome();
+
+  // Esc, straight from a zoomed change.
+  await compareWith(page, "a.png");
+  await zoomToChange(0);
+  await key(page, "Escape");
+  await expect(bar(page)).toHaveCount(0);
+  await key(page, "Alt+g");
+  await expectHome();
 });

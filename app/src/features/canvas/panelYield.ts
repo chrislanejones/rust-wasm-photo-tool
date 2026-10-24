@@ -57,6 +57,37 @@ export function panelsUnder(corners: Pt[]): Set<Element> {
   return hit;
 }
 
+/** Screen box: left, top, right, bottom. */
+export interface ScreenBox {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+}
+
+/** The part of `area` (SCREEN px) that no closable panel covers, inside the
+ *  window. Each panel trims the side it sits on — the cut that leaves the most
+ *  room — so the Gallery strip trims the bottom, Tools the left and Review the
+ *  right. For a canvas bar that has to stay clickable while those panels are
+ *  open (screenshot compare's bar): the bars sit under the panels, so they
+ *  go where the panels are not. */
+export function openArea(area: ScreenBox): ScreenBox {
+  let o = { l: Math.max(0, area.l), t: Math.max(0, area.t), r: Math.min(window.innerWidth, area.r), b: Math.min(window.innerHeight, area.b) };
+  for (const el of document.querySelectorAll(`[${PANEL_YIELDS_ATTR}]`)) {
+    const p = el.getBoundingClientRect();
+    if (!(p.left < o.r && p.right > o.l && p.top < o.b && p.bottom > o.t)) continue;
+    const cuts = [
+      { ...o, l: Math.max(o.l, p.right) },
+      { ...o, r: Math.min(o.r, p.left) },
+      { ...o, t: Math.max(o.t, p.bottom) },
+      { ...o, b: Math.min(o.b, p.top) },
+    ];
+    const room = (c: ScreenBox) => Math.max(0, c.r - c.l) * Math.max(0, c.b - c.t);
+    o = cuts.reduce((best, c) => (room(c) > room(best) ? c : best));
+  }
+  return o;
+}
+
 /** A box given by two opposite corners in CANVAS px, turned `rotation`° about
  *  its center, as four SCREEN px corners. A line's angle lives in its
  *  endpoints and its rotation is 0, so its box is the plain bbox. */
