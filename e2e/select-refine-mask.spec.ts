@@ -13,14 +13,8 @@ import { join } from "node:path";
 //      selected pixels, as one undo step, and hands over to the mask brush
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Optional stress mode keeps the normal CI run fast while making the requested
-// 4x CPU verification reproducible on Chromium.
-test.beforeEach(async ({ page }) => {
-  if (process.env.IH_CPU_THROTTLE) {
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.IH_CPU_THROTTLE) });
-  }
-});
+// Load check: `E2E_CPU_THROTTLE=4 pnpm exec playwright test select-refine-mask
+// --repeat-each 20` (the throttle is the guarded `test`'s opt-in fixture).
 
 const FIXTURE_PNG = join(__dirname, "fixtures", "sky-building.png");
 
