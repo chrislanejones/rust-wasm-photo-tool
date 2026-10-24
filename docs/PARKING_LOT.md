@@ -186,8 +186,8 @@ remains disabled. Input/mask/output retention (row 203) is documented, not built
 | ~~No Ctrl+Y for redo; only Ctrl+Shift+Z is bound, and the shortcut sheet says so. Windows users may expect Ctrl+Y.~~ **FIXED 10-23-2026 (Night 10-23 §3): Ctrl+Y and Cmd+Y redo wherever Ctrl+Shift+Z does; inside a text field they stay the browser's. On the shortcut sheet and in Keyboard-Shortcuts.md; e2e/redo-ctrl-y.spec.ts.** | `useKeyboardShortcuts.ts` (`isRedoY`) | Chris's call |
 | `smart-callout.spec.ts:176` ("…still does after a reload") flaked once under load: the pin landed at y 601, not 600, after a 200 px drag. 3 / 3 alone. Found 10-23-2026 during Night 10-23 §3; unrelated to Ctrl+Y | `e2e/smart-callout.spec.ts:176`, pin drag rounding | Tara |
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
-| `select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load | `e2e/` | Tara |
-| `SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone | `app/src/` | Tara |
+| ~~`select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load~~ **FIXED 10-23-2026: the engine lookup polls (`expect.poll`, landed in 27cfe4df), and the spec now uses the shared `E2E_CPU_THROTTLE` switch instead of its own `IH_CPU_THROTTLE` copy. 80/80 at 4× CPU (`--repeat-each 20`, all four tests 20/20). The old one-shot lookup fails a 1.5 s slow boot that the poll waits out.** | `e2e/` | Tara |
+| ~~`SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone~~ **FIXED 10-23-2026: there was no slow await. Both tests are synchronous, and vitest 5 fails a sync test after the fact once it runs past 5 s. The first test was the slowest of all 2,049 (927 to 1,050 ms in the full run) because sonner injects a 97-rule stylesheet on import, and every role query after a DOM change ran jsdom's `getComputedStyle` through it. sonner is now mocked (nothing asserts a toast). Full suite 5/5 green, with that test at 634 to 833 ms. It is still the slowest test: Radix's scroll-lock stylesheet and accessible-name computation are most of what is left.** | `app/src/` | Tara |
 | IN REVIEW on `feat/adjustments-oplog-20261017`: record all seven Adjustments settings with exact session resets. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md) explains why cumulative `TonalStack` cannot represent them; label stays "Adjustments". | engine, after #368 | Silas |
 | Captured 10-17 from production master d486fd4: real v13 TonalStack frame, base PNG, annotations and browser hash; included in the Adjustments branch with a compatibility test | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
 | `docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix | — | at merge |
@@ -266,7 +266,11 @@ lower tier for the same beat. Not a UI-night fix: the honest version is a
 touches AppShell and gating semantics. Once that exists, GalleryCount can
 show a `Skeleton variant="line"` the width of a `TinyNumberBox` for the max.
 
-## OPEN — `select-refine-mask` is load-sensitive too (10-07-2026)
+## FIXED 10-23-2026 — `select-refine-mask` is load-sensitive too (10-07-2026)
+
+All four tests 20/20 at 4× CPU (`E2E_CPU_THROTTLE=4 --repeat-each 20`), including "a Refine
+slider previews on a copy". The engine lookup polls instead of reading once. See the 10-14 row.
+
 
 Seen on #319's first full-directory CI run: "Add mask → Reveal selection" timed out waiting for the
 Add mask button after `location.hash = "#/tool/layers"` (shard 2/2; passed on the run before).

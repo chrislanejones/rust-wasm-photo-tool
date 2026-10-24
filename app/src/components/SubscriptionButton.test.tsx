@@ -19,6 +19,16 @@ vi.mock("@/lib/cloud", () => ({
   useCloudAuth: () => ({ isAuthenticated: false, isLoading: false }),
   useCloudClient: () => null,
 }));
+// sonner is mocked for speed, not behavior: importing it injects a 97-rule
+// stylesheet, and every default (`hidden: false`) role query runs jsdom's
+// getComputedStyle cascade through all of it, again after each DOM change.
+// That doubled the queries' cost and made the first test the slowest in the
+// suite (~1 s), so it crossed the 5 s timeout when the machine was busy.
+// Nothing here asserts a toast.
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn(), message: vi.fn(), dismiss: vi.fn() }),
+  Toaster: () => null,
+}));
 vi.mock("./UserMenu", () => ({ UserMenu: () => null }));
 vi.mock("./SuperUserPane", () => ({ SuperUserPane: () => <p>Admin controls</p> }));
 
@@ -54,8 +64,7 @@ it("keeps a labelled panel and one reachable tab after the admin category disapp
 });
 
 it("reopens a stale unavailable category on a real available tab", () => {
-  // No component is mounted yet: this synchronous store setup needs no
-  // async act queue (which can stall under the full suite's worker load).
+  // No component is mounted yet, so this synchronous store setup needs no act().
   useUIStore.getState().closeSettings();
   render(<SubscriptionButton general={general} openRaster={openRaster} />);
   fireEvent.click(screen.getByRole("button", { name: "Settings", exact: true }));
