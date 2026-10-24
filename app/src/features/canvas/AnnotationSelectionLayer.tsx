@@ -47,6 +47,8 @@ import { setLiveGroupOffset, useLiveGroupOffset } from "@/lib/liveEditGeometry";
 import { annotationToolActive, useAnnotationSelection, type AlignEdge } from "@/app/session/useAnnotationSelection";
 import { subToolKey } from "@/features/tools/toolGroups";
 import { useToolStore } from "@/stores/useToolStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { shapeAnnotationAt, type ShapeHitGeometry } from "@/lib/annotationHitTest";
 
 const SELECT_OBJECTS = subToolKey("create", "select-objects");
 /** A press that moves less than this (SCREEN px) is a click, not a drag. */
@@ -110,8 +112,11 @@ export function AnnotationSelectionLayer(props: Props) {
       const within = (b: Box) => x >= b.x0 - HIT_PAD && x <= b.x1 + HIT_PAD && y >= b.y0 - HIT_PAD && y <= b.y1 + HIT_PAD;
       // Texts draw above shapes; within each, the newest is on top.
       for (let i = texts.length - 1; i >= 0; i--) if (within(textBox(texts[i]))) return { type: "text", id: texts[i].id };
-      for (let i = shapes.length - 1; i >= 0; i--) if (within(shapeBox(shapes[i]))) return { type: "shape", id: shapes[i].id };
-      return null;
+      // Shapes by the engine's own rule, as a single-shape click: an UNFILLED
+      // rect / circle / oval is its outline ring, so a click in its empty
+      // middle picks what is behind it, not the frame (Night 10-23).
+      const id = shapeAnnotationAt(shapes as unknown as ShapeHitGeometry[], x, y);
+      return id >= 0 ? { type: "shape", id } : null;
     };
     let swallowClick = false;
 
@@ -178,8 +183,15 @@ export function AnnotationSelectionLayer(props: Props) {
       // annotation tool.
       if (hit && e.shiftKey) {
         claim(e);
-        const on = has(picked, hit.type, hit.id);
-        sel.setPicked(on ? toggle(picked, hit.type, hit.id) : pickOf(hit, picked));
+        // The shape open in the edit box counts as picked: Shift-clicking a
+        // second one picks both (useDrawingTools then closes the box).
+        const open = useAnnotationStore.getState().editingShapeId;
+        const base =
+          open != null && open !== hit.id && !has(picked, "shape", open)
+            ? expand(toggle(picked, "shape", open), geometry.shapes, geometry.texts)
+            : picked;
+        const on = has(base, hit.type, hit.id);
+        sel.setPicked(on ? toggle(base, hit.type, hit.id) : pickOf(hit, base));
         return;
       }
       // A press on a picked object drags the whole selection.

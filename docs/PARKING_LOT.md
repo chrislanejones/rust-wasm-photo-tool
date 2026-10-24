@@ -109,14 +109,16 @@ measurement limits and reproduction commands are in the
   - Resizing a group (out of scope by plan).
   - Select objects has no panel of its own: it shows whichever Shapes panel
     was last open (it shares the Shapes tool and carries no mode).
-  - Shift-clicking a second shape while the first is open in the edit box
-    does not add the open one; the edit box stays up.
-  - Reselect rows Shift-click exact objects; they do not pull in a callout's
-    other parts the way a canvas pick does.
+  - ~~Shift-clicking a second shape while the first is open in the edit box
+    does not add the open one~~ — fixed 10-23: both are picked and the edit
+    box commits and closes.
+  - ~~Reselect rows Shift-click exact objects~~ — fixed 10-23: a row adds the
+    whole callout, as a canvas pick does; taking one out takes that part.
   - During a group drag only the outlines move; the objects jump on release
     (one engine move, by design — the drag stays out of React).
-  - Hit-testing for picks is by box, so an unfilled shape is picked by its
-    empty middle too (the single-shape click uses the engine's outline ring).
+  - ~~Hit-testing for picks is by box~~ — fixed 10-23: shapes are hit by the
+    engine's rule (lib/annotationHitTest), so an unfilled shape is picked by
+    its outline ring, as a single-shape click.
 - [x] Screenshot comparison (Night 10-23). Right-click a gallery photo →
   Compare with this, or the top bar's Compare with another photo…: the open
   photo (B) shows every changed pixel tinted, with Overlay, Side by side,

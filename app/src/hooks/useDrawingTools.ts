@@ -529,9 +529,21 @@ export function useDrawingTools({
   // opens or clears the box — select, commit, cancel, undo removing it — is
   // covered without each remembering to write it.
   const editingKind = editState?.editId != null ? (editState.style?.kindByte ?? null) : null;
+  const editingId = editState?.editId ?? null;
   useEffect(() => {
     useAnnotationStore.getState().setEditingShapeKind(editingKind);
-  }, [editingKind]);
+    useAnnotationStore.getState().setEditingShapeId(editingId);
+  }, [editingKind, editingId]);
+
+  // A Shift-click on a second shape took the open one into a group: the
+  // group's bar acts on both now, so the edit box commits and closes rather
+  // than staying up over one of them (Night 10-23).
+  const picked = useAnnotationStore((st) => st.picked);
+  useEffect(() => {
+    if (editingId != null && picked.shapes.length + picked.texts.length > 1 && picked.shapes.includes(editingId)) {
+      void commitEdit();
+    }
+  }, [picked, editingId, commitEdit]);
 
   /** Overlay handle drags push new geometry here (canvas coords). `rotation`
    *  is passed only by the rotate handle; every other drag leaves it as is. */

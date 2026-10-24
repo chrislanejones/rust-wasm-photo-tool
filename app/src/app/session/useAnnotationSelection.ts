@@ -99,6 +99,14 @@ export function useAnnotationSelection({ toolRef, flushToCanvas, syncState, acti
     setPicked(NONE);
   }, [activeLayerId, setPicked]);
 
+  // The Reselect list grows its Shift-click picks to whole callouts with
+  // this, from the same geometry a canvas pick reads (Night 10-23).
+  useEffect(() => {
+    const { setExpandPick } = useAnnotationStore.getState();
+    setExpandPick((p: Picked) => expand(p, geometryRef.current.shapes, geometryRef.current.texts));
+    return () => setExpandPick(null);
+  }, []);
+
   /** After an engine call: redraw, publish the step, re-read everything. */
   const after = useCallback(async () => {
     flushToCanvas();

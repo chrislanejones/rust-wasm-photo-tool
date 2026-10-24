@@ -44,6 +44,10 @@ interface AnnotationState {
   // Written only by useDrawingTools, from its own edit state.
   editingShapeKind: number | null;
   setEditingShapeKind: (kind: number | null) => void;
+  // ...and its id (Night 10-23): a Shift-click on a second shape picks the
+  // one open in the edit box too. Written with the kind, by useDrawingTools.
+  editingShapeId: number | null;
+  setEditingShapeId: (id: number | null) => void;
 
   // Numbered steps (lib/pinSteps.ts). The active layer's pin sequence and the
   // Renumber action are published by hooks/usePinSteps for the Pins panel —
@@ -77,6 +81,12 @@ interface AnnotationState {
   // multi-selection. Cleared on a layer or photo switch.
   picked: Picked;
   setPicked: (v: SetArg<Picked>) => void;
+  // Grow a pick to whole callouts (pin + leader + label), the way a canvas
+  // pick does. Published by useAnnotationSelection, which holds the layer's
+  // geometry, so the Reselect list's Shift-click picks the same objects a
+  // canvas Shift-click would. null until it mounts.
+  expandPick: ((p: Picked) => Picked) | null;
+  setExpandPick: (fn: ((p: Picked) => Picked) | null) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -96,6 +106,8 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
 
   editingShapeKind: null,
   setEditingShapeKind: (kind) => set({ editingShapeKind: kind }),
+  editingShapeId: null,
+  setEditingShapeId: (id) => set({ editingShapeId: id }),
 
   pinSequence: { max: 0, gaps: false },
   setPinSequence: (seq) => set({ pinSequence: seq }),
@@ -115,4 +127,6 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
 
   picked: NONE,
   setPicked: (v) => set((s) => ({ picked: resolveSet(v, s.picked) })),
+  expandPick: null,
+  setExpandPick: (fn) => set({ expandPick: fn }),
 }));
