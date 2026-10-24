@@ -53,6 +53,7 @@ import {
   PackageOpen,
   Palette,
   PenTool,
+  MousePointer2,
   Pin,
   Pipette,
   Ruler,
@@ -489,6 +490,19 @@ const createGroup: ToolGroupDefinition = {
       mode: "pens",
       cursor: "crosshair",
       keywords: ["pin", "marker", "numbers", "letters", "annotate", "callout"],
+    },
+    {
+      // Multi-select (Night 10-22). No canvas gesture of its own in dispatch
+      // (useEffectiveTool idles it): AnnotationSelectionLayer takes the press —
+      // click to pick, marquee to pick everything inside, drag to move. Shares
+      // the Shapes tool and carries NO mode, like the Edit tiles that share
+      // `crop`: it lives on the stored key (routeState.test.ts).
+      id: "select-objects",
+      label: "Select objects",
+      description: "Pick several annotations — click, Shift-click or drag a box — then move, align or delete them together",
+      icon: MousePointer2,
+      tool: "shapes",
+      keywords: ["select", "multi", "several", "align", "distribute", "marquee", "group"],
     },
     {
       id: "arrow",

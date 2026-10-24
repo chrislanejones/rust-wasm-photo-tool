@@ -513,7 +513,7 @@ pub(crate) fn radii_f64(r: [u16; 4]) -> [f64; 4] {
 
 /// The kinds whose geometry turns with `rotation_deg`. Arrow, pin, polyline,
 /// bézier and the legacy hand-circle keep their stored geometry as-is.
-fn rotation_applies(kind: u8) -> bool {
+pub(crate) fn rotation_applies(kind: u8) -> bool {
     matches!(kind, 0 | 1 | 2 | 8 | 9 | 10 | 41) || crate::diagram::is_diagram_kind(kind)
 }
 
@@ -1676,14 +1676,16 @@ impl ImageHorseTool {
     /// box AND its connectors back, instead of first un-moving a line and
     /// leaving the box where it was.
     ///
-    /// ## Why this breaks the op log
+    /// ## The op log
     ///
-    /// The reconciler (`oplog_sync_annotations`) will see the box edit and
-    /// every re-routed arrow as separate ops under that one snapshot, which is
-    /// the "one recorded op ↔ one snapshot" lockstep `try_oplog_undo` relies
-    /// on — the same hazard `move_shape_annotation` documents. Routing undo
-    /// down the snapshot path is the safe answer there and here, and it only
-    /// happens when a box with connectors actually moves.
+    /// The reconciler (`oplog_sync_annotations`) records the box edit and
+    /// every re-routed arrow as separate `ShapeEdit`s under that one
+    /// snapshot. Before op-log v12 that broke the "one recorded op ↔ one
+    /// snapshot" lockstep, so this marked the log broken and undo fell back
+    /// to snapshots (and a reload lost the move). Since v12 (ADR-088) nothing
+    /// snaps between the box and its arrows, so the gesture marker groups
+    /// them and one op-log undo takes all of them back, reload or not
+    /// (tests/annotation_group.rs, the connector cases).
     pub fn reroute_connector(&mut self, id: u32, x0: f64, y0: f64, x1: f64, y1: f64) -> bool {
         let Some(s) = self.layers[self.active]
             .shape_annotations
@@ -1696,10 +1698,6 @@ impl ImageHorseTool {
         s.y0 = y0;
         s.x1 = x1;
         s.y1 = y1;
-        #[cfg(feature = "tiles")]
-        {
-            self.oplog_broken = true;
-        }
         true
     }
 

@@ -52,6 +52,12 @@ export interface ReselectBarProps {
   /** Persistent-selection highlight (lists without selection just omit it). */
   selected?: boolean;
   onSelect: () => void;
+  /** Shift-click / Shift+Enter: add the row to a multi-selection, or take it
+   *  out. Omit and Shift does what a plain click does. */
+  onShiftSelect?: () => void;
+  /** Part of a multi-selection of two or more: shows a check and announces
+   *  "selected". Undefined when no multi-selection is open. */
+  checked?: boolean;
   /** Omit entirely for the no-✕ variant. */
   onDelete?: () => void;
   /** Duplicate affordance, rendered immediately BEFORE the ✕. Omit for rows
@@ -94,6 +100,8 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       current = false,
       selected = false,
       onSelect,
+      onShiftSelect,
+      checked,
       onDelete,
       onDuplicate,
       disabled = false,
@@ -115,7 +123,8 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       if (disabled) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        onSelect();
+        if (e.shiftKey && onShiftSelect) onShiftSelect();
+        else onSelect();
       } else if ((e.key === "Delete" || e.key === "Backspace") && onDelete) {
         e.preventDefault();
         onDelete();
@@ -140,18 +149,24 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         aria-disabled={disabled || undefined}
         aria-keyshortcuts={onRename ? "F2" : undefined}
         title={title}
-        onClick={disabled ? undefined : onSelect}
+        onClick={disabled ? undefined : (e) => (e.shiftKey && onShiftSelect ? onShiftSelect() : onSelect())}
         onKeyDown={onKeyDown}
         className={cn(
           `full-width-badge type-${type}`,
           size === "lg" && "full-width-badge-lg",
-          selected && "is-selected",
+          (selected || checked) && "is-selected",
           disabled && "is-disabled",
           className,
         )}
       >
+        {checked !== undefined && (
+          <input type="checkbox" checked={checked} readOnly tabIndex={-1} aria-hidden className="pointer-events-none" />
+        )}
         {index !== undefined && <span className="history-index">{index}</span>}
-        <span className="large-badge">{label}</span>
+        <span className="large-badge">
+          {label}
+          {checked && <span className="sr-only">, selected</span>}
+        </span>
         <div className="row-actions">
           {actions}
           {onMoveUp && (

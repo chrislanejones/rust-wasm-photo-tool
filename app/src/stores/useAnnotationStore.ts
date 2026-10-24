@@ -6,7 +6,8 @@ import { create } from "zustand";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { type SetArg, resolveSet } from "./_shared";
 import type { PinSequence } from "@/lib/pinSteps";
-import type { Pt } from "@/lib/callouts";
+import type { LeaderStyle, Pt } from "@/lib/callouts";
+import { NONE, type Picked } from "@/lib/annotationSelection";
 
 export type { ReselectObject };
 
@@ -66,6 +67,16 @@ interface AnnotationState {
   setPendingCallout: (p: Pt | null) => void;
   commitCallout: ((p: Pt, text: string) => void) | null;
   setCommitCallout: (fn: ((p: Pt, text: string) => void) | null) => void;
+  // The Pins panel's Leader: Line · Arrow toggle — what a NEW callout's
+  // leader is drawn as. Existing callouts keep the leader they have.
+  calloutLeader: LeaderStyle;
+  setCalloutLeader: (style: LeaderStyle) => void;
+
+  // Multi-select (lib/annotationSelection.ts): the annotations picked on the
+  // ACTIVE layer, written by app/session/useAnnotationSelection. Empty is no
+  // multi-selection. Cleared on a layer or photo switch.
+  picked: Picked;
+  setPicked: (v: SetArg<Picked>) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -99,4 +110,9 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
   setPendingCallout: (p) => set({ pendingCallout: p }),
   commitCallout: null,
   setCommitCallout: (fn) => set({ commitCallout: fn }),
+  calloutLeader: "line",
+  setCalloutLeader: (style) => set({ calloutLeader: style }),
+
+  picked: NONE,
+  setPicked: (v) => set((s) => ({ picked: resolveSet(v, s.picked) })),
 }));

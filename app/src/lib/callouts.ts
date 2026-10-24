@@ -1,18 +1,26 @@
 // Smart Callout v1: a numbered pin, a text label and the leader joining them.
 //
 // THREE ORDINARY ANNOTATIONS, JOINED BY GEOMETRY. The pin is kind 5, the
-// leader an arrow (kind 4) from the label to the pin, the label a text
-// annotation. Nothing links them in storage: a leader whose tail sits on one
-// of a label's four edge midpoints and whose head sits on a pin's outline IS
-// that callout's leader (`findCallouts`). That is the rule #310's connectors
-// use (lib/shapePorts.ts), so the join survives undo, autosave, reload and
-// export with no format change. A user cannot make that shape by accident:
-// Connect refuses pins, and nothing else ends an arrow on a text's edge.
+// leader a line (kind 2) or an arrow (kind 4) from the label to the pin, the
+// label a text annotation. Nothing links them in storage: a leader whose tail
+// sits on one of a label's four edge midpoints and whose end sits on a pin's
+// outline IS that callout's leader (`findCallouts`). That is the rule #310's
+// connectors use (lib/shapePorts.ts), so the join survives undo, autosave,
+// reload and export with no format change. A user cannot make that shape by
+// accident: Connect refuses pins, and nothing else ends a line or an arrow
+// within a pixel of both a text's edge midpoint and a pin's outline.
+//
+// LINE OR ARROW (Night 10-23). The Pins panel's Leader toggle picks the kind a
+// NEW callout's leader gets; Line is the default. A plain line is the Line
+// shape (kind 2), not an arrow with a "no head" style: `arrow_style` only
+// knows single (0) and double (1), and a third value would be a format
+// change. Callouts made before the toggle keep their arrow.
 //
 // WHAT MOVES TOGETHER. When the pin or the label moves, the leader is drawn
 // again between them (`leaderFor`: the label's edge nearest the pin, the
-// pin's outline toward it). Follow rides the move's own undo step:
-// `reroute_connector` takes none. Adding and deleting a callout are one step
+// pin's outline toward it). Follow rides the move's own undo step: an arrow
+// through `reroute_connector`, which takes none, a line through
+// `continue_step` + `update_shape_annotation` (hooks/usePinSteps). Adding and deleting a callout are one step
 // through the engine's `continue_step` (tests/smart_callout.rs).
 //
 // The callout is found against the geometry from BEFORE the move, and only
@@ -59,7 +67,10 @@ export interface Callout {
 }
 
 const PIN = 5;
-const ARROW = 4;
+/** The shape kinds a leader can be: the Line (2) and the arrow (4). */
+export const LEADER_KIND = { line: 2, arrow: 4 } as const;
+export type LeaderStyle = keyof typeof LEADER_KIND;
+const isLeaderKind = (kind: number) => kind === LEADER_KIND.line || kind === LEADER_KIND.arrow;
 /** Ends are written exactly; this absorbs float round-trips through JSON. */
 const TOL = 0.75;
 
@@ -93,13 +104,13 @@ export function leaderFor(pin: CalloutShape, label: CalloutText): Leader {
   return { x0: tail.x, y0: tail.y, x1: c.x + ((tail.x - c.x) / d) * r, y1: c.y + ((tail.y - c.y) / d) * r };
 }
 
-/** Every callout on the layer: an arrow from a label's edge midpoint to a
- *  pin's outline. */
+/** Every callout on the layer: a line or an arrow from a label's edge
+ *  midpoint to a pin's outline. */
 export function findCallouts(shapes: readonly CalloutShape[], texts: readonly CalloutText[]): Callout[] {
   const pins = shapes.filter((s) => s.kind === PIN);
   const out: Callout[] = [];
   for (const a of shapes) {
-    if (a.kind !== ARROW) continue;
+    if (!isLeaderKind(a.kind)) continue;
     const label = texts.find((t) => labelPorts(t).some((p) => Math.hypot(p.x - a.x0, p.y - a.y0) <= TOL));
     const pin = pins.find((p) => {
       const { c, r } = pinCircle(p);

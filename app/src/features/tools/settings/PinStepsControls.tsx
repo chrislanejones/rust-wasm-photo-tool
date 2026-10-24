@@ -2,7 +2,7 @@
 // action come from useAnnotationStore (published by hooks/usePinSteps); the
 // rules are lib/pinSteps.ts.
 import { useState } from "react";
-import { ListOrdered, MapPin, MessageSquareText } from "lucide-react";
+import { ListOrdered, MapPin, MessageSquareText, MoveUpRight, Slash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
@@ -19,6 +19,13 @@ const DROP = [
   { id: "callout", label: "Callout", icon: MessageSquareText },
 ] as const;
 
+// What a new callout's leader is drawn as (lib/callouts `LEADER_KIND`). Line
+// is the default; callouts made before keep their arrow.
+const LEADER = [
+  { id: "line", label: "Line", icon: Slash },
+  { id: "arrow", label: "Arrow", icon: MoveUpRight },
+] as const;
+
 export function PinStepsControls({ letters }: { letters: boolean }) {
   const { max, gaps } = useAnnotationStore((s) => s.pinSequence);
   const pinNext = useAnnotationStore((s) => s.pinNext);
@@ -26,6 +33,8 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
   const renumber = useAnnotationStore((s) => s.renumberPins);
   const callout = useAnnotationStore((s) => s.calloutMode);
   const setCallout = useAnnotationStore((s) => s.setCalloutMode);
+  const leader = useAnnotationStore((s) => s.calloutLeader);
+  const setLeader = useAnnotationStore((s) => s.setCalloutLeader);
   const next = nextPinNumber(max, pinNext);
   const shown = pinLabelText(next, letters ? 1 : 0);
   // What is being typed; the field shows the live Next value otherwise.
@@ -49,9 +58,10 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
             Next to a number already used to insert a step there. Only pins on
             the active layer count as one sequence; a pin on another layer
             keeps its number. A Callout is a pin with a label joined by a
-            leader: type the label and press Enter. Drag the pin or the label
-            and the leader follows; delete the pin and all three go. The label
-            uses the Text tool&apos;s font, size and color.
+            leader: type the label and press Enter. Leader picks a plain line
+            or an arrow for the next callout. Drag the pin or the label and the
+            leader follows; delete the pin and all three go. The label uses
+            the Text tool&apos;s font, size and color.
           </>
         }
       />
@@ -61,6 +71,9 @@ export function PinStepsControls({ letters }: { letters: boolean }) {
         value={callout ? "callout" : "pin"}
         onChange={(id) => setCallout(id === "callout")}
       />
+      {callout && (
+        <ToolButtonGroup aria-label="Leader" options={LEADER} value={leader} onChange={setLeader} />
+      )}
       <div className="flex items-end gap-2">
         <TextField
           label="Next"

@@ -234,6 +234,8 @@ export function useEffectiveTool({
         case "pins":
         case "arrow":
           return use(drawingTools);
+        // Select objects: AnnotationSelectionLayer handles the press itself.
+        case "select-objects":
         case "text":
         case "ocr":
           // Text placement is handled a level up (useTextTool via CanvasArea)
