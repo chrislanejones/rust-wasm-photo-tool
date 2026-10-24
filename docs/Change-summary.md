@@ -11677,6 +11677,7 @@ PRs.
 | Annotations (#393) | Dragging a corner-radius dot no longer re-renders the editor on every move. Deleting any part of a callout deletes the whole callout. |
 | Multi-select (#395) | Shift-click in the Shapes tool adds to the pick instead of reopening one edit box. An unfilled shape is picked by its outline, not its empty middle. A Reselect row adds the whole callout. |
 | Tests (#398) | Two flaky tests now wait on state instead of timing: 80 / 80 runs at 4x CPU throttle, 5 / 5 full unit runs. |
+| Trail Log | The six PRs were squash-merged on Saturday, which put Friday's work on Saturday's square. A record-only merge of the PR branches (no file changes) brings their original commits onto master, so 10-23 shows the **9** commits written that day. |
 | Engine | Two new calls, `compare_photo` and `mark_regions` (src/image_diff.rs). 2880 × 1800 diffs in **15.3 ms** median. No op-log or storage format change. 923,141 → **935,825 B** (+12,684). |
 | Verification | CI green on every PR. All six merged into one build first: tsc, lint (0 errors), guardrails, **2,079 / 2,079** unit tests and **210** e2e passed. QC on its production build, logged out: boot, import, Ctrl+Y, both leader kinds, group Align with a callout, the shared action bars, reload and resume, keyboard access. All passed. |
 

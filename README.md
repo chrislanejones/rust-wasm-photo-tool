@@ -99,7 +99,8 @@ changed between the two gets a tint, and you can flip between Overlay, Side by
 side, Blink and Slider. The change list zooms to each one. Mark changes drops a
 box and a numbered pin on every change, and one Ctrl+Z takes them all back.
 Also: Ctrl+Y redoes, a callout's leader can be a plain line, leaders follow
-Align and Placement, and three multi-select fixes.
+Align and Placement, and three multi-select fixes. The Trail Log now shows
+Friday's night work on Friday, the day it was written.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

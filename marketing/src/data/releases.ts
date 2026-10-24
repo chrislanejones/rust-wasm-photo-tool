@@ -34,6 +34,7 @@ export const RELEASES: Release[] = [
       { tag: "feature", text: "A callout's leader can be a plain line or an arrow, and it follows the callout through Align, Placement and arrow-key nudges." },
       { tag: "fix", text: "Shift-click in the Shapes tool adds to the pick, an unfilled shape is picked by its outline, and deleting any part of a callout deletes all of it." },
       { tag: "infra", text: "Two flaky tests now wait on state instead of timing." },
+      { tag: "infra", text: "The Trail Log credits Friday's night work to Friday instead of the day it was merged." },
       { tag: "rust", text: "Two new engine calls for the screenshot diff, 15.3 ms at 2880 × 1800. Engine 923,141 to 935,825 B (+12,684)." },
     ],
   },

@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — squash merges move night work to the merge day on the Trail Log (10-24-2026)
+
+- `marketing/scripts/gen-trail-data.mjs` counts `git log master` by author
+  date, and a squash merge is dated when it merges. Night 10-23's 9 commits
+  landed on master Saturday and Friday read 0. Fixed for 10-23 with a
+  record-only merge (`git merge -s ours` of the six PR branches: their
+  commits join master's history, no file changes). Lasting fix: have the
+  generator credit each squashed PR to its own commits' dates (from
+  `gh pr view N --json commits`), or merge PR branches with a merge commit
+  instead of a squash. Either way GitHub's own graph follows master only.
+
 ## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
 
 - **C13, a JPEG re-save of text in a saturated color shows a false change.**
