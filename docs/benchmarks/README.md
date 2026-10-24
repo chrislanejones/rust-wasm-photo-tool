@@ -180,6 +180,27 @@ Enabling `dirty-regions` produces a 904816-byte WASM, an increase of 2873 bytes
 for the experimental renderer and its bindings. No default rendering path or
 frontend interaction was changed.
 
+## Screenshot compare diff (10-23-2026)
+
+`compare_photo` (src/image_diff.rs), the engine half of screenshot
+comparison — the call the page makes, against a loaded document — in WASM
+under Node 24 on the laptop (Core Ultra 7 165H, WSL2), 20 samples after
+3 warm-ups, default sensitivity (tolerance 28). A synthetic UI screenshot pair with three changes (a moved
+button, a recolored label, a recolored icon); all three found at every size.
+The plan's bar: **2880 × 1800 under 150 ms**.
+
+| Size | Median | p95 |
+| --- | --- | --- |
+| 1440 × 900 | 3.7 ms | 4.1 ms |
+| **2880 × 1800** | **15.3 ms** | 17.5 ms |
+| 4000 × 3000 | 34.9 ms | 37.4 ms |
+
+Raw: [screenshot-compare-diff.json](screenshot-compare-diff.json). This is the
+diff alone. In the app the call runs in the engine worker; getting photo A's
+pixels there (decode, then a structured clone of its RGBA) is not in these
+numbers. Reproduce: `pnpm run build:wasm`, then
+`pnpm --silent run bench:compare > /tmp/compare-bench.json`.
+
 ## Reproduce
 
 Run timing commands sequentially with other builds and tests stopped:

@@ -17,6 +17,9 @@ import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import { cornerDelta } from "@/lib/aspectLock";
 import { CompareSlider } from "./CompareSlider";
+import { CompareBar } from "./CompareBar";
+import { useCompareFocus } from "./useCompareFocus";
+import { useLoadedDocument } from "@/hooks/useLoadedDocument";
 import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { SwitchLoadingVeil } from "./SwitchLoadingVeil";
 import { PenOverlay } from "./PenOverlay";
@@ -723,6 +726,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     );
 
     const panDrag = useCanvasPanDrag(isPanning, panOffset, setPanOffset);
+
+    // Screenshot compare's change list (Night 10-23): zoom to one change.
+    const loadedDoc = useLoadedDocument(state);
+    const focusRegion = useCompareFocus({
+      canvasRef, toolRef: hookResult.toolRef, syncState: hookResult.syncState,
+      doc: loadedDoc, zoom: state.zoom, pan: panOffset, setPan: setPanOffset,
+    });
     const { isDraggingPan, onMouseDown: handlePanMouseDown, onMouseMove: handlePanMouseMove, onMouseUp: handlePanMouseUp } = panDrag;
 
     // ── Crop handle drag ───────────────────────────────────────────────
@@ -1067,6 +1077,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         )}
 
         <CompareSlider canvasEl={canvasRef.current} toolRef={hookResult.toolRef} revision={hookResult.state.undoCount} />
+        <CompareBar
+          canvasEl={canvasRef.current}
+          toolRef={hookResult.toolRef}
+          flushToCanvas={hookResult.flushToCanvas}
+          syncState={hookResult.syncState}
+          revision={loadedDoc?.undoCount ?? 0}
+          onFocusRegion={focusRegion}
+        />
         <SwitchLoadingVeil />
         {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}
         {(lassoCommitted || lassoPreview) && (

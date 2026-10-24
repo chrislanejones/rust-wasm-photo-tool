@@ -20,6 +20,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { withEditGeometry, type DrawEditState, type Point } from "./drawEditState";
 import type { ShapeName } from "./types";
+import type { CornerRadii } from "./shapeSloppiness";
 
 export interface LiveGeometry {
   start: Point;
@@ -73,8 +74,12 @@ export function takeLiveEdit(
   dirty?: { current: boolean },
 ): DrawEditState | null {
   const g = takeLiveGeometry();
-  if (g && dirty) dirty.current = true;
-  return es && applyLiveGeometry(es, g);
+  // A corner-dot drag's radii, too, until the panel patch has reached a
+  // reselected shape's style (see `setLiveRadii` below).
+  const r = takeLiveRadii();
+  if ((g || r) && dirty) dirty.current = true;
+  const out = es && applyLiveGeometry(es, g);
+  return out && r && out.style ? { ...out, style: { ...out.style, cornerRadii: r } } : out;
 }
 
 /** `es` with the in-flight drag applied, or `es` itself when nothing is
@@ -87,6 +92,49 @@ export function applyLiveGeometry(es: DrawEditState, g: LiveGeometry | null): Dr
 export function useLiveEditState(es: DrawEditState): DrawEditState {
   const g = useSyncExternalStore(subscribe, snapshot, snapshot);
   return useMemo(() => applyLiveGeometry(es, g), [es, g]);
+}
+
+// ── The corner-radius dot (Night 10-22) ─────────────────────────────────────
+// The same idea for Figma's corner dot. It used to write the panel's
+// `cornerRadii` on every move, which re-rendered AppShell per move exactly as
+// the body drag did before. Now a move writes here and only the edit box
+// reads it; the panel takes the final radii once, on release, which reaches a
+// reselected shape through `panelStylePatch` as a slider move would.
+//
+// The radii STAY here after release until that patch lands (useDrawingTools
+// clears them), because the patch is a passive effect and an Enter pressed
+// right after release can beat it — `takeLiveEdit` folds them into the commit.
+let radii: CornerRadii | null = null;
+const radiiListeners = new Set<() => void>();
+
+export function setLiveRadii(next: CornerRadii | null): void {
+  if (next === radii) return;
+  radii = next;
+  for (const fn of radiiListeners) fn();
+}
+
+/** The radii a dot drag has reached, still in the store. */
+export const peekLiveRadii = (): CornerRadii | null => radii;
+
+/** The radii a dot drag has reached, removed from the store. */
+export function takeLiveRadii(): CornerRadii | null {
+  const r = radii;
+  setLiveRadii(null);
+  return r;
+}
+
+function subscribeRadii(fn: () => void) {
+  radiiListeners.add(fn);
+  return () => {
+    radiiListeners.delete(fn);
+  };
+}
+
+const radiiSnapshot = () => radii;
+
+/** The radii of a corner-dot drag in flight, or null. */
+export function useLiveRadii(): CornerRadii | null {
+  return useSyncExternalStore(subscribeRadii, radiiSnapshot, radiiSnapshot);
 }
 
 // ── A multi-select group drag (Night 10-22) ─────────────────────────────────

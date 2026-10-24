@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOriginalImage } from "./useOriginalImage";
+import { useCanvasBox } from "./useCanvasBox";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -16,6 +17,10 @@ interface CompareSliderProps {
   toolRef: MutableRefObject<ImageHorseTool | null>;
   /** Pixel-change counter (`undoCount`): a resize, an undo or a flatten moves the photo. */
   revision: number;
+  /** Screenshot compare's Slider view (Night 10-23): ANOTHER photo on the
+   *  left instead of this one's original, open while it is mounted, with its
+   *  own side names. Omitted: the top bar's A/B compare, as before. */
+  source?: { url: string | null; left: string; right: string };
 }
 
 /** Handed to `usePhotoBounds` while compare is closed, so it asks the engine nothing. */
@@ -32,11 +37,13 @@ const NO_TOOL: MutableRefObject<ImageHorseTool | null> = { current: null };
  * through. Every part of the labeling below exists to say that without being
  * read twice — see the label block.
  */
-export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProps) {
+export function CompareSlider({ canvasEl, toolRef, revision, source }: CompareSliderProps) {
   // The "before" original URL + whether compare is on now come from the UI store
   // (were prop-drilled AppShell → CanvasArea → here before stage 1).
-  const beforeUrl = useUIStore((s) => s.originalUrl);
-  const active = useUIStore((s) => s.compareActive);
+  const storeUrl = useUIStore((s) => s.originalUrl);
+  const storeActive = useUIStore((s) => s.compareActive);
+  const beforeUrl = source ? source.url : storeUrl;
+  const active = source ? true : storeActive;
   const setCompareActive = useUIStore((s) => s.setCompareActive);
   // Divider position lives in the store (see useUIStore) — it is the thing the
   // "re-center on close" rule resets, and a CanvasArea remount must not silently
@@ -51,70 +58,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
   const original = useOriginalImage(beforeUrl, active);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [box, setBox] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!active || !canvasEl) {
-      setBox(null);
-      return;
-    }
-    // rAF-deduped box sync. getBoundingClientRect includes CSS transforms, so
-    // this picks up zoom (transform: scale) and pan (translate) — which a
-    // ResizeObserver alone never sees, because transforms don't change layout
-    // size. That gap is what left the overlay misaligned after zooming or
-    // panning with compare open.
-    let raf = 0;
-    const updateBox = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const parent = canvasEl.offsetParent as HTMLElement | null;
-        if (!parent) return;
-        const parentRect = parent.getBoundingClientRect();
-        const rect = canvasEl.getBoundingClientRect();
-        setBox((prev) => {
-          const next = {
-            left: rect.left - parentRect.left,
-            top: rect.top - parentRect.top,
-            width: rect.width,
-            height: rect.height,
-          };
-          return prev &&
-            prev.left === next.left &&
-            prev.top === next.top &&
-            prev.width === next.width &&
-            prev.height === next.height
-            ? prev
-            : next;
-        });
-      });
-    };
-    updateBox();
-    // Layout size changes (e.g. an Apply Resize swaps dimensions).
-    const ro = new ResizeObserver(updateBox);
-    ro.observe(canvasEl);
-    if (canvasEl.offsetParent) ro.observe(canvasEl.offsetParent);
-    // Transform/attribute changes (zoom scale, pan translate, canvas w/h).
-    const mo = new MutationObserver(updateBox);
-    mo.observe(canvasEl, {
-      attributes: true,
-      attributeFilter: ["style", "width", "height"],
-    });
-    window.addEventListener("scroll", updateBox, true);
-    window.addEventListener("resize", updateBox);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      ro.disconnect();
-      mo.disconnect();
-      window.removeEventListener("scroll", updateBox, true);
-      window.removeEventListener("resize", updateBox);
-    };
-  }, [active, canvasEl]);
+  const box = useCanvasBox(canvasEl, active);
 
   // The toggle is the top bar's Compare button, so the overlay works over
   // every tool — except the Batch editor, whose edits go to every loaded photo
@@ -124,8 +68,8 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
   // (`activeTool === "emoji"` is the Batch group — its legacy id, shared by
   // all four of its sub-tools.)
   useEffect(() => {
-    if (active && activeTool === "emoji") setCompareActive(false);
-  }, [active, activeTool, setCompareActive]);
+    if (storeActive && activeTool === "emoji") setCompareActive(false);
+  }, [storeActive, activeTool, setCompareActive]);
 
   const getPosition = useCallback((clientX: number) => {
     const el = overlayRef.current;
@@ -273,7 +217,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
             style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
           >
             <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
-            Original
+            {source?.left ?? "Original"}
           </span>
         </div>
         <div
@@ -284,7 +228,7 @@ export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProp
             className="flex items-center gap-1 py-1 pl-1.5 pr-2 rounded-r-md border-l-2 border-on-photo bg-black/75 text-2xs text-theme-primary font-mono whitespace-nowrap"
             style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
           >
-            Edited
+            {source?.right ?? "Edited"}
             <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
           </span>
         </div>

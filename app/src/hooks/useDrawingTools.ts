@@ -12,8 +12,8 @@ import { normalizeDeg } from "@/lib/shapeRotation";
 import { drawArrowPreview, drawCropPreview, drawShapePreview } from "@/lib/drawPreview";
 import { constrainCropFallback, freeCropRect } from "@/lib/cropRatioFallback";
 import { PressQueue } from "@/lib/pressQueue";
-import { usePinSteps } from "@/hooks/usePinSteps";
-import { liveDragActive, takeLiveEdit } from "@/lib/liveEditGeometry";
+import { removeCalloutOf, usePinSteps } from "@/hooks/usePinSteps";
+import { liveDragActive, takeLiveEdit, takeLiveRadii } from "@/lib/liveEditGeometry";
 import {
   drawnShapeFor,
   editStateFromShape,
@@ -457,9 +457,9 @@ export function useDrawingTools({
         tool.set_editing_shape(-1);
       }
       // A pin closes the gap it leaves, and takes a callout's leader and label
-      // with it (usePinSteps); anything else just goes.
+      // with it (usePinSteps); so does a callout's leader. Anything else just goes.
       if (shapesRef.current.some((s) => s.id === id && s.kind === 5)) await removePin(id);
-      else tool.remove_shape_annotation(id);
+      else if (!(await removeCalloutOf(tool, { shape: id }))) tool.remove_shape_annotation(id);
       // A deleted shape can't stay the Align target.
       useAnnotationStore
         .getState()
@@ -561,10 +561,11 @@ export function useDrawingTools({
   useEffect(() => {
     const prev = prevStyleSettingsRef.current;
     prevStyleSettingsRef.current = settings;
+    const dot = takeLiveRadii(); // a corner-dot drag's final radii, applied even if the panel already had them
     const es = editStateRef.current;
     // No snapshot = a brand-new shape, which already reads the panel live.
     if (!es?.style) return;
-    const patch = panelStylePatch(prev, settings);
+    const patch = dot ? { ...panelStylePatch(prev, settings), cornerRadii: dot } : panelStylePatch(prev, settings);
     if (!patch) return;
     editDirtyRef.current = true;
     setEditState((cur) => {

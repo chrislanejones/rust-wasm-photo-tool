@@ -11642,3 +11642,23 @@ warnings), guardrails and both builds pass. [QC evidence](qc/release-v934.md).
 Not in this release: no imagehorse-qc pass yet on the engine API change. A
 Callout sub-tool of its own, and following a label moved by Align or Placement,
 are open in PARKING_LOT.
+
+## v9.36 Change Summary — 2026-10-22
+
+**Pick several annotations and move them as one.**
+
+| Area | Change |
+| --- | --- |
+| Multi-select (#392) | Shift-click any shape, text, pin or callout with an annotation tool open, or use **Create › Select objects** (click, drag a box, drag the group). Ctrl+A picks the layer's annotations; the arrow keys nudge (Shift: 10 px); Esc or a click on empty canvas lets go. A dashed box frames the pick and an "N selected" bar carries Align, Distribute, Duplicate and Delete. |
+| One undo step | Every group action is one Ctrl+Z, before and after a reload. Align works on the selection's bounds (one object aligns to the canvas); Distribute needs three or more. Rotated shapes line up by their rotated box. |
+| Callouts and connectors | A callout's pin, leader and label are picked and aligned as one box. A connector between two picked boxes moves with them; one left behind re-routes in the same step. Deleting several pins renumbers the rest once. |
+| Reselect list | Shift-click (or Shift+Enter) adds a row to the pick or takes it out; picked rows show a check and read "selected". |
+| Group drag speed | Only the outlines move during the drag and the engine moves once on release: about 0.8 ms from event to screen with 20 of 100 annotations picked. |
+| Edit box under the panels (#389) | A shape's dashed box and handles no longer draw over the Tools, Gallery and Review panels. Dragging a shape into a panel closes that panel, as a pasted image does. |
+| Dependencies (#391, #383) | React 19.3.1, Vite 8.3.4, Radix Switch 1.4.1 and Slot 1.5.0, convex-test 0.0.62, CodeQL action 4.39.0. |
+| Engine | Five new calls for group move, align, distribute, delete and duplicate. No op-log or storage format change. 904,742 → **923,141 B** (+18,399). |
+| Verification | CI green on every PR. QC on a production build of master, logged out: **47 / 47** e2e across boot, multi-select, the edit box, callouts, pins, undo after reload, export, photo switching and accessibility. Boot threw no page errors. |
+
+Not in this release: the corner-radius dot drag and callout delete fix (#393),
+screenshot compare (#394) and three multi-select fixes (#395) are still open
+PRs.

@@ -4,6 +4,37 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
+
+- **C13, a JPEG re-save of text in a saturated color shows a false change.**
+  The default sensitivity (50, tolerance 28) stays. Measured: the fixture
+  `a.png` re-saved at q82, q80, q75 and q70 shows **0 changes** at 50 (and at
+  45/40/35/30), so a q82 case on the fixture would be green before and after
+  any change and proves nothing. A 1440×900 settings page with pure-blue
+  (#0000ff) bold nav text, re-saved at q82, shows 3 changes at 50, 2 at 45,
+  1 at 40, 1 at 35 and **still 1 at 30** (tolerance 38): the nav text, where
+  JPEG's 4:2:0 chroma subsampling smears color across the glyph edges. No
+  small default change reaches 0, while the known pair keeps 3 changes at
+  IoU ≥ 0.89 all the way down to 20. The fix belongs in the engine
+  (`src/image_diff.rs`): compare luma at the full tolerance and chroma at a
+  looser one, or over 2×2 blocks, then add a saturated-text q82 pair to
+  `e2e/fixtures/compare/make-fixtures.mjs`. The repro page is a dozen lines;
+  rebuild it from this note.
+- **Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
+  (a hand pan with H/Space survives Alt+0 too). Left alone: the pan is
+  CanvasArea's local state, `handleZoomReset` lives in `useCanvasActions` and
+  cannot reach it without a new prop through AppShell or moving the pan into
+  a store, and no test covers Alt+0 today. Compare no longer depends on it:
+  Done/Esc put back the view from before the first zoom-to-change. A
+  "reset view" that zeroes the pan wants its own session and its own spec.
+- **C20 (odd), pins sit on the box's top-left corner**, over the first letter
+  of the change. Untouched.
+- **`smart-callout.spec.ts` "the leader follows the pin and the label, and
+  still does after a reload" flakes**: the dragged pin lands 1 px off in y
+  (599 or 601 vs 600). 1 of 3 runs on the #394 base code with none of the
+  10-23 fixes applied, 1 of 2 with them. Drag rounding after the reload, not
+  the compare bar.
+
 ## OPEN — Annotation performance and editing work (2026-10-20)
 
 Work is on `feat/annotation-performance-baseline`. The benchmark and prototype
@@ -33,17 +64,40 @@ measurement limits and reproduction commands are in the
   **v1 shipped in v9.35 (10-21, #390)**: Pins ›
   Drop: Callout places pin + label + leader as one undo step; the leader follows
   the pin and the label (Text tool) and survives reload; deleting the pin takes
-  all three. Joined by geometry (`lib/callouts.ts`), no format change. Pins
-  renumber themselves (delete closes the gap, Next inserts, Renumber). Left
-  open: a Callout sub-tool entry of its own (needs AppShell's `penMode` line),
-  deleting the label or leader alone leaves the others as plain objects, the
-  leader is an arrow, not a plain line, and a label moved by Align or
-  Placement should follow (any refresh of the Text tool's list is diffed) but
-  only Text tool drags are tested.
+  all three, and since 10-22 so does deleting the label or the leader
+  (Reselect ✕, or emptying the label). Joined by geometry (`lib/callouts.ts`), no format change. Pins
+  renumber themselves (delete closes the gap, Next inserts, Renumber).
+  **Night 10-23**: a label moved by Align ▾ (alone and in a group), by the Text
+  tool's Placement and by an arrow-key nudge is now tested to keep its leader
+  joined in one undo step (e2e/callout-leader.spec.ts) — all four already
+  followed, nothing needed fixing. The Pins panel has **Leader: Line · Arrow**
+  (Line by default): a line leader is the Line shape (kind 2), because
+  `arrow_style` has no "no head" value and adding one would be a format
+  change; callouts made before keep their arrow. Left open:
+  - A Callout sub-tool entry of its own (needs AppShell's `penMode` line).
+  - **Undoing a text's Placement with the Text tool open breaks the op log**,
+    callout or not. Repro: add a plain text, open it, Placement › Bottom right,
+    Escape, Ctrl+Z → `oplog_status()` reads "broken — snapshot undo has taken
+    over" (the same Placement undone with Pins open does not break it). After a
+    reload, the snapshot steps undo falls back to drop the layer's SHAPES: one
+    Ctrl+Z on a placed callout's label restores the label and loses its pin and
+    leader. Callout-leader.spec's Placement case stops before that undo.
+  - Leaving the Text tool for Pins right after a Placement pushes an undo step
+    that records no op (`undo_count` +1, op count unchanged), so the next
+    Ctrl+Z appears to do nothing.
+  - Multi-select's Align ▾ menu opens below the selection: with the selection
+    near the bottom of the canvas it lands under the gallery strip, where it
+    cannot be clicked.
+  - An app build from before 10-23 reads a line-leader callout as a plain line
+    and a pin (the leader does not follow there). Only matters with two app
+    versions open on one photo; noted, not fixed.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
-  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The Corner-radius
-  dot drag still writes panel settings per move and was left as is.
+  [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
+  dot followed on 10-22: it writes `liveEditGeometry` too and the panel takes the
+  radius on release. `takeLiveEdit` folds the dot's radii into a commit, so Enter
+  right after release keeps them (tested); Enter MID dot-drag takes the same path
+  but is not tested on its own.
 - [x] Annotation alignment and multi-select (Night 10-22). Shift-click with
   any annotation tool, Create › Select objects (click, marquee, drag), Ctrl+A,
   arrows, Esc; an "N selected" bar with Align ▾ (to the selection's bounds;
@@ -65,8 +119,21 @@ measurement limits and reproduction commands are in the
   - ~~Hit-testing for picks is by box~~ — fixed 10-23: shapes are hit by the
     engine's rule (lib/annotationHitTest), so an unfilled shape is picked by
     its outline ring, as a single-shape click.
-- [ ] Screenshot comparison with a difference visualization and attached
-  annotations. Existing before/after comparison is not this feature.
+- [x] Screenshot comparison (Night 10-23). Right-click a gallery photo →
+  Compare with this, or the top bar's Compare with another photo…: the open
+  photo (B) shows every changed pixel tinted, with Overlay, Side by side,
+  Blink and Slider views, a Sensitivity slider, a "N changes" list that zooms
+  to each, and Mark changes (a box and a numbered pin per change, pins after
+  B's last, ONE undo step). The diff is `src/image_diff.rs` in the engine
+  worker (2880×1800 in 19 ms, docs/benchmarks); annotations on either photo
+  never count. e2e/screenshot-compare.spec.ts. Left open:
+  - No scaling or auto-alignment: photos of different sizes compare their
+    top-left overlap, and the Slider view stretches A over B's box.
+  - A is compared from its stored ORIGINAL, so edits made to A since upload
+    (a crop, a brush) are not part of the comparison.
+  - The top bar has a separate button, not a Compare ▾ menu (no dropdown
+    primitive in the repo; one is a new dependency).
+  - Phone: out of scope (the phone does not load the engine).
 - [ ] Human-test Smart Brush edge behavior. Keep the beta gate until a person
   checks high/low contrast edges, equal-luminance color edges, gaps, soft
   boundaries, image borders, zoom, fast strokes and undo. Automated kernel

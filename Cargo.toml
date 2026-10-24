@@ -185,3 +185,7 @@ required-features = ["tiles"]
 [[test]]
 name = "annotation_group"
 required-features = ["tiles"]
+
+[[test]]
+name = "image_diff"
+required-features = ["tiles"]
