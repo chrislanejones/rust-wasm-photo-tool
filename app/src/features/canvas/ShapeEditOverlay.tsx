@@ -33,7 +33,15 @@ import {
   toLocalDelta,
 } from "@/lib/shapeRotation";
 import { tooSmallForActions } from "@/lib/shapePorts";
-import { moveLiveGeometry, setLiveGeometry, takeLiveGeometry, useLiveEditState } from "@/lib/liveEditGeometry";
+import {
+  moveLiveGeometry,
+  setLiveGeometry,
+  setLiveRadii,
+  peekLiveRadii,
+  takeLiveGeometry,
+  useLiveEditState,
+  useLiveRadii,
+} from "@/lib/liveEditGeometry";
 import { useToolStore } from "@/stores/useToolStore";
 import { ROTATE_CURSOR } from "./canvasCursor";
 import { closePanelsHitBy, panelsUnder, screenCorners } from "./panelYield";
@@ -77,6 +85,7 @@ export function ShapeEditOverlay({
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
   const liveCornerRadii = useToolStore((s) => s.toolSettings.cornerRadii);
+  const dotRadii = useLiveRadii(); // a corner-dot drag in flight
   const actionMode = useToolStore((s) => s.shapeActionMode);
 
   // ── Shape/arrow edit-overlay drag ──────────────────────────────────
@@ -129,9 +138,10 @@ export function ShapeEditOverlay({
         // Figma's corner dot. The pointer delta is read in the shape's own
         // frame and along the corner's bisector; Shift rounds this corner
         // only, otherwise every corner takes the dragged one's new radius.
-        // Written to the panel's value, so it is the slider by other means:
-        // a new shape reads it live and a reselected one takes it through
-        // `panelStylePatch`, exactly as a slider move would.
+        // Written to lib/liveEditGeometry while the dot moves, so only this
+        // box re-renders; the panel's value takes it once, on release, and is
+        // then the slider by other means — a new shape reads it live and a
+        // reselected one takes it through `panelStylePatch`.
         const local = toLocalDelta(dx, dy, drag.startRotation);
         const r = radiusAfterDrag(drag.corner, drag.startRadii, local.dx, local.dy);
         const next = canonicalCornerRadii(
@@ -140,7 +150,7 @@ export function ShapeEditOverlay({
             ? drag.startRadii.map((v, i) => (i === drag.corner!.index ? r : v))
             : [r, r, r, r],
         );
-        useToolStore.getState().setToolSettings((p) => ({ ...p, cornerRadii: next }));
+        setLiveRadii(next);
         return;
       }
       if (drag.mode === "oval") {
@@ -266,6 +276,8 @@ export function ShapeEditOverlay({
       emit(pinned.start, pinned.end);
     };
     const onUp = () => { // React catches up once, in the commit that empties the store
+      const r = drawDragRef.current?.mode === "radius" ? peekLiveRadii() : null; // kept until the patch lands
+      if (r) useToolStore.getState().setToolSettings((p) => ({ ...p, cornerRadii: r }));
       const g = drawDragRef.current && takeLiveGeometry();
       drawDragRef.current = null;
       if (g) onDrawEditChangeRef.current?.(g.start, g.end, g.rotation, g.shape);
@@ -275,7 +287,10 @@ export function ShapeEditOverlay({
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      if (drawDragRef.current) setLiveGeometry(null);
+      if (drawDragRef.current) {
+        setLiveGeometry(null);
+        setLiveRadii(null);
+      }
     };
   }, []);
 
@@ -356,7 +371,7 @@ export function ShapeEditOverlay({
   // starPoints rule. Canonical for this shape, as the engine will store it.
   const radii = canonicalCornerRadii(
     kindByte === 5 ? "circle" : shape,
-    drawEditState.style?.cornerRadii ?? liveCornerRadii,
+    dotRadii ?? drawEditState.style?.cornerRadii ?? liveCornerRadii,
   );
   const rounded = hasRadius(radii);
   const rotatable = kind !== "arrow" && kindByte !== 5 && kindByte !== 3;
