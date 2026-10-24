@@ -1470,7 +1470,6 @@ export function AppShell() {
   // The object the Align row acts on (set by reselect / "Select bounding box").
   const selectedObject = useAnnotationStore((s) => s.selectedObject);
   const setSelectedObject = useAnnotationStore((s) => s.setSelectedObject);
-  const bumpAnnotations = useAnnotationStore((s) => s.bumpAnnotations);
 
   // Review → Reselect pick; with Perspective open it retargets the tool (#366).
   const handleSelectObject = useReselectPick(textTool, drawingTools);
@@ -1524,21 +1523,15 @@ export function AppShell() {
 
   const handleDeleteObject = useCallback(
     (o: ReselectObject) => {
-      if (o.type === "text") {
-        stamp.toolRef.current?.remove_text_annotation(o.id);
-        stamp.flushToCanvas();
-        stamp.syncState();
-        void textTool.refreshAnnotations();
-        bumpAnnotations(); // was a `text-annotations-changed` window event
-      } else {
-        void drawingTools.removeShape(o.id);
-      }
+      // A callout's label or leader takes the whole callout (usePinSteps).
+      if (o.type === "text") void textTool.deleteAnnotation(o.id);
+      else void drawingTools.removeShape(o.id);
       // Either way the deleted object can't stay the Align target.
       setSelectedObject((prev) =>
         prev?.type === o.type && prev.id === o.id ? null : prev,
       );
     },
-    [stamp, textTool, drawingTools, bumpAnnotations, setSelectedObject],
+    [textTool, drawingTools, setSelectedObject],
   );
 
   // The shape action bar under a selected shape (Apply · Cancel · Duplicate ·

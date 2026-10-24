@@ -26,6 +26,16 @@ describe("findCallouts", () => {
     expect(findCallouts(shapes, [label])).toEqual([{ pin: 1, leader: 2, label: 7 }]);
   });
 
+  it("joins them by a plain line (kind 2) too — the Leader toggle's default", () => {
+    const line = { ...arrow(leaderFor(pin, label)), kind: 2 };
+    expect(findCallouts([pin, line], [label])).toEqual([{ pin: 1, leader: 2, label: 7 }]);
+  });
+
+  it("no other shape between them is a leader", () => {
+    const l = leaderFor(pin, label);
+    for (const kind of [0, 1, 3, 6, 8]) expect(findCallouts([pin, { ...arrow(l), kind }], [label])).toEqual([]);
+  });
+
   it("an arrow that misses either end is not a leader", () => {
     const l = leaderFor(pin, label);
     expect(findCallouts([pin, arrow({ ...l, x0: l.x0 + 3 })], [label])).toEqual([]);
@@ -47,6 +57,14 @@ describe("calloutsToFollow", () => {
     const moved = { ...label, y: 300 };
     const now = { shapes: before.shapes, texts: [moved] };
     expect(calloutsToFollow(before, now)).toEqual([{ id: 2, ...leaderFor(pin, moved) }]);
+  });
+
+  it("a line leader is followed like an arrow", () => {
+    const line = { ...before.shapes[1], kind: 2 };
+    const moved = { ...label, y: 300 };
+    expect(calloutsToFollow({ ...before, shapes: [pin, line] }, { shapes: [pin, line], texts: [moved] })).toEqual([
+      { id: 2, ...leaderFor(pin, moved) },
+    ]);
   });
 
   it("nothing moved, or the leader moved with them (undo), redraws nothing", () => {

@@ -219,8 +219,10 @@ export default tseslint.config(
     // action bar mounts as one line (app/session/useShapeActions.ts).
     // 3392 -> 3254 (#366): the Reselect pick handler moved to
     // app/session/useReselectPick.ts, which also retargets Perspective.
+    // 3254 -> 3225 (Night 10-22): Reselect's text delete moved to the Text
+    // tool (`deleteAnnotation`, which also takes a callout's pin and leader).
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3254 }] },
+    rules: { "max-lines": ["error", { max: 3225 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
