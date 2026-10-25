@@ -15,9 +15,9 @@ wait their turn.
   `gh pr view N --json commits`), or merge PR branches with a merge commit
   instead of a squash. Either way GitHub's own graph follows master only.
 
-## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
+## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026; C13, C20 and the flake fixed 10-24)
 
-- **C13, a JPEG re-save of text in a saturated color shows a false change.**
+- ~~**C13, a JPEG re-save of text in a saturated color shows a false change.**
   The default sensitivity (50, tolerance 28) stays. Measured: the fixture
   `a.png` re-saved at q82, q80, q75 and q70 shows **0 changes** at 50 (and at
   45/40/35/30), so a q82 case on the fixture would be green before and after
@@ -30,7 +30,15 @@ wait their turn.
   (`src/image_diff.rs`): compare luma at the full tolerance and chroma at a
   looser one, or over 2×2 blocks, then add a saturated-text q82 pair to
   `e2e/fixtures/compare/make-fixtures.mjs`. The repro page is a dozen lines;
-  rebuild it from this note.
+  rebuild it from this note.~~ **FIXED 10-24-2026 (Night 10-24 §2):** luma
+  and alpha are compared at the tolerance and chroma (Cb, Cr) at 1.5 times it,
+  per 4×4 block and per pixel. The fixture pair `blue-nav.png` /
+  `blue-nav-q82.jpg` showed **2 changes** at the default (7 at 30) and now
+  shows **0** at every sensitivity up to 60; blue, red, green and magenta text
+  at q90 to q50 (24 pairs) all go from 2 to 7 changes to **0**. The known pair
+  keeps **3 changes**, boxes unchanged, IoU **0.90 / 0.96 / 1.00** (the e2e
+  bar is now 0.89). 2880×1800 bench within noise of master (15 to 18 ms).
+  WASM +549 B.
 - **Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
   (a hand pan with H/Space survives Alt+0 too). Left alone: the pan is
   CanvasArea's local state, `handleZoomReset` lives in `useCanvasActions` and
@@ -38,13 +46,21 @@ wait their turn.
   a store, and no test covers Alt+0 today. Compare no longer depends on it:
   Done/Esc put back the view from before the first zoom-to-change. A
   "reset view" that zeroes the pan wants its own session and its own spec.
-- **C20 (odd), pins sit on the box's top-left corner**, over the first letter
-  of the change. Untouched.
-- **`smart-callout.spec.ts` "the leader follows the pin and the label, and
+- ~~**C20 (odd), pins sit on the box's top-left corner**, over the first letter
+  of the change.~~ **FIXED 10-24-2026:** the pin sits outside the box's
+  top-left corner (up and left by its radius) and slides along the box's side
+  where the photo's edge leaves no room. Rust tests on `mark_regions`
+  positions plus a compare e2e case.
+- ~~**`smart-callout.spec.ts` "the leader follows the pin and the label, and
   still does after a reload" flakes**: the dragged pin lands 1 px off in y
-  (599 or 601 vs 600). 1 of 3 runs on the #394 base code with none of the
-  10-23 fixes applied, 1 of 2 with them. Drag rounding after the reload, not
-  the compare bar.
+  (599 or 601 vs 600).~~ **FIXED 10-24-2026: the spec's coordinate math, not
+  the app.** After the reload, `pins()` opens the Pins panel, which resizes
+  the canvas over about 70 ms (1200×900 → 1184×888). `dragPin` read the
+  drag's start while the canvas was still moving and its end after it
+  settled, so the drag carried the canvas's own motion (seen: +0.06 to
+  +0.19 px; past 0.5 the rounded center reads 601). Both ends now come from
+  one reading of a canvas that has held still for two frames. Master: **1 of
+  20** failed; after: **20 / 20**, and the whole spec 20× green.
 
 ## OPEN — Annotation performance and editing work (2026-10-20)
 
@@ -204,7 +220,9 @@ remains disabled. Input/mask/output retention (row 203) is documented, not built
 |---|---|---|
 | Preset sliders ignore ←/→. Each arrow step is too small to reach the next value, so it snaps back. Shapes › Points stays at 5 after five ArrowRight presses. PageUp and the preset buttons work. Since #242 (09-26). | `app/src/components/ui/size-slider.tsx` (`posToValue` / `valueToPos`) | Felix |
 | ~~No Ctrl+Y for redo; only Ctrl+Shift+Z is bound, and the shortcut sheet says so. Windows users may expect Ctrl+Y.~~ **FIXED 10-23-2026 (Night 10-23 §3): Ctrl+Y and Cmd+Y redo wherever Ctrl+Shift+Z does; inside a text field they stay the browser's. On the shortcut sheet and in Keyboard-Shortcuts.md; e2e/redo-ctrl-y.spec.ts.** | `useKeyboardShortcuts.ts` (`isRedoY`) | Chris's call |
-| `smart-callout.spec.ts:176` ("…still does after a reload") flaked once under load: the pin landed at y 601, not 600, after a 200 px drag. 3 / 3 alone. Found 10-23-2026 during Night 10-23 §3; unrelated to Ctrl+Y | `e2e/smart-callout.spec.ts:176`, pin drag rounding | Tara |
+| ~~`smart-callout.spec.ts:176` ("…still does after a reload") flaked once under load: the pin landed at y 601, not 600, after a 200 px drag. 3 / 3 alone. Found 10-23-2026 during Night 10-23 §3; unrelated to Ctrl+Y~~ **FIXED 10-24-2026 (Night 10-24 §2): the drag's start was read while the Pins panel was still resizing the canvas; both ends now come from one still reading. 1/20 failed on master, 20/20 after (see the compare-leftovers entry above).** | `e2e/smart-callout.spec.ts:176`, pin drag rounding | Tara |
+| `screenPoint` (e2e/annotation-benchmark-harness.ts) reads the canvas box once per call, so any spec that opens a tool panel and then reads a drag's start and end separately can carry the panel's resize into the drag, as smart-callout did (1 in 20). smart-callout now has a local `stillScreenPoints`; moving it into the harness for every drag spec is its own change. Found 10-24-2026, Night 10-24 §2 | `e2e/annotation-benchmark-harness.ts` | Tara |
+| Compare above the default sensitivity still shows JPEG ghosts on bold saturated text: the blue-nav q82 pair reads 0 changes up to 60, then 2 at 70 and 7 at 80. Expected (the chroma limit scales with the tolerance), noted so a high-sensitivity report is not read as C13 coming back. Found 10-24-2026 | `src/image_diff.rs` | Silas |
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
 | ~~`select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load~~ **FIXED 10-23-2026: the engine lookup polls (`expect.poll`, landed in 27cfe4df), and the spec now uses the shared `E2E_CPU_THROTTLE` switch instead of its own `IH_CPU_THROTTLE` copy. 80/80 at 4× CPU (`--repeat-each 20`, all four tests 20/20). The old one-shot lookup fails a 1.5 s slow boot that the poll waits out.** | `e2e/` | Tara |
 | ~~`SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone~~ **FIXED 10-23-2026: there was no slow await. Both tests are synchronous, and vitest 5 fails a sync test after the fact once it runs past 5 s. The first test was the slowest of all 2,049 (927 to 1,050 ms in the full run) because sonner injects a 97-rule stylesheet on import, and every role query after a DOM change ran jsdom's `getComputedStyle` through it. sonner is now mocked (nothing asserts a toast). Full suite 5/5 green, with that test at 634 to 833 ms. It is still the slowest test: Radix's scroll-lock stylesheet and accessible-name computation are most of what is left.** | `app/src/` | Tara |

@@ -3,6 +3,10 @@
 // button 24 px right, changes the "Draft" label to "Published" and recolors
 // the bell icon. Run once and commit the PNGs:
 //   node e2e/fixtures/compare/make-fixtures.mjs
+// Also C13's pair: a 1440 x 900 settings page with bold pure-blue (#0000ff)
+// nav text, as a PNG and re-saved as a q82 JPEG. JPEG halves the color
+// resolution (4:2:0), so the blue bleeds a pixel or two past each glyph while
+// the brightness stays sharp; the pair must show no changes at the default.
 // known.json holds the ground truth the spec checks boxes against: per
 // change, the bounding box of every pixel that differs at all between a.png
 // and b.png inside that element's old-or-new rectangle.
@@ -38,9 +42,35 @@ const page = (b) => `<!doctype html><html><head><style>
   <div id="save">Save</div>
 </body></html>`;
 
+const bluePage = `<!doctype html><html><head><style>
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fff; color: #222; }
+  nav { display: flex; gap: 28px; padding: 18px 32px; border-bottom: 1px solid #ddd; }
+  nav a { color: #0000ff; font-weight: 700; font-size: 16px; text-decoration: none; }
+  aside { position: absolute; left: 0; top: 60px; width: 220px; padding: 20px 32px; }
+  aside a { display: block; color: #0000ff; font-weight: 700; margin: 0 0 14px; text-decoration: none; }
+  main { position: absolute; left: 290px; top: 84px; width: 760px; }
+  h1 { font-size: 26px; margin: 0 0 18px; }
+  label { display: block; font-weight: 600; margin: 16px 0 6px; }
+  .field { height: 34px; border: 1px solid #bbb; border-radius: 4px; padding: 0 10px; line-height: 34px; }
+</style></head><body>
+  <nav>${["Home", "Projects", "Reports", "Team", "Billing", "Settings", "Help"].map((t) => `<a href="#">${t}</a>`).join("")}</nav>
+  <aside>${["Profile", "Account", "Security", "Notifications", "Integrations", "API keys"].map((t) => `<a href="#">${t}</a>`).join("")}</aside>
+  <main><h1>Account settings</h1>
+    <label>Display name</label><div class="field">Sam Rivera</div>
+    <label>Email</label><div class="field">sam@example.com</div>
+    <label>Time zone</label><div class="field">America/New_York</div>
+    <p>Changes apply to every workspace you belong to.</p></main>
+</body></html>`;
+
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
 const p = await ctx.newPage();
+await p.setViewportSize({ width: 1440, height: 900 });
+await p.setContent(bluePage);
+await p.evaluate(() => document.fonts.ready);
+await p.screenshot({ path: join(here, "blue-nav.png") });
+await p.screenshot({ path: join(here, "blue-nav-q82.jpg"), type: "jpeg", quality: 82 });
+await p.setViewportSize({ width: 960, height: 600 });
 const rects = {};
 for (const b of [false, true]) {
   await p.setContent(page(b));

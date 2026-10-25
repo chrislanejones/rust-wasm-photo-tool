@@ -97,15 +97,17 @@ test("An identical pair: No changes, and Mark changes is off", async ({ page }) 
   await expect(bar(page).getByRole("button", { name: "Mark changes" })).toBeDisabled();
 });
 
-test("The known pair: exactly 3 changes, each box on its known area (IoU ≥ 0.8)", async ({ page }) => {
+test("The known pair: exactly 3 changes, each box on its known area (IoU ≥ 0.89)", async ({ page }) => {
   await open(page, "b.png", "a.png", 960);
   await compareWith(page, "a.png");
   await expect(bar(page)).toContainText("3 changes");
   const found = await regions(page);
   expect(found).toHaveLength(3);
+  // Measured 0.96, 0.90 and 1.00 before and after C13's luma/chroma split
+  // (10-24); 0.89 is the bar the fix was held to.
   for (const [name, known] of Object.entries(KNOWN)) {
     const best = Math.max(...found.map((r) => iou(r, known)));
-    expect(best, `${name}: ${JSON.stringify(found)} vs ${JSON.stringify(known)}`).toBeGreaterThanOrEqual(0.8);
+    expect(best, `${name}: ${JSON.stringify(found)} vs ${JSON.stringify(known)}`).toBeGreaterThanOrEqual(0.89);
   }
   // A screen reader walks the list: "Change 1 of 3, …".
   await expect(page.getByRole("list", { name: "Changes" }).getByRole("button").first())
@@ -117,6 +119,38 @@ test("A JPEG re-save of the same screenshot: no changes at the default sensitivi
   await open(page, "a.png", "a-resave.jpg", 960);
   await compareWith(page, "a-resave.jpg");
   await expect(bar(page)).toContainText("No changes");
+});
+
+// C13 (10-24): bold pure-blue text re-saved as a q82 JPEG. JPEG stores color
+// at half resolution, so the blue bleeds past each glyph; the engine compares
+// brightness at the tolerance and color at 1.5 times it. 2 changes before.
+test("C13: a q82 JPEG re-save of bold pure-blue text: no changes at the default sensitivity", async ({ page }) => {
+  await open(page, "blue-nav.png", "blue-nav-q82.jpg", 1440);
+  await compareWith(page, "blue-nav-q82.jpg");
+  await expect(bar(page)).toContainText("No changes");
+});
+
+// C20 (10-24): a pin sat on its box's top-left corner, over the first letter
+// of the change. It sits just outside the corner now, whole inside the photo
+// (the bell's box touches the top edge, so its pin slides down beside it).
+test("C20: each pin sits outside its box's top-left corner, inside the photo", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960);
+  await compareWith(page, "a.png");
+  await expect(bar(page)).toContainText("3 changes");
+  await bar(page).getByRole("button", { name: "Mark changes" }).click();
+  await expect.poll(async () => (await shapes(page)).length).toBe(6);
+  const all = await shapes(page);
+  for (let i = 0; i < all.length; i += 2) {
+    const [box, pin] = [all[i], all[i + 1]];
+    expect([box.kind, pin.kind]).toEqual([0, 5]);
+    const where = `pin ${pin.number} ${JSON.stringify(pin)} vs box ${JSON.stringify(box)}`;
+    // Clear of the box's inside: wholly left of it or wholly above it.
+    expect(pin.x1 <= box.x0 + 0.5 || pin.y1 <= box.y0 + 0.5, where).toBe(true);
+    // Beside the corner it labels, not somewhere else along the box.
+    expect(pin.x1, where).toBeGreaterThanOrEqual(box.x0 - 1);
+    expect(pin.y1, where).toBeGreaterThanOrEqual(box.y0 - 1);
+    expect(pin.x0 >= 0 && pin.y0 >= 0 && pin.x1 <= 960 && pin.y1 <= 600, where).toBe(true);
+  }
 });
 
 test("Mark changes: 3 boxes and pins 1-3, one Ctrl+Z takes all six, before and after a reload", async ({ page }) => {

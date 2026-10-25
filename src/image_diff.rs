@@ -2,10 +2,17 @@
 //! photos, and pin each change with a box and a numbered pin in ONE step.
 //!
 //! The diff is measured on 4 × 4 blocks first: a block counts as changed when
-//! the AVERAGE of some channel moved by more than `tolerance`. Averaging is
-//! what makes the default ignore JPEG ringing and anti-aliasing (both swing
-//! single pixels and cancel over a block) while a one-pixel text stroke still
-//! moves a block by a quarter of its contrast. Changed blocks are dilated by
+//! its AVERAGE brightness (luma) or alpha moved by more than `tolerance`, or
+//! its average color (chroma: Cb or Cr) by more than 1.5 × `tolerance`.
+//! Averaging is what makes the default ignore JPEG ringing and anti-aliasing
+//! (both swing single pixels and cancel over a block) while a one-pixel text
+//! stroke still moves a block by a quarter of its contrast. The looser chroma
+//! limit is for JPEG's 4:2:0 subsampling, which keeps brightness sharp but
+//! stores color at half resolution: around bold saturated text (pure-blue
+//! links) the color bleeds a pixel or two past each glyph. Measured on a
+//! re-save of such a page (C13, 10-24), the worst block moves 8.7 in luma and
+//! 31.7 in chroma, but 62 in the blue channel, so a per-channel RGB test saw
+//! a change where a person sees none. Changed blocks are dilated by
 //! `merge_px` so the parts of one change (a label's letters) join, labeled
 //! into connected components, and each component's box is then fitted to the
 //! changed PIXELS inside it, so a box hugs the change rather than the grid.
@@ -55,21 +62,59 @@ pub struct Diff {
     pub regions: Vec<Region>,
 }
 
-/// The largest channel difference between two pixels.
-#[inline]
-fn px_diff(a: &[u8], b: &[u8]) -> u8 {
-    let mut d = 0;
-    for c in 0..4 {
-        d = d.max(a[c].abs_diff(b[c]));
-    }
-    d
+/// How far a change may go before it counts, scaled by 256 to match
+/// [`ycc_256`]: luma and alpha at the tolerance, chroma at 1.5 times it.
+#[derive(Clone, Copy)]
+struct Limits {
+    luma: i32,
+    chroma: i32,
+    alpha: i32,
 }
 
-/// Compare the `w` × `h` area of `a` and `b`. A block changes when one of its
-/// channel averages moves by more than `tolerance`; a pixel inside a changed
-/// block is tinted when it moved by more than `tolerance` itself. Changes
-/// closer than `merge_px` join; a change of fewer than `min_area` changed
-/// pixels is dropped as a speck. Regions come in reading order (top to
+impl Limits {
+    fn new(tolerance: u8) -> Self {
+        let t = tolerance as i32;
+        Limits {
+            luma: t * 256,
+            chroma: t * 384,
+            alpha: t,
+        }
+    }
+
+    /// Whether a SUM of `n` pixels' RGBA differences counts: the block's
+    /// average, without dividing. The conversion is linear, so the luma of
+    /// the summed difference is the summed luma difference.
+    #[inline]
+    fn exceeded(&self, s: [i32; 4], n: i32) -> bool {
+        let (y, c) = ycc_256(s[0], s[1], s[2]);
+        y > self.luma * n || c > self.chroma * n || s[3].abs() > self.alpha * n
+    }
+}
+
+/// |luma| and the larger of |Cb|, |Cr| of an RGB difference, times 256:
+/// JPEG's own BT.601 weights in 8.8 fixed point. Each chroma row sums to 0,
+/// so a change in gray alone has no chroma at all.
+#[inline]
+fn ycc_256(dr: i32, dg: i32, db: i32) -> (i32, i32) {
+    let y = 77 * dr + 150 * dg + 29 * db;
+    let cb = -43 * dr - 85 * dg + 128 * db;
+    let cr = 128 * dr - 107 * dg - 21 * db;
+    (y.abs(), cb.abs().max(cr.abs()))
+}
+
+/// Whether one pixel moved by more than the limits.
+#[inline]
+fn px_changed(a: &[u8], b: &[u8], lim: &Limits) -> bool {
+    let d = |c: usize| a[c] as i32 - b[c] as i32;
+    lim.exceeded([d(0), d(1), d(2), d(3)], 1)
+}
+
+/// Compare the `w` × `h` area of `a` and `b`. A block changes when its
+/// average luma or alpha moves by more than `tolerance`, or its average
+/// chroma by more than 1.5 × `tolerance`; a pixel inside a changed block is
+/// tinted when it moved past the same limits itself. Changes closer than
+/// `merge_px` join; a change of fewer than `min_area` changed pixels is
+/// dropped as a speck. Regions come in reading order (top to
 /// bottom, then left to right).
 pub fn diff_regions(
     a: &View,
@@ -81,6 +126,7 @@ pub fn diff_regions(
     min_area: u32,
 ) -> Diff {
     let (gw, gh) = (w.div_ceil(BLOCK), h.div_ceil(BLOCK));
+    let lim = Limits::new(tolerance);
     let cells = (gw * gh) as usize;
     let mut mask = vec![0u8; (w * h) as usize];
     if cells == 0 {
@@ -112,8 +158,7 @@ pub fn diff_regions(
         }
         for bx in 0..gw {
             let n = ((((bx + 1) * BLOCK).min(w) - bx * BLOCK) * (y1 - y0)) as i32;
-            let worst = sums[bx as usize].iter().map(|s| s.abs()).max().unwrap_or(0);
-            changed[(by * gw + bx) as usize] = worst > tolerance as i32 * n;
+            changed[(by * gw + bx) as usize] = lim.exceeded(sums[bx as usize], n);
         }
     }
 
@@ -200,7 +245,7 @@ pub fn diff_regions(
         for y in y0..y1 {
             for x in x0..x1 {
                 let (ia, ib) = (a.at(x, y), b.at(x, y));
-                if px_diff(&a.px[ia..ia + 4], &b.px[ib..ib + 4]) > tolerance {
+                if px_changed(&a.px[ia..ia + 4], &b.px[ib..ib + 4], &lim) {
                     any = true;
                     *bb = (
                         bb.0.min(x),
@@ -234,7 +279,7 @@ pub fn diff_regions(
         for y in y0..y1 {
             for x in x0..x1 {
                 let (ia, ib) = (a.at(x, y), b.at(x, y));
-                if whole[j] || px_diff(&a.px[ia..ia + 4], &b.px[ib..ib + 4]) > tolerance {
+                if whole[j] || px_changed(&a.px[ia..ia + 4], &b.px[ib..ib + 4], &lim) {
                     mask[(y * w + x) as usize] = 1;
                 }
             }
@@ -404,8 +449,8 @@ impl ImageHorseTool {
 
     /// Mark each region (`regions`: x, y, w, h quads in document pixels) with
     /// an unfilled rectangle `pad` px outside it and a numbered pin of
-    /// diameter `pin` on its top-left corner, the pins continuing the active
-    /// layer's sequence in the order given. ONE "Mark Changes" step. Returns
+    /// diameter `pin` just outside the rectangle's top-left corner, the pins
+    /// continuing the active layer's sequence in the order given. ONE "Mark Changes" step. Returns
     /// the new ids, rectangle then pin per region; empty, pushing nothing,
     /// when there is no whole region.
     pub fn mark_regions(
@@ -456,10 +501,14 @@ impl ImageHorseTool {
                 stroke_width,
                 ..Default::default()
             });
-            // The pin sits on the box's corner, kept whole inside the photo.
-            let half = pin / 2.0;
-            let px = x0.clamp(half, (dw - half).max(half));
-            let py = y0.clamp(half, (dh - half).max(half));
+            // The pin sits outside the box's top-left corner, up and left by
+            // its radius, so it never covers the first letter of the change
+            // (C20). Kept whole inside the photo: at the photo's edge it
+            // slides along the box's side instead. `max` maps a NaN size to 0,
+            // so the clamp's bounds are always ordered (no panic).
+            let half = pin.max(0.0) / 2.0;
+            let px = (x0 - half).clamp(half, (dw - half).max(half));
+            let py = (y0 - half).clamp(half, (dh - half).max(half));
             shapes.push(crate::annotations::ShapeAnnotation {
                 id: pin_id,
                 kind: 5,
