@@ -201,6 +201,15 @@ pixels there (decode, then a structured clone of its RGBA) is not in these
 numbers. Reproduce: `pnpm run build:wasm`, then
 `pnpm --silent run bench:compare > /tmp/compare-bench.json`.
 
+**10-24-2026, luma and chroma (C13).** A block now counts when its luma or
+alpha moves past the tolerance, or its chroma (Cb, Cr) past 1.5 times it, so
+a JPEG re-save of bold saturated text no longer shows changes. The sums stay
+RGB and are converted per block (the conversion is linear), so the per-pixel
+pass is unchanged. Alternating master/after runs at 2880 × 1800 on the same
+laptop, which other jobs were sharing: medians 15.2 to 17.9 ms before, 15.7 to
+17.9 ms after (one after run read 31.1 ms while another test suite was
+running). The JSON above is still the 10-23 run.
+
 ## Reproduce
 
 Run timing commands sequentially with other builds and tests stopped:

@@ -71,6 +71,78 @@ fn tolerance_ignores_small_shifts_and_catches_big_ones() {
     assert_eq!(diff(&a, &b, 10, 16, 24), vec![(40, 40, 30, 30, 900)]);
 }
 
+/// Shift every pixel of a `w` × `h` box at (x, y) by (dr, dg, db).
+fn shift(px: &mut [u8], stride: u32, x: u32, y: u32, w: u32, h: u32, d: [i16; 3]) {
+    for yy in y..y + h {
+        for xx in x..x + w {
+            let i = ((yy * stride + xx) * 4) as usize;
+            for c in 0..3 {
+                px[i + c] = (px[i + c] as i16 + d[c]).clamp(0, 255) as u8;
+            }
+        }
+    }
+}
+
+// C13 (10-24): JPEG keeps brightness sharp and smears color (4:2:0 chroma),
+// so luma is compared at the tolerance and chroma (Cb, Cr) at 1.5 times it.
+// Every shift below is on mid gray, so nothing clips.
+
+#[test]
+fn a_chroma_smear_under_the_chroma_tolerance_does_not_count() {
+    // Blue up 63, red and green down 8: the same brightness (luma +0.04),
+    // Cb +35.5. The old RGB test saw a 63 change; at tolerance 28 the
+    // chroma limit is 42.
+    let a = gray(W, H, 128);
+    let mut b = a.clone();
+    shift(&mut b, W, 40, 40, 30, 30, [-8, -8, 63]);
+    assert!(diff(&a, &b, 28, 16, 24).is_empty());
+}
+
+#[test]
+fn a_chroma_change_over_the_chroma_tolerance_counts() {
+    // Blue up 80, red and green down 10: luma +0.2, Cb +45 > 42.
+    let a = gray(W, H, 128);
+    let mut b = a.clone();
+    shift(&mut b, W, 40, 40, 30, 30, [-10, -10, 80]);
+    assert_eq!(diff(&a, &b, 28, 16, 24), vec![(40, 40, 30, 30, 900)]);
+}
+
+#[test]
+fn a_real_luma_change_counts() {
+    // Every channel up 30: luma +30 > 28, no chroma at all.
+    let a = gray(W, H, 128);
+    let mut b = a.clone();
+    shift(&mut b, W, 40, 40, 30, 30, [30, 30, 30]);
+    assert_eq!(diff(&a, &b, 28, 16, 24), vec![(40, 40, 30, 30, 900)]);
+    // Just under: +27 is under 28.
+    let mut c = a.clone();
+    shift(&mut c, W, 40, 40, 30, 30, [27, 27, 27]);
+    assert!(diff(&a, &c, 28, 16, 24).is_empty());
+}
+
+#[test]
+fn a_large_hue_change_at_the_same_brightness_still_counts() {
+    // Brick red (180, 90, 90) to green (60, 150, 90): luma moves under 1,
+    // Cr moves 85. A recolor nobody would call noise.
+    let mut a = gray(W, H, 128);
+    paint_rgb(&mut a, W, 100, 60, 24, 20, [180, 90, 90]);
+    let mut b = gray(W, H, 128);
+    paint_rgb(&mut b, W, 100, 60, 24, 20, [60, 150, 90]);
+    let (regions, bits) = unpack(&diff_rgba(&a, &b, W, H, 28, 16, 24));
+    assert_eq!(regions, vec![(100, 60, 24, 20, 480)]);
+    assert_eq!(bits, 480, "every recolored pixel is tinted");
+}
+
+/// Paint a `w` × `h` box of one RGB color at (x, y).
+fn paint_rgb(px: &mut [u8], stride: u32, x: u32, y: u32, w: u32, h: u32, c: [u8; 3]) {
+    for yy in y..y + h {
+        for xx in x..x + w {
+            let i = ((yy * stride + xx) * 4) as usize;
+            px[i..i + 3].copy_from_slice(&c);
+        }
+    }
+}
+
 #[test]
 fn a_lone_pixel_of_noise_does_not_move_its_block_average() {
     // Single-pixel swings (JPEG ringing, anti-aliasing) average out over a
@@ -269,19 +341,60 @@ fn mark_three_regions_is_one_step_before_and_after_a_reload() {
     }
 }
 
+/// (x0, y0, x1, y1) of each shape, in list order.
+fn boxes(t: &ImageHorseTool) -> Vec<(f64, f64, f64, f64)> {
+    let j = t.get_shape_annotations();
+    let (x0, y0, x1, y1) = (all(&j, "x0"), all(&j, "y0"), all(&j, "x1"), all(&j, "y1"));
+    (0..x0.len())
+        .map(|i| (x0[i], y0[i], x1[i], y1[i]))
+        .collect()
+}
+
 #[test]
-fn marks_are_a_padded_box_and_a_pin_on_its_corner() {
+fn marks_are_a_padded_box_and_a_pin_just_outside_its_corner() {
+    // C20 (10-24): the pin sat ON the box's corner, over the first letter of
+    // the change. It now sits outside it, up and left by its radius.
+    let mut t = tool(false);
+    t.mark_regions(&THREE[4..8], "#e02020", 3.0, 4.0, 24.0);
+    assert_eq!(all(&t.get_shape_annotations(), "kind"), vec![0.0, 5.0]);
+    let b = boxes(&t);
+    assert_eq!(b[0], (116.0, 26.0, 164.0, 50.0), "the box, 4 px outside");
+    assert_eq!(
+        b[1],
+        (92.0, 2.0, 116.0, 26.0),
+        "the pin ends at the box's corner"
+    );
+}
+
+#[test]
+fn a_pin_at_the_photos_edge_stays_whole_inside_it() {
+    let mut t = tool(false);
+    // Against the left edge: the pin is pushed right, and stays above.
+    t.mark_regions(&[2, 80, 20, 20], "#e02020", 3.0, 4.0, 24.0);
+    let b = boxes(&t);
+    assert_eq!(b[0], (0.0, 76.0, 26.0, 104.0));
+    assert_eq!(
+        b[1],
+        (0.0, 52.0, 24.0, 76.0),
+        "above the box, inside the photo"
+    );
+    // In the top-left corner there is no room outside: inside the photo wins.
     let mut t = tool(false);
     t.mark_regions(&THREE[..4], "#e02020", 3.0, 4.0, 24.0);
-    let j = t.get_shape_annotations();
-    assert_eq!(all(&j, "kind"), vec![0.0, 5.0]);
-    assert_eq!(all(&j, "x0")[0], 16.0);
-    assert_eq!(all(&j, "y0")[0], 16.0);
-    assert_eq!(all(&j, "x1")[0], 54.0);
-    assert_eq!(all(&j, "y1")[0], 44.0);
-    // The pin is centered on (16, 16), then nudged whole into the photo.
-    assert_eq!((all(&j, "x0")[1], all(&j, "y0")[1]), (4.0, 4.0));
-    assert_eq!((all(&j, "x1")[1], all(&j, "y1")[1]), (28.0, 28.0));
+    let b = boxes(&t);
+    assert_eq!(b[0], (16.0, 16.0, 54.0, 44.0));
+    assert_eq!(b[1], (0.0, 0.0, 24.0, 24.0));
+    // A pin wider than the photo, or a size that is not a number: placed,
+    // never a panic across the wasm boundary.
+    let mut t = ImageHorseTool::new(20, 20);
+    t.load_image(&gray(20, 20, 200));
+    t.mark_regions(&[5, 5, 4, 4], "#e02020", 3.0, 2.0, 30.0);
+    assert_eq!(boxes(&t)[1], (0.0, 0.0, 30.0, 30.0));
+    assert_eq!(
+        t.mark_regions(&[5, 5, 4, 4], "#e02020", 3.0, 2.0, f64::NAN)
+            .len(),
+        2
+    );
 }
 
 #[test]
