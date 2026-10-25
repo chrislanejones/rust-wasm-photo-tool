@@ -31,13 +31,17 @@ wait their turn.
   looser one, or over 2×2 blocks, then add a saturated-text q82 pair to
   `e2e/fixtures/compare/make-fixtures.mjs`. The repro page is a dozen lines;
   rebuild it from this note.
-- **Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
+- ~~**Alt+0 resets zoom but keeps the pan**, everywhere, not just in compare
   (a hand pan with H/Space survives Alt+0 too). Left alone: the pan is
   CanvasArea's local state, `handleZoomReset` lives in `useCanvasActions` and
   cannot reach it without a new prop through AppShell or moving the pan into
   a store, and no test covers Alt+0 today. Compare no longer depends on it:
   Done/Esc put back the view from before the first zoom-to-change. A
-  "reset view" that zeroes the pan wants its own session and its own spec.
+  "reset view" that zeroes the pan wants its own session and its own spec.~~
+  **FIXED 10-24-2026 (Night 10-24 §4): the pan moved to `stores/useViewStore.ts`
+  and Alt+0 zeroes it with the zoom. AppShell unchanged. Compare's Done/Esc
+  still put back the view from before the first zoom-to-change (C8 green).
+  On the shortcut sheet and in Keyboard-Shortcuts.md; e2e/zoom-reset-pan.spec.ts.**
 - **C20 (odd), pins sit on the box's top-left corner**, over the first letter
   of the change. Untouched.
 - **`smart-callout.spec.ts` "the leader follows the pin and the label, and

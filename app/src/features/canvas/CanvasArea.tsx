@@ -483,9 +483,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       // different route.
     }, [canvasRef, containerRef, flushToCanvas, state.ready, state.width, state.height, surfaceKey]);
 
-    // Item 2: Pan offset state
-    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-
     // ── The main canvas's LAYOUT size (CSS px, pre-transform) ────────────────
     // `.main-canvas` is CSS-fit-scaled (max-width/max-height), so its layout
     // box is NOT the image's natural size on any photo bigger than the
@@ -725,15 +722,16 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       [],
     );
 
-    const panDrag = useCanvasPanDrag(isPanning, panOffset, setPanOffset);
+    // The pan lives in useViewStore so Alt+0 can zero it; the drag hook holds it.
+    const panDrag = useCanvasPanDrag(isPanning);
 
     // Screenshot compare's change list (Night 10-23): zoom to one change.
     const loadedDoc = useLoadedDocument(state);
     const focusRegion = useCompareFocus({
       canvasRef, toolRef: hookResult.toolRef, syncState: hookResult.syncState,
-      doc: loadedDoc, zoom: state.zoom, pan: panOffset, setPan: setPanOffset,
+      doc: loadedDoc, zoom: state.zoom,
     });
-    const { isDraggingPan, onMouseDown: handlePanMouseDown, onMouseMove: handlePanMouseMove, onMouseUp: handlePanMouseUp } = panDrag;
+    const { panOffset, isDraggingPan, onMouseDown: handlePanMouseDown, onMouseMove: handlePanMouseMove, onMouseUp: handlePanMouseUp } = panDrag;
 
     // ── Crop handle drag ───────────────────────────────────────────────
     const cropDragRef = useRef<{

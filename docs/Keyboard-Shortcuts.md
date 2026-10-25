@@ -170,7 +170,7 @@ shifted pair is now the layer reorder above.
 | `H`                    | Pan mode: hold for as long as it's down, or tap to leave it on until the next tap or `Esc` |
 | `Alt + Scroll`         | Zoom in / out |
 | `Alt + =` / `Alt + -`  | Zoom in / out |
-| `Alt + 0`              | Reset zoom (100%) |
+| `Alt + 0`              | Reset zoom (100%) and pan: the photo back where it started |
 | `PgUp` / `PgDn`        | Previous / next photo |
 | `Alt + ←` / `Alt + →`  | Previous / next tool you used — the browser's own Back and Forward (`Cmd + [` / `Cmd + ]` on a Mac). Picking a tool writes the address, so Back walks your tool history |
 
