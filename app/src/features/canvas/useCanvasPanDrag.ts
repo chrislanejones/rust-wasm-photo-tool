@@ -1,15 +1,18 @@
 // The hand-tool drag (Space or H held, then drag the canvas). Out of CanvasArea,
 // which sits at its line cap.
+//
+// The pan itself is in useViewStore so Alt+0 can zero it (Night 10-24). This
+// hook is the canvas's hold on it: it returns the pan for the transform, and
+// puts it back home when the canvas unmounts, as CanvasArea's old useState did
+// (crossing the Batch boundary remounts CanvasArea).
 import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
+import { useViewStore } from "@/stores/useViewStore";
 
-type Offset = { x: number; y: number };
-
-export function useCanvasPanDrag(
-  isPanning: boolean,
-  panOffset: Offset,
-  setPanOffset: (o: Offset) => void,
-) {
+export function useCanvasPanDrag(isPanning: boolean) {
+  const panOffset = useViewStore((s) => s.pan);
+  const setPanOffset = useViewStore((s) => s.setPan);
+  useEffect(() => () => useViewStore.getState().resetPan(), []);
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const [isDraggingPan, setIsDraggingPan] = useState(false);
 
@@ -56,5 +59,5 @@ export function useCanvasPanDrag(
     };
   }, [isDraggingPan, isPanning, end]);
 
-  return { isDraggingPan, onMouseDown, onMouseMove, onMouseUp: end };
+  return { panOffset, isDraggingPan, onMouseDown, onMouseMove, onMouseUp: end };
 }

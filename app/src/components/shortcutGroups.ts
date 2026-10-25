@@ -105,7 +105,7 @@ export const SHORTCUT_GROUPS = [
       { keys: ["Alt", "Scroll"], action: "Zoom In / Out" },
       { keys: ["Alt", "="], action: "Zoom In" },
       { keys: ["Alt", "-"], action: "Zoom Out" },
-      { keys: ["Alt", "0"], action: "Reset Zoom (100%)" },
+      { keys: ["Alt", "0"], action: "Reset Zoom (100%) and Pan" },
     ],
   },
   {

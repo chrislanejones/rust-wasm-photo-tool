@@ -339,7 +339,8 @@ test("C8: leaving compare (Done or Esc) puts the photo back where it was before 
     await expect.poll(async () => (await canvasBox(page))!.width).toBeGreaterThan(home.width * 2);
   };
 
-  // The user's path: zoom to a change, Alt+0 (zoom only), then Done.
+  // The user's path: zoom to a change, Alt+0, then Done. (Alt+0 reset the zoom
+  // only on 10-23; it zeroes the pan too since 10-24, and Done still goes home.)
   await compareWith(page, "a.png");
   await zoomToChange(1);
   await key(page, "Alt+0");

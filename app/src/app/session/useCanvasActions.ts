@@ -5,6 +5,7 @@
 import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useViewStore } from "@/stores/useViewStore";
 import { toast } from "@/components/ui/sonner";
 import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
@@ -63,9 +64,12 @@ export function useCanvasActions({
     stamp.syncState();
   }, [stamp]);
 
+  // Alt+0: the photo back home — 100% AND no pan. Zoom alone left a photo
+  // dragged aside with the hand where it was (Night 10-24).
   const handleZoomReset = useCallback(() => {
     stamp.toolRef.current?.set_zoom(1.0);
     stamp.syncState();
+    useViewStore.getState().resetPan();
   }, [stamp]);
 
   const handleCopyToClipboard = useCallback(async () => {
