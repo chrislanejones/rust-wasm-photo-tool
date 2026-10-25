@@ -2,12 +2,22 @@
 // Regenerates the marketing site's DERIVED data from the repo itself.
 //
 //   src/data/commits.ts   ← `git log master`             (the Trail Log squares)
+//   src/data/squash-prs.json ← `gh pr view N` per squash merge (cache; see trail-days.mjs)
 //   src/data/features.ts  ← docs/Features.md             (the /features list)
 //   src/data/source-dates.json ← git log, per page source (the sitemap lastmod)
 //
 // Run it as part of the release routine, from anywhere:
 //
 //   node marketing/scripts/gen-trail-data.mjs
+//
+// It asks `gh` only for squash-merged PRs missing from squash-prs.json, so a
+// normal run makes a handful of calls at most. Flags:
+//
+//   --offline       never call gh; a PR with no cache entry counts on its merge day
+//   --refresh-prs   re-fetch every squash-merged PR, not only the missing ones
+//
+// The marketing build never runs this script. It reads the committed output,
+// so the Vercel build needs neither the network nor gh.
 //
 // Why this is a script and not a hand-edit: both files are counts and lists that
 // exist somewhere else already. Typed by hand they go stale silently — the graph
@@ -22,6 +32,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { countDays, fillCache, ghFetchPr, readCache, readLog, writeCache } from "./trail-days.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
@@ -54,11 +65,27 @@ const RELEASE_REF = (() => {
   return "HEAD"; // detached head, or a clone with neither branch: count what's here
 })();
 
-const log = execFileSync(
-  "git",
-  ["log", RELEASE_REF, "--date=format:%Y-%m-%d", "--pretty=format:%ad"],
-  { cwd: root, encoding: "utf8" },
-);
+const args = new Set(process.argv.slice(2));
+const log = readLog(root, RELEASE_REF);
+
+// Squash merges count on the days their commits were written, not the day
+// they merged. The rule and the double-count guard are in trail-days.mjs.
+const cachePath = out("squash-prs.json");
+const cache = readCache(cachePath);
+if (!args.has("--offline")) {
+  const fill = fillCache(cache, log, (n, offset) => ghFetchPr(root, n, offset), {
+    all: args.has("--refresh-prs"),
+  });
+  if (fill.fetched) writeCache(cachePath, cache);
+  if (fill.error) {
+    console.warn(
+      `gen-trail-data: WARNING — gh could not fetch ${fill.wanted - fill.fetched} squash-merged PR(s) (${fill.error}).\n` +
+        `  Those count on their merge day. Re-run with gh online to credit them to their own days.`,
+    );
+  } else if (fill.wanted) {
+    console.log(`squash-prs.json  fetched ${fill.fetched} PR(s) from gh`);
+  }
+}
 
 // Running before the merge is legitimate — the release routine regenerates
 // while the release commit is still on a branch. But the output lags until the
@@ -77,9 +104,19 @@ if (unmerged > 0) {
   );
 }
 
-const perDay = {};
-for (const day of log.split("\n").filter(Boolean)) {
-  perDay[day] = (perDay[day] || 0) + 1;
+const { perDay, squashes } = countDays(log, cache.prs);
+const tally = { credited: 0, "in-history": 0, fallback: 0 };
+for (const sq of squashes) tally[sq.status]++;
+const fallbacks = squashes.filter((sq) => sq.status === "fallback");
+if (fallbacks.length) {
+  console.warn(
+    `gen-trail-data: WARNING — ${fallbacks.length} squash merge(s) have no cached PR commits and count on their merge day: ` +
+      fallbacks
+        .slice(0, 12)
+        .map((sq) => sq.prs.map((n) => `#${n}`).join("+"))
+        .join(", ") +
+      (fallbacks.length > 12 ? `, and ${fallbacks.length - 12} more` : ""),
+  );
 }
 
 const days = Object.keys(perDay).sort();
@@ -92,6 +129,11 @@ let c = `// GENERATED — do not edit. Run: node marketing/scripts/gen-trail-dat
 // /trail-log: the release log counts releases, git counts the work that went
 // into them.
 //
+// A squash merge counts as its PR's commits on the days they were written
+// (src/data/squash-prs.json), and a commit already in the log is never counted
+// twice. ${squashes.length} squash merges: ${tally.credited} credited to their commits' days,
+// ${tally["in-history"]} already in history, ${tally.fallback} on their merge day (no cache entry).
+//
 // ${total} commits across ${days.length} active days, ${days[0]} → ${days[days.length - 1]}.
 
 export const COMMITS: Record<string, number> = {
@@ -100,7 +142,8 @@ for (const d of days) c += `  ${q(d)}: ${perDay[d]},\n`;
 c += `};\n`;
 writeFileSync(out("commits.ts"), c);
 console.log(
-  `commits.ts  ${total} commits · ${days.length} active days · ${days[0]} → ${days[days.length - 1]}`,
+  `commits.ts  ${total} commits · ${days.length} active days · ${days[0]} → ${days[days.length - 1]} · ` +
+    `squashes: ${tally.credited} credited, ${tally["in-history"]} in history, ${tally.fallback} on merge day`,
 );
 
 // ── features.ts ─────────────────────────────────────────────────────────

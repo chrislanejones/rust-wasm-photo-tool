@@ -4,16 +4,41 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — squash merges move night work to the merge day on the Trail Log (10-24-2026)
+## OPEN — CI does not run `pnpm -C marketing test:scripts` (10-24-2026)
+
+- The trail-days tests are not in CI. The push that added
+  `- run: pnpm test:scripts` after `pnpm build` in ci.yml's `marketing` job
+  was refused: the agent's GitHub token has no `workflow` scope. Add that
+  one line (with a comment: fixture git repos, no network) by hand.
+
+## OPEN — `pnpm lint` does not cover `marketing/scripts/` (10-24-2026)
+
+- The lint gate is `eslint app/src`, so the generator scripts are never
+  linted. Run directly, `gen-trail-data.mjs` has one real finding
+  (`no-regex-spaces`, the `releases.ts` block split) plus node-globals
+  `no-undef` noise, because no config block gives `marketing/scripts/*.mjs`
+  node globals. Adding one is its own small change.
+
+## FIXED 10-24-2026 (fix/trail-squash-dates) — squash merges move night work to the merge day on the Trail Log (10-24-2026)
 
 - `marketing/scripts/gen-trail-data.mjs` counts `git log master` by author
   date, and a squash merge is dated when it merges. Night 10-23's 9 commits
   landed on master Saturday and Friday read 0. Fixed for 10-23 with a
   record-only merge (`git merge -s ours` of the six PR branches: their
-  commits join master's history, no file changes). Lasting fix: have the
-  generator credit each squashed PR to its own commits' dates (from
-  `gh pr view N --json commits`), or merge PR branches with a merge commit
-  instead of a squash. Either way GitHub's own graph follows master only.
+  commits join master's history, no file changes). GitHub's own graph still
+  follows master only.
+- **Built:** `marketing/scripts/trail-days.mjs`. A one-parent commit whose
+  subject ends in `(#N)` or `(#N, #M)` counts as PR N's commits, each on its
+  own author date, read from the checked-in cache
+  `marketing/src/data/squash-prs.json` (307 PRs, from
+  `gh pr view N --json commits`). A commit already in master's history (the
+  10-23 record-only merge, a stacked PR's base) is never counted again, so
+  #389 and #393-#398 add 0. A PR with no cache entry counts once on its merge
+  day, as before. The generator asks `gh` only for PRs missing from the cache
+  (`--offline` never calls it, `--refresh-prs` re-fetches all); the marketing
+  build reads the committed output and never runs it. Tests:
+  `pnpm -C marketing test:scripts` (node --test, fixture git repos). Total squares 930 → 1283; 10-23 stays 9, 10-24 goes
+  10 → 5 (the double-counted squashes), 10-21 2 → 7 (Night 10-21's #390).
 
 ## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026)
 
