@@ -2393,6 +2393,26 @@ impl ImageHorseTool {
         else {
             return false;
         };
+        // A commit that changes nothing is not a step. Leaving the Text tool
+        // commits whatever is open in the editor, so a text opened and left
+        // alone used to push a snapshot that recorded no op: undo_count +1,
+        // and the next Ctrl+Z appeared to do nothing (Night 10-24).
+        {
+            let a = &self.layers[self.active].text_annotations[idx];
+            if a.text == text
+                && a.font_size == font_size
+                && (a.r, a.g, a.b) == (r, g, b)
+                && a.bold == bold
+                && (a.x, a.y) == (x, y)
+                && a.rotation_deg == rotation_deg
+                && a.background_kind == background_kind
+                && (a.bg_r, a.bg_g, a.bg_b, a.bg_a) == (bg_r, bg_g, bg_b, bg_a)
+                && (a.bg_padding, a.bg_corner_radius, a.bg_tail)
+                    == (bg_padding, bg_corner_radius, bg_tail)
+            {
+                return true;
+            }
+        }
         self.snap("Edit Text");
         // Preserve the existing reflow width across a text/background edit —
         // same reasoning as the shadow below. Without this, typing in a box
