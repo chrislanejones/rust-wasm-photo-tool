@@ -11685,3 +11685,23 @@ Not in this release: undoing a text Placement with the Text tool open can
 break the op log; a JPEG re-save can show one false change; ADR-092 (line
 leaders reuse the Line shape) is still a draft. All three are in PARKING_LOT.
 
+## v9.38 Change Summary — 2026-10-25
+
+**Undo stops losing your shapes.**
+
+| Area | Change |
+| --- | --- |
+| Undo with a text open (#402) | Undo, redo, a History jump or a fork restore closes an open text first, the way Esc does. If the text has typing in it, that press only throws the typing away. Before, an undo with the editor still open (Esc pressed while a panel had focus, the Undo button, Ctrl+Z after a click elsewhere) knocked undo off the op log for the rest of the session, left the editor open over the undone text, and after a reload the next undo could drop a callout's pin and leader. |
+| Empty undo steps (#402) | Leaving the Text tool without changing the open text no longer adds a step, so Ctrl+Z never seems to do nothing. |
+| Compare: JPEG ghosts (#401) | Brightness is compared at the Sensitivity setting and color at 1.5 times it, so JPEG's color smear around bright text stops counting. A blue-nav page re-saved at q82: **2** changes → **0**. Blue, red, green and magenta text at q90 to q50 (24 pairs): **0** each. The known pair still finds its **3** changes, same boxes. |
+| Mark changes pins (#401) | Each pin sits just outside its box's top-left corner, not over the first letter of the change, and stays inside the photo at its edges. |
+| Alt+0 (#400) | Resets the pan as well as the zoom. Compare's Done and Esc still put the view back where it was. |
+| Trail Log (#399) | A squash-merged PR counts on the days its commits were written, read from `marketing/src/data/squash-prs.json` so the site build stays offline. A PR whose commits are already in master's history isn't counted twice. |
+| Tests | The smart-callout 1 px flake was the spec reading a drag while the canvas was still resizing: **20 / 20** now. A callout's undo after a reload is asserted again. |
+| Engine | Compare's diff splits brightness from color with no extra work per pixel; 2880 × 1800 still diffs in about 16 ms. An unchanged text commit returns early. No op-log or storage format change. 935,825 → **936,626 B** (+801). |
+| Verification | CI green on every PR. All four merged into one build first: tsc, lint (0 errors), guardrails, **2,083 / 2,083** unit tests, the Trail Log script tests and **220** e2e passed. QC on its production build, logged out: resume after reload, the Text tool with Placement and the Undo button with the editor open (the undo stayed on the op log), Ctrl+Y. All passed. |
+
+Not in this release: after a reload, an undo that can't use the op log (more
+than one content layer, or a log broken before the save) still restores a
+flattened picture with the shapes baked in. Fixing that changes the saved-edit
+format; ADR-093 (proposed) lays out the options. ADR-092 is still a draft.

@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.38",
+    date: "2026-10-25",
+    headline: "Undo stops losing your shapes.",
+    entries: [
+      { tag: "fix", text: "Undo or redo with a text open in its editor closes the text first, the way Esc does. Before, it broke the fast undo history, and after a reload a callout could come back without its pin and leader." },
+      { tag: "fix", text: "Leaving the Text tool without changing anything no longer adds an undo step that does nothing." },
+      { tag: "fix", text: "Compare no longer reports changes in a JPEG re-save of bright colored text, and Mark changes puts each pin just outside its box instead of over the first letter." },
+      { tag: "fix", text: "Alt+0 resets the pan as well as the zoom." },
+      { tag: "infra", text: "The Trail Log counts a squash-merged PR on the days its commits were written, from a cache checked into the repo." },
+      { tag: "rust", text: "Compare checks brightness and color separately. Engine 935,825 to 936,626 B (+801)." },
+    ],
+  },
+  {
     version: "v9.37",
     date: "2026-10-24",
     headline: "Compare two screenshots and pin every change.",

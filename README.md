@@ -90,17 +90,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.37 — 2026-10-24
+### v9.38 — 2026-10-25
 
-**Compare two screenshots and pin every change.**
+**Undo stops losing your shapes.**
 
-Right-click a photo in the gallery and pick Compare with this. Every pixel that
-changed between the two gets a tint, and you can flip between Overlay, Side by
-side, Blink and Slider. The change list zooms to each one. Mark changes drops a
-box and a numbered pin on every change, and one Ctrl+Z takes them all back.
-Also: Ctrl+Y redoes, a callout's leader can be a plain line, leaders follow
-Align and Placement, and three multi-select fixes. The Trail Log now shows
-Friday's night work on Friday, the day it was written.
+Undo with a text still open in its editor used to knock undo onto its slower
+backup path, and after a reload the next Ctrl+Z could bring a callout's label
+back without its pin and leader. Now any undo or redo closes the open text
+first, the same as Esc, so the history stays whole. Leaving the Text tool
+without changing anything no longer adds a step that undoes nothing. Also:
+Compare stops finding changes in JPEG re-saves of bright colored text, Mark
+changes puts each pin just outside its box, and Alt+0 puts the photo back home,
+pan included.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
