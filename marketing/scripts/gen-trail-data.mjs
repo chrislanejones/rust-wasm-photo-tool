@@ -80,7 +80,8 @@ if (!args.has("--offline")) {
   if (fill.error) {
     console.warn(
       `gen-trail-data: WARNING — gh could not fetch ${fill.wanted - fill.fetched} squash-merged PR(s) (${fill.error}).\n` +
-        `  Those count on their merge day. Re-run with gh online to credit them to their own days.`,
+        `  A PR already in the cache keeps its cached commits; one with no entry counts on its merge day\n` +
+        `  (listed below if any). Re-run with gh online to credit those to their own days.`,
     );
   } else if (fill.wanted) {
     console.log(`squash-prs.json  fetched ${fill.fetched} PR(s) from gh`);

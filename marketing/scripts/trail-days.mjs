@@ -158,20 +158,52 @@ export function writeCache(path, cache) {
   writeFileSync(path, s);
 }
 
+const gh = (root, args) =>
+  execFileSync("gh", args, {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 60_000,
+  });
+
+/** `gh pr view --json commits` stops at 100 commits without saying so. */
+export const GH_PR_VIEW_COMMIT_CAP = 100;
+/** GitHub's REST list of a PR's commits stops at 250. */
+export const GH_REST_COMMIT_CAP = 250;
+
 /**
  * Ask `gh` for one PR. Resolves each commit's day from the local object when
  * git has it (exact, same as every other square), otherwise from GitHub's UTC
  * authoredDate shifted into the squash commit's own offset. Throws on a
  * network/auth failure; returns { note, commits: [] } for "not a PR".
+ *
+ * `gh pr view` silently truncates the commit list at 100 (cli/cli#13338), so a
+ * PR that comes back with 100 is listed again through the REST endpoint, page
+ * by page, which goes to GitHub's own limit of 250.
  */
 export function ghFetchPr(root, number, offset) {
-  let raw;
+  let pr;
+  let list;
+  let note;
   try {
-    raw = execFileSync(
-      "gh",
-      ["pr", "view", String(number), "--json", "number,state,mergedAt,commits"],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 },
-    );
+    pr = JSON.parse(gh(root, ["pr", "view", String(number), "--json", "number,state,mergedAt,commits"]));
+    list = pr.commits.map((c) => ({ oid: c.oid, authoredDate: c.authoredDate }));
+    if (list.length >= GH_PR_VIEW_COMMIT_CAP) {
+      list = gh(root, [
+        "api",
+        "--paginate",
+        `repos/{owner}/{repo}/pulls/${number}/commits?per_page=100`,
+        "--jq",
+        ".[] | {oid: .sha, authoredDate: .commit.author.date}",
+      ])
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+      if (list.length >= GH_REST_COMMIT_CAP) {
+        note = `GitHub lists at most ${GH_REST_COMMIT_CAP} commits of a PR; this one may have more`;
+      }
+    }
   } catch (err) {
     const msg = String(err.stderr || err.message || err);
     if (/Could not resolve to a PullRequest|no pull requests found/i.test(msg)) {
@@ -179,8 +211,7 @@ export function ghFetchPr(root, number, offset) {
     }
     throw new Error(msg.trim().split("\n")[0] || "gh failed", { cause: err });
   }
-  const pr = JSON.parse(raw);
-  const commits = pr.commits.map((c) => {
+  const commits = list.map((c) => {
     let day;
     try {
       day = git(root, ["show", "-s", "--date=format:%Y-%m-%d", "--format=%ad", `${c.oid}^{commit}`]).trim();
@@ -189,7 +220,7 @@ export function ghFetchPr(root, number, offset) {
     }
     return { oid: c.oid, authored: c.authoredDate, day };
   });
-  return { mergedAt: pr.mergedAt || null, commits };
+  return note ? { mergedAt: pr.mergedAt || null, note, commits } : { mergedAt: pr.mergedAt || null, commits };
 }
 
 /**

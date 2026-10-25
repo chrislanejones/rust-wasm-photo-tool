@@ -4,7 +4,7 @@
 // day counting is checked against real `git log` output rather than a mock.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -171,6 +171,42 @@ JSON
     wanted: 0,
     error: null,
   });
+});
+
+test("a PR that gh pr view cuts off at 100 commits is listed again through the REST pages", (t) => {
+  const { dir } = squashedNight(t);
+  const bin = join(dir, ".bin");
+  mkdirSync(bin);
+  const oid = (i) => i.toString(16).padStart(40, "0");
+  const at = (i) => new Date(Date.parse("2026-10-23T14:00:00Z") + i * 60_000).toISOString().replace(".000", "");
+  const view = { number: 7, state: "MERGED", mergedAt: "2026-10-24T20:44:00Z", commits: [] };
+  for (let i = 1; i <= 100; i++) view.commits.push({ oid: oid(i), authoredDate: at(i) });
+  writeFileSync(join(bin, "view.json"), JSON.stringify(view));
+  const rest = [];
+  for (let i = 1; i <= 130; i++) rest.push(JSON.stringify({ oid: oid(i), authoredDate: at(i) }));
+  writeFileSync(join(bin, "rest.jsonl"), rest.join("\n") + "\n");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh
+echo "$@" >> "${join(bin, "calls")}"
+case "$1" in
+  pr) cat "${join(bin, "view.json")}" ;;
+  api) cat "${join(bin, "rest.jsonl")}" ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const PATH = process.env.PATH;
+  process.env.PATH = `${bin}:${PATH}`;
+  t.after(() => {
+    process.env.PATH = PATH;
+  });
+
+  const entry = ghFetchPr(dir, 7, "-0400");
+  assert.equal(entry.commits.length, 130);
+  assert.equal(entry.note, undefined);
+  const calls = readFileSync(join(bin, "calls"), "utf8");
+  assert.match(calls, /^api --paginate repos\/\{owner\}\/\{repo\}\/pulls\/7\/commits/m);
 });
 
 test("squash subjects: the last parenthesis only, one or several PRs", () => {
