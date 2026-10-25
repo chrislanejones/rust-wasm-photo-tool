@@ -155,6 +155,10 @@ name = "oplog_v8_text_settings_replay"
 required-features = ["tiles"]
 
 [[test]]
+name = "text_commit_noop"
+required-features = ["tiles"]
+
+[[test]]
 name = "oplog_v7_v8_fixture_resume"
 required-features = ["tiles"]
 

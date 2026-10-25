@@ -87,6 +87,13 @@ interface AnnotationState {
   // canvas Shift-click would. null until it mounts.
   expandPick: ((p: Picked) => Picked) | null;
   setExpandPick: (fn: ((p: Picked) => Picked) | null) => void;
+
+  // Close the Text tool's editor before a history move (Night 10-24). An
+  // undo with a text still open in the editor went down snapshot undo, which
+  // breaks the op log. Published by useTextTool, called by useHistory; true
+  // means the editor held typing and the press was spent throwing it away.
+  closeTextEdit: (() => boolean) | null;
+  setCloseTextEdit: (fn: (() => boolean) | null) => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -129,4 +136,7 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
   setPicked: (v) => set((s) => ({ picked: resolveSet(v, s.picked) })),
   expandPick: null,
   setExpandPick: (fn) => set({ expandPick: fn }),
+
+  closeTextEdit: null,
+  setCloseTextEdit: (fn) => set({ closeTextEdit: fn }),
 }));

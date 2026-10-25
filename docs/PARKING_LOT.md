@@ -86,16 +86,25 @@ measurement limits and reproduction commands are in the
   `arrow_style` has no "no head" value and adding one would be a format
   change; callouts made before keep their arrow. Left open:
   - A Callout sub-tool entry of its own (needs AppShell's `penMode` line).
-  - **Undoing a text's Placement with the Text tool open breaks the op log**,
-    callout or not. Repro: add a plain text, open it, Placement › Bottom right,
-    Escape, Ctrl+Z → `oplog_status()` reads "broken — snapshot undo has taken
-    over" (the same Placement undone with Pins open does not break it). After a
-    reload, the snapshot steps undo falls back to drop the layer's SHAPES: one
-    Ctrl+Z on a placed callout's label restores the label and loses its pin and
-    leader. Callout-leader.spec's Placement case stops before that undo.
-  - Leaving the Text tool for Pins right after a Placement pushes an undo step
-    that records no op (`undo_count` +1, op count unchanged), so the next
-    Ctrl+Z appears to do nothing.
+  - ~~Undoing a text's Placement with the Text tool open breaks the op log~~
+    **FIXED 10-25-2026 (Night 10-24 §1).** The cause was not the Placement:
+    any undo while a text was still open in the editor went down snapshot
+    undo (the engine will not replay its log over a text it is not drawing),
+    and that marks the log broken. Escape pressed with focus outside the
+    editor, the Undo button, or Ctrl+Z after a click elsewhere all did it.
+    Every history move now closes an open text first, the way Escape does
+    (`useHistory` → `closeTextEdit`); if the editor holds typing, that press
+    only throws the typing away. e2e/text-placement-undo.spec.ts.
+  - ~~Leaving the Text tool for Pins right after a Placement pushes an empty
+    undo step~~ **FIXED 10-25-2026**: an unchanged text commit is no longer a
+    step (`update_text_annotation`, tests/text_commit_noop.rs).
+  - **OPEN — a fallback undo after a reload restores a flattened picture.**
+    The saved undo steps keep pixels and a text list, no shapes and no layer
+    stack, so when the op log can't serve the undo (more than one content
+    layer, or a log broken before the save) the step comes back with its
+    shapes baked into the pixels. Needs a saved-edit format change:
+    **ADR-093 (proposed)** lays out the options. Pinned as `test.fixme`
+    case 4 in e2e/text-placement-undo.spec.ts.
   - Multi-select's Align ▾ menu opens below the selection: with the selection
     near the bottom of the canvas it lands under the gallery strip, where it
     cannot be clicked.

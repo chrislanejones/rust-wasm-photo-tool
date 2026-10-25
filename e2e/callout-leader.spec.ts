@@ -103,17 +103,17 @@ async function reloadAndResume(page: Page) {
   await page.reload();
   await page.getByRole("button", { name: /Resume editing/i }).click();
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
+  // The app drops an undo press until the resumed photo stops loading.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await installAnnotationProbe(page);
 }
 
 /** `act` moves the label (`moved` says how we know), the leader follows, and
- *  it is all ONE undo step, before a reload and after one (unless
- *  `undoAfterReload` is false — see the Placement case). */
+ *  it is all ONE undo step, before a reload and after one. */
 async function followsInOneStep(
   page: Page,
   act: () => Promise<void>,
   moved: (before: Text, now: Text) => boolean,
-  undoAfterReload = true,
 ) {
   const before = await layer(page);
   const was = labelOf(before);
@@ -132,7 +132,6 @@ async function followsInOneStep(
   await expect.poll(() => layer(page)).toEqual(after);
   await reloadAndResume(page);
   await expect.poll(() => layer(page)).toEqual(after);
-  if (!undoAfterReload) return;
   await key(page, "Control+z");
   await expect.poll(() => layer(page)).toEqual(before);
 }
@@ -191,17 +190,16 @@ test.describe("§4 a callout's label moved without the Text tool drags its leade
     await expect(page.locator("textarea").first()).toHaveValue("Crack");
     const panel = page.getByRole("region", { name: "Tool options" });
     await panel.getByRole("button", { name: "Placement", exact: true }).click();
-    // The undo AFTER the reload is not asserted here, and not because of the
-    // callout: undoing ANY text's Placement with the Text tool open breaks
-    // the op log ("snapshot undo has taken over" — a plain text with no
-    // callout does it too), and the snapshot steps a reload brings back then
-    // drop the layer's shapes. Parked in docs/PARKING_LOT.md (Night 10-23).
+    // The undo after the reload is asserted too since Night 10-24: undoing a
+    // Placement with the editor still open used to break the op log, and the
+    // snapshot steps a reload brings back then dropped the pin and leader
+    // (e2e/text-placement-undo.spec.ts).
     await followsInOneStep(page, async () => {
       await panel.getByRole("radio", { name: "Bottom right", exact: true }).or(
         panel.getByRole("button", { name: "Bottom right", exact: true })).click();
-      // Close the editor the Placement re-opened, keeping the text as it is.
+      // Escape with focus outside the editor: the text stays open.
       await key(page, "Escape");
-    }, (was, now) => now.x > was.x + 300 && now.y > was.y + 200, false);
+    }, (was, now) => now.x > was.x + 300 && now.y > was.y + 200);
   });
 
   test("an arrow-key nudge", async ({ page }) => {

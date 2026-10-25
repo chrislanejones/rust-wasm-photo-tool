@@ -7,6 +7,7 @@ import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { removeText, rerouteCallouts } from "@/hooks/usePinSteps";
+import { useTextEditEnd } from "@/hooks/useTextEditEnd";
 
 interface TextInput {
   screenX: number;
@@ -117,6 +118,7 @@ export function useTextTool({
   /** When non-null, commitText updates the existing annotation instead of
    *  creating a new one. */
   const editingAnnotationId = useRef<number | null>(null);
+  const { cancel: cancelEdit, opened: openedText } = useTextEditEnd({ textInputRef, editingAnnotationId, setTextInput, toolRef, flushToCanvas });
   /** Parsed annotation list — refreshed after every add/update/remove. */
   const [annotations, setAnnotations] = useState<AnnotationMeta[]>([]);
   /** Annotation id currently under the cursor (text-tool hover). */
@@ -503,6 +505,7 @@ export function useTextTool({
         textColor: next.textColor,
       };
       editingAnnotationId.current = ann.id;
+      openedText.current = ann.text;
       // v8.40 — reopen the box at the width it was committed with, so dragging
       // a corner CONTINUES the previous reflow instead of resetting it. The
       // engine is the source of truth for the width (annotations JSON); this
@@ -528,7 +531,7 @@ export function useTextTool({
       });
       setTimeout(() => textareaRef.current?.focus(), 10);
     },
-    [canvasRef, containerRef, toolRef, flushToCanvas],
+    [canvasRef, containerRef, toolRef, flushToCanvas, openedText],
   );
 
   /** Open an existing text annotation for editing by id (Reselect list).
@@ -776,19 +779,14 @@ export function useTextTool({
   const onTextKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
-        textInputRef.current = null;
-        editingAnnotationId.current = null;
-        setTextInput(null);
-        // Canceling an edit must un-suppress the (unchanged) baked tile.
-        toolRef.current?.set_editing_text(-1);
-        flushToCanvas();
+        cancelEdit();
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         // `void`: a keydown handler cannot await, and nothing is sequenced after.
         void commitText();
       }
     },
-    [commitText, toolRef, flushToCanvas],
+    [commitText, cancelEdit],
   );
 
   const onTextChange = useCallback(
