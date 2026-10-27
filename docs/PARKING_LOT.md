@@ -425,7 +425,7 @@ quota. These are the holes that feed the sweep, left out of that diff:
 | CI's Convex "typecheck" is vacuous | `.github/workflows/*.yml` `convex` job | `convex codegen` prints "No `tsc` binary found, so skipping typecheck" — `typescript` is an app-level dep, the root has none. Local stand-in: `pnpm -C app exec tsc --noEmit -p ../convex/tsconfig.json` (11 known `process` false positives). |
 | Eight tables exist on brave-ant-608 that `schema.ts` does not declare | `authAccounts`, `authRateLimits`, `authRefreshTokens`, `authSessions`, `authVerificationCodes`, `authVerifiers`, `userProfiles`, `session_edits` | All empty and unwritten by any function; the sweep walks declared tables only. Harmless while empty. |
 
-## OPEN — three stale backend descriptions left after the dead-table removal (09-24-2026)
+## FIXED 10-26-2026 (docs/parking-lot-tidy-1026) — three stale backend descriptions left after the dead-table removal (09-24-2026)
 
 Found while deleting `projects`/`images`/`layers`/`annotations`/`history`
 (branch `chore/delete-dead-backend`). Left out of that diff on purpose:
@@ -589,7 +589,7 @@ Still open from the same work: the signed badge does show a negative number, so
 the growth was visible — but as `-11%` on a thumbnail, three seconds after a run
 reported success.
 
-## OPEN — the PageSpeed model was not Lighthouse's model (FIXED 2026-10-02)
+## FIXED 10-05-2026 (#289 via #297, v9.14) — the PageSpeed model was not Lighthouse's model
 
 > **FIXED 2026-10-02** on `fix/pagespeed-truth-and-panel-honesty`. Resolved
 > while fixing the Auto Compress guard above, which is why the two were one
@@ -635,7 +635,7 @@ ratio does not move (pinned by `a_downscale_alone_does_not_improve_the_ratio`).
 What fixes a dense photo is a lower quality or a next-gen format. The panel
 taught the opposite for years.
 
-## OPEN — 116 · The oval is the piece of this still to build (09-30-2026)
+## FIXED 10-06-2026 (#305, v9.18) — 116 · The oval is the piece of this still to build (09-30-2026)
 
 Triangle, star points and rotation are built on #187 and renumbered to **op-log v9** (ADR-059, ADR-070). What is left here is the oval.
 
@@ -731,7 +731,7 @@ lift `SceneKit`/`stream`/`fade`/`createScene` into one shared module both
 posts' `figures.tsx` import, and the `.scene`/`.scene__*` CSS into one file
 both posts' bodies import instead of duplicating.
 
-## OPEN — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
+## FIXED 09-25-2026 (#230, UI Night 2; `mode` required since #286) — `ToggleButtonGroup` never says which button is on to a screen reader (09-22-2026)
 
 Found while adding the Sync switch on `feat/sync-settings-pane`. The group's
 buttons carry no `aria-pressed`, so a screen reader hears "Sync on, button" and

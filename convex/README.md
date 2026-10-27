@@ -14,6 +14,8 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 | `user_colors` | the global "+" palette — one row per saved swatch, newest first, capped at 32. Anonymous users keep the same list in localStorage; this is where it lives once they sign in |
 | `photo_edits` | per-photo canvas archive: canvas dimensions plus a `_storage` id — the bytes live in Convex file storage, not in the row. What makes a signed-in user's edit state survive across devices |
 | `shares` | share-link tokens and their expiry |
+| `share_views` | one row per counted view of a share link: the share id and a timestamp, nothing that identifies the viewer. Feeds the owner's 30-day view sparkline; rows go with their share |
+| `sync_docs` | synced settings: one row per (user, key) holding a JSON blob (`prefs`, `ui`, `tools`), with a server-assigned `rev` that every write is checked against. Not the photo archive |
 | `ai_jobs` | the Replicate job queue rows the client subscribes to |
 
 ## Functions
@@ -23,7 +25,7 @@ Editing is local: pixels go through the Rust/WASM engine and originals live in t
 - **`ai.ts` / `aiJobs.ts` / `testReplicate.ts`** — the Replicate job queue: dispatch, poll, and the job rows the client subscribes to.
 - **`textHistory.ts` / `userColors.ts` / `photoEdits.ts` / `sync.ts`** — per-user persistence: recent texts, the saved palette, canvas archives, and synced settings.
 - **`shares.ts`** — share links.
-- **`crons.ts`** — scheduled cleanup.
+- **`crons.ts`** — registers **no** jobs today. The orphaned-storage sweep (`storageSweep.ts`) is written but its `crons.interval` line is commented out, so nothing runs on a schedule until a person turns it on.
 - **`http.ts` / `router.ts`** — the two webhook endpoints: `/replicate-webhook` and `/stripe-webhook`. Both verify signatures before touching data.
 
 ## Working on this
