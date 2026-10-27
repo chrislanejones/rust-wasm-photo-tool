@@ -11705,3 +11705,17 @@ Not in this release: after a reload, an undo that can't use the op log (more
 than one content layer, or a log broken before the save) still restores a
 flattened picture with the shapes baked in. Fixing that changes the saved-edit
 format; ADR-093 (proposed) lays out the options. ADR-092 is still a draft.
+
+## v9.39 Change Summary — 2026-10-26
+
+**Five library updates, and the notes catch up.**
+
+| Area | Change |
+| --- | --- |
+| Libraries (#409) | framer-motion 14.0.0 → **14.6.0**, @radix-ui/react-tooltip 1.2.16 → **1.4.1**, @radix-ui/react-context-menu 2.3.7 → **2.4.1**, @playwright/test 1.64.0 → **1.64.1**, lucide-react 1.52.0 → **1.61.0** (app and marketing). One lockfile change in place of five Dependabot PRs; the rollup bump each of those carried along is not in it. |
+| Backend notes (#410) | `convex/README.md` lists all **9** tables in `schema.ts`, adding `share_views` and `sync_docs`, and says `crons.ts` registers no jobs: the storage sweep is written but switched off. The Storage pane's header comment no longer names the `images` table, which is gone. |
+| Parking lot (#410) | Four done entries marked fixed with the PR that fixed each: the oval (#305), the toggle groups a screen reader couldn't read (#230), the PageSpeed model (#289) and the stale backend notes. |
+| Verification | CI green on both PRs and on master. tsc, lint (0 errors), guardrails, **2,083 / 2,083** unit tests and the production build passed. e2e on the new libraries: a tooltip opening on hover and closing on Esc, the gallery's right-click menu (screenshot-compare, **14 / 14**), and the animated gallery and accessibility specs (**13 / 13**). |
+
+Not in this release: the CodeQL action update (#404) edits a workflow file and
+is still open.

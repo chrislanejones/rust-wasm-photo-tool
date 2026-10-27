@@ -90,18 +90,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.38 — 2026-10-25
+### v9.39 — 2026-10-26
 
-**Undo stops losing your shapes.**
+**Five library updates, and the notes catch up.**
 
-Undo with a text still open in its editor used to knock undo onto its slower
-backup path, and after a reload the next Ctrl+Z could bring a callout's label
-back without its pin and leader. Now any undo or redo closes the open text
-first, the same as Esc, so the history stays whole. Leaving the Text tool
-without changing anything no longer adds a step that undoes nothing. Also:
-Compare stops finding changes in JPEG re-saves of bright colored text, Mark
-changes puts each pin just outside its box, and Alt+0 puts the photo back home,
-pan included.
+No new buttons this time. Five libraries moved up in one go: framer-motion,
+the Radix tooltip and right-click menu, Playwright and the lucide icons. The
+tooltips, the gallery's right-click menu and the animated gallery were tested
+on the new versions before they shipped. The backend notes now list every
+Convex table and say plainly that no cleanup job runs on a schedule yet, and
+four finished items in the parking lot are marked fixed.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

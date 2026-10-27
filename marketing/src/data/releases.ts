@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.39",
+    date: "2026-10-26",
+    headline: "Five library updates, and the notes catch up.",
+    entries: [
+      { tag: "infra", text: "framer-motion, the Radix tooltip and right-click menu, Playwright and the lucide icons all moved up in one update. Tooltips and the gallery's right-click menu were tested on the new versions." },
+      { tag: "infra", text: "The backend notes list all nine Convex tables and say plainly that no cleanup job runs on a schedule yet." },
+      { tag: "infra", text: "Four finished items in the parking lot are marked fixed, each with the PR that fixed it." },
+    ],
+  },
+  {
     version: "v9.38",
     date: "2026-10-25",
     headline: "Undo stops losing your shapes.",
