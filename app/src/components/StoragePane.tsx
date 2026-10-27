@@ -2,9 +2,9 @@
 // uploads are stored: Amazon S3, UploadThing, or Cloudflare R2. Free / demo keep
 // originals on-device, so the whole pane is Pro-gated.
 //
-// The Connect buttons are DISABLED for now — the upload pipeline (/api/upload →
-// provider → Convex `images` row + webhook) and the secure credential store
-// aren't wired yet. This is the entry point that lights up once they land.
+// The Connect buttons are DISABLED ("Coming soon"): there is no upload pipeline
+// to an outside provider and no secure credential store yet, and neither has
+// been designed. Today the pane only lists the providers and says so.
 import { Server, UploadCloud, Cloud, Lock } from "lucide-react";
 import { PaneHeading } from "@/components/ui/pane-heading";
 import { Button } from "@/components/ui/button";
