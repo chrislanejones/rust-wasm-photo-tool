@@ -5,6 +5,7 @@ import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "sonner";
 import { exportOra } from "./export";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 /** Strip a trailing extension (".png", ".jpg", …) so "Vacation Photo.png" →
  *  "Vacation Photo"; falls back to "image-horse" when there's nothing usable. */
@@ -47,7 +48,7 @@ export async function downloadOraProject({
   a.href = url;
   a.download = `${baseFileName(imageName)}.ora`;
   a.click();
-  URL.revokeObjectURL(url);
+  revokeObjectUrlLater(url);
   return { flattenedAnnotations };
 }
 

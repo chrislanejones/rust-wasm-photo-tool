@@ -7,6 +7,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "sonner";
 import { captureLayeredDocument } from "./bridge";
 import type { FormatSpec } from "./types";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 export interface DownloadPluginFormatOptions {
   format: FormatSpec;
@@ -44,7 +45,7 @@ async function downloadPluginFormat({
   a.href = url;
   a.download = `${fileStem}${format.extension}`;
   a.click();
-  URL.revokeObjectURL(url);
+  revokeObjectUrlLater(url);
   return { flattenedAnnotations };
 }
 

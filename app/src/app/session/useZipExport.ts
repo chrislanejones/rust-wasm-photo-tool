@@ -18,6 +18,7 @@ import { untouchedZipEntry } from "@/lib/zipEntry";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 type Persistence = ReturnType<typeof useEditPersistence>;
 type Format = Parameters<typeof encodeRgba>[3];
@@ -138,7 +139,7 @@ export function useZipExport(deps: ZipDeps) {
             a.href = url;
             a.download = filename;
             a.click();
-            URL.revokeObjectURL(url);
+            revokeObjectUrlLater(url);
             return { skipped, mode };
           },
           { timeoutMs: ZIP_TIMEOUT_MS, timeoutMessage: "Making the ZIP timed out." },
