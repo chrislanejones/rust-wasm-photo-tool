@@ -34,6 +34,7 @@ import type { PlacementCell } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
+import { SelectObjectsSettings } from "./settings/SelectObjectsSettings";
 import { BatchSettings } from "./settings/BatchSettings";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
@@ -312,6 +313,11 @@ export function ToolsSidebar({
    *  preferences, not the document. */
   const showRulersPanel = subToolId === "rulers";
 
+  /** Select objects shares `tool: "shapes"` and has no mode. Without its own
+   *  panel it showed ShapesSettings in the LAST mode used, so after Arrows &
+   *  Diagram Shapes two tiles opened the same picker (Night 10-28). */
+  const showSelectObjectsPanel = subToolId === "select-objects";
+
   /** Same, for LayerSettings' three sections. */
   const layerSection =
     subToolId === "guides"
@@ -528,7 +534,9 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "shapes" && (
+        {activeTool === "shapes" && showSelectObjectsPanel && <SelectObjectsSettings />}
+
+        {activeTool === "shapes" && !showSelectObjectsPanel && (
           <ShapesSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}

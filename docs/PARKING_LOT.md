@@ -14,6 +14,29 @@ wait their turn.
 | Peak memory | The e2e records the JS heap peak (179 MB for six 6–8 MP photos). The engine's wasm memory is not in that number | `performance.memory` sees only JS; measuring wasm needs the module's `Memory` handle |
 | Select ▾ Larger than… | Compares the **file size** (KB/MB) | A pixel-size rule ("wider than 3000 px") is a second item if anyone asks |
 
+## OPEN — tile names and panel headers still disagree on 9 sub-tools (fix/one-tile-per-subtool, 10-28-2026)
+
+Night 10-28 §1 made Arrows & Diagram Shapes one name everywhere. The sweep
+in `e2e/one-tile-per-subtool.spec.ts` prints every tile next to its panel's
+first heading, and these still differ (tile → header):
+
+| Group | Tile | Panel header |
+|---|---|---|
+| Enhance | Resize & Compress | Resize (the panel has two sections) |
+| Select | Magic Wand | Wand |
+| Create | Brush | Paint |
+| Create | Clone Stamp | Clone |
+| Create | Blur Brush | Blur |
+| Create | Emoji | Emojis |
+| Edit | Layers | Edit Layer |
+| Edit | Canvas Size | Background Canvas Size |
+| Edit | Guides | Horizontal and Vertical Guides |
+
+Pen, Eraser, Text, Shapes, Pins, Stamps and every Batch tile already match.
+Pick one name per row and change the header (the tile label is also the
+palette entry and the screen-reader name, and some e2e specs click by it).
+Out of the night's scope: the plan asked for the Arrows name only.
+
 ## OPEN — PNG Compress leftovers (fix/png-export-size, 10-27-2026)
 
 - **No dithering.** Compress reduces a PNG to at most 256 colors without

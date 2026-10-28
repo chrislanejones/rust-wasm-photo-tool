@@ -506,8 +506,11 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["select", "multi", "several", "align", "distribute", "marquee", "group"],
     },
     {
+      // One name everywhere (Night 10-28): this tile, the panel header, the
+      // palette and docs/Features.md. "Arrows & Shapes" sat next to the
+      // Shapes tile and read as the same tool. The id stays `arrow` — URLs.
       id: "arrow",
-      label: "Arrows & Shapes",
+      label: "Arrows & Diagram Shapes",
       description: "Arrows, plus 30 flowchart, basic and block-arrow diagram shapes",
       icon: ArrowUpRight,
       tool: "shapes",
