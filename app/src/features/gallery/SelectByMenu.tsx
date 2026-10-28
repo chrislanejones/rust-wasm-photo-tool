@@ -23,8 +23,8 @@ const RULES: { label: string; rule: SelectRule }[] = [
   { label: "Invert", rule: { kind: "invert" } },
 ];
 
-const ITEM =
-  "flex min-h-9 w-full items-center rounded-sm px-2 text-left text-xs text-theme-foreground hover:bg-bg-tertiary focus-visible:bg-bg-tertiary focus-visible:outline-none";
+/** Ghost buttons, full width and left-aligned: a list, not a row of tiles. */
+const ITEM = "w-full justify-start";
 
 export function SelectByMenu({ className, labelClassName }: { className?: string; labelClassName?: string }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +57,9 @@ export function SelectByMenu({ className, labelClassName }: { className?: string
     <span ref={root} className={cn("relative inline-flex", className)}>
       <Button
         size="default"
+        // "Select by" contains the visible "Select" (label-in-name), and
+        // keeps it apart from the rail's Select tool.
+        aria-label="Select by"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -87,19 +90,13 @@ export function SelectByMenu({ className, labelClassName }: { className?: string
           className="absolute bottom-full right-0 z-[var(--z-dialog)] mb-1 min-w-48 rounded-md border border-border bg-bg-elevated p-1 shadow-lg"
         >
           {RULES.slice(0, 3).map(({ label, rule }) => (
-            <button key={label} type="button" role="menuitem" className={ITEM} onClick={(e) => run(rule, e.shiftKey)}>
+            <Button key={label} variant="ghost" role="menuitem" className={ITEM} onClick={(e) => run(rule, e.shiftKey)}>
               {label}
-            </button>
+            </Button>
           ))}
-          <button
-            type="button"
-            role="menuitem"
-            aria-expanded={larger}
-            className={ITEM}
-            onClick={() => setLarger((v) => !v)}
-          >
+          <Button variant="ghost" role="menuitem" aria-expanded={larger} className={ITEM} onClick={() => setLarger((v) => !v)}>
             Larger than…
-          </button>
+          </Button>
           {larger && (
             <form
               className="flex items-center gap-1.5 px-2 pb-1.5"
@@ -120,9 +117,9 @@ export function SelectByMenu({ className, labelClassName }: { className?: string
             </form>
           )}
           {RULES.slice(3).map(({ label, rule }) => (
-            <button key={label} type="button" role="menuitem" className={ITEM} onClick={(e) => run(rule, e.shiftKey)}>
+            <Button key={label} variant="ghost" role="menuitem" className={ITEM} onClick={(e) => run(rule, e.shiftKey)}>
               {label}
-            </button>
+            </Button>
           ))}
         </div>
       )}

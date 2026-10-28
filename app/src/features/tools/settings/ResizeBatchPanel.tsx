@@ -79,6 +79,8 @@ export type ResizeRow = {
   /** resized: written · kept: would have grown, left as is · skipped / failed */
   status: "resized" | "kept" | "skipped" | "failed";
   note?: string;
+  /** What was written, for a resized row: "1600×1200 WebP". */
+  out?: { width: number; height: number; mime: string };
 };
 
 interface Props {
@@ -215,6 +217,7 @@ export function ResizeBatchPanel({ photos, activePhotoId, setPhotos, stampToolRe
             after: enc.blob.size,
             status: "resized",
             note: l.underKB !== null && !enc.fits ? `couldn't reach ${l.underKB} KB` : undefined,
+            out: { width: t.width, height: t.height, mime },
           });
         } catch (err) {
           console.error("Batch resize: failed on", photo.name, err);
@@ -290,6 +293,7 @@ export function ResizeBatchPanel({ photos, activePhotoId, setPhotos, stampToolRe
                 after: enc.blob.size,
                 status: "resized",
                 note: l.underKB !== null && !enc.fits ? `couldn't reach ${l.underKB} KB` : undefined,
+                out: { width: tw, height: th, mime },
               });
             }
             flushToCanvas();
@@ -429,6 +433,16 @@ export function ResizeBatchPanel({ photos, activePhotoId, setPhotos, stampToolRe
                       : r.status}
                 </span>
               </span>
+              {r.out && (
+                <span
+                  className="text-theme-muted-foreground"
+                  data-width={r.out.width}
+                  data-height={r.out.height}
+                  data-mime={r.out.mime}
+                >
+                  {`${r.out.width}×${r.out.height} ${(formatFromMime(r.out.mime) ?? "").toUpperCase()}`}
+                </span>
+              )}
               {r.note && <span className="text-theme-muted-foreground">{r.note}</span>}
             </li>
           ))}

@@ -10,8 +10,7 @@ import { NumberField, TextField } from "@/components/ui/number-field";
 import { FieldLabel } from "@/components/ui/field-label";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
-import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { ToolModeToggle, type ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
@@ -20,11 +19,7 @@ import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { registerExtraRootProvider } from "@/lib/extraRoots";
-import {
-  makeWorkingCopy,
-  makeThumbnail,
-  makeThumbnailFromPixels,
-} from "@/lib/workingCopy";
+import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
 import { useToolStore, type BatchMode } from "@/stores/useToolStore";
 import { AIRenamePanel } from "./AIRenamePanel";
 import { CropBatchPanel } from "./CropBatchPanel";
