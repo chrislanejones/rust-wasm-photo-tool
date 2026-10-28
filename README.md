@@ -90,19 +90,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.40 — 2026-10-27
+### v9.41 — 2026-10-28
 
-**Shrinking a PNG makes it smaller now.**
+**Resize a whole gallery in one pass.**
 
-Resize a PNG logo, press Compress, and the Google PageSpeed box said the file
-came out bigger than the one you uploaded. It was right, which was the
-problem. Every PNG was saved the heaviest way PNG allows, and the Quality
-slider did nothing for PNG at all. Now a PNG is saved in the smallest form
-that loses nothing, and Quality below 100 trims it down to 256 colors or
-fewer, the way TinyPNG does. A 28 KB logo that used to export at 28.7 KB now
-saves at 14 KB, and shrunk and compressed it lands at 10 KB. The PageSpeed box
-also measures what the button will actually write, so the number before Apply
-is the number after.
+Batch has a Resize & Compress tile now. Pick a width or a long edge, a
+format, a quality and, if you want, a size to stay under, and every photo is
+done from its full-size original, one at a time, with a line for each that
+says what it was and what it is now: 3,970 KB → 248 KB. A photo that would
+come out bigger is left alone, and its row says so. Exceptions get their own
+size, so the portraits can go to 1080 while the rest go to 1600.
+
+The gallery bar has a Select menu to go with it: every portrait, every
+landscape, every square, everything over a size, everything edited or
+unedited, or the opposite of what's ticked. Download All has recipes:
+Instagram 1080×1350, Web 1600, Email small, or one you save yourself. A recipe
+only shapes the ZIP, so the photos in the gallery stay as they are, and a
+saved recipe follows you to your other devices when you're signed in.
+
+Also fixed: Create showed two Arrows & Diagram Shapes tiles. The second one was
+Select objects borrowing the Shapes panel. It has its own panel now.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

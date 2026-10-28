@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.41",
+    date: "2026-10-28",
+    headline: "Resize a whole gallery in one pass.",
+    entries: [
+      { tag: "feature", text: "Batch › Resize & Compress resizes every photo from its full-size original and shows each one's size before and after. A photo that would get bigger is left alone." },
+      { tag: "feature", text: "Select ▾ in the gallery ticks photos by rule: portrait, landscape, square, larger than a size, edited, unedited, or the opposite of what's ticked." },
+      { tag: "feature", text: "Download All has recipes: Instagram 1080×1350, Web 1600, Email small, or one you save. A recipe shapes the ZIP and leaves the gallery alone, and saved ones sync when you're signed in." },
+      { tag: "fix", text: "Create showed two Arrows & Diagram Shapes tiles. The second was Select objects, and it has its own panel now." },
+    ],
+  },
+  {
     version: "v9.40",
     date: "2026-10-27",
     headline: "Shrinking a PNG makes it smaller now.",
