@@ -16,6 +16,49 @@ import { BATCH_CROP_RATIOS, type BatchCropRatioId, type CropFraming } from "@/li
 export type BatchCropWidthId = "keep" | "1080" | "1440";
 
 
+/** Where the engine's history stands: the live state's identity
+ *  (`history_node`) within one load of the document (`documentRevision`,
+ *  bumped by every load and restore, which rebuild the history). */
+export interface HistoryPosition {
+  node: number;
+  revision: number;
+}
+
+/** The active photo's last live batch crop, by IDENTITY. The undo count is
+ *  not one: crop, undo, one new edit, and the count is back where the crop
+ *  left it (PARKING_LOT 09-29-2026). */
+export interface ActiveCrop {
+  /** The state the crop produced. */
+  after: HistoryPosition;
+  /** The state it was applied to — where rewinding `steps` must land. */
+  before: HistoryPosition;
+  /** Undo steps it pushed: the crop, plus a resize when a width was set. */
+  steps: number;
+}
+
+const samePosition = (a: HistoryPosition, b: HistoryPosition) =>
+  a.node === b.node && a.revision === b.revision;
+
+/** Is the live document exactly the state this photo's last batch crop made? */
+export function isLiveCrop(
+  s: Pick<BatchCropState, "activeCrop">,
+  photoId: string,
+  live: HistoryPosition,
+): boolean {
+  const rec = s.activeCrop[photoId];
+  return !!rec && samePosition(rec.after, live);
+}
+
+/** After rewinding a crop: did we land on the state it was applied to? */
+export function isPreCrop(
+  s: Pick<BatchCropState, "activeCrop">,
+  photoId: string,
+  live: HistoryPosition,
+): boolean {
+  const rec = s.activeCrop[photoId];
+  return !!rec && samePosition(rec.before, live);
+}
+
 /** What ONE group's crop looks like. Each group has its own. */
 export interface CropLook {
   ratioId: BatchCropRatioId;
@@ -49,9 +92,9 @@ interface BatchCropState {
   /** photo id → the originalKey it had before its first batch crop. Every
    *  Apply crops from here, so a second Apply re-frames the whole photo. */
   baselines: Record<string, string>;
-  /** Active photo only: the undo count our last live crop left behind and how
-   *  many steps it pushed. If the count still matches, re-apply rewinds them. */
-  activeCrop: Record<string, { undoCount: number; steps: number }>;
+  /** Active photo only: WHICH history state our last live crop left behind,
+   *  and how many steps it pushed. Re-apply rewinds only from that state. */
+  activeCrop: Record<string, ActiveCrop>;
 
   setRatioId: (g: BatchGroup, id: BatchCropRatioId) => void;
   /** Picking an anchor is "put every frame in this group HERE" — it clears the
@@ -63,7 +106,7 @@ interface BatchCropState {
   clearFraming: (g: BatchGroup, photoId: string) => void;
   setApplyAll: (fn: (() => void) | null) => void;
   setBaseline: (photoId: string, key: string) => void;
-  setActiveCrop: (photoId: string, v: { undoCount: number; steps: number }) => void;
+  setActiveCrop: (photoId: string, v: ActiveCrop) => void;
 }
 
 const patchLook = (s: BatchCropState, g: BatchGroup, p: Partial<CropLook>) => ({
@@ -124,16 +167,17 @@ export function framingFor(
 
 /** Is the photo on screen still its ORIGINAL framing — i.e. is the preview
  *  frame measuring the same pixels the next Apply will crop? False once a batch
- *  crop has been baked into it (active: until undone; others: for good, since
- *  their stored original was replaced). */
+ *  crop has been baked into it (active: while its state is the live one;
+ *  others: for good, since their stored original was replaced). Any other
+ *  state of the active photo — undone, or edited since — is cropped as it is
+ *  on screen, so the frame drawn on it is the frame that applies. */
 export function showsOriginalFraming(
   s: Pick<BatchCropState, "baselines" | "activeCrop">,
   photoId: string,
   originalKey: string,
-  undoCount: number,
+  live: HistoryPosition,
 ): boolean {
-  const live = s.activeCrop[photoId];
-  if (live && live.undoCount === undoCount) return false;
+  if (isLiveCrop(s, photoId, live)) return false;
   const base = s.baselines[photoId];
   return !base || base === originalKey;
 }

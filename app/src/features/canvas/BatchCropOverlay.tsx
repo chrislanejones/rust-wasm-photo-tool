@@ -57,8 +57,10 @@ const CORNERS: { id: CropCorner; ax: 0 | 1; ay: 0 | 1; cursor: string }[] = [
 
 interface Props extends OverlayFrame {
   photoBounds: PhotoBounds | null;
-  /** The live undo count — tells us whether a batch crop is baked in. */
-  undoCount: number;
+  /** The live history state (`history_node`) — with the document revision,
+   *  tells us whether a batch crop is the state on screen. NOT the undo count:
+   *  crop, undo, one new edit lands back on the crop's count. */
+  historyNode: number;
 }
 
 /** The preview frame plus the "Exception" checkbox for the photo on screen. */
@@ -79,7 +81,7 @@ function BatchCropFrame({
   panOffset,
   zoom,
   photoBounds,
-  undoCount,
+  historyNode,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -111,8 +113,11 @@ function BatchCropFrame({
   const framing = useBatchCropStore((s) => (photoId ? framingFor(s, group, photoId) : undefined));
   const storeSetFraming = useBatchCropStore((s) => s.setFraming);
   const storeClearFraming = useBatchCropStore((s) => s.clearFraming);
+  const revision = useGalleryStore((s) => s.documentRevision);
   const onOriginal = useBatchCropStore((s) =>
-    photoId && originalKey ? showsOriginalFraming(s, photoId, originalKey, undoCount) : false,
+    photoId && originalKey
+      ? showsOriginalFraming(s, photoId, originalKey, { node: historyNode, revision })
+      : false,
   );
 
   if (!on || !photoId || !onOriginal || width <= 0 || height <= 0) return null;

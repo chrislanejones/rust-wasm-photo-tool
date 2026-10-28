@@ -294,6 +294,8 @@ declare module "stamp_tool" {
     export_quality: number;
     /** Beta history forks branch list (ADR-086); `"[]"` when none. */
     branches_json: string;
+    /** `history_node()`: identity of the live history state. */
+    history_node: number;
   }
 
   /**
@@ -404,6 +406,10 @@ declare module "stamp_tool" {
     set_history_forks(on: boolean): void;
     history_forks(): boolean;
     history_branch_count(): number;
+    /** Identity of the live history state: the same number however often
+     *  undo/redo leave and return to it, a new one for every new edit. Only
+     *  comparable within one load of the document. */
+    history_node(): number;
     /** Newest first: `[{"id":3,"label":"Crop","steps":4,"bytes":50331648,
      *  "nested":false}]`. Also on `capture_ui_state()` as `branches_json`,
      *  which is what the panel reads. */

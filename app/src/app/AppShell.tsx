@@ -1560,10 +1560,10 @@ export function AppShell() {
     (frame: OverlayFrame) => (
       <>
         {shapeActions.overlay && <ShapeActionsOverlay canvasRef={canvasRef} {...shapeActions.overlay} />}
-        <BatchCropOverlay {...frame} photoBounds={photoBounds} undoCount={stamp.state.undoCount} />
+        <BatchCropOverlay {...frame} photoBounds={photoBounds} historyNode={stamp.state.historyNode} />
       </>
     ),
-    [shapeActions.overlay, photoBounds, stamp.state.undoCount],
+    [shapeActions.overlay, photoBounds, stamp.state.historyNode],
   );
 
   const redStampTool = useRedStampTool({
