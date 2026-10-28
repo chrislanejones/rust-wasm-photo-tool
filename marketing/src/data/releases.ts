@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.40",
+    date: "2026-10-27",
+    headline: "Shrinking a PNG makes it smaller now.",
+    entries: [
+      { tag: "fix", text: "A PNG is saved in the smallest form that loses nothing. A 66-color logo that exported bigger than its upload now saves at half the size." },
+      { tag: "feature", text: "Compress works on PNG: Quality below 100 trims a PNG to 256 colors or fewer, the way TinyPNG does. A logo shrunk and compressed went from 46% bigger than the upload to 64% smaller." },
+      { tag: "fix", text: "The Google PageSpeed box measures what the button will actually write, so the size before Apply is the size after." },
+    ],
+  },
+  {
     version: "v9.39",
     date: "2026-10-26",
     headline: "Five library updates, and the notes catch up.",

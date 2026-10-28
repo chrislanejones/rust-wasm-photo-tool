@@ -11719,3 +11719,19 @@ format; ADR-093 (proposed) lays out the options. ADR-092 is still a draft.
 
 Not in this release: the CodeQL action update (#404) edits a workflow file and
 is still open.
+
+## v9.40 Change Summary — 2026-10-27
+
+**Shrinking a PNG makes it smaller now.**
+
+| Area | Change |
+| --- | --- |
+| PNG export (#412) | Every PNG was written as 8-bit RGBA. It now picks the smallest lossless layout: a palette for 256 colors or fewer, RGB when nothing is transparent, RGBA otherwise. A 66-color logo exported at **28,683 B** (bigger than its 28,477 B upload) now saves at **14,182 B**; an opaque 2101×1254 screenshot goes 1,628,690 → **1,441,476 B**. Pixels are identical after a round trip. |
+| Compress on PNG (#412) | Quality below 100 now does something to a PNG: it reduces the colors to 256 (Quality 75+), 128, 64 or 32, and keeps whichever is smaller, reduced or lossless. The same logo at half size: **41 KB, 46% bigger** than the upload before; **10 KB, 64% smaller** now. A reduced PNG remembers its quality, and Apply Resize keeps it. |
+| PageSpeed box (#412) | With only a size change pending, the box measures what Apply Resize writes, at the photo's own quality. Before, it measured at the slider's quality: a JPEG showed 8 KB and saved 11 KB. A PNG preview of a non-PNG photo is measured lossless, the way export writes it. |
+| Engine | New `src/quantize.rs` (median cut, no new dependency). Wasm 936,626 → **946,145 B** (+9,519). ADR-094. |
+| Verification | CI green on #412 and on master. cargo fmt, clippy (default + tiles), cargo test 529 + 791, tsc, lint (0 errors), **2,083 / 2,083** unit tests, guardrails and the production build passed. In the production build, all four formats were read on three images at 100% and 50%; in six Apply runs the box's number before Apply matched the file after. Undo after a PNG Compress restores the size. |
+
+Not in this release: dithering (a PNG photo compressed below 100 can band in
+skies), parked in `docs/PARKING_LOT.md`. imagehorse-qc is owed for the
+engine and Resize panel change.

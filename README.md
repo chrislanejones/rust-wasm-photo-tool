@@ -90,16 +90,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.39 — 2026-10-26
+### v9.40 — 2026-10-27
 
-**Five library updates, and the notes catch up.**
+**Shrinking a PNG makes it smaller now.**
 
-No new buttons this time. Five libraries moved up in one go: framer-motion,
-the Radix tooltip and right-click menu, Playwright and the lucide icons. The
-tooltips, the gallery's right-click menu and the animated gallery were tested
-on the new versions before they shipped. The backend notes now list every
-Convex table and say plainly that no cleanup job runs on a schedule yet, and
-four finished items in the parking lot are marked fixed.
+Resize a PNG logo, press Compress, and the Google PageSpeed box said the file
+came out bigger than the one you uploaded. It was right, which was the
+problem. Every PNG was saved the heaviest way PNG allows, and the Quality
+slider did nothing for PNG at all. Now a PNG is saved in the smallest form
+that loses nothing, and Quality below 100 trims it down to 256 colors or
+fewer, the way TinyPNG does. A 28 KB logo that used to export at 28.7 KB now
+saves at 14 KB, and shrunk and compressed it lands at 10 KB. The PageSpeed box
+also measures what the button will actually write, so the number before Apply
+is the number after.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
