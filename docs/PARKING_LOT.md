@@ -4,6 +4,16 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — first bulk night leftovers (feat/bulk-night, 10-28-2026)
+
+| Item | What is true now | Why it waited |
+|---|---|---|
+| Batch Resize: the open photo | Resized in the engine from its working copy (≤ 2048 px). A target bigger than that copy **skips** the open photo with a reason, instead of writing it smaller than its original | Same gap #413 parked for Batch Crop: there is no way for a panel to reload the open photo from new stored bytes without an AppShell wire |
+| Batch Resize: history label | The open photo's step reads **"Resize"**, not "Batch Resize" | The label is the engine's (`snap("Resize")`) and the op log synthesizes it after a reload; a custom label is an op-log change, off-limits that night |
+| Batch Resize: photos not on the canvas | Their stored file is replaced; there is no undo for them | Same as Batch Crop, Logo, Text and Compress All today. A per-photo history entry for a photo that is not open needs the archive to record one |
+| Peak memory | The e2e records the JS heap peak (179 MB for six 6–8 MP photos). The engine's wasm memory is not in that number | `performance.memory` sees only JS; measuring wasm needs the module's `Memory` handle |
+| Select ▾ Larger than… | Compares the **file size** (KB/MB) | A pixel-size rule ("wider than 3000 px") is a second item if anyone asks |
+
 ## OPEN — tile names and panel headers still disagree on 9 sub-tools (fix/one-tile-per-subtool, 10-28-2026)
 
 Night 10-28 §1 made Arrows & Diagram Shapes one name everywhere. The sweep

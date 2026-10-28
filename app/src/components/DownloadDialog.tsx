@@ -59,6 +59,8 @@ import type {
 } from "@/app/session/useDownloadFormat";
 import type { ActiveFormat } from "@/lib/plugins";
 import { ControlRow } from "@/components/ui/control-row";
+import { ZipRecipePicker } from "@/components/ZipRecipePicker";
+import { useZipRecipe } from "@/stores/useZipRecipeStore";
 
 /** The format picker's ids: every real download format, the formats the
  *  active plugins add (Settings → Plugins, lib/plugins — their manifest ids,
@@ -174,6 +176,7 @@ function DownloadPanes({
   svg,
 }: Omit<DownloadDialogProps, "open" | "onOpenChange">) {
   const multi = photoCount > 1;
+  const recipe = useZipRecipe();
   const [picked, setPicked] = React.useState<Pane>(multi ? "choose" : "selected");
   const [direction, setDirection] = React.useState<PaneDirection>(1);
   // An image deleted down to one while the dialog is open leaves nothing to
@@ -355,6 +358,9 @@ function DownloadPanes({
                 />
               )}
             </ControlRow>
+            {/* Recipes (Night 10-28): a named size + format + quality + name
+                pattern for the whole ZIP. Not for SVG, which keeps its vector. */}
+            {!allSvg && <ZipRecipePicker zipFormat={zipFormat} />}
             <DialogDescription>
               {allSvg ? (
                 <>
@@ -373,7 +379,9 @@ function DownloadPanes({
               <PanelAction icon={FolderArchive} onClick={onDownloadAll}>
                 {allSvg
                   ? `Download ${svg.all} as SVG`
-                  : `Download ${photoCount} as ${zipLabel}`}
+                  : recipe
+                    ? `Download ${photoCount} as ${recipe.name}`
+                    : `Download ${photoCount} as ${zipLabel}`}
               </PanelAction>
             </PanelActionBar>
           </>
