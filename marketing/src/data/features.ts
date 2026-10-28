@@ -63,7 +63,7 @@ export const FEATURES: FeatureGroup[] = [
   {
     name: "UI (React)",
     items: [
-      { name: "Fast drags are never dropped", body: "on the Shapes, Arrows & Shapes and Crop canvases a press is recorded the instant it lands, its moves and release are buffered while the engine answers the hit-test, then replayed in order; a quick second drag commits the first instead of overtaking it. Thirty fast drags in a row land thirty shapes (they used to land 19–24) (lib/pressQueue.ts)" },
+      { name: "Fast drags are never dropped", body: "on the Shapes, Arrows & Diagram Shapes and Crop canvases a press is recorded the instant it lands, its moves and release are buffered while the engine answers the hit-test, then replayed in order; a quick second drag commits the first instead of overtaking it. Thirty fast drags in a row land thirty shapes (they used to land 19–24) (lib/pressQueue.ts)" },
       { name: "One header row on every second-step dialog", body: "New Canvas, Create AI Image, Selected Image and All Images share one header: ‹ Back on the left, the title centered, ✕ on the right, Back the same 24px button as the close. One close per dialog (PaneHeader, a 1fr auto 1fr grid)" },
       { name: "Sign in from Settings", body: "a labeled Sign in button on the far right of the Settings footer (your avatar once you are signed in), as well as the person icon in the top bar" },
       { name: "Animated Panels", body: "Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)" },

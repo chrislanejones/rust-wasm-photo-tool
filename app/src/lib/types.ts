@@ -28,7 +28,7 @@ export interface StampSettings {
   opacity: number;
 }
 
-/** The diagram shapes the Arrows & Shapes tool draws — engine kinds 11..=40,
+/** The diagram shapes the Arrows & Diagram Shapes tool draws — engine kinds 11..=40,
  *  in the order of `DIAGRAM_SHAPES` (lib/diagramShapes.ts). */
 export type DiagramShapeName =
   | "terminator" | "data" | "document" | "multiDocument" | "predefinedProcess"
@@ -90,7 +90,7 @@ export interface ToolSettings extends StampSettings {
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: ShapeName;
-  /** What the Arrows & Shapes tool draws next: the line arrow (`arrowStyle`
+  /** What the Arrows & Diagram Shapes tool draws next: the line arrow (`arrowStyle`
    *  picks one head or two) or one of the diagram shapes. Its own field, not
    *  `shape`, so picking a flowchart shape there does not change the tile
    *  the Shapes tool has selected. Absent = the arrow. */
