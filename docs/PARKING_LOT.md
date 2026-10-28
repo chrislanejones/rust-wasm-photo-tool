@@ -4,6 +4,19 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — PNG Compress leftovers (fix/png-export-size, 10-27-2026)
+
+- **No dithering.** Compress reduces a PNG to at most 256 colors without
+  dither (dither noise costs bytes; the target case is logos). A PNG *photo*
+  compressed below Quality 100 can band in skies and gradients. Look at one
+  before deciding whether to add dithering.
+- **The "≈" estimate ignores color reduction.** `getImageWeight` forces PNG to
+  relative quality 100, so a PNG Compress shows the lossless estimate for the
+  ~350 ms before the real measurement lands.
+- **Apply Resize on a flat-art PNG still grows it** (honestly): Lanczos adds
+  edge colors and Apply Resize is lossless. Dragging Quality is what shrinks
+  it. A hint line in the panel was offered and declined on 10-27.
+
 ## OPEN — CI does not run `pnpm -C marketing test:scripts` (10-24-2026)
 
 - The trail-days tests are not in CI. The push that added
