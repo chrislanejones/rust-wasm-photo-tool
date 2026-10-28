@@ -234,8 +234,9 @@ console.log(
 // boundary, so the numbers are copied at generate time instead.
 const releasesSrc = readFileSync(resolve(here, "..", "src", "data", "releases.ts"), "utf8");
 
-// Split on the release-object boundary. Each block starts at `version:`.
-const relBlocks = releasesSrc.split(/\n  \{\n    version: /).slice(1);
+// Split on the release-object boundary. Each block starts at `version:`,
+// indented 4 under a `{` indented 2 (`{n}` counts the spaces for the reader).
+const relBlocks = releasesSrc.split(/\n {2}\{\n {4}version: /).slice(1);
 const releases = relBlocks
   .map((b) => {
     const version = (b.match(/^"([^"]+)"/) || [])[1];
