@@ -37,6 +37,7 @@ import {
   MapPin,
   PaintBucket,
   ScanEye,
+  Scaling,
   ScanText,
   Scissors,
   Shapes as ShapesIcon,
@@ -115,6 +116,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
       icon: ScanEye,
       keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
     },
+    { id: "resize", label: "Resize & Compress", icon: Scaling, keywords: ["resize", "compress", "shrink", "width", "kb", "webp", "batch"] },
   ],
   // `effects` is three tiles on one tool id: Adjustments, Levels and Presets.
   // `setModeOf` refuses any mode not listed here, silently — without this row

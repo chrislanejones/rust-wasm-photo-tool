@@ -57,6 +57,7 @@ import {
   Pin,
   Pipette,
   Ruler,
+  Scaling,
   Scan,
   ScanEye,
   ScanText,
@@ -775,6 +776,17 @@ const batchGroup: ToolGroupDefinition = {
         "auto name",
         "bulk",
       ],
+    },
+    {
+      // Night 10-28 (227): one size, format and quality for the whole
+      // gallery, from each stored original. Main | Exceptions like Crop.
+      id: "resize",
+      label: "Resize & Compress",
+      description: "Resize and re-encode every photo at once, never making a file bigger",
+      icon: Scaling,
+      tool: "emoji",
+      mode: "resize",
+      keywords: ["resize", "compress", "shrink", "width", "long edge", "kb", "webp", "bulk"],
     },
   ],
 };

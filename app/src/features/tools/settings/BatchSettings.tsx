@@ -4,7 +4,7 @@
 // photos are persisted to IDB irreversibly.
 import { batchOutcome } from "@/lib/batchOutcome";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
+import { ImagePlus, Type, Crop, FileEdit, ScanEye, Scaling, X } from "lucide-react";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { NumberField, TextField } from "@/components/ui/number-field";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -37,6 +37,7 @@ import { useEngineFaces } from "@/hooks/useEngineFaces";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { SelectField } from "@/components/ui/select-field";
 import { BatchGroupToggle } from "./BatchGroupToggle";
+import { ResizeBatchPanel } from "./ResizeBatchPanel";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
 import { Button } from "@/components/ui/button";
 import { ControlRow } from "@/components/ui/control-row";
@@ -63,6 +64,7 @@ const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "crop", label: "Crop", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
+  { id: "resize", label: "Resize & Compress", icon: Scaling },
 ];
 
 // Batch positions now use the shared 9-cell placement grid.
@@ -623,6 +625,8 @@ function BatchToolPanel({
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
         <AIRenamePanel photos={photos} setPhotos={setPhotos} />
+      ) : m === "resize" ? (
+        <ResizeBatchPanel {...panelProps} photos={allPhotos} />
       ) : (
       <>
       <div>
