@@ -119,6 +119,10 @@ interface UIState {
   // Resolved auth tier + the Super-User client-side override.
   userMode: UserMode;
   authResolved: boolean;
+  /** Signed in, but `users.me` has not answered yet, so the tier is unknown.
+   *  `userMode` holds the lower tier meanwhile (what is ALLOWED); this says the
+   *  answer is not in, so gates wait instead of refusing. Transient. */
+  tierPending: boolean;
   devTierOverride: UserMode | null;
 
   setShowUpload: (v: SetArg<boolean>) => void;
@@ -155,6 +159,7 @@ interface UIState {
   setIsPanning: (v: SetArg<boolean>) => void;
   setUserMode: (v: SetArg<UserMode>) => void;
   setAuthResolved: (v: SetArg<boolean>) => void;
+  setTierPending: (v: SetArg<boolean>) => void;
   setDevTierOverride: (v: SetArg<UserMode | null>) => void;
 }
 
@@ -222,6 +227,7 @@ export const useUIStore = create<UIState>()(
       isPanning: false,
       userMode: "demo",
       authResolved: false,
+      tierPending: false,
       devTierOverride: null,
 
       setShowUpload: (v) => set((s) => ({ showUpload: resolveSet(v, s.showUpload) })),
@@ -290,6 +296,8 @@ export const useUIStore = create<UIState>()(
       setUserMode: (v) => set((s) => ({ userMode: resolveSet(v, s.userMode) })),
       setAuthResolved: (v) =>
         set((s) => ({ authResolved: resolveSet(v, s.authResolved) })),
+      setTierPending: (v) =>
+        set((s) => ({ tierPending: resolveSet(v, s.tierPending) })),
       setDevTierOverride: (v) =>
         set((s) => ({ devTierOverride: resolveSet(v, s.devTierOverride) })),
     }),
