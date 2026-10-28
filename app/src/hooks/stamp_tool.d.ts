@@ -175,6 +175,18 @@ declare module "stamp_tool" {
   ): Uint8Array;
 
   /**
+   * Stateless: PNG at `quality` (0..100). 100 is lossless; below it the colors
+   * are reduced (256 at 75+, halving every 25 points, floor 32) and the
+   * smaller of the reduced and lossless encodes is returned.
+   */
+  export function encode_png_pixels_quality(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    quality: number,
+  ): Uint8Array;
+
+  /**
    * Return value of `decode_png_to_rgba`: decoded pixels + dimensions out of
    * one wasm-bindgen call. Call `.free()` once you've read the fields you
    * need — it holds a boxed allocation on the wasm heap.
