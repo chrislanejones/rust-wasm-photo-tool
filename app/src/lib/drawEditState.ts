@@ -148,7 +148,7 @@ export function pendingShapeType(
 
 /**
  * What a rubber-band drag with `tool` draws: the Shapes tool's tile, the
- * Arrows & Shapes tool's diagram shape, or `null` for the line arrow (and for
+ * Arrows & Diagram Shapes tool's diagram shape, or `null` for the line arrow (and for
  * every tool that draws neither). One answer for the preview and mouse-up, so
  * the band and the shape that lands cannot disagree.
  */
