@@ -4,6 +4,21 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — tier pending leftovers (fix/tier-pending, 10-27-2026)
+
+- **Settings › Storage still flashes "Sign in with a Pro account"** while
+  `users.me` is in flight. StoragePane reads `me` directly through
+  SubscriptionButton (`tier === null`), not the user mode, so `tierPending`
+  does not reach it. SubscriptionButton already has `planLoading`; pass it down.
+- **Before Clerk loads, a signed-in user is "demo"** (`userMode` default). The
+  boot splash waits up to 1.2 s for `authResolved` and hides most of it, but a
+  slow Clerk can still show "12 max" before the skeleton. Not pending today:
+  logged-out users would get the skeleton too.
+- **OCR's Extract Text button is disabled (no lock) while pending**, then
+  enables. It never says "Paid plan" to a paid user now, but it is still a
+  disabled-then-enabled control. The AISettings "Checking your plan" toast has
+  no vitest of its own (the panel is heavy to mount).
+
 ## OPEN — PNG Compress leftovers (fix/png-export-size, 10-27-2026)
 
 - **No dithering.** Compress reduces a PNG to at most 256 colors without
@@ -334,7 +349,20 @@ secret. Push and PR runs are green, so only the weekly run shows it. Fix with a
 narrow allowlist entry for that one test path in `.gitleaks.toml`, plus the sk_
 control matrix the file's header asks for. Don't widen the rule.
 
-## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+## FIXED 10-27-2026 (fix/tier-pending) — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+`useRealTier()` now returns `undefined` while `users.me` has not answered, and
+the mode watcher (moved out of AppShell to `app/session/useUserMode.ts`) sets a
+`tierPending` flag in useUIStore for that stretch, capped at 10 s. The mode is
+still `loggedIn` meanwhile, so what each tier is ALLOWED is unchanged; the gates
+just stop announcing it. GalleryCount shows a `line` skeleton the width of the
+widest max (300 ms grace, no shift for a paid answer), the OCR upgrade note and
+lock wait, an AI press says "Checking your plan", the layer button never says
+"Layer limit reached", and a gallery add or duplicate that the lower cap would
+trim waits for the answer (`decideGalleryCap`). Red-first in
+`useUserMode.pending.test.tsx` (users.me 2 s late: "3 photos · 24 max" at
+100 ms before, never after). Demo mode pinned in vitest and e2e.
+
 
 Found surveying skeleton gaps for UI Night 16. `useRealTier()`
 (`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,

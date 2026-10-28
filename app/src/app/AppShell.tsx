@@ -45,7 +45,7 @@ import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { OpenRasterControls } from "@/components/ExportPane";
 import { downloadOraWithToast } from "@/lib/openraster";
 import { TopBar } from "@/components/TopBar";
-import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
+import { StatusBar, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
 import type { GeneralControls } from "@/components/GeneralPane";
@@ -86,6 +86,7 @@ import { usePhotoLimit } from "./session/useEngineGate";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { hasReplicateAI, TIERS } from "@/lib/tiers";
 import { useUserMode } from "./session/useUserMode";
+import { capMessage, decideGalleryCap } from "./session/tierPending";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
@@ -196,15 +197,6 @@ const TOOL_ACTION_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   arrow: { keys: "Ctrl+M", label: "move" },
   stamp: { keys: "Ctrl+]/[", label: "brush size" },
 };
-
-/** User-facing message when the gallery cap is reached, nudging toward the next tier. */
-function capMessage(mode: UserMode, max: number): string {
-  if (mode === "demo")
-    return `Demo galleries hold ${max} photos. Sign in to load up to 24.`;
-  if (mode === "loggedIn")
-    return `Free accounts hold ${max} photos. Pro (100) is coming soon.`;
-  return `Gallery is limited to ${max} photos.`;
-}
 
 
 /** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
@@ -371,7 +363,7 @@ export function AppShell() {
   const userMode = useUIStore((s) => s.userMode);
   const authResolved = useUIStore((s) => s.authResolved);
   // Who you are, and what you may see — app/session/useUserMode.ts.
-  const { effectiveUserMode, superUser } = useUserMode();
+  const { effectiveUserMode, tierRef, superUser } = useUserMode();
 
   // App-wide preferences (Settings → General), persisted to localStorage.
   const [prefs, applyPreferences] = usePreferences();
@@ -498,6 +490,7 @@ export function AppShell() {
     stamp,
     prefs,
     effectiveUserMode,
+    tierRef,
     savePhotoEdit,
     loadPhotoEdit,
     deletePhotoEdit,
@@ -633,15 +626,11 @@ export function AppShell() {
     if (activePhotoId && selectedIds.has(activePhotoId) && stamp.toolRef.current) {
       await savePhotoEdit(activePhotoId, stamp.toolRef);
     }
-    const room = Math.max(0, maxPhotos - photos.length);
-    if (room <= 0) {
-      toast.error(capMessage(effectiveUserMode, maxPhotos));
-      return;
-    }
+    const cap = await decideGalleryCap(tierRef, { mode: effectiveUserMode, max: maxPhotos }, photos.length + selectedIds.size);
+    const room = Math.max(0, cap.max - photos.length);
+    if (room <= 0) return void toast.error(capMessage(cap.mode, cap.max));
     const sources = photos.filter((p) => selectedIds.has(p.id)).slice(0, room);
-    if (sources.length < selectedIds.size) {
-      toast.error(capMessage(effectiveUserMode, maxPhotos));
-    }
+    if (sources.length < selectedIds.size) toast.error(capMessage(cap.mode, cap.max));
     const dups = sources.map((src) => ({
       srcId: src.id,
       entry: {
@@ -678,6 +667,7 @@ export function AppShell() {
     savePhotoEdit,
     duplicatePhotoEdit,
     effectiveUserMode,
+    tierRef,
     clearSelection,
   ]);
 

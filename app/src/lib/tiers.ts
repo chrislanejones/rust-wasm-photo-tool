@@ -96,13 +96,14 @@ export const hasReplicateAI = (mode: UserMode): boolean => TIERS[mode].replicate
  *  Two vocabularies exist for one concept: the server stores
  *  `"free" | "pro" | "team"` (convex/schema.ts) and the client gates on
  *  `"demo" | "loggedIn" | "paid"`. Nothing translated between them, which is
- *  how paid accounts ended up capped at free limits — see the fix at
- *  `AuthModeWatcher` in AppShell.
+ *  how paid accounts ended up capped at free limits — see the fix in
+ *  app/session/useUserMode.ts.
  *
- *  `null` means "signed in, tier not resolved yet" (the Convex query is in
- *  flight) and deliberately maps to `loggedIn`, NOT `paid`: erring toward the
- *  lower tier means a free user never sees a flash of paid features, and a paid
- *  user upgrades a tick later when the query lands. The query is reactive, so a
+ *  `undefined` ("not answered yet") deliberately maps to `loggedIn`, NOT
+ *  `paid`: what is ALLOWED while the tier is unknown is the lower tier, so a
+ *  free user never sees a flash of paid features. What the UI SHOWS meanwhile
+ *  is a separate flag, `tierPending` (useUIStore): gates read it and wait
+ *  instead of answering "free" to a paid user. The query is reactive, so a
  *  tier grant or upgrade flips the UI live with no reload. */
 export function userModeForTier(tier: string | null | undefined): UserMode {
   return tier === "pro" || tier === "team" ? "paid" : "loggedIn";
