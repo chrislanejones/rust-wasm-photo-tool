@@ -42,6 +42,8 @@ import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
 import { SyncPane } from "@/components/SyncPane";
 import { SharedPane } from "@/components/SharedPane";
+import { ConnectionsPane } from "@/components/ConnectionsPane";
+import { useMcpPreview } from "@/hooks/useMcpPreview";
 import { BetaPane } from "@/components/BetaPane";
 import { FeatureFlagsPanel } from "@/components/FeatureFlagsPanel";
 import type { ImageMeta } from "@/components/ImageMetaPanel";
@@ -83,6 +85,7 @@ export type SettingsTab =
   | "shared"
   | "export"
   | "plugins"
+  | "connections"
   | "beta"
   | "flags"
   | "image"
@@ -168,6 +171,7 @@ export function SubscriptionButton({
   // Labels come from the route table (features/routing) — one source, so the
   // pane the URL names and the tab the rail shows can't drift apart. Icons and
   // the super-user gate stay local.
+  const mcpPreview = useMcpPreview();
   const TAB_ICONS: Record<SettingsTab, typeof SlidersHorizontal> = {
     general: SlidersHorizontal,
     appearance: Palette,
@@ -177,6 +181,7 @@ export function SubscriptionButton({
     shared: Share2,
     export: Package,
     plugins: Puzzle,
+    connections: Share2,
     beta: Beaker,
     flags: Flag,
     image: ImageIcon,
@@ -192,6 +197,7 @@ export function SubscriptionButton({
     "security",
     "sync",
     "shared",
+    ...(mcpPreview ? (["connections"] as SettingsTab[]) : []),
     "export",
     "plugins",
     "storage",
@@ -399,6 +405,8 @@ export function SubscriptionButton({
             ) : tab === "flags" ? (
               /* Moved here from the Diagnostics window (10-14-2026). */
               <FeatureFlagsPanel active={open && tab === "flags"} />
+            ) : tab === "connections" ? (
+              <ConnectionsPane />
             ) : tab === "beta" ? (
               /* Switches commit as pressed (see BetaPane), so no Apply. */
               <BetaPane />

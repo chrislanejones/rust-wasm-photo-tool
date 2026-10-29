@@ -78,6 +78,19 @@ export interface FeatureFlag {
 
 export const FEATURE_FLAGS: FeatureFlag[] = [
   {
+    key: "ih_mcp_connector",
+    label: "MCP Connections preview",
+    kind: "optin",
+    isOn: () => rawFlagValue("ih_mcp_connector") === "1",
+    effect: "Shows the Connections setup preview. Does not authorize account access.",
+    source: "components/ConnectionsPane.tsx",
+    beta: {
+      id: "mcp-connector",
+      label: "MCP Connections preview",
+      blurb: "Preview AI app setup, account access boundaries and example prompts. Connections are not available yet.",
+    },
+  },
+  {
     key: "ih_oplog_undo",
     label: "Op-log undo",
     kind: "kill",

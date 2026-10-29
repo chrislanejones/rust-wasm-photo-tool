@@ -63,3 +63,7 @@ Only transport red → green ran for MCP. Do not describe security tests as pass
 Read this ADR, confirm the live instance and JWT format/claims, then resume implementation and security tests. Only after that: Chris enables CIMD (DCR only if needed), configures agreed default scopes, merges and deploys, enables Beta for himself, connects Claude, exercises reads/pause/palette, checks activity and verifies immediate kill-switch refusal. Repeat configuration after production cutover. No merge or deploy occurred tonight.
 
 V2 may accept an image into the user's Transfer inbox once 192 exists, then create a share from a supplied image. Neither grants access to browser-local gallery contents.
+
+## Follow-up: authorized Beta settings preview
+
+The follow-up request authorizes a Settings pane while gate 2 remains unresolved. The mcp-connector Beta now reveals Connections through its own hook, without changing AppShell. Three additions: connection readiness, an access-boundary summary, and copyable example prompts. The account switch remains disabled and unchecked; no local preference impersonates the future server-side mcpEnabled kill switch. No endpoint, server schema or authentication behavior was added. This supersedes the earlier statement that no pane exists on this branch.
