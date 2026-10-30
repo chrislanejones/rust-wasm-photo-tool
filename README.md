@@ -90,26 +90,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.41 — 2026-10-28
+### v9.42 — 2026-10-29
 
-**Resize a whole gallery in one pass.**
+**A first look at connecting AI apps to your account.**
 
-Batch has a Resize & Compress tile now. Pick a width or a long edge, a
-format, a quality and, if you want, a size to stay under, and every photo is
-done from its full-size original, one at a time, with a line for each that
-says what it was and what it is now: 3,970 KB → 248 KB. A photo that would
-come out bigger is left alone, and its row says so. Exceptions get their own
-size, so the portraits can go to 1080 while the rest go to 1600.
+Settings › Beta has a new switch, MCP Connections preview. Turn it on and
+Settings gets a Connections page: a checklist of what has to be true before
+Claude or Cursor can talk to your Image Horse account, a summary of what that
+access would cover, and three example prompts you can copy. It is a preview
+and nothing connects yet. The "Let AI apps use my account" switch is there
+but grayed out, because the sign-in check and the server side aren't built.
+If you're signed out, the page just tells you to sign in.
 
-The gallery bar has a Select menu to go with it: every portrait, every
-landscape, every square, everything over a size, everything edited or
-unedited, or the opposite of what's ticked. Download All has recipes:
-Instagram 1080×1350, Web 1600, Email small, or one you save yourself. A recipe
-only shapes the ZIP, so the photos in the gallery stay as they are, and a
-saved recipe follows you to your other devices when you're signed in.
-
-Also fixed: Create showed two Arrows & Diagram Shapes tiles. The second one was
-Select objects borrowing the Shapes panel. It has its own panel now.
+The plan behind it is written down: what an AI app would be able to reach
+(shares, your palette, text styles, export recipes, a backup summary) and
+what it never would (gallery photos, AI jobs, billing).
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.42",
+    date: "2026-10-29",
+    headline: "A first look at connecting AI apps to your account.",
+    entries: [
+      { tag: "feature", text: "Settings › Beta › MCP Connections preview adds a Connections page: a checklist of what has to be true before Claude or Cursor can use your account, what that access would cover, and three example prompts to copy. Nothing connects yet, and the account-access switch stays grayed out until sign-in checks are built." },
+      { tag: "infra", text: "The MCP plan is written down: what an AI app could reach (shares, palette, text styles, export recipes, a backup summary) and what it never would (gallery photos, AI jobs, billing)." },
+    ],
+  },
+  {
     version: "v9.41",
     date: "2026-10-28",
     headline: "Resize a whole gallery in one pass.",

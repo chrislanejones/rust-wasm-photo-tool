@@ -11755,3 +11755,21 @@ needs more than its 2048 px working copy; its history step reads "Resize", not
 "Batch Resize"; photos not on the canvas have no undo after a Batch Resize. All
 three are in `docs/PARKING_LOT.md`. imagehorse-qc is owed for the Batch and
 Export changes.
+
+
+## v9.42 Change Summary — 2026-10-29
+
+**A first look at connecting AI apps to your account.**
+
+| Area | Change |
+| --- | --- |
+| Settings › Beta (#418) | New **MCP Connections preview** switch (`mcp-connector` flag). Off by default, stored on the device, grants no account access. |
+| Settings › Connections (#418) | Appears only with the preview on. A readiness checklist, an account-access summary and three copyable example prompts. The "Let AI apps use my account" switch is shown disabled until sign-in verification and server enforcement exist. Recent activity says "unavailable", not an empty log. Signed-out visitors see sign-in guidance only. |
+| Plan (#418) | ADR-095 and `docs/MCP.md`: planned tools, what an AI app can and cannot reach, and the open gate (the live Clerk instance's OAuth token format is unverified). |
+| Transport spike (#418) | `convex/mcpSpike.test.ts` runs initialize → tools/list → tools/call through a test-only router. `@modelcontextprotocol/sdk` is a dev dependency; no MCP endpoint ships. |
+| Verification | CI on #418: tsc, lint (0 errors), unit tests, guardrails, both e2e shards (shard 2 re-run after the known text-placement-undo flake). |
+
+Not in this release: the MCP endpoint itself, OAuth sign-in, ownership checks,
+rate limits, a server kill switch and the activity log. All wait on gate 2 in
+ADR-095. No engine, canvas or tool change, so imagehorse-qc is not owed for
+this one.
