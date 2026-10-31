@@ -5,7 +5,6 @@ import { ShareViewer } from "@/components/ShareViewer";
 import { CommandPalette } from "@/features/commandPalette";
 import { RouteSync, SHARE_PARAM } from "@/features/routing";
 import { MovedNotice } from "@/features/hostMove";
-import { HalloweenBanner } from "@/features/halloween";
 import { SyncProvider } from "@/lib/sync";
 
 export default function App() {
@@ -36,9 +35,6 @@ export default function App() {
       {/* Retired Netlify address only: "we moved, download your library
           first". Renders nothing anywhere else; see features/hostMove. */}
       <MovedNotice />
-      {/* A small "Happy Halloween" garland, October 24–31 only; renders
-          nothing the rest of the year. See features/halloween. */}
-      <HalloweenBanner />
       {/* Keeps preferences, remembered UI choices and tool modes the same in
           every tab, and on every device the user is signed in on. Renders
           nothing; see lib/sync and ADR-061. Mounted here rather than in

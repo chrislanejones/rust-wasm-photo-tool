@@ -1,74 +1,128 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useBreakpoint } from "@/lib/useBreakpoint";
 import { isHalloweenSeason, readDismissed, writeDismissed } from "./season";
 
-const WORDS = ["HAPPY", "HALLOWEEN"];
+const MESSAGE = "HAPPY HALLOWEEN";
+/** Footprint along the cord, margins included (see `.halloween-flag*`). */
+const LETTER_PITCH = 24;
+const BLANK_PITCH = 16;
+const GAP_PITCH = 10;
+/** How far the middle of the cord hangs below its ends. */
+const SAG = 12;
 
 /**
- * A small "Happy Halloween" pennant garland — a pumpkin, a string of flags,
- * a bat — hung at the top of the editor during the last week of October.
+ * A small "Happy Halloween" pennant garland: a pumpkin, a string of flags and
+ * a bat, shown during the last week of October.
  *
- * Decoration only, so it stays out of the way: the garland ignores the
- * pointer (clicks fall through to whatever is under it), only the X takes a
- * click, and closing it is remembered for the rest of this year's season.
- * After October 31 it renders nothing, so no release has to take it down.
- * The sway is a CSS animation, which the reduce-motion setting and the OS
- * preference both stop (see `.halloween-garland` in styles.css).
+ * Two placements, one garland:
+ *  - `bar`: hangs under the editor's top bar and runs its full length. It is
+ *    a child of the bar's surface, so it follows the bar's width as the side
+ *    panels open and close, and it goes wherever the bar goes (the bar is not
+ *    drawn in the dock layout, so neither is this).
+ *  - `centered`: the start screen covers the top bar, so it carries its own
+ *    copy at the top of the page, just the words.
  *
- * Full desktop layout only. In the compact dock layout (≤ BP_COMPACT) the
- * side panel reaches the top of the window and the garland would hang across
- * its tool icons, so it simply does not show there.
+ * Decoration only: the garland ignores the pointer, only the X takes a click,
+ * and closing either copy closes both and is remembered for the rest of this
+ * year's season. After October 31 nothing renders, so no release has to take
+ * it down. The sway is a CSS animation that the reduce-motion setting and the
+ * OS preference both stop (see `.halloween-garland` in styles.css).
  */
-export function HalloweenBanner() {
-  const [now] = useState(() => new Date());
-  const [closed, setClosed] = useState(() => readDismissed(safeStorage(), now));
-  const { dock } = useBreakpoint();
-
-  if (closed || dock || !isHalloweenSeason(now)) return null;
-
-  const letters = WORDS.flatMap((w, wi) => [...(wi ? [" "] : []), ...w.split("")]);
-  const mid = (letters.length - 1) / 2;
+export function HalloweenBanner({ placement }: { placement: "bar" | "centered" }) {
+  const closed = useSyncExternalStore(subscribe, isClosed);
+  if (closed || !isHalloweenSeason(new Date())) return null;
 
   return (
-    <div className="halloween-banner" data-testid="halloween-banner">
+    <div className={`halloween-banner halloween-banner-${placement}`} data-testid={`halloween-banner-${placement}`}>
       <div className="halloween-garland" role="img" aria-label="Happy Halloween">
         <Pumpkin />
-        <div className="halloween-string" aria-hidden>
-          {letters.map((ch, i) => {
-            // The string sags: flags near the middle hang lower and the ones
-            // either side tilt toward it, like a real garland.
-            const t = (i - mid) / mid;
-            const drop = Math.round(10 * (1 - t * t));
-            const tilt = Math.round(-t * 8);
-            if (ch === " ") return <span key={i} className="halloween-gap" />;
-            return (
-              <span
-                key={i}
-                className={i % 2 ? "halloween-flag halloween-flag-purple" : "halloween-flag"}
-                style={{ transform: `translateY(${drop}px) rotate(${tilt}deg)` }}
-              >
-                {ch}
-              </span>
-            );
-          })}
-        </div>
+        <Pennants fill={placement === "bar"} />
         <Bat />
       </div>
-      <Button
-        size="xs"
-        className="halloween-close"
-        aria-label="Hide the Halloween banner"
-        onClick={() => {
-          writeDismissed(safeStorage(), now);
-          setClosed(true);
-        }}
-      >
+      <Button size="xs" className="halloween-close" aria-label="Hide the Halloween banner" onClick={close}>
         <X aria-hidden />
       </Button>
     </div>
   );
+}
+
+/**
+ * The flags on their cord. With `fill`, the cord takes all the width it is
+ * given and plain flags pad out both sides, so the message stays centered
+ * however long the bar is.
+ */
+function Pennants({ fill }: { fill: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!fill || !el) return;
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
+
+  // The message sits in the middle on bigger flags; with `fill`, smaller
+  // plain flags run out to both ends of whatever width the cord is given.
+  const message = [...MESSAGE];
+  const messageWidth = message.reduce((w, ch) => w + (ch === " " ? GAP_PITCH : LETTER_PITCH), 0);
+  const perSide = fill ? Math.max(0, Math.floor((width - messageWidth) / 2 / BLANK_PITCH)) : 0;
+  const items = [...Array<string>(perSide).fill(""), ...message, ...Array<string>(perSide).fill("")];
+
+  const pitch = (ch: string) => (ch === "" ? BLANK_PITCH : ch === " " ? GAP_PITCH : LETTER_PITCH);
+  const total = items.reduce((w, ch) => w + pitch(ch), 0);
+  let x = 0;
+  const flags = items.map((ch, i) => {
+    // The cord sags: flags near the middle hang lower and the ones either
+    // side tilt toward it, like a real garland.
+    const t = ((x + pitch(ch) / 2) / total) * 2 - 1;
+    x += pitch(ch);
+    const drop = Math.round(SAG * (1 - t * t));
+    const tilt = Math.round(-t * 8);
+    if (ch === " ") return <span key={i} className="halloween-gap" />;
+    const colour = i % 2 ? " halloween-flag-purple" : "";
+    return (
+      <span
+        key={i}
+        className={`halloween-flag${ch ? "" : " halloween-flag-blank"}${colour}`}
+        style={{ transform: `translateY(${drop}px) rotate(${tilt}deg)` }}
+      >
+        {ch}
+      </span>
+    );
+  });
+
+  return (
+    <div ref={ref} className={fill ? "halloween-string halloween-string-fill" : "halloween-string"} aria-hidden>
+      <svg className="halloween-cord" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden>
+        <path d={`M0 2 Q50 ${2 + SAG * 2} 100 2`} vectorEffect="non-scaling-stroke" />
+      </svg>
+      {flags}
+    </div>
+  );
+}
+
+// ── Closed state, shared by both copies ──────────────────────────────────────
+// Read once from storage; after that, closing either copy notifies the other.
+const listeners = new Set<() => void>();
+let closedNow: boolean | null = null;
+
+function isClosed(): boolean {
+  if (closedNow === null) closedNow = readDismissed(safeStorage(), new Date());
+  return closedNow;
+}
+
+function subscribe(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function close(): void {
+  writeDismissed(safeStorage(), new Date());
+  closedNow = true;
+  listeners.forEach((fn) => fn());
 }
 
 function safeStorage(): Storage | undefined {
