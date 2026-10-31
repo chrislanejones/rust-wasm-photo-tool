@@ -4,7 +4,17 @@
 // "it's just so much stuff on here"). Shut in the Text mode, open in the
 // Background mode, and a setting that is ON still shows in the shut header.
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, expect, it, vi } from "vitest";
+
+// Demo mode, whatever the checkout's .env.local says. lib/cloud.ts picks real
+// or inert Convex hooks once, at import, from the two keys; with keys set, the
+// panel's color grid (useUserColors) calls the real useConvexAuth and throws
+// for want of a provider. Hoisted so the keys are blank before that import.
+vi.hoisted(() => {
+  vi.stubEnv("VITE_CONVEX_URL", "");
+  vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
+});
+afterAll(() => vi.unstubAllEnvs());
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { useToolStore } from "@/stores/useToolStore";
