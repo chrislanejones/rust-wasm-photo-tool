@@ -37,6 +37,21 @@ Pick one name per row and change the header (the tile label is also the
 palette entry and the screen-reader name, and some e2e specs click by it).
 Out of the night's scope: the plan asked for the Arrows name only.
 
+## OPEN — tier pending leftovers (fix/tier-pending, 10-27-2026)
+
+- **Settings › Storage still flashes "Sign in with a Pro account"** while
+  `users.me` is in flight. StoragePane reads `me` directly through
+  SubscriptionButton (`tier === null`), not the user mode, so `tierPending`
+  does not reach it. SubscriptionButton already has `planLoading`; pass it down.
+- **Before Clerk loads, a signed-in user is "demo"** (`userMode` default). The
+  boot splash waits up to 1.2 s for `authResolved` and hides most of it, but a
+  slow Clerk can still show "12 max" before the skeleton. Not pending today:
+  logged-out users would get the skeleton too.
+- **OCR's Extract Text button is disabled (no lock) while pending**, then
+  enables. It never says "Paid plan" to a paid user now, but it is still a
+  disabled-then-enabled control. The AISettings "Checking your plan" toast has
+  no vitest of its own (the panel is heavy to mount).
+
 ## OPEN — PNG Compress leftovers (fix/png-export-size, 10-27-2026)
 
 - **No dithering.** Compress reduces a PNG to at most 256 colors without
@@ -211,6 +226,30 @@ measurement limits and reproduction commands are in the
   - An app build from before 10-23 reads a line-leader callout as a plain line
     and a pin (the leader does not follow there). Only matters with two app
     versions open on one photo; noted, not fixed.
+  - ~~e2e/text-placement-undo.spec.ts case 2 and callout-leader.spec.ts fail
+    on CI~~ **FIXED 10-31-2026.** Not the test: an undo then a quick redo on a
+    callout's label pushed a no-op third step (the leader moved back to the
+    undone label, then forward again), so the Ctrl+Z after the reload spent
+    itself on that and changed nothing. The label follow paired the Text
+    tool's list, a render behind the engine, with the engine's leader; it now
+    reads both from the engine (`followLabels`, hooks/usePinSteps.test.ts).
+    Reproduced 4 runs in 10 with Chrome's CPU slowed 8×; 0 in 20 after.
+    callout-leader's Align ▾ (alone) had the same extra step on master, 3
+    runs in 24 at 8×; 0 after the fix.
+    Left open:
+    - Both specs' `reloadAndResume` waits for `[aria-busy="true"]` to be
+      gone, but that attribute only exists on the per-photo panels (Resize,
+      Levels…). With Text, Pins or Shapes open nothing carries it, so the wait
+      passes at once and does not hold the undo press back from a photo still
+      loading. It was not the cause here (the press reached the engine every
+      time); a real "loaded" signal is still missing.
+    - A label move followed by an undo inside one engine round trip could
+      still have its follow land after the undo. Not seen; noted.
+    - Unexplained, 2 runs in 32 at 8× (one batch, after the fix; 0 in the
+      24 since, 0 on master in 24): callout-leader's Align ▾ test reached
+      the reload with a 6-op log instead of 10, and the Ctrl+Z after the
+      reload fell back to the flattened picture (all shapes gone) — the
+      ADR-093 hole. How the log got short is not known.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
   [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
@@ -376,7 +415,20 @@ secret. Push and PR runs are green, so only the weekly run shows it. Fix with a
 narrow allowlist entry for that one test path in `.gitleaks.toml`, plus the sk_
 control matrix the file's header asks for. Don't widen the rule.
 
-## OPEN — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+## FIXED 10-27-2026 (fix/tier-pending) — a signed-in user is "loggedIn" until the tier query lands (10-11-2026)
+
+`useRealTier()` now returns `undefined` while `users.me` has not answered, and
+the mode watcher (moved out of AppShell to `app/session/useUserMode.ts`) sets a
+`tierPending` flag in useUIStore for that stretch, capped at 10 s. The mode is
+still `loggedIn` meanwhile, so what each tier is ALLOWED is unchanged; the gates
+just stop announcing it. GalleryCount shows a `line` skeleton the width of the
+widest max (300 ms grace, no shift for a paid answer), the OCR upgrade note and
+lock wait, an AI press says "Checking your plan", the layer button never says
+"Layer limit reached", and a gallery add or duplicate that the lower cap would
+trim waits for the answer (`decideGalleryCap`). Red-first in
+`useUserMode.pending.test.tsx` (users.me 2 s late: "3 photos · 24 max" at
+100 ms before, never after). Demo mode pinned in vitest and e2e.
+
 
 Found surveying skeleton gaps for UI Night 16. `useRealTier()`
 (`app/src/hooks/useStoreUser.ts`) returns `null` while `users.me` is in flight,
@@ -560,7 +612,20 @@ Two follow-ups that were deliberately left out of that session's diff:
   sitting on a host nothing builds from. Confirm it is set on Vercel, then
   delete it there; rotating it is the safer call.
 
-## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+## FIXED 10-27-2026 (fix/batch-crop-full-res) — Batch › Crop (#267): two review findings (09-29-2026)
+
+Both rows below are fixed; `e2e/batch-crop-full-res.spec.ts` was red on master for each, green after.
+
+- **Row 1:** the engine exports `history_node()` (also on `capture_ui_state`): the identity of the live
+  history state, carried through undo/redo, new for every new edit. `activeCrop` records the state the
+  crop made and the state it was applied to, each with the document revision (a load or restore
+  rebuilds history). Re-apply rewinds only when the live state IS the crop's, checks it landed on the
+  pre-crop state, and puts the steps back if not. Otherwise it crops what is on screen. The preview
+  frame uses the same test. Crop → undo → paint → re-apply now keeps the stroke and adds one Crop.
+- **Row 2:** the non-active pass decodes the stored original at full resolution and reads out only the
+  crop region (`decodeRegion`), one photo at a time, then writes the new original and sets
+  `origWidth`/`origHeight` to it. Two 4000×3000 photos at 1:1 Keep come out 3000×3000 (were 1536×1536).
+- **Still open, not part of either row:** see "Batch › Crop leftovers after the full-res fix (10-27-2026)".
 
 CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
 
@@ -568,6 +633,16 @@ CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
 | --- | --- | --- |
 | 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
 | 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
+## OPEN — Batch › Crop leftovers after the full-res fix (10-27-2026)
+
+Found doing fix/batch-crop-full-res; not in its scope.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **The open photo is still cropped at working resolution.** It lives in the engine as the ≤2048 working copy (every load goes through `makeWorkingCopy`), so 1:1 Keep on an open 4000×3000 photo gives 1536×1536 while the other photos now give 3000×3000. Fixing it means a full-resolution engine document or cropping the stored original beside the undo step; both are design calls. | `CropBatchPanel.tsx` active pass |
+| 2 | **Re-apply's crop identity does not survive a photo switch.** Switching away and back rebuilds the engine history, so the recorded state can never match and re-apply crops what is on screen. The old count check happened to rewind correctly there (and wrongly after crop → undo → edit). Carrying identity across a reload would need it persisted with the edit, which is a storage change. | `activeCrop` in `useBatchCropStore` |
+| 3 | `cropRgba` (`lib/batchCrop.ts`) has no caller left outside its own test. | `lib/batchCrop.ts` |
 
 ## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
 
@@ -801,7 +876,27 @@ not. `ToolButtonOption.active` already solved this for `ToolButtonGroup`
 probably the same one-line pattern here. It touches every pane, so it wants its
 own PR and a screen-reader check, not a ride-along.
 
-## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+## CLOSED 10-27-2026 — NOT REPRODUCED: Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Night 10-27 (`fix/alt-e-download-revoke`) measured it first, on the unchanged
+v9.39 tree (`0b627bb9`), production build, chromium, one worker:
+
+| Run | Throttle | Before (immediate revoke) | After (revoke 40 s later) |
+|---|---|---|---|
+| Raw flow: paste → canvas → 1 s → Alt+E | 1× CPU | 0 misses of 30 | 0 misses of 30 |
+| Raw flow | 4× CPU | 0 misses of 30 | 0 misses of 30 |
+| `pasted-export-name.spec.ts --repeat-each 20` | 1× CPU | 60 of 60 passed | 60 of 60 passed |
+
+The "Failed to load Clerk" page error that every 09-22 miss coincided with did
+not occur in any run today (0 page errors in 120 raw-flow runs), so whatever
+caused the miss went with the harness condition, not with a code change. The
+revoke was NOT shown to be the cause and this is not marked FIXED. Every
+download in the app now revokes its object URL 40 s after the click
+(`lib/revokeObjectUrlLater.ts`, FileSaver.js's delay) as a defensive change for
+engines the harness never runs. Reopen if a miss comes back, and record the page
+errors of the run that missed.
+
+Original note (09-22-2026, kept for the reasoning):
 
 Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
 against the master build and the branch build, same machine and hour:

@@ -1,20 +1,24 @@
 import { useEffect, useRef } from "react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useCloudAuth, useCloudMutation, useCloudQuery } from "@/lib/cloud";
 import { api } from "../../../convex/_generated/api";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 
 /**
- * The signed-in user's REAL tier from their Convex users row (null while
- * logged out / loading). This is what lifts the client's user mode to "paid"
- * for actual pro/team accounts — without it, tier gating (the AI panel, caps)
- * only ever saw "loggedIn" and paid features stayed locked in the UI even
- * though the server would have allowed them. Reactive: a tier grant or
- * upgrade flips the UI live, no reload.
+ * The signed-in user's REAL tier from their Convex users row. This is what
+ * lifts the client's user mode to "paid" for actual pro/team accounts —
+ * without it, tier gating (the AI panel, caps) only ever saw "loggedIn" and
+ * paid features stayed locked in the UI even though the server would have
+ * allowed them. Reactive: a tier grant or upgrade flips the UI live, no reload.
+ *
+ * `undefined` means NOT ANSWERED YET: Convex auth is still connecting, or
+ * `users.me` is in flight. `null` is an answer (no row, or no tier on it).
+ * The two used to be one `null`, which is how a paid user read as free for
+ * the length of the query (app/session/useUserMode.ts, "tier pending").
  */
-export function useRealTier(): string | null {
-  const { isAuthenticated } = useConvexAuth();
-  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
-  return me?.tier ?? null;
+export function useRealTier(): string | null | undefined {
+  const { isAuthenticated } = useCloudAuth();
+  const me = useCloudQuery(api.users.me, isAuthenticated ? {} : "skip");
+  return me === undefined ? undefined : (me?.tier ?? null);
 }
 
 /**
@@ -26,8 +30,8 @@ export function useRealTier(): string | null {
  * row, so tier / subscription / AI-gating have nothing to read.
  */
 export function useStoreUser() {
-  const { isAuthenticated } = useConvexAuth();
-  const upsert = useMutation(api.users.upsert);
+  const { isAuthenticated } = useCloudAuth();
+  const upsert = useCloudMutation(api.users.upsert);
   const stored = useRef(false);
 
   useEffect(() => {

@@ -24,6 +24,7 @@
 import { useCallback, useMemo } from "react";
 import { encodeRgba, extFromMime } from "@/lib/exportImage";
 import type { EngineCore } from "./useEngineCore";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 export function useExport(engine: EngineCore) {
   // No `canvasRef` and no `flushToCanvas`: this hook no longer touches the
@@ -50,7 +51,7 @@ export function useExport(engine: EngineCore) {
     a.href = url;
     a.download = revisedName(sourceName, ".png");
     a.click();
-    URL.revokeObjectURL(url);
+    revokeObjectUrlLater(url);
   }, [toolRef]);
 
   // Return the encoded export bytes as a Blob (no download). Lets callers
@@ -112,7 +113,7 @@ export function useExport(engine: EngineCore) {
       const ext = blob.type ? extFromMime(blob.type) : extMap[format];
       a.download = revisedName(sourceName, ext || extMap[format]);
       a.click();
-      URL.revokeObjectURL(url);
+      revokeObjectUrlLater(url);
     },
     [exportPng, exportBlob],
   );

@@ -46,6 +46,7 @@ import { reselectMultiProps } from "./reselectMulti";
 import type { SelectionCombineMode } from "@/lib/selectionBool";
 import { describeCoverage } from "@/lib/selectionCoverage";
 import { TIERS } from "@/lib/tiers";
+import { useUIStore } from "@/stores/useUIStore";
 import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
 import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
@@ -272,6 +273,7 @@ export function ReviewPanel({
 
   // Per-tier layer allowance. 0 → feature locked (must log in / upgrade).
   const layerLimit = TIERS[userMode].layersPerImage;
+  const tierPending = useUIStore((s) => s.tierPending); // limit holds, unannounced (useUserMode)
   const layersUnlocked = layerLimit > 0;
   const canAddLayer = layersUnlocked && layers.length < layerLimit;
   // Render top → bottom (the array is bottom → top), the way every editor shows it.
@@ -495,9 +497,7 @@ export function ReviewPanel({
               <div className="ml-auto flex items-center gap-1.5">
                 {/* Actual layer count (consistent with History/Reselect counts);
                     the per-tier allowance lives in the tooltip. */}
-                <TinyNumberBox
-                  title={`${layers.length} layer${layers.length === 1 ? "" : "s"} · limit ${TIERS[userMode].layersLabel}`}
-                >
+                <TinyNumberBox title={`${layers.length} layer${layers.length === 1 ? "" : "s"}${tierPending ? "" : ` · limit ${TIERS[userMode].layersLabel}`}`}>
                   {layers.length}
                 </TinyNumberBox>
                 {/* v8.38 — the signpost to where the mask buttons went: the
@@ -529,7 +529,7 @@ export function ReviewPanel({
                       ? "Layers require a logged-in or paid account"
                       : canAddLayer
                         ? "Add layer"
-                        : `Layer limit reached (${TIERS[userMode].layersLabel})`
+                        : tierPending ? "Checking your plan…" : `Layer limit reached (${TIERS[userMode].layersLabel})`
                   }
                 >
                   <Plus className="h-3.5 w-3.5" />

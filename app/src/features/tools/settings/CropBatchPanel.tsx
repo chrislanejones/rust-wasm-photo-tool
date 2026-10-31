@@ -23,15 +23,15 @@ import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { registerExtraRootProvider } from "@/lib/extraRoots";
 import {
-  makeWorkingCopy,
+  decodeRegion,
   makeThumbnail,
   makeThumbnailFromPixels,
+  workingSize,
 } from "@/lib/workingCopy";
 import {
   BATCH_CROP_RATIOS,
   anchoredCropRect,
   batchCropOutputSize,
-  cropRgba,
   framedCropRect,
   ratioLabel,
   type BatchCropWidth,
@@ -42,9 +42,12 @@ import { rebaseOnOriginalCrop } from "@/lib/svgPassthrough";
 import {
   useBatchCropStore,
   showsOriginalFraming,
+  isLiveCrop,
+  isPreCrop,
   cropRatioOf,
   framingFor,
   type BatchCropWidthId,
+  type HistoryPosition,
 } from "@/stores/useBatchCropStore";
 import { groupOf } from "@/stores/useBatchGroupStore";
 import { useBatchGroups } from "./useBatchGroups";
@@ -131,9 +134,11 @@ export function CropBatchPanel({
   //
   // The active photo can't be reset from a baseline — `load_image` only takes
   // pixels at the document's CURRENT size, and a crop changed that size. So we
-  // remember how many undo steps our last crop pushed and the undo count it
-  // left behind (`activeCrop`); if nothing has happened since, re-apply rewinds
-  // those steps first. If the user has edited since, we crop what they see.
+  // remember how many undo steps our last crop pushed and WHICH history state
+  // it left behind (`activeCrop`, by the engine's `history_node`, not the undo
+  // count); if that state is still the live one, re-apply rewinds those steps
+  // first. Anything else — edited since, undone and edited, or the photo
+  // reloaded — and we crop what they see.
   const baselineKeys = () => Object.values(useBatchCropStore.getState().baselines);
 
   // Baselines live in a store and in no manifest — declared as GC roots,
@@ -190,8 +195,11 @@ export function CropBatchPanel({
       let done = 0;
       let succeeded = 0;
 
-      // First pass: every non-active photo — crop in JS, scale + encode in
-      // Rust, write back to IDB.
+      // First pass: every non-active photo, cropped from its stored ORIGINAL
+      // at full resolution (the ≤2048 working copy capped "Keep"), scaled +
+      // encoded in Rust, written back as the photo's new original. One photo
+      // at a time, start to finish: nothing decoded outlives its iteration,
+      // so a batch of 24 MP photos holds one region, never all of them.
       const others = photos.filter((p) => p.id !== activePhotoId);
       for (const photo of others) {
         try {
@@ -206,13 +214,15 @@ export function CropBatchPanel({
           const file = new File([original.bytes], original.name, {
             type: original.mimeType,
           });
-          const working = await makeWorkingCopy(file);
 
-          // Always the baseline's pixels, so a framing always applies.
-          const rect = rectFor(photo.id, working.width, working.height, true);
+          // Always the baseline's pixels, so a framing always applies. Only
+          // the crop is read out of the decode.
+          const { pixels: region, rect, srcWidth, srcHeight } = await decodeRegion(file, (w, h) =>
+            rectFor(photo.id, w, h, true),
+          );
           const { ratio, targetWidth } = lookOf(photo.id);
           const out = batchCropOutputSize(rect, ratio, targetWidth);
-          let pixels = cropRgba(working.pixels, working.width, rect);
+          let pixels = new Uint8Array(region.buffer, region.byteOffset, region.byteLength);
           if (out.width !== rect.width || out.height !== rect.height) {
             pixels = resize_pixels(
               pixels,
@@ -251,18 +261,26 @@ export function CropBatchPanel({
 
           // An SVG's stored original just became this crop — move its
           // vector frame the same way (lib/svgPassthrough).
+          // Its frame is measured on the working copy (imageW × imageH), so
+          // the full-res rect is scaled onto it; the new base is the size
+          // the new original opens at.
+          const working = workingSize(out.width, out.height);
           const svg = useSvgSourceStore.getState().sources[photo.id];
           if (svg) {
+            const sx = svg.imageW / srcWidth;
+            const sy = svg.imageH / srcHeight;
             useSvgSourceStore.getState().setSource(
               photo.id,
               rebaseOnOriginalCrop(
                 svg,
-                { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
-                out.width,
-                out.height,
+                { x: rect.x * sx, y: rect.y * sy, w: rect.width * sx, h: rect.height * sy },
+                working.width,
+                working.height,
               ),
             );
           }
+          // The stored original IS the crop now, so its size is the photo's
+          // size (what the gallery shows), like an Apply Resize writes it.
           setPhotos((prev) =>
             prev.map((x) =>
               x.id !== photo.id
@@ -273,8 +291,10 @@ export function CropBatchPanel({
                     byteSize: pngBlob.size,
                     originalKey: newKey,
                     thumbBlob: newThumb,
-                    workingWidth: out.width,
-                    workingHeight: out.height,
+                    origWidth: out.width,
+                    origHeight: out.height,
+                    workingWidth: working.width,
+                    workingHeight: working.height,
                   },
             ),
           );
@@ -300,17 +320,30 @@ export function CropBatchPanel({
         try {
           const tool = stampToolRef.current;
           if (tool) {
+            // Where history stands, by identity — see ActiveCrop.
+            const position = async (): Promise<HistoryPosition> => ({
+              node: await tool.history_node(),
+              revision: useGalleryStore.getState().documentRevision,
+            });
             const prior = crops.activeCrop[active.id];
-            if (prior && (await tool.undo_count()) === prior.undoCount) {
-              for (let i = 0; i < prior.steps; i++) await tool.undo();
+            if (prior && isLiveCrop(crops, active.id, await position())) {
+              let undone = 0;
+              for (let i = 0; i < prior.steps; i++) if (await tool.undo()) undone++;
+              // The rewind must land on the state the crop was applied to.
+              // If it did not (a step under it was deleted from the History
+              // panel), put everything back and crop what is on screen.
+              if (!isPreCrop(crops, active.id, await position())) {
+                for (let i = 0; i < undone; i++) await tool.redo();
+              }
             }
             // Only replay a hand framing on the pixels it was drawn on.
             const onOriginal = showsOriginalFraming(
               useBatchCropStore.getState(),
               active.id,
               active.originalKey,
-              await tool.undo_count(),
+              await position(),
             );
+            const before = await position();
             // Crop the PHOTO, not the padded artboard around it.
             const b = await tool.photo_bounds();
             const [bx, by, bw, bh] =
@@ -326,10 +359,7 @@ export function CropBatchPanel({
               tool.resize_with_filter(out.width, out.height, LANCZOS3);
               steps = 2;
             }
-            crops.setActiveCrop(active.id, {
-              undoCount: await tool.undo_count(),
-              steps,
-            });
+            crops.setActiveCrop(active.id, { after: await position(), before, steps });
             flushToCanvas();
             syncState();
             succeeded++;

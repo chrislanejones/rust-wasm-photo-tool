@@ -221,10 +221,13 @@ export default tseslint.config(
     // app/session/useReselectPick.ts, which also retargets Perspective.
     // 3254 -> 3225 (Night 10-22): Reselect's text delete moved to the Text
     // tool (`deleteAnnotation`, which also takes a callout's pin and leader).
-    // 3225 -> 3202 (text stroke): the two copies of the canvas's text-settings
+    // 3225 -> 3151 (Night 10-27, tier pending): the Clerk mode watcher and the
+    // "who you are" block moved to app/session/useUserMode.ts, and the two
+    // copies of the gallery cap message became one in tierPending.ts.
+    // 3151 -> 3128 (text stroke): the two copies of the canvas's text-settings
     // object became one `textOverlaySettings(toolSettings)` (lib/textOverlaySettings.ts).
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3202 }] },
+    rules: { "max-lines": ["error", { max: 3128 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

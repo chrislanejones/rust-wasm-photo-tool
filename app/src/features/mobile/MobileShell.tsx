@@ -39,6 +39,7 @@ import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { useThumbImage } from "@/features/gallery/useThumbImage";
 import { GalleryLoadingRegion } from "@/features/gallery/GalleryLoadingRegion";
 import { useGalleryLoading, useGalleryTile } from "@/features/gallery/useGalleryLoading";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -219,7 +220,7 @@ function MobileViewer({
       // file gets it back from the stored MIME — otherwise it has no type.
       a.download = `${photo.name}${extFromMime(stored.mimeType)}`;
       a.click();
-      URL.revokeObjectURL(url);
+      revokeObjectUrlLater(url);
     } catch {
       toast.error("Couldn't save this image");
     } finally {

@@ -20,6 +20,7 @@ import { collectDeletedPhotoOriginals } from "@/lib/originalRefs";
 import { collectExtraRoots } from "@/lib/extraRoots";
 import { useUIStore } from "@/stores/useUIStore";
 import { toast } from "@/components/ui/sonner";
+import { capMessage, decideGalleryCap, type TierRef } from "./tierPending";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { putOriginal, getOriginal } from "@/lib/dexie/originalsAdapter";
 import { makeWorkingCopy, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
@@ -128,19 +129,11 @@ export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): nu
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
 
-/** User-facing message when the gallery cap is reached, nudging toward the next tier. */
-function capMessage(mode: UserMode, max: number): string {
-  if (mode === "demo")
-    return `Demo galleries hold ${max} photos. Sign in to load up to 24.`;
-  if (mode === "loggedIn")
-    return `Free accounts hold ${max} photos. Pro (100) is coming soon.`;
-  return `Gallery is limited to ${max} photos.`;
-}
-
 export function useImageSession({
   stamp,
   prefs,
   effectiveUserMode,
+  tierRef,
   savePhotoEdit,
   loadPhotoEdit,
   deletePhotoEdit,
@@ -148,6 +141,7 @@ export function useImageSession({
   stamp: ReturnType<typeof useCloneStamp>;
   prefs: Preferences;
   effectiveUserMode: UserMode;
+  tierRef: TierRef;
   savePhotoEdit: EditPersistence["savePhotoEdit"];
   loadPhotoEdit: EditPersistence["loadPhotoEdit"];
   deletePhotoEdit: EditPersistence["deletePhotoEdit"];
@@ -466,14 +460,16 @@ export function useImageSession({
       // ── Tier cap ─────────────────────────────────────────────────────────
       // Enforce the per-tier gallery limit (from Rust `photo_limit`). Accept
       // as many as fit, then notify if the batch was trimmed or already full.
-      const remaining = Math.max(0, maxPhotos - photos.length);
+      // A pending tier is never the one that refuses (useUserMode.ts).
+      const cap = await decideGalleryCap(tierRef, { mode: effectiveUserMode, max: maxPhotos }, photos.length + files.length);
+      const remaining = Math.max(0, cap.max - photos.length);
       if (remaining <= 0) {
-        toast.error(capMessage(effectiveUserMode, maxPhotos));
+        toast.error(capMessage(cap.mode, cap.max));
         return;
       }
       const accepted = files.length > remaining ? files.slice(0, remaining) : files;
       if (files.length > remaining) {
-        toast.error(capMessage(effectiveUserMode, maxPhotos));
+        toast.error(capMessage(cap.mode, cap.max));
       }
 
       // `layerRevision` included for the same reason as the autosave effect:
@@ -623,7 +619,7 @@ export function useImageSession({
         }
       }
     },
-    [activePhotoId, hasBeenModified, layerRevision, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
+    [activePhotoId, hasBeenModified, layerRevision, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, tierRef, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
   // ── Put a photo INTO the engine ────────────────────────────────────────────

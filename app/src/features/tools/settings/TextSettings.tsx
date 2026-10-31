@@ -166,6 +166,9 @@ export function TextSettings({
   // OCR uploads the image — not offered while "Everything in your browser" is
   // on (useAIJob refuses it too).
   const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  // Signed in, tier not answered yet: say nothing about plans until it is
+  // (app/session/useUserMode.ts). The button stays off — not yet, not "no".
+  const tierPending = useUIStore((s) => s.tierPending);
   const canRunOcr =
     aiEnabled && onlineFeaturesEnabled && !!activePhotoId && !!stampToolRef.current;
 
@@ -501,7 +504,7 @@ export function TextSettings({
             {!onlineFeaturesEnabled && (
               <OnlineFeaturesOffNotice what="OCR sends the image to a server to read the text." />
             )}
-            {onlineFeaturesEnabled && !aiEnabled && (
+            {onlineFeaturesEnabled && !aiEnabled && !tierPending && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
                 <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
                 <p className="text-2xs text-warning/90">
@@ -518,7 +521,7 @@ export function TextSettings({
               disabled={!canRunOcr || ocrBusy}
               className="w-full"
             >
-              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
+              {!aiEnabled && !tierPending && <Lock className="h-3.5 w-3.5" />}
               {ocrBusy && <Spinner size={14} />}
               {ocrPhase === "uploading"
                 ? "Uploading..."

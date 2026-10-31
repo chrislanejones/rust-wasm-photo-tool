@@ -6,7 +6,7 @@ import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
-import { removeText, rerouteCallouts } from "@/hooks/usePinSteps";
+import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
 import { textStrokeEngineArgs } from "@/lib/textOverlaySettings";
 
@@ -148,7 +148,8 @@ export function useTextTool({
   }, [toolRef]);
 
   // A Smart Callout's label that moved (or re-sized with its text) redraws
-  // its leader (lib/callouts.ts). The bump re-reads both lists everywhere.
+  // its leader (lib/callouts.ts), against the engine's lists, not this one.
+  // The bump re-reads both lists everywhere.
   const prevAnnotations = useRef(annotations);
   useEffect(() => {
     const before = prevAnnotations.current;
@@ -156,8 +157,7 @@ export function useTextTool({
     const tool = toolRef.current;
     if (!tool || before === annotations || !before.length) return;
     void (async () => {
-      const shapes = JSON.parse(await tool.get_shape_annotations());
-      if (!(await rerouteCallouts(tool, { shapes, texts: before }, { shapes, texts: annotations }))) return;
+      if (!(await followLabels(tool, before))) return;
       flushToCanvas();
       useAnnotationStore.getState().bumpAnnotations();
     })();

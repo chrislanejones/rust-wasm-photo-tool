@@ -46,6 +46,59 @@ export interface WorkingCopy {
   origHeight: number;
 }
 
+/** The size `makeWorkingCopy` gives a `w × h` image: unchanged when it fits,
+ *  else scaled so the long edge is `maxEdge`. */
+export function workingSize(
+  w: number,
+  h: number,
+  maxEdge = WORKING_MAX_EDGE,
+): { width: number; height: number } {
+  const longEdge = Math.max(w, h);
+  if (longEdge <= maxEdge) return { width: w, height: h };
+  const scale = maxEdge / longEdge;
+  return { width: Math.round(w * scale), height: Math.round(h * scale) };
+}
+
+/** A region decoded at the source's FULL resolution — see `decodeRegion`. */
+export interface DecodedRegion {
+  pixels: Uint8ClampedArray;
+  rect: { x: number; y: number; width: number; height: number };
+  /** The whole source's size, as decoded (EXIF orientation applied). */
+  srcWidth: number;
+  srcHeight: number;
+}
+
+/**
+ * Decode `file` at full resolution and keep only the part `pick` chooses from
+ * its size. Only that region is ever read out as RGBA: a 24 MP photo cropped
+ * 1:1 costs one 16 MP buffer here, not a 24 MP one plus the 16 MP crop. The
+ * decoded bitmap is closed before this returns, so a caller looping over a
+ * batch holds one photo at a time (Batch › Crop, PARKING_LOT 09-29-2026).
+ *
+ * `pick` must return a rect inside `w × h`.
+ */
+export async function decodeRegion(
+  file: File,
+  pick: (w: number, h: number) => { x: number; y: number; width: number; height: number },
+): Promise<DecodedRegion> {
+  const bitmap = await createImageBitmap(file);
+  assertWithinPixelBudget(bitmap);
+  const srcWidth = bitmap.width;
+  const srcHeight = bitmap.height;
+  try {
+    const rect = pick(srcWidth, srcHeight);
+    const oc = new OffscreenCanvas(rect.width, rect.height);
+    const ctx = oc.getContext("2d", { willReadFrequently: true })!;
+    // A straight copy of source pixels (same size in and out), so no
+    // resampling happens here — the scale, if any, is the engine's.
+    ctx.drawImage(bitmap, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+    const { data } = ctx.getImageData(0, 0, rect.width, rect.height);
+    return { pixels: data, rect, srcWidth, srcHeight };
+  } finally {
+    bitmap.close();
+  }
+}
+
 /**
  * Decode a File and downscale to working resolution (≤ maxEdge on the long edge).
  * Returns native size if the image is already within bounds.
@@ -58,14 +111,7 @@ export async function makeWorkingCopy(
   assertWithinPixelBudget(probe);
   const origWidth = probe.width;
   const origHeight = probe.height;
-  const longEdge = Math.max(origWidth, origHeight);
-  let targetW = origWidth;
-  let targetH = origHeight;
-  if (longEdge > maxEdge) {
-    const scale = maxEdge / longEdge;
-    targetW = Math.round(origWidth * scale);
-    targetH = Math.round(origHeight * scale);
-  }
+  const { width: targetW, height: targetH } = workingSize(origWidth, origHeight, maxEdge);
 
   let bitmap: ImageBitmap;
   if (targetW === origWidth) {

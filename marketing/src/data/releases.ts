@@ -24,6 +24,28 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.45",
+    date: "2026-10-31",
+    headline: "Undo after a callout label move does what it says.",
+    entries: [
+      { tag: "fix", text: "Undo then a quick redo on a callout label no longer saves an empty extra step, so the next Ctrl+Z after a reload actually undoes something." },
+      { tag: "fix", text: "A moved label's leader line follows the engine's copy of the label, not the Text tool's copy that runs a moment behind." },
+      { tag: "infra", text: "The text-placement-undo test stopped flaking: 4 bad runs in 10 with the browser slowed 8×, 0 in 20 after." },
+    ],
+  },
+  {
+    version: "v9.44",
+    date: "2026-10-30",
+    headline: "Batch Crop keeps full size, paid plans stop looking free, and downloads get more time.",
+    entries: [
+      { tag: "fix", text: "Batch › Crop crops photos you don't have open from their full-size original, so 1:1 Keep on a 4000×3000 photo gives 3000×3000 instead of 1536×1536, and the gallery shows the real size." },
+      { tag: "fix", text: "Re-applying a Batch crop after undo and a new edit keeps that edit. The crop is tracked by its history step, not by counting undos." },
+      { tag: "rust", text: "The engine names its live history step (history_node), read-only. +283 B, no change to the saved edit format." },
+      { tag: "fix", text: "Paid users no longer see free-plan limits while their plan loads after sign-in: no \"24 max\", no OCR Paid-plan note, no \"Layer limit reached\"." },
+      { tag: "fix", text: "Downloads keep their file link for 40 seconds after the click, so Safari and Firefox can't miss one." },
+    ],
+  },
+  {
     version: "v9.43",
     date: "2026-10-30",
     headline: "Housekeeping: the lint check now covers the Trail Log scripts.",

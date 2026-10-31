@@ -581,6 +581,19 @@ impl ImageHorseTool {
         self.hist.branch_count()
     }
 
+    /// Identity of the LIVE document state ([`Snapshot::node`]): the same
+    /// number however many times undo and redo leave and come back to it, and
+    /// a new one for every new edit. Undo depth cannot tell "crop, undo, paint"
+    /// from "crop" (both land on the same count); this can. Read-only.
+    ///
+    /// Only meaningful within one engine document: a load or a session restore
+    /// rebuilds the history, so a caller that keeps one across a load must pair
+    /// it with its own load marker. `f64` so it crosses to JS as a plain number
+    /// (exact far past any session's edit count), not a `BigInt`.
+    pub fn history_node(&self) -> f64 {
+        self.hist.current_node() as f64
+    }
+
     /// The branch list for the History panel, newest first:
     /// `[{"id":3,"label":"Crop","steps":4,"bytes":50331648,"nested":false}]`.
     ///
@@ -1069,5 +1082,57 @@ mod branch_budget_tests {
         h.set_forks(false);
         assert_eq!(h.branch_count(), 0);
         assert!(!h.forks);
+    }
+}
+
+#[cfg(test)]
+mod history_node_tests {
+    use crate::ImageHorseTool;
+
+    fn tool() -> ImageHorseTool {
+        let mut t = ImageHorseTool::new(40, 20);
+        t.load_image(&[200u8; 40 * 20 * 4]);
+        t
+    }
+
+    /// Batch › Crop's re-apply (PARKING_LOT 09-29-2026): crop, undo, one new
+    /// edit lands on the same undo COUNT as the crop did. The node must not
+    /// match, or re-apply rewinds the new edit instead of the crop.
+    #[test]
+    fn a_new_edit_after_undo_is_a_new_node_at_the_same_depth() {
+        let mut t = tool();
+        let before = t.history_node();
+        t.crop(0, 0, 20, 20);
+        let cropped = t.history_node();
+        let depth = t.undo_count();
+        assert_ne!(cropped, before, "the crop is a new state");
+
+        assert!(t.undo());
+        assert_eq!(
+            t.history_node(),
+            before,
+            "undo lands back on the pre-crop state"
+        );
+
+        t.resize(30, 10);
+        assert_eq!(t.undo_count(), depth, "setup: the count matches again");
+        assert_ne!(t.history_node(), cropped, "…but it is not the crop's state");
+        assert_ne!(
+            t.history_node(),
+            before,
+            "…and not the pre-crop state either"
+        );
+    }
+
+    /// The case re-apply must still recognize: leaving the crop's state and
+    /// coming back to it by redo is the SAME state.
+    #[test]
+    fn undo_then_redo_returns_to_the_same_node() {
+        let mut t = tool();
+        t.crop(0, 0, 20, 20);
+        let cropped = t.history_node();
+        assert!(t.undo());
+        assert!(t.redo());
+        assert_eq!(t.history_node(), cropped);
     }
 }

@@ -168,6 +168,9 @@ export function AISettings({
   // Background and object removal upload the image — not offered while the
   // "Everything in your browser" switch is on (useAIJob refuses them too).
   const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  // Signed in, tier not answered yet (app/session/useUserMode.ts): a press
+  // then is "one moment", never the Paid-plan pitch to someone who has it.
+  const tierPending = useUIStore((s) => s.tierPending);
   const canRun =
     aiEnabled && onlineFeaturesEnabled && !!activePhotoId && !!stampToolRef.current;
 
@@ -441,7 +444,11 @@ export function AISettings({
             disabled={busy || !activePhotoId}
             onChange={(id) => {
               if (!aiEnabled) {
-                toast.info("Remove Background and Remove Object need sign-in and a Paid plan.");
+                toast.info(
+                  tierPending
+                    ? "Checking your plan. Try again in a moment."
+                    : "Remove Background and Remove Object need sign-in and a Paid plan.",
+                );
                 return;
               }
               if (!onlineFeaturesEnabled) {
