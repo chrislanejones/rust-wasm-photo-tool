@@ -14,6 +14,7 @@ import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/expor
 import type { ExportFormat } from "@/lib/exportImage";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { defaultExportStem } from "@/lib/exportFileName";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 export function useCanvasActions({
   stamp,
@@ -257,7 +258,7 @@ export function useCanvasActions({
     const ext = extFromMime(blob.type) || EXT[exportFormat];
     a.download = `${stem ?? defaultExportStem(entry?.name)}${ext}`;
     a.click();
-    URL.revokeObjectURL(url);
+    revokeObjectUrlLater(url);
     // `exportCanvasBackground` is read at the top of this callback and was
     // missing here. Without it the memoized closure kept whichever value was
     // current when it was last rebuilt, so flipping Settings → Layers and

@@ -801,7 +801,27 @@ not. `ToolButtonOption.active` already solved this for `ToolButtonGroup`
 probably the same one-line pattern here. It touches every pane, so it wants its
 own PR and a screen-reader check, not a ride-along.
 
-## OPEN — Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+## CLOSED 10-27-2026 — NOT REPRODUCED: Alt+E export sometimes produces no download; `pasted-export-name.spec.ts` flakes on master too (09-22-2026)
+
+Night 10-27 (`fix/alt-e-download-revoke`) measured it first, on the unchanged
+v9.39 tree (`0b627bb9`), production build, chromium, one worker:
+
+| Run | Throttle | Before (immediate revoke) | After (revoke 40 s later) |
+|---|---|---|---|
+| Raw flow: paste → canvas → 1 s → Alt+E | 1× CPU | 0 misses of 30 | 0 misses of 30 |
+| Raw flow | 4× CPU | 0 misses of 30 | 0 misses of 30 |
+| `pasted-export-name.spec.ts --repeat-each 20` | 1× CPU | 60 of 60 passed | 60 of 60 passed |
+
+The "Failed to load Clerk" page error that every 09-22 miss coincided with did
+not occur in any run today (0 page errors in 120 raw-flow runs), so whatever
+caused the miss went with the harness condition, not with a code change. The
+revoke was NOT shown to be the cause and this is not marked FIXED. Every
+download in the app now revokes its object URL 40 s after the click
+(`lib/revokeObjectUrlLater.ts`, FileSaver.js's delay) as a defensive change for
+engines the harness never runs. Reopen if a miss comes back, and record the page
+errors of the run that missed.
+
+Original note (09-22-2026, kept for the reasoning):
 
 Measured while verifying `refactor/ssot-ui-cleanup`. Alternating runs of the spec
 against the master build and the branch build, same machine and hour:

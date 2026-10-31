@@ -8,6 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Toaster, toast } from "@/components/ui/sonner";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -142,7 +143,7 @@ function ShareReady({ share, editorUrl, loadingShown = false }: { share: ShareDa
       const stem = (share.title ?? "image").replace(/\.[^.]+$/, "");
       a.download = `${stem}-shared.png`;
       a.click();
-      URL.revokeObjectURL(url);
+      revokeObjectUrlLater(url);
     } catch {
       // Fall back to opening the raw image if the fetch is blocked.
       window.open(share.imageUrl, "_blank", "noopener");

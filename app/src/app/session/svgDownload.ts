@@ -11,6 +11,7 @@ import type { SavedEdit } from "@/lib/editPersistence";
 import { resolveDocFrame, writeCroppedSvg, type SvgSource } from "@/lib/svgPassthrough";
 import { toast } from "@/components/ui/sonner";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
+import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 const SVG_MIME = "image/svg+xml";
 
@@ -32,7 +33,7 @@ function saveBlob(blob: Blob, filename: string) {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  revokeObjectUrlLater(url);
 }
 
 /** The open photo as an SVG, or null when it is not an SVG or no longer a
