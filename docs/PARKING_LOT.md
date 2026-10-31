@@ -57,13 +57,22 @@ Out of the night's scope: the plan asked for the Arrows name only.
   was refused: the agent's GitHub token has no `workflow` scope. Add that
   one line (with a comment: fixture git repos, no network) by hand.
 
-## OPEN — `pnpm lint` does not cover `marketing/scripts/` (10-24-2026)
+## FIXED 10-27-2026 (chore/lint-marketing-scripts) — `pnpm lint` does not cover `marketing/scripts/` (10-24-2026)
 
 - The lint gate is `eslint app/src`, so the generator scripts are never
   linted. Run directly, `gen-trail-data.mjs` has one real finding
   (`no-regex-spaces`, the `releases.ts` block split) plus node-globals
   `no-undef` noise, because no config block gives `marketing/scripts/*.mjs`
   node globals. Adding one is its own small change.
+- **Fixed:** `pnpm lint` is now `eslint app/src eslint.config.mjs
+  marketing/scripts`. `eslint.config.mjs` gives `marketing/scripts/**/*.mjs`
+  Node globals, and gives `gen-og-images.mjs` exactly `document` and
+  `requestAnimationFrame` for its `page.evaluate` bodies (not all of
+  `globals.browser`, so a stray `window` in the Node half still fails). The
+  regex became `/\n {2}\{\n {4}version: /`; `gen-trail-data.mjs` run before
+  and after wrote byte-identical `commits.ts`, `features.ts`,
+  `celebrationStats.ts` and `source-dates.json`. 47 errors → 0; the warning
+  count stays 52.
 
 ## FIXED 10-24-2026 (fix/trail-squash-dates) — squash merges move night work to the merge day on the Trail Log (10-24-2026)
 
@@ -1061,6 +1070,14 @@ files, which come out clean. The scripts do not: `marketing/scripts/*.mjs` get
 config only declares globals for `app/src`. That is 9 errors in
 `gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
 `marketing/**` block with node and browser globals would make this gate real.
+
+- **Scripts half FIXED 10-27-2026 (chore/lint-marketing-scripts):**
+  `marketing/scripts/*.mjs` are in `pnpm lint` now, with Node globals, and
+  `gen-og-images.mjs` lints clean (19 errors at HEAD: the `console`/`process`/
+  `URL`/`Buffer` ones are Node globals; `document` and `requestAnimationFrame`
+  sit inside `page.evaluate` bodies, which run in Chromium, so those two names
+  alone are declared for that one file). **Still open:** `marketing/src`
+  (`.ts`/`.tsx`) is not in the lint command.
 
 ## CLOSED 10-07-2026 — NOT REPRODUCED: a commit click can leave a stray rectangle behind (2026-09-18)
 
