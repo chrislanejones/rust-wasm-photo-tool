@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.46",
+    date: "2026-10-31",
+    headline: "Text gets an outline, and the editor dresses up for Halloween.",
+    entries: [
+      { tag: "feature", text: "Text has a Stroke: an outline around the letters, 0 to 20 px, with its own color and opacity. It's drawn outside the letters, so thin type stays thin." },
+      { tag: "ui", text: "The Text panel's Background, Stroke and Drop Shadow controls each fold into a dropdown that shows what's on when it's shut." },
+      { tag: "rust", text: "The engine draws the outline itself, and the saved edit log moves to version 15. Older saves open with no outline." },
+      { tag: "ui", text: "A \"Happy Halloween\" garland with a pumpkin and a bat hangs from the top bar October 24–31. Close it once and it stays closed until next year." },
+    ],
+  },
+  {
     version: "v9.45",
     date: "2026-10-31",
     headline: "Undo after a callout label move does what it says.",

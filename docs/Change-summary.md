@@ -11823,3 +11823,22 @@ No engine or saved-format change. The callout tool changed, so imagehorse-qc
 is owed for this one. Still open: 2 of 32 Align runs at 8× hit a short undo
 log (cause unknown), and the reload wait in both specs is vacuous for Text,
 Pins and Shapes. Both are in `docs/PARKING_LOT.md`.
+
+
+## v9.46 Change Summary — 2026-10-31
+
+**Text gets an outline, and the editor dresses up for Halloween.**
+
+| Area | Change |
+| --- | --- |
+| Text stroke (#420) | New Stroke on text: width 0–20 px, color, opacity. The engine draws it outside the glyphs (`outline_glyphs`, `src/layer.rs`), and the tile grows outward with a negative offset so the letters never move, rotated or not. New `set_text_stroke` export: no history step when nothing visible changes, a "Text Stroke" step otherwise. Resize scales the width. ADR-099. |
+| Text panel (#420) | Background, Stroke and Drop Shadow each fold into a collapsed dropdown that shows what's on in its header. They open by default in Background mode. The textarea previews the stroke with a doubled `-webkit-text-stroke` painted under the fill. |
+| Saved format (#420) | Op log **v14 → v15**: `Op::TextStroke` appended (index 25), and a stroke tail on `encode_annotations`. v14 logs decode with no stroke. The archive gets five optional `stroke_*` fields, not indexed, so there's **no IndexedDB version bump**. Older saves read as "no outline". |
+| Halloween garland (#421) | A "Happy Halloween" pennant garland with a pumpkin and a bat, October 24–31 in local time. It hangs the full length of the top bar and sits centered over the start screen. Closing it is remembered per year in localStorage (`ih_halloween_banner_closed_<year>`). It's read once as a single labeled image, closing moves focus somewhere sensible, the motion stops under `prefers-reduced-motion`, and it has forced-colors support. `role="toolbar"` moved from the fixed wrapper onto the bar itself. |
+| Engine | wasm **946,428 → 954,456 B (+8,028)**. |
+| Verification | cargo 801 passed, fmt + clippy clean (with and without tiles), tsc 0, lint 0 errors (53 warnings), guardrails OK, 240 files / 2,154 unit tests (3 env-dependent fails in the main checkout only, parked), both production builds. CI green on #420 (18 pass) and #421 (19 pass). |
+
+The engine and the Text tool changed, so imagehorse-qc is owed for this one.
+Still open: a new way for callout-leader's Align test to fail on master CI
+(the leader is back where it was after the reload), and a fast A → B → A photo
+switch that can leave B's picture showing. Both are in `docs/PARKING_LOT.md`.

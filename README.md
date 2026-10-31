@@ -90,22 +90,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.45 — 2026-10-31
+### v9.46 — 2026-10-31
 
-**Undo after a callout label move does what it says.**
+**Text gets an outline, and the editor dresses up for Halloween.**
 
-Move a callout's label, undo it, then redo it quickly, and the app used to
-save an extra undo step that changed nothing. After a reload, your next
-Ctrl+Z spent itself on that empty step and looked like it did nothing. The
-leader line that follows a moved label was working out where to go from the
-Text tool's own copy of the labels, which runs a moment behind the engine.
-On a slow machine the undo's follow landed after the redo, pulled the leader
-back, and the redo pushed it forward again. Now the follow reads the label
-and its leader straight from the engine, so after an undo or redo they
-already match and nothing gets written.
+The Text panel has a Stroke now: an outline around the letters, 0 to 20 px,
+with its own color and opacity. It's drawn outside the letters, so a thick
+outline never eats into thin type, and the letters don't shift when you turn
+it on, rotated or not. The panel got tidier on the way. The background, stroke
+and drop shadow controls each fold into their own dropdown, and the shut
+header tells you what's on ("Bubble", "3 px", "Text").
 
-This was also the "flaky" text-placement-undo test. It failed 4 runs in 10
-with the browser slowed down 8×, and 0 in 20 after the fix.
+Saved edits from before this release open with no outline, and nothing else
+about them changes.
+
+From October 24 through the 31st, a little "Happy Halloween" garland hangs
+from the top bar and over the start screen, with a pumpkin and a bat. Close it
+once and it stays closed until next October. It takes itself down after
+tonight.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
