@@ -226,6 +226,30 @@ measurement limits and reproduction commands are in the
   - An app build from before 10-23 reads a line-leader callout as a plain line
     and a pin (the leader does not follow there). Only matters with two app
     versions open on one photo; noted, not fixed.
+  - ~~e2e/text-placement-undo.spec.ts case 2 and callout-leader.spec.ts fail
+    on CI~~ **FIXED 10-31-2026.** Not the test: an undo then a quick redo on a
+    callout's label pushed a no-op third step (the leader moved back to the
+    undone label, then forward again), so the Ctrl+Z after the reload spent
+    itself on that and changed nothing. The label follow paired the Text
+    tool's list, a render behind the engine, with the engine's leader; it now
+    reads both from the engine (`followLabels`, hooks/usePinSteps.test.ts).
+    Reproduced 4 runs in 10 with Chrome's CPU slowed 8×; 0 in 20 after.
+    callout-leader's Align ▾ (alone) had the same extra step on master, 3
+    runs in 24 at 8×; 0 after the fix.
+    Left open:
+    - Both specs' `reloadAndResume` waits for `[aria-busy="true"]` to be
+      gone, but that attribute only exists on the per-photo panels (Resize,
+      Levels…). With Text, Pins or Shapes open nothing carries it, so the wait
+      passes at once and does not hold the undo press back from a photo still
+      loading. It was not the cause here (the press reached the engine every
+      time); a real "loaded" signal is still missing.
+    - A label move followed by an undo inside one engine round trip could
+      still have its follow land after the undo. Not seen; noted.
+    - Unexplained, 2 runs in 32 at 8× (one batch, after the fix; 0 in the
+      24 since, 0 on master in 24): callout-leader's Align ▾ test reached
+      the reload with a 6-op log instead of 10, and the Ctrl+Z after the
+      reload fell back to the flattened picture (all shapes gone) — the
+      ADR-093 hole. How the log got short is not known.
 - [x] Drag latency (10-21): the 21 ms was AppShell re-rendering per move; a drag
   now writes the edit box through `lib/liveEditGeometry` (event → DOM ~6 ms,
   [write-up](benchmarks/README.md#where-the-drags-21-ms-goes)). The corner-radius
