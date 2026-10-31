@@ -54,6 +54,7 @@
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
+  --z-decoration: 47; /* seasonal garland (features/halloween) — above the start screen and editor chrome, below the mobile shell and dialogs; ignores the pointer except its X */
 
   /* ── Dialog scrim — the single source for every modal backdrop. ──
      ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. The New dialog, the
@@ -2961,3 +2962,165 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
 /* An applied shape the engine has not drawn yet: shown, never clickable — its
    handles use inline pointer-events, so only !important reaches them. */
 [data-draw-overlay][data-settling] * { pointer-events: none !important; }
+
+/* ── Halloween garland (features/halloween) ──────────────────────────────────
+   Seasonal decoration, last week of October only. Pumpkin orange and ink are
+   fixed in BOTH themes, like --on-photo: they are the decoration's own colours,
+   not a theme surface. The garland ignores the pointer — only the X is a
+   target — so it can sit over the canvas without blocking anything. */
+.halloween-banner {
+  --halloween-orange: #f28c28;
+  --halloween-orange-deep: #c4610f;
+  --halloween-ink: #231a14;
+  --halloween-purple: #6e3fa8;
+  --halloween-cream: #fff4e6;
+  --halloween-stem: #4f6b2d;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+/* Start screen: a short garland, centered near the top of the page. */
+.halloween-banner-centered {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-decoration);
+}
+/* Editor: hung from the top bar's bottom edge and as long as the bar. A child
+   of the bar's surface, so it takes the bar's stacking tier and its width. */
+.halloween-banner-bar {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 8px;
+  right: 8px;
+}
+.halloween-banner-bar .halloween-garland {
+  flex: 1;
+  min-width: 0;
+}
+.halloween-garland {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  transform-origin: 50% 0;
+  animation: halloween-sway 6s ease-in-out infinite;
+}
+.halloween-banner-bar .halloween-garland {
+  animation-name: halloween-sway-long;
+}
+.halloween-string {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding: 0 4px;
+}
+.halloween-string-fill {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+/* The cord itself: one curve behind the flags, stretched to the string. */
+.halloween-cord {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 24px;
+  margin-top: -2px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5px;
+  opacity: 0.7;
+}
+.halloween-flag {
+  display: flex;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  margin: 0 1px;
+  padding-top: 4px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: var(--halloween-orange);
+  color: var(--halloween-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 1;
+}
+/* The filler flags either side of the message: smaller, so the words lead. */
+.halloween-flag-blank {
+  width: 14px;
+  height: 18px;
+  opacity: 0.85;
+}
+.halloween-flag-purple {
+  background: var(--halloween-purple);
+  color: var(--halloween-cream);
+}
+.halloween-gap {
+  width: 10px;
+}
+.halloween-pumpkin {
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+}
+.halloween-pumpkin-body {
+  fill: var(--halloween-orange-deep);
+}
+.halloween-pumpkin-front {
+  fill: var(--halloween-orange);
+}
+.halloween-stem {
+  fill: var(--halloween-stem);
+}
+.halloween-face {
+  fill: var(--halloween-ink);
+}
+.halloween-bat {
+  width: 30px;
+  height: 15px;
+  margin-top: 6px;
+  animation: halloween-flap 1.6s ease-in-out infinite;
+}
+.halloween-bat-body {
+  fill: var(--halloween-ink);
+}
+:root.dark .halloween-bat-body {
+  fill: var(--text-secondary);
+}
+.halloween-close {
+  pointer-events: auto;
+}
+@keyframes halloween-sway {
+  0%, 100% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
+}
+/* A long garland rotating even 1° swings its ends ~10px; it bobs instead. */
+@keyframes halloween-sway-long {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(1.5px); }
+}
+@keyframes halloween-flap {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.7); }
+}
+/* Windows High Contrast and other forced-colour modes strip backgrounds,
+   which would leave bare letters floating on a cord. The garland is one
+   labelled image, so it keeps its own colours there; the X is left to the
+   system so it reads as a button in the user's chosen palette. */
+@media (forced-colors: active) {
+  .halloween-garland {
+    forced-color-adjust: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .halloween-garland,
+  .halloween-bat {
+    animation: none;
+  }
+}
