@@ -23,6 +23,14 @@ const SAG = 12;
  *  - `centered`: the start screen covers the top bar, so it carries its own
  *    copy at the top of the page, just the words.
  *
+ * ACCESSIBILITY. The garland is one image named "Happy Halloween"; the
+ * flags, pumpkin and bat inside it are hidden from assistive tech, so the
+ * words are read once rather than letter by letter. The X is a real, named,
+ * 24px button with the app's focus ring, and closing it puts focus back on a
+ * neighbouring control. The garland's motion stops under reduce-motion, and
+ * the X hides it outright (WCAG 2.2.2). The bar copy is a sibling of the top
+ * bar's toolbar, not inside it, so it is not announced as a toolbar control.
+ *
  * Decoration only: the garland ignores the pointer, only the X takes a click,
  * and closing either copy closes both and is remembered for the rest of this
  * year's season. After October 31 nothing renders, so no release has to take
@@ -40,7 +48,18 @@ export function HalloweenBanner({ placement }: { placement: "bar" | "centered" }
         <Pennants fill={placement === "bar"} />
         <Bat />
       </div>
-      <Button size="xs" className="halloween-close" aria-label="Hide the Halloween banner" onClick={close}>
+      <Button
+        size="tiny"
+        className="halloween-close"
+        aria-label="Hide the Halloween banner"
+        onClick={(e) => {
+          // The X is about to unmount. If it had focus, hand focus to the
+          // control just before it rather than dropping it on <body>, where a
+          // keyboard or screen-reader user would have to start over.
+          if (document.activeElement === e.currentTarget) focusNeighbour(e.currentTarget);
+          close();
+        }}
+      >
         <X aria-hidden />
       </Button>
     </div>
@@ -123,6 +142,18 @@ function close(): void {
   writeDismissed(safeStorage(), new Date());
   closedNow = true;
   listeners.forEach((fn) => fn());
+}
+
+const TABBABLE =
+  'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Focus the nearest visible tab stop before `from` (or after, if none). */
+function focusNeighbour(from: HTMLElement): void {
+  const all = [...document.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+    (el) => el !== from && !el.closest("[inert]") && el.getClientRects().length > 0,
+  );
+  const before = all.filter((el) => el.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING);
+  (before[before.length - 1] ?? all.find((el) => !before.includes(el)))?.focus();
 }
 
 function safeStorage(): Storage | undefined {

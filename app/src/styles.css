@@ -3109,6 +3109,15 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   0%, 100% { transform: scaleY(1); }
   50% { transform: scaleY(0.7); }
 }
+/* Windows High Contrast and other forced-colour modes strip backgrounds,
+   which would leave bare letters floating on a cord. The garland is one
+   labelled image, so it keeps its own colours there; the X is left to the
+   system so it reads as a button in the user's chosen palette. */
+@media (forced-colors: active) {
+  .halloween-garland {
+    forced-color-adjust: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .halloween-garland,
   .halloween-bat {

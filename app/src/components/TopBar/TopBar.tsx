@@ -171,8 +171,6 @@ export function TopBar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      role="toolbar"
-      aria-label="Editor controls"
       className="fixed top-3 left-0 right-0 z-[var(--z-topbar)] pointer-events-none"
     >
       <motion.div
@@ -182,8 +180,13 @@ export function TopBar({
         }}
         transition={reduceMotion ? instantTransition : springStandard}
       >
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto relative">
+          {/* The toolbar role is on the bar's own surface, not the fixed
+              wrapper, so the Halloween garland below can sit beside the
+              toolbar instead of being announced as one of its controls. */}
           <div
+            role="toolbar"
+            aria-label="Editor controls"
             className={
               compact
                 ? // COMPACT: no groups. Every button is a direct child of one
@@ -191,14 +194,10 @@ export function TopBar({
                   // the pills, the dividers and the three-column grid all go.
                   // (Chris, 2026-09-08: "remove the button groups and just make
                   // top buttons with space-between".)
-                  "relative flex items-center justify-between px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
-                : "relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
+                  "flex items-center justify-between px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
+                : "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
             }
           >
-            {/* Late October only: a "Happy Halloween" garland hung from the
-                bar's bottom edge, the bar's full length. Renders nothing the
-                rest of the year. See features/halloween. */}
-            <HalloweenBanner placement="bar" />
             {/* Left cluster: Undo/Redo + Zoom, anchored left. Below BP_COMPACT
                 Undo/Redo drop out (they live in the Review panel + Ctrl+Z),
                 leaving Zoom as the left cluster. */}
@@ -367,6 +366,11 @@ export function TopBar({
               </div>
             </div>
           </div>
+          {/* Late October only: a "Happy Halloween" garland hung from the
+              bar's bottom edge, the bar's full length. A sibling of the
+              toolbar, not inside it. Renders nothing the rest of the year.
+              See features/halloween. */}
+          <HalloweenBanner placement="bar" />
         </div>
       </motion.div>
     </motion.div>
