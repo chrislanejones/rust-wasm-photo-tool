@@ -2975,18 +2975,44 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   --halloween-purple: #6e3fa8;
   --halloween-cream: #fff4e6;
   --halloween-stem: #4f6b2d;
+  /* 1 = full size. The bar's string sets its own from its width (see
+     Pennants); the start-screen copy steps down on narrow screens below. */
+  --halloween-scale: 1;
   display: flex;
   align-items: flex-start;
   gap: 4px;
   pointer-events: none;
 }
-/* Start screen: a short garland, centered near the top of the page. */
+/* Start screen: a short garland, centered at the very top of the page, so
+   the full-size flags clear the logo below them. */
 .halloween-banner-centered {
   position: fixed;
-  top: 64px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-decoration);
+}
+@media (max-width: 1000px) {
+  .halloween-banner-centered {
+    --halloween-scale: 0.7;
+  }
+}
+@media (max-width: 700px) {
+  .halloween-banner-centered {
+    --halloween-scale: 0.42;
+  }
+}
+/* The start screen centers its logo, so a short window brings the logo up
+   under the garland: step the flags down with the height too. */
+@media (max-height: 820px) and (min-width: 1001px) {
+  .halloween-banner-centered {
+    --halloween-scale: 0.75;
+  }
+}
+@media (max-height: 700px) and (min-width: 701px) {
+  .halloween-banner-centered {
+    --halloween-scale: 0.5;
+  }
 }
 /* Editor: hung from the top bar's bottom edge and as long as the bar. A child
    of the bar's surface, so it takes the bar's stacking tier and its width. */
@@ -3021,40 +3047,42 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   min-width: 0;
   justify-content: center;
   overflow: hidden;
-  padding-bottom: 8px;
+  padding-bottom: calc(24px * var(--halloween-scale));
 }
 /* The cord itself: one curve behind the flags, stretched to the string. */
 .halloween-cord {
   position: absolute;
   inset: 0 0 auto 0;
   width: 100%;
-  height: 24px;
+  height: calc(40px * var(--halloween-scale));
   margin-top: -2px;
   overflow: visible;
   fill: none;
   stroke: var(--text-muted);
-  stroke-width: 1.5px;
+  stroke-width: 2px;
   opacity: 0.7;
 }
 .halloween-flag {
   display: flex;
   justify-content: center;
-  width: 22px;
-  height: 28px;
-  margin: 0 1px;
-  padding-top: 4px;
+  /* 52 + 2 + 2 = LETTER_PITCH (56) in HalloweenBanner.tsx, times the scale. */
+  width: calc(52px * var(--halloween-scale));
+  height: calc(64px * var(--halloween-scale));
+  margin: 0 calc(2px * var(--halloween-scale));
+  padding-top: calc(8px * var(--halloween-scale));
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   background: var(--halloween-orange);
   color: var(--halloween-ink);
   font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: 700;
+  font-size: calc(26px * var(--halloween-scale));
+  font-weight: 800;
   line-height: 1;
 }
 /* The filler flags either side of the message: smaller, so the words lead. */
 .halloween-flag-blank {
-  width: 14px;
-  height: 18px;
+  /* 28 + 2 + 2 = BLANK_PITCH (32). */
+  width: calc(28px * var(--halloween-scale));
+  height: calc(36px * var(--halloween-scale));
   opacity: 0.85;
 }
 .halloween-flag-purple {
@@ -3062,11 +3090,12 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   color: var(--halloween-cream);
 }
 .halloween-gap {
-  width: 10px;
+  width: calc(24px * var(--halloween-scale));
 }
 .halloween-pumpkin {
-  width: 26px;
-  height: 26px;
+  flex: none;
+  width: 52px;
+  height: 52px;
   margin-top: 2px;
 }
 .halloween-pumpkin-body {
@@ -3082,9 +3111,10 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   fill: var(--halloween-ink);
 }
 .halloween-bat {
-  width: 30px;
-  height: 15px;
-  margin-top: 6px;
+  flex: none;
+  width: 60px;
+  height: 30px;
+  margin-top: 10px;
   animation: halloween-flap 1.6s ease-in-out infinite;
 }
 .halloween-bat-body {
@@ -3116,6 +3146,18 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
 @media (forced-colors: active) {
   .halloween-garland {
     forced-color-adjust: none;
+  }
+}
+/* The pumpkin and bat follow the start-screen copy down on narrow screens. */
+@media (max-width: 700px) {
+  .halloween-pumpkin {
+    width: 30px;
+    height: 30px;
+  }
+  .halloween-bat {
+    width: 36px;
+    height: 18px;
+    margin-top: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

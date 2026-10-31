@@ -1,15 +1,18 @@
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isHalloweenSeason, readDismissed, writeDismissed } from "./season";
 
 const MESSAGE = "HAPPY HALLOWEEN";
-/** Footprint along the cord, margins included (see `.halloween-flag*`). */
-const LETTER_PITCH = 24;
-const BLANK_PITCH = 16;
-const GAP_PITCH = 10;
-/** How far the middle of the cord hangs below its ends. */
-const SAG = 12;
+/** Footprint along the cord at full size, margins included (see
+ *  `.halloween-flag*`, which multiply the same numbers by `--halloween-scale`). */
+const LETTER_PITCH = 56;
+const BLANK_PITCH = 32;
+const GAP_PITCH = 24;
+/** How far the middle of the cord hangs below its ends, at full size. */
+const SAG = 20;
+/** Never shrink the letters below this, however narrow the bar. */
+const MIN_SCALE = 0.4;
 
 /**
  * A small "Happy Halloween" pennant garland: a pumpkin, a string of flags and
@@ -85,9 +88,13 @@ function Pennants({ fill }: { fill: boolean }) {
 
   // The message sits in the middle on bigger flags; with `fill`, smaller
   // plain flags run out to both ends of whatever width the cord is given.
+  // A bar too short for the full-size message shrinks every flag to fit it,
+  // rather than clipping letters off both ends.
   const message = [...MESSAGE];
-  const messageWidth = message.reduce((w, ch) => w + (ch === " " ? GAP_PITCH : LETTER_PITCH), 0);
-  const perSide = fill ? Math.max(0, Math.floor((width - messageWidth) / 2 / BLANK_PITCH)) : 0;
+  const fullMessageWidth = message.reduce((w, ch) => w + (ch === " " ? GAP_PITCH : LETTER_PITCH), 0);
+  const scale = fill && width > 0 ? Math.max(MIN_SCALE, Math.min(1, width / fullMessageWidth)) : 1;
+  const messageWidth = fullMessageWidth * scale;
+  const perSide = fill ? Math.max(0, Math.floor((width - messageWidth) / 2 / (BLANK_PITCH * scale))) : 0;
   const items = [...Array<string>(perSide).fill(""), ...message, ...Array<string>(perSide).fill("")];
 
   const pitch = (ch: string) => (ch === "" ? BLANK_PITCH : ch === " " ? GAP_PITCH : LETTER_PITCH);
@@ -98,6 +105,8 @@ function Pennants({ fill }: { fill: boolean }) {
     // side tilt toward it, like a real garland.
     const t = ((x + pitch(ch) / 2) / total) * 2 - 1;
     x += pitch(ch);
+    // In full-size pixels; the CSS scale shrinks the drop with the flag, so
+    // the start-screen copy (scaled by media queries, not here) sags in step.
     const drop = Math.round(SAG * (1 - t * t));
     const tilt = Math.round(-t * 8);
     if (ch === " ") return <span key={i} className="halloween-gap" />;
@@ -106,7 +115,7 @@ function Pennants({ fill }: { fill: boolean }) {
       <span
         key={i}
         className={`halloween-flag${ch ? "" : " halloween-flag-blank"}${colour}`}
-        style={{ transform: `translateY(${drop}px) rotate(${tilt}deg)` }}
+        style={{ transform: `translateY(calc(${drop}px * var(--halloween-scale))) rotate(${tilt}deg)` }}
       >
         {ch}
       </span>
@@ -114,8 +123,15 @@ function Pennants({ fill }: { fill: boolean }) {
   });
 
   return (
-    <div ref={ref} className={fill ? "halloween-string halloween-string-fill" : "halloween-string"} aria-hidden>
-      <svg className="halloween-cord" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden>
+    <div
+      ref={ref}
+      className={fill ? "halloween-string halloween-string-fill" : "halloween-string"}
+      style={fill ? ({ "--halloween-scale": scale } as CSSProperties) : undefined}
+      aria-hidden
+    >
+      {/* 40 units tall in a box 40 × scale px tall (styles.css), so a unit is a
+          scaled pixel and the curve's middle dips SAG, the same as the flags. */}
+      <svg className="halloween-cord" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden>
         <path d={`M0 2 Q50 ${2 + SAG * 2} 100 2`} vectorEffect="non-scaling-stroke" />
       </svg>
       {flags}
