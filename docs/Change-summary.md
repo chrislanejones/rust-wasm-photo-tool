@@ -11788,3 +11788,22 @@ this one.
 | Verification | tsc 0, lint 0 errors (53 warnings), 231 files / 2,114 unit tests, production build, guardrails OK. |
 
 No engine, canvas or tool change, so imagehorse-qc is not owed for this one.
+
+
+## v9.44 Change Summary — 2026-10-30
+
+**Batch Crop keeps full size, paid plans stop looking free, and downloads get more time.**
+
+| Area | Change |
+| --- | --- |
+| Batch › Crop, photos not open (#413) | Cropped from the stored original at full resolution (`decodeRegion`, one photo at a time), then stored as the new original with `origWidth`/`origHeight` updated. 1:1 Keep on 4000×3000 now gives **3000×3000** (was 1536×1536). Existing fields only, no IndexedDB change. |
+| Batch › Crop, re-apply (#413) | Matches its crop by history identity (`history_node()` + `documentRevision`), not undo count. Crop → undo → paint → re-apply keeps the stroke (`["Paint","Crop"]`). ADR-098. |
+| Engine (#413) | New read-only `history_node()` export and a `history_node` field on `capture_ui_state`. No op-log change, no format bump. wasm **+283 B** (946,145 → 946,428). |
+| Plan loading (#415) | `useRealTier()` returns `undefined` until answered; a transient `tierPending` flag (capped at 10 s) makes the gallery cap, OCR, Remove BG/Object, Layers and gallery add/duplicate wait instead of answering with the free tier. Watcher moved to `app/session/useUserMode.ts`. ADR-096. |
+| Downloads (#414) | Every click-then-revoke site uses `revokeObjectUrlLater` (40 s) instead of revoking on the next line. Defensive: the 09-22 Alt+E miss did not reproduce (0 / 30 at 1× and 4× CPU before and after). |
+| Verification | tsc 0, lint 0 errors (53 warnings), 236 files / 2,133 unit tests, cargo 793 passed, fmt + clippy clean, production build, guardrails OK. CI green on all three PRs (E2E shard 2 re-run after the known `text-placement-undo` flake). |
+
+Batch › Crop and the engine changed, so imagehorse-qc is owed for this one.
+Still open: the open photo is still cropped from its ≤2048 working copy, and
+the Storage pane still flashes "Sign in with a Pro account" while the plan
+loads. Both are in `docs/PARKING_LOT.md`.

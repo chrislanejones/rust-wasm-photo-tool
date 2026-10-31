@@ -90,19 +90,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.43 — 2026-10-30
+### v9.44 — 2026-10-30
 
-**Housekeeping: the lint check now covers the Trail Log scripts.**
+**Batch Crop keeps full size, paid plans stop looking free, and downloads get more time.**
 
-`pnpm lint` used to check the editor's code and nothing else, so the
-scripts that build the Trail Log and the share images were never linted.
-Pointed at them, it found 47 errors. 46 were Node globals the config
-didn't know about, and one was a real regex with loose spaces in the
-Trail Log generator. All fixed, and the generator writes the same files
-byte for byte as before.
+Batch › Crop used to shrink every photo you didn't have open down to
+2048 px. A 4000×3000 photo cropped 1:1 with Keep came out 1536×1536, and
+the gallery still said 4000×3000. Now each of those photos is cropped from
+its full-size original, one at a time, and the gallery shows the real new
+size. Re-applying a crop also stopped eating your work: crop, undo, paint a
+stroke and re-apply used to rewind the stroke instead of the crop. It now
+tracks the exact history step the crop made, not a count of undos.
 
-GitHub's code scanning action is also bumped from 4.39.0 to 4.39.1. Nothing
-in the editor changed.
+If you're on a paid plan, the first second after sign-in no longer treats
+you as free. No more "24 max", no "needs a Paid plan" note on OCR, and no
+"Layer limit reached" while your plan is still loading. The app just waits
+for the answer (up to 10 seconds) before deciding.
+
+Every download (Alt+E, PNG, ZIP, SVG, the phone's Download button) now keeps
+its file link alive for 40 seconds instead of dropping it the moment the
+click fires. Chrome never missed one in testing, but Safari and Firefox start
+downloads a beat later, and this keeps them from racing.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
