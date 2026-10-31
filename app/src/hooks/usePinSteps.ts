@@ -9,7 +9,7 @@
 // toggle on Callout a click parks its point for the label input, whose Enter
 // adds pin, label and leader as ONE step (`continue_step`); deleting a pin
 // takes its leader and label with it, and a moved pin redraws its leader. A
-// moved label is followed from useTextTool, through `rerouteCallouts`. The
+// moved label is followed from useTextTool, through `followLabels`. The
 // panel's Leader toggle picks a line (default) or an arrow for a new callout.
 import { useCallback, useEffect, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
@@ -129,6 +129,19 @@ export async function rerouteCallouts(
     );
   }
   return true;
+}
+
+/** Redraw the leaders whose label moved since `before`, a text list read
+ *  earlier, against the engine's state NOW: both lists are read here, the one
+ *  right after the other. It used to compare with the Text tool's own list,
+ *  which trails the engine by a render. An undo then a quick redo had the
+ *  undo's follow pair the undone label with the REDONE leader, "follow" it
+ *  back, and the redo's follow put it forward again: a step of its own, which
+ *  a later Ctrl+Z spent doing nothing. Read now, a label and its leader come
+ *  from one state; after an undo or redo they already match, nothing moves. */
+export async function followLabels(tool: ImageHorseTool, before: readonly CalloutText[]): Promise<boolean> {
+  const shapes = await readShapes(tool);
+  return rerouteCallouts(tool, { shapes, texts: before }, { shapes, texts: await readTexts(tool) });
 }
 
 export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Options) {
