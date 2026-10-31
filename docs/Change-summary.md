@@ -11773,3 +11773,18 @@ Not in this release: the MCP endpoint itself, OAuth sign-in, ownership checks,
 rate limits, a server kill switch and the activity log. All wait on gate 2 in
 ADR-095. No engine, canvas or tool change, so imagehorse-qc is not owed for
 this one.
+
+
+## v9.43 Change Summary — 2026-10-30
+
+**Housekeeping: the lint check now covers the Trail Log scripts.**
+
+| Area | Change |
+| --- | --- |
+| Lint (#411) | `pnpm lint` and `lint:fix` now also cover `marketing/scripts`. Those files had 47 errors when linted directly: 46 `no-undef` for Node globals, and one real `no-regex-spaces` in `gen-trail-data.mjs`. |
+| ESLint config (#411) | `marketing/scripts/**/*.mjs` get Node globals. `gen-og-images.mjs` also gets exactly `document` and `requestAnimationFrame`, which only run inside Chromium `page.evaluate` bodies. |
+| Trail Log generator (#411) | The release-split regex counts its spaces (`{2}`, `{4}`). Before and after, it writes byte-identical commits.ts, features.ts, celebrationStats.ts and source-dates.json. |
+| CI (#404) | `github/codeql-action` 4.39.0 → 4.39.1. |
+| Verification | tsc 0, lint 0 errors (53 warnings), 231 files / 2,114 unit tests, production build, guardrails OK. |
+
+No engine, canvas or tool change, so imagehorse-qc is not owed for this one.

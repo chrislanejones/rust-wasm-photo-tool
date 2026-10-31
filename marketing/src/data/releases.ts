@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.43",
+    date: "2026-10-30",
+    headline: "Housekeeping: the lint check now covers the Trail Log scripts.",
+    entries: [
+      { tag: "infra", text: "pnpm lint now checks the scripts that build the Trail Log and the share images. It found 47 errors there: 46 Node globals the config didn't know about and one loose-spaces regex in the Trail Log generator. All fixed, and the generator's output is byte-identical." },
+      { tag: "infra", text: "GitHub's code scanning action is bumped from 4.39.0 to 4.39.1." },
+    ],
+  },
+  {
     version: "v9.42",
     date: "2026-10-29",
     headline: "A first look at connecting AI apps to your account.",
