@@ -530,6 +530,8 @@ pub(crate) fn build_annotation_tile(
     // Which typeface to rasterise with; "" is the embedded Liberation Sans and
     // what every annotation written before v8.76 means. See `crate::fonts`.
     font_id: &str,
+    // Outline around the glyphs; `TextStroke::default()` = none.
+    stroke: crate::annotations::TextStroke,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::grow_to_box_height(
         crate::text::render_text(text, font_size, r, g, b, bold, font_id),
@@ -537,6 +539,30 @@ pub(crate) fn build_annotation_tile(
     );
     let raw_w = rendered.width;
     let raw_h = rendered.height;
+
+    // TEXT STROKE. The outlined glyphs are `st` px bigger than the plain ones
+    // on every side, and they are pasted `st` px up-left of where the plain
+    // glyphs would go, so the LETTERS never move. The tile grows by `st` on
+    // every side to hold the outline, and the returned offset is `-st` so the
+    // tile's origin moves out instead of the text moving in — the anchor→ink
+    // mapping (`annotation_ink_offset`) needs no stroke term.
+    let st: u32 = if stroke.is_on() { stroke.width } else { 0 };
+    let outlined: Option<Vec<u8>> = (st > 0).then(|| {
+        outline_glyphs(
+            &rendered.pixels,
+            raw_w,
+            raw_h,
+            st,
+            [stroke.r, stroke.g, stroke.b, stroke.a],
+        )
+    });
+    // What actually gets painted (and casts the text shadow): the outlined
+    // glyphs when there is a stroke, else the plain ones. `(pixels, w, h)`.
+    let (glyph_px, glyph_w, glyph_h): (&[u8], u32, u32) = match &outlined {
+        Some(px) => (px.as_slice(), raw_w + st * 2, raw_h + st * 2),
+        None => (rendered.pixels.as_slice(), raw_w, raw_h),
+    };
+    let st_i = st as i32;
 
     // Reserve a uniform margin so the offset+blurred shadow isn't clipped — and
     // so the tile bbox (used by the Align tool) grows to include the shadow.
@@ -551,10 +577,14 @@ pub(crate) fn build_annotation_tile(
     if background_kind == 0 {
         // Fast path: nothing to compose (no shadow, no rotation).
         if !any_shadow && rotation_deg.abs() < 0.5 {
-            return (rendered.pixels, raw_w, raw_h, 0, 0);
+            return match outlined {
+                Some(px) => (px, glyph_w, glyph_h, -st_i, -st_i),
+                None => (rendered.pixels, raw_w, raw_h, 0, 0),
+            };
         }
-        let tile_w = raw_w + sh_margin * 2;
-        let tile_h = raw_h + sh_margin * 2;
+        let tile_w = raw_w + sh_margin * 2 + st * 2;
+        let tile_h = raw_h + sh_margin * 2 + st * 2;
+        // Where the (outlined) glyph block's top-left lands in the tile.
         let tx = sh_margin as i32;
         let ty = sh_margin as i32;
         let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
@@ -570,7 +600,7 @@ pub(crate) fn build_annotation_tile(
                 tile_w,
                 tile_h,
                 None,
-                Some((&rendered.pixels, raw_w, raw_h, tx, ty)),
+                Some((glyph_px, glyph_w, glyph_h, tx, ty)),
                 shadow_dx,
                 shadow_dy,
                 shadow_blur,
@@ -584,26 +614,13 @@ pub(crate) fn build_annotation_tile(
             &mut tile,
             tile_w as i32,
             tile_h as i32,
-            &rendered.pixels,
-            raw_w,
-            raw_h,
+            glyph_px,
+            glyph_w,
+            glyph_h,
             tx,
             ty,
         );
-        if rotation_deg.abs() < 0.5 {
-            return (tile, tile_w, tile_h, 0, 0);
-        }
-        // `rotate_pixels(+θ)` is clockwise — matches the CSS preview.
-        let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
-        // TOP-LEFT anchor, not center — see `text::rotated_tile_offset` (ADR-050).
-        let (off_x, off_y) = crate::text::rotated_tile_offset(
-            tile_w,
-            tile_h,
-            rotated.width,
-            rotated.height,
-            rotation_deg as f32,
-        );
-        return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
+        return finish_tile(tile, tile_w, tile_h, rotation_deg, st);
     }
 
     // Background path: expand the tile by `bg_padding` on all sides, plus a
@@ -611,13 +628,13 @@ pub(crate) fn build_annotation_tile(
     // the margin is reserved on every side — see `tail_margin`).
     let tail_margin: u32 = tail_margin(background_kind);
     let pad = bg_padding;
-    let tile_w = raw_w + pad * 2 + tail_margin * 2 + sh_margin * 2;
-    let tile_h = raw_h + pad * 2 + tail_margin * 2 + sh_margin * 2;
+    let tile_w = raw_w + pad * 2 + tail_margin * 2 + sh_margin * 2 + st * 2;
+    let tile_h = raw_h + pad * 2 + tail_margin * 2 + sh_margin * 2 + st * 2;
     let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
 
-    // Origin offset = tail margin + shadow margin; the background rect occupies
-    // the padded text area, inset by both.
-    let origin = (tail_margin + sh_margin) as i32;
+    // Origin offset = tail margin + shadow margin + stroke margin; the
+    // background rect occupies the padded text area, inset by all three.
+    let origin = (tail_margin + sh_margin + st) as i32;
     let rect_x0 = origin;
     let rect_y0 = origin;
     let rect_x1 = origin + (raw_w + pad * 2) as i32;
@@ -726,7 +743,7 @@ pub(crate) fn build_annotation_tile(
                 None
             },
             if shadow_text {
-                Some((&rendered.pixels, raw_w, raw_h, text_dx, text_dy))
+                Some((glyph_px, glyph_w, glyph_h, text_dx - st_i, text_dy - st_i))
             } else {
                 None
             },
@@ -746,28 +763,128 @@ pub(crate) fn build_annotation_tile(
         &mut tile,
         tile_w as i32,
         tile_h as i32,
-        &rendered.pixels,
-        raw_w,
-        raw_h,
-        text_dx,
-        text_dy,
+        glyph_px,
+        glyph_w,
+        glyph_h,
+        text_dx - st_i,
+        text_dy - st_i,
     );
 
+    // Rotate the composed tile (background + text together).
+    finish_tile(tile, tile_w, tile_h, rotation_deg, st)
+}
+
+/// The shared tail of both `build_annotation_tile` paths: rotate (if at all)
+/// and return the tile with its offset from the annotation's (x, y).
+///
+/// `st` is the stroke margin: the tile's top-left sits `st` px up-left of
+/// (x, y), so the unrotated offset is `-st`, and the rotation pivot — the
+/// annotation's TOP-LEFT (ADR-050), not the tile's — is `st` px inside the
+/// tile. Passing `rotated_tile_offset` the tile shrunk by `st` on every side
+/// puts its center exactly where the pivot math expects it. With `st == 0`
+/// this is the code both paths always ran.
+fn finish_tile(
+    tile: Vec<u8>,
+    tile_w: u32,
+    tile_h: u32,
+    rotation_deg: f64,
+    st: u32,
+) -> (Vec<u8>, u32, u32, i32, i32) {
+    let st_i = st as i32;
     if rotation_deg.abs() < 0.5 {
-        return (tile, tile_w, tile_h, 0, 0);
+        return (tile, tile_w, tile_h, -st_i, -st_i);
     }
-    // Rotate the composed tile (background + text together). Pass the angle
-    // as-is: rotate_pixels(+θ) is clockwise, matching the CSS preview.
+    // `rotate_pixels(+θ)` is clockwise — matches the CSS preview.
     let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
     // TOP-LEFT anchor, not center — see `text::rotated_tile_offset` (ADR-050).
     let (off_x, off_y) = crate::text::rotated_tile_offset(
-        tile_w,
-        tile_h,
+        tile_w - st * 2,
+        tile_h - st * 2,
         rotated.width,
         rotated.height,
         rotation_deg as f32,
     );
     (rotated.pixels, rotated.width, rotated.height, off_x, off_y)
+}
+
+/// Rendered glyphs with an outline `width` px wide drawn OUTSIDE them, as a
+/// block `width` px bigger on every side (glyph (0, 0) lands at
+/// (width, width)).
+///
+/// The outline is the glyph alpha dilated by a disc of radius `width`, with a
+/// one-pixel anti-aliased rim, filled with `rgba`; the original glyphs are
+/// then painted over it so the letters keep their exact color and weight.
+///
+/// Splatted from each inked source pixel rather than gathered per output
+/// pixel, and a fully opaque pixel whose four neighbours are also fully
+/// opaque is skipped: its disc is covered by theirs, and the interior of a
+/// glyph is most of its ink.
+pub(crate) fn outline_glyphs(px: &[u8], w: u32, h: u32, width: u32, rgba: [u8; 4]) -> Vec<u8> {
+    let s = width as i32;
+    let ow = w + width * 2;
+    let oh = h + width * 2;
+    let mut cov = vec![0u8; (ow * oh) as usize];
+    // The disc's offsets and their weights, once: weight 1 inside, a 1 px
+    // ramp at the rim.
+    let reach = s as f32 + 0.5;
+    let mut disc: Vec<(i32, i32, f32)> = Vec::new();
+    for dy in -s..=s {
+        for dx in -s..=s {
+            let d = ((dx * dx + dy * dy) as f32).sqrt();
+            let k = (reach - d).clamp(0.0, 1.0);
+            if k > 0.0 {
+                disc.push((dx, dy, k));
+            }
+        }
+    }
+    let wi = w as i32;
+    let hi = h as i32;
+    let alpha = |x: i32, y: i32| -> u8 {
+        if x < 0 || y < 0 || x >= wi || y >= hi {
+            0
+        } else {
+            px[((y * wi + x) * 4 + 3) as usize]
+        }
+    };
+    for y in 0..hi {
+        for x in 0..wi {
+            let a = alpha(x, y);
+            if a == 0 {
+                continue;
+            }
+            if a == 255
+                && alpha(x - 1, y) == 255
+                && alpha(x + 1, y) == 255
+                && alpha(x, y - 1) == 255
+                && alpha(x, y + 1) == 255
+            {
+                // Interior — but it still covers itself.
+                let i = ((y + s) * ow as i32 + (x + s)) as usize;
+                cov[i] = 255;
+                continue;
+            }
+            let af = a as f32;
+            for &(dx, dy, k) in &disc {
+                let i = ((y + s + dy) * ow as i32 + (x + s + dx)) as usize;
+                let v = (af * k).round() as u8;
+                if v > cov[i] {
+                    cov[i] = v;
+                }
+            }
+        }
+    }
+    let mut out = vec![0u8; (ow * oh * 4) as usize];
+    for (o, &c) in out.chunks_exact_mut(4).zip(cov.iter()) {
+        if c == 0 {
+            continue;
+        }
+        o[0] = rgba[0];
+        o[1] = rgba[1];
+        o[2] = rgba[2];
+        o[3] = ((c as u32 * rgba[3] as u32 + 127) / 255) as u8;
+    }
+    crate::transform::paste_region(&mut out, ow as i32, oh as i32, px, w, h, s, s);
+    out
 }
 
 /// Where the FIRST line's glyph ink begins inside the tile that
@@ -1967,6 +2084,14 @@ impl ImageHorseTool {
         // every archive written before v8.81, and restores to the identity:
         // exactly what those documents meant.
         perspective: &[f32],
+        // The text OUTLINE, as `annotations_to_json` writes it. An archive
+        // written before the outline existed has none of these and JS passes
+        // zeros: width 0 is "no outline", exactly what that document meant.
+        stroke_width: u32,
+        stroke_r: u8,
+        stroke_g: u8,
+        stroke_b: u8,
+        stroke_a: u8,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -2012,6 +2137,13 @@ impl ImageHorseTool {
             shadow_dy,
             shadow_blur,
             font_id,
+            crate::annotations::TextStroke::new(
+                stroke_width,
+                stroke_r,
+                stroke_g,
+                stroke_b,
+                stroke_a,
+            ),
         );
         let active = self.active;
         if let Some(layer) = self.layers.get_mut(active) {
@@ -2350,9 +2482,33 @@ mod tests {
                     for &bold in &[false, true] {
                         for &box_h in &[0u32, 4, 90, 240] {
                             let (tile, w, h, off_x, off_y) = build_annotation_tile(
-                                "Hg", fs, box_h, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
+                                "Hg",
+                                fs,
+                                box_h,
+                                255,
+                                255,
+                                255,
+                                bold,
+                                0.0,
+                                kind,
+                                0,
+                                0,
+                                0,
                                 0, // bg_a = 0: transparent bg, geometry unchanged
-                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0, "",
+                                pad,
+                                6,
+                                135,
+                                false,
+                                false,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                "",
+                                Default::default(),
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
@@ -2378,8 +2534,33 @@ mod tests {
     fn box_height_grows_the_tile_downwards_and_leaves_the_text_at_the_top() {
         let plain = |box_h: u32| {
             let (tile, w, h, _, _) = build_annotation_tile(
-                "Hg", 24.0, box_h, 255, 255, 255, false, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, false, false,
-                0, 0, 0, 0, 0, 0, 0, "",
+                "Hg",
+                24.0,
+                box_h,
+                255,
+                255,
+                255,
+                false,
+                0.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "",
+                Default::default(),
             );
             let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)
@@ -2455,5 +2636,85 @@ mod opaque_annotation_composite_tests {
                 assert_eq!(fast, generic, "alpha={alpha}, editing={editing:?}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod text_stroke_tile_tests {
+    use super::*;
+    use crate::annotations::TextStroke;
+
+    fn tile(kind: u8, rot: f64, stroke: TextStroke) -> (Vec<u8>, u32, u32, i32, i32) {
+        build_annotation_tile(
+            "Hg", 32.0, 0, 255, 255, 255, true, rot, kind, 0, 0, 255, 255, 6, 16, 135, false,
+            false, 0, 0, 0, 0, 0, 0, 0, "", stroke,
+        )
+    }
+
+    /// The glyph pixels of the outlined tile, put back at their canvas
+    /// position, are exactly where the plain tile put them — for no
+    /// background, a box and a bubble. The outline grows the tile OUTWARD.
+    #[test]
+    fn an_outline_never_moves_the_letters() {
+        let red = TextStroke::new(4, 255, 0, 0, 255);
+        for kind in [0u8, 1, 2] {
+            let (p, pw, ph, px, py) = tile(kind, 0.0, TextStroke::default());
+            let (o, ow, oh, ox, oy) = tile(kind, 0.0, red);
+            assert_eq!((ow, oh), (pw + 8, ph + 8), "kind {kind}: grows 4 px a side");
+            assert_eq!(
+                (ox - px, oy - py),
+                (-4, -4),
+                "kind {kind}: origin moves out"
+            );
+            // Every fully-opaque WHITE pixel of the plain tile is still white
+            // at the same canvas position in the outlined one.
+            for y in 0..ph {
+                for x in 0..pw {
+                    let i = ((y * pw + x) * 4) as usize;
+                    if p[i..i + 4] != [255, 255, 255, 255] {
+                        continue;
+                    }
+                    let j = (((y + 4) * ow + (x + 4)) * 4) as usize;
+                    assert_eq!(
+                        &o[j..j + 4],
+                        &[255, 255, 255, 255],
+                        "kind {kind} at ({x},{y})"
+                    );
+                }
+            }
+            assert!(
+                o.chunks_exact(4).any(|c| c == [255, 0, 0, 255]),
+                "kind {kind}: the outline is drawn"
+            );
+        }
+    }
+
+    /// Rotated, the pivot stays the annotation's top-left: the outlined
+    /// tile's center lands where the plain one's does.
+    #[test]
+    fn a_rotated_outline_keeps_the_pivot() {
+        let red = TextStroke::new(5, 255, 0, 0, 255);
+        let (_, pw, ph, px, py) = tile(0, 30.0, TextStroke::default());
+        let (_, ow, oh, ox, oy) = tile(0, 30.0, red);
+        let pc = (px as f32 + pw as f32 / 2.0, py as f32 + ph as f32 / 2.0);
+        let oc = (ox as f32 + ow as f32 / 2.0, oy as f32 + oh as f32 / 2.0);
+        assert!(
+            (pc.0 - oc.0).abs() <= 1.0 && (pc.1 - oc.1).abs() <= 1.0,
+            "{pc:?} vs {oc:?}"
+        );
+    }
+
+    #[test]
+    fn zero_width_or_alpha_is_no_outline() {
+        assert_eq!(TextStroke::new(0, 1, 2, 3, 255), TextStroke::default());
+        assert_eq!(TextStroke::new(5, 1, 2, 3, 0), TextStroke::default());
+        assert_eq!(
+            TextStroke::new(500, 1, 2, 3, 255).width,
+            crate::annotations::MAX_TEXT_STROKE_WIDTH
+        );
+        assert_eq!(
+            tile(1, 0.0, TextStroke::default()),
+            tile(1, 0.0, TextStroke::new(0, 255, 0, 0, 255))
+        );
     }
 }

@@ -71,6 +71,7 @@ fn a_text(id: u32, text: &str) -> TextParams {
         box_height: 0,
         perspective: stamp_tool::perspective::IDENTITY_QUAD,
         font_id: String::new(),
+        stroke: Default::default(),
         text: text.into(),
         x: 4,
         y: 6,

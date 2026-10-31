@@ -40,6 +40,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
+import { textStrokeCss, type TextOverlaySettings } from "@/lib/textOverlaySettings";
 import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -108,25 +109,7 @@ interface Props {
   onTextKeyDown?: (e: React.KeyboardEvent) => void;
   onTextChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTextBlur?: () => void;
-  textSettings?: {
-    fontSize: number;
-    /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
-     *  for the recent-text chips only. */
-    fontFamily?: string;
-    /** Engine typeface id; `""` = the embedded Liberation Sans. */
-    textFontId?: string;
-    fontWeight: string;
-    textColor: string;
-    /** Background-preview fields. The open textarea renders a live preview
-     *  using these so the user can configure their BG before committing. */
-    bgKind?: "none" | "rect" | "bubble";
-    bgColor?: string;
-    bgOpacity?: number;
-    bgPadding?: number;
-    bgCornerRadius?: number;
-    /** Speech-bubble tail angle in degrees (0-359). */
-    bgTail?: number;
-  };
+  textSettings?: TextOverlaySettings;
   colorPickerActive?: boolean;
   /** Select tool: canvas clicks fire the active selection kind. */
   selectionActive?: boolean;
@@ -1945,6 +1928,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   // was measured with, and the same bytes the engine was given
                   // — so these glyphs ARE the committed glyphs (v8.76).
                   fontFamily: effFontCss,
+                  ...textStrokeCss(textSettings, scaleX), // engine-true stroke preview
                   lineHeight: 1.3,
                   padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",

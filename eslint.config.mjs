@@ -224,8 +224,10 @@ export default tseslint.config(
     // 3225 -> 3151 (Night 10-27, tier pending): the Clerk mode watcher and the
     // "who you are" block moved to app/session/useUserMode.ts, and the two
     // copies of the gallery cap message became one in tierPending.ts.
+    // 3151 -> 3128 (text stroke): the two copies of the canvas's text-settings
+    // object became one `textOverlaySettings(toolSettings)` (lib/textOverlaySettings.ts).
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3151 }] },
+    rules: { "max-lines": ["error", { max: 3128 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
@@ -240,8 +242,10 @@ export default tseslint.config(
     // move/resize/rotate handles, and its drag state) moved out to
     // features/canvas/ShapeEditOverlay.tsx when rotation landed. It imports the
     // shared helpers above rather than keeping a second copy.
+    // 2166 -> 2141 (text stroke): the inline `textSettings` prop type moved to
+    // lib/textOverlaySettings.ts, beside the stroke's CSS preview.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2166 }] },
+    rules: { "max-lines": ["error", { max: 2141 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

@@ -606,6 +606,7 @@ impl ImageHorseTool {
             0,
             0, // shadow off
             font_id,
+            crate::annotations::TextStroke::default(),
         );
 
         self.snap("Text");

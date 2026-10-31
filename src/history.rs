@@ -819,6 +819,7 @@ impl ImageHorseTool {
             0,
             0, // shadow off; set via set_text_shadow
             font_id,
+            crate::annotations::TextStroke::default(),
         );
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
@@ -894,6 +895,7 @@ impl ImageHorseTool {
             0,
             0, // shadow off; set via set_text_shadow
             font_id,
+            crate::annotations::TextStroke::default(),
         );
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,

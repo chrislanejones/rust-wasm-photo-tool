@@ -2011,6 +2011,7 @@ impl ImageHorseTool {
                     t.shadow_dy,
                     t.shadow_blur,
                     &t.font_id,
+                    t.stroke,
                 )
             })
             .collect();
@@ -2908,6 +2909,15 @@ impl ImageHorseTool {
                         (a.shadow_dy as f64 * sy).round() as i32,
                         (a.shadow_blur as f64 * s_uniform).round() as u32,
                         &a.font_id,
+                        // A canvas-space width, like the padding: scales with
+                        // the image so the outline keeps its look.
+                        crate::annotations::TextStroke::new(
+                            (a.stroke.width as f64 * s_uniform).round() as u32,
+                            a.stroke.r,
+                            a.stroke.g,
+                            a.stroke.b,
+                            a.stroke.a,
+                        ),
                     )
                 })
                 .collect();
@@ -4930,6 +4940,12 @@ mod layer_persistence_tests {
             0,
             0,
             &[],
+            // No outline: the stroke width, then its RGBA.
+            0,
+            0,
+            0,
+            0,
+            0,
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

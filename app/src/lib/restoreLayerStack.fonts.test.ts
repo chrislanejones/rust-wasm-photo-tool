@@ -24,7 +24,7 @@ function fakeTool() {
       get: (_t, prop: string) => {
         if (prop === "then") return undefined; // not a thenable
         return (...args: unknown[]) => {
-          calls.push(prop === "restore_text_annotation" ? `text:${String(args[args.length - 4])}` : prop);
+          calls.push(prop === "restore_text_annotation" ? `text:${String(args[26])}` /* font_id — index 26, see textBoxSurvivesReload.test.ts */ : prop);
           return prop.startsWith("get_") ? [] : 1;
         };
       },

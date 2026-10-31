@@ -8,6 +8,7 @@ import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
+import { textStrokeEngineArgs } from "@/lib/textOverlaySettings";
 
 interface TextInput {
   screenX: number;
@@ -422,6 +423,7 @@ export function useTextTool({
         Math.round(s.shadowOffsetY),
         Math.max(0, Math.round(s.shadowBlur)),
       );
+      tool.set_text_stroke(targetId, ...textStrokeEngineArgs(s)); // …and the stroke, same contract
     }
     await refreshAnnotations();
     flushToCanvas();

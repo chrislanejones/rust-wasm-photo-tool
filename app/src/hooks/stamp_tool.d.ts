@@ -1134,6 +1134,10 @@ declare module "stamp_tool" {
       dy: number,
       blur: number,
     ): boolean;
+    /** Outline the text's glyphs: `width` px (0 = none, clamped to 20) in
+     *  `color_hex` at `alpha` (0-255). No-op — and no history step — when
+     *  nothing visible changes, so commitText calls it on every commit. */
+    set_text_stroke(id: number, width: number, color_hex: string, alpha: number): boolean;
     remove_text_annotation(id: number): boolean;
     get_text_annotations(): string;
     /** Returns the matching annotation id, or -1 if no hit. */
@@ -1341,6 +1345,12 @@ declare module "stamp_tool" {
       /** Flat [x0,y0,x1,y1,x2,y2,x3,y3] normalized quad. Any length but 8 is
        *  read as the identity, which is what every pre-v8.81 archive means. */
       perspective: Float32Array,
+      /** Text outline width in px (0 = none), then its RGBA. */
+      stroke_width: number,
+      stroke_r: number,
+      stroke_g: number,
+      stroke_b: number,
+      stroke_a: number,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;
