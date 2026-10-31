@@ -588,7 +588,20 @@ Two follow-ups that were deliberately left out of that session's diff:
   sitting on a host nothing builds from. Confirm it is set on Vercel, then
   delete it there; rotating it is the safer call.
 
-## OPEN — Batch › Crop (#267): two review findings still open (09-29-2026)
+## FIXED 10-27-2026 (fix/batch-crop-full-res) — Batch › Crop (#267): two review findings (09-29-2026)
+
+Both rows below are fixed; `e2e/batch-crop-full-res.spec.ts` was red on master for each, green after.
+
+- **Row 1:** the engine exports `history_node()` (also on `capture_ui_state`): the identity of the live
+  history state, carried through undo/redo, new for every new edit. `activeCrop` records the state the
+  crop made and the state it was applied to, each with the document revision (a load or restore
+  rebuilds history). Re-apply rewinds only when the live state IS the crop's, checks it landed on the
+  pre-crop state, and puts the steps back if not. Otherwise it crops what is on screen. The preview
+  frame uses the same test. Crop → undo → paint → re-apply now keeps the stroke and adds one Crop.
+- **Row 2:** the non-active pass decodes the stored original at full resolution and reads out only the
+  crop region (`decodeRegion`), one photo at a time, then writes the new original and sets
+  `origWidth`/`origHeight` to it. Two 4000×3000 photos at 1:1 Keep come out 3000×3000 (were 1536×1536).
+- **Still open, not part of either row:** see "Batch › Crop leftovers after the full-res fix (10-27-2026)".
 
 CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
 
@@ -596,6 +609,16 @@ CodeRabbit flagged both on #267; neither was fixed in the preview-frame work.
 | --- | --- | --- |
 | 1 | **Re-apply knows the last crop only by undo COUNT.** Undo the crop, make one new edit, and the count matches again, so re-apply rewinds the new edit instead of the crop. Needs an op identity (op-log generation) rather than a count. | `CropBatchPanel.tsx` active pass, `activeCrop` in `useBatchCropStore` |
 | 2 | **"Keep" width is not full resolution for non-active photos.** They are cropped from `makeWorkingCopy`, which caps at 2048px, so a 6000px photo comes out at most 2048 wide. `origWidth`/`origHeight` also still describe the pre-crop upload. | `CropBatchPanel.tsx` first pass |
+
+## OPEN — Batch › Crop leftovers after the full-res fix (10-27-2026)
+
+Found doing fix/batch-crop-full-res; not in its scope.
+
+| # | Problem | Where |
+| --- | --- | --- |
+| 1 | **The open photo is still cropped at working resolution.** It lives in the engine as the ≤2048 working copy (every load goes through `makeWorkingCopy`), so 1:1 Keep on an open 4000×3000 photo gives 1536×1536 while the other photos now give 3000×3000. Fixing it means a full-resolution engine document or cropping the stored original beside the undo step; both are design calls. | `CropBatchPanel.tsx` active pass |
+| 2 | **Re-apply's crop identity does not survive a photo switch.** Switching away and back rebuilds the engine history, so the recorded state can never match and re-apply crops what is on screen. The old count check happened to rewind correctly there (and wrongly after crop → undo → edit). Carrying identity across a reload would need it persisted with the edit, which is a storage change. | `activeCrop` in `useBatchCropStore` |
+| 3 | `cropRgba` (`lib/batchCrop.ts`) has no caller left outside its own test. | `lib/batchCrop.ts` |
 
 ## OPEN — photos saved before v9.3 still have the Canvas frame baked in (09-28-2026)
 

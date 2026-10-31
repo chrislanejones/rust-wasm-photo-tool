@@ -123,6 +123,10 @@ export interface CloneStampState {
    *  seeds a new document, and is never read for display. Two roles, not two
    *  owners — reading the store for display is what would make it a mirror. */
   exportQuality: number;
+  /** Identity of the live history state (`history_node`): unlike `undoCount`,
+   *  "crop, undo, one new edit" does not land back on the crop's value. 0 for
+   *  a fresh load, and from an older cached wasm that lacks the field. */
+  historyNode: number;
 }
 
 const INITIAL_STATE: CloneStampState = {
@@ -140,6 +144,7 @@ const INITIAL_STATE: CloneStampState = {
   // Matches DEFAULT_EXPORT_QUALITY in the crate. Both defaults are asserted
   // against each other by an engine test — they must not drift.
   exportQuality: 75,
+  historyNode: 0,
 };
 
 /** The ten values `capture_ui_state()` carries, copied out of wasm memory. */
@@ -156,6 +161,8 @@ export type UiSnapshot = {
   export_quality: number;
   /** Beta history forks (ADR-086). Undefined from an older cached wasm. */
   branches_json?: string;
+  /** Live history state's identity. Undefined from an older cached wasm. */
+  history_node?: number;
 };
 
 /** The minimum of the engine surface this needs — so a test can supply a fake
@@ -210,6 +217,7 @@ export async function readUiSnapshot(
       active_layer_id: ui.active_layer_id,
       export_quality: ui.export_quality,
       branches_json: ui.branches_json,
+      history_node: ui.history_node,
     };
   } finally {
     // BOTH paths free. The stale path is the one that matters: it is the new
@@ -376,6 +384,7 @@ export function useEngineCore(
       active_layer_id,
       export_quality,
       branches_json,
+      history_node,
     } = snap;
     // Beta history forks: published beside `history`, from the same capture.
     useHistoryBranchStore.getState().setBranches(parseBranches(branches_json));
@@ -426,6 +435,7 @@ export function useEngineCore(
       // restores the snapshot's quality reaches the slider through the same
       // path as every other engine change.
       exportQuality: export_quality,
+      historyNode: history_node ?? 0,
     });
   }, []);
 

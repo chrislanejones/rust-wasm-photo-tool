@@ -353,6 +353,11 @@ pub struct UiStateCapture {
     /// has to be right after EVERY history move, and `syncState` is the one
     /// place that already is.
     pub branches_json: String,
+    /// `history_node()`: which history state is live. Rides here for the same
+    /// reason as `branches_json` — the Batch › Crop frame has to know after
+    /// EVERY history move whether its crop is the live state, and the undo
+    /// count alone cannot say (crop, undo, one new edit: same count).
+    pub history_node: f64,
 }
 
 /// The layer stack and the canvas it sits on. Returned by
@@ -570,6 +575,7 @@ impl ImageHorseTool {
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
             branches_json: self.history_branches_json(),
+            history_node: self.history_node(),
         }
     }
 
@@ -1227,6 +1233,10 @@ mod capture_tests {
         assert_eq!(t.export_quality(), 37, "setup: quality must be non-default");
         assert!(t.undo_count() > 0, "setup: history must be non-empty");
         assert_eq!(t.history_branch_count(), 1, "setup: one fork must be held");
+        assert!(
+            t.history_node() > 0.0,
+            "setup: the live node must not be the load's"
+        );
 
         let ui = t.capture_ui_state();
 
@@ -1244,6 +1254,7 @@ mod capture_tests {
         assert_eq!(ui.active_layer_id, t.active_layer_id(), "active_layer_id");
         assert_eq!(ui.export_quality, t.export_quality(), "export_quality");
         assert_eq!(ui.branches_json, t.history_branches_json(), "branches_json");
+        assert_eq!(ui.history_node, t.history_node(), "history_node");
     }
 
     /// width and height are both `u32` and adjacent in the struct, so a

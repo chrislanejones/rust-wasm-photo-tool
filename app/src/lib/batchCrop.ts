@@ -99,7 +99,7 @@ export function cropRgba(
  * photo, and its size as a fraction of the largest crop that fits (`scale` 1 =
  * as big as the ratio allows). Fractions, not pixels, because the same framing
  * is replayed on two different resolutions — the live photo in the preview and
- * the ≤2048px working copy the non-active pass decodes — and because it
+ * the full-resolution original the non-active pass decodes — and because it
  * survives a ratio change: switch 1:1 → 4:5 and the frame stays where you put
  * it, just reshaped.
  */
