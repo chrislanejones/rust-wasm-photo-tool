@@ -4,6 +4,39 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — first bulk night leftovers (feat/bulk-night, 10-28-2026)
+
+| Item | What is true now | Why it waited |
+|---|---|---|
+| Batch Resize: the open photo | Resized in the engine from its working copy (≤ 2048 px). A target bigger than that copy **skips** the open photo with a reason, instead of writing it smaller than its original | Same gap #413 parked for Batch Crop: there is no way for a panel to reload the open photo from new stored bytes without an AppShell wire |
+| Batch Resize: history label | The open photo's step reads **"Resize"**, not "Batch Resize" | The label is the engine's (`snap("Resize")`) and the op log synthesizes it after a reload; a custom label is an op-log change, off-limits that night |
+| Batch Resize: photos not on the canvas | Their stored file is replaced; there is no undo for them | Same as Batch Crop, Logo, Text and Compress All today. A per-photo history entry for a photo that is not open needs the archive to record one |
+| Peak memory | The e2e records the JS heap peak (179 MB for six 6–8 MP photos). The engine's wasm memory is not in that number | `performance.memory` sees only JS; measuring wasm needs the module's `Memory` handle |
+| Select ▾ Larger than… | Compares the **file size** (KB/MB) | A pixel-size rule ("wider than 3000 px") is a second item if anyone asks |
+
+## OPEN — tile names and panel headers still disagree on 9 sub-tools (fix/one-tile-per-subtool, 10-28-2026)
+
+Night 10-28 §1 made Arrows & Diagram Shapes one name everywhere. The sweep
+in `e2e/one-tile-per-subtool.spec.ts` prints every tile next to its panel's
+first heading, and these still differ (tile → header):
+
+| Group | Tile | Panel header |
+|---|---|---|
+| Enhance | Resize & Compress | Resize (the panel has two sections) |
+| Select | Magic Wand | Wand |
+| Create | Brush | Paint |
+| Create | Clone Stamp | Clone |
+| Create | Blur Brush | Blur |
+| Create | Emoji | Emojis |
+| Edit | Layers | Edit Layer |
+| Edit | Canvas Size | Background Canvas Size |
+| Edit | Guides | Horizontal and Vertical Guides |
+
+Pen, Eraser, Text, Shapes, Pins, Stamps and every Batch tile already match.
+Pick one name per row and change the header (the tile label is also the
+palette entry and the screen-reader name, and some e2e specs click by it).
+Out of the night's scope: the plan asked for the Arrows name only.
+
 ## OPEN — tier pending leftovers (fix/tier-pending, 10-27-2026)
 
 - **Settings › Storage still flashes "Sign in with a Pro account"** while
@@ -39,13 +72,22 @@ wait their turn.
   was refused: the agent's GitHub token has no `workflow` scope. Add that
   one line (with a comment: fixture git repos, no network) by hand.
 
-## OPEN — `pnpm lint` does not cover `marketing/scripts/` (10-24-2026)
+## FIXED 10-27-2026 (chore/lint-marketing-scripts) — `pnpm lint` does not cover `marketing/scripts/` (10-24-2026)
 
 - The lint gate is `eslint app/src`, so the generator scripts are never
   linted. Run directly, `gen-trail-data.mjs` has one real finding
   (`no-regex-spaces`, the `releases.ts` block split) plus node-globals
   `no-undef` noise, because no config block gives `marketing/scripts/*.mjs`
   node globals. Adding one is its own small change.
+- **Fixed:** `pnpm lint` is now `eslint app/src eslint.config.mjs
+  marketing/scripts`. `eslint.config.mjs` gives `marketing/scripts/**/*.mjs`
+  Node globals, and gives `gen-og-images.mjs` exactly `document` and
+  `requestAnimationFrame` for its `page.evaluate` bodies (not all of
+  `globals.browser`, so a stray `window` in the Node half still fails). The
+  regex became `/\n {2}\{\n {4}version: /`; `gen-trail-data.mjs` run before
+  and after wrote byte-identical `commits.ts`, `features.ts`,
+  `celebrationStats.ts` and `source-dates.json`. 47 errors → 0; the warning
+  count stays 52.
 
 ## FIXED 10-24-2026 (fix/trail-squash-dates) — squash merges move night work to the merge day on the Trail Log (10-24-2026)
 
@@ -1056,6 +1098,14 @@ files, which come out clean. The scripts do not: `marketing/scripts/*.mjs` get
 config only declares globals for `app/src`. That is 9 errors in
 `gen-og-images.mjs` at HEAD. With those globals declared it lints clean. A
 `marketing/**` block with node and browser globals would make this gate real.
+
+- **Scripts half FIXED 10-27-2026 (chore/lint-marketing-scripts):**
+  `marketing/scripts/*.mjs` are in `pnpm lint` now, with Node globals, and
+  `gen-og-images.mjs` lints clean (19 errors at HEAD: the `console`/`process`/
+  `URL`/`Buffer` ones are Node globals; `document` and `requestAnimationFrame`
+  sit inside `page.evaluate` bodies, which run in Chromium, so those two names
+  alone are declared for that one file). **Still open:** `marketing/src`
+  (`.ts`/`.tsx`) is not in the lint command.
 
 ## CLOSED 10-07-2026 — NOT REPRODUCED: a commit click can leave a stray rectangle behind (2026-09-18)
 

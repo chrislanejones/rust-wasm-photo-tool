@@ -178,14 +178,14 @@ test.beforeEach(async ({ page }) => {
   await blockExternalNetwork(page);
 });
 
-test("diagram shapes draw from Arrows & Shapes and survive a reload", async ({ page }) => {
+test("diagram shapes draw from Arrows & Diagram Shapes and survive a reload", async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto("/");
   await importViaPicker(page);
   await installEngineProbe(page);
   const untouched = await canvasPng(page);
 
-  await pickTool(page, "Create", "Arrows & Shapes");
+  await pickTool(page, "Create", "Arrows & Diagram Shapes");
 
   // A database cylinder, then a filled cloud, then a block arrow. Picking the
   // next shape does not retype the one on the canvas; the next drag commits it.

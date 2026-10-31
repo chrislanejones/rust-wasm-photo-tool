@@ -57,6 +57,7 @@ import {
   Pin,
   Pipette,
   Ruler,
+  Scaling,
   Scan,
   ScanEye,
   ScanText,
@@ -505,8 +506,11 @@ const createGroup: ToolGroupDefinition = {
       keywords: ["select", "multi", "several", "align", "distribute", "marquee", "group"],
     },
     {
+      // One name everywhere (Night 10-28): this tile, the panel header, the
+      // palette and docs/Features.md. "Arrows & Shapes" sat next to the
+      // Shapes tile and read as the same tool. The id stays `arrow` — URLs.
       id: "arrow",
-      label: "Arrows & Shapes",
+      label: "Arrows & Diagram Shapes",
       description: "Arrows, plus 30 flowchart, basic and block-arrow diagram shapes",
       icon: ArrowUpRight,
       tool: "shapes",
@@ -775,6 +779,17 @@ const batchGroup: ToolGroupDefinition = {
         "auto name",
         "bulk",
       ],
+    },
+    {
+      // Night 10-28 (227): one size, format and quality for the whole
+      // gallery, from each stored original. Main | Exceptions like Crop.
+      id: "resize",
+      label: "Resize & Compress",
+      description: "Resize and re-encode every photo at once, never making a file bigger",
+      icon: Scaling,
+      tool: "emoji",
+      mode: "resize",
+      keywords: ["resize", "compress", "shrink", "width", "long edge", "kb", "webp", "bulk"],
     },
   ],
 };

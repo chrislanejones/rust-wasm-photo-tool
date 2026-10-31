@@ -96,6 +96,7 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   storage: "S3 / Image Hosting",
   billing: "Plan & Billing",
   aiusage: "AI Usage",
+  connections: "Connections",
   beta: "Beta",
   flags: "Feature Flags",
   image: "Current Image",

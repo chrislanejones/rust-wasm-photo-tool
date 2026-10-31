@@ -24,6 +24,35 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.43",
+    date: "2026-10-30",
+    headline: "Housekeeping: the lint check now covers the Trail Log scripts.",
+    entries: [
+      { tag: "infra", text: "pnpm lint now checks the scripts that build the Trail Log and the share images. It found 47 errors there: 46 Node globals the config didn't know about and one loose-spaces regex in the Trail Log generator. All fixed, and the generator's output is byte-identical." },
+      { tag: "infra", text: "GitHub's code scanning action is bumped from 4.39.0 to 4.39.1." },
+    ],
+  },
+  {
+    version: "v9.42",
+    date: "2026-10-29",
+    headline: "A first look at connecting AI apps to your account.",
+    entries: [
+      { tag: "feature", text: "Settings › Beta › MCP Connections preview adds a Connections page: a checklist of what has to be true before Claude or Cursor can use your account, what that access would cover, and three example prompts to copy. Nothing connects yet, and the account-access switch stays grayed out until sign-in checks are built." },
+      { tag: "infra", text: "The MCP plan is written down: what an AI app could reach (shares, palette, text styles, export recipes, a backup summary) and what it never would (gallery photos, AI jobs, billing)." },
+    ],
+  },
+  {
+    version: "v9.41",
+    date: "2026-10-28",
+    headline: "Resize a whole gallery in one pass.",
+    entries: [
+      { tag: "feature", text: "Batch › Resize & Compress resizes every photo from its full-size original and shows each one's size before and after. A photo that would get bigger is left alone." },
+      { tag: "feature", text: "Select ▾ in the gallery ticks photos by rule: portrait, landscape, square, larger than a size, edited, unedited, or the opposite of what's ticked." },
+      { tag: "feature", text: "Download All has recipes: Instagram 1080×1350, Web 1600, Email small, or one you save. A recipe shapes the ZIP and leaves the gallery alone, and saved ones sync when you're signed in." },
+      { tag: "fix", text: "Create showed two Arrows & Diagram Shapes tiles. The second was Select objects, and it has its own panel now." },
+    ],
+  },
+  {
     version: "v9.40",
     date: "2026-10-27",
     headline: "Shrinking a PNG makes it smaller now.",

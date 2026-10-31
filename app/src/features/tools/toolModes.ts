@@ -37,6 +37,7 @@ import {
   MapPin,
   PaintBucket,
   ScanEye,
+  Scaling,
   ScanText,
   Scissors,
   Shapes as ShapesIcon,
@@ -90,7 +91,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   shapes: [
     { id: "shapes", label: "Shapes", icon: ShapesIcon, keywords: ["rectangle", "ellipse", "box"] },
     { id: "pens", label: "Pins", icon: MapPin, keywords: ["pin", "callout", "number", "letter"] },
-    { id: "arrows", label: "Arrows", icon: ArrowUpRight, keywords: ["arrow", "pointer", "annotate"] },
+    { id: "arrows", label: "Arrows & Diagram Shapes", icon: ArrowUpRight, keywords: ["arrow", "pointer", "annotate"] },
   ],
   text: [
     { id: "text", label: "Text", icon: Type, keywords: ["text", "type", "caption", "label"] },
@@ -115,6 +116,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
       icon: ScanEye,
       keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
     },
+    { id: "resize", label: "Resize & Compress", icon: Scaling, keywords: ["resize", "compress", "shrink", "width", "kb", "webp", "batch"] },
   ],
   // `effects` is three tiles on one tool id: Adjustments, Levels and Presets.
   // `setModeOf` refuses any mode not listed here, silently — without this row

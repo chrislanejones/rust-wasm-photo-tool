@@ -8,6 +8,7 @@ import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
+import { SelectByMenu } from "./SelectByMenu";
 import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
@@ -170,6 +171,10 @@ function GalleryActions({
     <>
       {/* ── selection / delete / export ── */}
       <div className={actionRow}>
+        {/* Select ▾ — tick by a rule (lib/selectBy.ts). Needs two photos to
+            mean anything. */}
+        {totalCount > 1 && <SelectByMenu labelClassName={label} />}
+
         {some && onClearSelection && (
           <Button size="default" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
             <SquareX className="h-3.5 w-3.5" />

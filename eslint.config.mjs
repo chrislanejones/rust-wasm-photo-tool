@@ -288,4 +288,32 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+
+  {
+    // The marketing generator scripts (trail data, sitemap dates, prerender,
+    // OG images) and their node:test specs. Plain ESM under Node, run by hand
+    // or by `pnpm -C marketing build`. Before this block nothing linted them:
+    // the gate was `eslint app/src`, and run directly every file drowned in
+    // `no-undef` for console/process/Buffer/URL because no block gave them
+    // Node's globals.
+    files: ["marketing/scripts/**/*.mjs"],
+    languageOptions: {
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+  },
+
+  {
+    // gen-og-images.mjs drives headless Chromium, and the arrow functions it
+    // hands to `page.evaluate` run IN THE PAGE, not in Node: they wait on
+    // `document.fonts.load` and two `requestAnimationFrame` ticks. Those two
+    // names are declared here and nothing else from the browser is, so a stray
+    // `window` in the Node half of the script still fails `no-undef`.
+    // Not `globals.browser`: that would hide every browser global the script
+    // has no business touching outside an evaluate body.
+    files: ["marketing/scripts/gen-og-images.mjs"],
+    languageOptions: {
+      globals: { document: "readonly", requestAnimationFrame: "readonly" },
+    },
+  },
 );

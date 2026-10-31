@@ -11735,3 +11735,56 @@ is still open.
 Not in this release: dithering (a PNG photo compressed below 100 can band in
 skies), parked in `docs/PARKING_LOT.md`. imagehorse-qc is owed for the
 engine and Resize panel change.
+
+
+## v9.41 Change Summary — 2026-10-28
+
+**Resize a whole gallery in one pass.**
+
+| Area | Change |
+| --- | --- |
+| Batch › Resize & Compress (#417) | New sixth Batch tile. Width or Long edge, a size (Keep, 1080, 1600, 2048 or custom), format (Keep, JPEG, WebP, AVIF, PNG), quality, and an optional "Under N KB" that searches for the highest quality that fits. Photos not on the canvas are decoded from their **stored original at full size**, one at a time. A result bigger than the stored file is not written, and the row says so. Each photo gets a row: **3,970 KB → 248 KB** · 1600×1200 WEBP. Main and Exceptions each have their own settings. |
+| Select ▾ (#417) | Gallery bar menu: Portrait, Landscape, Square, Larger than…, Edited, Unedited, Invert. A rule replaces the ticks; Shift adds to them. The ticks are the Batch Exceptions, so a rule picks who gets the Exceptions settings. |
+| Export recipes (#417) | Download All › Recipe: Instagram 1080×1350 (cover crop, JPEG 85), Web 1600 (WebP 80), Email small (1024, JPEG 70), or **Save current as recipe…** with a file name pattern (`{name}` `{n}` `{w}` `{h}`). A recipe shapes the ZIP only; the gallery is not changed. |
+| Settings sync (#417) | Saved recipes live in Preferences, so they stay on the device when signed out and sync when signed in. The prefs sync format went **1 → 2** (ADR-097). A device still on an older build keeps its own settings changes locally until it reloads onto this one. No Convex change. |
+| One tile per tool (#416) | Create showed two Arrows & Diagram Shapes tiles: Select objects had no panel of its own and opened Shapes in whatever mode was last used. It has its own **Select objects** panel now, and "Arrows & Diagram Shapes" is the one name in the toolbar, the panel, the palette and the Features page. A new e2e opens all 39 tiles and fails if two in a group open the same panel. |
+| Verification | CI green on #416 and #417. tsc, lint (0 errors), **2,111 / 2,111** unit tests, guardrails, and the tile sweep plus the six bulk-night e2e cases (red on master, green here). Batch Resize on six 6–8 MP photos to 1600 / WebP / under 300 KB: all six ≤ 300 KB, peak JS heap **179 MB**. AppShell unchanged at 3,225 lines. No engine change. |
+
+Not in this release: the open photo is skipped by Batch Resize when the target
+needs more than its 2048 px working copy; its history step reads "Resize", not
+"Batch Resize"; photos not on the canvas have no undo after a Batch Resize. All
+three are in `docs/PARKING_LOT.md`. imagehorse-qc is owed for the Batch and
+Export changes.
+
+
+## v9.42 Change Summary — 2026-10-29
+
+**A first look at connecting AI apps to your account.**
+
+| Area | Change |
+| --- | --- |
+| Settings › Beta (#418) | New **MCP Connections preview** switch (`mcp-connector` flag). Off by default, stored on the device, grants no account access. |
+| Settings › Connections (#418) | Appears only with the preview on. A readiness checklist, an account-access summary and three copyable example prompts. The "Let AI apps use my account" switch is shown disabled until sign-in verification and server enforcement exist. Recent activity says "unavailable", not an empty log. Signed-out visitors see sign-in guidance only. |
+| Plan (#418) | ADR-095 and `docs/MCP.md`: planned tools, what an AI app can and cannot reach, and the open gate (the live Clerk instance's OAuth token format is unverified). |
+| Transport spike (#418) | `convex/mcpSpike.test.ts` runs initialize → tools/list → tools/call through a test-only router. `@modelcontextprotocol/sdk` is a dev dependency; no MCP endpoint ships. |
+| Verification | CI on #418: tsc, lint (0 errors), unit tests, guardrails, both e2e shards (shard 2 re-run after the known text-placement-undo flake). |
+
+Not in this release: the MCP endpoint itself, OAuth sign-in, ownership checks,
+rate limits, a server kill switch and the activity log. All wait on gate 2 in
+ADR-095. No engine, canvas or tool change, so imagehorse-qc is not owed for
+this one.
+
+
+## v9.43 Change Summary — 2026-10-30
+
+**Housekeeping: the lint check now covers the Trail Log scripts.**
+
+| Area | Change |
+| --- | --- |
+| Lint (#411) | `pnpm lint` and `lint:fix` now also cover `marketing/scripts`. Those files had 47 errors when linted directly: 46 `no-undef` for Node globals, and one real `no-regex-spaces` in `gen-trail-data.mjs`. |
+| ESLint config (#411) | `marketing/scripts/**/*.mjs` get Node globals. `gen-og-images.mjs` also gets exactly `document` and `requestAnimationFrame`, which only run inside Chromium `page.evaluate` bodies. |
+| Trail Log generator (#411) | The release-split regex counts its spaces (`{2}`, `{4}`). Before and after, it writes byte-identical commits.ts, features.ts, celebrationStats.ts and source-dates.json. |
+| CI (#404) | `github/codeql-action` 4.39.0 → 4.39.1. |
+| Verification | tsc 0, lint 0 errors (53 warnings), 231 files / 2,114 unit tests, production build, guardrails OK. |
+
+No engine, canvas or tool change, so imagehorse-qc is not owed for this one.

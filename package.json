@@ -12,8 +12,8 @@
     "bench:annotations": "node scripts/annotation-benchmark.mjs",
     "bench:compare": "node scripts/compare-benchmark.mjs",
     "build:all": "pnpm run build:wasm && pnpm run build",
-    "lint": "eslint app/src eslint.config.mjs",
-    "lint:fix": "eslint app/src eslint.config.mjs --fix",
+    "lint": "eslint app/src eslint.config.mjs marketing/scripts",
+    "lint:fix": "eslint app/src eslint.config.mjs marketing/scripts --fix",
     "test:convex": "node --test scripts/convex-deploy-check.test.mjs && vitest run",
     "test:e2e": "playwright test",
     "test:e2e:sw": "playwright test --config playwright.sw.config.ts",
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@playwright/test": "^1.64.1",
     "@types/node": "26.6.4",
     "convex": "catalog:",
