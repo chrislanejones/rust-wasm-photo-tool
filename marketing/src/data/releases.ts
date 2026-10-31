@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.47",
+    date: "2026-10-31",
+    headline: "The Halloween flags got a lot bigger.",
+    entries: [
+      { tag: "ui", text: "The \"Happy Halloween\" letter flags are about two and a half times bigger, and the pumpkin and bat grew to match." },
+      { tag: "ui", text: "On a narrow window every flag shrinks to fit instead of letters falling off the ends, and on the start screen the garland sits above the horse." },
+      { tag: "infra", text: "A Text panel test that failed on any computer with cloud keys set now runs in demo mode." },
+    ],
+  },
+  {
     version: "v9.46",
     date: "2026-10-31",
     headline: "Text gets an outline, and the editor dresses up for Halloween.",

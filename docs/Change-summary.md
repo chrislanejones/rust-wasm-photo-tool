@@ -11842,3 +11842,18 @@ The engine and the Text tool changed, so imagehorse-qc is owed for this one.
 Still open: a new way for callout-leader's Align test to fail on master CI
 (the leader is back where it was after the reload), and a fast A → B → A photo
 switch that can leave B's picture showing. Both are in `docs/PARKING_LOT.md`.
+
+
+## v9.47 Change Summary — 2026-10-31
+
+**The Halloween flags got a lot bigger.**
+
+| Area | Change |
+| --- | --- |
+| Halloween garland (#423) | Letter flags **22×28 → 52×64 px**, letters 2xs → **26 px** (weight 800), pumpkin 26 → 52 px, bat 30 → 60 px. Every size multiplies one CSS variable, `--halloween-scale`. The top bar's string sets it from its own width, so a bar shorter than the 808 px message shrinks the flags to fit (floor 0.4×) instead of clipping letters. The start screen steps it down with media queries (narrow 0.7× / 0.42×, short 0.75× / 0.5×) and the garland moved from 64 px to 12 px from the top so it clears the logo. |
+| Garland sag (#423) | The cord's dip and each flag's drop now scale with the flags. Before, the start-screen copy dipped a fixed 12 px whatever its size. |
+| Tests (#422) | `TextSettings.sections.test.tsx` blanks `VITE_CONVEX_URL` and `VITE_CLERK_PUBLISHABLE_KEY` in `vi.hoisted`, like `cloud.test.ts`, so it runs in demo mode. It failed 3 of 4 in any checkout with cloud keys in `app/.env.local`. |
+| Verification | tsc 0, lint 0 errors (53 warnings), guardrails OK, 240 files / 2,154 unit tests (also with placeholder cloud keys set), production build. Garland checked in a production build at 1440×800, 1440×640, 1280×800 and 1100×800: 0 letters clipped. |
+
+No engine or saved-format change. imagehorse-qc is still owed from v9.46
+(the engine and the Text tool).

@@ -90,24 +90,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.46 — 2026-10-31
+### v9.47 — 2026-10-31
 
-**Text gets an outline, and the editor dresses up for Halloween.**
+**The Halloween flags got a lot bigger.**
 
-The Text panel has a Stroke now: an outline around the letters, 0 to 20 px,
-with its own color and opacity. It's drawn outside the letters, so a thick
-outline never eats into thin type, and the letters don't shift when you turn
-it on, rotated or not. The panel got tidier on the way. The background, stroke
-and drop shadow controls each fold into their own dropdown, and the shut
-header tells you what's on ("Bubble", "3 px", "Text").
+The "Happy Halloween" garland's letters were too small to read from across
+the desk, so the flags are about two and a half times bigger now: 52 by 64 px
+with 26 px letters, and the pumpkin and bat grew to match. On a window too
+narrow for the whole message, every flag shrinks to fit instead of letters
+falling off the ends. On the start screen the garland moved up to the top of
+the page so it clears the horse.
 
-Saved edits from before this release open with no outline, and nothing else
-about them changes.
+It's still only up through tonight. Close it once and it stays closed.
 
-From October 24 through the 31st, a little "Happy Halloween" garland hangs
-from the top bar and over the start screen, with a pumpkin and a bat. Close it
-once and it stays closed until next October. It takes itself down after
-tonight.
+Also in this one: a Text panel test that failed on any computer with cloud
+keys set now runs in demo mode, the same as everywhere else.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
