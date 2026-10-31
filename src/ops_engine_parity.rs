@@ -254,6 +254,7 @@ fn text_add_replay_matches_live_annotation() {
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
+            stroke: Default::default(),
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -549,6 +550,7 @@ fn persist_restore_keeps_base_annotations_live() {
         box_height: 0,
         perspective: crate::perspective::IDENTITY_QUAD,
         font_id: String::new(),
+        stroke: Default::default(),
         id: 1,
         text: "base".into(),
         x: 6,
@@ -2137,7 +2139,11 @@ fn adjustments_preview_identity_duplicate_and_apply_record_only_commits() {
     assert!(!t.tonal_preview_active());
     assert_eq!(t.oplog_op_count(), 1);
     let frames = t.oplog_encoded_ops(0, 1);
-    assert_eq!((frames[4], frames[5]), (14, 24), "append-only wire index");
+    assert_eq!(
+        (frames[4], frames[5]),
+        (crate::ops::OP_FORMAT_VERSION, 24),
+        "append-only wire index"
+    );
     let ops = crate::ops::decode_op_frames(&frames).expect("frames"); // allow: rust-panic
     assert_eq!(ops[0].label(), "Adjustments");
     assert_eq!(
@@ -2206,4 +2212,55 @@ fn adjustments_session_survives_keyframes_and_keyframe_pruning() {
         assert_eq!(&composite_hash(&mut r), expected);
         assert!(!r.oplog_is_broken());
     }
+}
+
+#[test]
+fn a_text_outline_records_undoes_and_survives_a_reload() {
+    // v15: the outline is `#[serde(skip)]` on `TextParams`, so it reaches the
+    // log only as its own `Op::TextStroke`. Without it, replay would rebuild
+    // the text un-outlined, the hash would diverge and the log would mark
+    // itself broken.
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+    let id = t.add_text_annotation(
+        "Hi", 24.0, 255, 255, 255, true, 20, 20, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
+    );
+    t.recomposite();
+    let h_plain = composite_hash(&mut t);
+    let ops_before = t.oplog_op_count();
+
+    assert!(t.set_text_stroke(id, 3, "#000000", 255));
+    let h_outlined = composite_hash(&mut t);
+    assert_ne!(h_plain, h_outlined, "the outline changed the pixels");
+    assert_eq!(
+        t.oplog_op_count(),
+        ops_before + 1,
+        "one TextStroke op recorded"
+    );
+    assert!(!t.oplog_is_broken());
+
+    // Same outline again: no op, no history step.
+    let undo_steps = t.undo_count();
+    assert!(t.set_text_stroke(id, 3, "#000000", 255));
+    assert_eq!(t.oplog_op_count(), ops_before + 1);
+    assert_eq!(t.undo_count(), undo_steps);
+
+    // Persist → reload on a fresh engine lands on the outlined picture.
+    let total = t.oplog_op_count() as u32;
+    let frames = t.oplog_encoded_ops(0, total);
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+    let mut t2 = ImageHorseTool::new(bw, bh);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, total));
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_outlined,
+        "reload keeps the outline"
+    );
+
+    // And undo takes it off again.
+    assert!(t.undo());
+    assert_eq!(composite_hash(&mut t), h_plain, "undo removes the outline");
 }

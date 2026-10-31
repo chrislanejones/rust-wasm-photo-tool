@@ -55,6 +55,13 @@ const SHADOW_MODE_OPTIONS = [
   { id: "both", label: "Both" },
 ] as const;
 
+// Text stroke width, px. The engine clamps to the same 20
+// (`annotations::MAX_TEXT_STROKE_WIDTH`), so the slider can't ask for more
+// than gets drawn.
+// A plain slider rather than the preset steps Shape's Stroke Width uses: a
+// preset track cannot reach 0, and 0 is how the stroke is turned off.
+const TEXT_STROKE_MAX = 20;
+
 const BG_KIND_OPTIONS = [
   { id: "none", label: "None" },
   { id: "rect", label: "Text BG" },
@@ -103,7 +110,7 @@ const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
     id: "background",
     label: "Background",
     icon: PaintBucket,
-    info: "A fill behind the text — plain box or speech bubble, with padding, corners and a drop shadow.",
+    info: "A fill behind the text — plain box or speech bubble, with padding and corners — plus a stroke around the letters and a drop shadow.",
   },
   {
     id: "ocr",
@@ -182,6 +189,14 @@ export function TextSettings({
   };
 
   const activeModeInfo = MODE_OPTIONS.find((opt) => opt.id === mode);
+  const shadowMode =
+    settings.shadowBox && settings.shadowText
+      ? "both"
+      : settings.shadowBox
+        ? "box"
+        : settings.shadowText
+          ? "text"
+          : "off";
 
   return (
     // The mode tiles moved to the ToolsSidebar header (SubtoolRow); `-mt-2`
@@ -270,162 +285,215 @@ export function TextSettings({
           </div>
         )}
 
-        {/* Background / bubble / shadow controls.
+        {/* Background, stroke and drop shadow — each its own dropdown.
             Rendered for the TEXT mode too, immediately after the Color swatch
             above — the plate behind a caption is part of styling that caption,
             and hiding it behind a second mode meant you had to leave the text
             you were editing to reach it. `background` keeps its own mode so the
-            existing toggle, route and palette entry all still land somewhere. */}
+            existing toggle, route and palette entry all still land somewhere.
+
+            Collapsed by default in the Text mode (Chris, 10-31-2026: "it's
+            just so much stuff on here"), open in the Background mode, where
+            they are the whole point. `key={m}` re-mounts them on a mode
+            switch so that default actually applies. The summary on the right
+            of each header keeps a setting that is ON visible while shut. */}
         {(m === "text" || m === "background") && (
-          <div className="space-y-4">
-            {/* Style toggle */}
-            <ControlRow label="Style">
-              {({ labelId }) => (
-                <ToolButtonGroup
-                  aria-labelledby={labelId}
-                  options={BG_KIND_OPTIONS}
-                  value={settings.bgKind}
-                  onChange={(id) => onChange({ ...settings, bgKind: id })}
-                  columns={3}
-                />
-              )}
-            </ControlRow>
-
-            {settings.bgKind !== "none" && (
-              <>
-                {/* Background color */}
-                <ColorSwatchGrid
-                  label="Background Color"
-                  colors={TEXT_COLORS}
-                  value={settings.bgColor}
-                  onChange={(color) => onChange({ ...settings, bgColor: color })}
-                />
-
-                {/* Padding */}
-                <SizeSlider
-                  label="Padding"
-                  value={settings.bgPadding}
-                  min={0}
-                  max={40}
-                  unit="px"
-                  onChange={(v) => onChange({ ...settings, bgPadding: v })}
-                />
-
-                {/* Corner style — three presets, for both Text BG and Bubble. */}
-                <ControlRow label="Corners">
-                  {({ labelId }) => (
-                    <ToolButtonGroup
-                      aria-labelledby={labelId}
-                      options={BG_CORNER_OPTIONS}
-                      value={cornerIdFromRadius(settings.bgCornerRadius)}
-                      onChange={(id) =>
-                        onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
-                      }
-                      columns={3}
-                    />
-                  )}
-                </ControlRow>
-
-                {/* Tail direction — bubble only. Angle in degrees (0-359):
-                    the slider sweeps the tail all the way around the bubble. */}
-                {settings.bgKind === "bubble" && (
-                  <SizeSlider
-                    label="Tail Direction"
-                    value={settings.bgTail}
-                    min={0}
-                    max={359}
-                    unit="°"
-                    onChange={(v) => onChange({ ...settings, bgTail: v })}
+          <>
+            <CollapsibleSection
+              key={`bg-${m}`}
+              label="Background"
+              defaultOpen={m === "background"}
+              summary={BG_KIND_OPTIONS.find((o) => o.id === settings.bgKind)?.label}
+              info="A fill behind the text — a plain box or a speech bubble, with its own color, padding, corners and opacity."
+            >
+              {/* Style toggle */}
+              <ControlRow label="Style">
+                {({ labelId }) => (
+                  <ToolButtonGroup
+                    aria-labelledby={labelId}
+                    options={BG_KIND_OPTIONS}
+                    value={settings.bgKind}
+                    onChange={(id) => onChange({ ...settings, bgKind: id })}
+                    columns={3}
                   />
                 )}
+              </ControlRow>
 
-                {/* Opacity */}
-                <SizeSlider
-                  label="Opacity"
-                  value={settings.bgOpacity}
-                  min={0}
-                  max={100}
-                  unit="%"
-                  onChange={(v) => onChange({ ...settings, bgOpacity: v })}
-                />
-              </>
-            )}
+              {settings.bgKind !== "none" && (
+                <>
+                  {/* Background color */}
+                  <ColorSwatchGrid
+                    label="Background Color"
+                    colors={TEXT_COLORS}
+                    value={settings.bgColor}
+                    onChange={(color) => onChange({ ...settings, bgColor: color })}
+                  />
+
+                  {/* Padding */}
+                  <SizeSlider
+                    label="Padding"
+                    value={settings.bgPadding}
+                    min={0}
+                    max={40}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, bgPadding: v })}
+                  />
+
+                  {/* Corner style — three presets, for both Text BG and Bubble. */}
+                  <ControlRow label="Corners">
+                    {({ labelId }) => (
+                      <ToolButtonGroup
+                        aria-labelledby={labelId}
+                        options={BG_CORNER_OPTIONS}
+                        value={cornerIdFromRadius(settings.bgCornerRadius)}
+                        onChange={(id) =>
+                          onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
+                        }
+                        columns={3}
+                      />
+                    )}
+                  </ControlRow>
+
+                  {/* Tail direction — bubble only. Angle in degrees (0-359):
+                      the slider sweeps the tail all the way around the bubble. */}
+                  {settings.bgKind === "bubble" && (
+                    <SizeSlider
+                      label="Tail Direction"
+                      value={settings.bgTail}
+                      min={0}
+                      max={359}
+                      unit="°"
+                      onChange={(v) => onChange({ ...settings, bgTail: v })}
+                    />
+                  )}
+
+                  {/* Opacity */}
+                  <SizeSlider
+                    label="Opacity"
+                    value={settings.bgOpacity}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    onChange={(v) => onChange({ ...settings, bgOpacity: v })}
+                  />
+                </>
+              )}
+            </CollapsibleSection>
+
+            {/* Stroke — an outline around the letters, the text twin of a
+                shape's stroke. Engine-drawn OUTSIDE the glyphs (so it never
+                thins the type) by `outline_glyphs` in src/layer.rs. Width 0
+                is off; that is the default and what every older text means. */}
+            <CollapsibleSection
+              key={`stroke-${m}`}
+              label="Stroke"
+              defaultOpen={m === "background"}
+              summary={settings.textStrokeWidth > 0 ? `${settings.textStrokeWidth} px` : "Off"}
+              info="An outline around the letters themselves. Drawn outside the glyphs, so a thick stroke never makes the type thinner."
+            >
+              <SizeSlider
+                label="Stroke Width"
+                value={settings.textStrokeWidth}
+                min={0}
+                max={TEXT_STROKE_MAX}
+                unit="px"
+                onChange={(v) => onChange({ ...settings, textStrokeWidth: v })}
+              />
+              {settings.textStrokeWidth > 0 && (
+                <>
+                  <ColorSwatchGrid
+                    label="Stroke Color"
+                    colors={TEXT_COLORS}
+                    value={settings.textStrokeColor}
+                    onChange={(color) => onChange({ ...settings, textStrokeColor: color })}
+                  />
+                  <SizeSlider
+                    label="Stroke Opacity"
+                    value={settings.textStrokeOpacity}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    onChange={(v) => onChange({ ...settings, textStrokeOpacity: v })}
+                  />
+                </>
+              )}
+            </CollapsibleSection>
 
             {/* Drop shadow — soft, Rust-rendered. With a background, "Box" casts
                 from the box/bubble and "Text" from the glyphs. With Background =
                 None there's no box, so any shadow (Box/Text/Both) casts from the
                 text silhouette — "Box" still produces a visible shadow. */}
-            <ControlRow label="Drop Shadow">
-              {({ labelId }) => (
-                <ToolButtonGroup
-                  aria-labelledby={labelId}
-                  options={SHADOW_MODE_OPTIONS}
-                  value={
-                    settings.shadowBox && settings.shadowText
-                      ? "both"
-                      : settings.shadowBox
-                        ? "box"
-                        : settings.shadowText
-                          ? "text"
-                          : "off"
-                  }
-                  onChange={(id) =>
-                    onChange({
-                      ...settings,
-                      shadowBox: id === "box" || id === "both",
-                      shadowText: id === "text" || id === "both",
-                    })
-                  }
-                  columns={4}
-                />
-              )}
-            </ControlRow>
+            <CollapsibleSection
+              key={`shadow-${m}`}
+              label="Drop Shadow"
+              defaultOpen={m === "background"}
+              summary={SHADOW_MODE_OPTIONS.find((o) => o.id === shadowMode)?.label}
+              info="A soft shadow cast from the box, the text, or both — with its own color, opacity, offset and blur."
+            >
+              <ControlRow label="Cast From">
+                {({ labelId }) => (
+                  <ToolButtonGroup
+                    aria-labelledby={labelId}
+                    options={SHADOW_MODE_OPTIONS}
+                    value={shadowMode}
+                    onChange={(id) =>
+                      onChange({
+                        ...settings,
+                        shadowBox: id === "box" || id === "both",
+                        shadowText: id === "text" || id === "both",
+                      })
+                    }
+                    columns={4}
+                  />
+                )}
+              </ControlRow>
 
-            {(settings.shadowBox || settings.shadowText) && (
-              <>
-                <ColorSwatchGrid
-                  label="Shadow Color"
-                  colors={TEXT_COLORS}
-                  value={settings.shadowColor}
-                  onChange={(color) =>
-                    onChange({ ...settings, shadowColor: color })
-                  }
-                />
-                <SizeSlider
-                  label="Shadow Opacity"
-                  value={settings.shadowOpacity}
-                  min={0}
-                  max={100}
-                  unit="%"
-                  onChange={(v) => onChange({ ...settings, shadowOpacity: v })}
-                />
-                <SizeSlider
-                  label="Offset X"
-                  value={settings.shadowOffsetX}
-                  min={-20}
-                  max={20}
-                  unit="px"
-                  onChange={(v) => onChange({ ...settings, shadowOffsetX: v })}
-                />
-                <SizeSlider
-                  label="Offset Y"
-                  value={settings.shadowOffsetY}
-                  min={-20}
-                  max={20}
-                  unit="px"
-                  onChange={(v) => onChange({ ...settings, shadowOffsetY: v })}
-                />
-                <SizeSlider
-                  label="Blur"
-                  value={settings.shadowBlur}
-                  min={0}
-                  max={30}
-                  unit="px"
-                  onChange={(v) => onChange({ ...settings, shadowBlur: v })}
-                />
-              </>
-            )}
-          </div>
+              {(settings.shadowBox || settings.shadowText) && (
+                <>
+                  <ColorSwatchGrid
+                    label="Shadow Color"
+                    colors={TEXT_COLORS}
+                    value={settings.shadowColor}
+                    onChange={(color) =>
+                      onChange({ ...settings, shadowColor: color })
+                    }
+                  />
+                  <SizeSlider
+                    label="Shadow Opacity"
+                    value={settings.shadowOpacity}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    onChange={(v) => onChange({ ...settings, shadowOpacity: v })}
+                  />
+                  <SizeSlider
+                    label="Offset X"
+                    value={settings.shadowOffsetX}
+                    min={-20}
+                    max={20}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, shadowOffsetX: v })}
+                  />
+                  <SizeSlider
+                    label="Offset Y"
+                    value={settings.shadowOffsetY}
+                    min={-20}
+                    max={20}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, shadowOffsetY: v })}
+                  />
+                  <SizeSlider
+                    label="Blur"
+                    value={settings.shadowBlur}
+                    min={0}
+                    max={30}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, shadowBlur: v })}
+                  />
+                </>
+              )}
+            </CollapsibleSection>
+          </>
         )}
 
         {m === "ocr" && (

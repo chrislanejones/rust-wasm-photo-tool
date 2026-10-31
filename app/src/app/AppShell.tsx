@@ -151,6 +151,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { DownloadDialog } from "@/components/DownloadDialog";
 import { downloadActiveSvgWithToast, downloadSvgZip } from "./session/svgDownload";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
+import { textOverlaySettings } from "@/lib/textOverlaySettings";
 import {
   Undo,
   Redo,
@@ -2845,19 +2846,7 @@ export function AppShell() {
                           onTextKeyDown={textTool.onTextKeyDown}
                           onTextChange={textTool.onTextChange}
                           onTextBlur={textTool.onTextBlur}
-                          textSettings={{
-                            fontSize: toolSettings.fontSize,
-                            fontFamily: toolSettings.fontFamily,
-                            textFontId: toolSettings.textFontId,
-                            fontWeight: toolSettings.fontWeight,
-                            textColor: toolSettings.textColor,
-                            bgKind: toolSettings.bgKind,
-                            bgColor: toolSettings.bgColor,
-                            bgOpacity: toolSettings.bgOpacity,
-                            bgPadding: toolSettings.bgPadding,
-                            bgCornerRadius: toolSettings.bgCornerRadius,
-                            bgTail: toolSettings.bgTail,
-                          }}
+                          textSettings={textOverlaySettings(toolSettings)}
                           containerRef={containerRef}
                           onTextPositionChange={textTool.setTextPosition}
                           onTextFontSizeChange={handleTextFontSizeChange}
@@ -2972,19 +2961,7 @@ export function AppShell() {
                       onTextChange={textTool.onTextChange}
                       onTextBlur={textTool.onTextBlur}
                       guides={guidesConfig}
-                      textSettings={{
-                        fontSize: toolSettings.fontSize,
-                        fontFamily: toolSettings.fontFamily,
-                        textFontId: toolSettings.textFontId,
-                        fontWeight: toolSettings.fontWeight,
-                        textColor: toolSettings.textColor,
-                        bgKind: toolSettings.bgKind,
-                        bgColor: toolSettings.bgColor,
-                        bgOpacity: toolSettings.bgOpacity,
-                        bgPadding: toolSettings.bgPadding,
-                        bgCornerRadius: toolSettings.bgCornerRadius,
-                        bgTail: toolSettings.bgTail,
-                      }}
+                      textSettings={textOverlaySettings(toolSettings)}
                       containerRef={containerRef}
                       onTextPositionChange={textTool.setTextPosition}
                       onTextFontSizeChange={handleTextFontSizeChange}

@@ -55,5 +55,8 @@ export const defaultToolSettings: ToolSettings = {
   shadowOffsetX: 2,
   shadowOffsetY: 2,
   shadowBlur: 4,
+  textStrokeWidth: 0,
+  textStrokeColor: "#000000",
+  textStrokeOpacity: 100,
   pinLabel: "numbers",
 };

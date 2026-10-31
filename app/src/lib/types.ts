@@ -156,6 +156,12 @@ export interface ToolSettings extends StampSettings {
   shadowOffsetY: number;    // px
   shadowBlur: number;       // px
 
+  // Text outline (Rust-rendered, drawn OUTSIDE the glyphs) — the text twin of
+  // a shape's stroke. Width 0 = no outline.
+  textStrokeWidth: number;  // 0-20 px
+  textStrokeColor: string;  // hex
+  textStrokeOpacity: number; // 0-100
+
   // Pins (Shapes tool → Pins tab) — drop auto-sequenced callout discs.
   /** Pin label style: numbers (1, 2, 3…) or letters (A, B, C…). */
   pinLabel: "numbers" | "letters";

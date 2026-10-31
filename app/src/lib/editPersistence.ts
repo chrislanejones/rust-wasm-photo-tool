@@ -157,6 +157,15 @@ export interface PersistedAnnotation {
    *  before v8.81, and on any text the Perspective tool never touched; the
    *  restore path reads an absent or wrong-length value as the identity. */
   perspective?: number[];
+  /** The text OUTLINE: width in px (0 / absent = none) and its RGBA. Optional
+   *  and not indexed — no Dexie bump, same reasoning as `font_id` above. An
+   *  archive written before the outline existed reads back `undefined`, which
+   *  the restore path passes as 0: no outline, exactly what it meant. */
+  stroke_width?: number;
+  stroke_r?: number;
+  stroke_g?: number;
+  stroke_b?: number;
+  stroke_a?: number;
 }
 
 /** One live (non-destructive) shape/arrow annotation, as emitted by Rust's

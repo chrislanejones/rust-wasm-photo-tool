@@ -263,7 +263,17 @@ use serde::{Deserialize, Serialize};
 /// carries the panel's seven settings and whether this starts a new session.
 /// Replay keeps the untouched session pixels, so successive releases and
 /// resets do not compound clipped filters. v13 TonalStack bytes are unchanged.
-pub const OP_FORMAT_VERSION: u8 = 14;
+///
+/// **15** — the text OUTLINE: the recipe once more, for text.
+///
+///   * `stroke` is `#[serde(skip)]` on [`TextParams`]; the `TextAdd`/`TextEdit`
+///     wire layout is still v2's. Its skipped default (width 0) IS its
+///     semantic default — no outline — so no normalization step is needed.
+///   * The outline rides in an APPENDED variant, [`Op::TextStroke`]
+///     (index 25).
+///   * `encode_annotations` gained a THIRTEENTH tuple element, read as a tail
+///     after v11's, so an empty tail is a v14-or-older blob: no outlines.
+pub const OP_FORMAT_VERSION: u8 = 15;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -391,6 +401,16 @@ pub struct TextParams {
     /// what every pre-v8.76 annotation meant.
     #[serde(skip)]
     pub font_id: String,
+    /// The text OUTLINE. v15.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width` above — read that comment, it applies word for word.
+    /// The outline travels beside the struct instead: as the thirteenth
+    /// element of `encode_annotations`, and as [`Op::TextStroke`] in the log.
+    /// Deserialises to width 0, "no outline", which is exactly what every
+    /// annotation written before v15 meant.
+    #[serde(skip)]
+    pub stroke: crate::annotations::TextStroke,
 }
 
 /// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
@@ -528,6 +548,7 @@ impl TextParams {
             shadow_dy: a.shadow_dy,
             shadow_blur: a.shadow_blur,
             font_id: a.font_id.clone(),
+            stroke: a.stroke,
         }
     }
 
@@ -564,6 +585,8 @@ impl TextParams {
         self.box_height = prev.box_height;
         self.perspective = prev.perspective;
         self.font_id = std::mem::take(&mut prev.font_id);
+        // v15: the fifth, owned by `TextStroke`.
+        self.stroke = prev.stroke;
     }
 }
 
@@ -725,6 +748,7 @@ pub(crate) fn annotation_sync_ops(
                 let box_h = params.box_height;
                 let quad = params.perspective;
                 let font = params.font_id.clone();
+                let stroke = params.stroke;
                 pending.push(Op::TextAdd(params));
                 if wrap != 0 {
                     pending.push(Op::TextWrap {
@@ -754,6 +778,10 @@ pub(crate) fn annotation_sync_ops(
                         font_id: font,
                     });
                 }
+                // No outline is what a skipped-field decode already holds.
+                if stroke.is_on() {
+                    pending.push(Op::text_stroke(a.id, stroke));
+                }
             }
             Some(t) => {
                 if t.wrap_width != params.wrap_width {
@@ -780,6 +808,9 @@ pub(crate) fn annotation_sync_ops(
                         font_id: params.font_id.clone(),
                     });
                 }
+                if t.stroke != params.stroke {
+                    pending.push(Op::text_stroke(a.id, params.stroke));
+                }
                 // Compare everything EXCEPT the four skipped fields,
                 // which the branches above already accounted for —
                 // otherwise a box-only drag would also emit a redundant
@@ -791,6 +822,7 @@ pub(crate) fn annotation_sync_ops(
                 without_box.box_height = params.box_height;
                 without_box.perspective = params.perspective;
                 without_box.font_id = params.font_id.clone();
+                without_box.stroke = params.stroke;
                 if without_box != params {
                     pending.push(Op::TextEdit(params));
                 }
@@ -1098,6 +1130,12 @@ pub enum Op {
         sharpen: f64,
         blur: f64,
     },
+    /// v15 — a text annotation's OUTLINE: width in px (0 = none) and its
+    /// RGBA. The text twin of the appended shape family: `#[serde(skip)]` on
+    /// [`TextParams::stroke`] means `TextAdd`/`TextEdit` cannot carry it.
+    /// Appended after [`Op::Adjustments`] (index 25); same rule as every
+    /// variant since v2.
+    TextStroke { id: u32, width: u32, rgba: [u8; 4] },
 }
 
 impl Op {
@@ -1152,6 +1190,19 @@ impl Op {
             // The snapshot path's label for the same action (`snap("Preset")`).
             Op::TonalStack { .. } => "Preset",
             Op::Adjustments { .. } => "Adjustments",
+            // `set_text_stroke`'s own snapshot label.
+            Op::TextStroke { .. } => "Text Stroke",
+        }
+    }
+}
+
+impl Op {
+    /// The `TextStroke` op for an outline, in the wire's flat form.
+    pub(crate) fn text_stroke(id: u32, s: crate::annotations::TextStroke) -> Op {
+        Op::TextStroke {
+            id,
+            width: s.width,
+            rgba: [s.r, s.g, s.b, s.a],
         }
     }
 }
@@ -1336,6 +1387,16 @@ pub fn encode_annotations(
     let shape_star_points: Vec<u8> = shapes.iter().map(|s| s.star_points).collect();
     // v11 appends the per-shape CORNER RADII as the twelfth element.
     let shape_corner_radii: Vec<[u16; 4]> = shapes.iter().map(|s| s.corner_radii).collect();
+    // v15 appends the per-TEXT OUTLINE (width, rgba) as the thirteenth.
+    let text_strokes: Vec<(u32, [u8; 4])> = texts
+        .iter()
+        .map(|t| {
+            (
+                t.stroke.width,
+                [t.stroke.r, t.stroke.g, t.stroke.b, t.stroke.a],
+            )
+        })
+        .collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -1349,6 +1410,7 @@ pub fn encode_annotations(
         &shape_rotations,
         &shape_star_points,
         &shape_corner_radii,
+        &text_strokes,
     )) {
         out.extend_from_slice(&body);
     }
@@ -1445,9 +1507,16 @@ pub fn decode_annotations(
             }
             // v11: the same move once more. An empty tail is a v9 blob, and
             // every shape keeps the square corners the skip left it.
-            if let Ok(radii) = postcard::from_bytes::<Vec<[u16; 4]>>(v11_tail) {
+            if let Ok((radii, v15_tail)) = postcard::take_from_bytes::<Vec<[u16; 4]>>(v11_tail) {
                 for (sp, r) in shapes.iter_mut().zip(radii) {
                     sp.corner_radii = crate::annotations::canonical_corner_radii(sp.kind, &r);
+                }
+                // v15: the text outlines. An empty tail is a v14-or-older
+                // blob, and every text keeps the "no outline" the skip left.
+                if let Ok(strokes) = postcard::from_bytes::<Vec<(u32, [u8; 4])>>(v15_tail) {
+                    for (t, (w, c)) in texts.iter_mut().zip(strokes) {
+                        t.stroke = crate::annotations::TextStroke::new(w, c[0], c[1], c[2], c[3]);
+                    }
                 }
             }
         }
@@ -1765,6 +1834,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         t.shadow_dy,
         t.shadow_blur,
         &t.font_id,
+        t.stroke,
     )
 }
 
@@ -1976,6 +2046,12 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::TextFont { id, font_id } => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.font_id = font_id.clone();
+            }
+        }
+        Op::TextStroke { id, width, rgba } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.stroke =
+                    crate::annotations::TextStroke::new(*width, rgba[0], rgba[1], rgba[2], rgba[3]);
             }
         }
         Op::ShapeRotation { id, rotation_deg } => {
@@ -2469,6 +2545,7 @@ mod tests {
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
+            stroke: Default::default(),
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -3166,6 +3243,7 @@ mod v2_migration_tests {
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
+            stroke: Default::default(),
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -3653,6 +3731,87 @@ mod v2_migration_tests {
             postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
             postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
             "font_id must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_stroke_field() {
+        // The measurement once more, for v15's outline.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.stroke = crate::annotations::TextStroke::new(6, 1, 2, 3, 255);
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "the outline must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn v15_round_trips_text_strokes_and_v14_blobs_mean_none() {
+        let mut t = a_text(1);
+        t.stroke = crate::annotations::TextStroke::new(4, 10, 20, 30, 200);
+        let blob = encode_annotations(&[t.clone(), a_text(2)], &[a_shape(3)], None);
+        let (texts, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(texts[0].stroke, t.stroke, "the outline survives");
+        assert_eq!(texts[1].stroke, Default::default(), "no outline stays none");
+        assert_eq!(shapes.len(), 1);
+
+        // A v14 blob is the same tuple minus the thirteenth element.
+        let texts_in = [t.clone()];
+        let shapes_in = [a_shape(3)];
+        let wraps: Vec<u32> = vec![0];
+        let heights: Vec<u32> = vec![0];
+        let quads = vec![crate::perspective::IDENTITY_QUAD];
+        let shape_quads = vec![crate::perspective::IDENTITY_QUAD];
+        let slop: Vec<u8> = vec![0];
+        let fonts: Vec<&str> = vec![""];
+        let rots: Vec<f64> = vec![0.0];
+        let stars: Vec<u8> = vec![0];
+        let radii: Vec<[u16; 4]> = vec![[0; 4]];
+        let mut v14 = vec![14u8];
+        v14.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts_in[..],
+                &shapes_in[..],
+                None::<CanvasParams>,
+                &wraps,
+                &heights,
+                &quads,
+                &shape_quads,
+                &slop,
+                &fonts,
+                &rots,
+                &stars,
+                &radii,
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        let (texts, _, _) = decode_annotations(&v14).unwrap(); // allow: rust-panic
+        assert_eq!(
+            texts[0].stroke,
+            Default::default(),
+            "a v14 text had no outline"
+        );
+    }
+
+    #[test]
+    fn text_stroke_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextStroke {
+                id: 2,
+                width: 5,
+                rgba: [9, 8, 7, 255],
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].stroke, Default::default(), "untouched");
+        assert_eq!(
+            doc.texts[1].stroke,
+            crate::annotations::TextStroke::new(5, 9, 8, 7, 255)
         );
     }
 
@@ -4203,8 +4362,8 @@ mod v2_migration_tests {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
         assert_eq!(
-            OP_FORMAT_VERSION, 14,
-            "14 adds Adjustments sessions (ADR-091); earlier op indices stay fixed"
+            OP_FORMAT_VERSION, 15,
+            "15 adds the text outline; earlier op indices stay fixed"
         );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
@@ -4357,6 +4516,15 @@ mod v2_migration_tests {
             }),
             23,
             "TonalStack (v13, issue #37)"
+        );
+        assert_eq!(
+            idx(&Op::TextStroke {
+                id: 1,
+                width: 0,
+                rgba: [0; 4],
+            }),
+            25,
+            "TextStroke (v15)"
         );
     }
 

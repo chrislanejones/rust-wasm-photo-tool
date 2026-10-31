@@ -90,6 +90,51 @@ pub struct TextAnnotation {
     pub shadow_dx: i32,
     pub shadow_dy: i32,
     pub shadow_blur: u32,
+    /// Outline around the glyphs. Width 0 (the default, and what every
+    /// annotation written before the text stroke existed means) = none.
+    pub stroke: TextStroke,
+}
+
+/// The outline drawn around a text annotation's glyphs — the text twin of a
+/// shape's stroke. Drawn OUTSIDE the letters (the glyphs are painted on top),
+/// so turning it on never thins the type.
+///
+/// `width == 0` is "off" and is the default: a document written before the
+/// stroke existed decodes to it everywhere (op log, keyframes, JSON archive),
+/// which is exactly what that document meant.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextStroke {
+    /// Outline width in px, `0..=MAX_TEXT_STROKE_WIDTH`.
+    pub width: u32,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+/// Widest outline the engine draws. The panel slider stops here too; the
+/// clamp exists for the other doors (op replay, archive restore).
+pub const MAX_TEXT_STROKE_WIDTH: u32 = 20;
+
+impl TextStroke {
+    /// Clamped to [`MAX_TEXT_STROKE_WIDTH`]; a zero width or alpha is stored
+    /// as the canonical "off" so two invisible strokes always compare equal.
+    pub fn new(width: u32, r: u8, g: u8, b: u8, a: u8) -> Self {
+        if width == 0 || a == 0 {
+            return TextStroke::default();
+        }
+        TextStroke {
+            width: width.min(MAX_TEXT_STROKE_WIDTH),
+            r,
+            g,
+            b,
+            a,
+        }
+    }
+
+    pub fn is_on(&self) -> bool {
+        self.width > 0 && self.a > 0
+    }
 }
 /// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
 /// shapes sit in an overlay and are re-selectable / movable until
@@ -270,6 +315,8 @@ pub(crate) fn build_text_annotation(
     // `text` and still compile. At the end, a missed call site is a compile
     // error. See `crate::fonts` for what "" means.
     font_id: &str,
+    // Appended after `font_id` for the same reason.
+    stroke: TextStroke,
 ) -> TextAnnotation {
     // The tile renders WRAPPED text; the annotation stores the author's RAW
     // text. Keeping the raw text is what makes reflow reversible: drag the box
@@ -303,6 +350,7 @@ pub(crate) fn build_text_annotation(
         shadow_dy,
         shadow_blur,
         font_id,
+        stroke,
     );
     // PERSPECTIVE IS THE LAST STAGE, deliberately: it warps the finished,
     // already-rotated tile. Doing it here rather than inside
@@ -362,6 +410,7 @@ pub(crate) fn build_text_annotation(
         shadow_dx,
         shadow_dy,
         shadow_blur,
+        stroke,
     }
 }
 
@@ -400,7 +449,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{},\"stroke_width\":{},\"stroke_r\":{},\"stroke_g\":{},\"stroke_b\":{},\"stroke_a\":{}}}",
             a.id,
             a.wrap_width,
             a.box_height,
@@ -420,6 +469,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             a.shadow_box, a.shadow_text,
             a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
             a.shadow_dx, a.shadow_dy, a.shadow_blur,
+            a.stroke.width, a.stroke.r, a.stroke.g, a.stroke.b, a.stroke.a,
         ));
     }
     out.push(']');
@@ -2085,6 +2135,47 @@ impl ImageHorseTool {
 /// other Rust caller (tests, benches) is spared the churn too. Anything new
 /// that wants rotation or a point count calls the `_full` form.
 impl ImageHorseTool {
+    /// Rebuild the annotation at `idx` on the active layer with `stroke`. No
+    /// history, no recomposite — shared by the setter above and op replay.
+    pub(crate) fn apply_text_stroke_at(&mut self, idx: usize, stroke: TextStroke) {
+        let a = &self.layers[self.active].text_annotations[idx];
+        let rebuilt = build_text_annotation(
+            a.id,
+            &a.text,
+            a.wrap_width,
+            a.box_height,
+            a.perspective,
+            a.font_size,
+            a.r,
+            a.g,
+            a.b,
+            a.bold,
+            a.x,
+            a.y,
+            a.rotation_deg,
+            a.background_kind,
+            a.bg_r,
+            a.bg_g,
+            a.bg_b,
+            a.bg_a,
+            a.bg_padding,
+            a.bg_corner_radius,
+            a.bg_tail,
+            a.shadow_box,
+            a.shadow_text,
+            a.shadow_r,
+            a.shadow_g,
+            a.shadow_b,
+            a.shadow_a,
+            a.shadow_dx,
+            a.shadow_dy,
+            a.shadow_blur,
+            &a.font_id.clone(),
+            stroke,
+        );
+        self.layers[self.active].text_annotations[idx] = rebuilt;
+    }
+
     /// `add_shape_annotation_full(.., sloppiness, 0, 0.0)`.
     pub fn add_shape_annotation(
         &mut self,
@@ -2358,6 +2449,7 @@ impl ImageHorseTool {
             0,
             0, // shadow off; set via set_text_shadow
             font_id,
+            TextStroke::default(),
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -2470,6 +2562,8 @@ impl ImageHorseTool {
             sh.7,
             sh.8,
             &font_id,
+            // …and the outline, set via `set_text_stroke`.
+            self.layers[self.active].text_annotations[idx].stroke,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
@@ -2566,6 +2660,7 @@ impl ImageHorseTool {
             // Carry the typeface through, same reason as the quad above: a box
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
+            a.stroke,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2638,6 +2733,7 @@ impl ImageHorseTool {
             // Carry the typeface through, same reason as the quad above: a box
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
+            a.stroke,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2740,6 +2836,7 @@ impl ImageHorseTool {
             a.shadow_dy,
             a.shadow_blur,
             font_id,
+            a.stroke,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2806,6 +2903,7 @@ impl ImageHorseTool {
             // Carry the typeface through, same reason as the quad above: a box
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
+            a.stroke,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2989,8 +3087,33 @@ impl ImageHorseTool {
         // edit must not silently re-lay-out the text unwrapped.
         let wrapped = wrap_for_tile(&text, wrap_w, fs, bold, &font_id);
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
-            &wrapped, fs, box_h, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail,
-            on_box, on_text, c[0], c[1], c[2], alpha, dx, dy, blur, &font_id,
+            &wrapped,
+            fs,
+            box_h,
+            r,
+            g,
+            b,
+            bold,
+            rot,
+            bk,
+            br,
+            bgc,
+            bb,
+            ba,
+            bpad,
+            brad,
+            btail,
+            on_box,
+            on_text,
+            c[0],
+            c[1],
+            c[2],
+            alpha,
+            dx,
+            dy,
+            blur,
+            &font_id,
+            self.layers[self.active].text_annotations[idx].stroke,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
@@ -3007,6 +3130,34 @@ impl ImageHorseTool {
         a.tile_h = tile_h;
         a.tile_offset_x = tile_offset_x;
         a.tile_offset_y = tile_offset_y;
+        true
+    }
+
+    /// Set a text annotation's OUTLINE and rebuild its tile. `width` 0 (or
+    /// `alpha` 0) removes it; widths above `MAX_TEXT_STROKE_WIDTH` are
+    /// clamped. Returns false if `id` isn't on the active layer.
+    ///
+    /// The `set_text_shadow` contract exactly: a dedicated setter called on
+    /// every commit, a no-op (and no history snapshot) when nothing VISIBLE
+    /// changes — an outline that is off before and after is the same picture
+    /// whatever its dormant color says — and it maps 1:1 onto the
+    /// `Op::TextStroke` the recorder emits.
+    pub fn set_text_stroke(&mut self, id: u32, width: u32, color_hex: &str, alpha: u8) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        let c = drawing::parse_hex_color(color_hex);
+        let stroke = TextStroke::new(width, c[0], c[1], c[2], alpha);
+        if self.layers[self.active].text_annotations[idx].stroke == stroke {
+            return true;
+        }
+        self.snap("Text Stroke");
+        self.apply_text_stroke_at(idx, stroke);
+        self.recomposite();
         true
     }
 
@@ -3528,5 +3679,27 @@ mod diagram_shape_tests {
         assert_eq!(t.shape_annotation_at(100.0, 30.0), -1);
         let (t, _) = tool(36, 0, 0.0);
         assert_eq!(t.shape_annotation_at(30.0, 20.0), -1);
+    }
+}
+
+#[cfg(test)]
+mod text_stroke_history_tests {
+    use crate::ImageHorseTool;
+
+    #[test]
+    fn an_outline_is_one_undoable_step_and_off_to_off_is_free() {
+        let mut t = ImageHorseTool::new(64, 64);
+        let id = t.add_text_annotation(
+            "hi", 24.0, 255, 255, 255, false, 10, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
+        );
+        assert_eq!(t.undo_count(), 1);
+        // Off with a different dormant color: invisible, so not a step.
+        assert!(t.set_text_stroke(id, 0, "#ff0000", 255));
+        assert_eq!(t.undo_count(), 1);
+        assert!(t.set_text_stroke(id, 3, "#ff0000", 255));
+        assert_eq!(t.undo_count(), 2);
+        assert!(t.history_labels().contains("Text Stroke"));
+        assert!(t.get_text_annotations().contains("\"stroke_width\":3"));
+        assert!(!t.set_text_stroke(999, 3, "#ff0000", 255), "unknown id");
     }
 }

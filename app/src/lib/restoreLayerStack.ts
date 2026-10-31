@@ -123,6 +123,13 @@ export async function restoreLayerStack(
         // so the persisted array rides straight through. The engine reads any
         // length but 8 as the identity.
         new Float32Array(a.perspective ?? []),
+        // The text outline. Absent on every archive written before it
+        // existed: width 0 is "no outline", exactly what those meant.
+        a.stroke_width ?? 0,
+        a.stroke_r ?? 0,
+        a.stroke_g ?? 0,
+        a.stroke_b ?? 0,
+        a.stroke_a ?? 0,
       );
     }
     for (const s of layer.shapes ?? []) {
