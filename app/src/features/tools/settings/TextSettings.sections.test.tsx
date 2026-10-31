@@ -32,9 +32,15 @@ function renderPanel(overrides: Partial<ToolSettings> = {}) {
   return { onChange, settings };
 }
 
-/** The disclosure button whose accessible name starts with `label`. */
-const header = (label: string) =>
-  screen.getByRole("button", { name: new RegExp(`^${label}`) });
+/** The disclosure button (the one with `aria-expanded`) whose accessible
+ *  name starts with `label` — not the lightbulb beside it. */
+const header = (label: string) => {
+  const found = screen
+    .getAllByRole("button", { name: new RegExp(`^${label}`) })
+    .filter((b) => b.hasAttribute("aria-expanded"));
+  expect(found, `one "${label}" header`).toHaveLength(1);
+  return found[0]!;
+};
 
 beforeEach(() => useToolStore.setState({ textMode: "text" }));
 
@@ -43,7 +49,8 @@ it("the Text mode starts with all three sections shut", () => {
   for (const label of SECTIONS) {
     expect(header(label).getAttribute("aria-expanded"), label).toBe("false");
   }
-  expect(screen.queryByText("Stroke Width")).toBeNull();
+  // In the DOM (so `aria-controls` resolves) but inside the `hidden` region.
+  expect(screen.getByText("Stroke Width").closest("[hidden]")).not.toBeNull();
 });
 
 it("the Background mode starts with them open", () => {
