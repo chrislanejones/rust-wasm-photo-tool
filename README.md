@@ -90,27 +90,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.44 — 2026-10-30
+### v9.45 — 2026-10-31
 
-**Batch Crop keeps full size, paid plans stop looking free, and downloads get more time.**
+**Undo after a callout label move does what it says.**
 
-Batch › Crop used to shrink every photo you didn't have open down to
-2048 px. A 4000×3000 photo cropped 1:1 with Keep came out 1536×1536, and
-the gallery still said 4000×3000. Now each of those photos is cropped from
-its full-size original, one at a time, and the gallery shows the real new
-size. Re-applying a crop also stopped eating your work: crop, undo, paint a
-stroke and re-apply used to rewind the stroke instead of the crop. It now
-tracks the exact history step the crop made, not a count of undos.
+Move a callout's label, undo it, then redo it quickly, and the app used to
+save an extra undo step that changed nothing. After a reload, your next
+Ctrl+Z spent itself on that empty step and looked like it did nothing. The
+leader line that follows a moved label was working out where to go from the
+Text tool's own copy of the labels, which runs a moment behind the engine.
+On a slow machine the undo's follow landed after the redo, pulled the leader
+back, and the redo pushed it forward again. Now the follow reads the label
+and its leader straight from the engine, so after an undo or redo they
+already match and nothing gets written.
 
-If you're on a paid plan, the first second after sign-in no longer treats
-you as free. No more "24 max", no "needs a Paid plan" note on OCR, and no
-"Layer limit reached" while your plan is still loading. The app just waits
-for the answer (up to 10 seconds) before deciding.
-
-Every download (Alt+E, PNG, ZIP, SVG, the phone's Download button) now keeps
-its file link alive for 40 seconds instead of dropping it the moment the
-click fires. Chrome never missed one in testing, but Safari and Firefox start
-downloads a beat later, and this keeps them from racing.
+This was also the "flaky" text-placement-undo test. It failed 4 runs in 10
+with the browser slowed down 8×, and 0 in 20 after the fix.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

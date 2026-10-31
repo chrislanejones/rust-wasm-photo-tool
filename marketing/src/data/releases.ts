@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.45",
+    date: "2026-10-31",
+    headline: "Undo after a callout label move does what it says.",
+    entries: [
+      { tag: "fix", text: "Undo then a quick redo on a callout label no longer saves an empty extra step, so the next Ctrl+Z after a reload actually undoes something." },
+      { tag: "fix", text: "A moved label's leader line follows the engine's copy of the label, not the Text tool's copy that runs a moment behind." },
+      { tag: "infra", text: "The text-placement-undo test stopped flaking: 4 bad runs in 10 with the browser slowed 8×, 0 in 20 after." },
+    ],
+  },
+  {
     version: "v9.44",
     date: "2026-10-30",
     headline: "Batch Crop keeps full size, paid plans stop looking free, and downloads get more time.",

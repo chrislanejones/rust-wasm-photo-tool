@@ -11807,3 +11807,19 @@ Batch › Crop and the engine changed, so imagehorse-qc is owed for this one.
 Still open: the open photo is still cropped from its ≤2048 working copy, and
 the Storage pane still flashes "Sign in with a Pro account" while the plan
 loads. Both are in `docs/PARKING_LOT.md`.
+
+
+## v9.45 Change Summary — 2026-10-31
+
+**Undo after a callout label move does what it says.**
+
+| Area | Change |
+| --- | --- |
+| Callout leaders (#419) | A moved label's leader follow (`followLabels` in `usePinSteps.ts`) reads shapes and texts from the engine at follow time, instead of pairing the Text tool's React list (a render behind) with shapes read later. Undo then a quick redo no longer pushes a no-op `ShapeEdit / SameGesture / ShapeEdit` step that a later Ctrl+Z spent doing nothing. |
+| Tests (#419) | `e2e/text-placement-undo.spec.ts` case 2 at 8× CPU: **4/10 → 0/20** bad. `callout-leader` Align at 8×: master 3/24 → fix 0/32 phantom steps. 4 new `followLabels` unit tests. Engine-call contract count 222 → 221. |
+| Verification | tsc 0, lint 0 errors (53 warnings), 237 files / 2,137 unit tests, production build, guardrails OK. CI green on #419 (19 pass, 1 skipped). |
+
+No engine or saved-format change. The callout tool changed, so imagehorse-qc
+is owed for this one. Still open: 2 of 32 Align runs at 8× hit a short undo
+log (cause unknown), and the reload wait in both specs is vacuous for Text,
+Pins and Shapes. Both are in `docs/PARKING_LOT.md`.
