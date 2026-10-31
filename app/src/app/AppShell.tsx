@@ -6,8 +6,6 @@
 //   All other existing functionality preserved
 import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
@@ -47,11 +45,9 @@ import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { OpenRasterControls } from "@/components/ExportPane";
 import { downloadOraWithToast } from "@/lib/openraster";
 import { TopBar } from "@/components/TopBar";
-import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
+import { StatusBar, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
-import { useSession, effectiveMode } from "@/hooks/useEntitlement";
-import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
@@ -88,7 +84,9 @@ import {
 import { loadEngineIfWanted } from "@/lib/engineGate";
 import { usePhotoLimit } from "./session/useEngineGate";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
-import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
+import { hasReplicateAI, TIERS } from "@/lib/tiers";
+import { useUserMode } from "./session/useUserMode";
+import { capMessage, decideGalleryCap } from "./session/tierPending";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
@@ -200,20 +198,6 @@ const TOOL_ACTION_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   stamp: { keys: "Ctrl+]/[", label: "brush size" },
 };
 
-const AUTH_ENABLED = !!(
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY &&
-  import.meta.env.VITE_CONVEX_URL
-);
-
-/** User-facing message when the gallery cap is reached, nudging toward the next tier. */
-function capMessage(mode: UserMode, max: number): string {
-  if (mode === "demo")
-    return `Demo galleries hold ${max} photos. Sign in to load up to 24.`;
-  if (mode === "loggedIn")
-    return `Free accounts hold ${max} photos. Pro (100) is coming soon.`;
-  return `Gallery is limited to ${max} photos.`;
-}
-
 
 /** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
  *  drag/paste import flow before the user picks where the image should land. */
@@ -229,27 +213,6 @@ async function decodeImageSource(
   bitmap.close();
   const rgba = ctx.getImageData(0, 0, w, h).data;
   return { pixels: new Uint8ClampedArray(rgba.buffer as ArrayBuffer), w, h };
-}
-
-function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
-  const { isLoaded, isSignedIn } = useUser();
-  // Create/refresh the Convex users row on sign-in (tier lives there).
-  useStoreUser();
-  // ...and then actually READ that tier. This line was missing: the watcher
-  // created the row the tier lives in and then reported `loggedIn` for every
-  // signed-in user, so a pro/team subscriber was gated to free limits —
-  // gallery 24 instead of 100, 100 MB instead of 5 GB, 3 layers instead of
-  // unlimited, and the Replicate AI tools OFF, which is the paid headline.
-  // The server was enforcing the real tier the whole time; only the UI lied.
-  // `useRealTier` was written and documented for exactly this and never wired.
-  const realTier = useRealTier();
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    onMode(isSignedIn ? userModeForTier(realTier) : "demo");
-  }, [isLoaded, isSignedIn, realTier, onMode]);
-
-  return null;
 }
 
 // Minimum time the boot splash stays up, even on an instant load. The spinner's
@@ -398,42 +361,9 @@ export function AppShell() {
   const cropRatio = useToolStore((s) => s.cropRatio);
   const setCropRatio = useToolStore((s) => s.setCropRatio);
   const userMode = useUIStore((s) => s.userMode);
-  const setUserMode = useUIStore((s) => s.setUserMode);
   const authResolved = useUIStore((s) => s.authResolved);
-  const setAuthResolved = useUIStore((s) => s.setAuthResolved);
-  const handleAuthMode = useCallback((m: UserMode) => {
-    setUserMode(m);
-    setAuthResolved(true);
-  }, [setUserMode, setAuthResolved]);
-
-  // ── Who you are, and what you may see (ADR: role, not a fourth tier) ──────
-  //
-  // `session` comes from the SERVER (`users.me` → convex/entitlement.ts): the
-  // role from ADMIN_EMAILS, and the entitlement, in which an admin is entitled
-  // to paid WITHOUT a tier grant. The browser no longer decides either; it used
-  // to compare the signed-in email to a hardcoded address.
-  //
-  // The Super User preview may only TAKE AWAY (`effectiveMode` → `previewOf`),
-  // so the UI can never offer what the server would refuse — the mismatch that
-  // used to happen when the override raised a free account to "paid".
-  const session = useSession();
-  const devTierOverride = useUIStore((s) => s.devTierOverride);
-  const setDevTierOverride = useUIStore((s) => s.setDevTierOverride);
-  // While Convex is still answering, fall back to the Clerk-derived mode so the
-  // first paint is not "signed out" for someone who is signed in.
-  const effectiveUserMode = session.ready
-    ? effectiveMode(session, devTierOverride)
-    : (devTierOverride ?? userMode);
-
-  const superUser: SuperUserControls | null = session.role === "admin"
-    ? {
-        mode: effectiveUserMode,
-        overridden: devTierOverride !== null,
-        onSelect: (m) => setDevTierOverride(m),
-        onReset: () => setDevTierOverride(null),
-        entitlement: session.entitlement,
-      }
-    : null;
+  // Who you are, and what you may see — app/session/useUserMode.ts.
+  const { effectiveUserMode, tierRef, superUser } = useUserMode();
 
   // App-wide preferences (Settings → General), persisted to localStorage.
   const [prefs, applyPreferences] = usePreferences();
@@ -560,6 +490,7 @@ export function AppShell() {
     stamp,
     prefs,
     effectiveUserMode,
+    tierRef,
     savePhotoEdit,
     loadPhotoEdit,
     deletePhotoEdit,
@@ -695,15 +626,11 @@ export function AppShell() {
     if (activePhotoId && selectedIds.has(activePhotoId) && stamp.toolRef.current) {
       await savePhotoEdit(activePhotoId, stamp.toolRef);
     }
-    const room = Math.max(0, maxPhotos - photos.length);
-    if (room <= 0) {
-      toast.error(capMessage(effectiveUserMode, maxPhotos));
-      return;
-    }
+    const cap = await decideGalleryCap(tierRef, { mode: effectiveUserMode, max: maxPhotos }, photos.length + selectedIds.size);
+    const room = Math.max(0, cap.max - photos.length);
+    if (room <= 0) return void toast.error(capMessage(cap.mode, cap.max));
     const sources = photos.filter((p) => selectedIds.has(p.id)).slice(0, room);
-    if (sources.length < selectedIds.size) {
-      toast.error(capMessage(effectiveUserMode, maxPhotos));
-    }
+    if (sources.length < selectedIds.size) toast.error(capMessage(cap.mode, cap.max));
     const dups = sources.map((src) => ({
       srcId: src.id,
       entry: {
@@ -740,6 +667,7 @@ export function AppShell() {
     savePhotoEdit,
     duplicatePhotoEdit,
     effectiveUserMode,
+    tierRef,
     clearSelection,
   ]);
 
@@ -3178,8 +3106,6 @@ export function AppShell() {
           />
         )}
       </AnimatePresence>
-
-      {AUTH_ENABLED && <AuthModeWatcher onMode={handleAuthMode} />}
 
       {photos.length > 0 && (
         <StatusBar
