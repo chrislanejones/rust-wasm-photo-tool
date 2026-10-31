@@ -51,6 +51,14 @@ export async function encodeForApply(
   const sourceFormat = opts.keepSourceEncoding ? formatFromMime(entry.mimeType ?? "") : null;
   const format = opts.format ?? sourceFormat ?? exportFormat;
   const lossy = format !== "png";
+  if (!lossy) {
+    // A PNG's "quality" is how far Compress reduced its colors (10-27). Its
+    // own quality is the one it was last reduced at; unset is lossless, so
+    // Apply Resize on an untouched PNG stays lossless.
+    const pngQuality = sourceFormat ? (entry.encodeQuality ?? 100) : quality;
+    const blob = await encodePngAtQuality(pixels, w, h, pngQuality);
+    return { blob, storedQuality: pngQuality, format, kept: entry.byteSize > 0 && blob.size > entry.byteSize };
+  }
   const resizeQuality = entry.encodeQuality ?? 92;
   let storedQuality = sourceFormat ? resizeQuality : quality;
   let blob = await encodeRgba(pixels.slice(), w, h, format, storedQuality / 100);
@@ -63,4 +71,13 @@ export async function encodeForApply(
     }
   }
   return { blob, storedQuality, format, kept: entry.byteSize > 0 && blob.size > entry.byteSize };
+}
+
+/** PNG at `quality`: 100 is lossless, below it the engine reduces the colors
+ *  (at most 256) and keeps whichever of the two encodes is smaller. */
+async function encodePngAtQuality(pixels: Uint8Array, w: number, h: number, quality: number): Promise<Blob> {
+  const mod = await import("stamp_tool");
+  await mod.default();
+  const png = mod.encode_png_pixels_quality(pixels, w, h, Math.max(0, Math.min(100, Math.round(quality))));
+  return new Blob([new Uint8Array(png)], { type: "image/png" });
 }

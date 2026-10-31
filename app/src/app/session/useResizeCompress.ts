@@ -75,21 +75,24 @@ export function useResizeCompress({
       if (isPhotoSwitching()) return false;
       const entry = useGalleryStore.getState().photos.find((p) => p.id === activePhotoId);
       const own = formatFromMime(entry?.mimeType ?? "");
-      const lossy = own !== null && own !== "png";
+      // A PNG compresses by reducing its colors below quality 100 (10-27).
+      // At 100 an untouched PNG has nothing to re-encode, so it only records
+      // the setting; one reduced before is re-encoded lossless.
+      const compresses = own !== null && (own !== "png" || quality < 100 || entry?.encodeQuality !== undefined);
       const resized = w !== photoW || h !== photoH;
       if (resized) resizePhotoTo(w, h, filter);
       const recordQuality = async () => {
         await stamp.toolRef.current?.push_compress_marker(quality);
         await stamp.syncState();
       };
-      if (!lossy && !resized) {
+      if (!compresses && !resized) {
         await recordQuality();
         return true;
       }
       // A resize always writes (see `allowGrow`), so the canvas and the
       // stored file can never disagree about the size.
       const out = await persistActiveCanvas(
-        lossy ? { allowGrow: resized, format: own } : { allowGrow: true, keepSourceEncoding: true },
+        compresses ? { allowGrow: resized, format: own } : { allowGrow: true, keepSourceEncoding: true },
       );
       report(out);
       if (isPhotoSwitching() || useGalleryStore.getState().activePhotoId !== activePhotoId) return false;
@@ -167,10 +170,13 @@ export function useResizeCompress({
         pixels = mod.resize_pixels_filter(cap.pixels, cap.w, cap.h, req.w, req.h, req.filter);
         if (pixels.length !== req.w * req.h * 4) return null;
       }
+      // Previewing a non-PNG photo as PNG is an export preview, and export
+      // writes PNG lossless; only a PNG photo's own Compress reduces colors.
+      const exportOnlyPng = req.format === "png" && formatFromMime(entry.mimeType ?? "") !== "png";
       const r = await encodeForApply(pixels, req.w, req.h, {
         entry,
         exportFormat: req.exportFormat,
-        quality: req.quality,
+        quality: exportOnlyPng ? 100 : req.quality,
         keepSourceEncoding: req.keepSourceEncoding,
         format: req.format,
       });

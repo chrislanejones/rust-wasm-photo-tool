@@ -107,8 +107,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
   },
   {
     id: "arrows",
-    label: "Arrows",
-    title: "Arrows & Diagram Shapes",
+    label: "Arrows & Diagram Shapes",
     icon: ArrowUpRight,
     info: "A single or double-headed arrow, or one of 30 diagram shapes — flowchart symbols, basic shapes and block arrows. Drag on the canvas to draw it. An arrow's endpoints snap to 0/90/180/270° with Shift; a shape resizes, turns and fills like any other.",
   },
