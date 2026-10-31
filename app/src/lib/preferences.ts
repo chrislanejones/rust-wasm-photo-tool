@@ -18,6 +18,7 @@
 // (including the marketing prerender) without dragging a Convex client in.
 import { useCallback, useSyncExternalStore } from "react";
 import type { MetadataStripMode } from "@/lib/exif";
+import { normalizeRecipes, type ExportRecipe } from "@/lib/exportRecipes";
 
 export type ThemeChoice = "system" | "dark" | "light";
 
@@ -94,6 +95,9 @@ export interface Preferences {
    *  — exports crop to just the photo content. On ⇒ exports include the full
    *  padded canvas, fill and all. */
   exportCanvasBackground: boolean;
+  /** Download All recipes the person saved (Night 10-28). The built-ins live
+   *  in lib/exportRecipes.ts and are never stored. */
+  exportRecipes: ExportRecipe[];
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -133,6 +137,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // NOTE: this changes the default only. An existing install keeps whatever is
   // already stored in `image-horse-prefs` — no forced migration.
   exportCanvasBackground: false,
+  exportRecipes: [],
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -213,6 +218,7 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
       typeof p?.exportCanvasBackground === "boolean"
         ? p.exportCanvasBackground
         : DEFAULT_PREFERENCES.exportCanvasBackground,
+    exportRecipes: normalizeRecipes(p?.exportRecipes),
   };
 }
 
@@ -280,6 +286,9 @@ export function serializePreferences(p: Preferences): string {
     canvasBgColor: p.canvasBgColor,
     exportCanvasBackground: p.exportCanvasBackground,
     rulerUnit: p.rulerUnit,
+    // Appended last: the order is the canonical serialization. Its arrival
+    // is prefs format 2 (lib/sync/docs.ts).
+    exportRecipes: p.exportRecipes,
   });
 }
 

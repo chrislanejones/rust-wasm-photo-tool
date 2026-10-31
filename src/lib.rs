@@ -41,6 +41,7 @@ mod levels;
 mod livewire;
 mod paint;
 mod presets;
+mod quantize;
 // Pure-geometry projective transforms (the Perspective tool). `pub` for the
 // same reason `ops`/`tiles` are: the integration tests in `tests/` build
 // `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen

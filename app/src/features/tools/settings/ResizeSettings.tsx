@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getImageWeight, type ImageWeight } from "@/lib/webPerf";
-import type { ExportFormat } from "@/lib/exportImage";
+import { formatFromMime, type ExportFormat } from "@/lib/exportImage";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ControlRow } from "@/components/ui/control-row";
 import { SelectField } from "@/components/ui/select-field";
@@ -271,8 +271,12 @@ export function ResizeSettings({
     };
   }, [imageWidth, imageHeight, currentByteSize, currentMime, originalByteSize, newW, newH, relativeQuality, effectiveFormat]);
 
+  // With no quality change pending, the button is Apply Resize, which keeps
+  // the photo's own format AT ITS OWN QUALITY. Measuring that case at the
+  // slider's quality showed one size and wrote another (10-27).
+  const keepSourceEncoding = !compressionChanged && formatFromMime(currentMime ?? "") === effectiveFormat;
   const [measured, setMeasured] = useState<{ key: string; bytes: number } | null>(null);
-  const measureKey = `${activePhotoId}:${currentByteSize}:${newW}x${newH}:${method}:${effectiveFormat}:${quality}`;
+  const measureKey = `${activePhotoId}:${currentByteSize}:${newW}x${newH}:${method}:${effectiveFormat}:${quality}:${keepSourceEncoding}`;
   useEffect(() => {
     if (disabled || !measureApply || currentByteSize <= 0) return;
     let alive = true;
@@ -283,7 +287,7 @@ export function ResizeSettings({
         filter: FILTER_CODE[method],
         exportFormat: effectiveFormat,
         quality,
-        keepSourceEncoding: false,
+        keepSourceEncoding,
         format: effectiveFormat,
       })
         .then((m) => {

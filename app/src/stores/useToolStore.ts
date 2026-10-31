@@ -92,7 +92,7 @@ export type PerspectiveMode = "perspective" | "distort" | "skew";
  *  Persistence reads this list through `validated()`, so an older persisted
  *  state that predates `airename` falls back to the current default rather
  *  than poking an unknown string into the union. */
-const BATCH_MODES = ["logo", "text", "crop", "rename", "airename"] as const;
+const BATCH_MODES = ["logo", "text", "crop", "rename", "airename", "resize"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */

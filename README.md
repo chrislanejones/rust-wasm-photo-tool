@@ -90,16 +90,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.39 — 2026-10-26
+### v9.43 — 2026-10-30
 
-**Five library updates, and the notes catch up.**
+**Housekeeping: the lint check now covers the Trail Log scripts.**
 
-No new buttons this time. Five libraries moved up in one go: framer-motion,
-the Radix tooltip and right-click menu, Playwright and the lucide icons. The
-tooltips, the gallery's right-click menu and the animated gallery were tested
-on the new versions before they shipped. The backend notes now list every
-Convex table and say plainly that no cleanup job runs on a schedule yet, and
-four finished items in the parking lot are marked fixed.
+`pnpm lint` used to check the editor's code and nothing else, so the
+scripts that build the Trail Log and the share images were never linted.
+Pointed at them, it found 47 errors. 46 were Node globals the config
+didn't know about, and one was a real regex with loose spaces in the
+Trail Log generator. All fixed, and the generator writes the same files
+byte for byte as before.
+
+GitHub's code scanning action is also bumped from 4.39.0 to 4.39.1. Nothing
+in the editor changed.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

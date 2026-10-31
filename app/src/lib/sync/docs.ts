@@ -58,9 +58,13 @@ import { defineSyncedDoc, type SyncedDoc } from "./syncedDoc";
 // gate, because preferences.ts reads localStorage synchronously at import, so
 // `defineSyncedDoc` records the value the moment it is defined.
 
-/** Format 1: the field list of `serializePreferences`. The legacy
+/** Format 2 (10-28-2026): format 1 + `exportRecipes`. A format-1 build that
+ *  adopted a format-2 blob would drop the recipes and push the result back
+ *  over them; the server holds a newer format against an older writer, so the
+ *  bump is what keeps a second device on an old build from erasing them.
+ *  Format 1: the field list of `serializePreferences`. The legacy
  *  `users.settings` blob is treated as format 0. */
-const PREFS_FORMAT = 1;
+const PREFS_FORMAT = 2;
 
 const prefsDoc = defineSyncedDoc({
   key: "prefs",

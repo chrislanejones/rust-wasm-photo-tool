@@ -107,9 +107,17 @@ export function usePersistActiveCanvas({
                 originalKey: newKey,
                 byteSize: blob.size,
                 mimeType: mime,
-                // PNG (requested, or an AVIF fallback) is lossless — no
-                // quality to remember.
-                encodeQuality: lossy && mime !== "image/png" ? storedQuality : undefined,
+                // A requested PNG remembers the quality its colors were
+                // reduced at (unset = lossless), so the panel and Apply
+                // Resize keep it. An AVIF that fell back to PNG is lossless.
+                encodeQuality:
+                  encodeFormat === "png"
+                    ? storedQuality < 100
+                      ? storedQuality
+                      : undefined
+                    : lossy && mime !== "image/png"
+                      ? storedQuality
+                      : undefined,
                 origWidth: tw,
                 origHeight: th,
                 workingWidth: tw,

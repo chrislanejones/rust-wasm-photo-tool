@@ -4,14 +4,13 @@
 // photos are persisted to IDB irreversibly.
 import { batchOutcome } from "@/lib/batchOutcome";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, Crop, FileEdit, ScanEye, X } from "lucide-react";
+import { ImagePlus, Type, Crop, FileEdit, ScanEye, Scaling, X } from "lucide-react";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { NumberField, TextField } from "@/components/ui/number-field";
 import { FieldLabel } from "@/components/ui/field-label";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
-import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { ToolModeToggle, type ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
@@ -20,11 +19,7 @@ import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { registerExtraRootProvider } from "@/lib/extraRoots";
-import {
-  makeWorkingCopy,
-  makeThumbnail,
-  makeThumbnailFromPixels,
-} from "@/lib/workingCopy";
+import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
 import { useToolStore, type BatchMode } from "@/stores/useToolStore";
 import { AIRenamePanel } from "./AIRenamePanel";
 import { CropBatchPanel } from "./CropBatchPanel";
@@ -37,6 +32,7 @@ import { useEngineFaces } from "@/hooks/useEngineFaces";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 import { SelectField } from "@/components/ui/select-field";
 import { BatchGroupToggle } from "./BatchGroupToggle";
+import { ResizeBatchPanel } from "./ResizeBatchPanel";
 import { useBatchGroups, useWhoLabel } from "./useBatchGroups";
 import { Button } from "@/components/ui/button";
 import { ControlRow } from "@/components/ui/control-row";
@@ -63,6 +59,7 @@ const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
   { id: "crop", label: "Crop", icon: Crop },
   { id: "rename", label: "Rename", icon: FileEdit },
   { id: "airename", label: "AI Rename", icon: ScanEye },
+  { id: "resize", label: "Resize & Compress", icon: Scaling },
 ];
 
 // Batch positions now use the shared 9-cell placement grid.
@@ -623,6 +620,8 @@ function BatchToolPanel({
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
         <AIRenamePanel photos={photos} setPhotos={setPhotos} />
+      ) : m === "resize" ? (
+        <ResizeBatchPanel {...panelProps} photos={allPhotos} />
       ) : (
       <>
       <div>
