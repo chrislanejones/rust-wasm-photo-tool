@@ -92,7 +92,9 @@ describe("responsive labels stay in the accessibility tree", () => {
     // `hidden` is display:none, which removes the text from the accessibility
     // tree as well as the screen. sr-only hides it visually only.
     const src = read("features/gallery/GalleryBar.tsx");
-    expect(src).toMatch(/const label = vertical \? "inline" : "sr-only sm:not-sr-only";/);
+    // Trailing classes are allowed (sm:whitespace-nowrap keeps the wide row's
+    // labels on one line); the sr-only / not-sr-only pair is what is pinned.
+    expect(src).toMatch(/const label = vertical \? "inline" : "sr-only sm:not-sr-only(?: [^"]*)?";/);
     expect(src).not.toMatch(/const label = [^;]*"hidden sm:inline"/);
   });
 });
