@@ -26,7 +26,19 @@ const RULES: { label: string; rule: SelectRule }[] = [
 /** Ghost buttons, full width and left-aligned: a list, not a row of tiles. */
 const ITEM = "w-full justify-start";
 
-export function SelectByMenu({ className, labelClassName }: { className?: string; labelClassName?: string }) {
+export function SelectByMenu({
+  className,
+  labelClassName,
+  tile = false,
+}: {
+  className?: string;
+  labelClassName?: string;
+  /** Compact gallery: draw as one of the 3-up tiles (icon over label) and fill
+   *  the grid cell. The tile grid styles its BUTTON children, but this one sits
+   *  inside a span for its menu, so it has to be told — left alone it stayed a
+   *  wide row and covered Delete All beside it (Chris, 11-01-2026). */
+  tile?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [larger, setLarger] = useState(false);
   const [sizeText, setSizeText] = useState("500 KB");
@@ -54,9 +66,10 @@ export function SelectByMenu({ className, labelClassName }: { className?: string
   const bytes = parseSize(sizeText);
 
   return (
-    <span ref={root} className={cn("relative inline-flex", className)}>
+    <span ref={root} className={cn("relative inline-flex", tile && "h-full w-full", className)}>
       <Button
         size="default"
+        className={tile ? "h-full w-full flex-col gap-1 px-1.5 py-2 text-2xs" : undefined}
         // "Select by" contains the visible "Select" (label-in-name), and
         // keeps it apart from the rail's Select tool.
         aria-label="Select by"
@@ -67,8 +80,12 @@ export function SelectByMenu({ className, labelClassName }: { className?: string
         onClick={() => setOpen((o) => !o)}
       >
         <ListChecks className="h-3.5 w-3.5" />
-        <span className={labelClassName}>Select</span>
-        <ChevronDown className="h-3 w-3" />
+        {/* Label and chevron stay on one line, so a tile reads "Select ▾"
+            under its icon instead of stacking three rows. */}
+        <span className="inline-flex items-center gap-1">
+          <span className={labelClassName}>Select</span>
+          <ChevronDown className="h-3 w-3" />
+        </span>
       </Button>
       {open && (
         <div

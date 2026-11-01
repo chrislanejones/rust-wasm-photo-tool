@@ -152,8 +152,16 @@ function GalleryActions({
    * All / Deselect / Delete / Copy / Cut. Wide keeps the single inline row,
    * where there is space for icon-beside-label.
    */
+  // How many tiles the compact grid holds right now, so it can pick its
+  // columns: four (Select, Unselect, Delete Selected, Export) sit 2×2 rather
+  // than three and an orphan; three sit in a row; two side by side.
+  const tiles =
+    (totalCount > 1 ? 1 : 0) +
+    (some && onClearSelection ? 1 : 0) +
+    ((some ? onDeleteSelected : onDeleteAll) ? 1 : 0) +
+    (onExportSelected ? 1 : 0);
   const actionRow = vertical
-    ? "grid grid-cols-3 gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1"
+    ? `grid ${tiles === 3 ? "grid-cols-3" : tiles === 1 ? "grid-cols-1" : "grid-cols-2"} gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1`
     : "flex flex-wrap items-center justify-end gap-1";
   // COMPACT is the exception that stays: a 3-up tile grid in a narrow column,
   // icon over label, where `default`'s horizontal padding would wrap every
@@ -177,7 +185,7 @@ function GalleryActions({
       <div className={actionRow}>
         {/* Select ▾ — tick by a rule (lib/selectBy.ts). Needs two photos to
             mean anything. */}
-        {totalCount > 1 && <SelectByMenu labelClassName={label} />}
+        {totalCount > 1 && <SelectByMenu labelClassName={label} tile={vertical} />}
 
         {some && onClearSelection && (
           <Button size="default" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
