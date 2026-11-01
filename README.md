@@ -90,21 +90,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.47 — 2026-10-31
+### v9.48 — 2026-10-31
 
-**The Halloween flags got a lot bigger.**
+**The gallery's buttons line up again.**
 
-The "Happy Halloween" garland's letters were too small to read from across
-the desk, so the flags are about two and a half times bigger now: 52 by 64 px
-with 26 px letters, and the pumpkin and bat grew to match. On a window too
-narrow for the whole message, every flag shrinks to fit instead of letters
-falling off the ends. On the start screen the garland moved up to the top of
-the page so it clears the horse.
-
-It's still only up through tonight. Close it once and it stays closed.
-
-Also in this one: a Text panel test that failed on any computer with cloud
-keys set now runs in demo mode, the same as everywhere else.
+On a laptop, or with the History panel open, the gallery bar ran short of
+room, and "Delete All" and "Export or Share Image" folded onto two, three,
+even four lines. That left a row of buttons in three different heights. The
+labels don't wrap anymore, the buttons sit a little closer, and when the bar
+really can't fit everything on one line it moves the Compress buttons to a
+second row instead of squashing them. It goes by the bar's own width, so
+opening a side panel counts too, not just a small window.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -11857,3 +11857,17 @@ switch that can leave B's picture showing. Both are in `docs/PARKING_LOT.md`.
 
 No engine or saved-format change. imagehorse-qc is still owed from v9.46
 (the engine and the Text tool).
+
+
+## v9.48 Change Summary — 2026-10-31
+
+**The gallery's buttons line up again.**
+
+| Area | Change |
+| --- | --- |
+| Gallery bar labels (#424) | The wide labels are `sr-only sm:not-sr-only`, and `not-sr-only` resets `white-space` to `normal`, so a squeezed button broke "Delete All" and "Export or Share Image" across 2–4 lines (34 / 50 / 82 px buttons in one row). They are `sm:whitespace-nowrap` now. |
+| Gallery bar layout (#424) | The header grid was `1fr auto 1fr`, which gave the actions the same width as the short photo count. The sides are `minmax(max-content, 1fr)` now, so they still split evenly and center the middle when there's room. Under 56rem, a **container query** on the bar (side panels change its width, the window doesn't) switches to two rows: count and actions on top, Compress centered below. Gaps 1.5 → 1. |
+| Verification | Production build at 1280–2000 wide, History closed and open, with nothing or 2 photos selected: every button 34 px, 0 overlaps, 0 off the edge. tsc 0, lint 0 errors (53 warnings), guardrails OK, 240 files / 2,154 unit tests, inert-class audit 0. The `accessibleNames` guard allows classes after the `sr-only` pair. |
+
+No engine or saved-format change. imagehorse-qc is still owed from v9.46
+(the engine and the Text tool).

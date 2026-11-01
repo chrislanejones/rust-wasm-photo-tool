@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.48",
+    date: "2026-10-31",
+    headline: "The gallery's buttons line up again.",
+    entries: [
+      { tag: "fix", text: "\"Delete All\" and \"Export or Share Image\" no longer fold onto two or more lines, so every button in the gallery bar is the same height." },
+      { tag: "ui", text: "When the gallery bar is too narrow for one row, as on a laptop with History open, the Compress buttons move to a second row instead of squashing together." },
+    ],
+  },
+  {
     version: "v9.47",
     date: "2026-10-31",
     headline: "The Halloween flags got a lot bigger.",
