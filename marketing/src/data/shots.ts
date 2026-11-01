@@ -183,8 +183,6 @@ export const SHOTS: Shot[] = [
   },
   {
     src: "/IH-Hero-Image-September-2026.webp",
-    srcSet:
-      "/IH-Hero-Image-September-2026-800w.webp 800w, /IH-Hero-Image-September-2026-1200w.webp 1200w, /IH-Hero-Image-September-2026.webp 2000w",
     width: 2000,
     height: 1198,
     date: "2026-09-17",
@@ -193,10 +191,28 @@ export const SHOTS: Shot[] = [
     href: `${REPO}/cb614652ff77ab3e7a49d51b13455709540da7d3`,
     sourceLabel: "v8.79",
     annotations: [
-      { n: 1, shape: "box", x: 22, y: 283, w: 284, h: 250, lx: 322, ly: 290, title: "Presets", text: "— preview before you keep." },
-      { n: 2, shape: "line", x: 1061, y: 280, w: 0, h: 610, lx: 1160, ly: 196, title: "Original ⟷ Edited", text: "side by side." },
-      { n: 3, shape: "ellipse", x: 1004, y: 936, w: 188, h: 56, lx: 1204, ly: 944, title: "Compress All", text: "— every photo to your target size or smaller, one pass." },
+      { n: 1, shape: "line", x: 1061, y: 280, w: 0, h: 610, lx: 1160, ly: 196, title: "Original ⟷ Edited", text: "side by side." },
+      { n: 2, shape: "ellipse", x: 1004, y: 936, w: 188, h: 56, lx: 1204, ly: 944, title: "Compress All", text: "— every photo to your target size or smaller, one pass." },
+      { n: 3, shape: "box", x: 644, y: 1004, w: 68, h: 34, lx: 724, ly: 1044, title: "−92%", text: "— the thumbnail says what each photo saved." },
     ],
     alt: "The Image Horse editor open on a photo of a red Viper parked by the ocean, split down the middle between Original and Edited, with the Presets panel on the left previewing Enhance and History, Layers and a histogram on the right — eight cars in the gallery strip below, the Viper tagged −92%.",
+  },
+  {
+    src: "/IH-Hero-Image-October-2026.webp",
+    srcSet:
+      "/IH-Hero-Image-October-2026-800w.webp 800w, /IH-Hero-Image-October-2026-1200w.webp 1200w, /IH-Hero-Image-October-2026.webp 2000w",
+    width: 2000,
+    height: 1190,
+    date: "2026-10-31",
+    dateLabel: "31 Oct 2026",
+    note: "Today: a histogram under the presets that moves while you preview, Select ▾ to tick photos by a rule, and a Cayenne under the palms going warm before you commit to it.",
+    href: `${REPO}/f8af8114e2b1bc06728c37202021575c58cd5cda`,
+    sourceLabel: "v9.48",
+    annotations: [
+      { n: 1, shape: "box", x: 20, y: 286, w: 288, h: 450, lx: 322, ly: 292, title: "Presets", text: "— preview before you keep." },
+      { n: 2, shape: "box", x: 22, y: 796, w: 286, h: 308, lx: 322, ly: 800, title: "Histogram", text: "— pinned under the presets, and it moves while you preview." },
+      { n: 3, shape: "ellipse", x: 1196, y: 934, w: 132, h: 52, lx: 1196, ly: 996, title: "Select ▾", text: "— tick photos by a rule: portrait, landscape, edited, larger than a size." },
+    ],
+    alt: "The Image Horse editor open on a photo of a green Porsche Cayenne parked under palm trees beside a cream wall, split down the middle between Original and Edited, with the Presets panel on the left previewing Warm above a histogram, and History and Layers on the right — nine cars in the gallery strip below.",
   },
 ];
