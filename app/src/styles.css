@@ -54,7 +54,7 @@
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
-  --z-decoration: 47; /* seasonal garland (features/halloween) — above the start screen and editor chrome, below the mobile shell and dialogs; ignores the pointer except its X */
+  --z-decoration: 47; /* seasonal garland (features/fall-back) — above the start screen and editor chrome, below the mobile shell and dialogs; ignores the pointer except its X */
 
   /* ── Dialog scrim — the single source for every modal backdrop. ──
      ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. The New dialog, the
@@ -2963,21 +2963,23 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
    handles use inline pointer-events, so only !important reaches them. */
 [data-draw-overlay][data-settling] * { pointer-events: none !important; }
 
-/* ── Halloween garland (features/halloween) ──────────────────────────────────
-   Seasonal decoration, last week of October only. Pumpkin orange and ink are
-   fixed in BOTH themes, like --on-photo: they are the decoration's own colours,
-   not a theme surface. The garland ignores the pointer — only the X is a
+/* ── Fall Back garland (features/fall-back) ───────────────────────────────────
+   Seasonal decoration, the days around the first Sunday of November, when
+   clocks go back an hour. Pumpkin orange, rust and ink are fixed in BOTH
+   themes, like --on-photo: they are the decoration's own colours, not a theme
+   surface. The garland ignores the pointer — only the X is a
    target — so it can sit over the canvas without blocking anything. */
-.halloween-banner {
-  --halloween-orange: #f28c28;
-  --halloween-orange-deep: #c4610f;
-  --halloween-ink: #231a14;
-  --halloween-purple: #6e3fa8;
-  --halloween-cream: #fff4e6;
-  --halloween-stem: #4f6b2d;
+.fallback-banner {
+  --fallback-orange: #f28c28;
+  --fallback-orange-deep: #c4610f;
+  --fallback-ink: #231a14;
+  --fallback-rust: #8a3418;
+  --fallback-cream: #fff4e6;
+  --fallback-brass: #b8862b;
+  --fallback-stem: #4f6b2d;
   /* 1 = full size. The bar's string sets its own from its width (see
      Pennants); the start-screen copy steps down on narrow screens below. */
-  --halloween-scale: 1;
+  --fallback-scale: 1;
   display: flex;
   align-items: flex-start;
   gap: 4px;
@@ -2985,7 +2987,7 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
 }
 /* Start screen: a short garland, centered at the very top of the page, so
    the full-size flags clear the logo below them. */
-.halloween-banner-centered {
+.fallback-banner-centered {
   position: fixed;
   top: 12px;
   left: 50%;
@@ -2993,68 +2995,68 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   z-index: var(--z-decoration);
 }
 @media (max-width: 1000px) {
-  .halloween-banner-centered {
-    --halloween-scale: 0.7;
+  .fallback-banner-centered {
+    --fallback-scale: 0.7;
   }
 }
 @media (max-width: 700px) {
-  .halloween-banner-centered {
-    --halloween-scale: 0.42;
+  .fallback-banner-centered {
+    --fallback-scale: 0.42;
   }
 }
 /* The start screen centers its logo, so a short window brings the logo up
    under the garland: step the flags down with the height too. */
 @media (max-height: 820px) and (min-width: 1001px) {
-  .halloween-banner-centered {
-    --halloween-scale: 0.75;
+  .fallback-banner-centered {
+    --fallback-scale: 0.75;
   }
 }
 @media (max-height: 700px) and (min-width: 701px) {
-  .halloween-banner-centered {
-    --halloween-scale: 0.5;
+  .fallback-banner-centered {
+    --fallback-scale: 0.5;
   }
 }
 /* Editor: hung from the top bar's bottom edge and as long as the bar. A child
    of the bar's surface, so it takes the bar's stacking tier and its width. */
-.halloween-banner-bar {
+.fallback-banner-bar {
   position: absolute;
   top: calc(100% + 2px);
   left: 8px;
   right: 8px;
 }
-.halloween-banner-bar .halloween-garland {
+.fallback-banner-bar .fallback-garland {
   flex: 1;
   min-width: 0;
 }
-.halloween-garland {
+.fallback-garland {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   transform-origin: 50% 0;
-  animation: halloween-sway 6s ease-in-out infinite;
+  animation: fallback-sway 6s ease-in-out infinite;
 }
-.halloween-banner-bar .halloween-garland {
-  animation-name: halloween-sway-long;
+.fallback-banner-bar .fallback-garland {
+  animation-name: fallback-sway-long;
 }
-.halloween-string {
+.fallback-string {
   position: relative;
   display: flex;
   align-items: flex-start;
   padding: 0 4px;
 }
-.halloween-string-fill {
+.fallback-string-fill {
   flex: 1;
   min-width: 0;
   justify-content: center;
   overflow: hidden;
-  padding-bottom: calc(24px * var(--halloween-scale));
+  padding-bottom: calc(24px * var(--fallback-scale));
 }
 /* The cord itself: one curve behind the flags, stretched to the string. */
-.halloween-cord {
+.fallback-cord {
   position: absolute;
   inset: 0 0 auto 0;
   width: 100%;
-  height: calc(40px * var(--halloween-scale));
+  height: calc(40px * var(--fallback-scale));
   margin-top: -2px;
   overflow: visible;
   fill: none;
@@ -3062,107 +3064,142 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   stroke-width: 2px;
   opacity: 0.7;
 }
-.halloween-flag {
+.fallback-flag {
   display: flex;
   justify-content: center;
-  /* 52 + 2 + 2 = LETTER_PITCH (56) in HalloweenBanner.tsx, times the scale. */
-  width: calc(52px * var(--halloween-scale));
-  height: calc(64px * var(--halloween-scale));
-  margin: 0 calc(2px * var(--halloween-scale));
-  padding-top: calc(8px * var(--halloween-scale));
+  /* 52 + 2 + 2 = LETTER_PITCH (56) in FallBackBanner.tsx, times the scale. */
+  width: calc(52px * var(--fallback-scale));
+  height: calc(64px * var(--fallback-scale));
+  margin: 0 calc(2px * var(--fallback-scale));
+  padding-top: calc(8px * var(--fallback-scale));
   clip-path: polygon(0 0, 100% 0, 50% 100%);
-  background: var(--halloween-orange);
-  color: var(--halloween-ink);
+  background: var(--fallback-orange);
+  color: var(--fallback-ink);
   font-family: var(--font-sans);
-  font-size: calc(26px * var(--halloween-scale));
+  font-size: calc(26px * var(--fallback-scale));
   font-weight: 800;
   line-height: 1;
 }
 /* The filler flags either side of the message: smaller, so the words lead. */
-.halloween-flag-blank {
+.fallback-flag-blank {
   /* 28 + 2 + 2 = BLANK_PITCH (32). */
-  width: calc(28px * var(--halloween-scale));
-  height: calc(36px * var(--halloween-scale));
+  width: calc(28px * var(--fallback-scale));
+  height: calc(36px * var(--fallback-scale));
   opacity: 0.85;
 }
-.halloween-flag-purple {
-  background: var(--halloween-purple);
-  color: var(--halloween-cream);
+.fallback-flag-rust {
+  background: var(--fallback-rust);
+  color: var(--fallback-cream);
 }
-.halloween-gap {
-  width: calc(24px * var(--halloween-scale));
+/* The space between the two words: the pumpkin hangs there.
+   64 = GAP_PITCH in FallBackBanner.tsx, times the scale. */
+.fallback-gap {
+  display: flex;
+  justify-content: center;
+  width: calc(64px * var(--fallback-scale));
 }
-.halloween-pumpkin {
+.fallback-pumpkin {
+  flex: none;
+  width: calc(60px * var(--fallback-scale));
+  height: calc(60px * var(--fallback-scale));
+  margin-top: calc(-6px * var(--fallback-scale));
+}
+.fallback-pumpkin-body {
+  fill: var(--fallback-orange-deep);
+}
+.fallback-pumpkin-front {
+  fill: var(--fallback-orange);
+}
+.fallback-stem {
+  fill: var(--fallback-stem);
+}
+.fallback-leaf {
+  fill: var(--fallback-rust);
+}
+/* The clocks at each end of the cord. */
+.fallback-clock {
   flex: none;
   width: 52px;
   height: 52px;
   margin-top: 2px;
 }
-.halloween-pumpkin-body {
-  fill: var(--halloween-orange-deep);
+.fallback-clock-bell,
+.fallback-clock-rim {
+  fill: var(--fallback-brass);
 }
-.halloween-pumpkin-front {
-  fill: var(--halloween-orange);
+.fallback-clock-face {
+  fill: var(--fallback-cream);
 }
-.halloween-stem {
-  fill: var(--halloween-stem);
+.fallback-clock-ticks,
+.fallback-clock-hand {
+  fill: none;
+  stroke: var(--fallback-ink);
+  stroke-linecap: round;
 }
-.halloween-face {
-  fill: var(--halloween-ink);
+.fallback-clock-ticks {
+  stroke-width: 1.5px;
 }
-.halloween-bat {
-  flex: none;
-  width: 60px;
-  height: 30px;
-  margin-top: 10px;
-  animation: halloween-flap 1.6s ease-in-out infinite;
+.fallback-clock-hour {
+  stroke-width: 2.4px;
 }
-.halloween-bat-body {
-  fill: var(--halloween-ink);
+.fallback-clock-minute {
+  stroke-width: 1.6px;
 }
-:root.dark .halloween-bat-body {
-  fill: var(--text-secondary);
+.fallback-clock-pin {
+  fill: var(--fallback-rust);
 }
-.halloween-close {
+/* The hands wind BACKWARDS: the minute hand turns once anticlockwise while the
+   hour hand steps back an hour (30°), then both hold before going again. */
+.fallback-clock-hand {
+  transform-box: view-box;
+  transform-origin: 20px 22px;
+}
+.fallback-clock-minute {
+  animation: fallback-wind-minute 5s ease-in-out infinite;
+}
+.fallback-clock-hour {
+  animation: fallback-wind-hour 5s ease-in-out infinite;
+}
+.fallback-close {
   pointer-events: auto;
 }
-@keyframes halloween-sway {
+@keyframes fallback-sway {
   0%, 100% { transform: rotate(-1deg); }
   50% { transform: rotate(1deg); }
 }
 /* A long garland rotating even 1° swings its ends ~10px; it bobs instead. */
-@keyframes halloween-sway-long {
+@keyframes fallback-sway-long {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(1.5px); }
 }
-@keyframes halloween-flap {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.7); }
+@keyframes fallback-wind-minute {
+  0%, 20% { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(-360deg); }
+}
+@keyframes fallback-wind-hour {
+  0%, 20% { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(-30deg); }
 }
 /* Windows High Contrast and other forced-colour modes strip backgrounds,
    which would leave bare letters floating on a cord. The garland is one
    labelled image, so it keeps its own colours there; the X is left to the
    system so it reads as a button in the user's chosen palette. */
 @media (forced-colors: active) {
-  .halloween-garland {
+  .fallback-garland {
     forced-color-adjust: none;
   }
 }
-/* The pumpkin and bat follow the start-screen copy down on narrow screens. */
+/* The clocks follow the start-screen copy down on narrow screens (the
+   pumpkin already scales with the flags). */
 @media (max-width: 700px) {
-  .halloween-pumpkin {
+  .fallback-clock {
     width: 30px;
     height: 30px;
   }
-  .halloween-bat {
-    width: 36px;
-    height: 18px;
-    margin-top: 6px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .halloween-garland,
-  .halloween-bat {
+  .fallback-garland,
+  .fallback-clock-hand {
     animation: none;
   }
 }
