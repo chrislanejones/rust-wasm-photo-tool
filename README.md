@@ -90,20 +90,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.49 — 2026-11-01
+### v9.50 — 2026-11-01
 
-**Fall back, and the narrow-window gallery lines up.**
+**October takes over the front page.**
 
-The Halloween garland came down and a "Fall Back" one went up for the clock
-change: rust and orange flags, a pumpkin between the two words, and an alarm
-clock at each end whose hands wind backward. It shows from the Monday before
-the first Sunday of November through the Tuesday after, and like the last one
-it takes itself down and stays closed once you close it.
-
-In the compact layout (a window snapped to half the screen), the Select ▾
-button in the gallery spilled over Delete All beside it, and with photos
-selected Export sat alone on a second row. Select is a tile like its
-neighbors now, and four tiles sit two by two.
+The big picture at the top of [imagehorse.app](https://imagehorse.app) has a
+new last stop: a green Porsche Cayenne under the palms, going Warm before you
+commit to it, with nine cars in the gallery. Its three markers point at the
+Presets, the histogram pinned under them, and Select ▾ for ticking photos by a
+rule. September keeps Original ⟷ Edited and Compress All, and picks up the
+−92% badge on the Viper's thumbnail.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

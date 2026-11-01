@@ -7,10 +7,10 @@
 //
 // A squash merge counts as its PR's commits on the days they were written
 // (src/data/squash-prs.json), and a commit already in the log is never counted
-// twice. 325 squash merges: 319 credited to their commits' days,
+// twice. 326 squash merges: 320 credited to their commits' days,
 // 6 already in history, 0 on their merge day (no cache entry).
 //
-// 1339 commits across 139 active days, 2026-02-25 → 2026-11-01.
+// 1341 commits across 139 active days, 2026-02-25 → 2026-11-01.
 
 export const COMMITS: Record<string, number> = {
   "2026-02-25": 2,
@@ -150,6 +150,6 @@ export const COMMITS: Record<string, number> = {
   "2026-10-28": 6,
   "2026-10-29": 3,
   "2026-10-30": 7,
-  "2026-10-31": 16,
-  "2026-11-01": 2,
+  "2026-10-31": 17,
+  "2026-11-01": 3,
 };

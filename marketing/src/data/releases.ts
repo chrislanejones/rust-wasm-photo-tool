@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.50",
+    date: "2026-11-01",
+    headline: "October takes over the front page.",
+    entries: [
+      { tag: "ui", text: "The picture at the top of the home page ends on October now: a green Cayenne under the palms going Warm, with markers on the Presets, the histogram under them, and Select ▾." },
+      { tag: "ui", text: "September's frame points at Original ⟷ Edited, Compress All and the −92% badge a photo earns when it shrinks." },
+    ],
+  },
+  {
     version: "v9.49",
     date: "2026-11-01",
     headline: "Fall back, and the narrow-window gallery lines up.",

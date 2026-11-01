@@ -11885,3 +11885,15 @@ No engine or saved-format change. imagehorse-qc is still owed from v9.46
 
 No engine or saved-format change. imagehorse-qc is still owed from v9.46
 (the engine and the Text tool).
+
+## v9.50 Change Summary — 2026-11-01
+
+**October takes over the front page.**
+
+| Area | Change |
+| --- | --- |
+| Marketing hero (#425) | A new last frame on the hero timeline in `marketing/src/data/shots.ts`: the v9.48 editor previewing Warm on a green Porsche Cayenne, nine photos in the gallery. WebP at q60: 2000w 155 KB, 1200w 76 KB, 800w 39 KB. Markers: Presets (moved from September), Histogram, Select ▾. September keeps Original ⟷ Edited and Compress All and gains the −92% thumbnail badge. The srcSet moves to October, since only today's frame carries the smaller sizes. |
+| Verification | Production marketing build at 1600 wide: every label clears its box, the photo count and the buttons. Marketing tsc 0, lint 0 errors, guardrails OK, build:marketing OK. |
+
+Marketing only. No app, engine or saved-format change. September's 800w and
+1200w files stay in `marketing/public/`, unreferenced now.
