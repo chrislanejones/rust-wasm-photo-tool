@@ -4,7 +4,7 @@
 // fades it out. Thin wrapper over the shared BrandRevealScreen entrance.
 import type { ReactNode } from "react";
 import { BrandRevealScreen } from "@/components/BrandRevealScreen";
-import { HalloweenBanner } from "@/features/halloween";
+import { FallBackBanner } from "@/features/fall-back";
 
 export function FirstRunScreen({
   show,
@@ -35,9 +35,9 @@ export function FirstRunScreen({
         {children}
       </BrandRevealScreen>
       {/* This page covers the top bar, and with it the bar's garland, so it
-        carries its own (late October only). A sibling, not a child: fixed
+        carries its own (early November only). A sibling, not a child: fixed
         positioning inside the reveal's animated layers would not hold. */}
-      {show && ready && <HalloweenBanner placement="centered" />}
+      {show && ready && <FallBackBanner placement="centered" />}
     </>
   );
 }

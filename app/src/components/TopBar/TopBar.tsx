@@ -1,5 +1,5 @@
 // app/src/components/TopBar/TopBar.tsx
-import { HalloweenBanner } from "@/features/halloween";
+import { FallBackBanner } from "@/features/fall-back";
 import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { motion } from "framer-motion";
 import { slideFromTop, springStandard, instantTransition } from "@/lib/animations";
@@ -182,7 +182,7 @@ export function TopBar({
       >
         <div className="pointer-events-auto relative">
           {/* The toolbar role is on the bar's own surface, not the fixed
-              wrapper, so the Halloween garland below can sit beside the
+              wrapper, so the Fall Back garland below can sit beside the
               toolbar instead of being announced as one of its controls. */}
           <div
             role="toolbar"
@@ -366,11 +366,11 @@ export function TopBar({
               </div>
             </div>
           </div>
-          {/* Late October only: a "Happy Halloween" garland hung from the
-              bar's bottom edge, the bar's full length. A sibling of the
-              toolbar, not inside it. Renders nothing the rest of the year.
-              See features/halloween. */}
-          <HalloweenBanner placement="bar" />
+          {/* Around the first Sunday of November only: a "Fall Back" garland
+              hung from the bar's bottom edge, the bar's full length. A
+              sibling of the toolbar, not inside it. Renders nothing the rest
+              of the year. See features/fall-back. */}
+          <FallBackBanner placement="bar" />
         </div>
       </motion.div>
     </motion.div>

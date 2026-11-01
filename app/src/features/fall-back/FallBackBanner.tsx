@@ -1,22 +1,24 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isHalloweenSeason, readDismissed, writeDismissed } from "./season";
+import { isFallBackSeason, readDismissed, writeDismissed } from "./season";
 
-const MESSAGE = "HAPPY HALLOWEEN";
+const MESSAGE = "FALL BACK";
 /** Footprint along the cord at full size, margins included (see
- *  `.halloween-flag*`, which multiply the same numbers by `--halloween-scale`). */
+ *  `.fallback-flag*` and `.fallback-gap`, which multiply the same numbers by
+ *  `--fallback-scale`). The gap between the words holds the pumpkin. */
 const LETTER_PITCH = 56;
 const BLANK_PITCH = 32;
-const GAP_PITCH = 24;
+const GAP_PITCH = 64;
 /** How far the middle of the cord hangs below its ends, at full size. */
 const SAG = 20;
 /** Never shrink the letters below this, however narrow the bar. */
 const MIN_SCALE = 0.4;
 
 /**
- * A small "Happy Halloween" pennant garland: a pumpkin, a string of flags and
- * a bat, shown during the last week of October.
+ * A small "Fall Back" pennant garland: a clock at each end and a pumpkin
+ * hanging between the two words, shown in the days around the first Sunday
+ * of November, when clocks go back an hour (see season.ts).
  *
  * Two placements, one garland:
  *  - `bar`: hangs under the editor's top bar and runs its full length. It is
@@ -26,35 +28,36 @@ const MIN_SCALE = 0.4;
  *  - `centered`: the start screen covers the top bar, so it carries its own
  *    copy at the top of the page, just the words.
  *
- * ACCESSIBILITY. The garland is one image named "Happy Halloween"; the
- * flags, pumpkin and bat inside it are hidden from assistive tech, so the
- * words are read once rather than letter by letter. The X is a real, named,
- * 24px button with the app's focus ring, and closing it puts focus back on a
- * neighbouring control. The garland's motion stops under reduce-motion, and
- * the X hides it outright (WCAG 2.2.2). The bar copy is a sibling of the top
- * bar's toolbar, not inside it, so it is not announced as a toolbar control.
+ * ACCESSIBILITY. The garland is one image named "Fall back: clocks go back
+ * one hour"; the flags, clocks and pumpkin inside it are hidden from
+ * assistive tech, so the words are read once rather than letter by letter.
+ * The X is a real, named, 24px button with the app's focus ring, and closing
+ * it puts focus back on a neighbouring control. The garland's motion (a sway,
+ * and the clock hands winding backwards) stops under reduce-motion, and the X
+ * hides it outright (WCAG 2.2.2). The bar copy is a sibling of the top bar's
+ * toolbar, not inside it, so it is not announced as a toolbar control.
  *
  * Decoration only: the garland ignores the pointer, only the X takes a click,
  * and closing either copy closes both and is remembered for the rest of this
- * year's season. After October 31 nothing renders, so no release has to take
- * it down. The sway is a CSS animation that the reduce-motion setting and the
- * OS preference both stop (see `.halloween-garland` in styles.css).
+ * year's season. Outside the season nothing renders, so no release has to
+ * take it down. The motion is CSS animation that the reduce-motion setting
+ * and the OS preference both stop (see `.fallback-garland` in styles.css).
  */
-export function HalloweenBanner({ placement }: { placement: "bar" | "centered" }) {
+export function FallBackBanner({ placement }: { placement: "bar" | "centered" }) {
   const closed = useSyncExternalStore(subscribe, isClosed);
-  if (closed || !isHalloweenSeason(new Date())) return null;
+  if (closed || !isFallBackSeason(new Date())) return null;
 
   return (
-    <div className={`halloween-banner halloween-banner-${placement}`} data-testid={`halloween-banner-${placement}`}>
-      <div className="halloween-garland" role="img" aria-label="Happy Halloween">
-        <Pumpkin />
+    <div className={`fallback-banner fallback-banner-${placement}`} data-testid={`fallback-banner-${placement}`}>
+      <div className="fallback-garland" role="img" aria-label="Fall back: clocks go back one hour">
+        <Clock />
         <Pennants fill={placement === "bar"} />
-        <Bat />
+        <Clock />
       </div>
       <Button
         size="tiny"
-        className="halloween-close"
-        aria-label="Hide the Halloween banner"
+        className="fallback-close"
+        aria-label="Hide the Fall Back banner"
         onClick={(e) => {
           // The X is about to unmount. If it had focus, hand focus to the
           // control just before it rather than dropping it on <body>, where a
@@ -109,13 +112,19 @@ function Pennants({ fill }: { fill: boolean }) {
     // the start-screen copy (scaled by media queries, not here) sags in step.
     const drop = Math.round(SAG * (1 - t * t));
     const tilt = Math.round(-t * 8);
-    if (ch === " ") return <span key={i} className="halloween-gap" />;
-    const colour = i % 2 ? " halloween-flag-purple" : "";
+    const transform = `translateY(calc(${drop}px * var(--fallback-scale))) rotate(${tilt}deg)`;
+    if (ch === " ")
+      return (
+        <span key={i} className="fallback-gap" style={{ transform }}>
+          <Pumpkin />
+        </span>
+      );
+    const colour = i % 2 ? " fallback-flag-rust" : "";
     return (
       <span
         key={i}
-        className={`halloween-flag${ch ? "" : " halloween-flag-blank"}${colour}`}
-        style={{ transform: `translateY(calc(${drop}px * var(--halloween-scale))) rotate(${tilt}deg)` }}
+        className={`fallback-flag${ch ? "" : " fallback-flag-blank"}${colour}`}
+        style={{ transform }}
       >
         {ch}
       </span>
@@ -125,13 +134,13 @@ function Pennants({ fill }: { fill: boolean }) {
   return (
     <div
       ref={ref}
-      className={fill ? "halloween-string halloween-string-fill" : "halloween-string"}
-      style={fill ? ({ "--halloween-scale": scale } as CSSProperties) : undefined}
+      className={fill ? "fallback-string fallback-string-fill" : "fallback-string"}
+      style={fill ? ({ "--fallback-scale": scale } as CSSProperties) : undefined}
       aria-hidden
     >
       {/* 40 units tall in a box 40 × scale px tall (styles.css), so a unit is a
           scaled pixel and the curve's middle dips SAG, the same as the flags. */}
-      <svg className="halloween-cord" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden>
+      <svg className="fallback-cord" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden>
         <path d={`M0 2 Q50 ${2 + SAG * 2} 100 2`} vectorEffect="non-scaling-stroke" />
       </svg>
       {flags}
@@ -182,23 +191,28 @@ function safeStorage(): Storage | undefined {
 
 function Pumpkin() {
   return (
-    <svg className="halloween-pumpkin" viewBox="0 0 32 32" aria-hidden>
-      <path className="halloween-stem" d="M15 4c1-2 4-2 5-1-2 1-3 3-3 5h-2z" />
-      <ellipse className="halloween-pumpkin-body" cx="10.5" cy="19" rx="7.5" ry="10" />
-      <ellipse className="halloween-pumpkin-body" cx="21.5" cy="19" rx="7.5" ry="10" />
-      <ellipse className="halloween-pumpkin-body halloween-pumpkin-front" cx="16" cy="19" rx="7" ry="10.5" />
-      <path className="halloween-face" d="M10 15l3 3h-4zM22 15l1 3h-4zM10 22c2 3 10 3 12 0l-2 1-2-1-2 1-2-1-2 1z" />
+    <svg className="fallback-pumpkin" viewBox="0 0 32 32" aria-hidden>
+      <path className="fallback-stem" d="M15 4c1-2 4-2 5-1-2 1-3 3-3 5h-2z" />
+      <path className="fallback-leaf" d="M18 7c2-3 6-3 8-1-2 2-5 3-8 1z" />
+      <ellipse className="fallback-pumpkin-body" cx="10.5" cy="19" rx="7.5" ry="10" />
+      <ellipse className="fallback-pumpkin-body" cx="21.5" cy="19" rx="7.5" ry="10" />
+      <ellipse className="fallback-pumpkin-body fallback-pumpkin-front" cx="16" cy="19" rx="7" ry="10.5" />
     </svg>
   );
 }
 
-function Bat() {
+/** An alarm clock at two o'clock whose hands wind back to one: the minute hand turns once backwards. */
+function Clock() {
   return (
-    <svg className="halloween-bat" viewBox="0 0 40 20" aria-hidden>
-      <path
-        className="halloween-bat-body"
-        d="M20 6c1 0 2-2 2-3l1 3c3 0 3 3 3 5 2-3 6-4 9-3l5 2c-3 1-4 4-4 6-2-2-5-2-6 0-1-2-4-2-5 0-1 2-3 4-5 4s-4-2-5-4c-1-2-4-2-5 0-1-2-4-2-6 0 0-2-1-5-4-6l5-2c3-1 7 0 9 3 0-2 0-5 3-5l1-3c0 1 1 3 2 3z"
-      />
+    <svg className="fallback-clock" viewBox="0 0 40 40" aria-hidden>
+      <circle className="fallback-clock-bell" cx="9" cy="8" r="5" />
+      <circle className="fallback-clock-bell" cx="31" cy="8" r="5" />
+      <circle className="fallback-clock-rim" cx="20" cy="22" r="15" />
+      <circle className="fallback-clock-face" cx="20" cy="22" r="12" />
+      <path className="fallback-clock-ticks" d="M20 11.5v2.5M30.5 22h-2.5M20 32.5v-2.5M9.5 22h2.5" />
+      <line className="fallback-clock-hand fallback-clock-hour" x1="20" y1="22" x2="25.6" y2="18.8" />
+      <line className="fallback-clock-hand fallback-clock-minute" x1="20" y1="22" x2="20" y2="12.5" />
+      <circle className="fallback-clock-pin" cx="20" cy="22" r="1.4" />
     </svg>
   );
 }
