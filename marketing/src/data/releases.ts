@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.49",
+    date: "2026-11-01",
+    headline: "Fall back, and the narrow-window gallery lines up.",
+    entries: [
+      { tag: "ui", text: "The Halloween garland came down and a \"Fall Back\" one went up for the clock change, with a pumpkin between the words and two clocks winding backward. It shows the week of the change and takes itself down after." },
+      { tag: "fix", text: "In the compact layout, Select ▾ in the gallery no longer spills over Delete All, and with photos selected the four buttons sit two by two." },
+    ],
+  },
+  {
     version: "v9.48",
     date: "2026-10-31",
     headline: "The gallery's buttons line up again.",

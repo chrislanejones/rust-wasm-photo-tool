@@ -11871,3 +11871,17 @@ No engine or saved-format change. imagehorse-qc is still owed from v9.46
 
 No engine or saved-format change. imagehorse-qc is still owed from v9.46
 (the engine and the Text tool).
+
+
+## v9.49 Change Summary — 2026-11-01
+
+**Fall back, and the narrow-window gallery lines up.**
+
+| Area | Change |
+| --- | --- |
+| Seasonal garland (#426) | `features/halloween` becomes `features/fall-back`: "FALL BACK" on rust and orange flags, a pumpkin in the gap between the words, and a clock at each end whose hands wind backward (motion stops under `prefers-reduced-motion`). `fallBackDay()` finds the first Sunday of November; the garland shows from 6 days before through 2 days after, local time. It's read once as "Fall back: clocks go back one hour", and closing it is remembered per year. It keeps v9.47's `--fallback-scale` sizing. The Halloween garland is removed, so it won't come back next October on its own. |
+| Compact gallery (#427) | Select ▾ sits inside a span for its menu, so the compact grid's `[&>button]` tile rule never reached it: it stayed a wide row and covered Delete All / Unselect. `SelectByMenu` takes `tile` and draws as the same icon-over-label tile, and the grid picks its columns from the tile count (3 in a row, 4 as 2×2, 2 side by side). |
+| Verification | Garland in a production build at 1600 and 1280, start screen and editor, 0 page errors. Compact gallery at 873×1043: nothing selected = 3 tiles of 70×47, 2 selected = 2×2 of 109×47, 0 overlaps, 0 clipped labels, menu opens. tsc 0, lint 0 errors (53 warnings), guardrails OK, 240 files / 2,162 unit tests. |
+
+No engine or saved-format change. imagehorse-qc is still owed from v9.46
+(the engine and the Text tool).

@@ -90,17 +90,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.48 — 2026-10-31
+### v9.49 — 2026-11-01
 
-**The gallery's buttons line up again.**
+**Fall back, and the narrow-window gallery lines up.**
 
-On a laptop, or with the History panel open, the gallery bar ran short of
-room, and "Delete All" and "Export or Share Image" folded onto two, three,
-even four lines. That left a row of buttons in three different heights. The
-labels don't wrap anymore, the buttons sit a little closer, and when the bar
-really can't fit everything on one line it moves the Compress buttons to a
-second row instead of squashing them. It goes by the bar's own width, so
-opening a side panel counts too, not just a small window.
+The Halloween garland came down and a "Fall Back" one went up for the clock
+change: rust and orange flags, a pumpkin between the two words, and an alarm
+clock at each end whose hands wind backward. It shows from the Monday before
+the first Sunday of November through the Tuesday after, and like the last one
+it takes itself down and stays closed once you close it.
+
+In the compact layout (a window snapped to half the screen), the Select ▾
+button in the gallery spilled over Delete All beside it, and with photos
+selected Export sat alone on a second row. Select is a tile like its
+neighbors now, and four tiles sit two by two.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
