@@ -154,7 +154,7 @@ function GalleryActions({
    */
   const actionRow = vertical
     ? "grid grid-cols-3 gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1"
-    : "flex items-center gap-1.5";
+    : "flex flex-wrap items-center justify-end gap-1";
   // COMPACT is the exception that stays: a 3-up tile grid in a narrow column,
   // icon over label, where `default`'s horizontal padding would wrap every
   // label. It overrides padding on purpose and says so.
@@ -165,7 +165,11 @@ function GalleryActions({
   // of these buttons was icon-only with a flaky `title` as its only name.
   // sr-only looks identical (gone below sm, shown above) but a screen reader
   // still reads the label. Seven buttons fixed by this one string.
-  const label = vertical ? "inline" : "sr-only sm:not-sr-only";
+  // WIDE LABELS NEVER WRAP. `not-sr-only` resets white-space to `normal`, so a
+  // squeezed row broke "Delete All" and "Export or Share Image" onto two lines
+  // and the buttons came out two different heights (Chris, 10-31-2026: "it
+  // looks terrible"). The header grid below gives this column its full width.
+  const label = vertical ? "inline" : "sr-only sm:not-sr-only sm:whitespace-nowrap";
 
   const actions = (
     <>
@@ -220,7 +224,7 @@ function GalleryActions({
           className={
             vertical
               ? "flex flex-col gap-1.5 border-t border-theme-border pt-2.5"
-              : "flex flex-wrap items-center gap-1.5"
+              : "flex items-center gap-1"
           }
         >
           <InfoTooltip
@@ -250,7 +254,7 @@ function GalleryActions({
             className={
               vertical
                 ? "grid grid-cols-1 gap-1.5 [&>button]:w-full"
-                : "grid grid-flow-col auto-cols-fr justify-center gap-1.5 [&>button]:w-full"
+                : "grid grid-flow-col auto-cols-fr justify-center gap-1 [&>button]:w-full"
             }
           >
             {some ? (
@@ -447,7 +451,7 @@ export function GalleryBar({
             toggle brings it back. The docked (vertical) form is closed from the
             master bar's tabs instead. */}
         {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
-        <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
+        <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "@container p-4"}>
           <div
             inert={chromeInert}
             data-gallery-chrome=""
@@ -461,8 +465,19 @@ export function GalleryBar({
                   // BAR, not on whatever width the other two happened to leave
                   // — with equal thirds the compress block drifted whenever the
                   // count grew ("Selected: 3 of 12") or an action appeared.
-                  // The sides take only what they need and push nothing.
-                  "grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 mb-3"
+                  // Each side is at LEAST its content wide: a plain `1fr` gave
+                  // the actions the same width as the short count, which was
+                  // less than three buttons need, so their labels wrapped.
+                  // With room to spare the sides still split evenly and the
+                  // middle stays centered on the bar.
+                  // TWO ROWS WHEN ONE WON'T FIT. All three groups need ~870px
+                  // on one line; the bar is narrower than that on a laptop
+                  // with History open, and the middle column then squeezed
+                  // the Compress pair on top of each other. A CONTAINER query,
+                  // not a viewport one, because the side panels change the
+                  // bar's width without the window changing: under 56rem the
+                  // count and actions share row 1 and Compress centers on row 2.
+                  "grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-x-3 mb-3 @max-[56rem]:grid-cols-[auto_minmax(0,1fr)] @max-[56rem]:gap-y-2"
             }
           >
             {/* Horizontal: count far left. Vertical: it moves to a footer at
@@ -490,7 +505,7 @@ export function GalleryBar({
               />
             ) : (
               <>
-                <div className="justify-self-center">
+                <div className="justify-self-center @max-[56rem]:col-span-2 @max-[56rem]:row-start-2">
                   <GalleryActions
                     only="compress"
                     selectedCount={selectedIds.size}
@@ -498,7 +513,7 @@ export function GalleryBar({
                     onAutoCompress={onAutoCompress}
                   />
                 </div>
-                <div className="justify-self-end">
+                <div className="justify-self-end @max-[56rem]:col-start-2 @max-[56rem]:row-start-1">
                   <GalleryActions
                     only="actions"
                     selectedCount={selectedIds.size}
