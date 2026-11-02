@@ -11897,3 +11897,28 @@ No engine or saved-format change. imagehorse-qc is still owed from v9.46
 
 Marketing only. No app, engine or saved-format change. September's 800w and
 1200w files stay in `marketing/public/`, unreferenced now.
+
+
+## v9.51 Change Summary — 2026-11-02
+
+**The Fall Back garland comes down.**
+
+| Area | Change |
+| --- | --- |
+| Seasonal artwork (#428) | Removed the Fall Back banner, its season window, dismissal control and animations. The start screen and top bar return to their regular layout; the seasonal decoration styles and stacking token are removed. |
+| Scope | No engine, saved-format, authentication or billing change. Home, Features, Pricing and Architecture marketing copy remains applicable. |
+
+Verification: TypeScript clean; lint 0 errors (53 existing warnings); guardrails
+pass; 238 files / 2,141 unit tests; cargo fmt, clippy and 801 Rust tests pass;
+editor and marketing production builds pass; marketing script tests pass.
+[CI on the merged commit](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/runs/41394843746)
+is green, including both full browser-test shards, keyless boot and service-worker checks.
+
+Production-build Text outline QC covers keyboard controls, commit, the separate
+Add Text / Text Stroke undo-redo steps, and exact composite persistence after
+reload (`e2e/archive/release-1102.spec.ts`). All seven targeted callout tests pass.
+The live editor boots without page errors or seasonal artwork, and the deploy
+sentinel verifies the 954,456-byte engine. Production Convex insights report no
+issues over 72 hours. The previously recorded intermittent callout and fast
+photo-switch issues remain in the parking lot; this release does not claim to
+fix them.

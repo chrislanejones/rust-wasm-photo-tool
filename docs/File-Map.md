@@ -2,6 +2,9 @@
 
 > Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [Change Summary](Change-summary.md).
 
+The seasonal `features/fall-back/` module was removed in v9.51. The start
+screen and `TopBar` render their regular layout without a seasonal banner.
+
 ## Rust Module Map
 
 ```

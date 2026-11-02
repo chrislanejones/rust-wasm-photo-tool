@@ -90,16 +90,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.50 — 2026-11-01
+### v9.51 — 2026-11-02
 
-**October takes over the front page.**
+**The Fall Back garland comes down.**
 
-The big picture at the top of [imagehorse.app](https://imagehorse.app) has a
-new last stop: a green Porsche Cayenne under the palms, going Warm before you
-commit to it, with nine cars in the gallery. Its three markers point at the
-Presets, the histogram pinned under them, and Select ▾ for ticking photos by a
-rule. September keeps Original ⟷ Edited and Compress All, and picks up the
-−92% badge on the Viper's thumbnail.
+The start screen and editor top bar return to their regular layout after the
+clock change. The seasonal flags, clocks, pumpkin and dismissal control have
+been removed.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.51",
+    date: "2026-11-02",
+    headline: "The Fall Back garland comes down.",
+    entries: [
+      { tag: "ui", text: "The start screen and editor top bar return to their regular layout after the clock change. The seasonal flags, clocks and pumpkin have been removed." },
+    ],
+  },
+  {
     version: "v9.50",
     date: "2026-11-01",
     headline: "October takes over the front page.",
