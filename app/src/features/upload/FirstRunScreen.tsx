@@ -4,7 +4,6 @@
 // fades it out. Thin wrapper over the shared BrandRevealScreen entrance.
 import type { ReactNode } from "react";
 import { BrandRevealScreen } from "@/components/BrandRevealScreen";
-import { FallBackBanner } from "@/features/fall-back";
 
 export function FirstRunScreen({
   show,
@@ -20,24 +19,18 @@ export function FirstRunScreen({
 }) {
   const ready = phase === "ready";
   return (
-    <>
-      <BrandRevealScreen
-        show={show}
-        showContent={ready}
-        loading={!ready}
-        reduceMotion={reduceMotion}
-        ariaLabel={ready ? "Get started" : "Loading Image Horse"}
-        // Below z-dialog (unlike the real IdleScreen): this is just the app's
-        // empty state, so dialogs opened over it (e.g. Alt+Delete Diagnostics)
-        // must render visibly on top instead of getting trapped underneath.
-        zIndexClass="z-[var(--z-panel)]"
-      >
-        {children}
-      </BrandRevealScreen>
-      {/* This page covers the top bar, and with it the bar's garland, so it
-        carries its own (early November only). A sibling, not a child: fixed
-        positioning inside the reveal's animated layers would not hold. */}
-      {show && ready && <FallBackBanner placement="centered" />}
-    </>
+    <BrandRevealScreen
+      show={show}
+      showContent={ready}
+      loading={!ready}
+      reduceMotion={reduceMotion}
+      ariaLabel={ready ? "Get started" : "Loading Image Horse"}
+      // Below z-dialog (unlike the real IdleScreen): this is just the app's
+      // empty state, so dialogs opened over it (e.g. Alt+Delete Diagnostics)
+      // must render visibly on top instead of getting trapped underneath.
+      zIndexClass="z-[var(--z-panel)]"
+    >
+      {children}
+    </BrandRevealScreen>
   );
 }
