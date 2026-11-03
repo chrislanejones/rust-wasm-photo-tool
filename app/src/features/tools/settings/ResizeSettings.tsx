@@ -318,7 +318,7 @@ export function ResizeSettings({
       <div className="flex-1 space-y-8">
         <div className="space-y-4">
           <SectionHeader
-            title="Resize"
+            title="Resize & Compress"
             info="New pixel size for the photo. The lock keeps its shape; Scale sizes both sides by percent."
           />
           {/* The same dropdown as Text › Font Family and Batch's text font

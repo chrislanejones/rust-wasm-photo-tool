@@ -86,7 +86,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   stamp: [
     { id: "clone", label: "Clone Stamp", icon: Copy, keywords: ["clone", "heal", "duplicate"] },
     { id: "red", label: "Red Stamps", icon: StampIcon, keywords: ["red", "batch stamp", "marker"] },
-    { id: "emojis", label: "Emojis", icon: Smile, keywords: ["emoji", "sticker"] },
+    { id: "emojis", label: "Emoji", icon: Smile, keywords: ["emoji", "emojis", "sticker"] },
   ],
   shapes: [
     { id: "shapes", label: "Shapes", icon: ShapesIcon, keywords: ["rectangle", "ellipse", "box"] },

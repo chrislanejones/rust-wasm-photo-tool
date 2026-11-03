@@ -41,7 +41,7 @@ export type PaintMode = BrushMode;
 export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
   {
     id: "paint",
-    label: "Paint",
+    label: "Brush",
     icon: Brush,
     info: (
       <>
@@ -53,7 +53,7 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
   },
   {
     id: "blur",
-    label: "Blur",
+    label: "Blur Brush",
     icon: Droplets,
     info: (
       <>

@@ -123,7 +123,7 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
 })[] = [
   {
     id: "wand",
-    label: "Wand",
+    label: "Magic Wand",
     icon: Wand2,
     info: "Flood-selects the connected region of similar color around your click.",
   },
