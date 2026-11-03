@@ -47,10 +47,14 @@ Out of the night's scope: the plan asked for the Arrows name only.
 
 ## OPEN — tier pending leftovers (fix/tier-pending, 10-27-2026)
 
-- **Settings › Storage still flashes "Sign in with a Pro account"** while
+- ~~**Settings › Storage still flashes "Sign in with a Pro account"** while
   `users.me` is in flight. StoragePane reads `me` directly through
   SubscriptionButton (`tier === null`), not the user mode, so `tierPending`
-  does not reach it. SubscriptionButton already has `planLoading`; pass it down.
+  does not reach it. SubscriptionButton already has `planLoading`; pass it down.~~
+  **FIXED 11-02-2026 (chore/deps-1102):** StoragePane takes `planLoading` and
+  shows a placeholder until the plan lands. `StoragePane.loading.test.tsx`
+  (a vitest with the cloud hooks mocked, not an e2e: the Playwright build is
+  the logged-out demo, with no way to be a signed-in paid user).
 - **Before Clerk loads, a signed-in user is "demo"** (`userMode` default). The
   boot splash waits up to 1.2 s for `authResolved` and hides most of it, but a
   slow Clerk can still show "12 max" before the skeleton. Not pending today:

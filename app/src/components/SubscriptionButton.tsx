@@ -397,7 +397,7 @@ export function SubscriptionButton({
               /* Switches commit as pressed (see PluginsPane), so no Apply. */
               <PluginsPane />
             ) : tab === "storage" ? (
-              <StoragePane isPaid={isPaid} tier={tier} />
+              <StoragePane isPaid={isPaid} tier={tier} planLoading={planLoading} />
             ) : tab === "aiusage" ? (
               <AIUsagePane />
             ) : tab === "image" ? (
