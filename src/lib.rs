@@ -39,6 +39,8 @@ pub mod image_diff;
 mod layer;
 mod levels;
 mod livewire;
+#[cfg(feature = "tiles")]
+mod look;
 mod paint;
 mod presets;
 mod quantize;

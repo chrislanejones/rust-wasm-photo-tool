@@ -1172,6 +1172,13 @@ declare module "stamp_tool" {
      *  FEATURELESS build has reached production before (v7.36–v7.45), so every
      *  caller must feature-detect rather than assume. */
     oplog_is_broken?(): boolean;
+    /** Copy look (src/look.rs): the tonal steps still in the history, in the
+     *  order applied, as a flat wire: a kind code (1 Preset, 2 Levels, 3
+     *  Adjustments), then that kind's values in its apply call's order. Empty
+     *  when there are none. Decoded by `decodeLook` (lib/look.ts).
+     *
+     *  ⚠️ OPTIONAL: `#[cfg(feature = "tiles")]`, like every `oplog_*` export. */
+    oplog_look?(): Float64Array;
     /** Real PIXEL layers: the Canvas fill does NOT count (ADR-016). A default
      *  document (Canvas + Photo) answers 1. This — not `layer_count()` — is what
      *  decides whether the op log can describe the document (`isLogTrustworthy`). */

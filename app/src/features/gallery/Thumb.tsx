@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Zap, Trash2, ImageOff, GitCompareArrows } from "lucide-react";
+import { Check, Zap, Trash2, ImageOff, GitCompareArrows, Copy, ClipboardPaste } from "lucide-react";
 import { springPop, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
+import { copyLook, useLookStore } from "@/stores/useLookStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusMark } from "@/components/ui/status-mark";
 import { formatBytes } from "@/lib/format";
@@ -44,6 +45,7 @@ export interface ThumbProps {
 
 export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical, onPendingChange, loading = false }: ThumbProps) {
   const imgRef = useRef<HTMLImageElement>(null);
+  const hasLook = useLookStore((st) => st.copied !== null);
   // A thumbnail is either a placeholder or the photo — never a gray photo.
   // The object URL, the decode and the grace period all live in the hook.
   const thumb = useThumbImage(entry.thumbBlob);
@@ -95,11 +97,13 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
 
   return (
     // Right-click: "Compare with this" (Night 10-23) — the open photo against
-    // this one. Not offered on the open photo itself.
+    // this one, so not on the open photo itself. The open photo offers "Copy
+    // look" instead, and every other photo "Paste look to selected…" (Night
+    // 11-02, lib/look.ts).
     <ContextMenu>
     <Tooltip>
       <TooltipTrigger asChild>
-        <ContextMenuTrigger asChild disabled={isActive}>
+        <ContextMenuTrigger asChild>
         <motion.div
           data-id={entry.id}
           whileHover="hover"
@@ -356,9 +360,20 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
       </TooltipContent>
     </Tooltip>
     <ContextMenuContent>
-      <ContextMenuItem onSelect={() => useScreenshotCompareStore.getState().start(entry.id)}>
-        <GitCompareArrows aria-hidden className="size-4" /> Compare with this
-      </ContextMenuItem>
+      {isActive ? (
+        <ContextMenuItem onSelect={copyLook}>
+          <Copy aria-hidden className="size-4" /> Copy look
+        </ContextMenuItem>
+      ) : (
+        <>
+          <ContextMenuItem onSelect={() => useScreenshotCompareStore.getState().start(entry.id)}>
+            <GitCompareArrows aria-hidden className="size-4" /> Compare with this
+          </ContextMenuItem>
+          <ContextMenuItem disabled={!hasLook} onSelect={() => useLookStore.getState().openPaste()}>
+            <ClipboardPaste aria-hidden className="size-4" /> Paste look to selected…
+          </ContextMenuItem>
+        </>
+      )}
     </ContextMenuContent>
     </ContextMenu>
   );

@@ -49,6 +49,7 @@ import { FeatureFlagsPanel } from "@/components/FeatureFlagsPanel";
 import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { CurrentImagePane } from "@/components/CurrentImagePane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
+import { LookHost } from "@/features/look/LookHost";
 import { StoragePane } from "@/components/StoragePane";
 import { PluginsPane } from "@/components/PluginsPane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -310,6 +311,9 @@ export function SubscriptionButton({
 
   return (
     <>
+      {/* Copy look / Paste look: hosted here because this is the one place
+          that has the live engine in both layouts (features/look/LookHost). */}
+      <LookHost {...openRaster} />
       <IconButton
         icon={Settings}
         label="Settings"

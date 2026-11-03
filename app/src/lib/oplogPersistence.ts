@@ -641,6 +641,15 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
   }
 }
 
+/** Whether `photoId` has a persisted, still-current op log with ops in it: the
+ *  edits a resume would restore. Read-only. Paste look (lib/look.ts) asks so it
+ *  never writes over the stored file of a photo whose own edits would then
+ *  restore on top of the wrong pixels. */
+export async function hasPersistedOplog(photoId: string): Promise<boolean> {
+  const m = await db.oplogManifests.get(photoId);
+  return !!m && m.branch === BRANCH && !m.stale && m.opCount > 0;
+}
+
 // ── Restore path ─────────────────────────────────────────────────────────────
 
 export type OplogRestoreResult = "restored" | "none" | "failed";

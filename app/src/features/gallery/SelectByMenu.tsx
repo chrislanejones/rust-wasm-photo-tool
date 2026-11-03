@@ -1,5 +1,6 @@
 // Gallery › Select ▾ (Night 10-28, 233). Ticks photos by a rule: Portrait,
-// Landscape, Square, Larger than…, Edited, Unedited, Invert. A rule replaces
+// Landscape, Square, Larger than…, Edited, Unedited, Invert. Below them, Copy
+// look and Paste look to selected (Night 11-02, 228). A rule replaces
 // the ticks; Shift-click (or Shift+Enter) adds its matches to them. The rules
 // live in lib/selectBy.ts. The ticks are Batch's Exceptions (ADR-079).
 //
@@ -11,6 +12,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { copyLook, useLookStore } from "@/stores/useLookStore";
 import { applyRule, parseSize, type SelectRule } from "@/lib/selectBy";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +66,7 @@ export function SelectByMenu({
     setLarger(false);
   };
   const bytes = parseSize(sizeText);
+  const hasLook = useLookStore((st) => st.copied !== null);
 
   return (
     <span ref={root} className={cn("relative inline-flex", tile && "h-full w-full", className)}>
@@ -138,6 +141,34 @@ export function SelectByMenu({
               {label}
             </Button>
           ))}
+          {/* Copy look → Paste to selected (lib/look.ts): the look travels to
+              the ticks, so it sits with them. */}
+          <div role="separator" className="my-1 border-t border-border" />
+          <Button
+            variant="ghost"
+            role="menuitem"
+            className={ITEM}
+            title="Copy the open photo's Adjustments, Preset and Levels (Ctrl+Alt+C)"
+            onClick={() => {
+              setOpen(false);
+              copyLook();
+            }}
+          >
+            Copy look
+          </Button>
+          <Button
+            variant="ghost"
+            role="menuitem"
+            className={ITEM}
+            disabled={!hasLook}
+            title={hasLook ? "Paste the copied look onto the ticked photos (Ctrl+Alt+V)" : "Copy a look first"}
+            onClick={() => {
+              setOpen(false);
+              useLookStore.getState().openPaste();
+            }}
+          >
+            Paste look to selected…
+          </Button>
         </div>
       )}
     </span>
