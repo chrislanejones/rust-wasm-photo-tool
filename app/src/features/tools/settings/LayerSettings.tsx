@@ -250,7 +250,7 @@ export function LayerSettings({
       {show("layer") && (
       <div className="space-y-2">
         <SectionHeader
-          title="Edit Layer"
+          title="Layers"
           info={
             <>
               Pick a layer, then every control below acts on it.{" "}
@@ -643,7 +643,7 @@ export function LayerSettings({
       {show("guides") && (
       <div className={cn("space-y-2", sep)}>
         <SectionHeader
-          title="Horizontal and Vertical Guides"
+          title="Guides"
           info={
             <>
               Add evenly-spaced horizontal/vertical guides, then drag them on
@@ -745,7 +745,7 @@ export function LayerSettings({
       {show("canvas") && (
       <div className={cn("space-y-2", sep)}>
         <SectionHeader
-          title="Background Canvas Size"
+          title="Canvas Size"
           info="Resizes the backing canvas, not the photo — content keeps its native resolution, centered; new area uses the backing color."
         />
         <CanvasResize

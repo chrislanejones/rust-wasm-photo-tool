@@ -45,7 +45,7 @@ export type StampMode = "clone" | "red" | "emojis";
 const STAMP_TOOL_MODES: readonly ToolMode<StampMode>[] = [
   {
     id: "clone",
-    label: "Clone",
+    label: "Clone Stamp",
     icon: Copy,
     info: "Alt+Click to set the clone source, then paint elsewhere on the canvas to stamp copies of it.",
   },
@@ -57,7 +57,7 @@ const STAMP_TOOL_MODES: readonly ToolMode<StampMode>[] = [
   },
   {
     id: "emojis",
-    label: "Emojis",
+    label: "Emoji",
     icon: Smile,
     info: "Pick an emoji, then click on the canvas to place it at the chosen size.",
   },

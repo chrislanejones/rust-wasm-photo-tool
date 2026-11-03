@@ -98,10 +98,11 @@ test("phone width: no tile is lost", async ({ page }) => {
   await expect(panel(page).getByText("Arrows & Diagram Shapes")).toHaveCount(0);
 });
 
-// Every tile in every group opens a panel of its own: no two tiles in one
-// group show the same header. A Coming Soon, Pro or offline tile is skipped.
-// The printed table is the per-panel verdict in the PR.
-test("no two tiles in a group open the same panel", async ({ page }) => {
+// Every tile in every group opens a panel of its own, headed with the tile's
+// own name: no two tiles in one group show the same header, and no header
+// says something the tile doesn't. A Coming Soon, Pro or offline tile is
+// skipped. The printed table is the per-panel verdict in the PR.
+test("every tile opens its own panel, headed with the tile's name", async ({ page }) => {
   test.setTimeout(240_000);
   await open(page);
   // Batch needs a second photo before its tile wakes up.
@@ -125,6 +126,10 @@ test("no two tiles in a group open the same panel", async ({ page }) => {
       const head = await panel(page).evaluate((el) =>
         el.querySelector("span.font-mono")?.textContent?.trim() ?? "");
       rows.push(`${group} › ${name}: ${head}`);
+      // One name per sub-tool (Night 11-02 §3): the tile's label is also its
+      // palette entry, its screen-reader name and what specs click, so the
+      // panel's first heading says the same thing.
+      expect.soft(head, `${group} › "${name}" opens a panel headed "${head}"`).toBe(name);
       if (head) {
         expect(seen.get(head), `${group}: "${name}" opens the same panel as "${seen.get(head)}"`).toBeUndefined();
         seen.set(head, name);

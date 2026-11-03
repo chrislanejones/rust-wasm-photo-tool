@@ -32,7 +32,14 @@ wait their turn.
 | Peak memory | The e2e records the JS heap peak (179 MB for six 6–8 MP photos). The engine's wasm memory is not in that number | `performance.memory` sees only JS; measuring wasm needs the module's `Memory` handle |
 | Select ▾ Larger than… | Compares the **file size** (KB/MB) | A pixel-size rule ("wider than 3000 px") is a second item if anyone asks |
 
-## OPEN — tile names and panel headers still disagree on 9 sub-tools (fix/one-tile-per-subtool, 10-28-2026)
+## FIXED 11-02-2026 (fix/panel-headers-match-tiles) — tile names and panel headers still disagree on 9 sub-tools (fix/one-tile-per-subtool, 10-28-2026)
+
+**Fixed:** every header below now says its tile's name (the header changed, never
+the tile). `e2e/one-tile-per-subtool.spec.ts` now ASSERTS tile = first heading for
+every enabled tile in every group, instead of printing the table, so it can't
+drift again. The command palette's mode entries follow (they read the same mode
+labels): Magic Wand, Brush, Blur Brush, Clone Stamp, Emoji.
+
 
 Night 10-28 §1 made Arrows & Diagram Shapes one name everywhere. The sweep
 in `e2e/one-tile-per-subtool.spec.ts` prints every tile next to its panel's
