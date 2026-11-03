@@ -90,13 +90,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.51 — 2026-11-02
+### v9.52 — 2026-11-02
 
-**The Fall Back garland comes down.**
+**Copy a photo's look and paste it onto others.**
 
-The start screen and editor top bar return to their regular layout after the
-clock change. The seasonal flags, clocks, pumpkin and dismissal control have
-been removed.
+Press Ctrl+Alt+C, or pick Copy look from Select ▾ or a photo's right-click
+menu, and the photo's Adjustments, Preset and Levels are copied. Tick some
+photos, press Ctrl+Alt+V, choose which of the three to bring, and paste. On the
+open photo the paste is one undo step. Fast A → B → A photo switching no longer
+ends on A showing B's picture, every tool panel now carries its tile's name,
+and five dependencies moved up.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

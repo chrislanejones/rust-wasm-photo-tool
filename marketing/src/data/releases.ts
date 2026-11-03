@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.52",
+    date: "2026-11-02",
+    headline: "Copy a photo's look and paste it onto others.",
+    entries: [
+      { tag: "feature", text: "Copy look (Ctrl+Alt+C) takes a photo's Adjustments, Preset and Levels. Paste look (Ctrl+Alt+V) puts any of the three on the photos you ticked, and on the open photo it comes off again with one undo." },
+      { tag: "rust", text: "The engine reads the look straight out of a photo's edit history, so what gets pasted is exactly what you did, not a guess from the sliders." },
+      { tag: "fix", text: "Clicking from photo A to B and back to A quickly no longer leaves A in the gallery with B's picture on the canvas." },
+      { tag: "ui", text: "Every tool panel is headed with the same name as its tile: Brush, Blur Brush, Magic Wand, Clone Stamp, Emoji, Resize & Compress, Layers, Guides and Canvas Size." },
+      { tag: "fix", text: "Storage in Settings no longer flashes the Pro sign-in box for a moment while your plan loads." },
+      { tag: "infra", text: "Five dependency updates in one go: Vite, React Router, framer-motion, lucide icons and typescript-eslint." },
+    ],
+  },
+  {
     version: "v9.51",
     date: "2026-11-02",
     headline: "The Fall Back garland comes down.",

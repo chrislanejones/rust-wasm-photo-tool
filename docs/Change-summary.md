@@ -11922,3 +11922,27 @@ sentinel verifies the 954,456-byte engine. Production Convex insights report no
 issues over 72 hours. The previously recorded intermittent callout and fast
 photo-switch issues remain in the parking lot; this release does not claim to
 fix them.
+
+## v9.52 Change Summary — 2026-11-02
+
+**Copy a photo's look and paste it onto others.**
+
+| Area | Change |
+| --- | --- |
+| Copy look → Paste to selected (#435) | Ctrl+Alt+C, Select ▾ › Copy look, or a photo's right-click menu copies the open photo's Adjustments, Preset and Levels. Ctrl+Alt+V opens Paste look: a checkbox per kind, then Paste to N. The values are absolute, so a paste gives every photo the same look, not the same nudge. On the open photo the paste is one undo step with no new op format; on photos that aren't open it is written to the stored file the way Batch Resize does, and the dialog says it can't be undone there. Photos with their own edits, and SVGs, are skipped and named. |
+| Engine (#435) | New `oplog_look()` (`src/look.rs`, tiles feature) reads the look from the op log up to the undo cursor, collapsing each Adjustments session and dropping identity steps. An undone step is not part of the look, and a broken log has no look. ADR-100. wasm **954,456 → 957,006 B** (+2,550). |
+| Photo switching (#434) | A → B → A fast no longer ends on A in the gallery with B's picture on the canvas. The "go back to the photo already open" shortcut trusted the ownership marker while B's load was committed but had not yet claimed the engine; it now drains the load queue, asks again, and loads A back if B won. Narrow repro **5/5 red → 50/50 green** at 4× CPU throttle; the full photo-switch suite 22/22. |
+| Panel headers (#436) | Nine panel headers now read exactly as their tiles: Brush, Blur Brush, Magic Wand, Clone Stamp, Emoji, Resize & Compress, Layers, Guides, Canvas Size. The one-tile sweep asserts header = tile name for all 40 tiles. |
+| Storage pane (#437) | Settings › Storage no longer flashes the Pro sign-in box while the plan is loading; a placeholder shows instead. |
+| Dependencies (#437) | typescript-eslint 8.72.1, lucide-react 1.66.0, react-router 8.5.1, framer-motion 14.9.0, vite 8.3.5, in one lockfile change (Dependabot #429–#433 closed with a pointer). |
+
+Verification on master `fb356a04`: TypeScript clean; lint 0 errors (53
+existing warnings); guardrails pass; 240 files / 2,155 unit tests; engine
+rebuilt at 957,006 B; editor and marketing production builds pass. Copy look
+e2e 2/2 (6/6 at 4× CPU), red without the feature; peak JS heap during a paste
+35.6–51.0 MB.
+
+The intermittent callout-leader failure stays in the parking lot. Its suspected
+cause (an autosave between Align and the leader follow) was tested and ruled
+out: Align moves the pin, label and leader together. imagehorse-qc is owed for
+the engine and canvas changes in #434 and #435.
