@@ -720,8 +720,28 @@ export function useImageSession({
       try {
 
       // A failed switch can be abandoned by selecting the intact loaded photo.
+      //
+      // REQUESTED IS NOT LOADED. The marker says what the engine holds NOW,
+      // but a load for the photo we are bouncing back from may already be
+      // past its last stale check (committed to replacing the document) and
+      // simply not have claimed yet. Trusting the marker here ended A → B → A
+      // on A with B's picture: this returned "A is loaded", then B's load
+      // landed (1 in 12 on master; every run with B's load held, e2e
+      // photo-switch-bounce). So wait the queue out first, then ask again: if
+      // the engine still holds this photo, nothing to do; if that load won,
+      // load this photo back. No outgoing save: the engine holds a photo that
+      // was just loaded and never shown as the selected one.
       if (outgoing === entry.id && useGalleryStore.getState().documentPhotoId === entry.id) {
-        setIsImageLoading(false);
+        await stamp.serialize(async () => undefined);
+        if (!isCurrent()) return;
+        if (getEngineDocument() === entry.id) {
+          setIsImageLoading(false);
+          return;
+        }
+        setHasBeenModified(false);
+        setCompareActive(false);
+        await loadIntoEngine(entry, isCurrent);
+        if (isCurrent()) setIsImageLoading(false);
         return;
       }
 
