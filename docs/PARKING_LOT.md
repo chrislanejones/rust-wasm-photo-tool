@@ -4,6 +4,16 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Copy look → Paste to selected leftovers (feat/copy-paste-look, 11-02-2026)
+
+| Item | What is true now | Why it waited |
+|---|---|---|
+| Copy from a photo that is not open | Copy look reads the OPEN photo's op log (`oplog_look`). Right-click on the open photo says Copy look; on any other photo it says Paste look to selected… | Reading another photo's look means decoding its persisted log without loading it; a second reader of that format |
+| Not-open photo with edits of its own | Skipped, with "has edits of its own — open it and paste there" | Its edits restore on top of the stored file, so writing the look into that file would put them on the wrong pixels |
+| Not-open photos re-encode | Their stored file is replaced (JPEG/WebP/AVIF at the photo's own quality, else 92); no undo for them. The dialog says so | Same as Batch Resize, Crop, Logo, Text and Compress All today |
+| Top bar hidden | The host sits beside Settings (the one place with the live engine in both layouts, so AppShell gains nothing). With the top bar hidden there is no host: Ctrl+Alt+C / V and the menu items do nothing | Moving it needs an AppShell mount, off-limits that night |
+| Peak memory | The e2e records the JS heap peak only; the scratch engine's wasm memory is not in it | `performance.memory` sees only JS |
+
 ## OPEN — two e2e failures on master after v9.45 (10-31-2026)
 
 | Test | What is true now | Why it waited |

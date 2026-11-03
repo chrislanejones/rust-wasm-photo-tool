@@ -1,6 +1,7 @@
 import { isPhotoSwitching } from "@/hooks/usePhotoSwitching";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "@/stores/useUIStore";
+import { copyLook, useLookStore } from "@/stores/useLookStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
 import { setPaletteActions } from "@/features/commandPalette";
@@ -323,6 +324,15 @@ export function useKeyboardShortcuts({
         if (isRedoY(e)) {
           e.preventDefault();
           if (!isPhotoSwitching()) onRedo();
+          return;
+        }
+        // Ctrl/Cmd+Alt+C copies the open photo's look, Ctrl/Cmd+Alt+V opens
+        // Paste look (lib/look.ts). Store actions, like Alt+, — no new prop.
+        // Ahead of the plain Ctrl+C / Ctrl+V cases, which would take them.
+        if (e.altKey && !e.shiftKey && (e.code === "KeyC" || e.code === "KeyV")) {
+          e.preventDefault();
+          if (e.code === "KeyC") copyLook();
+          else useLookStore.getState().openPaste();
           return;
         }
         if (e.code === "KeyC") {
