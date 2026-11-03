@@ -6,6 +6,7 @@
 // to an outside provider and no secure credential store yet, and neither has
 // been designed. Today the pane only lists the providers and says so.
 import { Server, UploadCloud, Cloud, Lock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PaneHeading } from "@/components/ui/pane-heading";
 import { Button } from "@/components/ui/button";
 
@@ -42,9 +43,25 @@ interface Props {
   isPaid: boolean;
   /** null when signed out, else the tier string. */
   tier: string | null;
+  /** The plan is still on its way (SubscriptionButton's `planLoading`). The
+   *  tier reads null until `users.me` lands, so without this a paid user saw
+   *  "Sign in with a Pro account" flash first (tier pending, 10-27-2026). */
+  planLoading?: boolean;
 }
 
-export function StoragePane({ isPaid, tier }: Props) {
+export function StoragePane({ isPaid, tier, planLoading = false }: Props) {
+  if (planLoading) {
+    return (
+      <Shell>
+        <div role="status" aria-busy="true" data-testid="storage-plan-loading" className="space-y-2">
+          <span className="sr-only">Loading your plan…</span>
+          <Skeleton decorative variant="line" className="w-3/4" />
+          <Skeleton decorative variant="line" className="w-1/2" />
+        </div>
+      </Shell>
+    );
+  }
+
   if (tier === null) {
     return (
       <Shell>
