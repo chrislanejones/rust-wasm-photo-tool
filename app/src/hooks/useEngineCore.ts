@@ -39,6 +39,7 @@ import { parseBranches, withHistoryForks } from "@/lib/historyForks";
 import { withOplogUndo } from "@/lib/tilesFlush";
 import { useHistoryBranchStore } from "@/stores/useHistoryBranchStore";
 import { makeLoadQueue, isStale, claimEngineDocument, type LoadOpts } from "./engineLoadQueue";
+import { holdPoint } from "@/lib/testHold";
 export type { LoadOpts } from "./engineLoadQueue";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
@@ -565,6 +566,7 @@ export function useEngineCore(
       if (!canvas) return false;
       // Last exit before the engine is touched. Past here the load finishes.
       if (isStale(opts)) return false;
+      await holdPoint("load-committed"); // e2e seam, inert unless armed (lib/testHold.ts)
       const src = new Uint8Array(pixels.buffer as ArrayBuffer);
       if (artboard) {
         // Two-layer artboard (Background canvas + Photo). Load the photo native,
@@ -702,6 +704,7 @@ export function useEngineCore(
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
       // Last exit before the engine is touched. Past here the load finishes.
       if (isStale(opts)) return false;
+      await holdPoint("load-committed"); // e2e seam, inert unless armed (lib/testHold.ts)
 
       // Construct a fresh tool at the saved dimensions and load the canvas
       // ADR-024 a12.1 — factory creates and loads (which clears history); the
