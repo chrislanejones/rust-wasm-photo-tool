@@ -10,6 +10,7 @@
 
 import type * as ai from "../ai.js";
 import type * as aiCaps from "../aiCaps.js";
+import type * as aiJobFiles from "../aiJobFiles.js";
 import type * as aiJobs from "../aiJobs.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
@@ -41,6 +42,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   aiCaps: typeof aiCaps;
+  aiJobFiles: typeof aiJobFiles;
   aiJobs: typeof aiJobs;
   auth: typeof auth;
   crons: typeof crons;
