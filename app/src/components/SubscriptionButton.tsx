@@ -50,6 +50,7 @@ import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { CurrentImagePane } from "@/components/CurrentImagePane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { LookHost } from "@/features/look/LookHost";
+import { TransferHost } from "@/features/transfer/TransferHost";
 import { StoragePane } from "@/components/StoragePane";
 import { PluginsPane } from "@/components/PluginsPane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -314,6 +315,9 @@ export function SubscriptionButton({
       {/* Copy look / Paste look: hosted here because this is the one place
           that has the live engine in both layouts (features/look/LookHost). */}
       <LookHost {...openRaster} />
+      {/* Transfer's Inbox (features/transfer, ADR-102): the same funnel the
+          gallery's import uses, registered for "Add to gallery". */}
+      <TransferHost onAddPhotos={openRaster.onAddPhotos} />
       <IconButton
         icon={Settings}
         label="Settings"

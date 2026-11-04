@@ -126,3 +126,24 @@ test("demo mode (logged out) boots at both widths", async ({ page }) => {
     await expect(page.getByText("Could not find")).toHaveCount(0);
   }
 });
+
+// Transfer (ADR-102): the phone's Send to computer lives in its Settings sheet,
+// behind `?beta=transfer`, and must not bring the engine with it. Logged out
+// it offers no picker. This build points at a fake Convex and blocks Clerk, so
+// auth never settles and the line is "Connecting…"; a real signed-out visitor
+// sees that until Clerk loads, then "Sign in…". Either is the right answer.
+test("with the transfer Beta, the phone's Send to computer shows and the engine is still never requested", async ({ page }) => {
+  await blockExternalNetwork(page);
+  await page.setViewportSize(PHONE);
+  const engine = watchEngine(page);
+  await page.goto("/?beta=transfer");
+  await dismissNotice(page);
+  await page.getByRole("button", { name: "Settings" }).click();
+  const section = page.getByTestId("send-to-computer");
+  await expect(section.getByRole("heading", { name: "Send to computer" })).toBeVisible({ timeout: 30_000 });
+  await expect(
+    section.getByText(/^(Sign in to send photos to your computer\.|Connecting to your account…)$/),
+  ).toBeVisible();
+  await expect(page.getByTestId("send-to-computer-input")).toHaveCount(0);
+  expect(engine).toEqual([]);
+});

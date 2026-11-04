@@ -120,6 +120,17 @@ export const NETWORK_PATHS: readonly NetworkPath[] = [
     homeRow: "Sync and share links",
   },
   {
+    id: "transfer",
+    label: "Photos sent from your phone",
+    sends:
+      "each photo you send from your phone is kept on the server for up to 7 days, until your computer adds it to the gallery or you delete it",
+    // Behind the `transfer` Beta. The phone refuses before it asks for an
+    // upload URL, and the editor does not read the inbox (features/transfer).
+    gate: "online-switch",
+    disclosedAs: "send from your phone",
+    homeRow: "Sync and share links",
+  },
+  {
     id: "account",
     label: "Signing in",
     sends: "your email and sign-in go to the account provider",

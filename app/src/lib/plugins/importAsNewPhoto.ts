@@ -10,7 +10,7 @@ import { compositeLayers, type LayeredDocument } from "./document";
 import { encodePng, restoreLayeredDocument } from "./bridge";
 import type { FormatSpec } from "./types";
 
-type AddPhotosFn = (files: File[], opts?: { skipArtboard?: boolean }) => Promise<void>;
+type AddPhotosFn = (files: File[], opts?: { skipArtboard?: boolean }) => Promise<unknown>;
 
 export interface PluginImportResult {
   layers: number;

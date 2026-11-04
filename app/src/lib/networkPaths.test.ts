@@ -57,9 +57,9 @@ describe("equality with the gates as they were", () => {
 });
 
 describe("the switch gates exactly what it gated before", () => {
-  it("SWITCHED_PATHS is the three the switch always covered, plus share links (QC F2)", () => {
+  it("SWITCHED_PATHS is the three the switch always covered, plus share links (QC F2) and Transfer (ADR-102)", () => {
     expect(SWITCHED_PATHS.map((p) => p.id).sort()).toEqual(
-      ["ai_generation", "ai_processing", "photo_backup", "share_links"].sort(),
+      ["ai_generation", "ai_processing", "photo_backup", "share_links", "transfer"].sort(),
     );
   });
 

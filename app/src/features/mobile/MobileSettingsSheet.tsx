@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SyncPane } from "@/components/SyncPane";
+import { SendToComputer } from "@/features/transfer/SendToComputer";
 import { setSyncEnabled, useSyncEnabled } from "@/lib/sync";
 import {
   serializePreferences,
@@ -165,6 +166,9 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
           <div className="[&_button]:min-h-11">
             <SyncPane draftEnabled={syncDraft} onDraftEnabledChange={setSyncDraft} />
           </div>
+          {/* Behind the `transfer` Beta (renders nothing when it is off). An
+              action, like Sync's Send: it happens when pressed, not on Apply. */}
+          <SendToComputer />
         </DialogBody>
 
         <DialogFooter className="shrink-0 flex-row gap-2">

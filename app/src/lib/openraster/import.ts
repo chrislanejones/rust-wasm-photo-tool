@@ -10,7 +10,7 @@ import { parseStackXml } from "./stackXml";
 type AddPhotosFn = (
   files: File[],
   opts?: { skipArtboard?: boolean },
-) => Promise<void>;
+) => Promise<unknown>;
 
 const ORA_MIMETYPE = "image/openraster";
 
