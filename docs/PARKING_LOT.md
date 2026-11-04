@@ -4,7 +4,23 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — deleting one row deletes a file another of the user's rows still uses (11-03-2026)
+## OPEN — share-link trash leftovers (feat/share-trash, 11-03-2026)
+
+| What | Why it's left |
+| --- | --- |
+| A gallery photo deleted in the browser does not reach the trash | The server has no original to restore it from; Transfer / sync (89, 192). ADR-101 |
+| Cloud edit backups delete immediately | A restored backup has no gallery photo to attach to, same reason |
+| `shares.remove` and `shares.moveToTrash` both exist | `remove` stays for everyone without the Beta; fold them together when the Beta graduates |
+| ADR-101 (in #439) says the public `get` answers "unavailable" for a trashed link | It answers `null`, exactly like a deleted link. One-line wording fix to the ADR |
+| `trash.purge` re-reads paid rows aged 7–30 days on every run | They sit inside the range but outside their window; bounded by `maxRows`, fine at today's size |
+| No browser look at the Trash yet | Logic and wiring are tested in jsdom; how it sits in Settings › Shared wants a look with the Beta on |
+
+## HALF FIXED 11-03-2026 (feat/share-trash: shares) — deleting one row deletes a file another of the user's rows still uses (11-03-2026)
+
+**Shares: fixed in feat/share-trash** — `deleteShareRecord` deletes the image only if
+`isStoredFileReferenced` says nothing else points at it, asked after the row is gone.
+**Edits: still open** (`deletePhotoEditRecord`, and `photoEdits.save`'s replace path).
+
 
 Found writing the stored-bytes counter (feat/stored-bytes-counter). `deletePhotoEditRecord`
 and `deleteShareRecord` delete the row's file through `deleteStoredFiles`, with no
@@ -4882,6 +4898,9 @@ on touch, which is most of the phone surface, and the two densest files
   guide color is an app preference. Persisting positions remains separate work.
 - Trash/purge and per-photo cloud backup/conflict state remain separate backend
   projects. No UI-night change presents unwired actions or fabricated state.
+  **Trash: IN PR 11-03-2026 (feat/share-trash) for share links, behind the `trash`
+  Beta; purge dry run, cron off. Cloud backups and gallery photos are not in it
+  (ADR-101: restoring one needs the original on the server).**
 - Drafts #317 and #319 now target Night 15. #317 keeps the independent pen
   hit-test fix and browser guards; #319 keeps full CI coverage and drag-readiness
   checks. Both inherit the stack's gallery fixes and newer loading observations.

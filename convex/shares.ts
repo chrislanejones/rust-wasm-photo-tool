@@ -10,7 +10,7 @@ import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
 import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
-import { deleteStoredFiles } from "./storedFiles";
+import { deleteStoredFiles, isStoredFileReferenced } from "./storedFiles";
 import { fileSize, referenceDelta, settleStoredBytes } from "./storageUsage";
 import type { DeletedFiles } from "./testAccount";
 
@@ -234,7 +234,9 @@ export const get = query({
   args: { token: v.string() },
   handler: async (ctx, args): Promise<ShareView | ShareUnavailable | null> => {
     const share = await findByToken(ctx, args.token);
-    if (!share) return null;
+    // A trashed link answers exactly like a deleted one: the owner asked for
+    // it to go, and "it might come back" is not something to tell a visitor.
+    if (!share || share.deletedAt !== undefined) return null;
     const imageUrl = await ctx.storage.getUrl(share.storageId);
     if (!imageUrl) return null;
     const status = availability(share, Date.now());
@@ -268,7 +270,7 @@ export const recordView = mutation({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const share = await findByToken(ctx, args.token);
-    if (!share) return;
+    if (!share || share.deletedAt !== undefined) return;
     const now = Date.now();
     if (availability(share, now) !== "live") return;
     await ctx.db.patch(share._id, { views: share.views + 1, lastViewedAt: now });
@@ -315,12 +317,14 @@ export const listMine = query({
       .query("shares")
       .withIndex("by_userId", (q) => q.eq("userId", user._id))
       .collect();
-    shares.sort((a, b) => b.createdAt - a.createdAt);
+    // Trashed links are listed by trash.listMine, not here.
+    const live = shares.filter((s) => s.deletedAt === undefined);
+    live.sort((a, b) => b.createdAt - a.createdAt);
 
     const now = Date.now();
     const start = dailyWindowStart(now);
     const out: MyShare[] = [];
-    for (const s of shares) {
+    for (const s of live) {
       const recent = await ctx.db
         .query("share_views")
         .withIndex("by_shareId", (q) => q.eq("shareId", s._id).gte("at", start))
@@ -425,6 +429,21 @@ export const resume = mutation({
   },
 });
 
+/** Owner: move a link to the trash (the `trash` Beta). It stops being served
+ *  at once and leaves `listMine`; its image stays, and counts against the
+ *  quota, until Restore, Delete now, or `trash.purge` after the tier's window.
+ *  Idempotent: a second call keeps the first timestamp, so "Removes in N
+ *  days" does not move. `remove`, below, stays immediate for everyone without
+ *  the Beta. */
+export const moveToTrash = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const share = await ownedShare(ctx, args.token);
+    if (!share || share.deletedAt !== undefined) return;
+    await ctx.db.patch(share._id, { deletedAt: Date.now() });
+  },
+});
+
 /** Revoke a share. Only the owner can delete it; also drops the storage blob
  *  and the link's `share_views` rows (an index walk bounded by that one
  *  link's views — the rows would otherwise be orphans nothing could reach). */
@@ -443,13 +462,18 @@ export const remove = mutation({
  *  callers decide whose share it is before they get here. */
 export async function deleteShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<DeletedFiles> {
   const size = await fileSize(ctx, share.storageId);
-  const freed = await deleteStoredFiles(ctx, [share.storageId]);
   const views = await ctx.db
     .query("share_views")
     .withIndex("by_shareId", (q) => q.eq("shareId", share._id))
     .collect();
   for (const row of views) await ctx.db.delete(row._id);
   await ctx.db.delete(share._id);
+  // The file goes only if nothing else points at it (ADR-089's lookups), asked
+  // AFTER the row is gone so this row does not count. A second row on the same
+  // file — another share, an edit, an AI job — keeps it.
+  const freed: DeletedFiles = (await isStoredFileReferenced(ctx, share.storageId))
+    ? { files: 0, bytes: 0 }
+    : await deleteStoredFiles(ctx, [share.storageId]);
   await settleStoredBytes(ctx, share.userId, await referenceDelta(ctx, share.userId, { removed: share.storageId, size }));
   return freed;
 }

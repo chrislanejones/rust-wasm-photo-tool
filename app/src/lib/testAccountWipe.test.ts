@@ -44,6 +44,7 @@ function createFakeConvex() {
   const results = (rows: Row[]) => ({
     take: async (n: number) => rows.slice(0, n),
     collect: async () => rows,
+    first: async () => rows[0] ?? null,
     unique: async () => {
       if (rows.length > 1) throw new Error("more than one row");
       return rows[0] ?? null;

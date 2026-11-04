@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 // ── The per-user stored-bytes counter (widen → migrate → narrow) ──────────────
@@ -48,7 +48,7 @@ async function referencesBy(ctx: MutationCtx, userId: Id<"users">, id: Id<"_stor
 }
 
 /** The size of a file, or 0 if it is not in storage. Read it BEFORE deleting. */
-export async function fileSize(ctx: MutationCtx, id: Id<"_storage">): Promise<number> {
+export async function fileSize(ctx: QueryCtx | MutationCtx, id: Id<"_storage">): Promise<number> {
   return (await ctx.db.system.get("_storage", id))?.size ?? 0;
 }
 
@@ -72,7 +72,7 @@ export async function referenceDelta(
 /** Exact, uncapped: the bytes of the distinct files the user's edit and share
  *  rows reference. One transaction, so an account with many thousands of files
  *  would need this paginated; none is anywhere near that. */
-export async function recountStoredBytes(ctx: MutationCtx, userId: Id<"users">): Promise<number> {
+export async function recountStoredBytes(ctx: QueryCtx | MutationCtx, userId: Id<"users">): Promise<number> {
   // `.collect()` on purpose: the point of this function is that it has no
   // row cap (storedBytes' 2,000-row window is the bug being fixed).
   const edits = await ctx.db.query("photo_edits").withIndex("by_userId_photoKey", (q) => q.eq("userId", userId)).collect();

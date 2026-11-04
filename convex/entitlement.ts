@@ -119,6 +119,19 @@ export const STORAGE_QUOTA_BYTES: Readonly<Record<Entitlement, number>> = {
 };
 
 /** Human units for a quota message: "31.9 MB", "5 GB". Binary, like the caps. */
+// ── Trash windows ───────────────────────────────────────────────────────────
+// How long a trashed item stays before the purge removes it for good (ADR-083,
+// ADR-101). THE ONE PLACE THESE NUMBERS LIVE: the server's `trash.purge` and
+// the app's "Removes in N days" (app/src/lib/trash.ts) both read them here.
+
+export const TRASH_WINDOW_DAYS = { free: 7, paid: 30 } as const;
+
+/** The window for an entitlement. `none` cannot have stored anything, so it
+ *  gets the shorter one rather than a special case. */
+export function trashWindowDays(entitlement: Entitlement): number {
+  return entitlement === "paid" ? TRASH_WINDOW_DAYS.paid : TRASH_WINDOW_DAYS.free;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1024 * MiB) {
     const gb = bytes / (1024 * MiB);

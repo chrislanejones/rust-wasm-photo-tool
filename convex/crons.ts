@@ -2,6 +2,19 @@ import { cronJobs } from "convex/server";
 
 const crons = cronJobs();
 
+// ── Trash purge: WRITTEN, DELIBERATELY NOT SCHEDULED ─────────────────────────
+//
+// TODO(Chris): removes share links that have been in the trash longer than
+// their owner's window (free 7 days, paid 30) — the row, its views and its
+// image. Off until a person has read the dry run against the deployment:
+//
+//   pnpm exec convex run trash:purge '{}'
+//
+// To switch it on, add the `internal` import above and uncomment the line
+// below. Once a day; each run handles up to 200 links.
+//
+// crons.interval("purge the trash", { hours: 24 }, internal.trash.purge, { apply: true });
+
 // ── Orphaned-storage sweep: WRITTEN, DELIBERATELY NOT SCHEDULED ──────────────
 //
 // TODO(Chris): this is a job that deletes files from user storage with nobody

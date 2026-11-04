@@ -131,10 +131,17 @@ export default defineSchema({
      *  image past its end date until something else touched the row. */
     expiredAt: v.optional(v.number()),
     lastViewedAt: v.optional(v.number()),
+    /** In the trash since (ms epoch): `shares.moveToTrash` sets it, Restore
+     *  clears it. A trashed link is not served, is hidden from `listMine`, and
+     *  still counts against the quota until `trash.purge` or Delete now
+     *  removes it. Optional, so existing rows need nothing (absent = live). */
+    deletedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
     .index("by_userId", ["userId"])
-    .index("by_storageId", ["storageId"]),
+    .index("by_storageId", ["storageId"])
+    // trash.purge: rows trashed before the cutoff, as one range.
+    .index("by_deletedAt", ["deletedAt"]),
 
   // ── Share views (one row per counted view) ────────────────────────────────
   // TIMESTAMP ONLY. No IP, no user agent, no viewer id, nothing that could
