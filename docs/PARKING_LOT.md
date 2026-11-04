@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — deleting one row deletes a file another of the user's rows still uses (11-03-2026)
+
+Found writing the stored-bytes counter (feat/stored-bytes-counter). `deletePhotoEditRecord`
+and `deleteShareRecord` delete the row's file through `deleteStoredFiles`, with no
+reference check. If an edit and a share (or two edits) point at the same storage id, removing
+one leaves the other pointing at nothing. The app never creates that today (each save and
+each share uploads its own file), so it is a guard, not a live bug. The counter is exact for
+it anyway: it subtracts only when no row of the user still points at the file. The fix is
+`isStoredFileReferenced` after the row delete, as `aiJobFiles.expire` does; PR 3 of Night
+11-03 does it for shares.
+
 ## OPEN — Copy look → Paste to selected leftovers (feat/copy-paste-look, 11-02-2026)
 
 | Item | What is true now | Why it waited |
@@ -345,7 +356,14 @@ With no production deployment left, Vercel made the **first branch push** produc
 Also: #368's "Deploy sentinel" job went green on a re-run only because production
 was serving #368's own build. That green proves nothing about master.
 
-## OPEN — `storedBytes` undercounts past 2,000 rows per user (10-14-2026)
+## WIDENED 11-03-2026 (feat/stored-bytes-counter) — `storedBytes` undercounts past 2,000 rows per user (10-14-2026)
+
+**Night 11-03: widen + migrate written, narrow owed.** `storage_usage` counter kept by
+every edit/share add and remove path (`convex/storageUsage.ts`); the quota still
+reads `storedBytes()`. Owed, in order: Chris runs `storageUsage:backfillStoredBytes`
+(dry run, then `apply`) on dev, then prod; then a narrow PR switches the quota to the
+counter and keeps a recount check. ADR-101.
+
 
 `convex/storageQuota.ts` reads at most `SUM_ROW_CAP = 2_000` `photo_edits` rows and
 2,000 `shares` rows per user. Past that, extra rows count as 0 bytes and the quota

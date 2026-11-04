@@ -21,6 +21,7 @@ import type * as shares from "../shares.js";
 import type * as storageOrphans from "../storageOrphans.js";
 import type * as storageQuota from "../storageQuota.js";
 import type * as storageSweep from "../storageSweep.js";
+import type * as storageUsage from "../storageUsage.js";
 import type * as storedFiles from "../storedFiles.js";
 import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   storageOrphans: typeof storageOrphans;
   storageQuota: typeof storageQuota;
   storageSweep: typeof storageSweep;
+  storageUsage: typeof storageUsage;
   storedFiles: typeof storedFiles;
   stripe: typeof stripe;
   subscriptions: typeof subscriptions;

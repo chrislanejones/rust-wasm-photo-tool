@@ -200,6 +200,19 @@ export default defineSchema({
     // closed list of three — and a user-wide scan can use its `userId` prefix.
     .index("by_userId_key", ["userId", "key"]),
 
+  // ── Stored bytes per user (the quota's counter) ─────────────────────────
+  // ONE ROW PER USER, created by the first write that moves it (with an exact
+  // recount) or by `storageUsage.backfillStoredBytes`. Kept exact by every
+  // path that adds or removes a file reference on `photo_edits` or `shares`,
+  // in the same mutation — convex/storageUsage.ts. Its own table, not a field
+  // on `users`: it changes on every save, and profile rows stay quiet.
+  // Not read by the quota yet (widen → migrate → narrow, ADR-101).
+  storage_usage: defineTable({
+    userId: v.id("users"),
+    bytes: v.number(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
   // ── AI Jobs ─────────────────────────────────────────────
   // Keyed by photoKey (the editor's string id, same as photo_edits) rather
   // than a server-side image row (there is none). Input/output frames live in Convex file
