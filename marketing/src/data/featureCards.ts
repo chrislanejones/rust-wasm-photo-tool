@@ -102,9 +102,9 @@ export interface CardCopy {
  *  object, which follows the design. */
 const CARD_COPY: Record<string, CardCopy> = {
   // ── Annotate ─────────────────────────────────────────────────────────
-  "Paint / Brush": {
+  "Brush": {
     group: "annotate",
-    title: "Paint / Brush",
+    title: "Brush",
     plain: "Freehand painting with size, color and opacity.",
     detail: "WASM paint_dab + paint_stroke_to; Create → Brush, with Pen and Blur Brush as sibling sub-tools.",
   },
