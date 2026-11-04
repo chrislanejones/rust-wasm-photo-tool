@@ -25,7 +25,8 @@ import { roleOf } from "./users";
 // else. Throwing is still right: the caller must see the refusal.
 //
 // WHAT COUNTS. Files the account can delete from inside the app: its photo
-// edit archives and its share-link snapshots. NOT its AI job frames — nothing
+// edit archives, its share-link snapshots, and the photos waiting in its
+// Transfer inbox (ADR-102). NOT its AI job frames — nothing
 // in the app deletes those, so counting them would fill an account with bytes
 // its owner has no way to free. Orphans count for nobody: a file no row points
 // at has no owner on record.
@@ -46,6 +47,11 @@ export async function storedBytes(ctx: MutationCtx, userId: Id<"users">): Promis
     .withIndex("by_userId", (q) => q.eq("userId", userId))
     .take(SUM_ROW_CAP);
   for (const s of shares) ids.add(s.storageId);
+  const transfers = await ctx.db
+    .query("transfers")
+    .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+    .take(SUM_ROW_CAP);
+  for (const t of transfers) ids.add(t.storageId);
 
   let total = 0;
   for (const id of ids) {

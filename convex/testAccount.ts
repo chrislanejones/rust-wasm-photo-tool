@@ -111,6 +111,7 @@ export function resolveTestAccount(
 export const FILE_FIELDS = {
   photo_edits: ["storageId"],
   shares: ["storageId"],
+  transfers: ["storageId"],
   ai_jobs: ["inputStorageId", "maskStorageId", "outputStorageId", "referenceStorageId1", "referenceStorageId2", "referenceStorageId3"],
 } as const;
 
@@ -123,7 +124,7 @@ export type FileTable = keyof typeof FILE_FIELDS;
  * orphans are made. (`images`/`layers`/`annotations`/`history`/`projects` were
  * here until #236 dropped those tables.)
  */
-export const WIPE_ORDER = ["share_views", "photo_edits", "shares", "ai_jobs"] as const;
+export const WIPE_ORDER = ["share_views", "photo_edits", "shares", "transfers", "ai_jobs"] as const;
 
 export type WipeTable = (typeof WIPE_ORDER)[number];
 

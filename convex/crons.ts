@@ -42,4 +42,17 @@ const crons = cronJobs();
 //
 // crons.interval("expire AI job files", { hours: 24 }, internal.aiJobFiles.expire, { apply: true });
 
+// ── Transfer inbox expiry: WRITTEN, DELIBERATELY NOT SCHEDULED ───────────────
+//
+// TODO(Chris): removes photos that have waited in a Transfer inbox past their
+// seven days (the row and its file). Off until a person has read the dry run
+// against the deployment:
+//
+//   pnpm exec convex run transfers:expire '{}'
+//
+// To switch it on, add the `internal` import above and uncomment the line
+// below. Once a day; each run handles up to 200 photos.
+//
+// crons.interval("expire the transfer inbox", { hours: 24 }, internal.transfers.expire, { apply: true });
+
 export default crons;

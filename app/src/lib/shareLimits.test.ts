@@ -147,6 +147,9 @@ function createFakeConvex() {
     // Asked by the share delete's reference check (storedFiles.ts), with
     // photo_edits and shares, before the image is deleted.
     ["ai_jobs", new Map()],
+    // Transfer inbox rows (convex/transfers.ts): summed by the quota and the
+    // counter, and asked by the reference check, like the tables above.
+    ["transfers", new Map()],
   ]);
   /** Stored files and their sizes in bytes — `_storage`, as far as the quota
    *  check reads it. */

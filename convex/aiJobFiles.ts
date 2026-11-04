@@ -83,6 +83,7 @@ async function referencedOutside(
 ): Promise<boolean> {
   if (await ctx.db.query("photo_edits").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) return true;
   if (await ctx.db.query("shares").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) return true;
+  if (await ctx.db.query("transfers").withIndex("by_storageId", (q) => q.eq("storageId", id)).first()) return true;
   const n = ignore.size + 1;
   const lookups = [
     ctx.db.query("ai_jobs").withIndex("by_inputStorageId", (q) => q.eq("inputStorageId", id)).take(n),

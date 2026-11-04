@@ -11,7 +11,8 @@ import type { Id } from "./_generated/dataModel";
 // writes themselves answers in one read, whatever the account's size.
 //
 // WHAT IT COUNTS — exactly what the quota counts today, and nothing more: the
-// distinct files referenced by the user's `photo_edits` and `shares` rows. AI
+// distinct files referenced by the user's `photo_edits`, `shares` and
+// `transfers` rows (transfers since ADR-102). AI
 // job frames are NOT counted (storageQuota.ts says why, and since ADR-101 they
 // expire on their own). Counting them here would change what the quota
 // refuses the moment the quota switches to this number, and the narrow step
@@ -40,11 +41,16 @@ import type { Id } from "./_generated/dataModel";
  *  rows in practice; the answer only needs to tell 0, 1 and "more than 1". */
 const REFS_PER_FILE = 16;
 
-/** How many of `userId`'s edit and share rows point at `id`. */
+/** How many of `userId`'s edit, share and transfer rows point at `id`. */
 async function referencesBy(ctx: MutationCtx, userId: Id<"users">, id: Id<"_storage">): Promise<number> {
   const edits = await ctx.db.query("photo_edits").withIndex("by_storageId", (q) => q.eq("storageId", id)).take(REFS_PER_FILE);
   const shares = await ctx.db.query("shares").withIndex("by_storageId", (q) => q.eq("storageId", id)).take(REFS_PER_FILE);
-  return edits.filter((e) => e.userId === userId).length + shares.filter((s) => s.userId === userId).length;
+  const transfers = await ctx.db.query("transfers").withIndex("by_storageId", (q) => q.eq("storageId", id)).take(REFS_PER_FILE);
+  return (
+    edits.filter((e) => e.userId === userId).length +
+    shares.filter((s) => s.userId === userId).length +
+    transfers.filter((t) => t.userId === userId).length
+  );
 }
 
 /** The size of a file, or 0 if it is not in storage. Read it BEFORE deleting. */
@@ -69,15 +75,23 @@ export async function referenceDelta(
   return (await referencesBy(ctx, userId, change.removed)) === 0 ? -change.size : 0;
 }
 
-/** Exact, uncapped: the bytes of the distinct files the user's edit and share
- *  rows reference. One transaction, so an account with many thousands of files
+/** Exact, uncapped: the bytes of the distinct files the user's edit, share and
+ *  transfer rows reference. One transaction, so an account with many thousands of files
  *  would need this paginated; none is anywhere near that. */
 export async function recountStoredBytes(ctx: QueryCtx | MutationCtx, userId: Id<"users">): Promise<number> {
   // `.collect()` on purpose: the point of this function is that it has no
   // row cap (storedBytes' 2,000-row window is the bug being fixed).
   const edits = await ctx.db.query("photo_edits").withIndex("by_userId_photoKey", (q) => q.eq("userId", userId)).collect();
   const shares = await ctx.db.query("shares").withIndex("by_userId", (q) => q.eq("userId", userId)).collect();
-  const ids = new Set<Id<"_storage">>([...edits.map((e) => e.storageId), ...shares.map((s) => s.storageId)]);
+  const transfers = await ctx.db
+    .query("transfers")
+    .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+    .collect();
+  const ids = new Set<Id<"_storage">>([
+    ...edits.map((e) => e.storageId),
+    ...shares.map((s) => s.storageId),
+    ...transfers.map((t) => t.storageId),
+  ]);
   let total = 0;
   for (const id of ids) total += await fileSize(ctx, id);
   return total;

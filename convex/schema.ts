@@ -143,6 +143,36 @@ export default defineSchema({
     // trash.purge: rows trashed before the cutoff, as one range.
     .index("by_deletedAt", ["deletedAt"]),
 
+  // ── Transfer: a private 7-day inbox, phone → the editor (ADR-102) ──────────
+  // One row per photo a signed-in user sent from their phone. The file is kept
+  // AS SENT (the phone has no engine). The computer's Inbox lists these; "Add to
+  // gallery" imports the file through the normal import path and then calls
+  // `transfers.receive`, which removes the row and its file. Owner-only:
+  // nothing here is ever served to anyone else. Counts against the storage
+  // quota while it waits (convex/storageQuota.ts, convex/storageUsage.ts).
+  transfers: defineTable({
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    /** The file's name on the phone, trimmed to 200 characters. */
+    name: v.string(),
+    /** `_storage.contentType` as recorded at upload, never the client's word. */
+    mime: v.string(),
+    /** `_storage.size`, never the client's word. */
+    bytes: v.number(),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    /** A short label for the Inbox: "iPhone", "Android phone", "Phone". */
+    fromDevice: v.string(),
+    createdAt: v.number(),
+    /** createdAt + 7 days. `transfers.expire` removes rows past it. */
+    expiresAt: v.number(),
+  })
+    .index("by_userId_createdAt", ["userId", "createdAt"])
+    // ADR-089: every storage-id field has its reference index.
+    .index("by_storageId", ["storageId"])
+    // transfers.expire: everything past its date, as one range.
+    .index("by_expiresAt", ["expiresAt"]),
+
   // ── Share views (one row per counted view) ────────────────────────────────
   // TIMESTAMP ONLY. No IP, no user agent, no viewer id, nothing that could
   // identify who opened a link — the privacy policy says so, and this table is
@@ -210,9 +240,10 @@ export default defineSchema({
   // ── Stored bytes per user (the quota's counter) ─────────────────────────
   // ONE ROW PER USER, created by the first write that moves it (with an exact
   // recount) or by `storageUsage.backfillStoredBytes`. Kept exact by every
-  // path that adds or removes a file reference on `photo_edits` or `shares`,
-  // in the same mutation — convex/storageUsage.ts. Its own table, not a field
-  // on `users`: it changes on every save, and profile rows stay quiet.
+  // path that adds or removes a file reference on `photo_edits`, `shares` or
+  // `transfers`, in the same mutation — convex/storageUsage.ts. Its own
+  // table, not a field on `users`: it changes on every save, and profile rows
+  // stay quiet.
   // Not read by the quota yet (widen → migrate → narrow, ADR-101).
   storage_usage: defineTable({
     userId: v.id("users"),
