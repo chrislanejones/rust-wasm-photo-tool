@@ -29,4 +29,17 @@ const crons = cronJobs();
 //
 // crons.interval("sweep orphaned storage", { hours: 6 }, internal.storageSweep.sweep, { apply: true, olderThanHours: 24 });
 
+// ── AI job files: WRITTEN, DELIBERATELY NOT SCHEDULED ────────────────────────
+//
+// TODO(Chris): deletes the input, mask and output frames of AI jobs that
+// finished more than seven days ago (the rows stay). Off until a person has
+// read the dry run against the deployment:
+//
+//   pnpm exec convex run aiJobFiles:expire '{}'
+//
+// To switch it on, add the `internal` import above and uncomment the line
+// below. Once a day; each run handles up to 200 jobs per status.
+//
+// crons.interval("expire AI job files", { hours: 24 }, internal.aiJobFiles.expire, { apply: true });
+
 export default crons;

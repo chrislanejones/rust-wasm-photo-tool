@@ -272,12 +272,19 @@ export default defineSchema({
     error: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    /** Set by `aiJobFiles.expire` when it clears this row's storage-id fields,
+     *  seven days after the job finished. Optional, so existing rows need no
+     *  backfill: absent = not visited yet. */
+    filesExpiredAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])
     .index("by_userId_photoKey", ["userId", "photoKey"])
     .index("by_replicateId", ["replicateId"])
     .index("by_status", ["status"])
+    // aiJobFiles.expire: finished, not yet visited, finished before the cutoff
+    // — one range, and a visited row leaves it, so a rerun reads nothing done.
+    .index("by_status_filesExpiredAt_completedAt", ["status", "filesExpiredAt", "completedAt"])
     .index("by_inputStorageId", ["inputStorageId"])
     .index("by_outputStorageId", ["outputStorageId"])
     .index("by_maskStorageId", ["maskStorageId"])
