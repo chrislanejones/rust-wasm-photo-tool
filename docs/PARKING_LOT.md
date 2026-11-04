@@ -364,7 +364,7 @@ reference ownership transactionally on terminal outcomes. Shared files survive
 indexed checks; partial upload batches use guarded cleanup. #367 supplies the
 indexed save-safety foundation. See [AI reference storage](AI-reference-storage.md).
 Historical unrecorded orphans still need the separate sweep policy; its cron
-remains disabled. Input/mask/output retention (row 203) is documented, not built.
+remains disabled. Input/mask/output retention (row 203) is documented, not built. **Built 11-03-2026 (feat/ai-job-files-expire), off until Chris reads the dry run.**
 
 ## OPEN — small leftovers from the 10-14 night (10-14-2026)
 
@@ -544,7 +544,7 @@ account only.
 | Table | What happens | Effect |
 | --- | --- | --- |
 | `images` | `images.remove` deletes the ROW and never `storageId`'s file | Any file an `images` row owned becomes an orphan on Remove. The table looks unused by the editor today (`aiJobs.ts` calls it "the unused `images` table"), so this may be zero bytes; measure before fixing. |
-| `ai_jobs` | Nothing ever deletes a job, so its input, mask and output frames stay forever | Every AI run keeps up to 3 files. A retention rule for jobs is owed (Phase 1). |
+| `ai_jobs` | ~~Nothing ever deletes a job, so its input, mask and output frames stay forever~~ **IN PR 11-03-2026 (feat/ai-job-files-expire): `aiJobFiles.expire` deletes a finished job's files after 7 days and keeps the row; dry run by default, cron commented out until Chris reads a dry run. ADR-101.** | Every AI run keeps up to 3 files. A retention rule for jobs is owed (Phase 1). |
 
 ## OPEN — storage leaks the orphan sweep will mop up but does not fix (09-24-2026)
 
@@ -557,7 +557,7 @@ quota. These are the holes that feed the sweep, left out of that diff:
 | ~~The archive POST is raced against an 8 s `withTimeout` that rejects but never aborts the `fetch`~~ **FIXED 10-07-2026 (Night 10-07 PR 2): `lib/withTimeout` aborts the upload's `AbortController`; edit, AI and share uploads all use it. ⚠️ STILL OPEN, the other half: a size-scaled timeout. 108 of the 167 orphans were archives over 30 MiB, which cannot upload in 8 s on most links. They used to land as orphans; now they are cancelled. Either way a big photo never backs up. Chris's call.** | `app/src/hooks/useEditPersistence.ts` ~528 | The upload lands after the client gave up. `uploadedStorageId` is only set after `resp.json()`, so no discard runs, and the hash is never recorded, so the next save re-uploads the same bytes. Fits the data: 108 of 167 orphans are over 30 MiB (3 of 34 committed archives are); 82 orphans are byte-identical repeats. Fix: an `AbortController` on the upload, or a size-scaled timeout, or both. |
 | `ai.dispatch` refusals strand the frames already uploaded | `convex/ai.ts` / `app/src/hooks/useAIJob.ts` ~119 | Tier or daily/monthly cap refusal in `startJob` happens after the input (and mask) PNGs landed. None measured yet (0 png orphans), but every refused AI click would make one. |
 | The Replicate webhook stores the output, then commits it | `convex/http.ts` ~220 | If `completeJob` throws, or a duplicate webhook overwrites `outputStorageId`, the earlier output is orphaned. |
-| `ai_jobs` rows and their frames are never deleted | `convex/aiJobs.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
+| `ai_jobs` rows and their frames are never deleted — **frames: IN PR 11-03-2026 (feat/ai-job-files-expire), 7 days after the job finishes; rows stay as usage history** | `convex/aiJobs.ts`, `convex/aiJobFiles.ts` | Grows forever; excluded from the storage quota on purpose because the user has no way to free it. |
 | CI's Convex "typecheck" is vacuous | `.github/workflows/*.yml` `convex` job | `convex codegen` prints "No `tsc` binary found, so skipping typecheck" — `typescript` is an app-level dep, the root has none. Local stand-in: `pnpm -C app exec tsc --noEmit -p ../convex/tsconfig.json` (11 known `process` false positives). |
 | Eight tables exist on brave-ant-608 that `schema.ts` does not declare | `authAccounts`, `authRateLimits`, `authRefreshTokens`, `authSessions`, `authVerificationCodes`, `authVerifiers`, `userProfiles`, `session_edits` | All empty and unwritten by any function; the sweep walks declared tables only. Harmless while empty. |
 
