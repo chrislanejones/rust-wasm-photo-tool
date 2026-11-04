@@ -24,9 +24,9 @@ export interface TrashItem {
  *
  * Free and paid are the same view; only the window differs (lib/trash.ts).
  *
- * UNWIRED (Night 6 §0): there is no trash on the server yet — no `deletedAt`,
- * no purge. Built and tested against fixtures; the callbacks are optional so
- * the view renders before there is anything to call.
+ * WIRED for share links (Night 11-03, ADR-101): components/ShareTrash.tsx
+ * feeds it from `convex/trash.ts`, behind the `trash` Beta. The callbacks stay
+ * optional so the view still renders against fixtures.
  */
 export function TrashView({
   items,
@@ -37,6 +37,7 @@ export function TrashView({
   onRestore,
   onDeleteNow,
   onEmpty,
+  overModal,
 }: {
   items: readonly TrashItem[];
   paid: boolean;
@@ -47,6 +48,9 @@ export function TrashView({
   onRestore?: (id: string) => void;
   onDeleteNow?: (id: string) => void;
   onEmpty?: () => void;
+  /** Rendered inside a modal (Settings): the Empty trash confirm must open
+   *  above it, or it opens behind and the button seems to do nothing. */
+  overModal?: boolean;
 }) {
   const [confirmEmpty, setConfirmEmpty] = React.useState(false);
   const total = items.reduce((n, i) => n + i.bytes, 0);
@@ -123,6 +127,7 @@ export function TrashView({
         title="Empty the trash?"
         tone="destructive"
         confirmLabel="Empty trash"
+        overModal={overModal}
         onConfirm={() => {
           onEmpty?.();
           setConfirmEmpty(false);

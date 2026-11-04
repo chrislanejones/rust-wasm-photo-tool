@@ -144,6 +144,9 @@ function createFakeConvex() {
     // The stored-bytes counter (convex/storageUsage.ts), settled by every
     // share create and delete.
     ["storage_usage", new Map()],
+    // Asked by the share delete's reference check (storedFiles.ts), with
+    // photo_edits and shares, before the image is deleted.
+    ["ai_jobs", new Map()],
   ]);
   /** Stored files and their sizes in bytes — `_storage`, as far as the quota
    *  check reads it. */
@@ -180,6 +183,7 @@ function createFakeConvex() {
             },
             collect: async () => rows,
             take: async (n: number) => rows.slice(0, n),
+            first: async () => rows[0] ?? null,
           };
         },
       };

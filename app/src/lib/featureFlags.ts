@@ -91,6 +91,21 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     },
   },
   {
+    key: "ih_share_trash",
+    label: "Trash for share links",
+    kind: "optin",
+    isOn: () => rawFlagValue("ih_share_trash") === "1",
+    effect:
+      "Settings › Shared: Delete moves a link to a Trash (free 7 days, paid 30) where it can be restored. Off keeps Delete immediate. The trash is on the server, so it needs sign-in (ADR-101).",
+    source: "components/ShareTrash.tsx",
+    beta: {
+      id: "trash",
+      label: "Trash for share links",
+      blurb:
+        "Deleting a share link moves it to a Trash at the bottom of Settings › Shared instead of removing it. It stops working at once, and you can restore it for 7 days (30 on Pro). Trash still counts toward your storage until it is emptied.",
+    },
+  },
+  {
     key: "ih_oplog_undo",
     label: "Op-log undo",
     kind: "kill",

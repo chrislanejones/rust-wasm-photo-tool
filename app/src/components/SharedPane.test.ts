@@ -16,6 +16,11 @@ const h = vi.hoisted(() => ({
   pause: vi.fn(async () => {}),
   resume: vi.fn(async () => {}),
   remove: vi.fn(async () => {}),
+  moveToTrash: vi.fn(async () => {}),
+  restore: vi.fn(async () => {}),
+  deleteNow: vi.fn(async () => {}),
+  empty: vi.fn(async () => ({ deleted: 0, more: false })),
+  trash: null as unknown,
 }));
 
 const notUsedHere = (name: string) => () => {
@@ -24,11 +29,16 @@ const notUsedHere = (name: string) => () => {
 
 vi.mock("convex/react", () => ({
   useConvexAuth: () => h.auth,
-  useQuery: (_ref: unknown, args: unknown) => (args === "skip" ? undefined : h.links),
+  useQuery: (ref: unknown, args: unknown) =>
+    args === "skip" ? undefined : String(ref).startsWith("trash:") ? h.trash : h.links,
   // The pane asks for four mutations in a fixed order per card; the api ref is
   // a proxy path, so tell them apart by the last path segment.
   useMutation: (ref: unknown) => {
     const name = ref == null ? "" : String((ref as { toString(): string }).toString());
+    if (name.includes("moveToTrash")) return h.moveToTrash;
+    if (name.includes("trash:restore")) return h.restore;
+    if (name.includes("trash:deleteNow")) return h.deleteNow;
+    if (name.includes("trash:empty")) return h.empty;
     if (name.includes("setLimits")) return h.setLimits;
     if (name.includes("pause")) return h.pause;
     if (name.includes("resume")) return h.resume;
@@ -78,6 +88,13 @@ vi.mock("../../../convex/_generated/api", () => {
         pause: leaf("shares:pause"),
         resume: leaf("shares:resume"),
         remove: leaf("shares:remove"),
+        moveToTrash: leaf("shares:moveToTrash"),
+      },
+      trash: {
+        listMine: leaf("trash:listMine"),
+        restore: leaf("trash:restore"),
+        deleteNow: leaf("trash:deleteNow"),
+        empty: leaf("trash:empty"),
       },
     },
   };
@@ -153,6 +170,11 @@ beforeEach(() => {
   h.pause.mockClear();
   h.resume.mockClear();
   h.remove.mockClear();
+  h.moveToTrash.mockClear();
+  h.restore.mockClear();
+  h.deleteNow.mockClear();
+  h.trash = null;
+  localStorage.removeItem("ih_share_trash");
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -288,6 +310,61 @@ describe("Settings › Shared", () => {
       confirm!.click();
     });
     expect(h.remove).toHaveBeenCalledWith({ token: "tok-a" });
+  });
+
+  it("without the trash Beta there is no Trash, and Delete is still immediate", async () => {
+    h.links = [link()];
+    h.trash = { paid: false, windowDays: 7, items: [], quota: { usedBytes: 0, trashBytes: 0, limitBytes: 1 } };
+    await render();
+    expect(document.body.querySelector("#trash-heading")).toBeNull();
+    await act(async () => {
+      button("Delete sunset.jpg").click();
+    });
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("cannot be undone");
+  });
+
+  it("with the trash Beta on, Delete moves the link to the trash instead of removing it", async () => {
+    localStorage.setItem("ih_share_trash", "1");
+    h.links = [link()];
+    h.trash = { paid: false, windowDays: 7, items: [], quota: { usedBytes: 0, trashBytes: 0, limitBytes: 100 } };
+    await render();
+    await act(async () => {
+      button("Delete sunset.jpg").click();
+    });
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("Move this share link to the trash?");
+    expect(dialog?.textContent).toContain("restore it from the Trash");
+    const confirm = [...dialog!.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Move to trash");
+    await act(async () => {
+      confirm!.click();
+    });
+    expect(h.moveToTrash).toHaveBeenCalledWith({ token: "tok-a" });
+    expect(h.remove).not.toHaveBeenCalled();
+  });
+
+  it("with the trash Beta on, the Trash lists each link with its time left, and Restore / Delete now call the server", async () => {
+    localStorage.setItem("ih_share_trash", "1");
+    h.links = [];
+    h.trash = {
+      paid: false,
+      windowDays: 7,
+      items: [{ token: "tok-t", title: "beach.png", bytes: 2048, deletedAt: T0 - 2 * DAY, purgeAt: T0 + 5 * DAY, imageUrl: null }],
+      quota: { usedBytes: 1000, trashBytes: 2048, limitBytes: 100 * 1024 * 1024 },
+    };
+    await render();
+    expect(document.body.querySelector("#trash-heading")?.textContent).toBe("Trash");
+    const row = document.body.querySelector('[data-trash-item="tok-t"]');
+    expect(row?.textContent).toContain("beach.png");
+    expect(row?.textContent).toContain("Removes in 5 days");
+    await act(async () => {
+      button("Restore beach.png").click();
+    });
+    expect(h.restore).toHaveBeenCalledWith({ token: "tok-t" });
+    await act(async () => {
+      button("Delete beach.png now").click();
+    });
+    expect(h.deleteNow).toHaveBeenCalledWith({ token: "tok-t" });
   });
 
   it("draws no views chart — the stray single bar is gone", async () => {

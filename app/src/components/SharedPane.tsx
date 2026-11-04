@@ -45,6 +45,8 @@ import { ErrorNote } from "@/components/ui/status-note";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { shareUrlFor } from "@/hooks/useShare";
+import { useShareTrash } from "@/hooks/useShareTrash";
+import { ShareTrash } from "@/components/ShareTrash";
 import { FIELD_NUMERIC } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +104,9 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
   const pause = useMutation(api.shares.pause);
   const resume = useMutation(api.shares.resume);
   const remove = useMutation(api.shares.remove);
+  const moveToTrash = useMutation(api.shares.moveToTrash);
+  // The `trash` Beta: Delete moves the link to the Trash below instead.
+  const trashOn = useShareTrash();
 
   // The limits are a small draft: typing a number should not fire a mutation
   // per keystroke, and Save is what tells the person it stuck.
@@ -254,19 +259,21 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete this share link?"
+        title={trashOn ? "Move this share link to the trash?" : "Delete this share link?"}
         cancelLabel="Cancel"
-        confirmLabel="Delete"
+        confirmLabel={trashOn ? "Move to trash" : "Delete"}
         confirmIcon={Trash2}
         tone="destructive"
         overModal
         onConfirm={() => {
           setConfirmDelete(false);
-          void run("delete", () => remove({ token: link.token }), "Share link deleted");
+          if (trashOn) void run("delete", () => moveToTrash({ token: link.token }), "Moved to the trash");
+          else void run("delete", () => remove({ token: link.token }), "Share link deleted");
         }}
       >
-        The link stops working for everyone and the shared image is deleted. Your own copy in the
-        editor is not touched. This cannot be undone.
+        {trashOn
+          ? "The link stops working for everyone right away. You can restore it from the Trash below until it is removed for good; until then it still counts toward your storage. Your own copy in the editor is not touched."
+          : "The link stops working for everyone and the shared image is deleted. Your own copy in the editor is not touched. This cannot be undone."}
       </ConfirmDialog>
     </li>
   );
@@ -274,6 +281,7 @@ function LinkCard({ link, now }: { link: SharedLink; now: number }) {
 
 export function SharedPane() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const trashOn = useShareTrash();
   const links = useQuery(api.shares.listMine, isAuthenticated ? {} : "skip");
 
   // One clock for every "last opened" line, in state (ADR-020: no Date.now()
@@ -338,6 +346,8 @@ export function SharedPane() {
           </ul>
         </>
       )}
+
+      {isAuthenticated && trashOn && <ShareTrash now={now} />}
     </div>
   );
 }

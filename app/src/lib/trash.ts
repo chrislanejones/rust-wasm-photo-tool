@@ -7,10 +7,13 @@
 // Free and paid differ ONLY in the window (7 days vs 30). The view is the same;
 // the number is the difference.
 //
-// BACKEND (Night 6 §0): no `deletedAt`, no purge cron — `convex/crons.ts`
-// registers no jobs. Fixture-tested, wired to nothing.
+// BACKEND (Night 11-03, ADR-101): share links only, behind the `trash` Beta —
+// `shares.moveToTrash`, `convex/trash.ts`. The windows live in
+// convex/entitlement.ts, beside the quota, so the server's purge and this
+// line cannot disagree.
+import { TRASH_WINDOW_DAYS } from "../../../convex/entitlement";
 
-export const TRASH_WINDOW_DAYS = { free: 7, paid: 30 } as const;
+export { TRASH_WINDOW_DAYS };
 
 const DAY = 24 * 60 * 60 * 1000;
 
