@@ -11,6 +11,7 @@ import type { Doc } from "./_generated/dataModel";
 import { getUser, requireUser } from "./users";
 import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
 import { deleteStoredFiles } from "./storedFiles";
+import { fileSize, referenceDelta, settleStoredBytes } from "./storageUsage";
 import type { DeletedFiles } from "./testAccount";
 
 // ── Public, read-only share links ──────────────────────────────────────────
@@ -188,6 +189,7 @@ export const create = mutation({
       views: 0,
       createdAt: Date.now(),
     });
+    await settleStoredBytes(ctx, user._id, await referenceDelta(ctx, user._id, { added: args.storageId }));
     return { token };
   },
 });
@@ -440,6 +442,7 @@ export const remove = mutation({
  *  test-account wipe (testAccountWipe.ts) both call this. No ownership check:
  *  callers decide whose share it is before they get here. */
 export async function deleteShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<DeletedFiles> {
+  const size = await fileSize(ctx, share.storageId);
   const freed = await deleteStoredFiles(ctx, [share.storageId]);
   const views = await ctx.db
     .query("share_views")
@@ -447,5 +450,6 @@ export async function deleteShareRecord(ctx: MutationCtx, share: Doc<"shares">):
     .collect();
   for (const row of views) await ctx.db.delete(row._id);
   await ctx.db.delete(share._id);
+  await settleStoredBytes(ctx, share.userId, await referenceDelta(ctx, share.userId, { removed: share.storageId, size }));
   return freed;
 }

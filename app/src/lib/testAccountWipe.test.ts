@@ -32,6 +32,8 @@ interface Registered {
 const TABLES = [
   "users", "photo_edits", "shares", "share_views", "ai_jobs",
   "sync_docs", "subscriptions", "recent_texts", "user_colors",
+  // The stored-bytes counter: every edit/share delete settles it.
+  "storage_usage",
 ];
 
 function createFakeConvex() {
@@ -70,6 +72,11 @@ function createFakeConvex() {
       const _id = `${table}|${++seq}`;
       tables.get(table)!.set(_id, { ...doc, _id, _creationTime: 0 });
       return _id;
+    },
+    async patch(id: string, fields: Record<string, unknown>) {
+      const row = tables.get(id.split("|")[0])!.get(id);
+      if (!row) throw new Error(`patch: no row ${id}`);
+      Object.assign(row, fields);
     },
     async delete(id: string) {
       if (!tables.get(id.split("|")[0])!.delete(id)) throw new Error(`delete: no row ${id}`);

@@ -141,6 +141,9 @@ function createFakeConvex() {
     // Read by the storage quota (convex/storageQuota.ts), which sums an
     // account's photo edits and share snapshots.
     ["photo_edits", new Map()],
+    // The stored-bytes counter (convex/storageUsage.ts), settled by every
+    // share create and delete.
+    ["storage_usage", new Map()],
   ]);
   /** Stored files and their sizes in bytes — `_storage`, as far as the quota
    *  check reads it. */

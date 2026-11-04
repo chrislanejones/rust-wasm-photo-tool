@@ -5,14 +5,17 @@ import { getUser, requireUser } from "./users";
 import { assertNotOverQuota, assertStorageQuota } from "./storageQuota";
 import { deleteStoredFiles, isStoredFileReferenced } from "./storedFiles";
 import type { DeletedFiles } from "./testAccount";
+import { fileSize, referenceDelta, settleStoredBytes } from "./storageUsage";
 
 /** Delete one edit: its archive file and its row, in the caller's transaction.
  *  THE delete path for `photo_edits` — `remove`, `clearAll` and the
  *  test-account wipe (testAccountWipe.ts) all call this, so the file can never
  *  be dropped without the row or the row without the file. */
 export async function deletePhotoEditRecord(ctx: MutationCtx, edit: Doc<"photo_edits">): Promise<DeletedFiles> {
+  const size = await fileSize(ctx, edit.storageId);
   const freed = await deleteStoredFiles(ctx, [edit.storageId]);
   await ctx.db.delete(edit._id);
+  await settleStoredBytes(ctx, edit.userId, await referenceDelta(ctx, edit.userId, { removed: edit.storageId, size }));
   return freed;
 }
 
@@ -123,6 +126,7 @@ export const save = mutation({
         });
       }
     } else if (existing) {
+      const replacedSize = await fileSize(ctx, existing.storageId);
       await ctx.storage.delete(existing.storageId);
       await ctx.db.patch(existing._id, {
         storageId: args.storageId,
@@ -130,6 +134,13 @@ export const save = mutation({
         canvasH: args.canvasH,
         updatedAt: Date.now(),
       });
+      // One settle for the step: the new file in, the replaced one out.
+      await settleStoredBytes(
+        ctx,
+        user._id,
+        (await referenceDelta(ctx, user._id, { added: args.storageId })) +
+          (await referenceDelta(ctx, user._id, { removed: existing.storageId, size: replacedSize })),
+      );
     } else {
       await ctx.db.insert("photo_edits", {
         userId: user._id,
@@ -139,6 +150,7 @@ export const save = mutation({
         canvasH: args.canvasH,
         updatedAt: Date.now(),
       });
+      await settleStoredBytes(ctx, user._id, await referenceDelta(ctx, user._id, { added: args.storageId }));
     }
   },
 });
