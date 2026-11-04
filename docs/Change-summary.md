@@ -11946,3 +11946,23 @@ The intermittent callout-leader failure stays in the parking lot. Its suspected
 cause (an autosave between Align and the leader follow) was tested and ruled
 out: Align moves the pin, label and leader together. imagehorse-qc is owed for
 the engine and canvas changes in #434 and #435.
+
+## v9.53 Change Summary — 2026-11-03
+
+**Storage that cleans up after itself, and a trash for share links.**
+
+| Area | Change |
+| --- | --- |
+| Share-link trash, Beta (#441) | With Settings › Beta › "Trash for share links", Delete in Settings › Shared moves a link to a Trash under the list: it stops working at once, shows "Removes in N days", and can be restored to the same address. Free keeps it 7 days, paid 30 (`TRASH_WINDOW_DAYS`, `convex/entitlement.ts`). Trash still counts toward storage. Without the Beta, Delete is immediate as before. The trash holds share links only; cloud backups and gallery photos are not in it (ADR-101). `trash.purge` is a dry run by default and its cron is commented out. Deleting a share now keeps its image if anything else still uses it. |
+| AI job files expire (#439) | `aiJobFiles.expire` clears the input, mask and output files of AI jobs that finished more than 7 days ago and keeps the row as usage history. A file another row still uses is kept. Dry run by default; cron commented out. |
+| Exact storage count (#440) | A per-user `storage_usage` counter, updated by every save, delete and share, plus `backfillStoredBytes` (dry run by default) to count existing accounts. The storage limit still reads the old sum, which stops at 2,000 rows per table; it switches to the counter in a later release, after the backfill. |
+| Features page (#438) | The Brush card is keyed by the feature's new name, so it shows again. v9.52 had left master's CI red on this. |
+| ADR | ADR-101: AI files expire, the quota's counter, the share-link trash, and every cleanup ships as a dry run that a person switches on. |
+
+Convex schema changes are additive: `ai_jobs.filesExpiredAt`, `shares.deletedAt`, the
+`storage_usage` table and three indexes. Nothing deletes or backfills until it is run by hand.
+
+Verification: TypeScript clean; lint 0 errors (53 existing warnings); guardrails pass;
+backend suite 60/60 (24 new, each mutation-checked); app 2,158 unit tests; editor and
+marketing production builds pass. No engine change. Not yet looked at in a browser: the
+Trash in Settings › Shared.

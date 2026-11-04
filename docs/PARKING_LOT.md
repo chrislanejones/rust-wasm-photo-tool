@@ -11,7 +11,6 @@ wait their turn.
 | A gallery photo deleted in the browser does not reach the trash | The server has no original to restore it from; Transfer / sync (89, 192). ADR-101 |
 | Cloud edit backups delete immediately | A restored backup has no gallery photo to attach to, same reason |
 | `shares.remove` and `shares.moveToTrash` both exist | `remove` stays for everyone without the Beta; fold them together when the Beta graduates |
-| ADR-101 (in #439) says the public `get` answers "unavailable" for a trashed link | It answers `null`, exactly like a deleted link. One-line wording fix to the ADR |
 | `trash.purge` re-reads paid rows aged 7–30 days on every run | They sit inside the range but outside their window; bounded by `maxRows`, fine at today's size |
 | No browser look at the Trash yet | Logic and wiring are tested in jsdom; how it sits in Settings › Shared wants a look with the Beta on |
 

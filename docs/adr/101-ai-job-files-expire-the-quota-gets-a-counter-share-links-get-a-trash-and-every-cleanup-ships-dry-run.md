@@ -47,7 +47,7 @@ and a check compares the two.
 
 **3. The trash holds share links only (PR 3).** `shares` gains an optional
 `deletedAt`. A NEW `shares.moveToTrash` sets it, and `shares.remove` stays
-immediate. Trashed links stop serving (public `get` returns unavailable) and
+immediate. Trashed links stop serving (public `get` returns `null`, exactly like a deleted link) and
 leave `listMine`. Restore clears `deletedAt`. Delete now and Empty trash
 remove the row and its file through the reference check. Internal
 `trash.purge` removes rows past the owner's tier window. `TrashView` (UI

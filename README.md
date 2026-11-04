@@ -90,16 +90,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.52 — 2026-11-02
+### v9.53 — 2026-11-03
 
-**Copy a photo's look and paste it onto others.**
+**Storage that cleans up after itself, and a trash for share links.**
 
-Press Ctrl+Alt+C, or pick Copy look from Select ▾ or a photo's right-click
-menu, and the photo's Adjustments, Preset and Levels are copied. Tick some
-photos, press Ctrl+Alt+V, choose which of the three to bring, and paste. On the
-open photo the paste is one undo step. Fast A → B → A photo switching no longer
-ends on A showing B's picture, every tool panel now carries its tile's name,
-and five dependencies moved up.
+Deleting a share link can now move it to a Trash in Settings › Shared, where
+it waits 7 days (30 on Pro) for a Restore. It's a Beta for now: turn on "Trash
+for share links" in Settings › Beta. Behind the scenes, the files an AI tool
+used can be cleared a week after the job is done, and the server keeps an
+exact running count of what each account stores. Both cleanups stay switched
+off until they've been checked against real data. The Brush card is back on
+the Features page.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

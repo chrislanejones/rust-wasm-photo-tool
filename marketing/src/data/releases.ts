@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.53",
+    date: "2026-11-03",
+    headline: "Storage that cleans up after itself, and a trash for share links.",
+    entries: [
+      { tag: "feature", text: "Beta: deleting a share link can move it to a Trash in Settings › Shared, where you can restore it for 7 days (30 on Pro). Turn on \"Trash for share links\" in Settings › Beta." },
+      { tag: "infra", text: "The files an AI tool worked from can be cleared off the server a week after the job is done. It stays switched off until it has been checked against real data." },
+      { tag: "infra", text: "The server now keeps an exact running count of what each account stores. The old count stopped looking after 2,000 files; the storage limit moves over to the new one in a later release." },
+      { tag: "fix", text: "The Brush card is back on the Features page after its rename." },
+    ],
+  },
+  {
     version: "v9.52",
     date: "2026-11-02",
     headline: "Copy a photo's look and paste it onto others.",
