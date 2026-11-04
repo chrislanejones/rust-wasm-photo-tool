@@ -80,7 +80,7 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Blur Brush": Droplets,
   Arrows: ArrowUpRight,
   Shapes: Shapes,
-  "Paint / Brush": Paintbrush,
+  "Brush": Paintbrush,
   "Pen (Vector Paths)": PenTool,
   "Perspective / Distort / Skew": Frame,
   Text: Type,
