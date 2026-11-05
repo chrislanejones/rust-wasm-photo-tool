@@ -150,6 +150,15 @@ export default function PrivacyPolicy() {
               on a date, pause and resume it, or delete it, which removes the image too.
             </p>
             <p>
+              Photos you send from your phone to the editor (a Beta, off unless you turn it on) are
+              kept under your account exactly as the phone sent them, with the file name, its size
+              and which kind of phone it came from. They wait at most 7 days and count toward your
+              storage while they do. Adding one to the gallery on your computer removes the server
+              copy; so does deleting it, or the 7 days running out. Nothing is sent while the
+              &ldquo;Everything in your browser&rdquo; switch is on, and that switch is set on each
+              device.
+            </p>
+            <p>
               The settings sync is named in full because it is the one that happens without you
               asking each time. Three things travel: your preferences (the Settings dialog), which
               panels and tabs you last had open along with the command palette's recent list, and

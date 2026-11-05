@@ -18,6 +18,7 @@ import {
 } from "@/lib/plugins";
 import { useActivePluginFormats } from "@/hooks/usePlugins";
 import { navigateTo } from "@/features/routing";
+import type { AddPhotosResult } from "@/lib/addPhotosResult";
 
 export interface OpenRasterControls {
   stampToolRef: MutableRefObject<ImageHorseTool | null>;
@@ -32,7 +33,7 @@ export interface OpenRasterControls {
   onAddPhotos: (
     files: File[],
     opts?: { skipArtboard?: boolean },
-  ) => Promise<void>;
+  ) => Promise<AddPhotosResult | void>;
 }
 
 /**

@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Transfer leftovers (feat/transfer-ui, 11-04-2026, ADR-102)
+
+| What | Why it's left |
+| --- | --- |
+| The privacy policy says photos wait "at most 7 days" | True only once `transfers.expire`'s cron is uncommented. Switch it on before the Beta goes past Chris |
+| A HEIC sent from an iPhone fails to import in Chrome/Edge (it stays in the Inbox with "Couldn't open") | The editor's HEIC import is #316, still open. Safari decodes HEIC itself |
+| The Inbox is reachable only while the top bar is on screen | The dialog lives in TransferHost beside LookHost (same cost as ADR-100). The arrival toast covers an empty gallery when the top bar is up |
+| The server cannot see the online switch | It is per device, in the browser. Both sides check it before any call; a modified client could still upload while it is off |
+| Per-file progress on the phone is a state (waiting → sending → sent), not a percentage | `fetch` exposes no upload progress; a percentage needs XHR |
+| `transfers.create` takes the type from the upload's `Content-Type` | No magic-byte check (a mutation can't read bytes); the import decodes the file anyway. An action could check it in v2 |
+
 ## OPEN — share-link trash leftovers (feat/share-trash, 11-03-2026)
 
 | What | Why it's left |

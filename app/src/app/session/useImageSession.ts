@@ -27,6 +27,7 @@ import { makeWorkingCopy, makeThumbnailFromPixels, ImageTooLargeError } from "@/
 import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
+import type { AddPhotoOutcome, AddPhotosResult } from "@/lib/addPhotosResult";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
@@ -456,7 +457,11 @@ export function useImageSession({
 
   // ── Add photos ─────────────────────────────────────────────────────────────
   const handleAddPhotos = useCallback(
-    async (files: File[], opts?: { skipArtboard?: boolean }) => {
+    async (files: File[], opts?: { skipArtboard?: boolean }): Promise<AddPhotosResult> => {
+      // One outcome per file, in order (lib/addPhotosResult). Every file starts
+      // "over-limit" and is overwritten once it is attempted, so the files the
+      // cap trims off report exactly that.
+      const outcomes: AddPhotoOutcome[] = files.map(() => ({ status: "over-limit" }));
       // ── Tier cap ─────────────────────────────────────────────────────────
       // Enforce the per-tier gallery limit (from Rust `photo_limit`). Accept
       // as many as fit, then notify if the batch was trimmed or already full.
@@ -465,7 +470,7 @@ export function useImageSession({
       const remaining = Math.max(0, cap.max - photos.length);
       if (remaining <= 0) {
         toast.error(capMessage(cap.mode, cap.max));
-        return;
+        return { outcomes };
       }
       const accepted = files.length > remaining ? files.slice(0, remaining) : files;
       if (files.length > remaining) {
@@ -562,6 +567,7 @@ export function useImageSession({
           }
           setPhotos((prev) => [...prev, entry]);
           settle(index);
+          outcomes[index] = { status: "added", photoId: entry.id };
 
           if (!firstLoaded) {
             firstLoaded = true;
@@ -609,15 +615,17 @@ export function useImageSession({
           // it bites is what connects cause to effect.
           const insecureOrigin =
             !window.isSecureContext && typeof crypto?.subtle === "undefined";
-          toast.error(
+          const message =
             err instanceof ImageTooLargeError
               ? `${raw.name}: ${err.message}`
               : insecureOrigin
                 ? `Can't save images on an insecure page. ${location.protocol}//${location.host} isn't a secure context, so the browser withholds the crypto API used to store originals. Use https, or localhost.`
-                : `Couldn't open ${raw.name}.`,
-          );
+                : `Couldn't open ${raw.name}.`;
+          toast.error(message);
+          outcomes[index] = { status: "failed", message };
         }
       }
+      return { outcomes };
     },
     [activePhotoId, hasBeenModified, layerRevision, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, tierRef, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );

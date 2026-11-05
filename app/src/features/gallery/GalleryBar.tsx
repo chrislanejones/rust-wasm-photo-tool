@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
 import { SelectByMenu } from "./SelectByMenu";
+import { InboxButton } from "@/features/transfer/InboxButton";
 import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
@@ -185,6 +186,9 @@ function GalleryActions({
       <div className={actionRow}>
         {/* Select ▾ — tick by a rule (lib/selectBy.ts). Needs two photos to
             mean anything. */}
+        {/* Inbox — photos sent from the phone (features/transfer, Beta
+            `transfer`). Renders nothing unless some are waiting. */}
+        <InboxButton labelClassName={label} className={actionBtn} />
         {totalCount > 1 && <SelectByMenu labelClassName={label} tile={vertical} />}
 
         {some && onClearSelection && (

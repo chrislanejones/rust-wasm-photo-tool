@@ -106,6 +106,21 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     },
   },
   {
+    key: "ih_transfer",
+    label: "Send photos from your phone",
+    kind: "optin",
+    isOn: () => rawFlagValue("ih_transfer") === "1",
+    effect:
+      "Phone: Settings gains Send to computer. Editor: the gallery shows an Inbox when photos are waiting. Both need sign-in and the online switch on that device; files wait 7 days (ADR-102).",
+    source: "features/transfer/",
+    beta: {
+      id: "transfer",
+      label: "Send photos from your phone",
+      blurb:
+        "On your phone, Settings gets a Send to computer button. Photos you send wait in an Inbox in the editor's gallery for 7 days, and count toward your storage until you add or delete them. Turn this on on both devices.",
+    },
+  },
+  {
     key: "ih_oplog_undo",
     label: "Op-log undo",
     kind: "kill",
