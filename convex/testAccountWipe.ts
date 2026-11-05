@@ -29,6 +29,7 @@ import {
 } from "./testAccount";
 import { deletePhotoEditRecord } from "./photoEdits";
 import { deleteShareRecord } from "./shares";
+import { deleteTransferRecord } from "./transfers";
 import { deleteStoredFiles } from "./storedFiles";
 
 /** Per-table read ceiling for the dry run. Hitting it marks the plan
@@ -60,6 +61,11 @@ async function ownedParents(ctx: QueryCtx, userId: Id<"users">, table: FileTable
         .take(limit);
     case "shares":
       return await ctx.db.query("shares").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
+    case "transfers":
+      return await ctx.db
+        .query("transfers")
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+        .take(limit);
     case "ai_jobs":
       return await ctx.db.query("ai_jobs").withIndex("by_userId", (q) => q.eq("userId", userId)).take(limit);
   }
@@ -160,6 +166,8 @@ function convexWipeStore(ctx: MutationCtx, userId: Id<"users">): WipeStore {
           return await deletePhotoEditRecord(ctx, row as unknown as Doc<"photo_edits">);
         case "shares":
           return await deleteShareRecord(ctx, row as unknown as Doc<"shares">);
+        case "transfers":
+          return await deleteTransferRecord(ctx, row as unknown as Doc<"transfers">);
         case "ai_jobs":
           return await deleteAiJobRecord(ctx, row as unknown as Doc<"ai_jobs">);
         case "share_views":

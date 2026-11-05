@@ -31,6 +31,7 @@ import type * as testAccount from "../testAccount.js";
 import type * as testAccountWipe from "../testAccountWipe.js";
 import type * as testReplicate from "../testReplicate.js";
 import type * as textHistory from "../textHistory.js";
+import type * as transfers from "../transfers.js";
 import type * as trash from "../trash.js";
 import type * as userColors from "../userColors.js";
 import type * as users from "../users.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   testAccountWipe: typeof testAccountWipe;
   testReplicate: typeof testReplicate;
   textHistory: typeof textHistory;
+  transfers: typeof transfers;
   trash: typeof trash;
   userColors: typeof userColors;
   users: typeof users;

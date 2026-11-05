@@ -34,6 +34,8 @@ const TABLES = [
   "sync_docs", "subscriptions", "recent_texts", "user_colors",
   // The stored-bytes counter: every edit/share delete settles it.
   "storage_usage",
+  // The Transfer inbox (ADR-102): wiped with the account, like shares.
+  "transfers",
 ];
 
 function createFakeConvex() {
