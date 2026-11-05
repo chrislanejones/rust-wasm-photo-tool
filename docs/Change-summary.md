@@ -11966,3 +11966,23 @@ Verification: TypeScript clean; lint 0 errors (53 existing warnings); guardrails
 backend suite 60/60 (24 new, each mutation-checked); app 2,158 unit tests; editor and
 marketing production builds pass. No engine change. Not yet looked at in a browser: the
 Trash in Settings › Shared.
+
+## v9.54 Change Summary — 2026-11-04
+
+**Send photos from your phone to your computer.**
+
+| Area | Change |
+| --- | --- |
+| Transfer, Beta (#443) | With Settings › Beta › "Send photos from your phone" on, the phone's Settings sheet gets Send to computer: pick photos, each uploads as is with its own status line, and Cancel stops the queue. The phone never loads the engine. In the editor, an Inbox button with a count shows in the gallery bar only when photos are waiting, and a toast says when new ones arrive. Add to gallery uses the same import as drag-and-drop, and a photo leaves the server only after the gallery has saved it in this browser. A photo that fails to import stays in the Inbox with its error. Needs sign-in and the online switch on each device; with the switch off, the phone offers it right in the section. |
+| Transfer backend (#442) | A `transfers` table and `convex/transfers.ts`: upload URL, create (refuses non-images, files over 50 MiB, a full inbox of 50, or a full quota, and deletes the refused file), list, receive, remove. Waiting photos count toward storage through the stored-bytes counter. Every cleanup and reference check now knows about the table, so none can delete a waiting photo. `transfers.expire` removes photos older than 7 days; it is a dry run by default and its cron is commented out. |
+| Add photos | `handleAddPhotos` now reports one outcome per file (added, failed, over the limit). Callers that ignore it behave as before. |
+| Privacy policy | One new paragraph on what Transfer keeps and for how long. |
+| ADR | ADR-102: Transfer is a private 7-day inbox from the phone to the editor. |
+
+Convex schema change is additive: the `transfers` table and three indexes. Nothing expires until
+`transfers:expire` is run by hand.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; backend 77/77 (17 new); app
+2,187 unit tests (28 new); 13 of 13 mutants killed; phone e2e 5/5 (no engine on the phone);
+editor and marketing production builds pass. No engine change. Owed: a real round trip
+between a signed-in phone and computer. HEIC from an iPhone won't import in Chrome until #316.

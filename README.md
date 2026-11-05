@@ -90,17 +90,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.53 — 2026-11-03
+### v9.54 — 2026-11-04
 
-**Storage that cleans up after itself, and a trash for share links.**
+**Send photos from your phone to your computer.**
 
-Deleting a share link can now move it to a Trash in Settings › Shared, where
-it waits 7 days (30 on Pro) for a Restore. It's a Beta for now: turn on "Trash
-for share links" in Settings › Beta. Behind the scenes, the files an AI tool
-used can be cleared a week after the job is done, and the server keeps an
-exact running count of what each account stores. Both cleanups stay switched
-off until they've been checked against real data. The Brush card is back on
-the Features page.
+On your phone, Settings has a new Send to computer section. Pick photos there
+and they wait in an Inbox in the editor's gallery on your computer for 7 days.
+Add them to the gallery or delete them from the Inbox. They go up exactly as
+the phone has them and count toward your storage until you do. It's a Beta for
+now: turn on "Send photos from your phone" in Settings › Beta on both devices,
+and sign in on both.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.54",
+    date: "2026-11-04",
+    headline: "Send photos from your phone to your computer.",
+    entries: [
+      { tag: "feature", text: "Beta: on your phone, Settings has Send to computer. Photos you pick wait in an Inbox in the editor's gallery for 7 days, ready to add. Turn on \"Send photos from your phone\" in Settings › Beta on both devices and sign in." },
+      { tag: "infra", text: "Photos waiting in the Inbox count toward your storage, and nothing that tidies up the server can remove one until you add it or delete it." },
+      { tag: "ui", text: "The phone sends each photo exactly as it has it, with a status line per photo and a Cancel button. It still never downloads the editing engine." },
+    ],
+  },
+  {
     version: "v9.53",
     date: "2026-11-03",
     headline: "Storage that cleans up after itself, and a trash for share links.",
