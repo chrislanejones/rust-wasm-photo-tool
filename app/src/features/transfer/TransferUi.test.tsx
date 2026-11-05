@@ -48,7 +48,9 @@ import { useTransferStore } from "./transferStore";
 const fetchSpy = vi.fn(async (url: string) =>
   url.startsWith("https://upload")
     ? new Response(JSON.stringify({ storageId: "st" }), { status: 200 })
-    : new Response(new Blob([new Uint8Array(4)], { type: "image/jpeg" }), { status: 200 }),
+    : // Plain bytes, not a Blob: this file runs under jsdom, whose Blob has no
+      // .stream(), and Node 22's Response calls it (Node 24's does not).
+      new Response(new Uint8Array(4), { status: 200, headers: { "content-type": "image/jpeg" } }),
 );
 
 // jsdom has no IntersectionObserver; the Inbox's lazy thumbnails
