@@ -60,6 +60,10 @@ export interface OplogPersistWasm {
   /** Undo depth — the coverage check in `isLogTrustworthy` compares it to the
    *  cursor, because an unrecorded edit grows undo without growing the log. */
   undo_count(): number;
+  /** Moves on every history change, recorded or not. O(1), per-flush safe. */
+  oplog_edit_revision?(): number;
+  /** Full document compare, so per save only. See `readCoverage`. */
+  oplog_coverage?(): number;
   oplog_generation(): number;
   oplog_encoded_ops(from: number, to: number): Uint8Array;
   oplog_mem_keyframe_ops(): Uint32Array;
@@ -165,13 +169,10 @@ export async function isLogTrustworthy(tool: OplogPersistWasm): Promise<boolean>
   // which the v8.35 fast lane keeps fresh for exactly these documents. The
   // two fixes compose.
   //
-  // Known one-sided gap, accepted: the history cap (50–1000 snapshots) trims
-  // oldest entries, so on very long sessions `undo_count` can sit BELOW the
-  // cursor and mask a later unrecorded edit until the next detection signal.
-  // The error direction of every other imbalance is a false INVALIDATION,
-  // which costs the log optimization and never data. The complete fix — the
-  // engine marking the log at its own history-push choke point — is
-  // ADR-024-F4's session.
+  // This is only the cheap per-flush signal. It can miss an edit: multi-op
+  // gestures and the history cap both leave undo depth below the cursor, and
+  // an unrecorded edit fits in that gap. `readCoverage` is the proof, and it
+  // runs at save time.
   if (typeof tool.undo_count === "function") {
     const undo = await tool.undo_count();
     const cursor = await tool.oplog_cursor();
@@ -271,7 +272,14 @@ interface Binding {
   chunkCount: number;
   generation: number;
   cursor: number;
+  /** The edit revision the engine last proved this log covers.
+   *  `UNVERIFIED` makes the next flush check again; `null` means the engine
+   *  has no coverage exports. */
+  verifiedRevision: number | null;
 }
+
+/** Never equal to a real `oplog_edit_revision`, which is unsigned. */
+const UNVERIFIED = -1;
 
 let activePhotoId: string | null = null;
 let bound: Binding | null = null;
@@ -325,6 +333,32 @@ const invalidationEpochs = new Map<string, number>();
 function boundTo(tool: object, photoId: string): Binding | null {
   if (!bound || bound.photoId !== photoId) return null;
   return bound.toolToken === toolToken(tool) ? bound : null;
+}
+
+async function readRevision(tool: OplogPersistWasm): Promise<number | null> {
+  return typeof tool.oplog_edit_revision === "function" ? await tool.oplog_edit_revision() : null;
+}
+
+/** Ask the engine whether the log describes the live document.
+ *
+ *  The revision is read FIRST: an edit landing between the two calls leaves
+ *  the binding behind the engine, so the next flush checks again.
+ *
+ *  An open edit (a stroke, a text editor) can't be judged yet. The save still
+ *  goes ahead, because refusing it would keep older recorded edits off disk,
+ *  and `UNVERIFIED` makes the flush that closes the edit check again. */
+async function readCoverage(
+  tool: OplogPersistWasm,
+): Promise<{ missingEdit: boolean; verifiedRevision: number | null }> {
+  if (typeof tool.oplog_coverage !== "function") {
+    return { missingEdit: false, verifiedRevision: null };
+  }
+  const revision = await readRevision(tool);
+  const coverage = await tool.oplog_coverage();
+  return {
+    missingEdit: coverage === 0,
+    verifiedRevision: coverage === 1 ? revision : UNVERIFIED,
+  };
 }
 
 /** The engine's log no longer describes this photo's document (broken, or the
@@ -432,7 +466,15 @@ export async function onOplogFlush(tool: object): Promise<void> {
   // and treating that as "nothing new" would silently leave the previous
   // document persisted as this photo's truth.
   const seen = boundTo(tool, photoId);
-  if (seen && seen.opCount === len && seen.generation === gen && seen.cursor === cursor) {
+  if (
+    seen &&
+    seen.opCount === len &&
+    seen.generation === gen &&
+    seen.cursor === cursor &&
+    // An unrecorded edit moves no op counter, and on a log that already saved
+    // this is the only thing that would ever notice it.
+    seen.verifiedRevision === (await readRevision(tool))
+  ) {
     return; // nothing new
   }
   const backlog = seen && gen === seen.generation ? len - seen.opCount : len;
@@ -487,6 +529,11 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // land afterwards and persist a log that is missing it.
     if (!(await isLogTrustworthy(tool))) {
       await invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
+      return;
+    }
+    const { missingEdit, verifiedRevision } = await readCoverage(tool);
+    if (missingEdit) {
+      await invalidatePersistedLog(photoId, "an edit is missing from the log");
       return;
     }
     // Fire-time zero-op recheck (same reasoning as onOplogFlush): never write
@@ -636,6 +683,7 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
       chunkCount: manifest.chunkCount,
       generation: gen,
       cursor,
+      verifiedRevision,
     };
     invalidated.delete(photoId); // healthy again; a later break re-marks it
   }
@@ -736,6 +784,8 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
       chunkCount: m.chunkCount,
       generation: await tool.oplog_generation(),
       cursor,
+      // A restore IS the log, so there is nothing to verify yet.
+      verifiedRevision: await readRevision(tool),
     };
     return "restored";
   } catch (e) {

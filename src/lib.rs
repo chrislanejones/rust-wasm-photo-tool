@@ -757,6 +757,11 @@ pub struct ImageHorseTool {
     /// began.
     #[cfg(feature = "tiles")]
     oplog_gesture_ops: u32,
+    /// Steps that joined an open one through `continue_step`. They change the
+    /// document without moving `hist.generation`, so `oplog_edit_revision` adds
+    /// them in.
+    #[cfg(feature = "tiles")]
+    oplog_joined_steps: u32,
     /// Set by `continue_step`: the next `snap()` joins the step in progress
     /// instead of pushing one. Cleared by that snap or the next recomposite.
     join_next_step: bool,
@@ -853,6 +858,10 @@ impl ImageHorseTool {
     fn snap(&mut self, label: &str) {
         // `continue_step`: this change belongs to the step already open.
         if std::mem::take(&mut self.join_next_step) {
+            #[cfg(feature = "tiles")]
+            {
+                self.oplog_joined_steps = self.oplog_joined_steps.wrapping_add(1);
+            }
             return;
         }
         #[cfg(feature = "tiles")]
@@ -1152,6 +1161,8 @@ impl ImageHorseTool {
             oplog_use_for_undo: false,
             #[cfg(feature = "tiles")]
             oplog_gesture_ops: 0,
+            #[cfg(feature = "tiles")]
+            oplog_joined_steps: 0,
             join_next_step: false,
             #[cfg(feature = "tiles")]
             rec_stroke: None,
@@ -1718,9 +1729,7 @@ impl ImageHorseTool {
         let Some(log) = self.oplog.as_ref() else {
             return false;
         };
-        let log_flat = log.live_document().composite_flat();
-        log_flat.len() == self.composite_cache.len()
-            && Self::oplog_flat_hash(&log_flat) == Self::oplog_flat_hash(&self.composite_cache)
+        log.live_document().composite_flat() == self.composite_cache
     }
 
     /// Op-log undo: verify sync, keep the snapshot stacks aligned, seek the
@@ -2117,6 +2126,51 @@ impl ImageHorseTool {
     #[cfg(feature = "tiles")]
     pub fn oplog_is_broken(&self) -> bool {
         self.oplog_broken
+    }
+
+    /// Moves on every history change, recorded or not. An unrecorded edit moves
+    /// this and no op counter, so persistence compares it to the revision it
+    /// last verified. O(1), so the per-frame flush path can ask.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_edit_revision(&self) -> u32 {
+        (self.hist.generation as u32).wrapping_add(self.oplog_joined_steps)
+    }
+
+    /// Does the log describe the document the user has?
+    ///
+    /// 0 = no, an edit is missing from it. 1 = yes. 2 = can't say yet, an edit
+    /// is open and its op has not been recorded.
+    ///
+    /// The answer comes from comparing the two documents, because counters
+    /// can't give it: one gesture can record several ops, and the history cap
+    /// trims undo depth, so an unrecorded edit can fit inside the gap between
+    /// undo depth and the cursor. A full compare, so call it per save and never
+    /// per frame.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_coverage(&mut self) -> u8 {
+        if self.oplog_broken {
+            return 0;
+        }
+        // An empty log is rebased before its first op and is never persisted.
+        if self.oplog.as_ref().is_none_or(|log| log.is_empty()) {
+            return 1;
+        }
+        if self.rec_stroke.is_some()
+            || self.rec_effect.is_some()
+            || self.tonal_preview.is_some()
+            || self.editing_text_id.is_some()
+            || self.editing_shape_id.is_some()
+            || self.move_preview.is_some()
+            || self.paste_preview.is_some()
+        {
+            return 2;
+        }
+        // A save can land between `continue_step` and the snap it joins.
+        // Recompositing clears the join, which would split that gesture.
+        let join = self.join_next_step;
+        let in_sync = self.oplog_engine_in_sync();
+        self.join_next_step = join;
+        u8::from(in_sync)
     }
 
     // ── Op-log persistence surface (night project: op log → IndexedDB) ────

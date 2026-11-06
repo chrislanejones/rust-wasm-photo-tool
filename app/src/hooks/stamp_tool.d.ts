@@ -1172,6 +1172,12 @@ declare module "stamp_tool" {
      *  FEATURELESS build has reached production before (v7.36–v7.45), so every
      *  caller must feature-detect rather than assume. */
     oplog_is_broken?(): boolean;
+    /** Moves on every history change, recorded or not. Optional for the same
+     *  reason as `oplog_is_broken`. */
+    oplog_edit_revision?(): number;
+    /** 0 = an edit is missing from the log, 1 = covered, 2 = an edit is open.
+     *  A full document compare: per save, never per frame. */
+    oplog_coverage?(): number;
     /** Copy look (src/look.rs): the tonal steps still in the history, in the
      *  order applied, as a flat wire: a kind code (1 Preset, 2 Levels, 3
      *  Adjustments), then that kind's values in its apply call's order. Empty
