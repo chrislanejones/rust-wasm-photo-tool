@@ -119,6 +119,10 @@ name = "levels"
 name = "presets"
 
 [[test]]
+name = "oplog_coverage"
+required-features = ["tiles"]
+
+[[test]]
 name = "blur_stabilized"
 required-features = ["tiles"]
 
