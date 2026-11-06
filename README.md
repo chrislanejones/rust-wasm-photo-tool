@@ -90,16 +90,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.54 — 2026-11-04
+### v9.55 — 2026-11-05
 
-**Send photos from your phone to your computer.**
+**A refresh can't quietly undo a redaction anymore.**
 
-On your phone, Settings has a new Send to computer section. Pick photos there
-and they wait in an Inbox in the editor's gallery on your computer for 7 days.
-Add them to the gallery or delete them from the Inbox. They go up exactly as
-the phone has them and count toward your storage until you do. It's a Beta for
-now: turn on "Send photos from your phone" in Settings › Beta on both devices,
-and sign in on both.
+Some edits, like a solid redaction, aren't saved as steps in the edit history.
+In the right order after other edits, one could slip past the check for that,
+and a refresh brought the photo back without it. Now the engine compares the
+saved history to the photo you actually have. If they don't match, it drops the
+history and restores from your working copy, which has the redaction.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.55",
+    date: "2026-11-05",
+    headline: "A refresh can't quietly undo a redaction anymore.",
+    entries: [
+      { tag: "fix", text: "A solid redaction could disappear after a refresh when it landed in the wrong spot among other edits. The photo now comes back with the redaction." },
+      { tag: "rust", text: "The engine compares the saved edit history to the photo you have at every save, and drops the history if an edit is missing from it." },
+    ],
+  },
+  {
     version: "v9.54",
     date: "2026-11-04",
     headline: "Send photos from your phone to your computer.",

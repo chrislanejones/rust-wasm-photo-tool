@@ -11986,3 +11986,24 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; backend 77/77 (1
 2,187 unit tests (28 new); 13 of 13 mutants killed; phone e2e 5/5 (no engine on the phone);
 editor and marketing production builds pass. No engine change. Owed: a real round trip
 between a signed-in phone and computer. HEIC from an iPhone won't import in Chrome until #316.
+
+## v9.55 Change Summary — 2026-11-05
+
+**A refresh can't quietly undo a redaction anymore.**
+
+| Area | Change |
+| --- | --- |
+| Op log saves (#444) | The save compared undo depth to the log's cursor. One gesture can record several ops and the history cap trims undo depth, so an unrecorded edit could fit in the gap, and a refresh restored the photo without it. `oplog_coverage()` now compares the log's document to the live one at save time: if an edit is missing the log is retired and the working copy carries the resume. |
+| Flush check (#444) | An unrecorded edit on a log that had already saved moved no op counter, so it read as "nothing new" and never reached a save. `oplog_edit_revision()` moves on every history change and closes that. |
+| ADR | ADR-103: the engine answers whether the op log describes the live document, by comparing the two. |
+
+No format change, no Dexie migration, op log version unchanged. Engine 957,006 → 957,088 B
+(+82). The check costs 114 ms with a Canvas and 32 ms without at 2068×1556, per save and never
+per frame.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; `cargo test` 535 plain and 819
+with `tiles`; app 2,192 unit tests (5 new, on the built engine); 2 mutations killed; 5 browser
+specs on the production build; all 20 CI checks clean (18 pass, 2 skipped). Not covered: a log
+saved before this fix can't be checked at restore, so one already missing an edit stays that way
+until a later unrecorded edit retires it. Not run: `cargo bench`, and `imagehorse-qc`, which this
+engine change calls for.
