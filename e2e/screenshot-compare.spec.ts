@@ -31,7 +31,7 @@ const USER_WINDOW = { width: 1689, height: 922 };
 const LAPTOP_WINDOW = { width: 1366, height: 768 };
 
 /** Import B and A, and open B. */
-async function open(page: Page, b: string, a: string, width: number, viewport = { width: 1600, height: 1100 }) {
+async function open(page: Page, b: string, a: string, width: number, viewport = { width: 1600, height: 1100 }, extra: string[] = []) {
   await page.setViewportSize(viewport);
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -41,8 +41,8 @@ async function open(page: Page, b: string, a: string, width: number, viewport = 
   await page.addInitScript(() =>
     localStorage.setItem("image-horse-prefs", JSON.stringify({ canvasArtboard: false })));
   await page.goto("/");
-  await page.locator('input[type="file"]').first().setInputFiles([join(DIR, b), join(DIR, a)]);
-  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(2);
+  await page.locator('input[type="file"]').first().setInputFiles([b, a, ...extra].map((f) => join(DIR, f)));
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(2 + extra.length);
   await tile(page, b).click();
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe(String(width));
   await installAnnotationProbe(page);
@@ -88,13 +88,64 @@ async function reloadAndResume(page: Page, width: number) {
   await installAnnotationProbe(page);
 }
 
+/** The top bar's compare-mode toggle (11-07-2026 — it was a dialog). */
+const compareMode = (page: Page) => page.getByRole("button", { name: "Compare two photos" });
+const pickBox = (page: Page, file: string) => tile(page, file).getByRole("button", { name: "Compare", exact: true });
+const hint = (page: Page) => page.getByTestId("compare-pick-hint");
+
 test("An identical pair: No changes, and Mark changes is off", async ({ page }) => {
   await open(page, "a.png", "a-copy.png", 960);
-  // The top bar's way in, this time: Compare with another photo… → pick A.
-  await page.getByRole("button", { name: "Compare with another photo…" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /a-copy/ }).click();
+  // The top bar's way in, this time: compare mode on, then tick the two
+  // photos in the gallery. One of them is open, so it is B.
+  await compareMode(page).click();
+  await expect(compareMode(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(hint(page)).toContainText("0 of 2");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await pickBox(page, "a-copy.png").click();
+  await expect(hint(page)).toContainText("1 of 2");
+  await pickBox(page, "a.png").click();
   await expect(bar(page)).toContainText("No changes");
   await expect(bar(page).getByRole("button", { name: "Mark changes" })).toBeDisabled();
+
+  // The button again turns compare mode off: no bar, no ring, no picks.
+  await compareMode(page).click();
+  await expect(bar(page)).toHaveCount(0);
+  await expect(hint(page)).toHaveCount(0);
+  await expect(compareMode(page)).not.toHaveAttribute("aria-pressed", "true");
+});
+
+test("Compare mode: opens a closed gallery, picks two at most, opens the second when neither is open", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960, undefined, ["a-copy.png"]);
+
+  // A closed gallery opens.
+  await page.keyboard.press("Alt+KeyG");
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(0);
+  await compareMode(page).click();
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(3);
+
+  // b is open; tick a, then a-copy. Neither is open, so a-copy (the second)
+  // opens as B and is compared with a — the identical pair.
+  await pickBox(page, "a.png").click();
+  await pickBox(page, "a-copy.png").click();
+  await expect(tile(page, "a-copy.png")).toHaveAttribute("aria-pressed", "true");
+  await expect(bar(page)).toContainText("No changes");
+
+  // Two is the limit: the rest say they're unavailable (the picked two stay
+  // available to untick), and a third tick is refused.
+  await expect(pickBox(page, "b.png")).toHaveAttribute("aria-disabled", "true");
+  await expect(pickBox(page, "a.png")).not.toHaveAttribute("aria-disabled", "true");
+  await pickBox(page, "b.png").click({ force: true });
+  await expect(pickBox(page, "b.png")).toHaveAttribute("aria-pressed", "false");
+  await expect(hint(page)).toContainText("Comparing 2 photos");
+
+  // Unticking one ends that comparison but stays in compare mode.
+  await pickBox(page, "a.png").click();
+  await expect(bar(page)).toHaveCount(0);
+  await expect(hint(page)).toContainText("1 of 2");
+
+  // Compare mode's ticks are not the selection Batch uses for Exceptions.
+  await compareMode(page).click();
+  await expect(page.locator('[aria-label="Select image"][aria-pressed="true"]')).toHaveCount(0);
 });
 
 test("The known pair: exactly 3 changes, each box on its known area (IoU ≥ 0.89)", async ({ page }) => {

@@ -64,6 +64,7 @@ import { activateGroup, useActiveSubTool } from "@/features/tools/activateSubToo
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
+import { batchHeroStyle, batchHostStyle, batchScrollerStyle, useBatchZoom } from "@/features/canvas/batchLayout";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import { ShapeZOrderMenuItems } from "@/features/canvas/ShapeZOrderMenuItems";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
@@ -975,9 +976,9 @@ export function AppShell() {
   // Canvas viewport + single-image export/clipboard/histogram actions.
   const {
     getHistogram,
-    handleZoomIn,
-    handleZoomOut,
-    handleZoomReset,
+    handleZoomIn: engineZoomIn,
+    handleZoomOut: engineZoomOut,
+    handleZoomReset: engineZoomReset,
     handleCopyToClipboard,
     handleExport,
     handleExportAs,
@@ -989,6 +990,10 @@ export function AppShell() {
     exportCanvasBackground,
     canvasBgTransparent,
   });
+
+  const inBatch = activeTool === "emoji";
+  const { view: batchView, zoom: shownZoom, handleZoomIn, handleZoomOut, handleZoomReset } = useBatchZoom(
+    inBatch, { zoomIn: engineZoomIn, zoomOut: engineZoomOut, zoomReset: engineZoomReset }, stamp.state.zoom);
 
   // The size the export will actually produce. Computed in an effect, because
   // the "Photo only" branch costs a whole-image composite per call and used to
@@ -2523,7 +2528,7 @@ export function AppShell() {
       <AnimatePresence>
         {!bp.dock && showTopBar && (
           <TopBar
-            zoom={stamp.state.zoom}
+            zoom={shownZoom}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onUndo={stamp.undo}
@@ -2721,40 +2726,19 @@ export function AppShell() {
                     bottom: 56 + (showGallery ? GALLERY_OPEN_GUTTER : 0),
                     left: 12,
                     right: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                     minHeight: 0,
                     minWidth: 0,
+                    ...batchScrollerStyle(batchView.layout),
                   }}
                 >
-                  <div
-                    className="canvas-grid-host checkerboard-canvas"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(5, 1fr)",
-                      gridTemplateRows: "repeat(3, 1fr)",
-                      gap: "12px",
-                      padding: "12px",
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      width: "auto",
-                      margin: "auto",
-                      aspectRatio: "5 / 3",
-                    }}
-                  >
+                  <div className="canvas-grid-host checkerboard-canvas" style={batchHostStyle(batchView)}>
                     <div
                       className={`canvas-grid-hero${
                         activePhotoId && photos.length > 0
                           ? " ring-2 ring-orange-400"
                           : ""
                       }`}
-                      style={{
-                        gridArea: "1 / 1 / 3 / 3",
-                        position: "relative",
-                        overflow: "hidden",
-                        borderRadius: "0.375rem",
-                      }}
+                      style={batchHeroStyle(batchView.layout, photos.find((p) => p.id === activePhotoId))}
                     >
                       <div style={{ position: "absolute", inset: 0 }}>
                         <CanvasArea

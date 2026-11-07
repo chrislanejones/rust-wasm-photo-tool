@@ -31,6 +31,10 @@ export interface ThumbProps {
   selectionActive: boolean;
   /** Toggle this thumb's checkbox. */
   onToggleSelect: (shiftKey: boolean) => void;
+  /** Compare mode (features/canvas/comparePick): the checkbox picks this photo
+   *  for the comparison instead of selecting it, and `selected` is the pick.
+   *  `full`: two others are picked, so this one cannot be until one is not. */
+  comparePick?: { full: boolean };
   /** Vertical gallery: fill the grid column (square) instead of the fixed 96px. */
   vertical?: boolean;
   /** Report whether this tile still has no pixels, for the gallery's one `aria-busy`. */
@@ -43,7 +47,7 @@ export interface ThumbProps {
   loading?: boolean;
 }
 
-export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical, onPendingChange, loading = false }: ThumbProps) {
+export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, comparePick, vertical, onPendingChange, loading = false }: ThumbProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const hasLook = useLookStore((st) => st.copied !== null);
   // A thumbnail is either a placeholder or the photo — never a gray photo.
@@ -54,8 +58,14 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
   const view = useGalleryTile(thumb);
   // Batch: the checkbox means "exception — treat this one differently". Same
   // checkbox, same selection; only its name and badge change.
-  const batchMode = useToolStore((s) => s.activeTool === "emoji");
-  const checkTitle = batchMode
+  const batchMode = useToolStore((s) => s.activeTool === "emoji") && !comparePick;
+  const checkTitle = comparePick
+    ? selected
+      ? "Unpick"
+      : comparePick.full
+        ? "Two photos are picked — untick one first"
+        : "Pick to compare"
+    : batchMode
     ? selected
       ? "Back to Main"
       : "Exception — treat this photo differently"
@@ -309,8 +319,12 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         // A toggle: a stable name, with aria-pressed saying which way it is.
         // The only name used to be this flipping title.
-        aria-label={batchMode ? "Exception" : "Select image"}
+        aria-label={comparePick ? "Compare" : batchMode ? "Exception" : "Select image"}
         aria-pressed={selected}
+        // Compare mode with two picked: the rest can't be picked until one is
+        // unticked. aria-disabled (not disabled) keeps it focusable, and its
+        // title says why.
+        aria-disabled={comparePick?.full ? true : undefined}
         title={checkTitle}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
            `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
@@ -347,7 +361,14 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
           selected
             ? "bg-theme-primary-foreground border-theme-primary text-on-photo opacity-100"
             : "bg-black/55 border-on-photo/80 text-on-photo/45"
-        } ${selectionActive || batchMode ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100"}`}
+        } ${
+          // Compare mode with two picked: the rest are dimmed, not hidden.
+          comparePick?.full && !selected
+            ? "opacity-40"
+            : selectionActive || batchMode
+              ? "opacity-100"
+              : "opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100"
+        }`}
       >
         <Check className="h-3 w-3" />
       </button>

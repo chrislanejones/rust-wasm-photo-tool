@@ -15,13 +15,13 @@ import {
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
 import { useScreenshotCompare, type ScreenshotCompare } from "@/app/session/useScreenshotCompare";
+import { usePendingComparePick } from "./comparePick";
 import { useScreenshotCompareStore, type CompareView } from "@/stores/useScreenshotCompareStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { comparePhotoRect, type ScreenRect } from "@/lib/comparePhotoRect";
 import { changesCount, paintMask, regionLabel, type DiffRegion, type ScreenshotDiff } from "@/lib/screenshotDiff";
 import { CompareSlider } from "./CompareSlider";
-import { ComparePicker } from "./ComparePicker";
 import { useCanvasBox } from "./useCanvasBox";
 import { useOpenCanvasArea } from "./useOpenCanvasArea";
 import type { ScreenBox } from "./panelYield";
@@ -198,6 +198,8 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
   // change can all move B's pixels.
   const revision = undoCount + useGalleryStore((s) => s.layerRevision);
   const cmp = useScreenshotCompare({ toolRef, flushToCanvas, syncState, revision });
+  // Compare mode's pair, when neither was open: start once B is.
+  usePendingComparePick();
   const view = useScreenshotCompareStore((s) => s.view);
   const setView = useScreenshotCompareStore((s) => s.setView);
   const sensitivity = useScreenshotCompareStore((s) => s.sensitivity);
@@ -244,7 +246,7 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
     if (!cmp.active) setListOpen(false);
   }, [cmp.active]);
 
-  if (!cmp.active) return <ComparePicker />;
+  if (!cmp.active) return null;
 
   const anchor = barAnchor(canvasEl, box, area);
   const { diff, bounds } = cmp;
@@ -262,7 +264,6 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
 
   return (
     <>
-      <ComparePicker />
       {view === "overlay" && overlapRect && diff && bounds && (
         <TintLayer rect={overlapRect} diff={diff} origin={[bounds[0], bounds[1]]} focused={focused} />
       )}
