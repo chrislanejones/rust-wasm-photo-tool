@@ -1,39 +1,70 @@
-// "Compare with another photo…" (11-07-2026): picking photo A in Batch rather
-// than in a dialog. The top bar's button opens Batch, every tile there picks
-// instead of opening, and the pick goes back to the tool you were on, where
-// the Compare bar takes over. Esc, or leaving Batch, cancels. The gallery's
-// right-click "Compare with this" still starts a compare directly.
+// Compare mode (11-07-2026 — it was a dialog). The top bar's "Compare with
+// another photo…" is a toggle: on, the gallery opens (if it was closed) and
+// lights up with the drop ring, every photo shows its checkbox, and ticking
+// two compares them. Off — the button again, or Done / Esc on the Compare bar —
+// ends it. The gallery's right-click "Compare with this" still starts a
+// compare directly.
 //
-// Imperative (getState), like activateGroup, so the top bar and Batch's grid
+// B is always the open photo (useScreenshotCompare), so the pair decides it:
+// if one of the two is open it is B and the other is A; if neither is, the
+// second one ticked is opened as B and compared with the first once its
+// pixels are in the engine.
+//
+// Imperative (getState), like activateGroup, so the top bar and the gallery
 // share one path without a prop through AppShell.
+import { useEffect } from "react";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
-import { useToolStore } from "@/stores/useToolStore";
-import { groupById } from "@/features/tools/toolGroups";
-import { activateGroup } from "@/features/tools/activateSubTool";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 
-/** Open Batch to pick photo A. Already in Batch: stay there after the pick. */
-export function beginComparePick(): void {
-  const tools = useToolStore.getState();
-  const inBatch = tools.activeTool === "emoji";
-  useScreenshotCompareStore
-    .getState()
-    .beginPick(inBatch ? null : { tool: tools.activeTool, subTool: tools.activeSubTool });
-  if (!inBatch) {
-    const batch = groupById("batch");
-    if (batch) activateGroup(batch);
+/** How many photos compare mode picks. Two, for now. */
+export const COMPARE_PICKS = 2;
+
+/** The top bar's button: compare mode on (and the gallery open), or off. */
+export function toggleCompareMode(): void {
+  const cmp = useScreenshotCompareStore.getState();
+  if (cmp.picking || cmp.otherId !== null) {
+    cmp.stop();
+    return;
+  }
+  cmp.beginPick();
+  useUIStore.getState().setShowGallery(true);
+}
+
+/** A gallery checkbox in compare mode. Unticking ends any comparison; a
+ *  third tick is refused until one is unticked. `openPhoto` is the gallery's
+ *  own photo switch. */
+export function toggleComparePick(id: string, openPhoto: (id: string) => void): void {
+  const cmp = useScreenshotCompareStore.getState();
+  if (cmp.picks.includes(id)) {
+    cmp.setPicks(cmp.picks.filter((p) => p !== id));
+    return;
+  }
+  if (cmp.picks.length >= COMPARE_PICKS) return;
+  const picks = [...cmp.picks, id];
+  cmp.setPicks(picks);
+  if (picks.length < COMPARE_PICKS) return;
+
+  const [first, second] = picks as [string, string];
+  const open = useGalleryStore.getState().activePhotoId;
+  if (open === first) cmp.start(second);
+  else if (open === second) cmp.start(first);
+  else {
+    cmp.setPending({ a: first, b: second });
+    openPhoto(second);
   }
 }
 
-/** End the pick: compare with `otherId`, or cancel with null. Either way,
- *  back to the tool the pick began on. */
-export function finishComparePick(otherId: string | null): void {
-  const cmp = useScreenshotCompareStore.getState();
-  const back = cmp.pickReturn;
-  if (otherId) cmp.start(otherId);
-  else cmp.cancelPick();
-  if (back) {
-    const tools = useToolStore.getState();
-    tools.setActiveTool(back.tool);
-    tools.setActiveSubTool(back.subTool);
-  }
+/** Starts a pending pair once B is open and its pixels are in the engine.
+ *  Mounted by CompareBar, which is always on the canvas. */
+export function usePendingComparePick(): void {
+  const pending = useScreenshotCompareStore((s) => s.pending);
+  const activeId = useGalleryStore((s) => s.activePhotoId);
+  const switching = usePhotoSwitching();
+  useEffect(() => {
+    if (pending && activeId === pending.b && !switching) {
+      useScreenshotCompareStore.getState().start(pending.a);
+    }
+  }, [pending, activeId, switching]);
 }

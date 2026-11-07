@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
-import { beginComparePick } from "@/features/canvas/comparePick";
+import { toggleCompareMode } from "@/features/canvas/comparePick";
 import { IconButton } from "@/components/ui/icon-button";
 import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
@@ -121,7 +121,8 @@ export function TopBar({
   imageMeta,
 }: TopBarProps) {
   const photoCount = useGalleryStore((s) => s.photos.length);
-  const comparingOther = useScreenshotCompareStore((s) => s.otherId !== null);
+  // On while compare mode is picking in the gallery or two photos are compared.
+  const comparingOther = useScreenshotCompareStore((s) => s.picking || s.otherId !== null);
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below
@@ -329,16 +330,18 @@ export function TopBar({
                     another one. A button of its own rather than a Compare ▾
                     menu: the repo has no dropdown primitive, and the A/B
                     toggle's Alt + C and pressed state stay as they were.
-                    It opens Batch to pick the other photo (11-07-2026 — it
-                    was a dialog; features/canvas/comparePick). */}
+                    A toggle since 11-07-2026 (it was a dialog): on, the
+                    gallery opens and two ticks pick the pair; off ends it
+                    (features/canvas/comparePick). */}
                 <IconButton
                   icon={GitCompareArrows}
-                  label="Compare with another photo…"
-                  onClick={beginComparePick}
+                  label="Compare two photos"
+                  onClick={toggleCompareMode}
                   active={comparingOther}
+                  aria-pressed={comparingOther}
                   disabled={photoCount < 2}
                   standalone={compact}
-                  tooltip={{ label: "Compare with another photo…" }}
+                  tooltip={{ label: comparingOther ? "Stop comparing" : "Compare two photos" }}
                 />
                 <IconButton
                   icon={ArrowDownFromLine}

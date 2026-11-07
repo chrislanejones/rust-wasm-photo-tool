@@ -16,7 +16,7 @@ const FIXTURES = [
   join(__dirname, "fixtures", "checker.png"),
 ];
 
-async function openBatch(page: Page, enter = true): Promise<void> {
+async function openBatch(page: Page): Promise<void> {
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
     return ["localhost", "127.0.0.1"].includes(url.hostname) || ["blob:", "data:"].includes(url.protocol)
@@ -36,7 +36,6 @@ async function openBatch(page: Page, enter = true): Promise<void> {
   await expect
     .poll(() => page.locator("canvas.main-canvas").evaluate((c: HTMLCanvasElement) => c.width), { timeout: 30_000 })
     .toBe(1200);
-  if (!enter) return;
   await page.getByRole("button", { name: "Batch", exact: true }).first().click();
   await expect(page.getByTestId("batch-grid-bar")).toBeVisible();
 }
@@ -100,22 +99,4 @@ test("Alt + = / −: the Grid zooms the open photo, Masonry sizes every photo", 
   await expect.poll(() => style(page, "column-count")).toBe("5");
   await page.keyboard.press("Alt+Digit0");
   await expect.poll(() => style(page, "column-count")).toBe("4");
-});
-
-test("Compare with another photo… picks in Batch, Esc cancels and goes back", async ({ page }) => {
-  await openBatch(page, false);
-  await expect(page.locator(".canvas-grid-host")).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Compare with another photo…" }).click();
-  const bar = page.getByTestId("batch-grid-bar");
-  await expect(bar).toContainText("Pick the photo to compare with");
-  // No dialog any more.
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(bar).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Compare with another photo…" }).click();
-  await page.getByRole("button", { name: "Compare with checker" }).click();
-  await expect(page.getByTestId("compare-bar")).toBeVisible();
-  await expect(bar).toHaveCount(0);
 });

@@ -10,11 +10,9 @@
 //             scrapbook; the hero is one tile like the others, only marked
 //             Selected. Scrolls instead of paging. Zoom sizes every photo
 //             (the column count).
-//
-// While "Compare with another photo…" is picking (comparePick.ts), a tile
-// click picks that photo as A instead of opening it, and the bar says so.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ImageOff, LayoutDashboard, LayoutPanelLeft, X } from "lucide-react";
+
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ImageOff, LayoutDashboard, LayoutPanelLeft } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import { BatchCropThumbShade } from "@/features/gallery/BatchCropThumbShade";
 import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
@@ -25,10 +23,7 @@ import {
 } from "@/components/ui/canvas-action-bar";
 import { DecodedImage } from "@/components/ui/decoded-image";
 import { useGalleryStore } from "@/stores/useGalleryStore";
-import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
-import { useToolStore } from "@/stores/useToolStore";
 import { useBatchViewStore, type BatchLayout } from "@/stores/useBatchViewStore";
-import { finishComparePick } from "./comparePick";
 import { masonryTileStyle } from "./batchLayout";
 
 interface Props {
@@ -71,7 +66,6 @@ export function GridThumbnails({
   const layout = useBatchViewStore((s) => s.layout);
   const setLayout = useBatchViewStore((s) => s.setLayout);
   const masonry = layout === "masonry";
-  const picking = useScreenshotCompareStore((s) => s.picking);
 
   // Grid: 12 cells, the hero and 11 tiles; a bigger gallery is paged, 11
   // tiles at a time, with « » in the bar. Masonry shows every photo and
@@ -87,23 +81,6 @@ export function GridThumbnails({
   const current = Math.min(page, pages - 1);
   const others = rest.slice(current * perPage, (current + 1) * perPage);
 
-  // Picking: Esc cancels, and leaving Batch ends the pick without moving
-  // tools — whatever left Batch chose where to go. Checked against the tool,
-  // not on unmount alone: StrictMode's dev remount is not leaving Batch.
-  useEffect(() => {
-    if (!picking) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      finishComparePick(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [picking]);
-  useEffect(() => () => {
-    const cmp = useScreenshotCompareStore.getState();
-    if (cmp.picking && useToolStore.getState().activeTool !== "emoji") cmp.cancelPick();
-  }, []);
 
   // The bar hangs under the photos. Their box is AppShell's; we find it from a
   // marker of our own rather than adding a ref there (a marker, not the first
@@ -132,22 +109,20 @@ export function GridThumbnails({
     };
   }, [masonry]);
 
-  const tileClass = `relative overflow-hidden rounded-md border border-border bg-background hover:ring-2 ${
-    picking ? "cursor-copy hover:ring-sky-400" : "hover:ring-orange-400"
-  }`;
+  const tileClass = "relative overflow-hidden rounded-md border border-border bg-background hover:ring-2 hover:ring-orange-400";
 
   const tile = (p: PhotoEntry, style: React.CSSProperties) => (
     <div key={p.id} style={style} className={tileClass}>
       <button
         type="button"
-        onClick={() => (picking ? finishComparePick(p.id) : onSelectPhoto(p))}
+        onClick={() => onSelectPhoto(p)}
         className="flex h-full w-full items-center justify-center"
-        aria-label={picking ? `Compare with ${p.name}` : p.name}
+        aria-label={p.name}
       >
         <DecodedImage source={p.thumbBlob} alt={p.name} className="size-full object-contain" fallback={<span role="img" aria-label={`${p.name} could not be displayed. Select the photo to open it.`}><ImageOff aria-hidden className="size-4 text-text-muted" /></span>} />
       </button>
       <BatchCropThumbShade entry={p} isActive={false} cover={false} />
-      {!picking && <BatchExceptionCheckbox photoId={p.id} name={p.name} />}
+      <BatchExceptionCheckbox photoId={p.id} name={p.name} />
     </div>
   );
 
@@ -189,12 +164,10 @@ export function GridThumbnails({
             </CanvasActionBarButton>
           )}
           <CanvasActionBarText>
-            {picking
-              ? "Pick the photo to compare with"
-              : pages > 1
-                ? `Page ${current + 1} of ${pages} · ${photos.length} photos`
-                : `${photos.length} photo${photos.length === 1 ? "" : "s"}`}
-            {!picking && exceptionCount > 0 ? ` · ${exceptionCount} exception${exceptionCount === 1 ? "" : "s"}` : ""}
+            {pages > 1
+              ? `Page ${current + 1} of ${pages} · ${photos.length} photos`
+              : `${photos.length} photo${photos.length === 1 ? "" : "s"}`}
+            {exceptionCount > 0 ? ` · ${exceptionCount} exception${exceptionCount === 1 ? "" : "s"}` : ""}
           </CanvasActionBarText>
           {!masonry && (
             <CanvasActionBarButton
@@ -203,11 +176,6 @@ export function GridThumbnails({
               title="Next photos"
             >
               <ChevronRight aria-hidden className="size-4" />
-            </CanvasActionBarButton>
-          )}
-          {picking && (
-            <CanvasActionBarButton onClick={() => finishComparePick(null)} title="Cancel compare">
-              <X aria-hidden className="size-4" />
             </CanvasActionBarButton>
           )}
         </CanvasActionBar>

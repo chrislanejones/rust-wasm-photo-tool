@@ -16,6 +16,8 @@ import { useGalleryLoading } from "./useGalleryLoading";
 import { useActivityWhile } from "@/lib/activity";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
+import { COMPARE_PICKS, toggleComparePick } from "@/features/canvas/comparePick";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -348,6 +350,15 @@ export function GalleryBar({
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const selectionActive = selectedIds.size > 0;
+  // Compare mode (features/canvas/comparePick): the gallery lights up with the
+  // drop ring, every checkbox shows, and they pick the two photos to compare —
+  // their own list, so Batch's Exceptions (the selection) are left alone.
+  const comparing = useScreenshotCompareStore((s) => s.picking);
+  const comparePicks = useScreenshotCompareStore((s) => s.picks);
+  const openById = (id: string) => {
+    const entry = photos.find((p) => p.id === id);
+    if (entry) onSelect(entry);
+  };
   // Shift+click range anchor: the index of the last checkbox the user
   // toggled without shift. Shift+clicking another checkbox selects the whole
   // run between the two (inclusive), like every file manager. Plain clicks
@@ -450,7 +461,7 @@ export function GalleryBar({
               }
         }
         transition={reduceMotion ? instantTransition : springStandard}
-        style={vertical ? undefined : { position: "relative" }}
+        style={{ position: "relative" }}
         // While it can be closed, a pasted image dragged into it closes it.
         data-paste-yields={closable ? "gallery" : undefined}
         className={
@@ -463,6 +474,30 @@ export function GalleryBar({
             toggle brings it back. The docked (vertical) form is closed from the
             master bar's tabs instead. */}
         {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
+        {/* Compare mode: the image-drop ring (styles.css, the same one a file
+            dragged over the app gets) round the gallery, and a pill in the
+            Batch grid's Selected-badge shape, in the brand token, saying
+            what to do. */}
+        {comparing && (
+          <>
+            <div
+              aria-hidden
+              className="image-drop-ring pointer-events-none z-10 motion-reduce:animate-none"
+              style={vertical ? { borderRadius: "inherit" } : { inset: -4, borderRadius: 16 }}
+            />
+            <div
+              role="status"
+              data-testid="compare-pick-hint"
+              className={`absolute left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-theme-primary px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-theme-primary-foreground shadow-md pointer-events-none ${
+                vertical ? "top-1" : "-top-3"
+              }`}
+            >
+              {comparePicks.length < COMPARE_PICKS
+                ? `Pick ${COMPARE_PICKS} photos to compare · ${comparePicks.length} of ${COMPARE_PICKS}`
+                : "Comparing 2 photos"}
+            </div>
+          </>
+        )}
         <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "@container p-4"}>
           <div
             inert={chromeInert}
@@ -652,9 +687,18 @@ export function GalleryBar({
                   progress={compressionProgress?.[entry.id]}
                   savings={compressionSavings?.[entry.id]}
                   isModified={modifiedPhotos?.has(entry.id)}
-                  selected={selectedIds.has(entry.id)}
-                  selectionActive={selectionActive}
+                  selected={comparing ? comparePicks.includes(entry.id) : selectedIds.has(entry.id)}
+                  selectionActive={selectionActive || comparing}
+                  comparePick={
+                    comparing
+                      ? { full: comparePicks.length >= COMPARE_PICKS && !comparePicks.includes(entry.id) }
+                      : undefined
+                  }
                   onToggleSelect={(shiftKey) => {
+                    if (comparing) {
+                      toggleComparePick(entry.id, openById);
+                      return;
+                    }
                     if (
                       shiftKey &&
                       onSelectRange &&

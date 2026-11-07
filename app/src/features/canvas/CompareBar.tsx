@@ -15,6 +15,7 @@ import {
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
 import { useScreenshotCompare, type ScreenshotCompare } from "@/app/session/useScreenshotCompare";
+import { usePendingComparePick } from "./comparePick";
 import { useScreenshotCompareStore, type CompareView } from "@/stores/useScreenshotCompareStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -197,6 +198,8 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
   // change can all move B's pixels.
   const revision = undoCount + useGalleryStore((s) => s.layerRevision);
   const cmp = useScreenshotCompare({ toolRef, flushToCanvas, syncState, revision });
+  // Compare mode's pair, when neither was open: start once B is.
+  usePendingComparePick();
   const view = useScreenshotCompareStore((s) => s.view);
   const setView = useScreenshotCompareStore((s) => s.setView);
   const sensitivity = useScreenshotCompareStore((s) => s.sensitivity);
