@@ -11,6 +11,7 @@
 // CLIENT side. The fake answers like the real worker and lets a test control
 // timing precisely, which a real worker cannot.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { CALL_TIMEOUT_MS } from "@/lib/engine/callDeadline";
 import { EngineWorkerClient } from "@/lib/engine/workerClient";
 
 interface Sent { kind: string; id?: number; method?: string; args?: unknown[] }
@@ -62,6 +63,15 @@ async function started() {
 }
 
 describe("request ids", () => {
+  it("stamps every call with the moment its caller stops waiting", async () => {
+    const { c, w } = await started();
+    const before = Date.now();
+    void c.call("width");
+    const sent = w.sent.at(-1) as { deadline?: number };
+    expect(sent.deadline).toBeGreaterThanOrEqual(before + CALL_TIMEOUT_MS);
+    expect(sent.deadline).toBeLessThanOrEqual(Date.now() + CALL_TIMEOUT_MS);
+  });
+
   it("gives every call a distinct id", async () => {
     const { c, w } = await started();
     void c.call("width"); void c.call("height"); void c.call("layer_count");

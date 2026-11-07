@@ -32,6 +32,7 @@ import { staleCanvasReason, NO_CANVAS } from "@/lib/engine/canvasGeneration";
 import { engineSurfaceOf } from "@/lib/engine/engineSurface";
 import { isCaptureStruct, marshalCapture } from "@/lib/engine/captureMarshal";
 import { createBlitCoalescer } from "@/lib/engine/blitCoalescer";
+import { CALL_EXPIRED_ERROR, callExpired } from "@/lib/engine/callDeadline";
 
 export interface EngineRequest {
   /** Monotonic per-port. Echoed back so a reply cannot be mismatched. */
@@ -41,6 +42,9 @@ export interface EngineRequest {
   args: unknown[];
   /** Transferables the caller handed over; already detached on this side. */
   transfer?: Transferable[];
+  /** `Date.now()` past which the caller has stopped waiting. See
+   *  `lib/engine/callDeadline.ts`. */
+  deadline?: number;
   /** ADR-024 a11.2 — which canvas element this call is aimed at.
    *
    *  OMITTED for the overwhelming majority of calls, which do not touch the
@@ -113,6 +117,11 @@ async function drain() {
       const req = queue.shift()!;
       if (cancelled.delete(req.id)) {
         reply({ id: req.id, ok: false, error: "canceled" });
+        continue;
+      }
+      // Its "cancel" may still be behind it in the port: see lib/engine/callDeadline.
+      if (callExpired(req.deadline, Date.now())) {
+        reply({ id: req.id, ok: false, error: CALL_EXPIRED_ERROR });
         continue;
       }
       if (!tool) {
