@@ -90,9 +90,13 @@ async function reloadAndResume(page: Page, width: number) {
 
 test("An identical pair: No changes, and Mark changes is off", async ({ page }) => {
   await open(page, "a.png", "a-copy.png", 960);
-  // The top bar's way in, this time: Compare with another photo… → pick A.
+  // The top bar's way in, this time: Compare with another photo… opens Batch,
+  // where a tile picks A (no dialog since 11-07-2026), and the pick goes back
+  // to the tool it began on.
   await page.getByRole("button", { name: "Compare with another photo…" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /a-copy/ }).click();
+  await expect(page.getByTestId("batch-grid-bar")).toContainText("Pick the photo to compare with");
+  await page.getByRole("button", { name: /Compare with a-copy/ }).click();
+  await expect(page.getByTestId("batch-grid-bar")).toHaveCount(0);
   await expect(bar(page)).toContainText("No changes");
   await expect(bar(page).getByRole("button", { name: "Mark changes" })).toBeDisabled();
 });

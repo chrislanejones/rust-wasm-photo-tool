@@ -169,8 +169,8 @@ shifted pair is now the layer reorder above.
 | `Space` (hold)         | Pan mode (grab to drag the canvas) |
 | `H`                    | Pan mode: hold for as long as it's down, or tap to leave it on until the next tap or `Esc` |
 | `Alt + Scroll`         | Zoom in / out |
-| `Alt + =` / `Alt + -`  | Zoom in / out |
-| `Alt + 0`              | Reset zoom (100%) and pan: the photo back where it started |
+| `Alt + =` / `Alt + -`  | Zoom in / out. In Batch's Masonry view, every photo bigger / smaller (fewer or more columns); the top bar's zoom buttons do the same there. Batch's Grid zooms the open photo as usual |
+| `Alt + 0`              | Reset zoom (100%) and pan: the photo back where it started. In Batch's Masonry view, the default photo size |
 | `PgUp` / `PgDn`        | Previous / next photo |
 | `Alt + ←` / `Alt + →`  | Previous / next tool you used — the browser's own Back and Forward (`Cmd + [` / `Cmd + ]` on a Mac). Picking a tool writes the address, so Back walks your tool history |
 

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
+import { beginComparePick } from "@/features/canvas/comparePick";
 import { IconButton } from "@/components/ui/icon-button";
 import { CompareIcon } from "@/components/icons/CompareIcon";
 import { UserMenu } from "@/components/UserMenu";
@@ -121,7 +122,6 @@ export function TopBar({
 }: TopBarProps) {
   const photoCount = useGalleryStore((s) => s.photos.length);
   const comparingOther = useScreenshotCompareStore((s) => s.otherId !== null);
-  const setComparePicker = useScreenshotCompareStore((s) => s.setPickerOpen);
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
   // (toolbar + history) are open and eating the horizontal room. Below
@@ -328,11 +328,13 @@ export function TopBar({
                 {/* Screenshot compare (Night 10-23): the open photo against
                     another one. A button of its own rather than a Compare ▾
                     menu: the repo has no dropdown primitive, and the A/B
-                    toggle's Alt + C and pressed state stay as they were. */}
+                    toggle's Alt + C and pressed state stay as they were.
+                    It opens Batch to pick the other photo (11-07-2026 — it
+                    was a dialog; features/canvas/comparePick). */}
                 <IconButton
                   icon={GitCompareArrows}
                   label="Compare with another photo…"
-                  onClick={() => setComparePicker(true)}
+                  onClick={beginComparePick}
                   active={comparingOther}
                   disabled={photoCount < 2}
                   standalone={compact}

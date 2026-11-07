@@ -226,8 +226,10 @@ export default tseslint.config(
     // copies of the gallery cap message became one in tierPending.ts.
     // 3151 -> 3128 (text stroke): the two copies of the canvas's text-settings
     // object became one `textOverlaySettings(toolSettings)` (lib/textOverlaySettings.ts).
+    // 3128 -> 3112 (Batch Masonry, 11-07-2026): the Batch grid's container
+    // and hero styles moved to features/canvas/batchLayout.ts.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3128 }] },
+    rules: { "max-lines": ["error", { max: 3112 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

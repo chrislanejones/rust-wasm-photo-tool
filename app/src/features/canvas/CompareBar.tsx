@@ -21,7 +21,6 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { comparePhotoRect, type ScreenRect } from "@/lib/comparePhotoRect";
 import { changesCount, paintMask, regionLabel, type DiffRegion, type ScreenshotDiff } from "@/lib/screenshotDiff";
 import { CompareSlider } from "./CompareSlider";
-import { ComparePicker } from "./ComparePicker";
 import { useCanvasBox } from "./useCanvasBox";
 import { useOpenCanvasArea } from "./useOpenCanvasArea";
 import type { ScreenBox } from "./panelYield";
@@ -244,7 +243,7 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
     if (!cmp.active) setListOpen(false);
   }, [cmp.active]);
 
-  if (!cmp.active) return <ComparePicker />;
+  if (!cmp.active) return null;
 
   const anchor = barAnchor(canvasEl, box, area);
   const { diff, bounds } = cmp;
@@ -262,7 +261,6 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
 
   return (
     <>
-      <ComparePicker />
       {view === "overlay" && overlapRect && diff && bounds && (
         <TintLayer rect={overlapRect} diff={diff} origin={[bounds[0], bounds[1]]} focused={focused} />
       )}
