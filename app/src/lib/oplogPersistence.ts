@@ -364,6 +364,15 @@ function boundTo(tool: object, photoId: string): Binding | null {
   return bound.toolToken === toolToken(tool) ? bound : null;
 }
 
+/** Everything that moves when the log or the document changes, as one value. */
+async function readLogState(tool: OplogPersistWasm): Promise<string> {
+  const revision = await readRevision(tool);
+  const len = await tool.oplog_op_count();
+  const gen = await tool.oplog_generation();
+  const cursor = await tool.oplog_cursor();
+  return `${revision}:${len}:${gen}:${cursor}`;
+}
+
 async function readRevision(tool: OplogPersistWasm): Promise<number | null> {
   return typeof tool.oplog_edit_revision === "function" ? await tool.oplog_edit_revision() : null;
 }
@@ -563,6 +572,9 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // Everything below reads the engine, so it has to be this photo's document.
     // A log check on another photo's document could retire this photo's log.
     if (!engineHolds(photoId)) return;
+    // The reads below are separate round trips to the engine, so an edit can land
+    // between any two. Compared again before the commit: see the capture check.
+    const stateAtStart = await readLogState(tool);
     // Re-checked at fire time, not just when the save was scheduled: a save
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
@@ -691,6 +703,14 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // already correct, and the working-copy archive carries the resume.
     // The encode span above is awaited, and only deferred saves are queued.
     if (raced() || !engineHolds(photoId)) return;
+
+    // ── THE CAPTURE CHECK ─────────────────────────────────────────────────
+    // Counters, frames and keyframes are only one log if nothing moved across
+    // all of those reads. An undo and a new edit in the middle would write the
+    // new branch's frames onto the old branch's chunks, and a clean coverage
+    // answer would describe a document that has since changed. Nothing is lost by
+    // stopping: the edit that moved them flushes, and that flush saves again.
+    if ((await readLogState(tool)) !== stateAtStart) return;
 
     // ── ONE transaction: chunks + keyframes + manifest ────────────────────
     await db.transaction("rw", db.opLogs, db.keyframes, db.oplogManifests, async () => {
