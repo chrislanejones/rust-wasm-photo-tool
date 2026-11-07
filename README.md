@@ -90,15 +90,14 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.55 — 2026-11-05
+### v9.56 — 2026-11-06
 
-**A refresh can't quietly undo a redaction anymore.**
+**Fill and Background stay out of the way until you need them.**
 
-Some edits, like a solid redaction, aren't saved as steps in the edit history.
-In the right order after other edits, one could slip past the check for that,
-and a refresh brought the photo back without it. Now the engine compares the
-saved history to the photo you actually have. If they don't match, it drops the
-history and restores from your working copy, which has the redaction.
+Fill on the Shapes and Arrows & Diagram Shapes panels, and Background on the Pen,
+are now closed dropdowns, the same as Placement. Each one shows what's on while
+it's shut, so a fill that's on is never hidden. Open it to pick None, Solid,
+Gradient or Pixelate.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -12007,3 +12007,20 @@ specs on the production build; all 20 CI checks clean (18 pass, 2 skipped). Not 
 saved before this fix can't be checked at restore, so one already missing an edit stays that way
 until a later unrecorded edit retires it. Not run: `cargo bench`, and `imagehorse-qc`, which this
 engine change calls for.
+
+## v9.56 Change Summary — 2026-11-06
+
+**Fill and Background stay out of the way until you need them.**
+
+| Area | Change |
+| --- | --- |
+| Shapes and Arrows & Diagram Shapes panels (#445) | Fill is a closed `CollapsibleSection`, like Placement. The shut header shows the active mode: None, Solid, Gradient or Pixelate. |
+| Pen panel (#445) | Background is a closed `CollapsibleSection` that shows None or Solid. The color swatches still appear only when a fill is on. |
+| Tests (#445) | New `ShapeSettings.fill.test.tsx`; `e2e/diagram-shapes.spec.ts` opens Fill before picking Solid. |
+
+No engine change.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production
+builds run after the trail data regen. The PR merged with E2E shard 1 still rerunning: its first
+run failed one test outside this change, `callout-leader` at line 134, which also failed on
+earlier CI runs. Not looked at in a browser: the panels themselves.

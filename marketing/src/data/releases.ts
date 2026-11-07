@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.56",
+    date: "2026-11-06",
+    headline: "Fill and Background stay out of the way until you need them.",
+    entries: [
+      { tag: "ui", text: "Fill on the shape panels and Background on the Pen are closed dropdowns now, like Placement. The shut header says what's on, so a fill that's on is never hidden." },
+    ],
+  },
+  {
     version: "v9.55",
     date: "2026-11-05",
     headline: "A refresh can't quietly undo a redaction anymore.",
