@@ -5,6 +5,13 @@
 // leaves it.
 import { create } from "zustand";
 import { DEFAULT_SENSITIVITY } from "@/lib/screenshotDiff";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+/** See `pending`. */
+export interface PendingPair {
+  a: string;
+  b: string;
+  from: string | null;
+}
 export type CompareView = "overlay" | "side" | "blink" | "slider";
 
 interface ScreenshotCompareState {
@@ -20,8 +27,9 @@ interface ScreenshotCompareState {
    *  not the gallery's selection: that one is Batch's Exceptions. */
   picks: string[];
   /** Two are picked and neither is open: the second is being opened, and A is
-   *  compared with it once it is (comparePick.ts). */
-  pending: { a: string; b: string } | null;
+   *  compared with it once it is (comparePick.ts). `from` is the photo that
+   *  was open when B was asked for, so opening anything else drops the pair. */
+  pending: PendingPair | null;
   view: CompareView;
   /** 0..100; see `toleranceFor`. */
   sensitivity: number;
@@ -33,7 +41,7 @@ interface ScreenshotCompareState {
   beginPick: () => void;
   /** Replace the picks; any comparison in progress ends (one was unticked). */
   setPicks: (picks: string[]) => void;
-  setPending: (pending: { a: string; b: string } | null) => void;
+  setPending: (pending: PendingPair | null) => void;
   setView: (view: CompareView) => void;
   setSensitivity: (s: number) => void;
   setFocused: (i: number | null) => void;
@@ -47,7 +55,18 @@ export const useScreenshotCompareStore = create<ScreenshotCompareState>((set) =>
   view: "overlay",
   sensitivity: DEFAULT_SENSITIVITY,
   focused: null,
-  start: (otherId) => set({ otherId, pending: null, view: "overlay", focused: null }),
+  // In compare mode the gallery's ticks are the pair: A and the open photo
+  // (B). Starting from the right-click menu replaces any stale pick, so the
+  // hint doesn't say "1 of 2" mid-compare and unticking an unrelated photo
+  // can't end it.
+  start: (otherId) =>
+    set((s) => {
+      const open = useGalleryStore.getState().activePhotoId;
+      const picks = s.picking
+        ? [otherId, ...(open !== null && open !== otherId ? [open] : [])]
+        : s.picks;
+      return { otherId, picks, pending: null, view: "overlay", focused: null };
+    }),
   stop: () => set({ otherId: null, focused: null, picking: false, picks: [], pending: null }),
   beginPick: () => set({ otherId: null, focused: null, picking: true, picks: [], pending: null }),
   setPicks: (picks) => set({ picks, otherId: null, focused: null, pending: null }),

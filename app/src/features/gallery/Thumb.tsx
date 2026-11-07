@@ -321,6 +321,10 @@ export function Thumb({ entry, index, isActive, onSelect, onRemove, progress, sa
         // The only name used to be this flipping title.
         aria-label={comparePick ? "Compare" : batchMode ? "Exception" : "Select image"}
         aria-pressed={selected}
+        // Compare mode with two picked: the rest can't be picked until one is
+        // unticked. aria-disabled (not disabled) keeps it focusable, and its
+        // title says why.
+        aria-disabled={comparePick?.full ? true : undefined}
         title={checkTitle}
         /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
            `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,

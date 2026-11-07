@@ -349,12 +349,19 @@ export function GalleryBar({
   vertical = false,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
-  const selectionActive = selectedIds.size > 0;
   // Compare mode (features/canvas/comparePick): the gallery lights up with the
   // drop ring, every checkbox shows, and they pick the two photos to compare —
   // their own list, so Batch's Exceptions (the selection) are left alone.
   const comparing = useScreenshotCompareStore((s) => s.picking);
   const comparePicks = useScreenshotCompareStore((s) => s.picks);
+  const comparingNow = useScreenshotCompareStore((s) => s.otherId !== null);
+  const comparePending = useScreenshotCompareStore((s) => s.pending !== null);
+  // The selection's ticks are hidden in compare mode, so its actions go too:
+  // Compress / Delete / Export Selected would act on photos you can't see
+  // picked. The selection itself is kept and comes back when compare ends.
+  const selectionActive = !comparing && selectedIds.size > 0;
+  const selectedCount = comparing ? 0 : selectedIds.size;
+  const selectionAction = <T,>(fn: T): T | undefined => (comparing ? undefined : fn);
   const openById = (id: string) => {
     const entry = photos.find((p) => p.id === id);
     if (entry) onSelect(entry);
@@ -494,7 +501,11 @@ export function GalleryBar({
             >
               {comparePicks.length < COMPARE_PICKS
                 ? `Pick ${COMPARE_PICKS} photos to compare · ${comparePicks.length} of ${COMPARE_PICKS}`
-                : "Comparing 2 photos"}
+                : comparingNow
+                  ? "Comparing 2 photos"
+                  : comparePending
+                    ? "Opening the second photo…"
+                    : `Pick ${COMPARE_PICKS} photos to compare`}
             </div>
           </>
         )}
@@ -533,7 +544,7 @@ export function GalleryBar({
               <div className="justify-self-start">
                 <GalleryCount
                   selectionActive={selectionActive}
-                  selectedCount={selectedIds.size}
+                  selectedCount={selectedCount}
                   total={photos.length}
                   maxPhotos={maxPhotos}
                 />
@@ -541,34 +552,34 @@ export function GalleryBar({
             )}
             {vertical ? (
               <GalleryActions
-                selectedCount={selectedIds.size}
+                selectedCount={selectedCount}
                 totalCount={photos.length}
                 vertical
-                onAutoCompress={onAutoCompress}
-                onClearSelection={onClearSelection}
+                onAutoCompress={selectionAction(onAutoCompress)}
+                onClearSelection={selectionAction(onClearSelection)}
                 onDeleteAll={onDeleteAll}
-                onDeleteSelected={onDeleteSelected}
-                onExportSelected={onExportSelected}
+                onDeleteSelected={selectionAction(onDeleteSelected)}
+                onExportSelected={selectionAction(onExportSelected)}
               />
             ) : (
               <>
                 <div className="justify-self-center @max-[56rem]:col-span-2 @max-[56rem]:row-start-2">
                   <GalleryActions
                     only="compress"
-                    selectedCount={selectedIds.size}
+                    selectedCount={selectedCount}
                     totalCount={photos.length}
-                    onAutoCompress={onAutoCompress}
+                    onAutoCompress={selectionAction(onAutoCompress)}
                   />
                 </div>
                 <div className="justify-self-end @max-[56rem]:col-start-2 @max-[56rem]:row-start-1">
                   <GalleryActions
                     only="actions"
-                    selectedCount={selectedIds.size}
+                    selectedCount={selectedCount}
                     totalCount={photos.length}
-                    onClearSelection={onClearSelection}
+                    onClearSelection={selectionAction(onClearSelection)}
                     onDeleteAll={onDeleteAll}
-                    onDeleteSelected={onDeleteSelected}
-                    onExportSelected={onExportSelected}
+                    onDeleteSelected={selectionAction(onDeleteSelected)}
+                    onExportSelected={selectionAction(onExportSelected)}
                   />
                 </div>
               </>
@@ -749,7 +760,7 @@ export function GalleryBar({
             <div inert={chromeInert} data-gallery-chrome="" className="mt-3 flex justify-center border-t border-border pt-3">
               <GalleryCount
                 selectionActive={selectionActive}
-                selectedCount={selectedIds.size}
+                selectedCount={selectedCount}
                 total={photos.length}
                 maxPhotos={maxPhotos}
               />

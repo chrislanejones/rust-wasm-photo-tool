@@ -130,8 +130,11 @@ test("Compare mode: opens a closed gallery, picks two at most, opens the second 
   await expect(tile(page, "a-copy.png")).toHaveAttribute("aria-pressed", "true");
   await expect(bar(page)).toContainText("No changes");
 
-  // Two is the limit: a third tick is refused.
-  await pickBox(page, "b.png").click();
+  // Two is the limit: the rest say they're unavailable (the picked two stay
+  // available to untick), and a third tick is refused.
+  await expect(pickBox(page, "b.png")).toHaveAttribute("aria-disabled", "true");
+  await expect(pickBox(page, "a.png")).not.toHaveAttribute("aria-disabled", "true");
+  await pickBox(page, "b.png").click({ force: true });
   await expect(pickBox(page, "b.png")).toHaveAttribute("aria-pressed", "false");
   await expect(hint(page)).toContainText("Comparing 2 photos");
 

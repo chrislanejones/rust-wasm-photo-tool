@@ -51,20 +51,31 @@ export function toggleComparePick(id: string, openPhoto: (id: string) => void): 
   if (open === first) cmp.start(second);
   else if (open === second) cmp.start(first);
   else {
-    cmp.setPending({ a: first, b: second });
+    cmp.setPending({ a: first, b: second, from: open });
     openPhoto(second);
   }
 }
 
 /** Starts a pending pair once B is open and its pixels are in the engine.
+ *  If B fails to open, or another photo is opened first, the pair is dropped
+ *  and B unticked, so the gallery goes back to "1 of 2" and the stale pair
+ *  can't start later when B is opened for some other reason.
  *  Mounted by CompareBar, which is always on the canvas. */
 export function usePendingComparePick(): void {
   const pending = useScreenshotCompareStore((s) => s.pending);
   const activeId = useGalleryStore((s) => s.activePhotoId);
+  const switchError = useUIStore((s) => s.photoSwitchError);
   const switching = usePhotoSwitching();
   useEffect(() => {
-    if (pending && activeId === pending.b && !switching) {
-      useScreenshotCompareStore.getState().start(pending.a);
+    if (!pending) return;
+    const cmp = useScreenshotCompareStore.getState();
+    const drop = () => cmp.setPicks(cmp.picks.filter((p) => p !== pending.b));
+    if (activeId === pending.b) {
+      if (switchError) drop();
+      else if (!switching) cmp.start(pending.a);
+    } else if (activeId !== pending.from) {
+      // Superseded: a different photo was opened before B.
+      drop();
     }
-  }, [pending, activeId, switching]);
+  }, [pending, activeId, switching, switchError]);
 }

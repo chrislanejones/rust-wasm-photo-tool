@@ -31,8 +31,9 @@ const clampCols = (v: unknown, fallback: number) =>
     ? Math.min(MASONRY_COLS.max, Math.max(MASONRY_COLS.min, Math.round(v)))
     : fallback;
 
-function load(): Saved {
-  const fallback: Saved = { layout: "grid", masonryCols: MASONRY_COLS.initial };
+const DEFAULTS: Saved = { layout: "grid", masonryCols: MASONRY_COLS.initial };
+
+function load(fallback: Saved = DEFAULTS): Saved {
   try {
     if (typeof localStorage === "undefined") return fallback;
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "null") as Partial<Saved> | null;
@@ -65,13 +66,20 @@ interface BatchViewState extends Saved {
 }
 
 export const useBatchViewStore = create<BatchViewState>()((set, get) => {
-  const commit = (patch: Partial<Saved>) => {
-    set(patch);
+  // Another tab may have saved since this one loaded, so each change starts
+  // from what's saved and only replaces the field it changes; otherwise a
+  // layout switch here would write back this tab's stale column count.
+  const latest = (): Saved => {
     const { layout, masonryCols } = get();
-    save({ layout, masonryCols });
+    return load({ layout, masonryCols });
+  };
+  const commit = (patch: Partial<Saved>) => {
+    const next = { ...latest(), ...patch };
+    set(next);
+    save(next);
   };
   const step = (delta: number) => {
-    const cols = get().masonryCols;
+    const cols = latest().masonryCols;
     commit({ masonryCols: clampCols(cols + delta, cols) });
   };
   return {
