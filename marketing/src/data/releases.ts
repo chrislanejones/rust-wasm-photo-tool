@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.57",
+    date: "2026-11-06",
+    headline: "Switching photos can't save one photo's edits under another anymore.",
+    entries: [
+      { tag: "fix", text: "A save still waiting when you switched photos could write the new photo's edits under the old photo's name. A switch now finishes that save first." },
+      { tag: "fix", text: "A save refuses to run when the editor is holding a different photo." },
+    ],
+  },
+  {
     version: "v9.56",
     date: "2026-11-06",
     headline: "Fill and Background stay out of the way until you need them.",

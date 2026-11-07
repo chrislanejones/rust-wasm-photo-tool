@@ -90,14 +90,14 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.56 — 2026-11-06
+### v9.57 — 2026-11-06
 
-**Fill and Background stay out of the way until you need them.**
+**Switching photos can't save one photo's edits under another anymore.**
 
-Fill on the Shapes and Arrows & Diagram Shapes panels, and Background on the Pen,
-are now closed dropdowns, the same as Placement. Each one shows what's on while
-it's shut, so a fill that's on is never hidden. Open it to pick None, Solid,
-Gradient or Pixelate.
+After you stopped drawing, the editor could wait up to 20 seconds to save. If
+you switched photos during that wait, the save still ran, and it wrote the new
+photo's edits under the old photo's name. Now a switch finishes that save first,
+and a save refuses to run if the editor is holding a different photo.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

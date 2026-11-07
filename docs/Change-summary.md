@@ -12024,3 +12024,19 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests a
 builds run after the trail data regen. The PR merged with E2E shard 1 still rerunning: its first
 run failed one test outside this change, `callout-leader` at line 134, which also failed on
 earlier CI runs. Not looked at in a browser: the panels themselves.
+
+## v9.57 Change Summary — 2026-11-06
+
+**Switching photos can't save one photo's edits under another anymore.**
+
+| Area | Change |
+| --- | --- |
+| Op log saves (#447) | After its debounce, a save waits for the pen to go quiet, up to 20 s, and nothing tracked that wait. A photo switch could neither land it nor cancel it, so it ran with the next photo in the engine and wrote that photo's ops under the first photo's id. The whole wait is now one tracked pending save: a switch lands it and waits out one already running, and changing the active photo cancels it. |
+| Document queue (#447) | A deferred save takes its turn in the queue after the quiet wait, so it can't read a load in progress and never holds one up. It shows in the status bar's activity indicator, as an archive save already does. |
+| Ownership check (#447) | A save refuses to run or commit when the engine positively holds another photo. |
+
+No engine change.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app 2,207 unit tests (12 new, 6 of
+the first 8 failing on the old code); 9 of 9 mutations caught; 13 browser specs on the production
+build; all 20 CI checks clean (18 pass, 2 skipped). Not run: `imagehorse-qc`, owed since v9.55.
