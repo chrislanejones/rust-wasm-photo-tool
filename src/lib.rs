@@ -1094,6 +1094,8 @@ impl ImageHorseTool {
 
     #[wasm_bindgen(constructor)]
     pub fn new(width: u32, height: u32) -> ImageHorseTool {
+        // A size the engine can't address is a 0×0 document, as in `ImageBuffer`.
+        let (width, height) = core::rgba_len(width, height).map_or((0, 0), |_| (width, height));
         let base = Layer::new(1, "Background".to_string(), width, height);
         ImageHorseTool {
             export_quality: DEFAULT_EXPORT_QUALITY,
@@ -1249,8 +1251,12 @@ impl ImageHorseTool {
         if pixels.len() != (img_w as usize) * (img_h as usize) * 4 {
             return;
         }
-        let doc_w = img_w + 2 * pad;
-        let doc_h = img_h + 2 * pad;
+        let border = pad.saturating_mul(2);
+        let doc_w = img_w.saturating_add(border);
+        let doc_h = img_h.saturating_add(border);
+        if core::rgba_len(doc_w, doc_h).is_none() {
+            return;
+        }
         self.width = doc_w;
         self.height = doc_h;
 
@@ -2844,7 +2850,7 @@ impl ImageHorseTool {
     /// of the two, which is exact for a uniform resize and preserves the area
     /// ratio for a non-uniform one.
     pub fn resize_with_filter(&mut self, new_w: u32, new_h: u32, filter: u8) {
-        if new_w == 0 || new_h == 0 {
+        if new_w == 0 || new_h == 0 || core::rgba_len(new_w, new_h).is_none() {
             return;
         }
         let (ow, oh) = (self.width, self.height);
@@ -3038,7 +3044,7 @@ impl ImageHorseTool {
         // short-circuited: it re-fills the backing layer (so a backing-color
         // change with an unchanged border still repaints) while preserving the
         // content layers byte-for-byte at offset 0.
-        if new_w == 0 || new_h == 0 {
+        if new_w == 0 || new_h == 0 || core::rgba_len(new_w, new_h).is_none() {
             return;
         }
         self.snap("Canvas Size");
