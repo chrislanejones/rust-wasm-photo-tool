@@ -43,6 +43,7 @@ import {
   type PhotoOplogManifest,
 } from "@/lib/dexie/db";
 import { USE_OPLOG_PERSISTENCE } from "@/lib/dexie/flags";
+import { engineHolds } from "@/lib/engineDocument";
 import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 import { whenStrokeQuiet } from "@/lib/strokeGate";
 
@@ -283,7 +284,35 @@ const UNVERIFIED = -1;
 
 let activePhotoId: string | null = null;
 let bound: Binding | null = null;
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+/** A save on its way, from the flush that scheduled it until it starts. It waits
+ *  twice: on `timer` (the debounce), then, with `timer` null, for the pen to go
+ *  quiet and for its turn in the document queue. A switch has to reach it in
+ *  every one of those, so the whole wait is tracked here. Clearing or replacing
+ *  this slot is what cancels it. */
+interface PendingSave {
+  tool: object;
+  photoId: string;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+let pendingSave: PendingSave | null = null;
+
+function cancelPendingSave(): PendingSave | null {
+  const job = pendingSave;
+  if (job?.timer != null) clearTimeout(job.timer);
+  pendingSave = null;
+  return job;
+}
+
+type SaveQueue = <T>(run: () => Promise<T>) => Promise<T>;
+const noQueue: SaveQueue = (run) => run();
+let saveQueue: SaveQueue = noQueue;
+
+/** The document queue (hooks/engineLoadQueue). A deferred save takes its turn
+ *  there like an archive save, so it can't read a load in progress. */
+export function setOplogSaveQueue(queue: SaveQueue): void {
+  saveQueue = queue;
+}
+
 /** The save currently running, or the tail of the queue behind it. A save that
  *  arrives while another is running CHAINS onto this instead of being dropped.
  *
@@ -392,23 +421,20 @@ async function invalidatePersistedLog(photoId: string, reason: string): Promise<
 /** The photo the current engine document belongs to. `null` disables the
  *  write path (e.g. a scratch canvas that isn't in the gallery yet). */
 export function setActiveOplogPhoto(photoId: string | null): void {
-  if (photoId !== activePhotoId && debounceTimer != null) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
+  if (photoId !== activePhotoId) cancelPendingSave();
   activePhotoId = photoId;
 }
 
-/** Flush a still-debouncing save for the CURRENT photo right now — call
- *  before switching photos, while the engine still holds the outgoing
- *  document (a photo switch would otherwise drop the pending save). */
+/** Land the outgoing photo's save right now, and wait out one already running.
+ *  Call before switching photos, while the engine still holds the outgoing
+ *  document. Runs inside the document queue, so it saves directly: queueing here
+ *  would wait on itself. */
 export async function flushPendingOplogSave(tool: object): Promise<void> {
-  if (debounceTimer == null || !activePhotoId || !hasPersistExports(tool)) return;
-  clearTimeout(debounceTimer);
-  debounceTimer = null;
-  const photoId = activePhotoId;
+  if (!hasPersistExports(tool)) return;
+  const job = cancelPendingSave();
   try {
-    await saveOplogNow(tool, photoId);
+    if (job?.tool === tool) await saveOplogNow(tool, job.photoId);
+    else await inFlight;
   } catch (e) {
     console.warn("[oplog-persist] flush-on-switch failed", e);
     bound = null; // unknown disk state ⇒ the next save rewrites
@@ -424,16 +450,12 @@ export async function onOplogFlush(tool: object): Promise<void> {
   // The log stopped describing the document ⇒ never write it, and retire
   // whatever is already on disk (it describes a document the user no longer
   // has). Checked BEFORE oplog_active(), which is false in this case too.
-  // A still-debouncing save is disarmed too — it was scheduled when the log
-  // was healthy and would only fire to be turned away (the epoch gate in
-  // `saveOplogInner` refuses it regardless; this just cancels the pointless
-  // wakeup). The armed timer is always this photo's: `setActiveOplogPhoto`
-  // clears it on every photo switch.
+  // A pending save is canceled too — it was scheduled when the log was healthy
+  // and would only fire to be turned away (the epoch gate in `saveOplogInner`
+  // refuses it regardless; this just cancels the pointless wakeup). It is always
+  // this photo's: `setActiveOplogPhoto` cancels it on every photo switch.
   if (!(await isLogTrustworthy(tool))) {
-    if (debounceTimer != null) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
+    cancelPendingSave();
     void invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
     return;
   }
@@ -477,23 +499,37 @@ export async function onOplogFlush(tool: object): Promise<void> {
   ) {
     return; // nothing new
   }
+  // Already past its debounce. It reads the log when it starts, so it will carry
+  // this change too, and leaving it armed keeps the 20 s bound on the wait.
+  if (pendingSave?.timer === null && pendingSave.tool === tool && pendingSave.photoId === photoId) {
+    return;
+  }
   const backlog = seen && gen === seen.generation ? len - seen.opCount : len;
-  if (debounceTimer != null) clearTimeout(debounceTimer);
+  cancelPendingSave();
   const delay = backlog >= OPS_PER_FORCED_SAVE ? 0 : DEBOUNCE_MS;
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
+  const job: PendingSave = { tool, photoId, timer: null };
+  job.timer = setTimeout(() => {
+    job.timer = null;
     // Same rule as the archive autosave (useImageSession, 10-07): the save
     // encodes a keyframe PNG on the worker — measured 0.4–1.0 s at
     // 2068×1556 — and a `paint_move` queued behind it waits all of it. Hold
     // until no stroke has ended for the debounce window; bounded inside the
-    // gate, so a long burst still saves.
-    void whenStrokeQuiet(DEBOUNCE_MS).then(() =>
-      saveOplogNow(tool, photoId).catch((e) => {
+    // gate, so a long burst still saves. The queue comes after the gate, so this
+    // wait never holds up a load.
+    void whenStrokeQuiet(DEBOUNCE_MS)
+      .then(() =>
+        saveQueue(async () => {
+          if (pendingSave !== job) return; // canceled while it waited
+          pendingSave = null;
+          await saveOplogNow(tool, photoId);
+        }),
+      )
+      .catch((e) => {
         console.warn("[oplog-persist] save failed; will retry on next change", e);
         bound = null; // unknown disk state ⇒ the next save rewrites
-      }),
-    );
+      });
   }, delay);
+  pendingSave = job;
 }
 
 /** Persist the photo's log now (also the test entry point). One readwrite
@@ -524,6 +560,9 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // a clean manifest or clearing the photo's invalidated claim.
     const epochAtCheck = invalidationEpochs.get(photoId) ?? 0;
     const raced = () => (invalidationEpochs.get(photoId) ?? 0) !== epochAtCheck;
+    // Everything below reads the engine, so it has to be this photo's document.
+    // A log check on another photo's document could retire this photo's log.
+    if (!engineHolds(photoId)) return;
     // Re-checked at fire time, not just when the save was scheduled: a save
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
@@ -650,7 +689,8 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // the user's newest edit and prefer it at restore. Abort instead: the
     // invalidation's own bookkeeping (set + DB mark, when one exists) is
     // already correct, and the working-copy archive carries the resume.
-    if (raced()) return;
+    // The encode span above is awaited, and only deferred saves are queued.
+    if (raced() || !engineHolds(photoId)) return;
 
     // ── ONE transaction: chunks + keyframes + manifest ────────────────────
     await db.transaction("rw", db.opLogs, db.keyframes, db.oplogManifests, async () => {
@@ -806,8 +846,8 @@ export function __resetOplogPersistenceForTests(): void {
   bound = null;
   invalidated.clear();
   invalidationEpochs.clear();
-  if (debounceTimer != null) clearTimeout(debounceTimer);
-  debounceTimer = null;
+  cancelPendingSave();
+  saveQueue = noQueue;
   inFlight = null;
   warnedRestoreFailure = false;
 }
