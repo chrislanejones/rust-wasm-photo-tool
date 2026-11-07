@@ -405,24 +405,27 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 
 /** Fill — None / Solid / Gradient / Pixelate, and each one's controls. One
  *  section for every shape with an interior, in both the Shapes and the
- *  Arrows & Diagram Shapes panels. */
+ *  Arrows & Diagram Shapes panels.
+ *
+ *  Collapsed, like Placement (Chris, 11-07-2026: "treat like placement and
+ *  do a closed dropdown"). The header is the word itself, so the mode tiles
+ *  carry no second heading; their accessible name is still "Fill". The
+ *  closed summary shows the mode, so a fill that is ON is never hidden. */
 function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings" | "onChange">) {
+  const mode = settings.fillMode ?? "none";
   return (
-    <div className="space-y-4">
-      {/* A ControlRow, not a bold bare <label> that labeled nothing: 8px to
-          the tiles like every other row, and the group points at the word. */}
-      <ControlRow label="Fill">
-        {({ labelId }) => (
-          <ToolButtonGroup
-            aria-labelledby={labelId}
-            options={FILL_MODES}
-            value={settings.fillMode ?? "none"}
-            onChange={(id) =>
-              onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-            }
-          />
-        )}
-      </ControlRow>
+    <CollapsibleSection
+      label="Fill"
+      summary={FILL_MODES.find((m) => m.id === mode)?.label}
+    >
+      <ToolButtonGroup
+        aria-label="Fill"
+        options={FILL_MODES}
+        value={mode}
+        onChange={(id) =>
+          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+        }
+      />
 
       {settings.fillMode === "solid" && (
         <ColorSwatchGrid
@@ -484,6 +487,6 @@ function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings
           </p>
         </div>
       )}
-    </div>
+    </CollapsibleSection>
   );
 }
