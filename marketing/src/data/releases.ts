@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.58",
+    date: "2026-11-07",
+    headline: "Three more ways the editor could get your photo wrong, closed.",
+    entries: [
+      { tag: "fix", text: "A save that an edit landed in the middle of could write a mix of old and new edits to disk. It now stops and saves again." },
+      { tag: "fix", text: "The editor won't run an edit after it has already told you that edit failed." },
+      { tag: "rust", text: "A blur brushed wholly past the edge of the photo can't crash the editor, and sizes too big to handle are refused." },
+    ],
+  },
+  {
     version: "v9.57",
     date: "2026-11-06",
     headline: "Switching photos can't save one photo's edits under another anymore.",

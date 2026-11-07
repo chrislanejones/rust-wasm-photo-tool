@@ -12040,3 +12040,23 @@ No engine change.
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app 2,207 unit tests (12 new, 6 of
 the first 8 failing on the old code); 9 of 9 mutations caught; 13 browser specs on the production
 build; all 20 CI checks clean (18 pass, 2 skipped). Not run: `imagehorse-qc`, owed since v9.55.
+
+## v9.58 Change Summary — 2026-11-07
+
+**Three more ways the editor could get your photo wrong, closed.**
+
+| Area | Change |
+| --- | --- |
+| Op log saves (#449) | A save reads the log in separate round trips, so an undo and a new edit between two of them spliced the new branch's frames onto the old branch's chunks. It now compares the log's state before those reads and again before it commits, and stops if anything moved. The edit's own flush saves again. |
+| Engine worker (#450) | A timed-out call could still run, because its cancel arrives behind it in the port. Each call now carries a deadline, checked just before entering wasm. A refused call is answered and never retried. |
+| Size limit (#448) | `rgba_len` caps a buffer at `i32::MAX` bytes, which still allows 16384×16384. All four resample kernels, resize, canvas resize, the constructor, artboard load and paste now respect it. A length computed in u32 used to wrap at 4 GiB. |
+| Off-canvas blur (#448) | `gaussian_blur_region` checks for an empty box before casting its extents, so a brush wholly off the canvas no longer panics. |
+
+Engine 957,088 → 957,511 B (+423), the limit checks. No format change and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; `cargo test` 548 plain and 832 with
+`tiles`; app 2,220 unit tests and both production builds run after the trail data regen; 15 mutations
+caught across the three PRs; all three PRs' CI clean (18 pass, 2 skipped each). Not covered: the size
+limit is per layer, so a large multi-layer resize can still run out of wasm memory; a refused resize
+shows no message; the wasm SIMD path and the worker's drain aren't run directly in a test. Not run:
+`cargo bench` (the blur bench doesn't call this function) and `imagehorse-qc`, owed since v9.55.
