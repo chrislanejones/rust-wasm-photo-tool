@@ -1348,7 +1348,7 @@ impl ImageHorseTool {
         dest_w: u32,
         dest_h: u32,
     ) {
-        if pixels.len() != (src_w * src_h * 4) as usize || src_w == 0 || src_h == 0 {
+        if Some(pixels.len()) != crate::core::rgba_len(src_w, src_h) || src_w == 0 || src_h == 0 {
             return;
         }
         self.paste_preview = Some(PastePreview {
@@ -1502,6 +1502,9 @@ impl ImageHorseTool {
     /// No-op if there's no active preview (e.g. `begin_paste_preview` wasn't
     /// called, or it already ended via commit/cancel).
     pub fn set_paste_preview_rect(&mut self, dest_x: i32, dest_y: i32, dest_w: u32, dest_h: u32) {
+        if crate::core::rgba_len(dest_w, dest_h).is_none() {
+            return;
+        }
         if let Some(p) = &mut self.paste_preview {
             p.dest_x = dest_x;
             p.dest_y = dest_y;

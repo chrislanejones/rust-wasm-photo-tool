@@ -133,7 +133,7 @@ pub fn paste_region(
     dest_x: i32,
     dest_y: i32,
 ) {
-    if pixels.len() != (src_w * src_h * 4) as usize {
+    if Some(pixels.len()) != crate::core::rgba_len(src_w, src_h) {
         return;
     }
     for sy in 0..src_h as i32 {
@@ -188,7 +188,7 @@ pub fn paste_region_rotated(
     angle: f32,
     bilinear: bool,
 ) {
-    if pixels.len() != (src_w * src_h * 4) as usize || src_w == 0 || src_h == 0 {
+    if Some(pixels.len()) != crate::core::rgba_len(src_w, src_h) || src_w == 0 || src_h == 0 {
         return;
     }
     let (sin, cos) = angle.sin_cos();

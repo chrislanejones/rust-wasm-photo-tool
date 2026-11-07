@@ -1094,6 +1094,8 @@ impl ImageHorseTool {
 
     #[wasm_bindgen(constructor)]
     pub fn new(width: u32, height: u32) -> ImageHorseTool {
+        // A size the engine can't address is a 0×0 document, as in `ImageBuffer`.
+        let (width, height) = core::rgba_len(width, height).map_or((0, 0), |_| (width, height));
         let base = Layer::new(1, "Background".to_string(), width, height);
         ImageHorseTool {
             export_quality: DEFAULT_EXPORT_QUALITY,
@@ -1249,8 +1251,12 @@ impl ImageHorseTool {
         if pixels.len() != (img_w as usize) * (img_h as usize) * 4 {
             return;
         }
-        let doc_w = img_w + 2 * pad;
-        let doc_h = img_h + 2 * pad;
+        let border = pad.saturating_mul(2);
+        let doc_w = img_w.saturating_add(border);
+        let doc_h = img_h.saturating_add(border);
+        if core::rgba_len(doc_w, doc_h).is_none() {
+            return;
+        }
         self.width = doc_w;
         self.height = doc_h;
 
