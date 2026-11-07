@@ -16,7 +16,7 @@ import { useEffect } from "react";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { usePhotoSwitching } from "@/hooks/usePhotoSwitching";
+import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 
 /** How many photos compare mode picks. Two, for now. */
 export const COMPARE_PICKS = 2;
@@ -48,9 +48,13 @@ export function toggleComparePick(id: string, openPhoto: (id: string) => void): 
 
   const [first, second] = picks as [string, string];
   const open = useGalleryStore.getState().activePhotoId;
-  if (open === first) cmp.start(second);
-  else if (open === second) cmp.start(first);
-  else {
+  if (open === first || open === second) {
+    const other = open === first ? second : first;
+    // The open photo may still be loading (or have failed to): the engine
+    // could hold the previous photo's pixels, so wait the pending way.
+    if (isPhotoSwitching()) cmp.setPending({ a: other, b: open, from: open });
+    else cmp.start(other);
+  } else {
     cmp.setPending({ a: first, b: second, from: open });
     openPhoto(second);
   }

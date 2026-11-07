@@ -42,6 +42,18 @@ describe("useBatchViewStore keeps the newest saved preference", () => {
     expect(JSON.parse(map.get(LS_KEY)!).masonryCols).toBe(7);
   });
 
+  it("after a failed write, its own values win over the older saved copy", async () => {
+    const map = stubLocalStorage({ [LS_KEY]: JSON.stringify({ layout: "masonry", masonryCols: 4 }) });
+    localStorage.setItem = () => {
+      throw new Error("quota");
+    };
+    const { useBatchViewStore } = await import("./useBatchViewStore");
+    useBatchViewStore.getState().zoomIn();
+    useBatchViewStore.getState().zoomIn();
+    expect(useBatchViewStore.getState().masonryCols).toBe(2);
+    expect(JSON.parse(map.get(LS_KEY)!).masonryCols).toBe(4);
+  });
+
   it("still works with no localStorage (node)", async () => {
     const { useBatchViewStore } = await import("./useBatchViewStore");
     useBatchViewStore.getState().setLayout("masonry");

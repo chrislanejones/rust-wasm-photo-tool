@@ -47,11 +47,14 @@ function load(fallback: Saved = DEFAULTS): Saved {
   }
 }
 
-function save(s: Saved): void {
+/** False when the write failed. */
+function save(s: Saved): boolean {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(s));
+    return true;
   } catch {
     // Unavailable (private mode / quota): the choice lasts this session only.
+    return false;
   }
 }
 
@@ -69,14 +72,17 @@ export const useBatchViewStore = create<BatchViewState>()((set, get) => {
   // Another tab may have saved since this one loaded, so each change starts
   // from what's saved and only replaces the field it changes; otherwise a
   // layout switch here would write back this tab's stale column count.
+  // After a failed write the saved copy is older than this tab's, so this
+  // tab's own values win until a write succeeds again.
+  let unsaved = false;
   const latest = (): Saved => {
     const { layout, masonryCols } = get();
-    return load({ layout, masonryCols });
+    return unsaved ? { layout, masonryCols } : load({ layout, masonryCols });
   };
   const commit = (patch: Partial<Saved>) => {
     const next = { ...latest(), ...patch };
     set(next);
-    save(next);
+    unsaved = !save(next);
   };
   const step = (delta: number) => {
     const cols = latest().masonryCols;

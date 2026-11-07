@@ -63,6 +63,37 @@ describe("usePendingComparePick", () => {
     expect(useScreenshotCompareStore.getState().otherId).toBeNull();
   });
 
+  it("waits for an open photo that is still loading before comparing", () => {
+    renderHook(() => usePendingComparePick());
+    act(() => {
+      openPhoto("b"); // b picked while its pixels are still loading
+      const cmp = useScreenshotCompareStore.getState();
+      cmp.beginPick();
+      toggleComparePick("a", openPhoto);
+      toggleComparePick("b", openPhoto);
+    });
+    expect(useScreenshotCompareStore.getState().otherId).toBeNull();
+    act(() => {
+      loaded("b");
+    });
+    expect(useScreenshotCompareStore.getState().otherId).toBe("a");
+  });
+
+  it("drops the pair when the open photo it waits on fails to load", () => {
+    renderHook(() => usePendingComparePick());
+    act(() => {
+      openPhoto("b");
+      const cmp = useScreenshotCompareStore.getState();
+      cmp.beginPick();
+      toggleComparePick("a", openPhoto);
+      toggleComparePick("b", openPhoto);
+    });
+    act(() => {
+      useUIStore.setState({ isImageLoading: false, photoSwitchError: "Couldn't open b" });
+    });
+    expect(useScreenshotCompareStore.getState()).toMatchObject({ otherId: null, pending: null, picks: ["a"] });
+  });
+
   it("drops the pair when another photo is opened first", () => {
     renderHook(() => usePendingComparePick());
     act(() => {
