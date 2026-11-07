@@ -9,12 +9,29 @@ pub struct ImageBuffer {
     pub data: Vec<u8>,
 }
 
+/// The byte length of a `w`×`h` RGBA buffer, or `None` past what the engine can
+/// address. Pixel offsets are computed in `i32` throughout, so the limit is
+/// `i32::MAX`, which still allows a 16384×16384 document.
+pub fn rgba_len(w: u32, h: u32) -> Option<usize> {
+    let bytes = u64::from(w).checked_mul(u64::from(h))?.checked_mul(4)?;
+    (bytes <= i32::MAX as u64).then_some(bytes as usize)
+}
+
 impl ImageBuffer {
+    /// A size past `rgba_len` gives a 0×0 buffer, so its dimensions and its data
+    /// never disagree.
     pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height,
-            data: vec![0u8; (width * height * 4) as usize],
+        match rgba_len(width, height) {
+            Some(len) => Self {
+                width,
+                height,
+                data: vec![0u8; len],
+            },
+            None => Self {
+                width: 0,
+                height: 0,
+                data: Vec::new(),
+            },
         }
     }
 

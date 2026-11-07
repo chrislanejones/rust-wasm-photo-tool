@@ -127,12 +127,12 @@ pub fn gaussian_blur_region(
     let min_y = ((cy - brush_radius).floor() as i32).max(0);
     let max_y = ((cy + brush_radius).ceil() as i32).min(h - 1);
 
-    let bw = (max_x - min_x + 1) as usize;
-    let bh = (max_y - min_y + 1) as usize;
-
-    if bw == 0 || bh == 0 {
+    // Wholly off the canvas: checked while these can still be negative.
+    if min_x > max_x || min_y > max_y {
         return;
     }
+    let bw = (max_x - min_x + 1) as usize;
+    let bh = (max_y - min_y + 1) as usize;
 
     // Reuse caller-supplied scratch buffers — grow if needed, never reallocate on shrink.
     let needed = bw * bh * 4;
@@ -281,6 +281,10 @@ pub fn redact_region(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "engine_bounds_tests.rs"]
+mod engine_bounds_tests;
 
 #[cfg(test)]
 mod sharpen_tests {
