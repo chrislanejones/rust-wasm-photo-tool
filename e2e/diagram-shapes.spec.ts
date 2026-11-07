@@ -193,6 +193,8 @@ test("diagram shapes draw from Arrows & Diagram Shapes and survive a reload", as
   await dragCanvas(page, [16, 16], [110, 120]);
 
   await page.getByRole("radiogroup", { name: "Basic" }).getByRole("radio", { name: /Cloud/ }).click();
+  // Fill is a closed dropdown, like Placement: open it, then pick Solid.
+  await page.getByRole("button", { name: /^Fill/, expanded: false }).click();
   await page.getByRole("radiogroup", { name: "Fill" }).getByRole("radio", { name: "Solid" }).click();
   await dragCanvas(page, [130, 16], [240, 110]);
 
