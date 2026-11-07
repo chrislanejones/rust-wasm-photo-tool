@@ -133,7 +133,7 @@ pub fn paste_region(
     dest_x: i32,
     dest_y: i32,
 ) {
-    if pixels.len() != (src_w * src_h * 4) as usize {
+    if Some(pixels.len()) != crate::core::rgba_len(src_w, src_h) {
         return;
     }
     for sy in 0..src_h as i32 {
@@ -188,7 +188,7 @@ pub fn paste_region_rotated(
     angle: f32,
     bilinear: bool,
 ) {
-    if pixels.len() != (src_w * src_h * 4) as usize || src_w == 0 || src_h == 0 {
+    if Some(pixels.len()) != crate::core::rgba_len(src_w, src_h) || src_w == 0 || src_h == 0 {
         return;
     }
     let (sin, cos) = angle.sin_cos();
@@ -301,6 +301,9 @@ pub fn translate(data: &[u8], img_w: i32, img_h: i32, dx: i32, dy: i32) -> Vec<u
 // thin delegator so existing call sites (`transform::resize_bilinear`) are
 // unchanged.
 pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
+    if output_too_big(new_w, new_h) {
+        return Vec::new();
+    }
     // The SIMD path reads through raw pointers with no bounds check, trusting
     // `old_w × old_h` to describe `data`. Two of this function's callers hand
     // it caller-supplied dimensions straight from JS (`resize_pixels`,
@@ -411,6 +414,9 @@ fn resize_separable(
     support: f32,
     kernel: impl Fn(f32) -> f32 + Copy,
 ) -> Vec<u8> {
+    if output_too_big(new_w, new_h) {
+        return Vec::new();
+    }
     let nw = new_w.max(1) as usize;
     let nh = new_h.max(1) as usize;
     let ow = old_w as usize;
@@ -427,9 +433,19 @@ fn resize_separable(
     crate::simd::resize::sep_vertical(&mid, nw, nh, &v_windows)
 }
 
+/// Past `rgba_len` every kernel returns an empty buffer. The output length is the
+/// only bound on the SIMD passes' raw-pointer stores, so it has to be right before
+/// any of them runs.
+fn output_too_big(new_w: u32, new_h: u32) -> bool {
+    crate::core::rgba_len(new_w.max(1), new_h.max(1)).is_none()
+}
+
 /// Resize using nearest-neighbor sampling. Returns the new RGBA buffer.
 /// Minimum dimension is 1×1.
 pub fn resize_nearest(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
+    if output_too_big(new_w, new_h) {
+        return Vec::new();
+    }
     let nw = new_w.max(1) as usize;
     let nh = new_h.max(1) as usize;
     let ow = old_w as usize;

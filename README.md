@@ -90,15 +90,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.55 — 2026-11-05
+### v9.58 — 2026-11-07
 
-**A refresh can't quietly undo a redaction anymore.**
+**Three more ways the editor could get your photo wrong, closed.**
 
-Some edits, like a solid redaction, aren't saved as steps in the edit history.
-In the right order after other edits, one could slip past the check for that,
-and a refresh brought the photo back without it. Now the engine compares the
-saved history to the photo you actually have. If they don't match, it drops the
-history and restores from your working copy, which has the redaction.
+A save that an edit landed in the middle of could write a mix of old and new edits
+to disk, so now it stops and saves again. The editor won't run an edit after it's
+already told you that edit failed. And a blur brushed past the edge of the photo
+can't crash the editor anymore. Sizes too big for it to handle are refused instead
+of causing trouble later.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

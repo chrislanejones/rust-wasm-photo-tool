@@ -10,7 +10,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { StabilizerRow } from "./StabilizerRow";
-import { ControlRow } from "@/components/ui/control-row";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Kbd } from "@/components/ui/kbd";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
@@ -303,31 +303,33 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   onChange={(color) => onChange({ ...settings, strokeColor: color })}
                 />
 
-                {/* Background — fills the closed path's interior (under the stroke). */}
-                <ControlRow label="Background">
-                  {({ labelId }) => (
-                    <div className="space-y-2">
-                      <ToolButtonGroup
-                        aria-labelledby={labelId}
-                        options={[
-                          { id: "none", label: "None" },
-                          { id: "solid", label: "Solid" },
-                        ]}
-                        value={settings.fillMode === "none" ? "none" : "solid"}
-                        onChange={(id) =>
-                          onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
-                        }
-                      />
-                      {settings.fillMode !== "none" && (
-                        <ColorSwatchGrid
-                          colors={TEXT_COLORS}
-                          value={settings.fillColor}
-                          onChange={(color) => onChange({ ...settings, fillColor: color })}
-                        />
-                      )}
-                    </div>
+                {/* Background — fills the closed path's interior (under the
+                    stroke). A closed dropdown like Placement and the Shapes'
+                    Fill (Chris, 11-07-2026); the summary keeps a fill that
+                    is ON visible while shut. */}
+                <CollapsibleSection
+                  label="Background"
+                  summary={settings.fillMode === "none" ? "None" : "Solid"}
+                >
+                  <ToolButtonGroup
+                    aria-label="Background"
+                    options={[
+                      { id: "none", label: "None" },
+                      { id: "solid", label: "Solid" },
+                    ]}
+                    value={settings.fillMode === "none" ? "none" : "solid"}
+                    onChange={(id) =>
+                      onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+                    }
+                  />
+                  {settings.fillMode !== "none" && (
+                    <ColorSwatchGrid
+                      colors={TEXT_COLORS}
+                      value={settings.fillColor}
+                      onChange={(color) => onChange({ ...settings, fillColor: color })}
+                    />
                   )}
-                </ControlRow>
+                </CollapsibleSection>
               </>
             );
 

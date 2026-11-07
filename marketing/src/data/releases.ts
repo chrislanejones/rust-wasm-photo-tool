@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.58",
+    date: "2026-11-07",
+    headline: "Three more ways the editor could get your photo wrong, closed.",
+    entries: [
+      { tag: "fix", text: "A save that an edit landed in the middle of could write a mix of old and new edits to disk. It now stops and saves again." },
+      { tag: "fix", text: "The editor won't run an edit after it has already told you that edit failed." },
+      { tag: "rust", text: "A blur brushed wholly past the edge of the photo can't crash the editor, and sizes too big to handle are refused." },
+    ],
+  },
+  {
+    version: "v9.57",
+    date: "2026-11-06",
+    headline: "Switching photos can't save one photo's edits under another anymore.",
+    entries: [
+      { tag: "fix", text: "A save still waiting when you switched photos could write the new photo's edits under the old photo's name. A switch now finishes that save first." },
+      { tag: "fix", text: "A save refuses to run when the editor is holding a different photo." },
+    ],
+  },
+  {
+    version: "v9.56",
+    date: "2026-11-06",
+    headline: "Fill and Background stay out of the way until you need them.",
+    entries: [
+      { tag: "ui", text: "Fill on the shape panels and Background on the Pen are closed dropdowns now, like Placement. The shut header says what's on, so a fill that's on is never hidden." },
+    ],
+  },
+  {
     version: "v9.55",
     date: "2026-11-05",
     headline: "A refresh can't quietly undo a redaction anymore.",

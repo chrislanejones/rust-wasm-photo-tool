@@ -31,7 +31,7 @@ import type { AddPhotoOutcome, AddPhotosResult } from "@/lib/addPhotosResult";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { prepareSvgSource } from "@/lib/svgPassthrough";
 import { useSvgSourceStore } from "@/stores/useSvgSourceStore";
-import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
+import { flushPendingOplogSave, setActiveOplogPhoto, setOplogSaveQueue } from "@/lib/oplogPersistence";
 import { commitPendingEdits } from "@/lib/pendingEdits";
 import { getEngineDocument, setEngineDocument } from "@/lib/engineDocument";
 import type { LoadOpts } from "@/hooks/useEngineCore";
@@ -412,6 +412,8 @@ export function useImageSession({
     setActiveOplogPhoto(getEngineDocument() ?? activePhotoId);
   }, [activePhotoId, documentPhotoId]);
 
+  useEffect(() => setOplogSaveQueue(stamp.serialize), [stamp.serialize]);
+
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
       // Phone: nothing to decode for — see loadImageFromPixels above.
@@ -781,7 +783,7 @@ export function useImageSession({
           return next;
         });
         if (stamp.toolRef.current) {
-          // The outgoing photo's still-debouncing op-log save would be
+          // The outgoing photo's pending op-log save would be
           // dropped by the photo switch — land it while the engine still
           // holds the outgoing document. No-op when persistence is off.
           const tool = stamp.toolRef.current;
