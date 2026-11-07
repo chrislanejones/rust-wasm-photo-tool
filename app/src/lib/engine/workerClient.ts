@@ -20,12 +20,12 @@
 // not a crash, an undo stack that stops reproducing. So the ordering is
 // written down here rather than delegated.
 import type { EngineReply, EngineRequest } from "@/workers/engine.worker";
+import { CALL_TIMEOUT_MS } from "./callDeadline";
 import { NO_CANVAS } from "./canvasGeneration";
 import { rehydrateCapture } from "./captureMarshal";
 
 /** How long a single engine call may take before the caller is told it hung.
  *  A 12MP sharpen measured ~470 ms; 30 s is "the worker died", not "slow". */
-const CALL_TIMEOUT_MS = 30_000;
 
 interface Pending {
   resolve: (v: unknown) => void;
@@ -170,7 +170,13 @@ export class EngineWorkerClient {
         reject(new Error(`engine call timed out after ${CALL_TIMEOUT_MS}ms: ${method}`));
       }, CALL_TIMEOUT_MS);
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer, method });
-      const req: EngineRequest & { kind: "call" } = { kind: "call", id, method, args };
+      const req: EngineRequest & { kind: "call" } = {
+        kind: "call",
+        id,
+        method,
+        args,
+        deadline: Date.now() + CALL_TIMEOUT_MS,
+      };
       if (canvasGeneration !== undefined) req.canvasGeneration = canvasGeneration;
       this.worker!.postMessage(req, transfer);
     });
