@@ -2,6 +2,10 @@
 
 Date: 10-11-2026. Review branch: `ui/state-v4-v927`.
 
+> **Shipped.** This branch merged as #348 on 10-13-2026 and went out in
+> v9.29. The text below is the review as it stood before the merge. The UI
+> docs now start at [docs/UI.md](../UI.md).
+
 The seven-night document-state pass has been reconciled with the shipped v9.27
 editor. This branch combines master `3bdee40c` and the original Night 7 head
 `d7cbd664`. The seven original commits and draft PRs #328–334 remain intact.
