@@ -15,7 +15,7 @@ built from, and the work that got it there.
 
 Some of these rules are enforced. `./scripts/guardrails.sh` counts spacing
 off the scale, raw `<button>`s and exceptions with no reason given, and CI
-fails if any count goes up. See [CI.md](CI.md).
+fails if a count goes above its baseline in the script. See [CI.md](CI.md).
 
 The decisions behind them:
 [ADR-065](adr/065-the-ui-vocabulary-is-measured-before-it-is-decided.md)
