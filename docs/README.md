@@ -13,12 +13,11 @@ What is in this folder, and what deliberately is not.
 | [Keyboard-Shortcuts.md](Keyboard-Shortcuts.md) | every chord |
 | [OpenRaster-Export-Import.md](OpenRaster-Export-Import.md) | the .ora format contract |
 | [CI.md](CI.md) | the gates, and which ones block |
+| [UI.md](UI.md) | start here for UI: the rules, the inventory, the exceptions, and the UI work that shipped |
 | [UI_CONSISTENCY.md](UI_CONSISTENCY.md) | the ten UI rules, and the canonical scale |
-| [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md) | gallery, preview loading and Settings keyboard work shipped in v9.27 |
-| [UI_NIGHTS_16_19.md](UI_NIGHTS_16_19.md) | loading skeletons for sign-in, AI Usage, Compare, Plan & Billing and the phone viewer, shipped in v9.28 |
-| [ui-state-v4/08-v927-integration.md](ui-state-v4/08-v927-integration.md) | the next seven-night UI pass, reconciled with v9.27 and still under review |
 | [UI_INVENTORY.md](UI_INVENTORY.md) | what the UI vocabulary actually is, counted |
 | [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) | every registered exception to a UI gate |
+| [MCP.md](MCP.md) | the planned Image Horse MCP server, and the Beta Connections preview |
 | [Deploying.md](Deploying.md) | how a release reaches production |
 | [Change-summary.md](Change-summary.md) | full release history |
 | [PARKING_LOT.md](PARKING_LOT.md) | problems noticed but deliberately not fixed yet |
