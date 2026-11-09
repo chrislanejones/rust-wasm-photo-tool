@@ -52,6 +52,12 @@ export const listMine = query({
   handler: async (ctx) => {
     const user = await getUser(ctx);
     if (!user) return null;
+    return await trashOf(ctx, user);
+  },
+});
+
+/** One user's trash, for the Trash view and the MCP tool. */
+export async function trashOf(ctx: Parameters<typeof recountStoredBytes>[0], user: Doc<"users">) {
     const entitlement = entitlementOf(user.tier, await roleOf(ctx, user), true);
     const windowDays = trashWindowDays(entitlement);
 
@@ -82,8 +88,7 @@ export const listMine = query({
         limitBytes: STORAGE_QUOTA_BYTES[entitlement],
       },
     };
-  },
-});
+}
 
 /** The caller's trashed share for `token`, or null. Throws for someone else's. */
 async function ownedTrashed(ctx: MutationCtx, token: string): Promise<Doc<"shares"> | null> {

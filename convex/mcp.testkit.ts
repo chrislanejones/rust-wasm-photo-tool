@@ -20,7 +20,7 @@ export interface Keys { pair: CryptoKeyPair; jwksFetches: () => number }
 
 /** Fresh signing keys, with a mock JWKS in front of `fetch`. No real Clerk call
  *  can happen: an unexpected URL throws unless `passthrough` handles it. */
-export async function setupMcp(passthrough?: (url: string, init?: RequestInit) => Promise<Response> | undefined): Promise<Keys> {
+export async function setupMcp(passthrough?: (url: string, init?: RequestInit) => Promise<Response | undefined>): Promise<Keys> {
   resetJwksCache();
   vi.stubEnv("MCP_ENDPOINT_ENABLED", "1");
   vi.stubEnv("CONVEX_SITE_URL", SITE);

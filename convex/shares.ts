@@ -127,7 +127,7 @@ export function checkLimits(args: {
   return null;
 }
 
-async function findByToken(ctx: QueryCtx | MutationCtx, token: string): Promise<Doc<"shares"> | null> {
+export async function findByToken(ctx: QueryCtx | MutationCtx, token: string): Promise<Doc<"shares"> | null> {
   return await ctx.db
     .query("shares")
     .withIndex("by_token", (q) => q.eq("token", token))
@@ -368,6 +368,17 @@ export const setLimits = mutation({
     if (!share) return;
     const invalid = checkLimits(args);
     if (invalid) throw new Error(invalid);
+    await writeShareLimits(ctx, share, args);
+  },
+});
+
+/** Apply checked limits. `null` clears. No ownership check: callers decide
+ *  whose share it is (`setLimits`, and the MCP tool). */
+export async function writeShareLimits(
+  ctx: MutationCtx,
+  share: Doc<"shares">,
+  args: { maxViews: number | null; expiresAt: number | null },
+): Promise<void> {
     // `undefined` in a patch REMOVES the field (the same move sync.ts uses to
     // clear the legacy settings blob), which is how `null` clears a limit.
     // `expiredAt` goes too: it belonged to the old date.
@@ -387,8 +398,7 @@ export const setLimits = mutation({
         at: args.expiresAt,
       });
     }
-  },
-});
+}
 
 /** INTERNAL, scheduled by `setLimits` for the end date. Stamps `expiredAt`,
  *  which is the write that makes every cached read of this link re-run — see
@@ -410,11 +420,15 @@ export const pause = mutation({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const share = await ownedShare(ctx, args.token);
-    if (!share) return;
-    if (share.pausedAt !== undefined) return;
-    await ctx.db.patch(share._id, { pausedAt: Date.now() });
+    if (share) await pauseShareRecord(ctx, share);
   },
 });
+
+/** Idempotent, and keeps the first timestamp. No ownership check. */
+export async function pauseShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<void> {
+  if (share.pausedAt !== undefined) return;
+  await ctx.db.patch(share._id, { pausedAt: Date.now() });
+}
 
 /** Owner: serve the link again. Clears `pausedAt` only — if a view cap or a
  *  date stopped the link too, it stays stopped for THAT reason and the pane
@@ -423,11 +437,15 @@ export const resume = mutation({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const share = await ownedShare(ctx, args.token);
-    if (!share) return;
-    if (share.pausedAt === undefined) return;
-    await ctx.db.patch(share._id, { pausedAt: undefined });
+    if (share) await resumeShareRecord(ctx, share);
   },
 });
+
+/** Idempotent. No ownership check. */
+export async function resumeShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<void> {
+  if (share.pausedAt === undefined) return;
+  await ctx.db.patch(share._id, { pausedAt: undefined });
+}
 
 /** Owner: move a link to the trash (the `trash` Beta). It stops being served
  *  at once and leaves `listMine`; its image stays, and counts against the
@@ -439,10 +457,15 @@ export const moveToTrash = mutation({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const share = await ownedShare(ctx, args.token);
-    if (!share || share.deletedAt !== undefined) return;
-    await ctx.db.patch(share._id, { deletedAt: Date.now() });
+    if (share) await trashShareRecord(ctx, share);
   },
 });
+
+/** Idempotent, and keeps the first timestamp. No ownership check. */
+export async function trashShareRecord(ctx: MutationCtx, share: Doc<"shares">): Promise<void> {
+  if (share.deletedAt !== undefined) return;
+  await ctx.db.patch(share._id, { deletedAt: Date.now() });
+}
 
 /** Revoke a share. Only the owner can delete it; also drops the storage blob
  *  and the link's `share_views` rows (an index walk bounded by that one

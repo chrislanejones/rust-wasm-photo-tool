@@ -7,7 +7,8 @@ import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEFAULT_AUTH_ISSUER, MCP_SCOPES } from "./mcpClaims";
 import { TRUSTED_ISSUERS, verifyAccessToken } from "./mcpAuth";
-import { MCP_TOOLS, type McpTool, type Principal } from "./mcpTools";
+import { MAX_BASE64_CHARS } from "./mcpImage";
+import { MCP_PROMPTS, MCP_TOOLS, type McpTool, type Principal } from "./mcpTools";
 
 // ── The MCP endpoint: POST /mcp, stateless JSON (ADR-095) ─────────────────────
 //
@@ -87,6 +88,11 @@ function buildServer(ctx: ActionCtx, who: Principal): McpServer {
       runTool(ctx, who, tool) as never,
     );
   }
+  for (const prompt of MCP_PROMPTS) {
+    server.registerPrompt(prompt.name, { title: prompt.title }, () => ({
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: prompt.text } }],
+    }));
+  }
   return server;
 }
 
@@ -102,7 +108,13 @@ async function handleMcp(ctx: ActionCtx, request: Request): Promise<Response> {
   if (!principal) return unauthorized(request, "No Image Horse account for this sign-in.");
 
   const server = buildServer(ctx, { userId: principal.userId, clientId: verified.clientId, scopes: verified.scopes });
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+    // The SDK's default is 4 MiB, which would cap base64 images near 3 MB.
+    // send_image_to_inbox has its own limit and a message that explains it.
+    maxRequestBodySize: MAX_BASE64_CHARS + 1024 * 1024,
+  });
   await server.connect(transport);
   try {
     const response = await transport.handleRequest(request);
