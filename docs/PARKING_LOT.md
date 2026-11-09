@@ -4,6 +4,13 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — owed after v9.59 (11-08-2026)
+
+| What | Why it's left |
+| --- | --- |
+| GitHub Releases for v9.52 through v9.58 | The tags exist. Publishing a Release is done by hand, so these wait for a person. |
+| `imagehorse-qc` on the production build | Owed since v9.55. Masonry and Compare mode in v9.59 are the newest things it hasn't covered. |
+
 ## OPEN — Transfer leftovers (feat/transfer-ui, 11-04-2026, ADR-102)
 
 | What | Why it's left |
