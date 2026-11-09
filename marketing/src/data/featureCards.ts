@@ -405,6 +405,21 @@ const CARD_COPY: Record<string, CardCopy> = {
       "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read. Docked rows scroll without overlapping; hover reveals only that photo's controls. Welcome Back previews keep their space while loading and show a fallback if an image cannot be displayed.",
   },
   // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
+  "Compare two photos": {
+    group: "edit",
+    title: "Compare two photos",
+    plain: "Tick two photos in the gallery and see exactly what's different. Every changed pixel gets tinted.",
+    detail:
+      "Overlay, Side by side, Blink or Slider. If neither photo is open, the second one you tick opens and the compare starts once it's loaded.",
+  },
+
+  "Masonry view": {
+    group: "edit",
+    title: "Masonry view",
+    plain: "See every photo in Batch at its own shape, in scrolling columns.",
+    detail: "Zooming changes the column count, from 2 to 10. Batch remembers the layout you left it on.",
+  },
+
   "Batch Crop": {
     group: "edit",
     title: "Batch Crop",
