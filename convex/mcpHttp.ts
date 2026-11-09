@@ -7,6 +7,7 @@ import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEFAULT_AUTH_ISSUER, MCP_SCOPES } from "./mcpClaims";
 import { TRUSTED_ISSUERS, verifyAccessToken } from "./mcpAuth";
+import { endpointEnabled } from "./mcp";
 import { MAX_BASE64_CHARS } from "./mcpImage";
 import { MCP_PROMPTS, MCP_TOOLS, type McpTool, type Principal } from "./mcpTools";
 
@@ -24,8 +25,6 @@ const noValidator = {
 };
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource/mcp";
-
-export const endpointEnabled = () => process.env.MCP_ENDPOINT_ENABLED === "1";
 
 const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

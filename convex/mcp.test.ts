@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { MCP_RATE_LIMIT } from "./mcp";
 import { addUser, callTool, INITIALIZE, newBackend, rawPost, setupMcp, signToken, SITE, RESOURCE, type Keys } from "./mcp.testkit";
 
@@ -178,5 +178,65 @@ describe("the transport", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
     expect(res.headers.get("mcp-session-id")).toBeNull();
     expect(((await res.json()) as any).result.serverInfo.name).toBe("image-horse");
+  });
+});
+
+describe("Settings › Connections", () => {
+  const me = () => { const t = newBackend(); return { t, as: t.withIdentity({ subject: "user_a" }) }; };
+  const row = (t: ReturnType<typeof newBackend>) => t.run((ctx) => ctx.db.query("users").first());
+
+  it("the switch turns access on, and off cuts the next call", async () => {
+    const { t, as } = me();
+    await addUser(t, "user_a", {});
+    const token = await signToken(keys.pair);
+    expect((await callTool(t, token, "get_connection_status")).isError).toBe(true);
+    await as.mutation(api.mcp.setEnabled, { enabled: true });
+    expect((await callTool(t, token, "get_connection_status")).isError).toBe(false);
+    await as.mutation(api.mcp.setEnabled, { enabled: false });
+    expect((await callTool(t, token, "get_connection_status")).isError).toBe(true);
+  });
+  it("a device going browser-only turns access off, and says why", async () => {
+    const { t, as } = me();
+    await addUser(t, "user_a");
+    await as.mutation(api.mcp.browserOnlyOn, {});
+    expect(await row(t)).toMatchObject({ mcpEnabled: false, mcpOffReason: "browser-only" });
+    expect((await callTool(t, await signToken(keys.pair), "get_connection_status")).text).toMatch(/Everything in your browser/);
+  });
+  it("browser-only leaves an account that was already off alone", async () => {
+    const { t, as } = me();
+    await addUser(t, "user_a", {});
+    await as.mutation(api.mcp.browserOnlyOn, {});
+    expect((await row(t))!.mcpOffReason).toBeUndefined();
+  });
+  it("turning it back on clears the reason", async () => {
+    const { t, as } = me();
+    await addUser(t, "user_a", { mcpEnabled: false, mcpOffReason: "browser-only" });
+    await as.mutation(api.mcp.setEnabled, { enabled: true });
+    expect((await row(t))!.mcpOffReason).toBeUndefined();
+  });
+  it("the URL appears only when the server switch is on", async () => {
+    const { t, as } = me();
+    await addUser(t, "user_a");
+    expect(await as.query(api.mcp.connection, {})).toMatchObject({ enabled: true, url: RESOURCE });
+    vi.stubEnv("MCP_ENDPOINT_ENABLED", "0");
+    expect(await as.query(api.mcp.connection, {})).toMatchObject({ url: null });
+  });
+  it("recent activity: only your own, newest first, at most 20", async () => {
+    const { t, as } = me();
+    const a = await addUser(t, "user_a");
+    const b = await addUser(t, "user_b");
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 25; i++) await ctx.db.insert("mcp_calls", { userId: a, clientId: "c", tool: `t${i}`, outcome: "ok", at: 1000 + i });
+      await ctx.db.insert("mcp_calls", { userId: b, clientId: "c", tool: "theirs", outcome: "ok", at: 9999 });
+    });
+    const calls = await as.query(api.mcp.recentCalls, {});
+    expect(calls).toHaveLength(20);
+    expect(calls[0]!.tool).toBe("t24");
+  });
+  it("signed out: nothing, and no way in", async () => {
+    const t = newBackend();
+    expect(await t.query(api.mcp.connection, {})).toBeNull();
+    expect(await t.query(api.mcp.recentCalls, {})).toEqual([]);
+    await expect(t.mutation(api.mcp.setEnabled, { enabled: true })).rejects.toThrow();
   });
 });
