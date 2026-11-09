@@ -89,15 +89,14 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.58 — 2026-11-07
+### v9.59 — 2026-11-08
 
-**Three more ways the editor could get your photo wrong, closed.**
+**Batch gets a Masonry view, and Compare picks its two photos right in the gallery.**
 
-A save that an edit landed in the middle of could write a mix of old and new edits
-to disk, so now it stops and saves again. The editor won't run an edit after it's
-already told you that edit failed. And a blur brushed past the edge of the photo
-can't crash the editor anymore. Sizes too big for it to handle are refused instead
-of causing trouble later.
+Masonry shows every photo at its own shape in scrolling columns, and zooming changes
+how many columns you get. Batch remembers which layout you left it on. Compare mode
+lets you tick two photos in the gallery. If neither one is open, the second one
+opens and the compare starts once it's loaded.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

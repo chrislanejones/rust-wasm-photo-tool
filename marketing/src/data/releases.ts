@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.59",
+    date: "2026-11-08",
+    headline: "Batch gets a Masonry view, and Compare picks its two photos right in the gallery.",
+    entries: [
+      { tag: "feature", text: "Masonry in Batch shows every photo at its own shape in scrolling columns. Zooming changes how many columns you get, and Batch remembers the layout you left it on." },
+      { tag: "feature", text: "Compare mode lets you tick two photos in the gallery. If neither is open, the second one opens and the compare starts once it's loaded." },
+      { tag: "ui", text: "\"Compare with another photo\" no longer opens a separate picker. You pick right in the gallery, and the right-click \"Compare with this\" still works." },
+    ],
+  },
+  {
     version: "v9.58",
     date: "2026-11-07",
     headline: "Three more ways the editor could get your photo wrong, closed.",

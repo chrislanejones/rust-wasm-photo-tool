@@ -12060,3 +12060,18 @@ caught across the three PRs; all three PRs' CI clean (18 pass, 2 skipped each). 
 limit is per layer, so a large multi-layer resize can still run out of wasm memory; a refused resize
 shows no message; the wasm SIMD path and the worker's drain aren't run directly in a test. Not run:
 `cargo bench` (the blur bench doesn't call this function) and `imagehorse-qc`, owed since v9.55.
+
+## v9.59 Change Summary — 2026-11-08
+
+**Batch gets a Masonry view, and Compare picks its two photos right in the gallery.**
+
+| Area | Change |
+| --- | --- |
+| Masonry (#446) | Batch has a Grid/Masonry switch. Masonry shows every photo at its own shape in scrolling columns (2 to 10, default 4), and the zoom keys change the column count. Grid still zooms only the open photo. The layout is saved per browser, not synced. |
+| Compare mode (#446) | Tick two photos in the gallery. If neither is open, the second opens as B and the pair starts once its pixels load. If B fails to open, or another photo is opened first, the pair is dropped and B is unticked. |
+| Gallery bar (#446) | Compress, Delete and Export Selected are hidden in compare mode, and compare picks stay separate from Batch selections. The old dialog picker is gone. |
+| README index (#451) | New UI and MCP pages, replacing the UI Nights lines. |
+
+No engine change and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #446 ran 2,231 app unit tests and 17 browser specs on the production build, and 6 of 6 mutations were caught. Not run: `imagehorse-qc`, owed since v9.55.
