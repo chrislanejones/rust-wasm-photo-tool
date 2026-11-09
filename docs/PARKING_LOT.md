@@ -4,6 +4,15 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — MCP needs an attended check before it's switched on (#452, #453, #454, 11-09-2026)
+
+| What | Why it's left |
+| --- | --- |
+| Read one real OAuth token's claims | The claim names in `convex/mcpClaims.ts` come from Clerk's docs. |
+| Run the endpoint on a real Convex deployment | The tests use `convex-test` on the edge runtime. |
+| Choose the default scopes | ADR-095 never listed any, and `profile email` is a placeholder. |
+| Check a 50 MB image URL fits in an HTTP action's memory | Only smaller files have been tested. |
+
 ## OPEN — owed after v9.59 (11-08-2026)
 
 | What | Why it's left |
