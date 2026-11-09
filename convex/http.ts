@@ -3,8 +3,11 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { registerMcpRoutes } from "./mcpHttp";
 
 const http = httpRouter();
+
+registerMcpRoutes(http);
 
 // ── Replicate webhook security helpers ─────────────────────────────────────
 

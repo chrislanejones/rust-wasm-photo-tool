@@ -16,6 +16,7 @@ import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as entitlement from "../entitlement.js";
 import type * as http from "../http.js";
+import type * as mcp from "../mcp.js";
 import type * as photoEdits from "../photoEdits.js";
 import type * as router from "../router.js";
 import type * as shares from "../shares.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   entitlement: typeof entitlement;
   http: typeof http;
+  mcp: typeof mcp;
   photoEdits: typeof photoEdits;
   router: typeof router;
   shares: typeof shares;

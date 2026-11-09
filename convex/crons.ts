@@ -55,4 +55,15 @@ const crons = cronJobs();
 //
 // crons.interval("expire the transfer inbox", { hours: 24 }, internal.transfers.expire, { apply: true });
 
+// ── MCP call log: WRITTEN, DELIBERATELY NOT SCHEDULED ────────────────────────
+//
+// TODO(Chris): removes MCP call-log rows older than 30 days. Off until a person
+// has read the dry run against the deployment:
+//
+//   pnpm exec convex run mcp:expire '{}'
+//
+// To switch it on, add the `internal` import above and uncomment the line below.
+//
+// crons.interval("expire the MCP call log", { hours: 24 }, internal.mcp.expire, { apply: true });
+
 export default crons;
