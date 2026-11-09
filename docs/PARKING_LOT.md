@@ -4,6 +4,12 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — callout-leader e2e flakes on Align (seen 11-09-2026 on #452 and #454)
+
+| What | Why it's left |
+| --- | --- |
+| `e2e/callout-leader.spec.ts`, the Align ▾ cases, failed once each on #452 and #454 | #452 changes no editor code and #453 passed, so it isn't MCP. Cause not found yet. |
+
 ## OPEN — MCP needs an attended check before it's switched on (#452, #453, #454, 11-09-2026)
 
 | What | Why it's left |
