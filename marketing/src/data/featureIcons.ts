@@ -5,6 +5,7 @@
 import type { ElementType } from "react";
 import {
   BadgeCheck,
+  LayoutDashboard,
   Stamp,
   Move,
   Layers2,
@@ -120,6 +121,8 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Stroke Stabilizer, everywhere": Magnet,
   // Without this the Batch › Crop card renders the fallback dot.
   "Batch Crop": PackageOpen,
+  "Compare two photos": GitCompare,
+  "Masonry view": LayoutDashboard,
 };
 
 // A DOT, not a square — deliberately. `Square` was the fallback, and "Blank

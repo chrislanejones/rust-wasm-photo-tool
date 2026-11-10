@@ -4,6 +4,28 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — callout-leader e2e flakes on Align (seen 11-09-2026 on #452 and #454)
+
+| What | Why it's left |
+| --- | --- |
+| `e2e/callout-leader.spec.ts`, the Align ▾ cases, failed once each on #452 and #454 | #452 changes no editor code and #453 passed, so it isn't MCP. Cause not found yet. |
+
+## OPEN — MCP needs an attended check before it's switched on (#452, #453, #454, 11-09-2026)
+
+| What | Why it's left |
+| --- | --- |
+| Read one real OAuth token's claims | The claim names in `convex/mcpClaims.ts` come from Clerk's docs. |
+| Run the endpoint on a real Convex deployment | The tests use `convex-test` on the edge runtime. |
+| Choose the default scopes | ADR-095 never listed any, and `profile email` is a placeholder. |
+| Check a 50 MB image URL fits in an HTTP action's memory | Only smaller files have been tested. |
+
+## OPEN — owed after v9.59 (11-08-2026)
+
+| What | Why it's left |
+| --- | --- |
+| GitHub Releases for v9.52 through v9.58 | The tags exist. Publishing a Release is done by hand, so these wait for a person. |
+| `imagehorse-qc` on the production build | Owed since v9.55. Masonry and Compare mode in v9.59 are the newest things it hasn't covered. |
+
 ## OPEN — Transfer leftovers (feat/transfer-ui, 11-04-2026, ADR-102)
 
 | What | Why it's left |

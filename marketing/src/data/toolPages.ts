@@ -313,6 +313,10 @@ export const TOOL_PAGES: readonly ToolPage[] = [
         p: "Every Batch tool — Logo, Text, Crop, Rename and AI Rename — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop gives them a crop of their own and one button crops both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
       },
       {
+        h2: "See the whole set at once",
+        p: "The Grid shows a page of photos at a time. Masonry shows all of them at their own shape, in columns you scroll, and zooming changes how many columns you get. Tick two photos in the gallery to compare them, and every pixel that changed gets tinted.",
+      },
+      {
         h2: "One pass over the whole set",
         p: "Every photo is decoded, edited and re-encoded in the same worker, which means a hundred files is one job rather than a hundred round trips. Nothing uploads, so the time it takes is your machine's, not your connection's.",
       },
