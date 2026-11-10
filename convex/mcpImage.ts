@@ -8,13 +8,15 @@ import { ConvexError } from "convex/values";
 // Convex can't resolve DNS first, so a public name pointing at a private address
 // is not caught here: the deployment's network is the backstop for that.
 
-export const MAX_IMAGE_BYTES = 50 * 1024 * 1024; // TRANSFER_MAX_BYTES in transfers.ts
+/** Below Transfer's 50 MB: an HTTP action has 64 MiB of memory, and the
+ *  download is held twice for a moment (its chunks, then the joined copy). */
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 /** A Convex HTTP request tops out near 20 MB, and base64 is a third bigger. */
 export const MAX_BASE64_CHARS = 20 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 20_000;
 
-const TOO_BIG = "That image is over the 50 MB limit.";
+const TOO_BIG = "That image is over the 20 MB limit for a URL.";
 
 export function checkImageUrl(raw: string): URL {
   let url: URL;
@@ -23,7 +25,8 @@ export function checkImageUrl(raw: string): URL {
   } catch {
     throw new ConvexError("That isn't a valid URL.");
   }
-  const host = url.hostname.toLowerCase();
+  // One trailing root dot is legal ("localhost.") and would dodge the checks.
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
   const allowed =
     url.protocol === "https:" &&
     !url.username &&
@@ -32,7 +35,7 @@ export function checkImageUrl(raw: string): URL {
     host.includes(".") &&
     !host.startsWith("[") &&
     !/^[\d.]+$/.test(host) &&
-    !/\.(localhost|local|internal|intranet|lan|home|corp)\.?$/.test(host);
+    !/(^|\.)(localhost|local|internal|intranet|lan|home|corp)$/.test(host);
   if (!allowed) throw new ConvexError("That address can't be fetched. Use a public https:// image URL, or send the image as base64.");
   return url;
 }
