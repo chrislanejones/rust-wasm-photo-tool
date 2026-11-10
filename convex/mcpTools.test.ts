@@ -398,18 +398,18 @@ describe("send_image_to_inbox", () => {
       remote = () => new Response(null, { status: 302, headers: { location: "https://a.example/again" } });
       expect((await callTool(t, token, "send_image_to_inbox", { image_url: "https://a.example/x" })).text).toMatch(/too many/);
     });
-    it("an honest Content-Length over 50 MB is refused without reading", async () => {
+    it("an honest Content-Length over 20 MB is refused without reading", async () => {
       const { t, token } = await me();
-      remote = () => new Response(PNG, { headers: { "content-length": String(51 * MiB) } });
-      expect((await callTool(t, token, "send_image_to_inbox", { image_url: "https://a.example/x" })).text).toMatch(/50 MB/);
+      remote = () => new Response(PNG, { headers: { "content-length": String(21 * MiB) } });
+      expect((await callTool(t, token, "send_image_to_inbox", { image_url: "https://a.example/x" })).text).toMatch(/20 MB/);
     });
     it("a lying Content-Length: the bytes are counted", async () => {
       const { t, token } = await me();
       const chunk = new Uint8Array(MiB);
       let sent = 0;
-      remote = () => new Response(new ReadableStream({ pull(c) { if (sent++ > 60) c.close(); else c.enqueue(chunk); } }), { headers: { "content-length": "12" } });
-      expect((await callTool(t, token, "send_image_to_inbox", { image_url: "https://a.example/x" })).text).toMatch(/50 MB/);
-      expect(sent).toBeLessThan(55);
+      remote = () => new Response(new ReadableStream({ pull(c) { if (sent++ > 30) c.close(); else c.enqueue(chunk); } }), { headers: { "content-length": "12" } });
+      expect((await callTool(t, token, "send_image_to_inbox", { image_url: "https://a.example/x" })).text).toMatch(/20 MB/);
+      expect(sent).toBeLessThan(25);
       expect(await files(t)).toHaveLength(0);
     });
     it("an error status and a network failure", async () => {
@@ -427,7 +427,8 @@ describe("send_image_to_inbox", () => {
     "http://cdn.example/a.png", "file:///etc/passwd", "ftp://a.example/x", "https://localhost/x", "https://foo.localhost/x",
     "https://127.0.0.1/x", "https://2130706433/x", "https://0x7f.0.0.1/x", "https://10.0.0.5/x", "https://169.254.169.254/x",
     "https://[::1]/x", "https://[fd00::1]/x", "https://user:pw@a.example/x", "https://a.example:8443/x", "https://intranet/x",
-    "https://db.internal/x", "https://printer.local/x", "not a url",
+    "https://db.internal/x", "https://printer.local/x", "https://localhost./x", "https://intranet./x",
+    "https://printer.local./x", "not a url",
   ])("refuses %s", (url) => { expect(() => checkImageUrl(url)).toThrow(); });
   it("allows an ordinary https URL", () => { expect(checkImageUrl("https://cdn.example.com:443/a.png").hostname).toBe("cdn.example.com"); });
 

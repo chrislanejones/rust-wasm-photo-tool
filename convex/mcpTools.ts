@@ -211,7 +211,7 @@ export const MCP_TOOLS: McpTool[] = [
   },
   {
     name: "send_image_to_inbox",
-    description: `Put an image in the user's Transfer inbox, where they add it to the gallery from the editor. Send image_base64 (about 15 MB at most) or a public https image_url (50 MB at most). JPEG, PNG, WebP, AVIF, HEIC or GIF. It waits 7 days and counts against storage. Cannot put anything in the gallery directly. ${LIMITS}`,
+    description: `Put an image in the user's Transfer inbox, where they add it to the gallery from the editor. Send image_base64 (about 15 MB at most) or a public https image_url (20 MB at most). JPEG, PNG, WebP, AVIF, HEIC or GIF. It waits 7 days and counts against storage. Cannot put anything in the gallery directly. ${LIMITS}`,
     input: {
       image_base64: z.string().optional(),
       image_url: z.string().optional(),
