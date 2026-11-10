@@ -279,6 +279,22 @@ export function TextSettings({
               )}
             </ControlRow>
 
+            {/* Align — where each line sits in the box (ADR-104) */}
+            <ControlRow label="Align">
+              {({ labelId }) => (
+                <ToolButtonGroup
+                  aria-labelledby={labelId}
+                  options={[
+                    { id: "left", label: "Left" },
+                    { id: "center", label: "Center" },
+                    { id: "right", label: "Right" },
+                  ] as const}
+                  value={settings.textAlign ?? "left"}
+                  onChange={(id) => onChange({ ...settings, textAlign: id })}
+                />
+              )}
+            </ControlRow>
+
             {/* Color */}
             <ColorSwatchGrid
               colors={TEXT_COLORS}

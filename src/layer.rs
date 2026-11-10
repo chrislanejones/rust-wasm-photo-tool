@@ -532,9 +532,14 @@ pub(crate) fn build_annotation_tile(
     font_id: &str,
     // Outline around the glyphs; `TextStroke::default()` = none.
     stroke: crate::annotations::TextStroke,
+    // Where each line sits in the box (v16, ADR-104): 0 left, 1 center,
+    // 2 right; and the BOX width it aligns in (`wrap_width`, 0 = none, align
+    // against the widest line). Appended for the same reason as `font_id`.
+    align: u8,
+    box_w: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::grow_to_box_height(
-        crate::text::render_text(text, font_size, r, g, b, bold, font_id),
+        crate::text::render_text_aligned(text, font_size, r, g, b, bold, font_id, align, box_w),
         box_height,
     );
     let raw_w = rendered.width;
@@ -2112,6 +2117,9 @@ impl ImageHorseTool {
         stroke_g: u8,
         stroke_b: u8,
         stroke_a: u8,
+        // Line alignment in the box (v16, ADR-104). An archive written before
+        // it has none and JS passes 0: Left, what that document meant.
+        align: u8,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -2164,6 +2172,7 @@ impl ImageHorseTool {
                 stroke_b,
                 stroke_a,
             ),
+            align,
         );
         let layer = match self.text_restore_target {
             (0, _) => self.layers.get_mut(self.active),
@@ -2546,6 +2555,8 @@ mod tests {
                                 0,
                                 "",
                                 Default::default(),
+                                0,
+                                0,
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
@@ -2598,6 +2609,8 @@ mod tests {
                 0,
                 "",
                 Default::default(),
+                0,
+                0,
             );
             let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)
@@ -2684,7 +2697,7 @@ mod text_stroke_tile_tests {
     fn tile(kind: u8, rot: f64, stroke: TextStroke) -> (Vec<u8>, u32, u32, i32, i32) {
         build_annotation_tile(
             "Hg", 32.0, 0, 255, 255, 255, true, rot, kind, 0, 0, 255, 255, 6, 16, 135, false,
-            false, 0, 0, 0, 0, 0, 0, 0, "", stroke,
+            false, 0, 0, 0, 0, 0, 0, 0, "", stroke, 0, 0,
         )
     }
 

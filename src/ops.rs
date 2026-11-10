@@ -273,7 +273,17 @@ use serde::{Deserialize, Serialize};
 ///     (index 25).
 ///   * `encode_annotations` gained a THIRTEENTH tuple element, read as a tail
 ///     after v11's, so an empty tail is a v14-or-older blob: no outlines.
-pub const OP_FORMAT_VERSION: u8 = 15;
+///
+/// **16** — a text's LINE ALIGNMENT in its box (ADR-104): the recipe again.
+///
+///   * `align` is `#[serde(skip)]` on [`TextParams`]; the wire layout is
+///     still v2's. Its skipped default (0) IS Left, what every older text
+///     means, so no normalization step is needed.
+///   * The alignment rides in an APPENDED variant, [`Op::TextAlign`]
+///     (index 26).
+///   * `encode_annotations` gained a FOURTEENTH tuple element, read as a tail
+///     after v15's, so an empty tail is a v15-or-older blob: all Left.
+pub const OP_FORMAT_VERSION: u8 = 16;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -411,6 +421,14 @@ pub struct TextParams {
     /// annotation written before v15 meant.
     #[serde(skip)]
     pub stroke: crate::annotations::TextStroke,
+    /// The line alignment in the box. v16, ADR-104.
+    ///
+    /// ⚠️ `#[serde(skip)]` for the identical reason as `wrap_width` above.
+    /// It travels as the fourteenth element of `encode_annotations` and as
+    /// [`Op::TextAlign`] in the log. Deserialises to 0, Left, which is what
+    /// every annotation written before v16 meant.
+    #[serde(skip)]
+    pub align: u8,
 }
 
 /// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
@@ -549,6 +567,7 @@ impl TextParams {
             shadow_blur: a.shadow_blur,
             font_id: a.font_id.clone(),
             stroke: a.stroke,
+            align: a.align,
         }
     }
 
@@ -587,6 +606,8 @@ impl TextParams {
         self.font_id = std::mem::take(&mut prev.font_id);
         // v15: the fifth, owned by `TextStroke`.
         self.stroke = prev.stroke;
+        // v16: the sixth, the line alignment.
+        self.align = prev.align;
     }
 }
 
@@ -749,6 +770,7 @@ pub(crate) fn annotation_sync_ops(
                 let quad = params.perspective;
                 let font = params.font_id.clone();
                 let stroke = params.stroke;
+                let align = params.align;
                 pending.push(Op::TextAdd(params));
                 if wrap != 0 {
                     pending.push(Op::TextWrap {
@@ -782,6 +804,10 @@ pub(crate) fn annotation_sync_ops(
                 if stroke.is_on() {
                     pending.push(Op::text_stroke(a.id, stroke));
                 }
+                // Left is what a skipped-field decode already holds.
+                if align != crate::annotations::TEXT_ALIGN_LEFT {
+                    pending.push(Op::TextAlign { id: a.id, align });
+                }
             }
             Some(t) => {
                 if t.wrap_width != params.wrap_width {
@@ -811,6 +837,12 @@ pub(crate) fn annotation_sync_ops(
                 if t.stroke != params.stroke {
                     pending.push(Op::text_stroke(a.id, params.stroke));
                 }
+                if t.align != params.align {
+                    pending.push(Op::TextAlign {
+                        id: a.id,
+                        align: params.align,
+                    });
+                }
                 // Compare everything EXCEPT the four skipped fields,
                 // which the branches above already accounted for —
                 // otherwise a box-only drag would also emit a redundant
@@ -823,6 +855,7 @@ pub(crate) fn annotation_sync_ops(
                 without_box.perspective = params.perspective;
                 without_box.font_id = params.font_id.clone();
                 without_box.stroke = params.stroke;
+                without_box.align = params.align;
                 if without_box != params {
                     pending.push(Op::TextEdit(params));
                 }
@@ -1136,6 +1169,11 @@ pub enum Op {
     /// Appended after [`Op::Adjustments`] (index 25); same rule as every
     /// variant since v2.
     TextStroke { id: u32, width: u32, rgba: [u8; 4] },
+    /// v16 — a text's line alignment in its box: 0 left, 1 center, 2 right
+    /// (ADR-104). `#[serde(skip)]` on [`TextParams::align`] means
+    /// `TextAdd`/`TextEdit` cannot carry it. Appended after
+    /// [`Op::TextStroke`] (index 26); same rule as every variant since v2.
+    TextAlign { id: u32, align: u8 },
 }
 
 impl Op {
@@ -1192,6 +1230,8 @@ impl Op {
             Op::Adjustments { .. } => "Adjustments",
             // `set_text_stroke`'s own snapshot label.
             Op::TextStroke { .. } => "Text Stroke",
+            // `set_text_align`'s own snapshot label.
+            Op::TextAlign { .. } => "Text Align",
         }
     }
 }
@@ -1397,6 +1437,8 @@ pub fn encode_annotations(
             )
         })
         .collect();
+    // v16 appends the per-TEXT line alignment as the fourteenth.
+    let text_aligns: Vec<u8> = texts.iter().map(|t| t.align).collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -1411,6 +1453,7 @@ pub fn encode_annotations(
         &shape_star_points,
         &shape_corner_radii,
         &text_strokes,
+        &text_aligns,
     )) {
         out.extend_from_slice(&body);
     }
@@ -1513,9 +1556,18 @@ pub fn decode_annotations(
                 }
                 // v15: the text outlines. An empty tail is a v14-or-older
                 // blob, and every text keeps the "no outline" the skip left.
-                if let Ok(strokes) = postcard::from_bytes::<Vec<(u32, [u8; 4])>>(v15_tail) {
+                if let Ok((strokes, v16_tail)) =
+                    postcard::take_from_bytes::<Vec<(u32, [u8; 4])>>(v15_tail)
+                {
                     for (t, (w, c)) in texts.iter_mut().zip(strokes) {
                         t.stroke = crate::annotations::TextStroke::new(w, c[0], c[1], c[2], c[3]);
+                    }
+                    // v16: the line alignments. An empty tail is a
+                    // v15-or-older blob, and every text keeps Left.
+                    if let Ok(aligns) = postcard::from_bytes::<Vec<u8>>(v16_tail) {
+                        for (t, al) in texts.iter_mut().zip(aligns) {
+                            t.align = crate::annotations::canonical_text_align(al);
+                        }
                     }
                 }
             }
@@ -1848,6 +1900,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         t.shadow_blur,
         &t.font_id,
         t.stroke,
+        t.align,
     );
     let pixels =
         std::sync::Arc::try_unwrap(a.tile_pixels).unwrap_or_else(|shared| (*shared).clone());
@@ -2068,6 +2121,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.stroke =
                     crate::annotations::TextStroke::new(*width, rgba[0], rgba[1], rgba[2], rgba[3]);
+            }
+        }
+        Op::TextAlign { id, align } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.align = crate::annotations::canonical_text_align(*align);
             }
         }
         Op::ShapeRotation { id, rotation_deg } => {
@@ -2562,6 +2620,7 @@ mod tests {
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
             stroke: Default::default(),
+            align: 0,
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -3260,6 +3319,7 @@ mod v2_migration_tests {
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
             stroke: Default::default(),
+            align: 0,
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -3809,6 +3869,67 @@ mod v2_migration_tests {
             Default::default(),
             "a v14 text had no outline"
         );
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_align_field() {
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.align = crate::annotations::TEXT_ALIGN_CENTER;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "the alignment must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn v16_round_trips_text_align_and_v15_blobs_mean_left() {
+        let mut t = a_text(1);
+        t.align = crate::annotations::TEXT_ALIGN_RIGHT;
+        t.stroke = crate::annotations::TextStroke::new(3, 1, 2, 3, 255);
+        let blob = encode_annotations(&[t.clone(), a_text(2)], &[a_shape(3)], None);
+        let (texts, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(texts[0].align, crate::annotations::TEXT_ALIGN_RIGHT);
+        assert_eq!(texts[0].stroke, t.stroke, "v15's element still reads");
+        assert_eq!(texts[1].align, crate::annotations::TEXT_ALIGN_LEFT);
+
+        // A v15 blob is the same tuple minus the fourteenth element.
+        let texts_in = [t.clone()];
+        let shapes_in = [a_shape(3)];
+        let mut v15 = vec![15u8];
+        v15.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts_in[..],
+                &shapes_in[..],
+                None::<CanvasParams>,
+                &vec![0u32],
+                &vec![0u32],
+                &vec![crate::perspective::IDENTITY_QUAD],
+                &vec![crate::perspective::IDENTITY_QUAD],
+                &vec![0u8],
+                &vec![""],
+                &vec![0.0f64],
+                &vec![0u8],
+                &vec![[0u16; 4]],
+                &vec![(3u32, [1u8, 2, 3, 255])],
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        let (texts, _, _) = decode_annotations(&v15).unwrap(); // allow: rust-panic
+        assert_eq!(texts[0].align, 0, "a v15 text was left-aligned");
+        assert_eq!(texts[0].stroke.width, 3, "and keeps its outline");
+    }
+
+    #[test]
+    fn text_align_op_applies_to_the_right_annotation_and_unknown_values_are_left() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(&Op::TextAlign { id: 2, align: 1 }, &mut doc);
+        assert_eq!((doc.texts[0].align, doc.texts[1].align), (0, 1));
+        apply(&Op::TextAlign { id: 2, align: 9 }, &mut doc);
+        assert_eq!(doc.texts[1].align, 0, "an unknown value draws as left");
     }
 
     #[test]
@@ -4378,8 +4499,8 @@ mod v2_migration_tests {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
         assert_eq!(
-            OP_FORMAT_VERSION, 15,
-            "15 adds the text outline; earlier op indices stay fixed"
+            OP_FORMAT_VERSION, 16,
+            "16 adds the text line alignment (ADR-104); earlier op indices stay fixed"
         );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
@@ -4541,6 +4662,11 @@ mod v2_migration_tests {
             }),
             25,
             "TextStroke (v15)"
+        );
+        assert_eq!(
+            idx(&Op::TextAlign { id: 1, align: 0 }),
+            26,
+            "TextAlign (v16)"
         );
     }
 

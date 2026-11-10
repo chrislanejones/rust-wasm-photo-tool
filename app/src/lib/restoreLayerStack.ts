@@ -194,5 +194,7 @@ export function restoreStoredText(
     a.stroke_g ?? 0,
     a.stroke_b ?? 0,
     a.stroke_a ?? 0,
+    // Line alignment (v16, ADR-104). Absent before it: 0, left.
+    a.align ?? 0,
   );
 }

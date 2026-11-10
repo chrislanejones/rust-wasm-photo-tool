@@ -6,7 +6,7 @@
 // ratchet (eslint.config.mjs): AppShell built this object twice, CanvasArea
 // declared its type inline, and the stroke would have grown all three.
 import type React from "react";
-import type { ToolSettings } from "@/lib/types";
+import type { TextAlign, ToolSettings } from "@/lib/types";
 import { formatRgba, hexToRgba } from "@/lib/colorConvert";
 
 /** What `CanvasArea` reads to draw the open textarea and its live preview. */
@@ -32,6 +32,8 @@ export interface TextOverlaySettings {
   textStrokeWidth?: number;
   textStrokeColor?: string;
   textStrokeOpacity?: number;
+  /** Line alignment in the box (ADR-104); absent = left. */
+  textAlign?: TextAlign;
 }
 
 /** The overlay's slice of the tool settings. */
@@ -51,6 +53,7 @@ export function textOverlaySettings(s: ToolSettings): TextOverlaySettings {
     textStrokeWidth: s.textStrokeWidth,
     textStrokeColor: s.textStrokeColor,
     textStrokeOpacity: s.textStrokeOpacity,
+    textAlign: s.textAlign,
   };
 }
 
@@ -72,7 +75,7 @@ export function textStrokeEngineArgs(
  *  src/layer.rs). `-webkit-text-stroke` is centered on the glyph edge, so it
  *  is drawn twice as wide and painted UNDER the fill: what shows is exactly
  *  the outer half, the same band the engine commits. */
-export function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
+function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
   const width = Math.max(0, s.textStrokeWidth ?? 0) * scale;
   const opacity = Math.max(0, Math.min(100, s.textStrokeOpacity ?? 100)) / 100;
   if (width <= 0 || opacity <= 0) return {};
@@ -81,4 +84,17 @@ export function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSP
     WebkitTextStroke: `${width * 2}px ${formatRgba(rgb, opacity)}`,
     paintOrder: "stroke fill",
   };
+}
+
+/** The engine's alignment byte: 0 left, 1 center, 2 right (`set_text_align`). */
+export function textAlignEngineArg(align: TextAlign | undefined): number {
+  return align === "center" ? 1 : align === "right" ? 2 : 0;
+}
+
+/** Everything the open textarea previews beyond the face and color: the
+ *  stroke (`textStrokeCss`) and the line alignment. The textarea is as wide
+ *  as the box, so CSS `text-align` puts each line where the engine will:
+ *  against the box when it has one, against the widest line when it hasn't. */
+export function textPreviewCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
+  return { ...textStrokeCss(s, scale), textAlign: s.textAlign ?? "left" };
 }

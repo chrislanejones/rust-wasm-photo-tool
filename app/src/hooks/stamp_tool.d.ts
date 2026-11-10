@@ -1109,6 +1109,9 @@ declare module "stamp_tool" {
      *  `color_hex` at `alpha` (0-255). No-op — and no history step — when
      *  nothing visible changes, so commitText calls it on every commit. */
     set_text_stroke(id: number, width: number, color_hex: string, alpha: number): boolean;
+    /** Line alignment in the box: 0 left, 1 center, 2 right (anything else is
+     *  left). No-op, and no history step, when unchanged (v16, ADR-104). */
+    set_text_align(id: number, align: number): boolean;
     remove_text_annotation(id: number): boolean;
     get_text_annotations(): string;
     /** Returns the matching annotation id, or -1 if no hit. */
@@ -1337,6 +1340,8 @@ declare module "stamp_tool" {
       stroke_g: number,
       stroke_b: number,
       stroke_a: number,
+      /** Line alignment (v16): 0 left, 1 center, 2 right. */
+      align: number,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;

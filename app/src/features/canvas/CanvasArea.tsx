@@ -40,7 +40,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
-import { textStrokeCss, type TextOverlaySettings } from "@/lib/textOverlaySettings";
+import { textPreviewCss, type TextOverlaySettings } from "@/lib/textOverlaySettings";
 import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -1928,7 +1928,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   // was measured with, and the same bytes the engine was given
                   // — so these glyphs ARE the committed glyphs (v8.76).
                   fontFamily: effFontCss,
-                  ...textStrokeCss(textSettings, scaleX), // engine-true stroke preview
+                  ...textPreviewCss(textSettings, scaleX), // engine-true stroke + line alignment
                   lineHeight: 1.3,
                   padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",

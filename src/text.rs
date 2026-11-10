@@ -127,13 +127,34 @@ pub fn render_text(
     bold: bool,
     font_id: &str,
 ) -> RenderedText {
+    render_text_aligned(text, font_size, r, g, b, bold, font_id, 0, 0)
+}
+
+/// [`render_text`] with each line placed inside the box: `align` 0 = left,
+/// 1 = center, 2 = right (v16, ADR-104). `box_w` is the BOX width the user
+/// dragged (`wrap_width`); 0 = no box, and the lines align against the
+/// widest one. Left lays out exactly as [`render_text`] always has, so every
+/// text written before v16 draws byte-identically.
+#[allow(clippy::too_many_arguments)]
+pub fn render_text_aligned(
+    text: &str,
+    font_size: f32,
+    r: u8,
+    g: u8,
+    b: u8,
+    bold: bool,
+    font_id: &str,
+    align: u8,
+    box_w: u32,
+) -> RenderedText {
     crate::fonts::with_face(font_id, bold, |font| {
-        render_text_with(text, font_size, r, g, b, font)
+        render_text_with(text, font_size, r, g, b, font, align, box_w)
     })
 }
 
 /// The body of [`render_text`], against an already-resolved face. Split out so
 /// the face is resolved exactly once per call rather than once per helper.
+#[allow(clippy::too_many_arguments)]
 fn render_text_with(
     text: &str,
     font_size: f32,
@@ -141,6 +162,8 @@ fn render_text_with(
     g: u8,
     b: u8,
     font: &FontRef<'_>,
+    align: u8,
+    box_w: u32,
 ) -> RenderedText {
     let scale = PxScale::from(font_size);
     let sf = font.as_scaled(scale);
@@ -149,24 +172,38 @@ fn render_text_with(
     let line_height = font_size * 1.3;
     let ascent = sf.ascent();
 
-    let max_w = lines
-        .iter()
-        .map(|l| line_width(l, font, scale))
-        .fold(0.0f32, f32::max);
+    let widths: Vec<f32> = lines.iter().map(|l| line_width(l, font, scale)).collect();
+    let max_w = widths.iter().copied().fold(0.0f32, f32::max);
     let pad = (font_size * 0.25).ceil() as u32;
+    // Centered and right text in a box line up against the box's CONTENT
+    // width, the same width `wrap_for_tile` breaks the lines to (the box less
+    // `side_padding` each side). A word wider than the box widens it. Left
+    // keeps the widest line as the block width, as it always has.
+    let content_w = if align != 0 && box_w > 0 {
+        (box_w as f32 - 2.0 * pad as f32).max(max_w)
+    } else {
+        max_w
+    };
 
-    let canvas_w = (max_w.ceil() as u32 + pad * 2).max(1);
+    let canvas_w = (content_w.ceil() as u32 + pad * 2).max(1);
     let canvas_h = ((lines.len() as f32 * line_height).ceil() as u32 + pad * 2).max(1);
 
     let mut pixels = vec![0u8; (canvas_w * canvas_h * 4) as usize];
 
     for (i, line) in lines.iter().enumerate() {
         let baseline_y = pad as f32 + i as f32 * line_height + ascent;
+        // Whole pixels, so a centered line's glyphs sit on the same grid as
+        // a left-aligned one's.
+        let inset = match align {
+            1 => ((content_w - widths[i]) / 2.0).round(),
+            2 => (content_w - widths[i]).round(),
+            _ => 0.0,
+        };
         rasterise_line(
             line,
             font,
             scale,
-            pad as f32,
+            pad as f32 + inset,
             baseline_y,
             canvas_w,
             canvas_h,
@@ -607,6 +644,8 @@ impl ImageHorseTool {
             0, // shadow off
             font_id,
             crate::annotations::TextStroke::default(),
+            0, // left: this path has no box
+            0,
         );
 
         self.snap("Text");
@@ -741,5 +780,87 @@ mod wrap_tests {
             "side_padding {} vs derived {derived}",
             side_padding(size)
         );
+    }
+
+    /// Ink columns (min, max) inside rows `y0..y1` of a rendered block.
+    fn ink_cols(t: &RenderedText, y0: u32, y1: u32) -> (u32, u32) {
+        let (mut lo, mut hi) = (u32::MAX, 0);
+        for y in y0..y1.min(t.height) {
+            for x in 0..t.width {
+                if t.pixels[((y * t.width + x) * 4 + 3) as usize] > 0 {
+                    lo = lo.min(x);
+                    hi = hi.max(x);
+                }
+            }
+        }
+        (lo, hi)
+    }
+
+    #[test]
+    fn centered_lines_sit_in_the_middle_of_the_box_and_right_lines_at_its_edge() {
+        // ADR-104. "H" has equal side bearings, so its ink is centered on its
+        // advance and the check is about the layout, not the glyph.
+        let fs = 24.0;
+        let pad = side_padding(fs) as u32;
+        let lh = fs * 1.3;
+        let band = |i: u32| {
+            (
+                pad + (i as f32 * lh) as u32,
+                pad + ((i + 1) as f32 * lh) as u32,
+            )
+        };
+        let text = "HHHHHH\nHH";
+
+        let c = render_text_aligned(text, fs, 0, 0, 0, false, "", 1, 300);
+        assert_eq!(c.width, 300, "the block is the box: content + padding");
+        for i in 0..2 {
+            let (y0, y1) = band(i);
+            let (lo, hi) = ink_cols(&c, y0, y1);
+            let mid = (lo + hi + 1) as f32 / 2.0;
+            assert!(
+                (mid - 150.0).abs() <= 1.0,
+                "line {i} centered: ink {lo}..={hi}, mid {mid}"
+            );
+        }
+
+        let r = render_text_aligned(text, fs, 0, 0, 0, false, "", 2, 300);
+        let ends: Vec<u32> = (0..2)
+            .map(|i| ink_cols(&r, band(i).0, band(i).1).1)
+            .collect();
+        assert!(
+            ends[0].abs_diff(ends[1]) <= 1,
+            "right edges line up: {ends:?}"
+        );
+        assert!(
+            ends[0] >= 300 - pad - 3,
+            "against the box's right side: {ends:?}"
+        );
+    }
+
+    #[test]
+    fn with_no_box_lines_center_against_the_widest_one() {
+        let fs = 24.0;
+        let pad = side_padding(fs) as u32;
+        let lh = fs * 1.3;
+        let c = render_text_aligned("HHHHHH\nHH", fs, 0, 0, 0, false, "", 1, 0);
+        let wide = ink_cols(&c, pad, pad + lh as u32);
+        let short = ink_cols(&c, pad + lh as u32, pad + (2.0 * lh) as u32);
+        let mid = |(lo, hi): (u32, u32)| (lo + hi + 1) as f32 / 2.0;
+        assert!(
+            (mid(wide) - mid(short)).abs() <= 1.0,
+            "{wide:?} vs {short:?}"
+        );
+    }
+
+    #[test]
+    fn left_is_exactly_the_old_layout_box_or_not() {
+        // Every text written before v16 is Left: it must not move a pixel.
+        let old = render_text("Hello there\nfriend", 24.0, 10, 20, 30, false, "");
+        for box_w in [0, 120, 600] {
+            let new =
+                render_text_aligned("Hello there\nfriend", 24.0, 10, 20, 30, false, "", 0, box_w);
+            assert_eq!((new.width, new.height), (old.width, old.height));
+            assert!(new.pixels == old.pixels, "box {box_w}");
+        }
     }
 }

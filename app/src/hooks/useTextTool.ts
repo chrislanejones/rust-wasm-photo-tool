@@ -8,7 +8,7 @@ import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
-import { textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { textAlignEngineArg, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
 import { joinedSetters } from "@/lib/commitSteps";
 
 interface TextInput {
@@ -409,6 +409,10 @@ export function useTextTool({
         },
         async (id) => {
           if (id !== null && typeof tool.set_text_box_height === "function") await tool.set_text_box_height(id, boxHeightAtCommit);
+        },
+        // v16 — the line alignment in the box (ADR-104), same contract.
+        async (id) => {
+          if (id !== null) await tool.set_text_align(id, textAlignEngineArg(s.textAlign));
         },
       ],
     );

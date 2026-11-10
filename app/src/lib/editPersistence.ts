@@ -166,6 +166,9 @@ export interface PersistedAnnotation {
   stroke_g?: number;
   stroke_b?: number;
   stroke_a?: number;
+  /** Line alignment in the box: 0 left, 1 center, 2 right (v16, ADR-104).
+   *  Absent on every archive written before it: 0, left, what it meant. */
+  align?: number;
 }
 
 /** One live (non-destructive) shape/arrow annotation, as emitted by Rust's

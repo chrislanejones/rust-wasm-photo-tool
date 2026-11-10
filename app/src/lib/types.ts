@@ -47,6 +47,9 @@ export type ShapeName =
   | "rect" | "circle" | "line" | "diamond" | "star" | "triangle" | "oval"
   | DiagramShapeName;
 
+/** A text's line alignment in its box. */
+export type TextAlign = "left" | "center" | "right";
+
 export interface ToolSettings extends StampSettings {
   strokeWidth: number;
   strokeColor: string;
@@ -87,6 +90,10 @@ export interface ToolSettings extends StampSettings {
    *  answers in the FALLBACK and is then cached against the real id forever.
    *  `ensureEngineFonts` exists to make that impossible; await it. */
   textFontId: string;
+  /** Where each line sits in the text's box (v16, ADR-104). Absent = left,
+   *  what every text before it was. No justify: greedy wrapping at small
+   *  widths makes it look bad. */
+  textAlign?: TextAlign;
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: ShapeName;

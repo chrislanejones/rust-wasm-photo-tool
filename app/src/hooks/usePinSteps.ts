@@ -12,6 +12,7 @@
 // moved label is followed from useTextTool, through `followLabels`. The
 // panel's Leader toggle picks a line (default) or an arrow for a new callout.
 import { useCallback, useEffect, useRef } from "react";
+import { textAlignEngineArg } from "@/lib/textOverlaySettings";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { nextAfterDrop, nextPinNumber, pinSequence } from "@/lib/pinSteps";
@@ -205,6 +206,12 @@ export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Optio
         ((Math.round(s.bgTail) % 360) + 360) % 360, // the bubble tail, as the Text tool sends it
         s.textFontId ?? "",
       );
+      // The Text panel's Align, so a callout label reads like a text placed
+      // by hand (ADR-104); one step with the pin. A no-op for Left, and the
+      // join it leaves armed is taken by the leader below, or cleared by the
+      // recomposite `afterChange` ends with.
+      tool.continue_step();
+      tool.set_text_align(labelId, textAlignEngineArg(s.textAlign));
       const label = (await readTexts(tool)).find((t) => t.id === labelId);
       if (label) {
         const l = leaderFor(pin, label);
