@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { getUser, requireUser } from "./users";
 
 // ── MCP: who is calling, may they, and what happened (ADR-095) ────────────────
 
@@ -19,6 +20,62 @@ export function mcpRefusal(user: Pick<Doc<"users">, "mcpEnabled" | "mcpOffReason
     ? 'AI access went off when a device switched to "Everything in your browser". Turn on "Let AI apps use my account" in Settings › Connections to use it again.'
     : 'AI access is off for this account. Turn on "Let AI apps use my account" in Settings › Connections.';
 }
+
+export const endpointEnabled = () => process.env.MCP_ENDPOINT_ENABLED === "1";
+
+const RECENT_CALLS = 20;
+
+/** Settings › Connections. `url` is null until the server switch is on, so the
+ *  pane can't hand out an address that answers 404. */
+export const connection = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getUser(ctx);
+    if (!user) return null;
+    const on = endpointEnabled() && process.env.CONVEX_SITE_URL;
+    return {
+      enabled: user.mcpEnabled === true,
+      offReason: user.mcpOffReason ?? null,
+      url: on ? `${process.env.CONVEX_SITE_URL}/mcp` : null,
+    };
+  },
+});
+
+/** "Let AI apps use my account". */
+export const setEnabled = mutation({
+  args: { enabled: v.boolean() },
+  handler: async (ctx, { enabled }) => {
+    const user = await requireUser(ctx);
+    await ctx.db.patch(user._id, { mcpEnabled: enabled, mcpOffReason: undefined, updatedAt: Date.now() });
+  },
+});
+
+/** A device just switched to "Everything in your browser". The switch itself
+ *  lives in that browser, where the server can't see it (ADR-095), so this is
+ *  how it reaches the server. Does nothing if access is already off. */
+export const browserOnlyOn = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getUser(ctx);
+    if (!user || user.mcpEnabled !== true) return;
+    await ctx.db.patch(user._id, { mcpEnabled: false, mcpOffReason: "browser-only", updatedAt: Date.now() });
+  },
+});
+
+/** The last 20 calls AI apps made on this account. Empty when signed out. */
+export const recentCalls = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getUser(ctx);
+    if (!user) return [];
+    const rows = await ctx.db
+      .query("mcp_calls")
+      .withIndex("by_userId_at", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(RECENT_CALLS);
+    return rows.map((r) => ({ id: r._id, app: r.clientId, tool: r.tool, outcome: r.outcome, at: r.at }));
+  },
+});
 
 /** The `users` row for a verified token's subject, or null (a 401). */
 export const principalFor = internalQuery({
