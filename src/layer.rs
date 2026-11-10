@@ -1968,6 +1968,7 @@ impl ImageHorseTool {
         self.editing_text_id = None;
         self.next_text_id = 1;
         self.next_shape_id = 1;
+        self.text_restore_target = (0, 0);
         self.next_layer_id = 1;
     }
 
@@ -2023,9 +2024,25 @@ impl ImageHorseTool {
         id
     }
 
-    /// Restore a text annotation onto the active (just-pushed) layer WITHOUT
-    /// pushing history. Mirrors `restore_shape_annotation` for text. The tile is
-    /// rebuilt from config; a fresh id is assigned.
+    /// Where the next `restore_text_annotation` calls put their text: `stack`
+    /// 0 = the active layer (the default), 1 = undo snapshot `index`, 2 = redo
+    /// snapshot `index`. Reset to the layer by `begin_layer_restore`.
+    ///
+    /// This replaced `push_annotation_to_undo_snapshot` / `_redo_snapshot`,
+    /// which took only the first 19 fields: every text re-injected into the
+    /// history after a reload from the archive lost its box, its perspective,
+    /// its shadow and its outline, so the first undo after that reload put the
+    /// text back unwrapped (33a, ADR-024-F7). With one restore call there is
+    /// one argument list, and a field added to it reaches all three.
+    pub fn set_text_restore_target(&mut self, stack: u8, index: usize) {
+        self.text_restore_target = (stack, index);
+    }
+
+    /// Restore a text annotation WITHOUT pushing history, onto the active
+    /// (just-pushed) layer or the history snapshot `set_text_restore_target`
+    /// named. Mirrors `restore_shape_annotation` for text. The tile is rebuilt
+    /// from config; a fresh id is assigned. Returns 0, adding nothing, when the
+    /// target snapshot doesn't exist.
     #[allow(clippy::too_many_arguments)]
     pub fn restore_text_annotation(
         &mut self,
@@ -2148,11 +2165,28 @@ impl ImageHorseTool {
                 stroke_a,
             ),
         );
-        let active = self.active;
-        if let Some(layer) = self.layers.get_mut(active) {
-            layer.text_annotations.push(ann);
+        let layer = match self.text_restore_target {
+            (0, _) => self.layers.get_mut(self.active),
+            (stack, index) => {
+                let snap = if stack == 1 {
+                    self.hist.undo_stack.get_mut(index)
+                } else {
+                    self.hist.redo_stack.get_mut(index)
+                };
+                snap.and_then(|snap| {
+                    snap.png.take(); // its pixels change: the cached PNG is stale
+                    let a = snap.active;
+                    snap.layers.get_mut(a)
+                })
+            }
+        };
+        match layer {
+            Some(layer) => {
+                layer.text_annotations.push(ann);
+                id
+            }
+            None => 0,
         }
-        id
     }
 
     /// Finish a layer-restore: recover the Canvas flag for documents persisted

@@ -12,7 +12,7 @@
 import type { SavedEdit } from "@/lib/editPersistence";
 import { encodeAvif } from "@/lib/avifEncoder";
 import { encodeViaWorker } from "@/lib/codecWorkerClient";
-import { restoreLayerStack } from "@/lib/restoreLayerStack";
+import { restoreLayerStack, restoreStoredText } from "@/lib/restoreLayerStack";
 
 /** Every export format, as a tuple so it can be range-checked at runtime —
  *  the persisted `exportFormat` preference is rehydrated from same-origin-
@@ -244,23 +244,7 @@ export async function compositeSavedEdit(
 
     if (!usedLayers && edit.annotations && edit.annotations.length > 0) {
       for (const a of edit.annotations) {
-        tool.add_text_annotation(
-          a.text,
-          a.font_size,
-          a.r, a.g, a.b,
-          a.bold,
-          a.x, a.y,
-          a.rotation_deg,
-          a.background_kind ?? 0,
-          a.bg_r ?? 255,
-          a.bg_g ?? 255,
-          a.bg_b ?? 255,
-          a.bg_a ?? 255,
-          a.bg_padding ?? 8,
-          a.bg_corner_radius ?? 8,
-          a.bg_tail ?? 0,
-          a.font_id ?? "",
-        );
+        restoreStoredText(tool, a);
       }
       tool.flatten_text_annotations();
     }

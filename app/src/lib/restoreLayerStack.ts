@@ -21,7 +21,7 @@
 // `decodeToRgba`) and this module should not become the fourth, nor force an
 // import direction between lib/ and hooks/.
 import type { ImageHorseTool } from "stamp_tool";
-import type { PersistedLayer } from "@/lib/editPersistence";
+import type { PersistedAnnotation, PersistedLayer } from "@/lib/editPersistence";
 import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 
 /** Decode a PNG to raw RGBA. Signature matches the existing local helpers. */
@@ -77,60 +77,7 @@ export async function restoreLayerStack(
       layer.opacity,
     );
     for (const a of layer.annotations ?? []) {
-      tool.restore_text_annotation(
-        a.text,
-        a.font_size,
-        a.r, a.g, a.b,
-        a.bold,
-        a.x, a.y,
-        a.rotation_deg,
-        a.background_kind ?? 0,
-        a.bg_r ?? 255,
-        a.bg_g ?? 255,
-        a.bg_b ?? 255,
-        a.bg_a ?? 255,
-        a.bg_padding ?? 8,
-        a.bg_corner_radius ?? 8,
-        a.bg_tail ?? 0,
-        a.shadow_box ?? false,
-        a.shadow_text ?? false,
-        a.shadow_r ?? 0,
-        a.shadow_g ?? 0,
-        a.shadow_b ?? 0,
-        a.shadow_a ?? 0,
-        a.shadow_dx ?? 0,
-        a.shadow_dy ?? 0,
-        a.shadow_blur ?? 0,
-        a.font_id ?? "",
-        // ── The box and the quad — ADR-060 ─────────────────────────────────
-        //
-        // These three arguments are new in v8.81, and the reason they were not
-        // here before is a premise that was measured FALSE. `layer.rs` carried
-        // three comments saying the gap was fine because "the op-log path
-        // (which DOES carry it, via Op::TextWrap) is the one the resume
-        // actually uses". On production, 2026-09-20: in every run where the
-        // user dragged the text box before the first save, NO op log was
-        // persisted at all — so the resume landed here, on the path that
-        // carried none of it, and the text came back unwrapped on one line.
-        //
-        // Absent on every archive written before v8.81, which is what the
-        // `?? 0` and the empty array mean: 0 is "size the box to the text" and
-        // a wrong-length quad is "no perspective recorded". Both are exactly
-        // what those documents meant, so an old archive restores unchanged.
-        a.wrap_width ?? 0,
-        a.box_height ?? 0,
-        // Flat [x0,y0,x1,y1,x2,y2,x3,y3] — `annotations_to_json`'s own layout,
-        // so the persisted array rides straight through. The engine reads any
-        // length but 8 as the identity.
-        new Float32Array(a.perspective ?? []),
-        // The text outline. Absent on every archive written before it
-        // existed: width 0 is "no outline", exactly what those meant.
-        a.stroke_width ?? 0,
-        a.stroke_r ?? 0,
-        a.stroke_g ?? 0,
-        a.stroke_b ?? 0,
-        a.stroke_a ?? 0,
-      );
+      restoreStoredText(tool, a);
     }
     for (const s of layer.shapes ?? []) {
       if (s.kind === 5) {
@@ -175,4 +122,77 @@ export async function restoreLayerStack(
   const activeIdx = layers.findIndex((l) => l.id === activeLayerId);
   tool.finish_layer_restore(activeIdx >= 0 ? activeIdx : layers.length - 1);
   return true;
+}
+
+/** THE one place a stored text becomes an engine call (33a, ADR-024-F7).
+ *
+ *  Every way a saved text comes back goes through here: the layer stack on a
+ *  resume (`restoreLayerStack`), the undo and redo snapshots re-injected after
+ *  it (useEngineCore, with `set_text_restore_target`), the legacy flat archive
+ *  and the batch export's throwaway engine. It used to be four argument lists:
+ *  the history re-injection and the two legacy paths stopped at `font_id`, so
+ *  each lost the box, the perspective, the shadow and the outline, and the
+ *  first undo after an archive resume put a wrapped text back on one line.
+ *  A field added below now reaches every path at once. */
+export function restoreStoredText(
+  tool: Pick<ImageHorseTool, "restore_text_annotation">,
+  a: PersistedAnnotation,
+): void {
+  tool.restore_text_annotation(
+    a.text,
+    a.font_size,
+    a.r, a.g, a.b,
+    a.bold,
+    a.x, a.y,
+    a.rotation_deg,
+    a.background_kind ?? 0,
+    a.bg_r ?? 255,
+    a.bg_g ?? 255,
+    a.bg_b ?? 255,
+    a.bg_a ?? 255,
+    a.bg_padding ?? 8,
+    a.bg_corner_radius ?? 8,
+    a.bg_tail ?? 0,
+    a.shadow_box ?? false,
+    a.shadow_text ?? false,
+    a.shadow_r ?? 0,
+    a.shadow_g ?? 0,
+    a.shadow_b ?? 0,
+    a.shadow_a ?? 0,
+    a.shadow_dx ?? 0,
+    a.shadow_dy ?? 0,
+    a.shadow_blur ?? 0,
+    a.font_id ?? "",
+    // ── The box and the quad — ADR-060 ─────────────────────────────────
+    //
+    // These three arguments are new in v8.81, and the reason they were not
+    // here before is a premise that was measured FALSE. `layer.rs` carried
+    // three comments saying the gap was fine because "the op-log path
+    // (which DOES carry it, via Op::TextWrap) is the one the resume
+    // actually uses". On production, 2026-09-20: in every run where the
+    // user dragged the text box before the first save, NO op log was
+    // persisted at all — so the resume landed here, on the path that
+    // carried none of it, and the text came back unwrapped on one line.
+    // (Why no log, found 11-09: the replay drew a wrapped text unwrapped,
+    // so its pixels didn't match and the save retired the log. Fixed in
+    // ops.rs `build_text_tile`; this path still has to carry the box.)
+    //
+    // Absent on every archive written before v8.81, which is what the
+    // `?? 0` and the empty array mean: 0 is "size the box to the text" and
+    // a wrong-length quad is "no perspective recorded". Both are exactly
+    // what those documents meant, so an old archive restores unchanged.
+    a.wrap_width ?? 0,
+    a.box_height ?? 0,
+    // Flat [x0,y0,x1,y1,x2,y2,x3,y3] — `annotations_to_json`'s own layout,
+    // so the persisted array rides straight through. The engine reads any
+    // length but 8 as the identity.
+    new Float32Array(a.perspective ?? []),
+    // The text outline. Absent on every archive written before it
+    // existed: width 0 is "no outline", exactly what those meant.
+    a.stroke_width ?? 0,
+    a.stroke_r ?? 0,
+    a.stroke_g ?? 0,
+    a.stroke_b ?? 0,
+    a.stroke_a ?? 0,
+  );
 }

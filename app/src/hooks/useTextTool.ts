@@ -9,6 +9,7 @@ import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
 import { textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { joinedSetters } from "@/lib/commitSteps";
 
 interface TextInput {
   screenX: number;
@@ -340,72 +341,77 @@ export function useTextTool({
       }
     }
 
-    let targetId: number | null;
-    if (editingId !== null) {
-      tool.update_text_annotation(
-        editingId,
-        ti.text,
-        ti.fontSize,
-        r,
-        g,
-        b,
-        bold,
-        x,
-        y,
-        ti.rotation,
-        bgKind,
-        bgR,
-        bgG,
-        bgB,
-        bgA,
-        bgPadding,
-        bgCornerRadius,
-        bgTail,
-      );
-      targetId = editingId;
-    } else {
-      targetId = await tool.add_text_annotation(
-        ti.text,
-        ti.fontSize,
-        r,
-        g,
-        b,
-        bold,
-        x,
-        y,
-        ti.rotation,
-        bgKind,
-        bgR,
-        bgG,
-        bgB,
-        bgA,
-        bgPadding,
-        bgCornerRadius,
-        bgTail,
-        fontId,
-      );
-    }
-    // v8.76 — and the typeface, by the identical argument to the wrap width
-    // below. `update_text_annotation` takes no font parameter (it PRESERVES
-    // the annotation's own), so an edit that changes the face has to say so
-    // here; Rust no-ops when it is unchanged.
-    if (targetId !== null && typeof tool.set_text_font === "function") {
-      await tool.set_text_font(targetId, fontId);
-    }
-    // v8.40 — carry the box's reflow width onto the committed annotation.
-    // A separate call rather than another argument on the two entry points
-    // above: it maps 1:1 onto the engine's `Op::TextWrap`, and those
-    // signatures are already 19 arguments long. Rust no-ops when the width is
-    // unchanged, so this is free on every ordinary commit.
-    if (targetId !== null && typeof tool.set_text_wrap_width === "function") {
-      await tool.set_text_wrap_width(targetId, wrapWidthAtCommit);
-    }
-    // v8.41 — and the box's HEIGHT, by the identical argument. Kept adjacent
-    // to the width on purpose: the two are one box, and the failure mode of
-    // this pair is one of them being added and the other quietly forgotten.
-    if (targetId !== null && typeof tool.set_text_box_height === "function") {
-      await tool.set_text_box_height(targetId, boxHeightAtCommit);
-    }
+    // One commit is ONE undo step and one op-log gesture: the create/edit call,
+    // then the setters for what it can't carry, joined into its step
+    // (lib/commitSteps). As separate steps, a dragged box committed as three,
+    // and the op log, which records them as fewer gestures, was then retired as
+    // missing an edit, so a reload lost the box (33a, ADR-024-F7).
+    //
+    // v8.76 — the typeface: `update_text_annotation` takes no font parameter
+    // (it PRESERVES the annotation's own), so an edit that changes the face
+    // has to say so. v8.40 / v8.41 — the box's reflow width and HEIGHT, kept
+    // adjacent on purpose: the two are one box, and the failure mode of this
+    // pair is one of them being added and the other quietly forgotten. Rust
+    // no-ops each when unchanged, so they're free on an ordinary commit.
+    const targetId: number | null = await joinedSetters(
+      tool,
+      async () => {
+        if (editingId !== null) {
+          await tool.update_text_annotation(
+            editingId,
+            ti.text,
+            ti.fontSize,
+            r,
+            g,
+            b,
+            bold,
+            x,
+            y,
+            ti.rotation,
+            bgKind,
+            bgR,
+            bgG,
+            bgB,
+            bgA,
+            bgPadding,
+            bgCornerRadius,
+            bgTail,
+          );
+          return editingId;
+        }
+        return await tool.add_text_annotation(
+          ti.text,
+          ti.fontSize,
+          r,
+          g,
+          b,
+          bold,
+          x,
+          y,
+          ti.rotation,
+          bgKind,
+          bgR,
+          bgG,
+          bgB,
+          bgA,
+          bgPadding,
+          bgCornerRadius,
+          bgTail,
+          fontId,
+        );
+      },
+      [
+        async (id) => {
+          if (id !== null && typeof tool.set_text_font === "function") await tool.set_text_font(id, fontId);
+        },
+        async (id) => {
+          if (id !== null && typeof tool.set_text_wrap_width === "function") await tool.set_text_wrap_width(id, wrapWidthAtCommit);
+        },
+        async (id) => {
+          if (id !== null && typeof tool.set_text_box_height === "function") await tool.set_text_box_height(id, boxHeightAtCommit);
+        },
+      ],
+    );
 
     // Apply / sync the soft drop shadow on the committed annotation (Rust no-ops
     // when unchanged, so this is cheap to call on every commit).

@@ -765,6 +765,12 @@ pub struct ImageHorseTool {
     /// Set by `continue_step`: the next `snap()` joins the step in progress
     /// instead of pushing one. Cleared by that snap or the next recomposite.
     join_next_step: bool,
+    /// Where `restore_text_annotation` puts the text it builds: 0 = the
+    /// active layer, 1 = undo snapshot `.1`, 2 = redo snapshot `.1`. Set by
+    /// `set_text_restore_target`; back to the layer on every
+    /// `begin_layer_restore`. One restore call for all three is what keeps a
+    /// stored text's fields from being dropped on one of them (33a).
+    text_restore_target: (u8, usize),
     /// In-flight paint/erase stroke being recorded: (painted polyline, brush).
     #[cfg(feature = "tiles")]
     rec_stroke: Option<(Vec<(f64, f64)>, crate::ops::Brush)>,
@@ -1166,6 +1172,7 @@ impl ImageHorseTool {
             #[cfg(feature = "tiles")]
             oplog_joined_steps: 0,
             join_next_step: false,
+            text_restore_target: (0, 0),
             #[cfg(feature = "tiles")]
             rec_stroke: None,
             #[cfg(feature = "tiles")]
@@ -4953,6 +4960,103 @@ mod layer_persistence_tests {
         t.load_image(&solid(8, 8, [0, 0, 0, 0]));
         assert_eq!(t.begin_layer_resize_preview(), Vec::<i32>::new());
         assert!(!t.has_paste_preview(), "nothing to resize — no preview");
+    }
+
+    #[test]
+    fn a_text_restored_into_a_history_snapshot_keeps_its_box() {
+        // 33a: snapshot re-injection used to take only 19 fields and drop the
+        // box, the quad, the shadow and the outline, so the first undo after
+        // an archive resume put a wrapped text back on one line.
+        let mut t = ImageHorseTool::new(400, 200);
+        t.load_image(&vec![255u8; 400 * 200 * 4]);
+        t.add_layer("b");
+        t.set_text_restore_target(1, 0);
+        let quad = [0.0, 0.0, 1.0, 0.05, 0.95, 1.0, 0.02, 0.97];
+        let id = t.restore_text_annotation(
+            "One two three four five six",
+            20.0,
+            0,
+            0,
+            0,
+            false,
+            10,
+            10,
+            0.0,
+            0,
+            255,
+            255,
+            255,
+            255,
+            8,
+            8,
+            0,
+            true,
+            false,
+            0,
+            0,
+            0,
+            128,
+            2,
+            2,
+            3,
+            "",
+            120,
+            90,
+            &quad,
+            2,
+            255,
+            0,
+            0,
+            255,
+        );
+        assert_ne!(id, 0);
+        let snap = &t.hist.undo_stack[0];
+        let a = &snap.layers[snap.active].text_annotations[0];
+        assert_eq!((a.wrap_width, a.box_height), (120, 90));
+        assert!(!crate::perspective::is_identity(&a.perspective));
+        assert!(a.shadow_box && a.stroke.is_on());
+        // A snapshot that doesn't exist takes nothing.
+        t.set_text_restore_target(2, 5);
+        assert_eq!(
+            t.restore_text_annotation(
+                "x",
+                20.0,
+                0,
+                0,
+                0,
+                false,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "",
+                0,
+                0,
+                &[],
+                0,
+                0,
+                0,
+                0,
+                0,
+            ),
+            0
+        );
     }
 
     #[test]

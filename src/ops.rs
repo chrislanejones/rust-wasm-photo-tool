@@ -1803,18 +1803,31 @@ impl Document {
     }
 }
 
-/// Build a text annotation's pre-rendered (possibly rotated) tile through
-/// the engine's own `build_annotation_tile`. Returns
-/// (pixels, w, h, off_x, off_y).
+/// Build a text annotation's pre-rendered tile through the ENGINE'S OWN text
+/// builder, `build_text_annotation` — the one every live path (add, edit, the
+/// box setters, restore) uses. Returns (pixels, w, h, off_x, off_y).
+///
+/// It used to call the inner `build_annotation_tile` directly, which skips
+/// the two stages `build_text_annotation` adds around it: the WRAP (the tile
+/// draws the text broken to the box's width) and the PERSPECTIVE warp. So a
+/// wrapped or warped text replayed as one unwarped line, the log's composite
+/// no longer matched the engine's, the save read that as an edit missing from
+/// the log and retired it, and a reload came back from the archive instead of
+/// the log (33a, ADR-024-F7). One builder means the two can't drift again.
 fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
-    crate::layer::build_annotation_tile(
+    let a = crate::annotations::build_text_annotation(
+        0,
         &t.text,
-        t.font_size,
+        t.wrap_width,
         t.box_height,
+        t.perspective,
+        t.font_size,
         t.r,
         t.g,
         t.b,
         t.bold,
+        0,
+        0,
         t.rotation_deg,
         t.background_kind,
         t.bg_r,
@@ -1835,7 +1848,10 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         t.shadow_blur,
         &t.font_id,
         t.stroke,
-    )
+    );
+    let pixels =
+        std::sync::Arc::try_unwrap(a.tile_pixels).unwrap_or_else(|shared| (*shared).clone());
+    (pixels, a.tile_w, a.tile_h, a.tile_offset_x, a.tile_offset_y)
 }
 
 // ── Applying ops ─────────────────────────────────────────────────────────────

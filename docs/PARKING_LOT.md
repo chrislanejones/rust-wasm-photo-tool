@@ -4,6 +4,25 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## FIXED 11-09-2026 (night/1109-text-box-survives) — ADR-024-F7: a dragged text box lost on some ways back
+
+Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060's 11-09 addendum.
+
+| Path | Was | Now |
+|---|---|---|
+| Op-log resume | Never ran for a boxed text: replay drew it unwrapped, the save retired the log | Replays through `build_text_annotation`; the log is kept |
+| Commit of a dragged box | 3 undo steps | 1 step, 1 gesture (`lib/commitSteps`) |
+| Archive resume, then undo | Undo snapshots lost the box, quad, shadow, outline | `restoreStoredText` for every path |
+| Layer JSON, cloud, in-session undo/redo, duplicate, nudge, Perspective | Fine | Fine, and tested (cloud through the archive) |
+
+## OPEN — 33a leftovers (11-09-2026)
+
+| What | Why it's left |
+|---|---|
+| Rotation, Align and Placement then a reload are not in `text-box-survives` | The engine keeps the box through all three (`update_text_annotation` and the group moves keep the whole annotation); covered in-session by callout-leader and text-placement-undo, not with a dragged box |
+| An export compared with the canvas | The single download is the engine's composite (the spec hashes it); the batch export restores through `restoreStoredText`. No e2e downloads a file yet |
+| Restored texts get fresh ids, and a history snapshot's copy a different one | Was already so; nothing found that keys on a text's id across a reload |
+
 ## OPEN — callout-leader e2e flakes on Align (seen 11-09-2026 on #452 and #454)
 
 | What | Why it's left |
