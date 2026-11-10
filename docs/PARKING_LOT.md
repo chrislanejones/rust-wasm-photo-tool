@@ -2214,7 +2214,17 @@ strip the suffixes from the headings or write the anchors to match them.
 The sweep itself is clean — 181 relative links across 80 tracked `.md` files,
 0 broken. This is anchors only, in one archived file.
 
-## OPEN — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
+## FIXED 11-09-2026 (night/1109-text-one-step) — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
+
+v12's gestures (ADR-088) made the "real fix" below unnecessary: a snapshot can
+now cover several ops. `commitText` joins every setter into the add's step
+(`lib/commitSteps`): face, box, align, shadow, outline. A fresh text with the
+shadow on, an outline and Center is one "Add Text" and one Ctrl+Z, in the
+session and after a reload by the op log or the archive
+(`e2e/text-commit-one-step.spec.ts`, red before: Add Text + Text Shadow + Text
+Stroke). `e2e/archive/release-1102.spec.ts` still expects the old two steps; it
+is an ignored one-off sweep.
+
 
 Found by the shapes user-testing session, via the QC text spec going red the
 moment Ctrl+Z stopped being double-bound. Measured with `history_labels()` on
