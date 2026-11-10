@@ -7,7 +7,7 @@ import {
 import { getUserId, requireUser, roleOf } from "./users";
 import { entitlementOf } from "./entitlement";
 import { aiCapsFor } from "./aiCaps";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { deleteStoredFile, isStoredFileReferenced } from "./storedFiles";
 import type { Doc } from "./_generated/dataModel";
 
@@ -68,27 +68,31 @@ export const usage = query({
     if (!userId) return null;
     const user = await ctx.db.get(userId);
     if (!user) return null;
-
-    const now = Date.now();
-    const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
-    const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
-    const caps = aiCapsFor(user.tier, entitlementOf(user.tier, await roleOf(ctx, user), true));
-
-    return {
-      tier: user.tier,
-      daily: {
-        used: day.used,
-        cap: caps.daily,
-        resetsAt: day.resetsAt,
-      },
-      monthly: {
-        used: month.used,
-        cap: caps.monthly,
-        resetsAt: month.resetsAt,
-      },
-    };
+    return await usageOf(ctx, user);
   },
 });
+
+/** One user's AI counts and caps, for the pane and the MCP tool. */
+export async function usageOf(ctx: QueryCtx | MutationCtx, user: Doc<"users">) {
+  const now = Date.now();
+  const day = windowUsage(user.dailyUsage, user.usageResetAt, ONE_DAY_MS, now);
+  const month = windowUsage(user.monthlyUsage, user.monthResetAt, ONE_MONTH_MS, now);
+  const caps = aiCapsFor(user.tier, entitlementOf(user.tier, await roleOf(ctx, user), true));
+
+  return {
+    tier: user.tier,
+    daily: {
+      used: day.used,
+      cap: caps.daily,
+      resetsAt: day.resetsAt,
+    },
+    monthly: {
+      used: month.used,
+      cap: caps.monthly,
+      resetsAt: month.resetsAt,
+    },
+  };
+}
 
 /** Single job by id, with a signed output URL once the webhook has written
  *  the result. Returns null if the job isn't the caller's. */

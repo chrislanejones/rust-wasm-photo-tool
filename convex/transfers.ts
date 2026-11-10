@@ -167,6 +167,17 @@ export const create = mutation({
   },
   handler: async (ctx, args): Promise<TransferCreated | TransferRefusal> => {
     const user = await requireUser(ctx);
+    return await createTransfer(ctx, user, { ...args, fromDevice: cleanDevice(args.fromDevice) });
+  },
+});
+
+/** The checks and the insert, for `create` and the MCP tool. `fromDevice` is
+ *  stored as given, so each caller decides what a safe label is. */
+export async function createTransfer(
+  ctx: MutationCtx,
+  user: Doc<"users">,
+  args: { storageId: Id<"_storage">; name: string; fromDevice: string; width?: number; height?: number },
+): Promise<TransferCreated | TransferRefusal> {
     const meta = await ctx.db.system.get("_storage", args.storageId);
     if (!meta) {
       return { ok: false, reason: "missing", message: "That upload did not arrive. Please try again." };
@@ -220,14 +231,13 @@ export const create = mutation({
       bytes: meta.size,
       width: positiveInt(args.width),
       height: positiveInt(args.height),
-      fromDevice: cleanDevice(args.fromDevice),
+      fromDevice: args.fromDevice,
       createdAt: now,
       expiresAt,
     });
     await settleStoredBytes(ctx, user._id, await referenceDelta(ctx, user._id, { added: args.storageId }));
     return { ok: true, id, bytes: meta.size, expiresAt };
-  },
-});
+}
 
 function positiveInt(n: number | undefined): number | undefined {
   return n !== undefined && Number.isInteger(n) && n > 0 ? n : undefined;
