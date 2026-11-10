@@ -30,6 +30,12 @@ export default defineSchema({
     // plus its SHA-256 so the client can skip redundant writes / verify on load.
     settings: v.optional(v.string()),
     settingsHash: v.optional(v.string()),
+    /** Settings › Connections: "Let AI apps use my account". Absent = off, so
+     *  no existing account is reachable until its owner turns this on. */
+    mcpEnabled: v.optional(v.boolean()),
+    /** Why it went off, when it was not the switch itself: a device moved to
+     *  "Everything in your browser" (ADR-095). Only changes the refusal text. */
+    mcpOffReason: v.optional(v.literal("browser-only")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -172,6 +178,21 @@ export default defineSchema({
     .index("by_storageId", ["storageId"])
     // transfers.expire: everything past its date, as one range.
     .index("by_expiresAt", ["expiresAt"]),
+
+  // ── MCP call log (Settings › Connections › Recent activity, ADR-095) ──────
+  // One row per tool call an AI app made. Never the token, the arguments or
+  // the response. The rate limit counts these rows too. Kept 30 days
+  // (mcp.expire, dry-run by default).
+  mcp_calls: defineTable({
+    userId: v.id("users"),
+    /** The OAuth client that made the call, from the verified token. */
+    clientId: v.string(),
+    tool: v.string(),
+    outcome: v.union(v.literal("ok"), v.literal("error")),
+    at: v.number(),
+  })
+    .index("by_userId_at", ["userId", "at"])
+    .index("by_at", ["at"]),
 
   // ── Share views (one row per counted view) ────────────────────────────────
   // TIMESTAMP ONLY. No IP, no user agent, no viewer id, nothing that could
