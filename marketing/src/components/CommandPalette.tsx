@@ -43,6 +43,7 @@ const ITEMS: Item[] = [
   { group: "Pages", label: "Pricing", hint: "Three tiers, and the access matrix", href: "/pricing", kind: "route" },
   { group: "Pages", label: "Trail Log", hint: "Every release, and the commits behind them", href: "/trail-log", kind: "route" },
   { group: "Pages", label: "Contact", hint: "Email, bug reports, security, your account", href: "/contact", kind: "route" },
+  { group: "Pages", label: "Design System", hint: "The editor's colors, typography, controls, and interaction rules", href: "/design-system", kind: "route" },
 
   { group: "On this site", label: "What runs where", hint: "Every operation, and the machine it runs on", href: "/#runs", kind: "route" },
   { group: "On this site", label: "In the editor", hint: "The whole tool list", href: "/#editor", kind: "route" },

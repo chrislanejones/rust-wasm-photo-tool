@@ -12,7 +12,8 @@
     "build:client": "vite build",
     "build:ssr": "vite build --ssr src/entry-server.tsx --outDir dist-ssr",
     "prerender": "node scripts/prerender.mjs",
-    "gen:og": "node scripts/gen-og-images.mjs"
+    "gen:og": "node scripts/gen-og-images.mjs",
+    "gen:tokens": "node scripts/gen-editor-tokens.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.65.0",
