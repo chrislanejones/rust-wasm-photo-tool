@@ -102,3 +102,43 @@ Early warning sign to watch for: a new `#[serde(skip)]` field on
 `TextParams` or `ShapeParams` in a diff that does not also touch
 `carry_skipped_from`. A second one: an `Op::*Edit` variant added for a new
 annotation kind whose apply arm reads `*t = p.clone()`.
+
+## Addendum 2026-11-09 — ADR-024-F7 closed: three more ways the box was lost
+
+The pre-mortem's sign came true in a different place. `build_text_annotation`
+is the text builder with the wrap and the perspective in it, and three paths
+did not go through it, or not with all the fields. Night 11-09 forced each
+resume path in `e2e/text-box-survives.spec.ts` (a text typed, its box dragged
+to ~340 × 200, then a duplicate, a nudge or a perspective, a last edit, a
+reload by the op log or by the archive, one Ctrl+Z):
+
+| Path | Before | Cause |
+|---|---|---|
+| Op-log resume | **Never ran** for a boxed text: no log was saved | Replay drew the tile with `build_annotation_tile`, skipping the wrap and the perspective, so a wrapped text replayed as one line. The log's composite stopped matching the engine's, `oplog_coverage` said 0, and the save retired the log as missing an edit. This is what "no op log was persisted at all" (09-20) was. |
+| Commit of a dragged box | 3 undo steps for one commit | `add`, `set_text_wrap_width` and `set_text_box_height` each took a snapshot, and the log recorded them as fewer gestures, so `undo_count` ran ahead of the cursor: a second reason the save retired the log. |
+| Archive resume, then undo | The undone-to text came back unwrapped | `push_annotation_to_undo_snapshot` / `_redo_snapshot` took 19 fields and dropped the box, the quad, the shadow and the outline. The legacy flat paths (useEngineCore, exportImage) did the same through `add_text_annotation`. |
+| Layer-JSON restore (`restoreLayerStack`) | Fine since this ADR | — |
+| Cloud restore | Fine | Same archive format and restore code as the local archive. |
+| In-session undo/redo, duplicate, nudge, Align, Placement | Fine | Snapshots and `duplicate_annotations` clone the whole annotation. |
+
+**Fixed by:**
+- Replay's `build_text_tile` calls `build_text_annotation` (one builder for
+  live and replay). `ops_engine_parity::boxed_and_warped_text_replays_byte_identically`
+  is red on the old code.
+- A text commit is one undo step and one gesture: `lib/commitSteps`
+  `joinedSetters` joins each setter that changes something into the step the
+  create/edit opened, with `continue_step` (ADR-088), and never into a step the
+  commit didn't open.
+- `restore_text_annotation` takes a target (`set_text_restore_target`: the live
+  layer, or undo/redo snapshot *n*), the two snapshot injectors are deleted,
+  and `restoreStoredText` (lib/restoreLayerStack) is the one place a stored
+  text becomes an engine call, for every path. Engine 957,511 → 956,874 B.
+
+No format change: the log, the archive and the keyframes carry exactly what
+they carried. Logs already on disk replay correctly now; boxed texts saved
+while the log was being retired come back from the archive as before.
+
+The pre-mortem stands, widened: **a text field reaches the screen through
+`build_text_annotation` and reaches the engine from storage through
+`restoreStoredText`.** A diff that rasterizes a text any other way, or calls
+`restore_text_annotation` anywhere else, is the warning sign.

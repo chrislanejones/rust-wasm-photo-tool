@@ -962,9 +962,47 @@ mod capture_tests {
             t.hist.undo_stack[0].png.get().is_some(),
             "cached by the read"
         );
-        assert!(t.push_annotation_to_undo_snapshot(
-            0, "Hi", 20.0, 255, 255, 255, true, 4, 4, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, ""
-        ));
+        t.set_text_restore_target(1, 0);
+        assert_ne!(
+            t.restore_text_annotation(
+                "Hi",
+                20.0,
+                255,
+                255,
+                255,
+                true,
+                4,
+                4,
+                0.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "",
+                0,
+                0,
+                &[],
+                0,
+                0,
+                0,
+                0,
+                0,
+            ),
+            0
+        );
         assert!(
             t.hist.undo_stack[0].png.get().is_none(),
             "the edit cleared it"

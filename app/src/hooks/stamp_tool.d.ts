@@ -937,41 +937,12 @@ declare module "stamp_tool" {
     get_redo_snapshot_annotations(index: number): string;
     inject_undo_snapshot(data: Uint8Array, w: number, h: number, label: string): void;
     inject_redo_snapshot(data: Uint8Array, w: number, h: number, label: string): void;
-    /**
-     * Append one annotation onto the snapshot at `snap_idx`. The tile is
-     * re-rendered from the config so callers don't need to persist tile bytes.
-     * Returns false if the index is out of range.
-     */
-    push_annotation_to_undo_snapshot(
-      snap_idx: number,
-      text: string,
-      font_size: number,
-      r: number, g: number, b: number,
-      bold: boolean,
-      x: number, y: number,
-      rotation_deg: number,
-      background_kind: number,
-      bg_r: number, bg_g: number, bg_b: number, bg_a: number,
-      bg_padding: number,
-      bg_corner_radius: number,
-      bg_tail: number,
-      font_id: string,
-    ): boolean;
-    push_annotation_to_redo_snapshot(
-      snap_idx: number,
-      text: string,
-      font_size: number,
-      r: number, g: number, b: number,
-      bold: boolean,
-      x: number, y: number,
-      rotation_deg: number,
-      background_kind: number,
-      bg_r: number, bg_g: number, bg_b: number, bg_a: number,
-      bg_padding: number,
-      bg_corner_radius: number,
-      bg_tail: number,
-      font_id: string,
-    ): boolean;
+    /** Where the next `restore_text_annotation` calls put their text: 0 = the
+     *  active layer (default), 1 = undo snapshot `index`, 2 = redo snapshot
+     *  `index`. Reset to the layer by `begin_layer_restore`. Replaced
+     *  `push_annotation_to_undo_snapshot` / `_redo_snapshot`, which dropped
+     *  the box, the quad, the shadow and the outline (33a). */
+    set_text_restore_target(stack: number, index: number): void;
 
     // Item 9: Crop preview in WASM
     // Uncomment after adding the Rust implementations
@@ -1333,7 +1304,9 @@ declare module "stamp_tool" {
       visible: boolean,
       opacity: number,
     ): number;
-    /** Restore a text annotation onto the active layer (no history). */
+    /** Restore a text annotation, with no history, onto the active layer or
+     *  the snapshot `set_text_restore_target` named. Returns its id, or 0 when
+     *  that snapshot doesn't exist. Call it through `restoreStoredText`. */
     restore_text_annotation(
       text: string,
       font_size: number,

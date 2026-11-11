@@ -2264,3 +2264,58 @@ fn a_text_outline_records_undoes_and_survives_a_reload() {
     assert!(t.undo());
     assert_eq!(composite_hash(&mut t), h_plain, "undo removes the outline");
 }
+
+/// A text whose box WRAPS it, and one with a perspective quad, replay to the
+/// engine's own pixels (33a, ADR-024-F7). Replay drew the raw text unwrapped
+/// and unwarped, so the log's composite stopped matching the engine's and the
+/// save retired the log as missing an edit; a reload then came back from the
+/// archive. Each case is RED with the old `build_text_tile`.
+#[test]
+fn boxed_and_warped_text_replays_byte_identically() {
+    let cases: [(u32, u32, &[f32]); 4] = [
+        (438, 0, &[]),                                         // wraps (natural width ~488)
+        (438, 116, &[]),                                       // wraps, and a taller box
+        (600, 200, &[]),                                       // a box wider than the text
+        (0, 0, &[0.0, 0.0, 1.0, 0.05, 0.95, 1.0, 0.02, 0.97]), // perspective only
+    ];
+    for (wrap, height, quad) in cases {
+        let (mut t, _px) = seeded_tool(800, 400);
+        t.set_oplog_undo(true);
+        let id = t.add_text_annotation(
+            "Hello there. Second sentence here. Third one too.",
+            24.0,
+            0,
+            0,
+            0,
+            false,
+            197,
+            193,
+            0.0,
+            0,
+            255,
+            255,
+            255,
+            255,
+            8,
+            8,
+            135,
+            "",
+        );
+        t.recomposite();
+        t.continue_step();
+        t.set_text_wrap_width(id, wrap);
+        t.continue_step();
+        t.set_text_box_height(id, height);
+        if !quad.is_empty() {
+            t.continue_step();
+            assert!(t.set_text_perspective(id, quad));
+        }
+        t.recomposite();
+        let ctx = format!("wrap {wrap}, height {height}, quad {quad:?}");
+        assert!(!t.oplog_is_broken(), "{ctx}: log broken");
+        let replay = t.oplog.as_ref().unwrap().live_document().composite_flat(); // allow: rust-panic
+        assert_flat_identical(&t.composite_cache, &replay, t.width(), &ctx);
+        assert_eq!(t.oplog_coverage(), 1, "{ctx}: the log covers the document");
+        assert_eq!(t.undo_count(), 1, "{ctx}: one commit, one undo step");
+    }
+}

@@ -23,7 +23,7 @@ import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
-import { restoreLayerStack } from "@/lib/restoreLayerStack";
+import { restoreLayerStack, restoreStoredText } from "@/lib/restoreLayerStack";
 import {
   blitLiveEngine,
   clearLiveCanvas,
@@ -732,8 +732,11 @@ export function useEngineCore(
       );
 
       // Re-inject undo snapshots (oldest first — preserves original order).
-      // Each snapshot's annotations are pushed via per-annotation calls so
-      // Rust rebuilds the tile cache (we don't store tile bytes on disk).
+      // Each snapshot's annotations are restored one by one so Rust rebuilds
+      // the tile cache (we don't store tile bytes on disk), through the same
+      // `restoreStoredText` as the layers, pointed at the snapshot
+      // (`set_text_restore_target`). The old per-snapshot calls stopped at
+      // `font_id`, so the first undo after this resume lost the box (33a).
       for (let i = 0; i < saved.undoStack.length; i++) {
         const snap = saved.undoStack[i];
         await tool.set_export_quality(snap.exportQuality ?? 75);
@@ -745,25 +748,8 @@ export function useEngineCore(
           snap.label,
         );
         if (snap.annotations) {
-          for (const a of snap.annotations) {
-            tool.push_annotation_to_undo_snapshot(
-              i,
-              a.text,
-              a.font_size,
-              a.r, a.g, a.b,
-              a.bold,
-              a.x, a.y,
-              a.rotation_deg,
-              a.background_kind ?? 0,
-              a.bg_r ?? 255,
-              a.bg_g ?? 255,
-              a.bg_b ?? 255,
-              a.bg_a ?? 255,
-              a.bg_padding ?? 8,
-              a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0, a.font_id ?? "",
-            );
-          }
+          tool.set_text_restore_target(1, i);
+          for (const a of snap.annotations) restoreStoredText(tool, a);
         }
       }
 
@@ -779,25 +765,8 @@ export function useEngineCore(
           snap.label,
         );
         if (snap.annotations) {
-          for (const a of snap.annotations) {
-            tool.push_annotation_to_redo_snapshot(
-              i,
-              a.text,
-              a.font_size,
-              a.r, a.g, a.b,
-              a.bold,
-              a.x, a.y,
-              a.rotation_deg,
-              a.background_kind ?? 0,
-              a.bg_r ?? 255,
-              a.bg_g ?? 255,
-              a.bg_b ?? 255,
-              a.bg_a ?? 255,
-              a.bg_padding ?? 8,
-              a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0, a.font_id ?? "",
-            );
-          }
+          tool.set_text_restore_target(2, i);
+          for (const a of snap.annotations) restoreStoredText(tool, a);
         }
       }
 
@@ -811,27 +780,14 @@ export function useEngineCore(
         sizeLiveCanvas(canvas, saved.canvasW, saved.canvasH);
       }
 
+      tool.set_text_restore_target(0, 0); // back to the live layer
+
       // Re-create live text annotations (non-destructive overlay layer).
       // Skipped when the layer stack was restored above (overlays already
       // re-attached per-layer) to avoid duplicating them on the active layer.
       if (!usedLayers && saved.annotations && saved.annotations.length > 0) {
         for (const a of saved.annotations) {
-          tool.add_text_annotation(
-            a.text,
-            a.font_size,
-            a.r, a.g, a.b,
-            a.bold,
-            a.x, a.y,
-            a.rotation_deg,
-            a.background_kind ?? 0,
-            a.bg_r ?? 255,
-            a.bg_g ?? 255,
-            a.bg_b ?? 255,
-            a.bg_a ?? 255,
-            a.bg_padding ?? 8,
-            a.bg_corner_radius ?? 8,
-            a.bg_tail ?? 0, a.font_id ?? "",
-          );
+          restoreStoredText(tool, a);
         }
       }
 
