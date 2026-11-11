@@ -53,7 +53,9 @@ async function styledText(page: Page) {
   await page.getByRole("button", { name: "Text", exact: true }).first().click();
   const panel = page.getByRole("region", { name: "Tool options" });
 
-  await panel.getByRole("radiogroup", { name: "Align" }).getByRole("radio", { name: "Center", exact: true }).click();
+  const grid = panel.getByRole("radiogroup", { name: "Text in Box" });
+  if (!(await grid.isVisible())) await panel.getByRole("button", { name: /^Text in Box/ }).first().click();
+  await grid.getByRole("radio", { name: "Top center", exact: true }).click();
   // The two sections open on click; each one's controls show once it's open.
   const stroke = panel.getByRole("slider", { name: "Stroke Width" });
   if (!(await stroke.isVisible())) await panel.getByRole("button", { name: /^Stroke/ }).first().click();
