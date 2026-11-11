@@ -15,6 +15,12 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Archive resume, then undo | Undo snapshots lost the box, quad, shadow, outline | `restoreStoredText` for every path |
 | Layer JSON, cloud, in-session undo/redo, duplicate, nudge, Perspective | Fine | Fine, and tested (cloud through the archive) |
 
+## OPEN — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
+
+| What | Why it's left |
+|---|---|
+| A text with no dragged box, set to center or right: the textarea is the measured text plus `0.6 × font size`, wider than the engine's tile (widest line plus `side_padding` a side), so the lines center in a slightly different width and the commit can land a few px off the preview | Boxed text was fixed in #462 (`alignAnchorShift`, anchored on the box). With no box there's no box to anchor on; the fix needs the engine's widest-line width at commit time and a matching inverse in `editAnnotation`. Left text is unaffected |
+
 ## OPEN — 33a leftovers (11-09-2026)
 
 | What | Why it's left |

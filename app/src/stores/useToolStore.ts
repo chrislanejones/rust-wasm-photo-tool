@@ -627,3 +627,14 @@ subscribePreferences((p) => {
     s.setToolSettings((t) => ({ ...t, textAlign: p.textAlign }));
   }
 });
+
+/** Put the Text in Box choice back to the saved preference. Opening an
+ *  existing text shows ITS alignment in the panel for that edit (useTextTool);
+ *  closing the editor, by commit or cancel, calls this so the next new text
+ *  starts where the person last chose. A grid change during the edit was
+ *  already saved as the preference, so it survives this. */
+export function restoreTextAlignPreference(): void {
+  const pref = readPreferences().textAlign;
+  const s = useToolStore.getState();
+  if (s.toolSettings.textAlign !== pref) s.setToolSettings((t) => ({ ...t, textAlign: pref }));
+}

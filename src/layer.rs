@@ -2120,8 +2120,8 @@ impl ImageHorseTool {
         stroke_g: u8,
         stroke_b: u8,
         stroke_a: u8,
-        // Line alignment in the box (v16, ADR-104). An archive written before
-        // it has none and JS passes 0: Left, what that document meant.
+        // Where the text sits in its box, `row * 3 + column` (v16, ADR-104).
+        // An archive written before it has none and JS passes 0: top-left.
         align: u8,
     ) -> u32 {
         let id = self.next_text_id;

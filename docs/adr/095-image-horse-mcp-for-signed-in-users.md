@@ -67,3 +67,25 @@ V2 may accept an image into the user's Transfer inbox once 192 exists, then crea
 ## Follow-up: authorized Beta settings preview
 
 The follow-up request authorizes a Settings pane while gate 2 remains unresolved. The mcp-connector Beta now reveals Connections through its own hook, without changing AppShell. Three additions: connection readiness, an access-boundary summary, and copyable example prompts. The account switch remains disabled and unchecked; no local preference impersonates the future server-side mcpEnabled kill switch. No endpoint, server schema or authentication behavior was added. This supersedes the earlier statement that no pane exists on this branch.
+
+## Update 11-08-2026: built, switched off
+
+Status stays draft until the attended check below. Base: `0f1c535` (v9.59).
+
+**Token format.** Clerk Dashboard → OAuth applications → Settings → Access token format. JWT is the default for applications created since 2026-01-08; older ones stay opaque until changed. The live instance's setting is still unconfirmed, and no real token has been read.
+
+**Verification is JWT only.** RS256, against the JWKS of an issuer in `auth.config.ts`; the token never picks the JWKS address. `exp` and `nbf` with 30 seconds of skew. An access token must carry a client id and a scope and must not carry a session id. `aud` is checked when present and must be this resource or the client id. Opaque tokens get a 401 that says why, with no introspection and no Clerk secret. The claim names are in `convex/mcpClaims.ts`, marked to confirm against a real token.
+
+**Revocation is the in-app switch.** A JWT can't be revoked before it expires, so `users.mcpEnabled` (absent = off) is read when a call is admitted and again inside each write's transaction.
+
+**The online switch.** It is per-browser consent and deliberately never synced, so the server can't read it. Chris decided 11-08: when a signed-in device moves to "Everything in your browser", that device tells the server to turn `mcpEnabled` off (`mcpOffReason: "browser-only"`), so there is one server-side switch. A device with no connection can't send that, and Settings says so.
+
+**The server switch.** Every route answers 404 unless `MCP_ENDPOINT_ENABLED=1`. The metadata names `https://clerk.imagehorse.app` unless `MCP_AUTH_ISSUER` picks another trusted issuer.
+
+**Tools.** 21: the 13 above plus `get_storage`, `list_inbox`, `send_image_to_inbox`, `remove_from_inbox`, `list_trash`, `restore_share`, `list_ai_usage`, `get_connection_status`. Three prompts. Chris decided 11-08 that `delete_share` moves the link to the trash, which supersedes "actual delete" above. Another user's row reads as not found.
+
+**`send_image_to_inbox` is the first AI → gallery path**, through the inbox and the user's own Add to gallery. The bytes decide the type, and SVG is refused. Chris decided 11-08 to allow URLs: https on the default port, no credentials, no IP literals or internal names, each redirect re-checked, 50 MB counted while reading. Convex can't resolve DNS first, so a public name pointing at a private address isn't caught. Base64 stops near 15 MB because of the request size.
+
+**Not verified.** Nothing here has run on a real Convex deployment: the tests use `convex-test` on the edge runtime with locally signed JWTs. Unknown until the attended check: whether the SDK and zod load in the Convex runtime, the real claim names and `aud`, the default scopes (none were ever listed in this ADR; `profile` and `email` are a placeholder), and whether a 50 MB download fits in an HTTP action's memory.
+
+**Attended steps.** Merge the three PRs and deploy. Set the token format to JWT on the instance the live app uses, turn on CIMD, and set default scopes. Set `MCP_ENDPOINT_ENABLED=1` on dev Convex. Read one token's claims in MCP Inspector and fix `mcpClaims.ts` if they differ. Turn on the Beta and the switch, connect Claude, try a read, a palette write and a sent image, then turn the switch off and confirm the refusal.
