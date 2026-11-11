@@ -3208,8 +3208,9 @@ impl ImageHorseTool {
         true
     }
 
-    /// Set a text annotation's LINE ALIGNMENT in its box (0 left, 1 center,
-    /// 2 right; anything else is left) and rebuild its tile. v16, ADR-104.
+    /// Set where a text sits in its box, a 3×3 cell `row * 3 + column`
+    /// (column 0/1/2 left/center/right, row 0/1/2 top/middle/bottom; anything
+    /// over 8 is top-left), and rebuild its tile. v16, ADR-104.
     /// Returns false if `id` isn't on the active layer.
     ///
     /// The `set_text_stroke` contract: called on every commit, a no-op with

@@ -8,7 +8,8 @@ import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
-import { textAlignEngineArg, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { restoreTextAlignPreference, useToolStore } from "@/stores/useToolStore";
 import { joinedSetters } from "@/lib/commitSteps";
 
 interface TextInput {
@@ -47,6 +48,8 @@ interface AnnotationMeta {
    *  annotations from before v8.76, hence optional — `annotations_to_json`
    *  always writes it now, but a payload can outlive a reload. */
   font_id?: string;
+  /** Where the text sits in its box, `row * 3 + column` (v16). */
+  align?: number;
   rotation_deg: number;
   tile_w: number;
   tile_h: number;
@@ -99,6 +102,39 @@ const BG_KIND_MAP = { none: 0, rect: 1, bubble: 2 } as const;
  *  from the box's actual layout. */
 export const TEXT_OVERLAY_PAD_X = 4;
 export const TEXT_OVERLAY_PAD_Y = 2;
+
+/** How far a centered or right-aligned text's anchor sits from where the
+ *  left-aligned ink mapping puts it, canvas px (ADR-104 addendum).
+ *
+ *  Left text is anchored on its first glyph's ink: the commit maps the
+ *  preview's glyphs onto the engine's. Lines placed INSIDE a box can't be
+ *  anchored that way, because the engine aligns within its content width
+ *  (`text::side_padding` a side) and the textarea within its own padding
+ *  (TEXT_OVERLAY_PAD_X), so the two content boxes differ and the gap grows
+ *  with the font size. For those the BOX is the anchor instead:
+ *    center → the tile's box sits exactly where the preview's box was;
+ *    right  → the content's right edges line up.
+ *  0 for left, and for a text with no box. editAnnotation subtracts the same
+ *  shift, so commit → re-edit → commit doesn't drift. */
+async function alignAnchorShift(
+  tool: ImageHorseTool,
+  text: string,
+  fontSize: number,
+  bold: boolean,
+  fontId: string,
+  align: number,
+  wrapWidth: number,
+  scaleX: number,
+): Promise<number> {
+  const column = align % 3;
+  if (column === 0 || wrapWidth <= 0) return 0;
+  // The first glyph's inset with no background: the engine's side padding
+  // plus the glyph's own bearing. The background margin cancels out.
+  const plain = await textInkOffsetBgAwaited(tool, text, fontSize, bold, 0, 0, fontId);
+  if (!plain) return 0;
+  const pad = TEXT_OVERLAY_PAD_X / (scaleX || 1);
+  return column === 1 ? plain[0] - pad : plain[0] + Math.ceil(fontSize * 0.25) - 2 * pad;
+}
 
 export function useTextTool({
   toolRef,
@@ -225,6 +261,7 @@ export function useTextTool({
           textInputRef.current = null;
           setTextInput(null);
           tool.set_editing_text(-1);
+          restoreTextAlignPreference();
         }
       }
       // Drop stale hover.
@@ -250,6 +287,9 @@ export function useTextTool({
     const wrapWidthAtCommit = useTextBoxStore.getState().wrapWidth;
     // Same capture, same reason, for the vertical axis (v8.41).
     const boxHeightAtCommit = useTextBoxStore.getState().boxHeight;
+    // …and the Text in Box cell: it is put back to the saved preference once
+    // this commit is done, so read it now.
+    const alignAtCommit = textAlignEngineArg(settingsRef.current.textAlign);
     textInputRef.current = null;
     editingAnnotationId.current = null;
     setTextInput(null);
@@ -335,7 +375,8 @@ export function useTextTool({
         // block exists to cancel. With no metric, apply no correction and keep
         // the uncorrected anchor, the same as the `if (canvas)` miss above.
         if (ink) {
-          x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
+          const shift = await alignAnchorShift(tool, ti.text, ti.fontSize, bold, fontId, alignAtCommit, wrapWidthAtCommit, scaleX);
+          x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0] + shift);
           y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
         }
       }
@@ -412,7 +453,7 @@ export function useTextTool({
         },
         // v16 — the line alignment in the box (ADR-104), same contract.
         async (id) => {
-          if (id !== null) await tool.set_text_align(id, textAlignEngineArg(s.textAlign));
+          if (id !== null) await tool.set_text_align(id, alignAtCommit);
         },
       ],
     );
@@ -435,6 +476,7 @@ export function useTextTool({
       );
       tool.set_text_stroke(targetId, ...textStrokeEngineArgs(s)); // …and the stroke, same contract
     }
+    restoreTextAlignPreference();
     await refreshAnnotations();
     flushToCanvas();
     syncState();
@@ -489,7 +531,11 @@ export function useTextTool({
         // not a zero one. This is the exact inverse of the mapping applied on
         // commit, so a bogus value here makes re-edit cycles drift.
         if (ink) {
-          boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1);
+          const shift = await alignAnchorShift(
+            toolRef.current, ann.text, ann.font_size, ann.bold, ann.font_id ?? "",
+            ann.align ?? 0, ann.wrap_width ?? 0, scaleX || 1,
+          );
+          boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1) - shift;
           boxY = ann.y + ink[1] - TEXT_OVERLAY_PAD_Y / (scaleY || 1);
         }
       }
@@ -527,6 +573,11 @@ export function useTextTool({
       // both: an annotation written before its axis existed has no field, and
       // 0 is exactly what it meant ("size the box to the text").
       useTextBoxStore.getState().setBoxHeight(ann.box_height ?? 0);
+      // …and where the text sits in that box. The panel shows THIS text's
+      // cell while it is open, so committing without touching the grid keeps
+      // it; closing the editor puts the saved choice back
+      // (restoreTextAlignPreference).
+      useToolStore.getState().setToolSettings((t) => ({ ...t, textAlign: textAlignFromEngine(ann.align) }));
       textInputRef.current = next;
       setTextInput(next);
       // Suppress this annotation's baked tile while the textarea overlay is

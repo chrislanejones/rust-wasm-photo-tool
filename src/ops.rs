@@ -1169,7 +1169,8 @@ pub enum Op {
     /// Appended after [`Op::Adjustments`] (index 25); same rule as every
     /// variant since v2.
     TextStroke { id: u32, width: u32, rgba: [u8; 4] },
-    /// v16 — a text's line alignment in its box: 0 left, 1 center, 2 right
+    /// v16 — where a text sits in its box, a 3×3 cell `row * 3 + column`
+    /// (0 top-left … 8 bottom-right)
     /// (ADR-104). `#[serde(skip)]` on [`TextParams::align`] means
     /// `TextAdd`/`TextEdit` cannot carry it. Appended after
     /// [`Op::TextStroke`] (index 26); same rule as every variant since v2.

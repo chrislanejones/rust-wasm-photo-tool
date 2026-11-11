@@ -260,3 +260,94 @@ test("the Text in Box choice is kept after a reload", async ({ page }) => {
   if (!(await grid.isVisible())) await panel.getByRole("button", { name: /^Text in Box/ }).first().click();
   await expect(grid.getByRole("radio", { name: "Bottom right", exact: true })).toBeChecked();
 });
+
+/** Open a text in the Text tool by clicking it, then commit it unchanged. */
+async function reopenAndCommit(page: Page, t: Text) {
+  const at = await screenPoint(page, t.x + t.tile_offset_x + t.tile_w / 2, t.y + t.tile_offset_y + t.tile_h / 2);
+  await page.mouse.click(at.x, at.y);
+  await expect(page.locator("textarea").first()).toBeVisible();
+}
+
+async function commitAway(page: Page) {
+  const away = await screenPoint(page, 1000, 800);
+  await page.mouse.click(away.x, away.y);
+  await page.waitForTimeout(600);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+}
+
+/** The preview box's NW and SE corners, canvas px. */
+async function previewBox(page: Page) {
+  const corners = page.locator('rect[style*="nwse-resize"]');
+  const nw = (await corners.nth(0).boundingBox())!;
+  const se = (await corners.nth(1).boundingBox())!;
+  return page.evaluate(([a, b]) => {
+    const c = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    const r = c.getBoundingClientRect();
+    const k = c.width / r.width;
+    return { x0: (a.x + a.width / 2 - r.left) * k, x1: (b.x + b.width / 2 - r.left) * k };
+  }, [nw, se] as const);
+}
+
+test("re-editing a text keeps ITS cell, then the panel goes back to the saved one", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, "Bottom center");
+  const at = await screenPoint(page, AT.x, AT.y);
+  await page.mouse.click(at.x, at.y);
+  await page.locator("textarea").first().fill("HHHHHHHH\nHH");
+  await commitAway(page);
+  await expect.poll(async () => (await texts(page)).length).toBe(1);
+  const [placed] = await texts(page);
+  expect(placed.align).toBe(7);
+
+  // The saved choice moves on; the text keeps its own.
+  await pickCell(page, "Top left");
+  await reopenAndCommit(page, placed);
+  const grid = page.getByRole("region", { name: "Tool options" }).getByRole("radiogroup", { name: "Text in Box" });
+  await expect(grid.getByRole("radio", { name: "Bottom center", exact: true }), "the panel shows this text's cell").toBeChecked();
+  await commitAway(page);
+  const [after] = await texts(page);
+  expect(after.align, "committed unchanged, it stays bottom center").toBe(7);
+  await expect(grid.getByRole("radio", { name: "Top left", exact: true }), "and the saved choice is back").toBeChecked();
+});
+
+test("a centered boxed text lands where its preview box was, and a re-edit doesn't move it", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  // A big size, where the old left-anchored mapping was furthest off.
+  const size = page.getByRole("region", { name: "Tool options" }).getByRole("slider", { name: "Font Size" });
+  await size.focus();
+  for (let i = 0; i < 24; i++) await page.keyboard.press("ArrowRight");
+  await pickCell(page, "Top center");
+  const blank = await composite(page);
+  const at = await screenPoint(page, AT.x, AT.y);
+  await page.mouse.click(at.x, at.y);
+  await page.locator("textarea").first().fill("HHHH\nHH");
+  const corners = page.locator('rect[style*="nwse-resize"]');
+  const nw = (await corners.nth(0).boundingBox())!;
+  const se = (await corners.nth(1).boundingBox())!;
+  const scale = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    return c.getBoundingClientRect().width / c.width;
+  });
+  await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(nw.x + nw.width / 2 + 420 * scale, se.y + se.height / 2, { steps: 10 });
+  await page.mouse.up();
+  const box = await previewBox(page);
+  await commitAway(page);
+  const [t] = await texts(page);
+  expect(t.align).toBe(1);
+  const { bands } = await lineInk(page, blank, t);
+  const mid = (bands[0][0] + bands[0][1] + 1) / 2;
+  const boxMid = (box.x0 + box.x1) / 2;
+  expect(Math.abs(mid - boxMid), `ink center ${mid} vs preview box center ${boxMid}`).toBeLessThanOrEqual(2);
+
+  // Open it and commit unchanged: the inverse mapping puts it back exactly.
+  await reopenAndCommit(page, t);
+  await commitAway(page);
+  expect((await texts(page))[0].x, "no drift on re-edit").toBe(t.x);
+});

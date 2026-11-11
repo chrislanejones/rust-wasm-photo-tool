@@ -98,6 +98,14 @@ function alignCell(align: TextAlign | undefined): [number, number] {
   return r < 0 || c < 0 ? [0, 0] : [r, c];
 }
 
+/** The grid cell for an engine alignment byte (anything off the grid is
+ *  top-left), the inverse of `textAlignEngineArg`. */
+export function textAlignFromEngine(byte: number | undefined): TextAlign {
+  const b = Number.isInteger(byte) && byte! >= 0 && byte! <= 8 ? byte! : 0;
+  const cell = `${ALIGN_ROWS[Math.floor(b / 3)]}-${ALIGN_COLUMNS[b % 3]}`;
+  return (cell === "middle-center" ? "center" : cell) as TextAlign;
+}
+
 /** The engine's alignment byte, `row * 3 + column` (`set_text_align`). */
 export function textAlignEngineArg(align: TextAlign | undefined): number {
   const [r, c] = alignCell(align);
