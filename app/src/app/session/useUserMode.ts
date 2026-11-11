@@ -26,6 +26,7 @@ import { useUser } from "@clerk/clerk-react";
 import { CLOUD_CONFIGURED } from "@/lib/cloud";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
+import { useMcpBrowserOnlyGuard } from "@/hooks/useMcpBrowserOnlyGuard";
 import { useSession, effectiveMode } from "@/hooks/useEntitlement";
 import { userModeForTier, type UserMode } from "@/lib/tiers";
 import { useUIStore } from "@/stores/useUIStore";
@@ -38,6 +39,8 @@ function useClerkUserMode(): void {
   const { isLoaded, isSignedIn } = useUser();
   // Create/refresh the Convex users row on sign-in (tier lives there)...
   useStoreUser();
+  // Going "Everything in your browser" turns AI app access off too.
+  useMcpBrowserOnlyGuard();
   // ...and then actually READ that tier. Without this line a pro/team
   // subscriber was gated to free limits: the watcher created the row the tier
   // lives in and then reported `loggedIn` for every signed-in user.

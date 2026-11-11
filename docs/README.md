@@ -17,7 +17,7 @@ What is in this folder, and what deliberately is not.
 | [UI_CONSISTENCY.md](UI_CONSISTENCY.md) | the ten UI rules, and the canonical scale |
 | [UI_INVENTORY.md](UI_INVENTORY.md) | what the UI vocabulary actually is, counted |
 | [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) | every registered exception to a UI gate |
-| [MCP.md](MCP.md) | the planned Image Horse MCP server, and the Beta Connections preview |
+| [MCP.md](MCP.md) | connecting an AI app to your account: the tools, the limits, and what turns it on |
 | [Deploying.md](Deploying.md) | how a release reaches production |
 | [Change-summary.md](Change-summary.md) | full release history |
 | [PARKING_LOT.md](PARKING_LOT.md) | problems noticed but deliberately not fixed yet |

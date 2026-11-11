@@ -40,7 +40,7 @@ environment variables → **[Getting Started](docs/Getting-Started.md)**.
 - **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 - **[UI](docs/UI.md)** — the UI rules, what the UI is built from, and the UI work that shipped.
-- **[MCP](docs/MCP.md)** — connecting Claude or Cursor to your Image Horse account: what's planned, and the Beta preview in Settings you can try now.
+- **[MCP](docs/MCP.md)** — connecting Claude or Cursor to your Image Horse account: the tools, the limits, and what turns it on.
 
 Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 
