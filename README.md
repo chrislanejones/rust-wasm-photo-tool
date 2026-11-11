@@ -89,14 +89,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.59 — 2026-11-08
+### v9.60 — 2026-11-11
 
-**Batch gets a Masonry view, and Compare picks its two photos right in the gallery.**
+**A text box you drag to size keeps that size, however the editor brings it back.**
 
-Masonry shows every photo at its own shape in scrolling columns, and zooming changes
-how many columns you get. Batch remembers which layout you left it on. Compare mode
-lets you tick two photos in the gallery. If neither one is open, the second one
-opens and the compare starts once it's loaded.
+Drag a text box wider or taller, reload, and it's still that box. On some reloads,
+and after the first undo once it was back, the text used to come back on one long
+line. Committing a sized text box is one undo step now, not three.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

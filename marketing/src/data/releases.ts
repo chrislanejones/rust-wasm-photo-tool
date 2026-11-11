@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.60",
+    date: "2026-11-11",
+    headline: "A text box you drag to size keeps that size, however the editor brings it back.",
+    entries: [
+      { tag: "fix", text: "Drag a text box wider or taller, reload, and it's still that box. On some reloads, and after the first undo once it was back, the text used to come back on one long line." },
+      { tag: "fix", text: "Committing a text whose box you dragged is one undo step, not three." },
+    ],
+  },
+  {
     version: "v9.59",
     date: "2026-11-08",
     headline: "Batch gets a Masonry view, and Compare picks its two photos right in the gallery.",

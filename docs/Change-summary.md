@@ -12075,3 +12075,18 @@ shows no message; the wasm SIMD path and the worker's drain aren't run directly 
 No engine change and no Dexie migration.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #446 ran 2,231 app unit tests and 17 browser specs on the production build, and 6 of 6 mutations were caught. Not run: `imagehorse-qc`, owed since v9.55.
+
+## v9.60 Change Summary — 2026-11-11
+
+**A text box you drag to size keeps that size, however the editor brings it back.**
+
+| Area | Change |
+| --- | --- |
+| Op-log resume (#461) | Replay drew a wrapped or warped text without its wrap or perspective, so the saved log's picture didn't match the editor's and the save retired the log. A reload then came back from the archive. Replay now builds text the same way the editor does, so the log is kept. |
+| One commit, one step (#461) | Committing a text with a dragged box took three undo steps (add, width, height). They are joined into one step now, and the log records them as one. |
+| Archive resume, then undo (#461) | The undo and redo history restored after an archive resume lost each text's box, perspective, shadow and outline. Every saved text now comes back through one restore call. |
+| ADR-024-F7 (#461) | Closed, with an addendum to ADR-060 listing each path. |
+
+No format change and no Dexie migration. Engine 957,511 → 956,874 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; cargo fmt, clippy and tests with and without `tiles`; app unit tests and both production builds pass, all run after the trail data regen. PR #461 ran `e2e/text-box-survives.spec.ts` (9 of 9, three times; 8 of 9 failed before the fix) and the text, callout and op-log specs. Not run: `imagehorse-qc`, owed since v9.55.
