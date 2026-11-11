@@ -8,7 +8,10 @@
  * may read a marketing color. */
 
 .design-system {
-  --ds-max: min(var(--page-max), 76rem);
+  /* No max-width or auto margins on the wrappers below: --page-gutter already
+     grows to (100vw - --page-max) / 2, so it IS the centering. Adding both
+     centered the column twice (h1 at 128px vs the site's 64px at 1280 wide,
+     768 vs 384 at 1920). Gutter only, like every other page. */
 }
 .design-system code {
   font-family: var(--font-outlier);
@@ -18,8 +21,6 @@
 
 /* ── head ─────────────────────────────────────────────────────────────── */
 .ds-head {
-  max-width: var(--ds-max);
-  margin: 0 auto;
   padding: calc(var(--banner-height) + 56px) var(--page-gutter) var(--space-lg);
   display: grid;
   gap: 20px;
@@ -51,8 +52,6 @@
 
 /* ── tabs ─────────────────────────────────────────────────────────────── */
 .ds-tabs {
-  max-width: var(--ds-max);
-  margin: 0 auto;
   padding: 0 var(--page-gutter);
 }
 .ds-tabs__list {
@@ -105,8 +104,6 @@
 }
 
 .ds-panel-tab {
-  max-width: var(--ds-max);
-  margin: 0 auto;
   padding: var(--space-lg) var(--page-gutter) var(--space-3xl);
 }
 
@@ -307,6 +304,9 @@
 
 /* ── editor specimens: EDITOR tokens only ─────────────────────────────── */
 .ds-spec { display: grid; gap: 10px; }
+/* A note that follows a specimen pair needs air above it, or it reads as the
+   pair's caption. */
+.ds-spec + .ds-note { margin-top: var(--space-md); }
 .ds-spec--pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
 .ds-ed {
   margin: 0;
