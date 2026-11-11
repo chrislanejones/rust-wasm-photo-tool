@@ -16,6 +16,7 @@ import "./contact.css";
 import "./blog.css";
 import "./blog-post.css";
 import "./architecture.css";
+import "./design-system.css";
 import "./legal.css";
 import "./footer.css";
 import "./shot-annotations.css";

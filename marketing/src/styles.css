@@ -581,6 +581,11 @@ a { color: inherit; }
   height: 20rem;
   gap: 6px;
 }
+/* Eight Learn pages: five on the first row and three on the second wherever
+   the panel is wide enough for five, rather than whatever auto-fit lands on. */
+@media (min-width: 1200px) {
+  .nav-mega__learn-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 
 /* Feature card (the tall one that previews whatever is hovered) */
 .nav-mega__feat {
