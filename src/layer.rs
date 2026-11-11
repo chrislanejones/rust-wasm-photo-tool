@@ -500,7 +500,7 @@ pub(crate) fn build_annotation_tile(
     // Minimum BOX height in px; 0 = size the box to the text, which is what
     // every annotation written before v8.41 means. When it exceeds the
     // rendered text's own height the block is grown and the text centered in it
-    // (`text::grow_to_box_height`) BEFORE anything else looks at the
+    // (`text::grow_to_box_height_aligned`) BEFORE anything else looks at the
     // dimensions — so the background rect, the bubble tail, the shadow and the
     // rotation bounds all follow the box for free, with no second place to
     // keep in step.
@@ -538,9 +538,12 @@ pub(crate) fn build_annotation_tile(
     align: u8,
     box_w: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
-    let rendered = crate::text::grow_to_box_height(
-        crate::text::render_text_aligned(text, font_size, r, g, b, bold, font_id, align, box_w),
+    // `align` is a 3×3 cell (ADR-104): the column places each line, the row
+    // places the block in a box taller than the text.
+    let rendered = crate::text::grow_to_box_height_aligned(
+        crate::text::render_text_aligned(text, font_size, r, g, b, bold, font_id, align % 3, box_w),
         box_height,
+        align / 3,
     );
     let raw_w = rendered.width;
     let raw_h = rendered.height;
@@ -928,7 +931,7 @@ pub(crate) fn annotation_ink_offset(
         (tail_margin(background_kind) + bg_padding) as i32
     };
     // ⚠️ `box_height` is deliberately NOT a parameter here. The box grows
-    // BELOW the text (`text::grow_to_box_height` keeps it top-aligned), so a
+    // BELOW the text (`text::grow_to_box_height_aligned`, top row), so a
     // taller box moves no glyph and the ink offset is genuinely independent of
     // it. Pinned by the sweep in `ink_offset_matches_tile_geometry`, which
     // varies the height and asserts this answer does not move — if the layout

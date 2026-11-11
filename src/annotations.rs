@@ -42,10 +42,11 @@ pub struct TextAnnotation {
     /// before changing the units here; storing pixels would make the warp drift
     /// off the tile the first time somebody fixes a typo.
     pub perspective: [(f32, f32); 4],
-    /// Where each line sits in the box: [`TEXT_ALIGN_LEFT`] (0, what every
-    /// text written before v16 means), center (1) or right (2). Against the
-    /// box's content width when it has one (`wrap_width`), else against the
-    /// widest line. v16, ADR-104.
+    /// Where the text sits in its box, `row * 3 + column` (0 = top-left, what
+    /// every text written before v16 means). The column places each line
+    /// against the box's content width when it has one (`wrap_width`), else
+    /// against the widest line; the row places the block in a box taller than
+    /// the text (`box_height`). v16, ADR-104.
     pub align: u8,
     pub text: String,
     pub x: i32, // unrotated top-left in canvas coords
@@ -100,17 +101,23 @@ pub struct TextAnnotation {
     pub stroke: TextStroke,
 }
 
-/// A text's line alignment in its box (v16, ADR-104). Left is 0 so that a
-/// field the wire skips, an archive without it, or a v15 log all mean Left.
+/// Where a text sits in its box (v16, ADR-104): one byte, `row * 3 + column`
+/// on a 3×3 grid. Column 0/1/2 = left/center/right, row 0/1/2 = top/middle/
+/// bottom. 0 is top-left, so a field the wire skips, an archive without it,
+/// or a v15 log all mean what every older text was: left, at the top.
 pub const TEXT_ALIGN_LEFT: u8 = 0;
 #[allow(dead_code)] // named for readers and tests; the engine only tests left/right
 pub const TEXT_ALIGN_CENTER: u8 = 1;
+#[allow(dead_code)] // named for readers and tests
 pub const TEXT_ALIGN_RIGHT: u8 = 2;
 
-/// Any value but center or right is left: the byte arrives from JS and from
+/// The last grid cell, bottom-right.
+pub const TEXT_ALIGN_LAST: u8 = 8;
+
+/// Any value off the grid is top-left: the byte arrives from JS and from
 /// disk, and an unknown value must still draw.
 pub fn canonical_text_align(v: u8) -> u8 {
-    if v <= TEXT_ALIGN_RIGHT {
+    if v <= TEXT_ALIGN_LAST {
         v
     } else {
         TEXT_ALIGN_LEFT

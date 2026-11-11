@@ -318,12 +318,26 @@ pub fn side_padding(font_size: f32) -> f32 {
 /// before v8.41 means, so those keep their exact previous layout, and it makes
 /// the height a MINIMUM rather than a clip: a box dragged shorter than its own
 /// text simply has no effect instead of cropping words away.
-pub fn grow_to_box_height(rendered: RenderedText, box_height: u32) -> RenderedText {
+/// The text placed in the surplus: `row` 0 = top
+/// (exactly the old v8.41 layout, surplus below), 1 = middle, 2 = bottom (v16, ADR-104). Whole
+/// pixel rows, so the glyphs land on the same grid as a top-aligned text.
+pub fn grow_to_box_height_aligned(
+    rendered: RenderedText,
+    box_height: u32,
+    row: u8,
+) -> RenderedText {
     if box_height <= rendered.height {
         return rendered;
     }
-    let mut pixels = vec![0u8; rendered.width as usize * 4 * box_height as usize];
-    pixels[..rendered.pixels.len()].copy_from_slice(&rendered.pixels);
+    let spare = (box_height - rendered.height) as usize;
+    let top = match row {
+        1 => spare / 2,
+        2 => spare,
+        _ => 0,
+    };
+    let stride = rendered.width as usize * 4;
+    let mut pixels = vec![0u8; stride * box_height as usize];
+    pixels[top * stride..top * stride + rendered.pixels.len()].copy_from_slice(&rendered.pixels);
     RenderedText {
         pixels,
         width: rendered.width,
@@ -862,5 +876,31 @@ mod wrap_tests {
             assert_eq!((new.width, new.height), (old.width, old.height));
             assert!(new.pixels == old.pixels, "box {box_w}");
         }
+    }
+
+    #[test]
+    fn the_row_puts_the_text_at_the_top_middle_or_bottom_of_a_taller_box() {
+        // ADR-104: rows 1 and 2 of the 3×3 cell. Row 0 is the old layout.
+        let text = || render_text("HH\nHH", 24.0, 0, 0, 0, false, "");
+        let h = text().height;
+        let ink_rows = |t: &RenderedText| {
+            let rows: Vec<u32> = (0..t.height)
+                .filter(|&y| {
+                    (0..t.width).any(|x| t.pixels[((y * t.width + x) * 4 + 3) as usize] > 0)
+                })
+                .collect();
+            (rows[0], *rows.last().unwrap()) // allow: rust-panic
+        };
+        let (t0, b0) = ink_rows(&text());
+        let top = grow_to_box_height_aligned(text(), 200, 0);
+        let mid = grow_to_box_height_aligned(text(), 200, 1);
+        let bot = grow_to_box_height_aligned(text(), 200, 2);
+        assert_eq!((top.height, mid.height, bot.height), (200, 200, 200));
+        assert_eq!(ink_rows(&top), (t0, b0), "top: exactly where it was");
+        let spare = 200 - h;
+        assert_eq!(ink_rows(&mid), (t0 + spare / 2, b0 + spare / 2), "middle");
+        assert_eq!(ink_rows(&bot), (t0 + spare, b0 + spare), "bottom");
+        // A box no taller than the text changes nothing, whatever the row.
+        assert!(grow_to_box_height_aligned(text(), h, 2).pixels == text().pixels);
     }
 }
