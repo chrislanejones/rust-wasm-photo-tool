@@ -13,6 +13,7 @@ import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
+import { readPreferences, subscribePreferences } from "@/lib/preferences";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
 import { clampGap, GAP_DEFAULT } from "@/lib/shapePorts";
 import {
@@ -439,7 +440,10 @@ export const useToolStore = create<ToolState>()(
       objectRemovalBrush: 40,
       objectRemovalBusy: false,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
-      toolSettings: defaultToolSettings,
+      // Text in Box is a saved preference (lib/preferences, synced when signed
+      // in), so a new text starts where the person last chose. Kept in step
+      // below.
+      toolSettings: { ...defaultToolSettings, textAlign: readPreferences().textAlign },
 
       setActiveTool: (v) =>
         set((s) => {
@@ -613,3 +617,13 @@ export const useToolStore = create<ToolState>()(
     },
   ),
 );
+
+// The Text in Box choice follows its preference: a change from the Text
+// panel, another tab or another signed-in device lands in the tool settings
+// the next commit reads.
+subscribePreferences((p) => {
+  const s = useToolStore.getState();
+  if (s.toolSettings.textAlign !== p.textAlign) {
+    s.setToolSettings((t) => ({ ...t, textAlign: p.textAlign }));
+  }
+});

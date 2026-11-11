@@ -29,8 +29,12 @@ async function open(page: Page) {
     return ["localhost", "127.0.0.1"].includes(url.hostname) || ["blob:", "data:"].includes(url.protocol)
       ? route.continue() : route.abort();
   });
-  await page.addInitScript(() =>
-    localStorage.setItem("image-horse-prefs", JSON.stringify({ canvasArtboard: false })));
+  // Merged, not replaced: this runs on every load, and the reload test needs
+  // what the app saved to still be there.
+  await page.addInitScript(() => {
+    const was = JSON.parse(localStorage.getItem("image-horse-prefs") ?? "{}");
+    localStorage.setItem("image-horse-prefs", JSON.stringify({ ...was, canvasArtboard: false }));
+  });
   await page.goto("/");
   await page.locator('input[type="file"]').first().setInputFiles(FIXTURE_PNG);
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
@@ -94,14 +98,21 @@ async function reloadAndResume(page: Page, retireLog: boolean) {
   await installAnnotationProbe(page);
 }
 
+/** Pick a cell of the Text panel's Text in Box grid, opening its section. */
+async function pickCell(page: Page, cell: string) {
+  const panel = page.getByRole("region", { name: "Tool options" });
+  const grid = panel.getByRole("radiogroup", { name: "Text in Box" });
+  if (!(await grid.isVisible())) await panel.getByRole("button", { name: /^Text in Box/ }).first().click();
+  await grid.getByRole("radio", { name: cell, exact: true }).click();
+  await expect(grid.getByRole("radio", { name: cell, exact: true })).toBeChecked();
+}
+
 async function placeCentered(page: Page): Promise<{ blank: number[]; steps: number }> {
   const blank = await composite(page);
   const steps = await undoCount(page);
   await page.getByRole("button", { name: "Create", exact: true }).first().click();
   await page.getByRole("button", { name: "Text", exact: true }).first().click();
-  const align = page.getByRole("radiogroup", { name: "Align" });
-  await align.getByRole("radio", { name: "Center", exact: true }).click();
-  await expect(align.getByRole("radio", { name: "Center", exact: true })).toBeChecked();
+  await pickCell(page, "Top center");
 
   const at = await screenPoint(page, AT.x, AT.y);
   await page.mouse.click(at.x, at.y);
@@ -167,3 +178,85 @@ for (const retireLog of [false, true]) {
     expect((await composite(page)).join(",") === before.join(","), "the same pixels").toBe(true);
   });
 }
+
+test("Bottom center: the text drops to the bottom of a taller box, preview and commit", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, "Bottom center");
+  const blank = await composite(page);
+
+  const at = await screenPoint(page, AT.x, AT.y);
+  await page.mouse.click(at.x, at.y);
+  const input = page.locator("textarea").first();
+  await expect(input).toBeVisible();
+  await input.fill("HHHHHHHH\nHH");
+  const corners = page.locator('rect[style*="nwse-resize"]');
+  const nw = (await corners.nth(0).boundingBox())!;
+  const se = (await corners.nth(1).boundingBox())!;
+  const scale = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    return c.getBoundingClientRect().width / c.width;
+  });
+  await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(nw.x + nw.width / 2 + BOX_W * scale, nw.y + nw.height / 2 + 240 * scale, { steps: 10 });
+  await page.mouse.up();
+  // The preview drops too: the box's spare height moves above the text.
+  await expect.poll(async () => parseFloat(await input.evaluate((el) => getComputedStyle(el).paddingTop))).toBeGreaterThan(60);
+  await expect(input).toHaveCSS("text-align", "center");
+
+  const away = await screenPoint(page, 1000, 800);
+  await page.mouse.click(away.x, away.y);
+  await page.waitForTimeout(600);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await texts(page)).length).toBe(1);
+  const [t] = await texts(page);
+  expect(t.align, "stored as bottom center: row 2 * 3 + column 1").toBe(7);
+  const bottom = await lineInk(page, blank, t);
+  expect(bottom.bands).toHaveLength(2);
+
+  // The same text at the top of the same box, and its height with no box:
+  // the bottom cell must sit exactly the spare height lower.
+  const inkTop = async () => {
+    const now = await composite(page);
+    for (let y = t.y; y < t.y + t.tile_h; y++)
+      for (let x = t.x; x < t.x + t.tile_w; x++) {
+        const i = (y * 1200 + x) * 4;
+        if (Math.abs(now[i] - blank[i]) + Math.abs(now[i + 1] - blank[i + 1]) + Math.abs(now[i + 2] - blank[i + 2]) > 60) return y;
+      }
+    return -1;
+  };
+  const yBottom = await inkTop();
+  const natural = await page.evaluate(async (id) => {
+    const tool = window.__annotationTool;
+    const box = JSON.parse(await tool.get_text_annotations())[0].box_height;
+    await tool.set_text_box_height(id, 0);
+    const h = JSON.parse(await tool.get_text_annotations())[0].tile_h;
+    await tool.set_text_box_height(id, box);
+    await tool.set_text_align(id, 1);
+    await tool.recomposite();
+    return h;
+  }, t.id);
+  const yTop = await inkTop();
+  expect(yBottom - yTop, `spare ${t.box_height} - ${natural}`).toBe(t.box_height - natural);
+});
+
+test("the Text in Box choice is kept after a reload", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, "Bottom right");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("image-horse-prefs") ?? "{}").textAlign)).toBe("bottom-right");
+
+  await page.waitForTimeout(3000);
+  await page.reload();
+  await page.getByRole("button", { name: /Resume editing/i }).click();
+  await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  const panel = page.getByRole("region", { name: "Tool options" });
+  const grid = panel.getByRole("radiogroup", { name: "Text in Box" });
+  if (!(await grid.isVisible())) await panel.getByRole("button", { name: /^Text in Box/ }).first().click();
+  await expect(grid.getByRole("radio", { name: "Bottom right", exact: true })).toBeChecked();
+});

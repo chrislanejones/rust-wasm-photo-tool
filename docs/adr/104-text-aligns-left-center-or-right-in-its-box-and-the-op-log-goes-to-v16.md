@@ -74,3 +74,33 @@ advance width of each line, the textarea uses the browser's, and the outline
 (ADR-099) grows the tile outward, so a thick outline on centered text in a
 narrow box may sit a few pixels off the preview. Early warning sign to watch
 for: a centered, outlined text that jumps sideways on commit.
+
+## Addendum 2026-11-10 — a 3×3 grid, and the choice is kept
+
+Chris asked for the vertical placement too, and for the choice to stick.
+Since v16 was not merged yet, it is folded into the same byte instead of
+taking v17:
+
+- **`align` = `row * 3 + column`** on a 3×3 grid: column 0/1/2 left/center/
+  right (as above), row 0/1/2 top/middle/bottom. 0 is still top-left, so
+  every value already written keeps its meaning (1 and 2 were top-center and
+  top-right all along). `canonical_text_align` takes 0..=8.
+- **The row** places the text block in a box taller than the text:
+  `text::grow_to_box_height_aligned` puts the surplus below (top, the old
+  layout), half above (middle) or above (bottom), in whole pixel rows.
+  The box itself and the stored `x`, `y` don't move, so the editor's anchor
+  mapping is unchanged.
+- **Panel:** the Left/Center/Right row is replaced by a **Text in Box**
+  section right above Placement: the same 3×3 `PlacementGrid`, with
+  text-align icons per column (`icons="text"`). The textarea previews the
+  row by moving the box's spare height into its top padding (border-box, so
+  the box stays the same height).
+- **Kept:** `textAlign` is a preference (`lib/preferences`, appended last),
+  prefs sync format **2 → 3**, so it survives a reload and follows a signed-in
+  user to their other devices. The tool settings follow the preference at
+  start and on every change.
+
+Engine 960,077 → 960,152 B (+75). Tests: rows 0/1/2 move the ink by exactly 0,
+spare/2 and spare (`text.rs`); replay parity for cells 4, 6 and 8;
+e2e Bottom center drops by exactly the spare height, preview included, and
+the choice is still checked after a reload.

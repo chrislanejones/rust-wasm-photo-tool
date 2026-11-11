@@ -2326,7 +2326,17 @@ fn boxed_and_warped_text_replays_byte_identically() {
 /// own pixels, and setting the alignment is one undo step (ADR-104).
 #[test]
 fn aligned_text_replays_byte_identically_and_is_one_step() {
-    for (wrap, align) in [(300u32, 1u8), (300, 2), (0, 1), (0, 2)] {
+    // The 3×3 cell: top center/right, and the middle and bottom rows in a
+    // box taller than the text.
+    for (wrap, align) in [
+        (300u32, 1u8),
+        (300, 2),
+        (0, 1),
+        (0, 2),
+        (300, 4),
+        (300, 8),
+        (0, 6),
+    ] {
         let (mut t, _px) = seeded_tool(800, 400);
         t.set_oplog_undo(true);
         let id = t.add_text_annotation(
@@ -2352,6 +2362,8 @@ fn aligned_text_replays_byte_identically_and_is_one_step() {
         t.recomposite();
         t.continue_step();
         t.set_text_wrap_width(id, wrap);
+        t.continue_step();
+        t.set_text_box_height(id, 160);
         t.continue_step();
         assert!(t.set_text_align(id, align));
         t.recomposite();

@@ -16,6 +16,7 @@ import { useAIJob } from "@/hooks/useAIJob";
 import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
+import { commitPreferences, readPreferences } from "@/lib/preferences";
 import { useEngineFaces } from "@/hooks/useEngineFaces";
 import { useUIStore } from "@/stores/useUIStore";
 import { OnlineFeaturesOffNotice } from "@/components/OnlineFeaturesOffNotice";
@@ -47,6 +48,12 @@ import { ToolPanel } from "@/components/ui/tool-panel";
  */
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
+
+const TEXT_IN_BOX_LABEL: Record<PlacementCell, string> = {
+  "top-left": "Top left", "top-center": "Top center", "top-right": "Top right",
+  "middle-left": "Middle left", center: "Center", "middle-right": "Middle right",
+  "bottom-left": "Bottom left", "bottom-center": "Bottom center", "bottom-right": "Bottom right",
+};
 
 const SHADOW_MODE_OPTIONS = [
   { id: "off", label: "Off" },
@@ -275,22 +282,6 @@ export function TextSettings({
                   ] as const}
                   value={settings.fontWeight ?? "normal"}
                   onChange={(id) => onChange({ ...settings, fontWeight: id })}
-                />
-              )}
-            </ControlRow>
-
-            {/* Align — where each line sits in the box (ADR-104) */}
-            <ControlRow label="Align">
-              {({ labelId }) => (
-                <ToolButtonGroup
-                  aria-labelledby={labelId}
-                  options={[
-                    { id: "left", label: "Left" },
-                    { id: "center", label: "Center" },
-                    { id: "right", label: "Right" },
-                  ] as const}
-                  value={settings.textAlign ?? "left"}
-                  onChange={(id) => onChange({ ...settings, textAlign: id })}
                 />
               )}
             </ControlRow>
@@ -584,6 +575,30 @@ export function TextSettings({
         </>
       );
     })()}
+
+    {/* Text in Box — where the text sits inside its own box: the column
+        lines it up left / center / right, the row puts it at the top,
+        middle or bottom of a box taller than the text (ADR-104). Top-left is
+        the default and what every older text is. A setting, so it carries to
+        the next text, like the font. */}
+    {mode === "text" && (
+      <CollapsibleSection
+        label="Text in Box"
+        summary={TEXT_IN_BOX_LABEL[settings.textAlign ?? "top-left"]}
+        info="Where the text sits inside its box. Left, center or right lines up the lines; top, middle or bottom shows in a box dragged taller than the text."
+      >
+        <PlacementGrid
+          name="Text in Box"
+          icons="text"
+          value={settings.textAlign ?? "top-left"}
+          onChange={(cell) => {
+            onChange({ ...settings, textAlign: cell });
+            // Kept for next time (and on a signed-in user's other devices).
+            commitPreferences({ ...readPreferences(), textAlign: cell });
+          }}
+        />
+      </CollapsibleSection>
+    )}
 
     {/* Placement only applies to the Text mode — Background/OCR aren't
         placing a new object on the canvas. Collapsed under "Placement" since

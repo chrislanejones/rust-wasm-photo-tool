@@ -47,8 +47,13 @@ export type ShapeName =
   | "rect" | "circle" | "line" | "diamond" | "star" | "triangle" | "oval"
   | DiagramShapeName;
 
-/** A text's line alignment in its box. */
-export type TextAlign = "left" | "center" | "right";
+/** Where a text sits in its box: a cell of the 3×3 grid (the column places
+ *  each line, the row places the block in a taller box). Same ids as the
+ *  Placement grid's cells. */
+export type TextAlign =
+  | "top-left" | "top-center" | "top-right"
+  | "middle-left" | "center" | "middle-right"
+  | "bottom-left" | "bottom-center" | "bottom-right";
 
 export interface ToolSettings extends StampSettings {
   strokeWidth: number;
@@ -90,9 +95,9 @@ export interface ToolSettings extends StampSettings {
    *  answers in the FALLBACK and is then cached against the real id forever.
    *  `ensureEngineFonts` exists to make that impossible; await it. */
   textFontId: string;
-  /** Where each line sits in the text's box (v16, ADR-104). Absent = left,
-   *  what every text before it was. No justify: greedy wrapping at small
-   *  widths makes it look bad. */
+  /** Where the text sits in its box (v16, ADR-104). Absent = top-left, what
+   *  every text before it was. No justify: greedy wrapping at small widths
+   *  makes it look bad. */
   textAlign?: TextAlign;
   fontWeight: "normal" | "bold";
   textColor: string;
