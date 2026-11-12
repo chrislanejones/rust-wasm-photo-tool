@@ -191,6 +191,29 @@ test("body text has enough contrast", async ({ page }) => {
   expect(ratio).toBeGreaterThanOrEqual(4.5);
 });
 
+test("small text on a raised surface has enough contrast", async ({ page }) => {
+  // Captions and swatch values sit on paper-2, where the faintest ink falls
+  // just short of 4.5:1. Measured in the browser, on both tabs.
+  const measure = (sel: string) => page.locator(sel).first().evaluate((el) => {
+    const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+    const rgb = (css: string) => { c.clearRect(0, 0, 1, 1); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return Array.from(c.getImageData(0, 0, 1, 1).data).slice(0, 3); };
+    const lum = (v: number[]) => v.map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }).reduce((s, x, i) => s + x * [0.2126, 0.7152, 0.0722][i], 0);
+    let bgEl: Element | null = el;
+    let bg = "rgba(0, 0, 0, 0)";
+    while (bgEl && (bg = getComputedStyle(bgEl).backgroundColor) === "rgba(0, 0, 0, 0)") bgEl = bgEl.parentElement;
+    const a = lum(rgb(getComputedStyle(el).color)), b = lum(rgb(bg));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+  await page.goto("/design-system#marketing");
+  for (const sel of ["#ds-panel-marketing .ds-live__cap", "#ds-panel-marketing .ds-swatch__vals"]) {
+    expect(await measure(sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await go(page);
+  for (const sel of ["#ds-panel-editor .ds-card__meta", "#ds-panel-editor .ds-swatch__vals"]) {
+    expect(await measure(sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("screenshots at desktop, dock and phone", async ({ page }) => {
   const dir = process.env.SHOTS;
   test.skip(!dir, "set SHOTS=<dir> to write screenshots");
