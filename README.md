@@ -89,15 +89,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.61 — 2026-11-11
+### v9.62 — 2026-11-12
 
-**The editor's design system has its own page.**
+**The Design System page covers the marketing site too.**
 
-[imagehorse.app/design-system](https://imagehorse.app/design-system) shows how the
-editor is put together: its principles, colors, type, spacing, 17 components, loading
-states and accessibility rules. Every specimen can be viewed in light, dark or both.
-The colors are copied straight from the editor's stylesheet, and a test fails if the
-two ever drift apart.
+[imagehorse.app/design-system](https://imagehorse.app/design-system) has two tabs now.
+Image Horse Editor is the one from yesterday. Image Horse Marketing shows this site's
+own colors, type, spacing, six components, motion and accessibility rules, read from
+its stylesheet with a test that fails if they drift. Each tab ends with a button that
+opens its Figma file. On the Trail Log, the month tiles fill the row and run through
+December.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.62",
+    date: "2026-11-12",
+    headline: "The Design System page covers the marketing site too.",
+    entries: [
+      { tag: "feature", text: "The Design System page has a second tab, Image Horse Marketing: this site's own colors, type, spacing, six components, motion and accessibility rules, read from its stylesheet." },
+      { tag: "feature", text: "Each tab ends with a button that opens its Figma file." },
+      { tag: "ui", text: "The page looks like the Trail Log and Architecture pages now, and the component cards line up across each row." },
+      { tag: "ui", text: "On the Trail Log, the month tiles fill the row evenly and run through December." },
+      { tag: "fix", text: "Small gray text on the Design System cards was a hair under the contrast rule. It's darker now." },
+    ],
+  },
+  {
     version: "v9.61",
     date: "2026-11-11",
     headline: "The editor's design system has its own page.",

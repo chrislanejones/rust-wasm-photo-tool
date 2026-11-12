@@ -12107,3 +12107,21 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; cargo fmt, clipp
 Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #464 ran `marketing/e2e/design-system.spec.ts` (13 of 13) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.
+
+## v9.62 Change Summary — 2026-11-12
+
+**The Design System page covers the marketing site too.**
+
+| Area | Change |
+| --- | --- |
+| Marketing tab (#466) | Image Horse Marketing is live on `/design-system`; it was "Coming soon". Seven sections: Principles, Colors, Typography, Spacing, layout and radii, Components (6), Motion, Accessibility. `/design-system#marketing` opens it directly. |
+| Site tokens stay true (#466) | The tab prints 89 values generated from `marketing/src/tokens.css` by `marketing/scripts/gen-site-tokens.mjs`. `app/src/lib/editorTokens.drift.test.ts` fails if the copy drifts. |
+| Same look as the other pages (#466) | The page uses the Trail Log's header and tiles: the two tabs are a pair of tiles, with arrow keys moving between them. |
+| Cards line up (#466) | In the Components sections, the titles, previews and notes of every card in a row start at the same height. |
+| Figma (#466) | Each tab ends with a row that opens its Figma file and links the written design doc. |
+| Contrast (#466) | Small gray text on the raised cards measured 4.46:1. It uses the darker ink now and passes 4.5:1. |
+| Trail Log (#466) | The month tiles fill the row evenly and run through December. A month with no releases yet is shown and can't be selected. |
+
+Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #466 ran `marketing/e2e/design-system.spec.ts` (18 passed, 1 screenshot run skipped) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.
