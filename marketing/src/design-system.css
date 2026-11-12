@@ -19,13 +19,10 @@
   color: var(--color-ink);
 }
 
-/* ── head ─────────────────────────────────────────────────────────────── */
-.ds-head {
-  padding: calc(var(--banner-height) + 56px) var(--page-gutter) var(--space-lg);
-  display: grid;
-  gap: 20px;
-}
-.ds-head__eyebrow,
+/* ── head and tabs ────────────────────────────────────────────────────────
+   Not styled here. The header is the Trail Log's (.trail-head) and the two
+   tabs are its month tiles (.trail-tile, in an even full-width row), so this
+   page opens the way the others do. Only the section eyebrow is ours. */
 .ds-sec__eyebrow {
   margin: 0;
   font-family: var(--font-outlier);
@@ -34,66 +31,11 @@
   text-transform: uppercase;
   color: var(--color-accent);
 }
-.ds-head__title {
-  margin: 0;
-  font-size: clamp(2.5rem, 4vw + 1rem, 4.75rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-}
-.ds-head__deck {
-  margin: 0;
-  max-width: 44ch;
-  font-size: var(--text-lg);
-  line-height: 1.4;
-  color: var(--color-ink-2);
-  text-wrap: pretty;
-}
-
-/* ── tabs ─────────────────────────────────────────────────────────────── */
-.ds-tabs {
-  padding: 0 var(--page-gutter);
-}
-.ds-tabs__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  border-bottom: 1px solid var(--color-rule);
-}
-.ds-tabs__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 var(--space-md);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  background: none;
-  color: var(--color-ink-2);
-  font: inherit;
-  font-size: var(--text-ui);
-  font-weight: 600;
-  cursor: pointer;
-}
-.ds-tabs__tab[aria-selected="true"] {
-  color: var(--color-ink);
-  border-bottom-color: var(--color-accent);
-}
-.ds-tabs__tab[aria-disabled="true"] {
-  cursor: not-allowed;
-  color: var(--color-ink-3);
-}
-.ds-tabs__soon {
-  font-family: var(--font-outlier);
-  font-size: var(--text-xs);
-  font-weight: 400;
-  padding: 2px 8px;
-  border: 1px solid var(--color-rule-strong);
-  border-radius: var(--radius-pill);
-  color: var(--color-ink-2);
-}
-.ds-tabs__tab:focus-visible,
+/* The panel brings its own top padding. */
+.ds-tabs { padding-bottom: 0; }
+/* Two tiles with long names: side by side while each has 15rem, stacked below
+   that, so "Image Horse Marketing" never runs out of its tile on a phone. */
+.ds-tabs .trail-tiles__row { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
 .ds-seg__opt:focus-visible,
 .ds-btn-m:focus-visible,
 .ds-index a:focus-visible,
@@ -212,7 +154,8 @@
   background: var(--color-paper-2);
 }
 .ds-card__title { margin: 0 0 8px; font-size: var(--text-md); font-weight: 650; }
-.ds-card__meta { font-family: var(--font-outlier); font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-3); }
+/* ink-2, not ink-3: these three sit on paper-2, where ink-3 measures 4.46:1. */
+.ds-card__meta { font-family: var(--font-outlier); font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-2); }
 .ds-card__body { margin: 0; font-size: var(--text-sm); line-height: 1.55; color: var(--color-ink-2); }
 
 /* swatches */
@@ -233,7 +176,7 @@
 .ds-swatch__chips { display: flex; height: 48px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-rule); }
 .ds-swatch__chip { flex: 1; }
 .ds-swatch__name { display: block; margin: 8px 0 4px; font-size: var(--text-sm); }
-.ds-swatch__vals { display: flex; gap: 14px; margin: 0; font-size: var(--text-xs); color: var(--color-ink-3); }
+.ds-swatch__vals { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: var(--text-xs); color: var(--color-ink-2); }
 .ds-swatch__vals div { display: flex; gap: 6px; }
 .ds-swatch__vals dt { text-transform: capitalize; }
 .ds-swatch__vals dd { margin: 0; }
@@ -269,7 +212,13 @@
   gap: var(--space-lg);
 }
 
-/* components grid */
+/* components grid
+   Every card shares its row's tracks (subgrid): the light picture, the dark
+   picture, the name, the description and the link each sit on one line across
+   the row, however tall one card's picture is. Without it a card whose buttons
+   wrapped to two lines pushed everything under it down, and the three names in
+   a row landed at three heights. --ds-rows is how many tracks a card spans:
+   the pictures it shows, plus three. */
 .ds-comps {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
@@ -278,6 +227,19 @@
   padding: 0;
   list-style: none;
 }
+.ds-comp {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span var(--ds-rows, 5);
+  row-gap: 0;
+  align-content: start;
+  min-width: 0;
+}
+/* The pair's wrapper steps aside so each picture is a row of its own. */
+.ds-comp > .ds-spec { display: contents; }
+.ds-comp .ds-ed + .ds-ed { margin-top: 10px; }
+/* A picture fills its row; its caption stays on the bottom edge. */
+.ds-comp :is(.ds-ed, .ds-live) { display: grid; grid-template-rows: 1fr auto; }
 .ds-comp__name { margin: 12px 0 4px; font-size: var(--text-md); }
 .ds-comp__what { margin: 0 0 6px; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-2); }
 .ds-comp__src { font-family: var(--font-outlier); font-size: var(--text-xs); color: var(--color-accent); }
@@ -301,6 +263,63 @@
 .ds-btn-m:hover { border-color: var(--color-accent); }
 .ds-demo__ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: var(--space-sm); }
 .ds-demo__ctl .ds-note { margin: 0; }
+
+/* ── marketing specimens: the site's real classes, in a plain frame ───── */
+.ds-live {
+  margin: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  overflow: hidden;
+}
+.ds-live__body { padding: var(--space-lg); min-height: 64px; display: grid; align-content: center; justify-items: start; gap: var(--space-sm); }
+.ds-live__cap {
+  margin: 0;
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+}
+.ds-live + .ds-table { margin-top: var(--space-md); }
+.ds-typeset p { margin: 0; max-width: 100%; overflow-wrap: anywhere; }
+.ds-typeset { gap: var(--space-md); }
+.ds-radius-m {
+  display: inline-grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--color-rule-strong);
+  background: var(--color-paper-3);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  color: var(--color-ink-2);
+}
+/* The skip link lives off screen until it has focus. This is that focused look, held still. */
+.ds-skip-shown { position: static; outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-live .tp-next__card { min-height: 0; width: 100%; }
+/* .tag--latest carries a margin for its place in a release header; here it sits in a row. */
+.ds-live .tag--latest { align-self: center; margin-block-start: 0; }
+.ds-scale--wide li { grid-template-columns: 150px 8rem 3rem; }
+.ds-motion { justify-items: stretch; width: 100%; }
+.ds-live__body.ds-motion { justify-items: stretch; }
+.ds-motion__lane { display: grid; grid-template-columns: 8rem 1fr 3.5rem; align-items: center; gap: 12px; font-size: var(--text-sm); }
+.ds-motion__track { position: relative; display: block; height: 12px; border-radius: var(--radius-pill); background: var(--color-paper-3); }
+.ds-motion__dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  transition: left var(--dur-short) var(--ease-out);
+}
+.ds-motion__dot.is-end { left: calc(100% - 12px); }
+
+/* ── the closing row: the Architecture page's coda, inside a padded panel ── */
+.ds-coda { padding-inline: 0; padding-bottom: 0; }
 
 /* ── editor specimens: EDITOR tokens only ─────────────────────────────── */
 .ds-spec { display: grid; gap: 10px; }
@@ -524,6 +543,8 @@
 @media (max-width: 640px) {
   .ds-topbar { align-items: flex-start; flex-direction: column; }
   .ds-scale li { grid-template-columns: 1fr 3rem 3rem; }
+  .ds-scale--wide li { grid-template-columns: 1fr 7rem 3rem; }
+  .ds-motion__lane { grid-template-columns: 6.5rem 1fr 3rem; }
   .ds-scale__bar { max-width: 100%; }
   .ds-table { font-size: var(--text-xs); }
 }

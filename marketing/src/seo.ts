@@ -264,11 +264,12 @@ export const ROUTES: readonly Route[] = [
     label: "Design System",
     title: "Design System — the colors, type and controls of the Image Horse editor",
     description:
-      "How the Image Horse editor looks and behaves: its two themes, type scale, spacing, the shared components, loading states and the accessibility rules every panel is held to.",
+      "How the Image Horse editor looks and behaves: its two themes, type scale, spacing, the shared components, loading states and the accessibility rules every panel is held to. A second tab does the same for this site.",
     sources: [
       "marketing/src/pages/DesignSystem.tsx",
       "marketing/src/data/designSystem.ts",
       "marketing/src/data/editorTokens.ts",
+      "marketing/src/data/siteTokens.ts",
     ],
   },
   {
