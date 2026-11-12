@@ -89,13 +89,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.60 — 2026-11-11
+### v9.61 — 2026-11-11
 
-**A text box you drag to size keeps that size, however the editor brings it back.**
+**The editor's design system has its own page.**
 
-Drag a text box wider or taller, reload, and it's still that box. On some reloads,
-and after the first undo once it was back, the text used to come back on one long
-line. Committing a sized text box is one undo step now, not three.
+[imagehorse.app/design-system](https://imagehorse.app/design-system) shows how the
+editor is put together: its principles, colors, type, spacing, 17 components, loading
+states and accessibility rules. Every specimen can be viewed in light, dark or both.
+The colors are copied straight from the editor's stylesheet, and a test fails if the
+two ever drift apart.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

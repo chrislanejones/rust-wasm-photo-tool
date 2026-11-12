@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.61",
+    date: "2026-11-11",
+    headline: "The editor's design system has its own page.",
+    entries: [
+      { tag: "feature", text: "A new Design System page, under Learn, shows how the editor is put together: its principles, colors, type, spacing, 17 components, loading states and accessibility rules." },
+      { tag: "feature", text: "Every specimen on it can be viewed in light, dark or both side by side. The colors are copied straight from the editor's stylesheet, and a test fails if the two ever drift apart." },
+      { tag: "fix", text: "The page lines up with the rest of the site. On wide screens it used to sit further in from the edge than every other page." },
+    ],
+  },
+  {
     version: "v9.60",
     date: "2026-11-11",
     headline: "A text box you drag to size keeps that size, however the editor brings it back.",

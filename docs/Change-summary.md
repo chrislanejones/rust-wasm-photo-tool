@@ -12090,3 +12090,20 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests a
 No format change and no Dexie migration. Engine 957,511 → 956,874 B.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; cargo fmt, clippy and tests with and without `tiles`; app unit tests and both production builds pass, all run after the trail data regen. PR #461 ran `e2e/text-box-survives.spec.ts` (9 of 9, three times; 8 of 9 failed before the fix) and the text, callout and op-log specs. Not run: `imagehorse-qc`, owed since v9.55.
+
+## v9.61 Change Summary — 2026-11-11
+
+**The editor's design system has its own page.**
+
+| Area | Change |
+| --- | --- |
+| Design System page (#464) | New page at `/design-system`, linked from the Learn menu, the phone menu, the Command Palette and the sitemap. Seven sections: Principles, Colors and themes, Typography, Spacing, layout and radii, Components (17), Loading and interaction states, Accessibility and consistency. |
+| Theme preview (#464) | A Both / Light / Dark switch applies to every specimen on the page. |
+| Colors stay true (#464) | The page's colors are generated from `app/src/styles.css` by `marketing/scripts/gen-editor-tokens.mjs`. `app/src/lib/editorTokens.drift.test.ts` runs with the app suite and fails if the copy drifts or a linked repo file disappears. |
+| Tabs (#464) | Image Horse Editor is live. Image Horse Marketing is shown as "Coming soon" and can't be selected. |
+| Layout (#465) | The page was centered twice, so on a 1920 px screen its heading sat 768 px from the edge where every other page sits at 384 px. It uses the site gutter alone now. |
+| Trail Log | The commit squares catch up through 11-11. |
+
+Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #464 ran `marketing/e2e/design-system.spec.ts` (13 of 13) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.
