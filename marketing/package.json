@@ -16,7 +16,7 @@
     "gen:tokens": "node scripts/gen-editor-tokens.mjs && node scripts/gen-site-tokens.mjs"
   },
   "dependencies": {
-    "lucide-react": "^1.65.0",
+    "lucide-react": "^1.70.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router": "^8.5.1",
