@@ -70,9 +70,11 @@
 /* ── month tiles ────────────────────────────────────────────────────── */
 
 .trail-tiles { padding: var(--space-xs) var(--page-gutter) var(--space-xl); }
+/* An even grid, edge to edge: every tile is the same width and the row fills
+   the column. auto-fit keeps the tiles equal when the row has to wrap. */
 .trail-tiles__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   gap: 10px;
 }
 .trail-tile {
@@ -93,9 +95,16 @@
   transition: border-color var(--dur-micro) var(--ease-out),
               background-color var(--dur-micro) var(--ease-out);
 }
-.trail-tile:hover { border-color: var(--color-accent); }
+/* The year tile holds the longest label ("2026 · All"), so it takes two of the
+   row's even columns; a single column cropped it. */
+.trail-tile--all { grid-column: span 2; }
+.trail-tile:hover:not(:disabled) { border-color: var(--color-accent); }
+/* A month with no release yet: there, but not pressable. */
+.trail-tile:disabled { opacity: 0.55; cursor: not-allowed; }
 .trail-tile:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.trail-tile[aria-pressed="true"] {
+/* aria-selected too: the Design System page uses the same tile as its tabs. */
+.trail-tile[aria-pressed="true"],
+.trail-tile[aria-selected="true"] {
   border-color: var(--color-accent);
   background: color-mix(in oklch, var(--color-accent) 16%, var(--color-paper-2));
   color: var(--color-ink);
@@ -113,7 +122,8 @@
   line-height: 1;
   color: var(--color-ink-3);
 }
-.trail-tile[aria-pressed="true"] .trail-tile__count { color: var(--color-accent); }
+.trail-tile[aria-pressed="true"] .trail-tile__count,
+.trail-tile[aria-selected="true"] .trail-tile__count { color: var(--color-accent); }
 
 /* ── the cream summary card ─────────────────────────────────────────── */
 
