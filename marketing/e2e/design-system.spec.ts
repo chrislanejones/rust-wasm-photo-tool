@@ -55,21 +55,74 @@ test("the Command Palette finds it", async ({ page }) => {
   await expect(page).toHaveURL(/\/design-system$/);
 });
 
-test("Editor is the selected tab; Marketing is disabled and can't be activated", async ({ page }) => {
+test("two tabs: Editor opens first, Marketing switches the panel, arrows move between them", async ({ page }) => {
   await go(page);
-  const editor = page.getByRole("tab", { name: "Image Horse Editor" });
+  const editor = page.getByRole("tab", { name: /Image Horse Editor/ });
   const marketing = page.getByRole("tab", { name: /Image Horse Marketing/ });
   await expect(editor).toHaveAttribute("aria-selected", "true");
-  await expect(marketing).toHaveAttribute("aria-disabled", "true");
   await expect(marketing).toHaveAttribute("aria-selected", "false");
-  await expect(marketing).toContainText("Coming soon");
-  await marketing.click({ force: true });
-  await expect(editor).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "ds-tab-editor");
-  // The keyboard can't reach it either: arrows stay on the one enabled tab.
-  await editor.focus();
-  await page.keyboard.press("ArrowRight");
+  await marketing.click();
+  await expect(marketing).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "ds-tab-marketing");
+  await expect(page).toHaveURL(/#marketing$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Motion" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Loading and interaction states" })).toBeHidden();
+  // Arrow keys move the selection and the focus together.
+  await page.keyboard.press("ArrowLeft");
   await expect(editor).toBeFocused();
+  await expect(editor).toHaveAttribute("aria-selected", "true");
+});
+
+test("the two tabs are one even row, like the Trail Log's tiles", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await go(page);
+  const boxes = await page.getByRole("tab").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) })));
+  expect(boxes).toHaveLength(2);
+  expect(boxes[0].top).toBe(boxes[1].top);
+  expect(Math.abs(boxes[0].w - boxes[1].w)).toBeLessThanOrEqual(1);
+  expect(boxes[0].h).toBeGreaterThanOrEqual(44);
+});
+
+test("a link to a Marketing section opens the Marketing tab on it", async ({ page }) => {
+  await page.goto("/design-system#m-color");
+  await expect(page.getByRole("tab", { name: /Image Horse Marketing/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { level: 2, name: "Colors", exact: true })).toBeInViewport();
+});
+
+test("the Marketing tab shows the site's real token values", async ({ page }) => {
+  await page.goto("/design-system#marketing");
+  const swatch = page.locator(".ds-swatch").filter({ hasText: "--color-accent-ink" });
+  await expect(swatch).toContainText("oklch(15% 0.040 50)");
+  // Ink is measured against the page background, and passes AA.
+  const ink2 = page.locator("#ds-panel-marketing .ds-swatch").filter({ hasText: /--color-ink-2/ });
+  const ratio = Number((await ink2.innerText()).match(/([\d.]+):1/)![1]);
+  expect(ratio).toBeGreaterThanOrEqual(4.5);
+});
+
+test("component cards line up across a row", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await go(page);
+  // The first row of Actions: Button, IconButton, ToolButton. Button's picture
+  // wraps to two lines; the names under all three still share one line.
+  const row = page.locator("#components .ds-comps").first().locator("> .ds-comp");
+  const read = (sel: string) => row.locator(sel).evaluateAll((els) => els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)));
+  for (const sel of [".ds-comp__name", ".ds-comp__what", ".ds-comp__src", '.ds-ed[data-theme="dark"]']) {
+    const tops = await read(sel);
+    expect(tops, sel).toHaveLength(3);
+    expect(new Set(tops).size, `${sel} tops ${tops.join(", ")}`).toBe(1);
+  }
+});
+
+test("each tab ends with its Figma file and its source", async ({ page }) => {
+  await go(page);
+  const editor = page.locator("#ds-panel-editor .arch-coda");
+  await expect(editor.getByRole("link", { name: /Open the Figma file/ })).toHaveAttribute("href", /figma\.com\/design\/FDdCTUAv9LPdVy5lHwCwtA/);
+  await expect(editor.getByRole("link", { name: /Read the UI consistency doc/ })).toBeVisible();
+  await page.getByRole("tab", { name: /Image Horse Marketing/ }).click();
+  const site = page.locator("#ds-panel-marketing .arch-coda");
+  await expect(site.getByRole("link", { name: /Open the Figma file/ })).toHaveAttribute("href", /figma\.com\/design\/u596SNiguDyjqlXObV2BZi/);
+  await expect(site.getByRole("link", { name: /Read tokens\.css/ })).toBeVisible();
 });
 
 test("section links land on their sections", async ({ page }) => {
@@ -110,13 +163,13 @@ test("Reduce Motion stops the skeleton shimmer", async ({ page }) => {
 test("a fast load never shows a skeleton", async ({ page }) => {
   await go(page);
   await page.getByRole("button", { name: "Load in 150 ms" }).click();
-  await expect(page.locator(".ds-demo")).toContainText("No skeleton was shown.");
+  await expect(page.locator("#states .ds-demo")).toContainText("No skeleton was shown.");
   await expect(page.locator(".ds-thumbs .ds-skel")).toHaveCount(0);
 });
 
 test("keyboard focus is visible on the page's controls", async ({ page }) => {
   await go(page);
-  await page.getByRole("tab", { name: "Image Horse Editor" }).focus();
+  await page.getByRole("tab", { name: /Image Horse Editor/ }).focus();
   await page.keyboard.press("Tab");
   const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
   expect(outline).not.toBe("none");
@@ -159,6 +212,26 @@ test("screenshots at desktop, dock and phone", async ({ page }) => {
     await page.locator("#components").scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${dir}/editor-${t.toLowerCase()}-components.png` });
   }
+  // The Marketing tab, and the closing row of each tab.
+  for (const [name, w, h] of [["desktop-1440", 1440, 900], ["phone-390", 390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/design-system#marketing");
+    await expect(page.getByRole("tab", { name: /Image Horse Marketing/ })).toHaveAttribute("aria-selected", "true");
+    await page.screenshot({ path: `${dir}/${name}-marketing-top.png` });
+    for (const id of ["m-color", "m-type", "m-space", "m-components", "m-motion"]) {
+      await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+      await page.locator(`#${id}`).evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 120));
+      await page.screenshot({ path: `${dir}/${name}-${id}.png` });
+    }
+    await page.locator("#ds-panel-marketing .arch-coda").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${dir}/${name}-marketing-coda.png` });
+    await page.goto("/design-system");
+    await page.locator("#ds-panel-editor .arch-coda").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${dir}/${name}-editor-coda.png` });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/trail-log");
+  await page.screenshot({ path: `${dir}/trail-tiles-1440.png` });
   await page.goto("/");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("menuitem", { name: "Learn" }).hover();
   await page.locator(".nav-mega__learn-grid").getByRole("link", { name: /Design System/ }).hover();
