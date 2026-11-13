@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { installAnnotationProbe, screenPoint } from "./annotation-benchmark-harness";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// A fresh text with the shadow ON, an outline and Align: Center commits as ONE
+// A fresh text with the shadow ON, an outline and Text in Box: Bottom center
+// (both alignment axes) commits as ONE
 // undo step (PARKING_LOT 08-28). `commitText` was the add plus a setter each
 // for the shadow and the outline, each its own snapshot: "Add Text", then
 // "Text Shadow", then "Text Stroke". v12's gestures (ADR-088) made one step of
@@ -55,7 +56,8 @@ async function styledText(page: Page) {
 
   const grid = panel.getByRole("radiogroup", { name: "Text in Box" });
   if (!(await grid.isVisible())) await panel.getByRole("button", { name: /^Text in Box/ }).first().click();
-  await grid.getByRole("radio", { name: "Top center", exact: true }).click();
+  // Both axes off their default: bottom (the row) and center (the column).
+  await grid.getByRole("radio", { name: "Bottom center", exact: true }).click();
   // The two sections open on click; each one's controls show once it's open.
   const stroke = panel.getByRole("slider", { name: "Stroke Width" });
   if (!(await stroke.isVisible())) await panel.getByRole("button", { name: /^Stroke/ }).first().click();
@@ -78,7 +80,7 @@ async function styledText(page: Page) {
   const [t] = await texts(page);
   expect(t.shadow_text, "shadow on").toBe(true);
   expect(t.stroke_width, "outline on").toBeGreaterThan(0);
-  expect(t.align, "centered").toBe(1);
+  expect(t.align, "bottom center, cell 7").toBe(7);
 }
 
 async function reloadAndResume(page: Page, retireLog: boolean) {
@@ -103,7 +105,7 @@ async function reloadAndResume(page: Page, retireLog: boolean) {
   await installAnnotationProbe(page);
 }
 
-test("shadow + outline + center: one Add Text, one Ctrl+Z", async ({ page }) => {
+test("shadow + outline + bottom center: one Add Text, one Ctrl+Z", async ({ page }) => {
   await open(page);
   const before = await labels(page);
   await styledText(page);
