@@ -1,0 +1,42 @@
+// Fixture generator (Night 11-09, ADR-104). Not part of the suite: run with
+// OUT=<dir> cargo test --features tiles --test zz_capture -- --ignored
+use stamp_tool::ImageHorseTool;
+
+#[test]
+#[ignore]
+fn capture() {
+    let out = std::env::var("OUT").expect("OUT"); // allow: rust-panic
+    let (w, h) = (320u32, 200u32);
+    let mut t = ImageHorseTool::new(w, h);
+    t.load_image(&vec![240u8; (w * h * 4) as usize]);
+    t.set_oplog_undo(true);
+    let a = t.add_text_annotation(
+        "Centered caption in a box", 22.0, 20, 20, 20, false, 40, 30, 0.0, 0, 255, 255, 255, 255,
+        8, 8, 0, "",
+    );
+    t.recomposite();
+    t.continue_step();
+    t.set_text_wrap_width(a, 180);
+    t.recomposite();
+    let b = t.add_text_annotation(
+        "Right\nlabel here", 18.0, 200, 0, 0, true, 180, 120, 0.0, 0, 255, 255, 255, 255, 8, 8,
+        0, "",
+    );
+    t.recomposite();
+    let _ = b;
+    t.set_text_align(a, 1);
+    t.recomposite();
+    t.set_text_align(b, 2);
+    t.recomposite();
+    let n = t.oplog_op_count() as u32;
+    std::fs::write(format!("{out}/frames.bin"), t.oplog_encoded_ops(0, n)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/annotations.bin"), t.oplog_keyframe_annotations(0)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/base.png"), t.oplog_keyframe_png(0)).unwrap(); // allow: rust-panic
+    let px = t.get_image_data();
+    std::fs::write(format!("{out}/composite.rgba"), &px).unwrap(); // allow: rust-panic
+    std::fs::write(
+        format!("{out}/meta.txt"),
+        format!("ops {n} cursor {} broken {} coverage {}\n{}", t.oplog_cursor(), t.oplog_is_broken(), t.oplog_coverage(), t.get_text_annotations()),
+    )
+    .unwrap(); // allow: rust-panic
+}

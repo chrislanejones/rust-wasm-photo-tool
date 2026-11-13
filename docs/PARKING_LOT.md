@@ -23,12 +23,16 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Esc does nothing in compare mode until two photos are being compared | CompareBar's Esc handler only listens while a comparison is active. The X, the top bar button and a click elsewhere all work while picking. |
 | The wide top bar's Gallery toggle counts as "elsewhere" | Clicking it ends compare mode. The compact master bar's Gallery tab is exempt because the docked gallery is where the picks are made. |
 
+## OPEN — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
+
+| What | Why it's left |
+|---|---|
+| A text with no dragged box, set to center or right: the textarea is the measured text plus `0.6 × font size`, wider than the engine's tile (widest line plus `side_padding` a side), so the lines center in a slightly different width and the commit can land a few px off the preview | Boxed text was fixed in #462 (`alignAnchorShift`, anchored on the box). With no box there's no box to anchor on; the fix needs the engine's widest-line width at commit time and a matching inverse in `editAnnotation`. Left text is unaffected |
+
 ## OPEN — 33a leftovers (11-09-2026)
 
 | What | Why it's left |
 |---|---|
-| Rotation, Align and Placement then a reload are not in `text-box-survives` | The engine keeps the box through all three (`update_text_annotation` and the group moves keep the whole annotation); covered in-session by callout-leader and text-placement-undo, not with a dragged box |
-| An export compared with the canvas | The single download is the engine's composite (the spec hashes it); the batch export restores through `restoreStoredText`. No e2e downloads a file yet |
 | Restored texts get fresh ids, and a history snapshot's copy a different one | Was already so; nothing found that keys on a text's id across a reload |
 
 ## OPEN — callout-leader e2e flakes on Align (seen 11-09-2026 on #452 and #454)
@@ -2222,7 +2226,17 @@ strip the suffixes from the headings or write the anchors to match them.
 The sweep itself is clean — 181 relative links across 80 tracked `.md` files,
 0 broken. This is anchors only, in one archived file.
 
-## OPEN — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
+## FIXED 11-09-2026 (night/1109-text-one-step) — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
+
+v12's gestures (ADR-088) made the "real fix" below unnecessary: a snapshot can
+now cover several ops. `commitText` joins every setter into the add's step
+(`lib/commitSteps`): face, box, align, shadow, outline. A fresh text with the
+shadow on, an outline and Center is one "Add Text" and one Ctrl+Z, in the
+session and after a reload by the op log or the archive
+(`e2e/text-commit-one-step.spec.ts`, red before: Add Text + Text Shadow + Text
+Stroke). `e2e/archive/release-1102.spec.ts` still expects the old two steps; it
+is an ignored one-off sweep.
+
 
 Found by the shapes user-testing session, via the QC text spec going red the
 moment Ctrl+Z stopped being double-bound. Measured with `history_labels()` on

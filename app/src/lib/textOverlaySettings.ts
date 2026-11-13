@@ -6,7 +6,7 @@
 // ratchet (eslint.config.mjs): AppShell built this object twice, CanvasArea
 // declared its type inline, and the stroke would have grown all three.
 import type React from "react";
-import type { ToolSettings } from "@/lib/types";
+import type { TextAlign, ToolSettings } from "@/lib/types";
 import { formatRgba, hexToRgba } from "@/lib/colorConvert";
 
 /** What `CanvasArea` reads to draw the open textarea and its live preview. */
@@ -32,6 +32,8 @@ export interface TextOverlaySettings {
   textStrokeWidth?: number;
   textStrokeColor?: string;
   textStrokeOpacity?: number;
+  /** Line alignment in the box (ADR-104); absent = left. */
+  textAlign?: TextAlign;
 }
 
 /** The overlay's slice of the tool settings. */
@@ -51,6 +53,7 @@ export function textOverlaySettings(s: ToolSettings): TextOverlaySettings {
     textStrokeWidth: s.textStrokeWidth,
     textStrokeColor: s.textStrokeColor,
     textStrokeOpacity: s.textStrokeOpacity,
+    textAlign: s.textAlign,
   };
 }
 
@@ -72,7 +75,7 @@ export function textStrokeEngineArgs(
  *  src/layer.rs). `-webkit-text-stroke` is centered on the glyph edge, so it
  *  is drawn twice as wide and painted UNDER the fill: what shows is exactly
  *  the outer half, the same band the engine commits. */
-export function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
+function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
   const width = Math.max(0, s.textStrokeWidth ?? 0) * scale;
   const opacity = Math.max(0, Math.min(100, s.textStrokeOpacity ?? 100)) / 100;
   if (width <= 0 || opacity <= 0) return {};
@@ -81,4 +84,47 @@ export function textStrokeCss(s: TextOverlaySettings, scale: number): React.CSSP
     WebkitTextStroke: `${width * 2}px ${formatRgba(rgb, opacity)}`,
     paintOrder: "stroke fill",
   };
+}
+
+const ALIGN_ROWS = ["top", "middle", "bottom"] as const;
+const ALIGN_COLUMNS = ["left", "center", "right"] as const;
+
+/** A grid cell as (row, column), 0-2 each. Anything unknown is top-left. */
+function alignCell(align: TextAlign | undefined): [number, number] {
+  if (align === "center") return [1, 1];
+  const [row, col] = (align ?? "top-left").split("-");
+  const r = ALIGN_ROWS.indexOf(row as (typeof ALIGN_ROWS)[number]);
+  const c = ALIGN_COLUMNS.indexOf(col as (typeof ALIGN_COLUMNS)[number]);
+  return r < 0 || c < 0 ? [0, 0] : [r, c];
+}
+
+/** The grid cell for an engine alignment byte (anything off the grid is
+ *  top-left), the inverse of `textAlignEngineArg`. */
+export function textAlignFromEngine(byte: number | undefined): TextAlign {
+  const b = Number.isInteger(byte) && byte! >= 0 && byte! <= 8 ? byte! : 0;
+  const cell = `${ALIGN_ROWS[Math.floor(b / 3)]}-${ALIGN_COLUMNS[b % 3]}`;
+  return (cell === "middle-center" ? "center" : cell) as TextAlign;
+}
+
+/** The engine's alignment byte, `row * 3 + column` (`set_text_align`). */
+export function textAlignEngineArg(align: TextAlign | undefined): number {
+  const [r, c] = alignCell(align);
+  return r * 3 + c;
+}
+
+/** Everything the open textarea previews beyond the face and color: the
+ *  stroke (`textStrokeCss`) and the column of the text's cell. The textarea
+ *  is as wide as the box, so CSS `text-align` puts each line where the engine
+ *  will: against the box when it has one, against the widest line when not. */
+export function textPreviewCss(s: TextOverlaySettings, scale: number): React.CSSProperties {
+  return { ...textStrokeCss(s, scale), textAlign: ALIGN_COLUMNS[alignCell(s.textAlign)[1]] };
+}
+
+/** The textarea's padding, with the row of the text's cell: `spare` screen px
+ *  of box below the text go above it instead (all for bottom, half for
+ *  middle), as the engine places it (`text::grow_to_box_height_aligned`).
+ *  The textarea is border-box, so the box stays the same height. */
+export function textPreviewPadding(s: TextOverlaySettings, spare: number, padY: number, padX: number): string {
+  const top = padY + (Math.max(0, spare) * alignCell(s.textAlign)[0]) / 2;
+  return `${top}px ${padX}px ${padY}px`;
 }

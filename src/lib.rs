@@ -2036,6 +2036,7 @@ impl ImageHorseTool {
                     t.shadow_blur,
                     &t.font_id,
                     t.stroke,
+                    t.align,
                 )
             })
             .collect();
@@ -2987,6 +2988,7 @@ impl ImageHorseTool {
                             a.stroke.b,
                             a.stroke.a,
                         ),
+                        a.align,
                     )
                 })
                 .collect();
@@ -5008,6 +5010,7 @@ mod layer_persistence_tests {
             0,
             0,
             255,
+            0,
         );
         assert_ne!(id, 0);
         let snap = &t.hist.undo_stack[0];
@@ -5049,6 +5052,7 @@ mod layer_persistence_tests {
                 0,
                 0,
                 &[],
+                0,
                 0,
                 0,
                 0,
@@ -5107,6 +5111,7 @@ mod layer_persistence_tests {
             0,
             &[],
             // No outline: the stroke width, then its RGBA.
+            0,
             0,
             0,
             0,

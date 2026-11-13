@@ -19,6 +19,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type { MetadataStripMode } from "@/lib/exif";
 import { normalizeRecipes, type ExportRecipe } from "@/lib/exportRecipes";
+import type { TextAlign } from "@/lib/types";
 
 export type ThemeChoice = "system" | "dark" | "light";
 
@@ -98,6 +99,10 @@ export interface Preferences {
   /** Download All recipes the person saved (Night 10-28). The built-ins live
    *  in lib/exportRecipes.ts and are never stored. */
   exportRecipes: ExportRecipe[];
+  /** Where a new text sits in its box: the Text panel's Text in Box grid
+   *  (ADR-104). Kept once chosen, and synced to a signed-in user's other
+   *  devices like every preference. Top-left is what every text was. */
+  textAlign: TextAlign;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -138,6 +143,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // already stored in `image-horse-prefs` — no forced migration.
   exportCanvasBackground: false,
   exportRecipes: [],
+  textAlign: "top-left",
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -219,8 +225,17 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
         ? p.exportCanvasBackground
         : DEFAULT_PREFERENCES.exportCanvasBackground,
     exportRecipes: normalizeRecipes(p?.exportRecipes),
+    textAlign: TEXT_ALIGN_CELLS.includes(p?.textAlign as TextAlign)
+      ? (p?.textAlign as TextAlign)
+      : DEFAULT_PREFERENCES.textAlign,
   };
 }
+
+const TEXT_ALIGN_CELLS: readonly TextAlign[] = [
+  "top-left", "top-center", "top-right",
+  "middle-left", "center", "middle-right",
+  "bottom-left", "bottom-center", "bottom-right",
+];
 
 /** Map the backing-canvas color pref to the rgba the Rust artboard fill expects.
  *  The sentinel "transparent" ⇒ a:0 (checkerboard shows through); a #rrggbb hex
@@ -289,6 +304,8 @@ export function serializePreferences(p: Preferences): string {
     // Appended last: the order is the canonical serialization. Its arrival
     // is prefs format 2 (lib/sync/docs.ts).
     exportRecipes: p.exportRecipes,
+    // Appended last again: prefs format 3 (11-10-2026).
+    textAlign: p.textAlign,
   });
 }
 

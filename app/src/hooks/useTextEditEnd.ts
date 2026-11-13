@@ -8,6 +8,7 @@
 // with the editor still open went down snapshot undo, broke the log for the
 // rest of the session, and left the editor open over the undone text.
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
+import { restoreTextAlignPreference } from "@/stores/useToolStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 interface TextEditEndOptions {
@@ -35,6 +36,7 @@ export function useTextEditEnd({
     setTextInput(null);
     // Canceling an edit must un-suppress the (unchanged) baked tile.
     toolRef.current?.set_editing_text(-1);
+    restoreTextAlignPreference();
     flushToCanvas();
   }, [textInputRef, editingAnnotationId, setTextInput, toolRef, flushToCanvas]);
 

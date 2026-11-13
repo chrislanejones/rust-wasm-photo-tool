@@ -233,6 +233,9 @@ mod tests {
     fn non_tonal_ops_are_skipped() {
         assert!(look_of(&[]).is_empty());
         assert!(look_of(&[Op::SameGesture]).is_empty());
+        // A text's alignment is per text, not part of a photo's look
+        // (ADR-104): Copy look never carries it to another photo.
+        assert!(look_of(&[Op::TextAlign { id: 1, align: 1 }]).is_empty());
     }
 
     /// What `applyLookAsOneStep` (app/src/lib/look.ts) sends, on a real

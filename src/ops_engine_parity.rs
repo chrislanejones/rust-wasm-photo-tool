@@ -255,6 +255,7 @@ fn text_add_replay_matches_live_annotation() {
             perspective: crate::perspective::IDENTITY_QUAD,
             font_id: String::new(),
             stroke: Default::default(),
+            align: 0,
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -551,6 +552,7 @@ fn persist_restore_keeps_base_annotations_live() {
         perspective: crate::perspective::IDENTITY_QUAD,
         font_id: String::new(),
         stroke: Default::default(),
+        align: 0,
         id: 1,
         text: "base".into(),
         x: 6,
@@ -2317,5 +2319,67 @@ fn boxed_and_warped_text_replays_byte_identically() {
         assert_flat_identical(&t.composite_cache, &replay, t.width(), &ctx);
         assert_eq!(t.oplog_coverage(), 1, "{ctx}: the log covers the document");
         assert_eq!(t.undo_count(), 1, "{ctx}: one commit, one undo step");
+    }
+}
+
+/// A centered or right-aligned text, boxed or not, replays to the engine's
+/// own pixels, and setting the alignment is one undo step (ADR-104).
+#[test]
+fn aligned_text_replays_byte_identically_and_is_one_step() {
+    // The 3×3 cell: top center/right, and the middle and bottom rows in a
+    // box taller than the text.
+    for (wrap, align) in [
+        (300u32, 1u8),
+        (300, 2),
+        (0, 1),
+        (0, 2),
+        (300, 4),
+        (300, 8),
+        (0, 6),
+    ] {
+        let (mut t, _px) = seeded_tool(800, 400);
+        t.set_oplog_undo(true);
+        let id = t.add_text_annotation(
+            "Hello there. Second sentence here.",
+            24.0,
+            0,
+            0,
+            0,
+            false,
+            100,
+            100,
+            0.0,
+            0,
+            255,
+            255,
+            255,
+            255,
+            8,
+            8,
+            135,
+            "",
+        );
+        t.recomposite();
+        t.continue_step();
+        t.set_text_wrap_width(id, wrap);
+        t.continue_step();
+        t.set_text_box_height(id, 160);
+        t.continue_step();
+        assert!(t.set_text_align(id, align));
+        t.recomposite();
+        let ctx = format!("wrap {wrap}, align {align}");
+        let replay = t.oplog.as_ref().unwrap().live_document().composite_flat(); // allow: rust-panic
+        assert_flat_identical(&t.composite_cache, &replay, t.width(), &ctx);
+        assert_eq!(t.oplog_coverage(), 1, "{ctx}");
+        assert_eq!(t.undo_count(), 1, "{ctx}: one step");
+        // Unchanged: no step, still true.
+        assert!(t.set_text_align(id, align));
+        assert_eq!(t.undo_count(), 1, "{ctx}: a no-op takes no step");
+        // One undo takes the text away; one redo brings it back aligned.
+        let aligned = t.composite_cache.clone();
+        assert!(t.undo());
+        assert!(t.redo());
+        t.recomposite();
+        assert!(t.composite_cache == aligned, "{ctx}: redo restores it");
     }
 }

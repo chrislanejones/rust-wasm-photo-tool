@@ -1,0 +1,14 @@
+{
+  "capturedAtUtc": "2026-11-09",
+  "generator": "capture-text-align.rs.txt (cargo test --features tiles --test zz_capture -- --ignored, OUT=<dir>)",
+  "document": "320x200 flat gray (240), oplog undo on",
+  "baseKeyframe": "base-keyframe-320x200.png (identical bytes from both crates)",
+  "file": "v15-text-wrap.frames.bin",
+  "crate": "master a83c8b70 (OP_FORMAT_VERSION 15)",
+  "session": "text 'Centered caption in a box' (22 px) in a 180 px box, then an unboxed two-line label 'Right\\nlabel here' (18 px bold)",
+  "ops": 4,
+  "cursor": 4,
+  "coverageAtCapture": 0,
+  "note": "coverage 0 at capture IS the 33a bug: the v15 replay drew the boxed text unwrapped, so its pixels did not match the engine's and the app retired such a log. compositeFnv1a is the v15 engine's LIVE composite.",
+  "compositeFnv1a": "0x5fd837406a6b07f6"
+}

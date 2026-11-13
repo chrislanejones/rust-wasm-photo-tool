@@ -1,0 +1,13 @@
+{
+  "capturedAtUtc": "2026-11-09",
+  "generator": "capture-text-align.rs.txt (cargo test --features tiles --test zz_capture -- --ignored, OUT=<dir>)",
+  "document": "320x200 flat gray (240), oplog undo on",
+  "baseKeyframe": "base-keyframe-320x200.png (identical bytes from both crates)",
+  "file": "v16-text-align.frames.bin",
+  "crate": "night/1109-text-align (OP_FORMAT_VERSION 16)",
+  "session": "the v15 session, then Center on the boxed text and Right on the label",
+  "ops": 6,
+  "cursor": 6,
+  "coverageAtCapture": 1,
+  "compositeFnv1a": "0xd4363f5fdd7ea4f6"
+}
