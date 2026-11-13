@@ -1,0 +1,63 @@
+// Fixture generator (11-13-2026, ADR-104): the vertical row of Text in Box.
+// Not part of the suite: copy to tests/zz_capture.rs and run with
+// OUT=<dir> cargo test --features tiles --test zz_capture -- --ignored
+use stamp_tool::ImageHorseTool;
+
+fn session(cells: (u8, u8)) -> ImageHorseTool {
+    let (w, h) = (320u32, 200u32);
+    let mut t = ImageHorseTool::new(w, h);
+    t.load_image(&vec![240u8; (w * h * 4) as usize]);
+    t.set_oplog_undo(true);
+    // A boxed caption in a box far taller than its two lines, on a white fill
+    // so the box shows.
+    let a = t.add_text_annotation(
+        "Middle of\nthe box", 18.0, 20, 20, 20, false, 20, 20, 0.0, 1, 255, 255, 255, 255, 8, 8,
+        0, "",
+    );
+    t.recomposite();
+    t.continue_step();
+    t.set_text_wrap_width(a, 130);
+    t.continue_step();
+    t.set_text_box_height(a, 150);
+    t.recomposite();
+    // A second one, bottom center.
+    let b = t.add_text_annotation(
+        "Bottom\ncenter", 18.0, 200, 0, 0, true, 170, 20, 0.0, 1, 255, 255, 255, 255, 8, 8, 0, "",
+    );
+    t.recomposite();
+    t.continue_step();
+    t.set_text_wrap_width(b, 130);
+    t.continue_step();
+    t.set_text_box_height(b, 150);
+    t.recomposite();
+    t.set_text_align(a, cells.0);
+    t.recomposite();
+    t.set_text_align(b, cells.1);
+    t.recomposite();
+    t
+}
+
+fn write(t: &mut ImageHorseTool, out: &str) {
+    std::fs::create_dir_all(out).unwrap(); // allow: rust-panic
+    let n = t.oplog_op_count() as u32;
+    std::fs::write(format!("{out}/frames.bin"), t.oplog_encoded_ops(0, n)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/annotations.bin"), t.oplog_keyframe_annotations(0)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/base.png"), t.oplog_keyframe_png(0)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/composite.rgba"), t.get_image_data()).unwrap(); // allow: rust-panic
+    std::fs::write(
+        format!("{out}/meta.txt"),
+        format!("ops {n} cursor {} broken {} coverage {}\n{}", t.oplog_cursor(), t.oplog_is_broken(), t.oplog_coverage(), t.get_text_annotations()),
+    )
+    .unwrap(); // allow: rust-panic
+}
+
+#[test]
+#[ignore]
+fn capture() {
+    let out = std::env::var("OUT").expect("OUT"); // allow: rust-panic
+    // Center (cell 4) and bottom center (cell 7): the fixture.
+    write(&mut session((4, 7)), &format!("{out}/rows"));
+    // The same session left at top left (0, 0): only its composite is kept,
+    // to show the rows moved the ink.
+    write(&mut session((0, 0)), &format!("{out}/top"));
+}

@@ -242,6 +242,54 @@ test("Bottom center: the text drops to the bottom of a taller box, preview and c
   expect(yBottom - yTop, `spare ${t.box_height} - ${natural}`).toBe(t.box_height - natural);
 });
 
+/** A two-line text in a box dragged BOX_W wide and 240 px tall, at `cell`,
+ *  committed. Returns the stored text. */
+async function placeInTallBox(page: Page, cell: string): Promise<Text & { box_height: number }> {
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, cell);
+  const at = await screenPoint(page, AT.x, AT.y);
+  await page.mouse.click(at.x, at.y);
+  const input = page.locator("textarea").first();
+  await expect(input).toBeVisible();
+  await input.fill("HHHHHHHH\nHH");
+  const corners = page.locator('rect[style*="nwse-resize"]');
+  const nw = (await corners.nth(0).boundingBox())!;
+  const se = (await corners.nth(1).boundingBox())!;
+  const scale = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    return c.getBoundingClientRect().width / c.width;
+  });
+  await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(nw.x + nw.width / 2 + BOX_W * scale, nw.y + nw.height / 2 + 240 * scale, { steps: 10 });
+  await page.mouse.up();
+  const away = await screenPoint(page, 1000, 800);
+  await page.mouse.click(away.x, away.y);
+  await page.waitForTimeout(600);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await texts(page)).length).toBe(1);
+  return (await texts(page))[0] as Text & { box_height: number };
+}
+
+// Both axes through a reload (11-12 plan §1 A): the middle row AND the center
+// column, in a box taller than the text, come back the same by either path.
+for (const retireLog of [false, true]) {
+  test(`Center (middle row) in a tall box survives a reload by the ${retireLog ? "archive" : "op log"}`, async ({ page }) => {
+    await open(page);
+    const placed = await placeInTallBox(page, "Center");
+    expect(placed.align, "middle center: row 1 * 3 + column 1").toBe(4);
+    expect(placed.box_height, "a box taller than two lines").toBeGreaterThan(150);
+    const before = await composite(page);
+    await reloadAndResume(page, retireLog);
+    const [back] = await texts(page);
+    const { id: _a, ...was } = placed;
+    const { id: _b, ...now } = back;
+    expect(now, "every field but the id (the archive gives a fresh one)").toEqual(was);
+    expect((await composite(page)).join(",") === before.join(","), "the same pixels").toBe(true);
+  });
+}
+
 test("the Text in Box choice is kept after a reload", async ({ page }) => {
   await open(page);
   await page.getByRole("button", { name: "Create", exact: true }).first().click();
