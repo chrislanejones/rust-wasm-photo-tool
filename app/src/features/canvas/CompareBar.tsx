@@ -15,7 +15,7 @@ import {
   CanvasActionBarText,
 } from "@/components/ui/canvas-action-bar";
 import { useScreenshotCompare, type ScreenshotCompare } from "@/app/session/useScreenshotCompare";
-import { usePendingComparePick } from "./comparePick";
+import { useCompareClickAway, usePendingComparePick } from "./comparePick";
 import { useScreenshotCompareStore, type CompareView } from "@/stores/useScreenshotCompareStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -160,7 +160,7 @@ function SideBySide({ cmp, bUrl, docW, docH }: { cmp: ScreenshotCompare; bUrl: s
     </figure>
   );
   return (
-    <div className="absolute inset-0 flex items-center gap-4 bg-theme-background p-4 pt-16" style={{ zIndex: "var(--z-compare)" }}>
+    <div data-compare-keep="" className="absolute inset-0 flex items-center gap-4 bg-theme-background p-4 pt-16" style={{ zIndex: "var(--z-compare)" }}>
       {figure(`A · ${cmp.other?.name ?? "other photo"}`, <>
         <image href={a.url} width={a.w} height={a.h} />
         {outlines(bounds[0], bounds[1])}
@@ -200,6 +200,9 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
   const cmp = useScreenshotCompare({ toolRef, flushToCanvas, syncState, revision });
   // Compare mode's pair, when neither was open: start once B is.
   usePendingComparePick();
+  // Compare mode's "click elsewhere" exit. Everything this file draws is
+  // marked data-compare-keep, so the views' own controls keep working.
+  useCompareClickAway();
   const view = useScreenshotCompareStore((s) => s.view);
   const setView = useScreenshotCompareStore((s) => s.setView);
   const sensitivity = useScreenshotCompareStore((s) => s.sensitivity);
@@ -270,19 +273,23 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
       {view === "blink" && photoRect && <BlinkLayer rect={photoRect} cmp={cmp} showA={showA} />}
       {view === "side" && canvasEl && <SideBySide cmp={cmp} bUrl={bUrl} docW={canvasEl.width} docH={canvasEl.height} />}
       {view === "slider" && cmp.a && (
-        <CompareSlider
-          canvasEl={canvasEl}
-          toolRef={toolRef}
-          revision={revision}
-          source={{ url: cmp.a.url, left: "A", right: "B" }}
-        />
+        // `contents`: no box of its own, so the slider still positions
+        // against the canvas; the wrapper only marks it as compare's own.
+        <div data-compare-keep="" className="contents">
+          <CompareSlider
+            canvasEl={canvasEl}
+            toolRef={toolRef}
+            revision={revision}
+            source={{ url: cmp.a.url, left: "A", right: "B" }}
+          />
+        </div>
       )}
       {/* The bars sit over the four views (--z-compare): Side by side covers the
           whole canvas area and the Slider the photo, and from either a person
           must reach the other views and Done (C15, C16). Still under the
           panels, like every canvas bar. */}
       {anchor && (
-        <div className="absolute left-0 top-0" style={{ zIndex: "var(--z-topbar)" }}>
+        <div data-compare-keep="" className="absolute left-0 top-0" style={{ zIndex: "var(--z-topbar)" }}>
           <CanvasActionBar x={anchor.x} y={anchor.y} label="Compare" data-testid="compare-bar">
             <div role="group" aria-label="View" className="flex items-center gap-0.5">
               {VIEWS.map(({ view: v, label, Icon }) => (

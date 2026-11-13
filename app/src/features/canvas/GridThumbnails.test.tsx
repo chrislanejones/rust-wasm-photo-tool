@@ -52,3 +52,17 @@ it("keeps a decoded tile during an update and clamps pagination after removal", 
   expect(screen.queryByRole('button', { name: 'Photo 1', exact: true })).toBeNull();
   expect(container.querySelectorAll('button[aria-label^="Photo"]')).toHaveLength(2);
 });
+
+it("names both layouts in words beside their icons, and keeps which is pressed", () => {
+  render(grid(photos(3)));
+  const gridBtn = screen.getByRole('button', { name: 'Grid view' });
+  const masonryBtn = screen.getByRole('button', { name: 'Masonry view' });
+  expect(gridBtn.textContent).toBe('Grid');
+  expect(masonryBtn.textContent).toBe('Masonry');
+  expect(gridBtn.getAttribute('aria-pressed')).toBe('true');
+  expect(masonryBtn.getAttribute('aria-pressed')).toBe('false');
+  fireEvent.click(masonryBtn);
+  expect(screen.getByRole('button', { name: 'Grid view' }).textContent).toBe('Grid');
+  expect(screen.getByRole('button', { name: 'Masonry view' }).getAttribute('aria-pressed')).toBe('true');
+  fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+});

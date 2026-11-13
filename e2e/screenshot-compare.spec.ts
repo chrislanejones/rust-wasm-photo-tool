@@ -91,7 +91,9 @@ async function reloadAndResume(page: Page, width: number) {
 /** The top bar's compare-mode toggle (11-07-2026 — it was a dialog). */
 const compareMode = (page: Page) => page.getByRole("button", { name: "Compare two photos" });
 const pickBox = (page: Page, file: string) => tile(page, file).getByRole("button", { name: "Compare", exact: true });
-const hint = (page: Page) => page.getByTestId("compare-pick-hint");
+/** Compare mode's line in the gallery bar, where Compress was (11-12-2026 —
+ *  it was a pill over the bar's top edge). */
+const hint = (page: Page) => page.getByTestId("compare-status").getByRole("status");
 
 test("An identical pair: No changes, and Mark changes is off", async ({ page }) => {
   await open(page, "a.png", "a-copy.png", 960);
@@ -146,6 +148,50 @@ test("Compare mode: opens a closed gallery, picks two at most, opens the second 
   // Compare mode's ticks are not the selection Batch uses for Exceptions.
   await compareMode(page).click();
   await expect(page.locator('[aria-label="Select image"][aria-pressed="true"]')).toHaveCount(0);
+});
+
+test("Compare mode: the line replaces Compress; the X and a click elsewhere end it, the views' own controls don't", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960);
+  const gallery = page.locator('[data-paste-yields="gallery"]');
+  await expect(gallery.getByRole("button", { name: "Compress Image" })).toBeVisible();
+  await compareMode(page).click();
+  await expect(hint(page)).toContainText("Pick 2 photos to compare · 0 of 2");
+  await expect(gallery.getByRole("button", { name: "Compress Image" })).toHaveCount(0);
+  await expect(page.getByTestId("compare-pick-hint")).toHaveCount(0);
+  await expect(page.getByTestId("compare-status").getByRole("button", { name: "Compare info" })).toBeVisible();
+
+  // The X, like the New dialog's.
+  await page.getByTestId("compare-status").getByRole("button", { name: "Stop comparing" }).click();
+  await expect(hint(page)).toHaveCount(0);
+  await expect(compareMode(page)).not.toHaveAttribute("aria-pressed", "true");
+  await expect(gallery.getByRole("button", { name: "Compress Image" })).toBeVisible();
+
+  // Picking, and the Compare bar and its Slider, are not "elsewhere".
+  await compareMode(page).click();
+  await pickBox(page, "a.png").click();
+  await pickBox(page, "b.png").click();
+  await expect(bar(page)).toContainText("3 changes");
+  await expect(hint(page)).toContainText("Comparing 2 photos");
+  await bar(page).getByRole("button", { name: "Slider", exact: true }).click();
+  const handle = page.locator("div.cursor-col-resize");
+  await expect(handle).toBeVisible();
+  const h = (await handle.boundingBox())!;
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 4, h.y + h.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await bar(page).getByRole("slider").fill("70");
+  await bar(page).getByRole("button", { name: "Overlay", exact: true }).click();
+  await expect(bar(page)).toBeVisible();
+  await expect(hint(page)).toContainText("Comparing 2 photos");
+
+  // A click anywhere else — here the empty canvas area beside the photo —
+  // ends compare mode, comparison and all.
+  const c = (await canvasBox(page))!;
+  await page.mouse.click(c.x - 40, c.y + c.height / 2);
+  await expect(hint(page)).toHaveCount(0);
+  await expect(bar(page)).toHaveCount(0);
+  await expect(compareMode(page)).not.toHaveAttribute("aria-pressed", "true");
 });
 
 test("The known pair: exactly 3 changes, each box on its known area (IoU ≥ 0.89)", async ({ page }) => {
