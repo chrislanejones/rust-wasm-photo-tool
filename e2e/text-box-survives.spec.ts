@@ -20,9 +20,14 @@ import { installAnnotationProbe, screenPoint } from "./annotation-benchmark-harn
 // the wrap and the line breaks, which are the tile's size, match), the engine's
 // pixels hash the same, and ONE Ctrl+Z undoes the last edit, not the box.
 //
+// The actions: nothing, a duplicate, a nudge, a Perspective, a rotation, and
+// (through the UI) Align ▾ › Align bottom and Placement › Bottom right
+// (PARKING_LOT 33a leftovers, 11-12-2026).
+//
 // Cloud restore uses the archive's own format and restore code
 // (useEditPersistence → restoreLayerStack), so `archive` covers it. Export
-// rebuilds through the same `restoreLayerStack` and is covered by the last test.
+// rebuilds through the same `restoreLayerStack`; e2e/export-matches-canvas.spec.ts
+// downloads one and compares it with the canvas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FIXTURE_PNG = join(__dirname, "fixtures", "paper-1200x900.png");
@@ -201,6 +206,49 @@ const ACTIONS: Record<string, Action> = {
       await window.__annotationTool.set_text_perspective(id, Float32Array.of(0, 0, 1, 0.05, 0.95, 1, 0.02, 0.97));
       await window.__annotationTool.recomposite();
     }, t.id);
+  },
+  // The Text tool's rotate handle ends in this same call: the annotation
+  // rewritten with every field it had and a new angle.
+  "a rotation": async (page, t) => {
+    await page.evaluate(async (id) => {
+      const tool = window.__annotationTool;
+      const a = JSON.parse(await tool.get_text_annotations()).find((x: { id: number }) => x.id === id);
+      await tool.update_text_annotation(
+        id, a.text, a.font_size, a.r, a.g, a.b, a.bold, a.x, a.y, 15,
+        a.background_kind, a.bg_r, a.bg_g, a.bg_b, a.bg_a, a.bg_padding, a.bg_corner_radius, a.bg_tail,
+      );
+      await tool.recomposite();
+    }, t.id);
+    expect((await layer(page)).texts[0].rotation_deg).toBe(15);
+  },
+  // Through the UI: Select objects, the text, Align ▾ › Align bottom.
+  "an Align": async (page, t) => {
+    await createTool(page, "Select objects");
+    const at = await screenPoint(page, t.x + 20, t.y + 20);
+    await page.mouse.click(at.x, at.y);
+    const bar = page.getByTestId("multi-select-bar");
+    await bar.getByRole("button", { name: "Align", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Align bottom", exact: true }).click();
+    await expect.poll(async () => (await layer(page)).texts[0].y).toBeGreaterThan(t.y + 100);
+    await page.keyboard.press("Escape");
+  },
+  // Through the UI: the text open in the Text tool, Placement › Bottom right.
+  "a Placement": async (page, t) => {
+    await createTool(page, "Text");
+    const at = await screenPoint(page, t.x + 20, t.y + 20);
+    await page.mouse.click(at.x, at.y);
+    await expect(page.locator("textarea").first()).toBeVisible();
+    const panel = page.getByRole("region", { name: "Tool options" });
+    const cell = panel.getByRole("radio", { name: "Bottom right", exact: true }).or(
+      panel.getByRole("button", { name: "Bottom right", exact: true }));
+    if (!(await cell.isVisible())) await panel.getByRole("button", { name: "Placement", exact: true }).click();
+    await cell.click();
+    await expect.poll(async () => (await layer(page)).texts[0].x).toBeGreaterThan(t.x + 100);
+    const away = await screenPoint(page, 100, 100);
+    await page.mouse.click(away.x, away.y);
+    await page.waitForTimeout(600);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("textarea")).toHaveCount(0);
   },
 };
 
