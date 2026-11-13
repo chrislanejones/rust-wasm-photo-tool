@@ -30,6 +30,7 @@ export const defaultToolSettings: ToolSettings = {
   // The embedded face, and its CSS twin. `""` is what every text annotation
   // written before v8.76 means, so this default is also the migration.
   textFontId: "",
+  textAlign: "top-left",
   fontFamily: "'IH Liberation Sans', Arial, Helvetica, sans-serif",
   fontWeight: "normal",
   textColor: "#000000",

@@ -42,6 +42,12 @@ pub struct TextAnnotation {
     /// before changing the units here; storing pixels would make the warp drift
     /// off the tile the first time somebody fixes a typo.
     pub perspective: [(f32, f32); 4],
+    /// Where the text sits in its box, `row * 3 + column` (0 = top-left, what
+    /// every text written before v16 means). The column places each line
+    /// against the box's content width when it has one (`wrap_width`), else
+    /// against the widest line; the row places the block in a box taller than
+    /// the text (`box_height`). v16, ADR-104.
+    pub align: u8,
     pub text: String,
     pub x: i32, // unrotated top-left in canvas coords
     pub y: i32,
@@ -93,6 +99,29 @@ pub struct TextAnnotation {
     /// Outline around the glyphs. Width 0 (the default, and what every
     /// annotation written before the text stroke existed means) = none.
     pub stroke: TextStroke,
+}
+
+/// Where a text sits in its box (v16, ADR-104): one byte, `row * 3 + column`
+/// on a 3×3 grid. Column 0/1/2 = left/center/right, row 0/1/2 = top/middle/
+/// bottom. 0 is top-left, so a field the wire skips, an archive without it,
+/// or a v15 log all mean what every older text was: left, at the top.
+pub const TEXT_ALIGN_LEFT: u8 = 0;
+#[allow(dead_code)] // named for readers and tests; the engine only tests left/right
+pub const TEXT_ALIGN_CENTER: u8 = 1;
+#[allow(dead_code)] // named for readers and tests
+pub const TEXT_ALIGN_RIGHT: u8 = 2;
+
+/// The last grid cell, bottom-right.
+pub const TEXT_ALIGN_LAST: u8 = 8;
+
+/// Any value off the grid is top-left: the byte arrives from JS and from
+/// disk, and an unknown value must still draw.
+pub fn canonical_text_align(v: u8) -> u8 {
+    if v <= TEXT_ALIGN_LAST {
+        v
+    } else {
+        TEXT_ALIGN_LEFT
+    }
 }
 
 /// The outline drawn around a text annotation's glyphs — the text twin of a
@@ -317,7 +346,10 @@ pub(crate) fn build_text_annotation(
     font_id: &str,
     // Appended after `font_id` for the same reason.
     stroke: TextStroke,
+    // …and the line alignment (v16), for the same reason again.
+    align: u8,
 ) -> TextAnnotation {
+    let align = canonical_text_align(align);
     // The tile renders WRAPPED text; the annotation stores the author's RAW
     // text. Keeping the raw text is what makes reflow reversible: drag the box
     // wider and the breaks are recomputed, rather than being stuck with
@@ -351,6 +383,8 @@ pub(crate) fn build_text_annotation(
         shadow_blur,
         font_id,
         stroke,
+        align,
+        wrap_width,
     );
     // PERSPECTIVE IS THE LAST STAGE, deliberately: it warps the finished,
     // already-rotated tile. Doing it here rather than inside
@@ -378,6 +412,7 @@ pub(crate) fn build_text_annotation(
         wrap_width,
         box_height,
         perspective,
+        align,
         text: text.to_string(),
         x,
         y,
@@ -449,7 +484,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{},\"stroke_width\":{},\"stroke_r\":{},\"stroke_g\":{},\"stroke_b\":{},\"stroke_a\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{},\"stroke_width\":{},\"stroke_r\":{},\"stroke_g\":{},\"stroke_b\":{},\"stroke_a\":{},\"align\":{}}}",
             a.id,
             a.wrap_width,
             a.box_height,
@@ -469,7 +504,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             a.shadow_box, a.shadow_text,
             a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
             a.shadow_dx, a.shadow_dy, a.shadow_blur,
-            a.stroke.width, a.stroke.r, a.stroke.g, a.stroke.b, a.stroke.a,
+            a.stroke.width, a.stroke.r, a.stroke.g, a.stroke.b, a.stroke.a, a.align,
         ));
     }
     out.push(']');
@@ -2172,6 +2207,7 @@ impl ImageHorseTool {
             a.shadow_blur,
             &a.font_id.clone(),
             stroke,
+            a.align,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
     }
@@ -2450,6 +2486,7 @@ impl ImageHorseTool {
             0, // shadow off; set via set_text_shadow
             font_id,
             TextStroke::default(),
+            TEXT_ALIGN_LEFT,
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -2510,6 +2547,7 @@ impl ImageHorseTool {
         // same reasoning as the shadow below. Without this, typing in a box
         // the user had dragged narrower would silently un-wrap it.
         let wrap_width = self.layers[self.active].text_annotations[idx].wrap_width;
+        let align = self.layers[self.active].text_annotations[idx].align;
         // Same for the box height — retyping inside a box the user had dragged
         // taller must not collapse it back onto the text.
         let box_height = self.layers[self.active].text_annotations[idx].box_height;
@@ -2564,6 +2602,8 @@ impl ImageHorseTool {
             &font_id,
             // …and the outline, set via `set_text_stroke`.
             self.layers[self.active].text_annotations[idx].stroke,
+            align,
+            wrap_width,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
@@ -2661,6 +2701,7 @@ impl ImageHorseTool {
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
             a.stroke,
+            a.align,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2734,6 +2775,7 @@ impl ImageHorseTool {
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
             a.stroke,
+            a.align,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2837,6 +2879,7 @@ impl ImageHorseTool {
             a.shadow_blur,
             font_id,
             a.stroke,
+            a.align,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2904,6 +2947,7 @@ impl ImageHorseTool {
             // drag must not silently reset the annotation to Liberation Sans.
             &a.font_id.clone(),
             a.stroke,
+            a.align,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -3059,6 +3103,7 @@ impl ImageHorseTool {
         // Rebuild the tile with the new shadow, reusing the annotation's current
         // text / background config.
         let wrap_w = self.layers[self.active].text_annotations[idx].wrap_width;
+        let align = self.layers[self.active].text_annotations[idx].align;
         let box_h = self.layers[self.active].text_annotations[idx].box_height;
         let font_id = self.layers[self.active].text_annotations[idx]
             .font_id
@@ -3114,6 +3159,8 @@ impl ImageHorseTool {
             blur,
             &font_id,
             self.layers[self.active].text_annotations[idx].stroke,
+            align,
+            wrap_w,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
@@ -3156,6 +3203,36 @@ impl ImageHorseTool {
             return true;
         }
         self.snap("Text Stroke");
+        self.apply_text_stroke_at(idx, stroke);
+        self.recomposite();
+        true
+    }
+
+    /// Set where a text sits in its box, a 3×3 cell `row * 3 + column`
+    /// (column 0/1/2 left/center/right, row 0/1/2 top/middle/bottom; anything
+    /// over 8 is top-left), and rebuild its tile. v16, ADR-104.
+    /// Returns false if `id` isn't on the active layer.
+    ///
+    /// The `set_text_stroke` contract: called on every commit, a no-op with
+    /// no history snapshot when the alignment is unchanged, a "Text Align"
+    /// step otherwise, mapped 1:1 onto the `Op::TextAlign` the recorder emits.
+    pub fn set_text_align(&mut self, id: u32, align: u8) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        let align = canonical_text_align(align);
+        if self.layers[self.active].text_annotations[idx].align == align {
+            return true;
+        }
+        self.snap("Text Align");
+        self.layers[self.active].text_annotations[idx].align = align;
+        let stroke = self.layers[self.active].text_annotations[idx].stroke;
+        // Rebuilds through `build_text_annotation` with every field as it is
+        // now, the new alignment included.
         self.apply_text_stroke_at(idx, stroke);
         self.recomposite();
         true

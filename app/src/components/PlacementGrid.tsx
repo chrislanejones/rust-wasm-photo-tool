@@ -14,6 +14,9 @@ import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -58,6 +61,10 @@ const ROW_ICON = [
   AlignVerticalJustifyEnd,
 ];
 
+// `icons="text"`: where text sits in its box. The icon shows how the lines
+// line up (the column); the button's row gives top, middle or bottom.
+const COLUMN_ICON = [AlignLeft, AlignCenter, AlignRight];
+
 export function PlacementGrid({
   value,
   onChange,
@@ -66,6 +73,8 @@ export function PlacementGrid({
   /** Lightbulb-tooltip content shown next to `label`. Omit for a plain label. */
   info,
   numpadKeys = false,
+  icons = "placement",
+  name,
 }: {
   value?: PlacementCell | null;
   onChange: (cell: PlacementCell) => void;
@@ -73,6 +82,11 @@ export function PlacementGrid({
   label?: string;
   info?: ReactNode;
   numpadKeys?: boolean;
+  /** "placement" (default): row icons. "text": text-align icons by column. */
+  icons?: "placement" | "text";
+  /** The group's accessible name when there is no visible `label` (the
+   *  section header already shows it). Defaults to `label`, then "Placement". */
+  name?: string;
 }) {
   // One of nine, so a named radio group: the lit cell was the only thing that
   // said where the item sits, and a screen reader heard nine plain buttons.
@@ -106,11 +120,11 @@ export function PlacementGrid({
       {label && <FieldLabel title={label} info={info} />}
       <div
         {...radio.groupProps}
-        aria-label={label ?? "Placement"}
+        aria-label={label ?? name ?? "Placement"}
         className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]"
       >
         {CELLS.map(({ id, label: cellLabel, row }, i) => {
-          const Icon = ROW_ICON[row];
+          const Icon = icons === "text" ? COLUMN_ICON[i % 3] : ROW_ICON[row];
           return (
             <ToolButton
               key={id}

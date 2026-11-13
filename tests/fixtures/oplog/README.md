@@ -23,6 +23,9 @@ Captured 2026-09-20, before the renumber.
 | `base-annotations.v8.bin` | **8** (23 B) | the base keyframe's annotation blob, `[8] ++ postcard((texts, shapes, canvas, …))` |
 | `base-annotations.v7.bin` | **7** (22 B) | its v7 twin — one byte shorter, which is the ninth tuple element (per-text `font_id`) that v8 appended |
 | `base-keyframe-276x276.png` | — | the base keyframe pixels at op 0. Byte-identical across all four captures, so one copy serves them all |
+| `v15-text-wrap.frames.bin` (+ `.annotations.bin`) | **15** | a boxed text, then an unboxed label. Engine-written by master `a83c8b70` (generator: `capture-text-align.rs.txt`), not a browser. Its writer could not replay its own box (33a), see the sidecar |
+| `v16-text-align.frames.bin` (+ `.annotations.bin`) | **16** | the same session, then Center and Right (ADR-104). Engine-written, same generator |
+| `base-keyframe-320x200.png` | — | the base keyframe both of those start from |
 | `v8-archive-edit-record.json` | — | the OTHER persisted copy of the same document (the `image-horse-edits` archive), pixels replaced by byte counts |
 | `v8-engine-text-annotations.json` | — | `get_text_annotations()` straight out of the engine, for comparison with the archive record above |
 
