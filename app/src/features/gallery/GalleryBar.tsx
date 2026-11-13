@@ -8,6 +8,7 @@ import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { GalleryCount } from "./GalleryCount";
+import { GalleryCompareStatus } from "./GalleryCompareStatus";
 import { SelectByMenu } from "./SelectByMenu";
 import { InboxButton } from "@/features/transfer/InboxButton";
 import { PendingImportTile } from "./PendingImportTile";
@@ -354,8 +355,6 @@ export function GalleryBar({
   // their own list, so Batch's Exceptions (the selection) are left alone.
   const comparing = useScreenshotCompareStore((s) => s.picking);
   const comparePicks = useScreenshotCompareStore((s) => s.picks);
-  const comparingNow = useScreenshotCompareStore((s) => s.otherId !== null);
-  const comparePending = useScreenshotCompareStore((s) => s.pending !== null);
   // The selection's ticks are hidden in compare mode, so its actions go too:
   // Compress / Delete / Export Selected would act on photos you can't see
   // picked. The selection itself is kept and comes back when compare ends.
@@ -471,6 +470,9 @@ export function GalleryBar({
         style={{ position: "relative" }}
         // While it can be closed, a pasted image dragged into it closes it.
         data-paste-yields={closable ? "gallery" : undefined}
+        // Compare mode is picked here, so a click in the bar is not the
+        // "click elsewhere" that ends it (comparePick's useCompareClickAway).
+        data-compare-keep=""
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -482,32 +484,14 @@ export function GalleryBar({
             master bar's tabs instead. */}
         {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
         {/* Compare mode: the image-drop ring (styles.css, the same one a file
-            dragged over the app gets) round the gallery, and a pill in the
-            Batch grid's Selected-badge shape, in the brand token, saying
-            what to do. */}
+            dragged over the app gets) round the gallery. What to do is said
+            in the header, where Compress was (GalleryCompareStatus). */}
         {comparing && (
-          <>
-            <div
-              aria-hidden
-              className="image-drop-ring pointer-events-none z-10 motion-reduce:animate-none"
-              style={vertical ? { borderRadius: "inherit" } : { inset: -4, borderRadius: 16 }}
-            />
-            <div
-              role="status"
-              data-testid="compare-pick-hint"
-              className={`absolute left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-theme-primary px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-theme-primary-foreground shadow-md pointer-events-none ${
-                vertical ? "top-1" : "-top-3"
-              }`}
-            >
-              {comparePicks.length < COMPARE_PICKS
-                ? `Pick ${COMPARE_PICKS} photos to compare · ${comparePicks.length} of ${COMPARE_PICKS}`
-                : comparingNow
-                  ? "Comparing 2 photos"
-                  : comparePending
-                    ? "Opening the second photo…"
-                    : `Pick ${COMPARE_PICKS} photos to compare`}
-            </div>
-          </>
+          <div
+            aria-hidden
+            className="image-drop-ring pointer-events-none z-10 motion-reduce:animate-none"
+            style={vertical ? { borderRadius: "inherit" } : { inset: -4, borderRadius: 16 }}
+          />
         )}
         <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "@container p-4"}>
           <div
@@ -550,7 +534,7 @@ export function GalleryBar({
                 />
               </div>
             )}
-            {vertical ? (
+            {vertical && (
               <GalleryActions
                 selectedCount={selectedCount}
                 totalCount={photos.length}
@@ -561,15 +545,23 @@ export function GalleryBar({
                 onDeleteSelected={selectionAction(onDeleteSelected)}
                 onExportSelected={selectionAction(onExportSelected)}
               />
-            ) : (
+            )}
+            {/* Compact: under the actions, where its compress block was. */}
+            {vertical && comparing && <GalleryCompareStatus vertical />}
+            {!vertical && (
               <>
                 <div className="justify-self-center @max-[56rem]:col-span-2 @max-[56rem]:row-start-2">
-                  <GalleryActions
-                    only="compress"
-                    selectedCount={selectedCount}
-                    totalCount={photos.length}
-                    onAutoCompress={selectionAction(onAutoCompress)}
-                  />
+                  {/* Compare mode takes the Compress buttons' place. */}
+                  {comparing ? (
+                    <GalleryCompareStatus />
+                  ) : (
+                    <GalleryActions
+                      only="compress"
+                      selectedCount={selectedCount}
+                      totalCount={photos.length}
+                      onAutoCompress={selectionAction(onAutoCompress)}
+                    />
+                  )}
                 </div>
                 <div className="justify-self-end @max-[56rem]:col-start-2 @max-[56rem]:row-start-1">
                   <GalleryActions

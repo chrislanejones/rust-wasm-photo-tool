@@ -150,7 +150,10 @@ export function GridThumbnails({
             {LAYOUTS.map(({ layout: l, label, name, Icon }) => (
               <CanvasActionBarButton key={l} onClick={() => setLayout(l)} pressed={layout === l} title={label}>
                 <Icon aria-hidden className="size-4" />
-                {layout === l && name}
+                {/* The word on both, not just the pressed one (Chris,
+                    11-12-2026): two layout icons at 16px don't say which is
+                    which until you've tried them. */}
+                {name}
               </CanvasActionBarButton>
             ))}
           </div>

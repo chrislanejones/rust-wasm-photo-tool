@@ -15,6 +15,14 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Archive resume, then undo | Undo snapshots lost the box, quad, shadow, outline | `restoreStoredText` for every path |
 | Layer JSON, cloud, in-session undo/redo, duplicate, nudge, Perspective | Fine | Fine, and tested (cloud through the archive) |
 
+## OPEN — compare mode leftovers (feat/gallery-labels-compare-bar, 11-12-2026)
+
+| What | Why it's left |
+| --- | --- |
+| The compact master bar has no Compare two photos button | Compare mode can only be started at desktop width (or by narrowing the window while it is on). Adding an entry to the compact chrome is its own change. |
+| Esc does nothing in compare mode until two photos are being compared | CompareBar's Esc handler only listens while a comparison is active. The X, the top bar button and a click elsewhere all work while picking. |
+| The wide top bar's Gallery toggle counts as "elsewhere" | Clicking it ends compare mode. The compact master bar's Gallery tab is exempt because the docked gallery is where the picks are made. |
+
 ## OPEN — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
 
 | What | Why it's left |

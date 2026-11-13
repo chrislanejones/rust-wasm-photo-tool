@@ -104,6 +104,10 @@ export function MasterBar({
           // Unlike New and Export these three are one-of-three, so the two
           // that are off must say so too; IconButton omits the attribute.
           aria-pressed={activeTab === t.id}
+          // Compare mode is picked in the docked gallery, so the tab that
+          // brings it back isn't a "click elsewhere" that ends compare mode
+          // (features/canvas/comparePick).
+          data-compare-keep={t.id === "gallery" ? "" : undefined}
           standalone
           tooltip
         />

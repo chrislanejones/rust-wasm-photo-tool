@@ -342,6 +342,9 @@ export function TopBar({
                   disabled={photoCount < 2}
                   standalone={compact}
                   tooltip={{ label: comparingOther ? "Stop comparing" : "Compare two photos" }}
+                  // Its own click toggles compare off; the "click elsewhere"
+                  // exit must not end it first and have this turn it back on.
+                  data-compare-keep=""
                 />
                 <IconButton
                   icon={ArrowDownFromLine}

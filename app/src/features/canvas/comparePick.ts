@@ -1,8 +1,8 @@
 // Compare mode (11-07-2026 — it was a dialog). The top bar's "Compare with
 // another photo…" is a toggle: on, the gallery opens (if it was closed) and
 // lights up with the drop ring, every photo shows its checkbox, and ticking
-// two compares them. Off — the button again, or Done / Esc on the Compare bar —
-// ends it. The gallery's right-click "Compare with this" still starts a
+// two compares them. Off — the button again, the X in the gallery, a click
+// anywhere else, or Done / Esc on the Compare bar — ends it. The gallery's right-click "Compare with this" still starts a
 // compare directly.
 //
 // B is always the open photo (useScreenshotCompare), so the pair decides it:
@@ -58,6 +58,41 @@ export function toggleComparePick(id: string, openPhoto: (id: string) => void): 
     cmp.setPending({ a: first, b: second, from: open });
     openPhoto(second);
   }
+}
+
+/** Where a pointerdown does NOT leave compare mode: the gallery (where the
+ *  picking happens), the Compare bar and the views it draws over the canvas
+ *  (the Slider's handle, Side by side), and the top bar's own toggle, whose
+ *  click does the leaving itself. Each carries `data-compare-keep`. Anything
+ *  floating over the page — a menu, a tooltip, a dialog — is kept too. */
+const COMPARE_KEEP =
+  "[data-compare-keep], [role=dialog], [role=alertdialog], [role=menu], [role=listbox], [role=tooltip], [data-radix-popper-content-wrapper]";
+
+/** While a dialog, menu or list is open, a click elsewhere is closing THAT,
+ *  so it doesn't also leave compare mode — one click, one thing dismissed. */
+const OPEN_LAYER = "[role=dialog], [role=alertdialog], [role=menu], [role=listbox]";
+
+/** Does a pointerdown on `target` count as "clicking elsewhere"? */
+export function leavesCompareMode(target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || !target.isConnected) return false;
+  if (target.closest(COMPARE_KEEP)) return false;
+  return target.ownerDocument.querySelector(OPEN_LAYER) === null;
+}
+
+/** Compare mode ends on a pointerdown anywhere else — the same `stop` as the
+ *  top bar's button, the gallery's X and Esc. Capture phase, so a control
+ *  that stops propagation still counts as somewhere. Mounted by CompareBar,
+ *  which is always on the canvas, so it works with the gallery closed too. */
+export function useCompareClickAway(): void {
+  const picking = useScreenshotCompareStore((s) => s.picking);
+  useEffect(() => {
+    if (!picking) return;
+    const onDown = (e: PointerEvent) => {
+      if (leavesCompareMode(e.target)) useScreenshotCompareStore.getState().stop();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [picking]);
 }
 
 /** Starts a pending pair once B is open and its pixels are in the engine.
