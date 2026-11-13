@@ -20,6 +20,7 @@ const P = {
   home:      ["M3 10.5 12 3l9 7.5","M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9"],
   tag:       ["M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z","M7.5 7.5h.01"],
   mail:      ["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z","m22 7-10 6L2 7"],
+  palette:   ["M12 22a10 10 0 1 1 10-10c0 2.2-1.8 3-3.5 3H16a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z","M7.5 10.5h.01","M10.5 7h.01","M15 8h.01"],
 };
 
 // ── data ──────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ const LEARN_ITEMS: LearnItem[] = [
   { key: "openraster",   href: "/openraster",   title: "OpenRaster (.ora)", desc: "Open a layered .ora here. Save it as PNG or PSD.", paths: P.layers, detail: "OpenRaster is the open layered format Krita, GIMP and MyPaint share. Drop a .ora on the page to see every layer, then save it as PNG, a layered PSD or a fresh .ora — all in the tab, never uploaded." },
   { key: "coming",       href: "/in-the-works",  title: "What's coming", desc: "Being built, decided, or thought about — it says which.", paths: P.telescope, detail: "What's being built, what's decided, and what's still just an idea — it says which. No dates. When something lands it moves to the Trail Log." },
   { key: "about",        href: "/about",        title: "About",        desc: "Who builds it, and the horse.",          paths: P.info,      detail: "Image Horse is one person's project, and it is named after a horse. Chris builds it. Naji, an Arabian who survived his herd and later worked as a therapy horse, lent the name." },
+  { key: "design",       href: "/design-system", title: "Design System", desc: "The editor's colors, typography, controls, and interaction rules.", paths: P.palette, detail: "How the editor looks and behaves, and why: both themes with their real color values, the type scale, the spacing, every shared control, how loading and errors show, and the accessibility rules each panel is held to." },
 ];
 
 /* The three pages that belong to no group. On the phone sheet they get a

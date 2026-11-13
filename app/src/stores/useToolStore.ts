@@ -11,7 +11,7 @@ import type { SelectionCoverage } from "@/lib/selectionCoverage";
 import type { ObjectRef } from "@/lib/objectSelection";
 import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
+import type { ToolType, StampSettings, ToolSettings, TextAlign } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { readPreferences, subscribePreferences } from "@/lib/preferences";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
@@ -628,12 +628,33 @@ subscribePreferences((p) => {
   }
 });
 
-/** Put the Text in Box choice back to the saved preference. Opening an
- *  existing text shows ITS alignment in the panel for that edit (useTextTool);
- *  closing the editor, by commit or cancel, calls this so the next new text
- *  starts where the person last chose. A grid change during the edit was
- *  already saved as the preference, so it survives this. */
+// True while an EXISTING text is open in the editor (useTextTool's
+// editAnnotation → the commit or cancel that closes it). The Text panel reads
+// it so a grid change during that edit stays with that text alone.
+let textAlignHeldForEdit = false;
+
+/** Opening an existing text shows ITS Text in Box cell in the panel for that
+ *  edit, so committing without touching the grid keeps it. Until the editor
+ *  closes, a grid change is that text's own and is not saved as the
+ *  preference: re-aligning an old caption doesn't change where the next new
+ *  text starts (11-10 Q2). Only a pick made with no existing text open is. */
+export function holdTextAlignForEdit(align: TextAlign): void {
+  textAlignHeldForEdit = true;
+  const s = useToolStore.getState();
+  if (s.toolSettings.textAlign !== align) s.setToolSettings((t) => ({ ...t, textAlign: align }));
+}
+
+/** Whether a Text in Box change belongs to an open existing text (see
+ *  `holdTextAlignForEdit`) rather than to the preference. */
+export function isTextAlignHeldForEdit(): boolean {
+  return textAlignHeldForEdit;
+}
+
+/** Put the Text in Box choice back to the saved preference. Closing the
+ *  editor, by commit or cancel, calls this so the next new text starts where
+ *  the person last chose with no existing text open. */
 export function restoreTextAlignPreference(): void {
+  textAlignHeldForEdit = false;
   const pref = readPreferences().textAlign;
   const s = useToolStore.getState();
   if (s.toolSettings.textAlign !== pref) s.setToolSettings((t) => ({ ...t, textAlign: pref }));

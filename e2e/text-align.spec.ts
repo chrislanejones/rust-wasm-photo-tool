@@ -351,3 +351,71 @@ test("a centered boxed text lands where its preview box was, and a re-edit doesn
   await commitAway(page);
   expect((await texts(page))[0].x, "no drift on re-edit").toBe(t.x);
 });
+
+const savedCell = (page: Page): Promise<string | undefined> =>
+  page.evaluate(() => JSON.parse(localStorage.getItem("image-horse-prefs") ?? "{}").textAlign);
+
+/** Type a new text at canvas (x, y) with the Text tool and commit it. */
+async function placeText(page: Page, x: number, y: number, body: string) {
+  const at = await screenPoint(page, x, y);
+  await page.mouse.click(at.x, at.y);
+  await page.locator("textarea").first().fill(body);
+  await commitAway(page);
+}
+
+test("re-aligning an old text doesn't change where the next new one starts (11-10 Q2)", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, "Top center");
+  await placeText(page, 200, 150, "FIRST\nA");
+  await placeText(page, 200, 500, "SECOND\nB");
+  await expect.poll(async () => (await texts(page)).length).toBe(2);
+  const [first, second] = (await texts(page)).sort((a, b) => a.y - b.y);
+  expect(first.align, "Top center is cell 1").toBe(1);
+  expect(second.align, "the second text starts where the first did").toBe(1);
+
+  // Back to Left on the FIRST text only.
+  await reopenAndCommit(page, first);
+  await pickCell(page, "Top left");
+  await commitAway(page);
+  const grid = page.getByRole("region", { name: "Tool options" }).getByRole("radiogroup", { name: "Text in Box" });
+  await expect.poll(async () => (await texts(page)).find((t) => t.y === first.y)?.align, "the edited text is Left now").toBe(0);
+  expect(await savedCell(page), "the saved choice is untouched").toBe("top-center");
+  await expect(grid.getByRole("radio", { name: "Top center", exact: true }), "the panel is back on it").toBeChecked();
+
+  await placeText(page, 750, 150, "THIRD\nC");
+  await expect.poll(async () => (await texts(page)).length).toBe(3);
+  const third = (await texts(page)).find((t) => t.id !== first.id && t.id !== second.id && t.x > 600)!;
+  expect(third.align, "the next new text still starts Center").toBe(1);
+});
+
+test("a new callout label starts centered, whatever Text in Box remembers (11-10 Q3)", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await pickCell(page, "Bottom right");
+
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Pins", exact: true }).first().click();
+  await page.getByRole("radio", { name: "Callout", exact: true }).click();
+  const p = await screenPoint(page, 300, 450);
+  await page.mouse.click(p.x, p.y);
+  const input = page.getByRole("textbox", { name: "Callout label" });
+  await expect(input).toBeFocused();
+  await input.fill("Label");
+  await input.press("Enter");
+  await expect.poll(async () => (await texts(page)).length).toBe(1);
+  const [label] = await texts(page);
+  expect(label.align, "middle center is cell 4").toBe(4);
+  expect(await savedCell(page), "the Text tool's choice is untouched").toBe("bottom-right");
+
+  // It can still be set to anything afterwards.
+  await page.getByRole("radio", { name: "Pin", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Text", exact: true }).first().click();
+  await reopenAndCommit(page, label);
+  await pickCell(page, "Top left");
+  await commitAway(page);
+  await expect.poll(async () => (await texts(page))[0]?.align).toBe(0);
+});

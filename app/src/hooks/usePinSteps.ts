@@ -27,7 +27,7 @@ import {
   type Pt,
 } from "@/lib/callouts";
 import type { Point, ShapeMeta } from "@/lib/drawEditState";
-import type { ToolSettings } from "@/lib/types";
+import type { TextAlign, ToolSettings } from "@/lib/types";
 
 interface Options {
   toolRef: React.RefObject<ImageHorseTool | null>;
@@ -39,6 +39,9 @@ interface Options {
 }
 
 const BG_KIND = { none: 0, rect: 1, bubble: 2 } as const;
+
+/** The Text in Box cell a NEW callout label starts in: middle, centered (11-10 Q3). */
+const NEW_LABEL_ALIGN: TextAlign = "center";
 
 const hexRgb = (hex: string) =>
   [0, 2, 4].map((i) => parseInt(hex.replace("#", "").slice(i, i + 2), 16) || 0);
@@ -206,12 +209,15 @@ export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Optio
         ((Math.round(s.bgTail) % 360) + 360) % 360, // the bubble tail, as the Text tool sends it
         s.textFontId ?? "",
       );
-      // The Text panel's Align, so a callout label reads like a text placed
-      // by hand (ADR-104); one step with the pin. A no-op for Left, and the
-      // join it leaves armed is taken by the leader below, or cleared by the
-      // recomposite `afterChange` ends with.
+      // A new label starts centered (11-10 Q3), whatever the Text panel's
+      // remembered Text in Box cell is: a label is a caption on a pin, and a
+      // two-line one reads best centered over it. It can be set to anything
+      // afterwards with the Text tool; callouts placed before this keep the
+      // cell they were saved with. One step with the pin; the join it leaves
+      // armed is taken by the leader below, or cleared by the recomposite
+      // `afterChange` ends with.
       tool.continue_step();
-      tool.set_text_align(labelId, textAlignEngineArg(s.textAlign));
+      tool.set_text_align(labelId, textAlignEngineArg(NEW_LABEL_ALIGN));
       const label = (await readTexts(tool)).find((t) => t.id === labelId);
       if (label) {
         const l = leaderFor(pin, label);

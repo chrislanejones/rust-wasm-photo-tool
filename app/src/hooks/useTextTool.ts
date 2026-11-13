@@ -9,7 +9,7 @@ import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
 import { textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
-import { restoreTextAlignPreference, useToolStore } from "@/stores/useToolStore";
+import { holdTextAlignForEdit, restoreTextAlignPreference } from "@/stores/useToolStore";
 import { joinedSetters } from "@/lib/commitSteps";
 
 interface TextInput {
@@ -576,9 +576,9 @@ export function useTextTool({
       useTextBoxStore.getState().setBoxHeight(ann.box_height ?? 0);
       // …and where the text sits in that box. The panel shows THIS text's
       // cell while it is open, so committing without touching the grid keeps
-      // it; closing the editor puts the saved choice back
-      // (restoreTextAlignPreference).
-      useToolStore.getState().setToolSettings((t) => ({ ...t, textAlign: textAlignFromEngine(ann.align) }));
+      // it, and a grid change stays with this text; closing the editor puts
+      // the saved choice back (restoreTextAlignPreference).
+      holdTextAlignForEdit(textAlignFromEngine(ann.align));
       textInputRef.current = next;
       setTextInput(next);
       // Suppress this annotation's baked tile while the textarea overlay is

@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.62",
+    date: "2026-11-12",
+    headline: "The Design System page covers the marketing site too.",
+    entries: [
+      { tag: "feature", text: "The Design System page has a second tab, Image Horse Marketing: this site's own colors, type, spacing, six components, motion and accessibility rules, read from its stylesheet." },
+      { tag: "feature", text: "Each tab ends with a button that opens its Figma file." },
+      { tag: "ui", text: "The page looks like the Trail Log and Architecture pages now, and the component cards line up across each row." },
+      { tag: "ui", text: "On the Trail Log, the month tiles fill the row evenly and run through December." },
+      { tag: "fix", text: "Small gray text on the Design System cards was a hair under the contrast rule. It's darker now." },
+    ],
+  },
+  {
+    version: "v9.61",
+    date: "2026-11-11",
+    headline: "The editor's design system has its own page.",
+    entries: [
+      { tag: "feature", text: "A new Design System page, under Learn, shows how the editor is put together: its principles, colors, type, spacing, 17 components, loading states and accessibility rules." },
+      { tag: "feature", text: "Every specimen on it can be viewed in light, dark or both side by side. The colors are copied straight from the editor's stylesheet, and a test fails if the two ever drift apart." },
+      { tag: "fix", text: "The page lines up with the rest of the site. On wide screens it used to sit further in from the edge than every other page." },
+    ],
+  },
+  {
+    version: "v9.60",
+    date: "2026-11-11",
+    headline: "A text box you drag to size keeps that size, however the editor brings it back.",
+    entries: [
+      { tag: "fix", text: "Drag a text box wider or taller, reload, and it's still that box. On some reloads, and after the first undo once it was back, the text used to come back on one long line." },
+      { tag: "fix", text: "Committing a text whose box you dragged is one undo step, not three." },
+    ],
+  },
+  {
     version: "v9.59",
     date: "2026-11-08",
     headline: "Batch gets a Masonry view, and Compare picks its two photos right in the gallery.",
