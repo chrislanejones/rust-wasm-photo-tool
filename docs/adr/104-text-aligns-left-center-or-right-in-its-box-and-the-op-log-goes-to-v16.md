@@ -104,3 +104,11 @@ Engine 960,077 → 960,152 B (+75). Tests: rows 0/1/2 move the ink by exactly 0,
 spare/2 and spare (`text.rs`); replay parity for cells 4, 6 and 8;
 e2e Bottom center drops by exactly the spare height, preview included, and
 the choice is still checked after a reload.
+
+### Addendum, 11-12-2026: re-editing a text doesn't move the saved choice (11-10 Q2)
+
+Opening an existing text still shows its own cell, but a grid change during
+that edit now belongs to that text alone; only a pick made with no existing
+text open is saved as the preference (`holdTextAlignForEdit` /
+`isTextAlignHeldForEdit` in `stores/useToolStore`). Re-aligning an old caption
+no longer changes where the next new text starts. No format change.

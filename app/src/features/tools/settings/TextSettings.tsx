@@ -13,7 +13,7 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
-import { useToolStore } from "@/stores/useToolStore";
+import { isTextAlignHeldForEdit, useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 import { faceCss } from "@/lib/engineFonts";
 import { commitPreferences, readPreferences } from "@/lib/preferences";
@@ -593,8 +593,10 @@ export function TextSettings({
           value={settings.textAlign ?? "top-left"}
           onChange={(cell) => {
             onChange({ ...settings, textAlign: cell });
-            // Kept for next time (and on a signed-in user's other devices).
-            commitPreferences({ ...readPreferences(), textAlign: cell });
+            // Kept for next time (and on a signed-in user's other devices),
+            // unless an existing text is open: re-aligning that one text
+            // doesn't change where the next new one starts (11-10 Q2).
+            if (!isTextAlignHeldForEdit()) commitPreferences({ ...readPreferences(), textAlign: cell });
           }}
         />
       </CollapsibleSection>
