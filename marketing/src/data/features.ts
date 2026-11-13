@@ -1,7 +1,7 @@
 // GENERATED — do not edit. Run: node marketing/scripts/gen-trail-data.mjs
 //
 // The feature list, from docs/Features.md — the repo's own canonical list.
-// 75 features across 2 groups.
+// 76 features across 2 groups.
 
 export interface Feature {
   name: string;
@@ -24,6 +24,7 @@ export const FEATURES: FeatureGroup[] = [
       { name: "Placement grid", body: "a nine-cell grid in the Text and Shapes panels drops the selected text or shape into that ninth of the canvas. It folds away under a header called Placement at the foot of the panel — a collapsed section is always named for what is inside it, never \"Advanced\". Rust centers the bounding box in the cell (align_annotation) as a single undo step" },
       { name: "Text Shadow", body: "soft drop shadow on the text glyphs and/or the background box, in the Text panel's Drop Shadow dropdown: shared color / opacity / offset / blur, rendered in Rust (offset + box-blurred silhouette, tile grown to fit so Align sees it) and persisted with the edit" },
       { name: "Text Background, Stroke and Drop Shadow dropdowns", body: "below the color swatch, the Text panel folds its styling into three collapsed sections named for what is inside them: Background (None / Text BG / Bubble, color, padding, corners, tail, opacity), Stroke and Drop Shadow. Each shut header shows what is on (\"Bubble\", \"3 px\", \"Text\"), so nothing switched on is hidden. They open by default in the Background mode" },
+      { name: "Text in Box", body: "a 3×3 grid in the Text panel, right above Placement: where the text sits inside its box. Left, center or right lines up each line against the box you dragged (or with no box, against the widest line); top, middle or bottom places the text in a box dragged taller than it. Top-left is the default. Your choice is kept for the next text, after a reload, and on your other devices when signed in. Laid out in Rust; rides the op log as Op::TextAlign (format v16) and the archive as align. A new callout label starts centered instead, and can be changed afterwards" },
       { name: "Text Stroke", body: "an outline around the letters, the text twin of a shape's stroke: width 0–20 px, color and opacity. Rendered in Rust OUTSIDE the glyphs (outline_glyphs, src/layer.rs) so a thick stroke never thins the type; the tile grows outward so the letters never move. Rides the op log as Op::TextStroke (format v15) and the archive as stroke_*, so it undoes, reloads and syncs like the shadow" },
       { name: "Security tab", body: "EXIF keep/strip moved out of Compress into Settings → Security as a saved preference (applies to every export path); GPS / capture-time / lens stays or goes by your choice" },
       { name: "Responsive / snapped windows", body: "one shared useBreakpoint hook: below ~1000px the top bar goes icon-only, below ~900px the side panels float as overlay drawers (scrim, one at a time) instead of crushing the canvas, below ~600px the editor steps aside for a phone surface — upload, add and view the gallery, no editing — with a gear that opens Theme, Motion and Sync. Reduce Motion suppresses the layout slides" },

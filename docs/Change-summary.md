@@ -12125,3 +12125,24 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests a
 Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #466 ran `marketing/e2e/design-system.spec.ts` (18 passed, 1 screenshot run skipped) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.
+
+## v9.63 Change Summary — 2026-11-13
+
+**Text lines up inside its box, top to bottom and side to side.**
+
+| Area | Change |
+| --- | --- |
+| Text in Box (#462) | A 3×3 grid in the Text panel, above Placement: left, center or right lines up each line in the box you dragged (or against the widest line with no box); top, middle or bottom places the text in a box taller than it. Top-left is the default and what every older text is. |
+| Op log v16 (#462) | `OP_FORMAT_VERSION` 15 → 16: the cell rides the appended `Op::TextAlign` (index 26) and the archive's optional `align`. A v15 log still opens, as top-left. ADR-104. |
+| Kept for next time (#462) | The cell is a preference (prefs sync format 3), kept after a reload and on a signed-in user's other devices. Changing the grid while re-editing an existing text stays with that text and doesn't change the saved choice. |
+| Callout labels (#462) | A new callout label starts centered, whatever the Text panel remembers. It can be changed afterwards; older callouts keep theirs. |
+| One undo step (#463) | A new text with the shadow and an outline on commits as one "Add Text", one Ctrl+Z, before and after a reload. It was three steps. |
+| Compare (#469) | The ring stays round the gallery; the floating badge is gone. What to do is written where the Compress buttons were, in the same style as the photo count, with a tip and an X. A click outside the gallery ends compare mode. |
+| Batch (#469) | The layout toggle says Grid and Masonry beside its icons. |
+| Tests (#468) | A dragged box survives a rotation, Align and Placement through a reload; a downloaded PNG matches the canvas byte for byte. |
+| Dependencies (#467) | vitest 5.1.0, vite 8.3.7, lucide-react 1.70.0, globals 17.14.0, jsdom 31.0.0. |
+| Trail Log | Squares catch up through 11-13, including 11-10. |
+
+No Dexie migration. Engine 956,874 → 960,152 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PRs ran e2e text-align (9/9), text-commit-one-step, text-box-survives and export-matches-canvas (16/16), screenshot-compare, batch-layout and batch-exceptions (22/22), plus the text and callout specs. Not run: `imagehorse-qc`, owed since v9.55; this release changes the text tool, the engine and the gallery.

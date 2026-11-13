@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.63",
+    date: "2026-11-13",
+    headline: "Text lines up inside its box, top to bottom and side to side.",
+    entries: [
+      { tag: "feature", text: "Text in Box: a grid in the Text panel that puts your text left, center or right, and top, middle or bottom, inside the box you dragged." },
+      { tag: "feature", text: "Your choice carries to the next text and follows you to your other devices when signed in. Re-aligning an old caption doesn't change it." },
+      { tag: "ui", text: "A new callout label starts centered over its pin." },
+      { tag: "fix", text: "A new text with a shadow and an outline is one undo step, not three." },
+      { tag: "ui", text: "Compare tells you what to do right in the gallery bar, with an X to leave. Clicking anywhere else leaves too." },
+      { tag: "ui", text: "Batch's layout buttons say Grid and Masonry." },
+      { tag: "rust", text: "The op log goes to version 16 to carry the alignment. Older saves open exactly as before." },
+      { tag: "infra", text: "vitest, vite, lucide-react, globals and jsdom updated." },
+    ],
+  },
+  {
     version: "v9.62",
     date: "2026-11-12",
     headline: "The Design System page covers the marketing site too.",

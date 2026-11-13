@@ -89,16 +89,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.62 — 2026-11-12
+### v9.63 — 2026-11-13
 
-**The Design System page covers the marketing site too.**
+**Text lines up inside its box, top to bottom and side to side.**
 
-[imagehorse.app/design-system](https://imagehorse.app/design-system) has two tabs now.
-Image Horse Editor is the one from yesterday. Image Horse Marketing shows this site's
-own colors, type, spacing, six components, motion and accessibility rules, read from
-its stylesheet with a test that fails if they drift. Each tab ends with a button that
-opens its Figma file. On the Trail Log, the month tiles fill the row and run through
-December.
+The Text panel has a Text in Box grid: pick where the text sits in the box you
+dragged, left, center or right and top, middle or bottom. Your pick carries to the
+next text, but changing an old caption doesn't change it. A new callout label starts
+centered. A text with a shadow and an outline is one undo step now, not three. In the
+gallery, Compare tells you what to do where the Compress buttons were, with an X to
+leave it, and a click anywhere else leaves it too. Batch's Grid and Masonry buttons
+say their names.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
