@@ -4,7 +4,7 @@
 // `stop` as the X and the top bar's button. Inside them, or while a dialog or
 // menu is open (that click is closing it), compare mode stays.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { leavesCompareMode, useCompareClickAway } from "./comparePick";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
 
@@ -26,6 +26,8 @@ beforeEach(() => {
   useScreenshotCompareStore.getState().stop();
 });
 afterEach(() => {
+  // Unmount each test's hook: no vitest globals here, so RTL won't do it.
+  cleanup();
   document.body.innerHTML = "";
 });
 
