@@ -455,27 +455,28 @@ export function useTextTool({
         async (id) => {
           if (id !== null) await tool.set_text_align(id, alignAtCommit);
         },
+        // The soft drop shadow and the outline, same contract. These used to
+        // run after the joined call, each its own snapshot, so a fresh text
+        // with the shadow on was "Add Text" + "Text Shadow" (+ "Text Stroke"):
+        // two or three undo steps for one commit (PARKING_LOT 08-28).
+        async (id) => {
+          if (id === null || id < 0) return;
+          await tool.set_text_shadow(
+            id,
+            s.shadowBox,
+            s.shadowText,
+            s.shadowColor,
+            Math.round(Math.max(0, Math.min(100, s.shadowOpacity)) * 2.55),
+            Math.round(s.shadowOffsetX),
+            Math.round(s.shadowOffsetY),
+            Math.max(0, Math.round(s.shadowBlur)),
+          );
+        },
+        async (id) => {
+          if (id !== null && id >= 0) await tool.set_text_stroke(id, ...textStrokeEngineArgs(s));
+        },
       ],
     );
-
-    // Apply / sync the soft drop shadow on the committed annotation (Rust no-ops
-    // when unchanged, so this is cheap to call on every commit).
-    if (targetId !== null && targetId >= 0) {
-      const shadowAlpha = Math.round(
-        Math.max(0, Math.min(100, s.shadowOpacity)) * 2.55,
-      );
-      tool.set_text_shadow(
-        targetId,
-        s.shadowBox,
-        s.shadowText,
-        s.shadowColor,
-        shadowAlpha,
-        Math.round(s.shadowOffsetX),
-        Math.round(s.shadowOffsetY),
-        Math.max(0, Math.round(s.shadowBlur)),
-      );
-      tool.set_text_stroke(targetId, ...textStrokeEngineArgs(s)); // …and the stroke, same contract
-    }
     restoreTextAlignPreference();
     await refreshAnnotations();
     flushToCanvas();
