@@ -112,3 +112,12 @@ that edit now belongs to that text alone; only a pick made with no existing
 text open is saved as the preference (`holdTextAlignForEdit` /
 `isTextAlignHeldForEdit` in `stores/useToolStore`). Re-aligning an old caption
 no longer changes where the next new text starts. No format change.
+
+### Addendum, 11-12-2026: a new callout label starts centered (11-10 Q3)
+
+A callout label used to take the Text panel's remembered cell. A NEW label
+now starts at Center (cell 4, middle center) whatever that cell is
+(`NEW_LABEL_ALIGN` in `hooks/usePinSteps`): a label is a caption on a pin,
+and a two-line one reads best centered. It can be set to anything afterwards
+with the Text tool; callouts placed before this keep the cell they were saved
+with. Still one undo step with the pin. No format change.
