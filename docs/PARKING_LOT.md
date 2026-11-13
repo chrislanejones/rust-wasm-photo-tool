@@ -50,12 +50,20 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Choose the default scopes | ADR-095 never listed any, and `profile email` is a placeholder. |
 | Check a 50 MB image URL fits in an HTTP action's memory | Only smaller files have been tested. |
 
+## OPEN — from imagehorse-qc 11-13-2026 (v9.63, `docs/qc/qc-1113.md`)
+
+| What | Why it's left |
+| --- | --- |
+| After an op-log resume, the next archive the photo writes has no undo history, so an archive resume (log retired) comes back with undo 0. Pixels and texts are right | The same on v9.55 (e2e/archive/qc-1113.spec.ts Q2d/Q2e), so it isn't new. Fixing it means the archive carrying history only the op log holds, which goes through `dexie-migration` |
+| Masonry draws the open photo inset in its tile; the others fill theirs | Visual only; the tile's shape is right |
+| An in-page `#marketing` link on `/design-system` switches the tab but keeps the scroll | No element has `id="marketing"`. A fresh load is fine. Nothing links there in-page today |
+
 ## OPEN — owed after v9.59 (11-08-2026)
 
 | What | Why it's left |
 | --- | --- |
 | GitHub Releases for v9.52 through v9.58 | The tags exist. Publishing a Release is done by hand, so these wait for a person. |
-| `imagehorse-qc` on the production build | Owed since v9.55. Masonry and Compare mode in v9.59 are the newest things it hasn't covered. |
+| ~~`imagehorse-qc` on the production build~~ | Done 11-13-2026 on v9.63, PASS: `docs/qc/qc-1113.md`. |
 
 ## OPEN — Transfer leftovers (feat/transfer-ui, 11-04-2026, ADR-102)
 
