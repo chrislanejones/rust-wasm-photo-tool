@@ -1,0 +1,550 @@
+/* /design-system. Scoped under `.design-system` (the page's <main>) or a `ds-`
+ * prefix, so nothing leaks onto pages that share styles.css.
+ *
+ * Two languages on one page, on purpose: the page itself speaks the marketing
+ * site's tokens (paper, ink, the orange accent, Geist), and the specimens
+ * inside `.ds-ed` speak the EDITOR's, as `--e-*` custom properties set from
+ * data/editorTokens.ts (generated from app/src/styles.css). Nothing in `.ds-ed`
+ * may read a marketing color. */
+
+.design-system {
+  /* No max-width or auto margins on the wrappers below: --page-gutter already
+     grows to (100vw - --page-max) / 2, so it IS the centering. Adding both
+     centered the column twice (h1 at 128px vs the site's 64px at 1280 wide,
+     768 vs 384 at 1920). Gutter only, like every other page. */
+}
+.design-system code {
+  font-family: var(--font-outlier);
+  font-size: 0.9em;
+  color: var(--color-ink);
+}
+
+/* ── head and tabs ────────────────────────────────────────────────────────
+   Not styled here. The header is the Trail Log's (.trail-head) and the two
+   tabs are its month tiles (.trail-tile, in an even full-width row), so this
+   page opens the way the others do. Only the section eyebrow is ours. */
+.ds-sec__eyebrow {
+  margin: 0;
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+/* The panel brings its own top padding. */
+.ds-tabs { padding-bottom: 0; }
+/* Two tiles with long names: side by side while each has 15rem, stacked below
+   that, so "Image Horse Marketing" never runs out of its tile on a phone. */
+.ds-tabs .trail-tiles__row { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+.ds-seg__opt:focus-visible,
+.ds-btn-m:focus-visible,
+.ds-index a:focus-visible,
+.ds-comp__src:focus-visible,
+.ds-docs a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.ds-panel-tab {
+  padding: var(--space-lg) var(--page-gutter) var(--space-3xl);
+}
+
+/* ── section index + theme preview (not sticky: the site nav already floats) ── */
+.ds-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md) var(--space-xl);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-rule);
+}
+.ds-index ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-index a {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.ds-index a:hover { color: var(--color-accent); }
+.ds-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+.ds-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+}
+.ds-seg__opt {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.ds-seg__opt[aria-checked="true"] {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+
+/* ── sections ─────────────────────────────────────────────────────────── */
+.ds-sec {
+  padding: var(--space-3xl) 0 0;
+  scroll-margin-top: calc(var(--banner-height) + 96px);
+}
+.ds-sec__head { display: grid; gap: 12px; margin-bottom: var(--space-xl); }
+.ds-sec__title {
+  margin: 0;
+  font-size: clamp(2rem, 2.5vw + 1rem, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.ds-sec__deck {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--color-ink-2);
+}
+.ds-h3 {
+  margin: var(--space-xl) 0 var(--space-sm);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+.ds-note {
+  margin: 0 0 var(--space-md);
+  max-width: 68ch;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-ink-2);
+}
+.ds-group { margin-top: var(--space-lg); }
+
+.ds-principles,
+.ds-surfaces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-card {
+  padding: var(--space-lg);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+.ds-card__title { margin: 0 0 8px; font-size: var(--text-md); font-weight: 650; }
+/* ink-2, not ink-3: these three sit on paper-2, where ink-3 measures 4.46:1. */
+.ds-card__meta { font-family: var(--font-outlier); font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-2); }
+.ds-card__body { margin: 0; font-size: var(--text-sm); line-height: 1.55; color: var(--color-ink-2); }
+
+/* swatches */
+.ds-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-swatch {
+  padding: 10px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+.ds-swatch__chips { display: flex; height: 48px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-rule); }
+.ds-swatch__chip { flex: 1; }
+.ds-swatch__name { display: block; margin: 8px 0 4px; font-size: var(--text-sm); }
+.ds-swatch__vals { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: var(--text-xs); color: var(--color-ink-2); }
+.ds-swatch__vals div { display: flex; gap: 6px; }
+.ds-swatch__vals dt { text-transform: capitalize; }
+.ds-swatch__vals dd { margin: 0; }
+.ds-swatch__vals code { font-size: 1em; color: var(--color-ink-2); }
+
+/* tables */
+.ds-table {
+  width: 100%;
+  max-width: 52rem;
+  margin: var(--space-sm) 0 var(--space-md);
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.ds-table th,
+.ds-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-rule);
+  text-align: left;
+  vertical-align: top;
+  color: var(--color-ink-2);
+}
+.ds-table thead th { color: var(--color-ink); font-weight: 600; }
+.ds-table tbody th { color: var(--color-ink); font-weight: 600; }
+
+.ds-scale { margin: 0 0 var(--space-md); padding: 0; list-style: none; display: grid; gap: 6px; }
+.ds-scale li { display: grid; grid-template-columns: 100px 3rem 3rem; align-items: center; gap: 12px; font-size: var(--text-sm); }
+.ds-scale__bar { display: block; height: 10px; border-radius: 2px; background: var(--color-accent); }
+.ds-scale__px { color: var(--color-ink-3); font-family: var(--font-outlier); font-size: var(--text-xs); }
+
+.ds-three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-lg);
+}
+
+/* components grid
+   Every card shares its row's tracks (subgrid): the light picture, the dark
+   picture, the name, the description and the link each sit on one line across
+   the row, however tall one card's picture is. Without it a card whose buttons
+   wrapped to two lines pushed everything under it down, and the three names in
+   a row landed at three heights. --ds-rows is how many tracks a card spans:
+   the pictures it shows, plus three. */
+.ds-comps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-comp {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span var(--ds-rows, 5);
+  row-gap: 0;
+  align-content: start;
+  min-width: 0;
+}
+/* The pair's wrapper steps aside so each picture is a row of its own. */
+.ds-comp > .ds-spec { display: contents; }
+.ds-comp .ds-ed + .ds-ed { margin-top: 10px; }
+/* A picture fills its row; its caption stays on the bottom edge. */
+.ds-comp :is(.ds-ed, .ds-live) { display: grid; grid-template-rows: 1fr auto; }
+.ds-comp__name { margin: 12px 0 4px; font-size: var(--text-md); }
+.ds-comp__what { margin: 0 0 6px; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-2); }
+.ds-comp__src { font-family: var(--font-outlier); font-size: var(--text-xs); color: var(--color-accent); }
+.ds-docs { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.ds-docs li { display: grid; gap: 2px; }
+.ds-docs a { color: var(--color-accent); font-weight: 600; }
+.ds-docs__what { font-size: var(--text-sm); color: var(--color-ink-2); }
+
+/* the marketing-styled demo button */
+.ds-btn-m {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.ds-btn-m:hover { border-color: var(--color-accent); }
+.ds-demo__ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: var(--space-sm); }
+.ds-demo__ctl .ds-note { margin: 0; }
+
+/* ── marketing specimens: the site's real classes, in a plain frame ───── */
+.ds-live {
+  margin: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  overflow: hidden;
+}
+.ds-live__body { padding: var(--space-lg); min-height: 64px; display: grid; align-content: center; justify-items: start; gap: var(--space-sm); }
+.ds-live__cap {
+  margin: 0;
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+}
+.ds-live + .ds-table { margin-top: var(--space-md); }
+.ds-typeset p { margin: 0; max-width: 100%; overflow-wrap: anywhere; }
+.ds-typeset { gap: var(--space-md); }
+.ds-radius-m {
+  display: inline-grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--color-rule-strong);
+  background: var(--color-paper-3);
+  font-family: var(--font-outlier);
+  font-size: var(--text-2xs);
+  color: var(--color-ink-2);
+}
+/* The skip link lives off screen until it has focus. This is that focused look, held still. */
+.ds-skip-shown { position: static; outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-live .tp-next__card { min-height: 0; width: 100%; }
+/* .tag--latest carries a margin for its place in a release header; here it sits in a row. */
+.ds-live .tag--latest { align-self: center; margin-block-start: 0; }
+.ds-scale--wide li { grid-template-columns: 150px 8rem 3rem; }
+.ds-motion { justify-items: stretch; width: 100%; }
+.ds-live__body.ds-motion { justify-items: stretch; }
+.ds-motion__lane { display: grid; grid-template-columns: 8rem 1fr 3.5rem; align-items: center; gap: 12px; font-size: var(--text-sm); }
+.ds-motion__track { position: relative; display: block; height: 12px; border-radius: var(--radius-pill); background: var(--color-paper-3); }
+.ds-motion__dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  transition: left var(--dur-short) var(--ease-out);
+}
+.ds-motion__dot.is-end { left: calc(100% - 12px); }
+
+/* ── the closing row: the Architecture page's coda, inside a padded panel ── */
+.ds-coda { padding-inline: 0; padding-bottom: 0; }
+
+/* ── editor specimens: EDITOR tokens only ─────────────────────────────── */
+.ds-spec { display: grid; gap: 10px; }
+/* A note that follows a specimen pair needs air above it, or it reads as the
+   pair's caption. */
+.ds-spec + .ds-note { margin-top: var(--space-md); }
+.ds-spec--pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+.ds-ed {
+  margin: 0;
+  border-radius: var(--e-radius-lg);
+  background: var(--e-bg-secondary);
+  border: 1px solid var(--e-border);
+  color: var(--e-text-primary);
+  font-family: "DM Sans", system-ui, sans-serif;
+  overflow: hidden;
+}
+.ds-ed__body { padding: 16px; min-height: 64px; display: grid; align-content: center; }
+/* Inline components keep their own width; panels, sliders and grids fill. */
+.ds-ed__body > :is(.ds-btn, .ds-ibtn, .ds-seg-e, .ds-field, .ds-t-help) { justify-self: start; }
+.ds-ed__cap {
+  padding: 6px 12px;
+  border-top: 1px solid var(--e-border);
+  background: var(--e-bg-primary);
+  color: var(--e-text-muted);
+  font-family: var(--font-outlier);
+  font-size: 11px;
+}
+.ds-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ds-stack { display: grid; gap: 8px; justify-items: start; }
+.ds-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+/* Button (button.tsx: ELEVATED / SECONDARY / GHOST) */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--e-border);
+  border-radius: var(--e-radius-lg);
+  background: var(--e-bg-elevated);
+  color: var(--e-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.ds-btn.is-secondary { background: var(--e-bg-tertiary); border-color: transparent; }
+.ds-btn.is-ghost { background: transparent; border-color: transparent; color: var(--e-text-secondary); }
+.ds-btn.is-danger { background: var(--e-confirm-danger); border-color: transparent; color: #fff; }
+.ds-btn.is-sm { padding: 6px 10px; }
+.ds-btn.is-disabled { background: var(--e-bg-tertiary); color: var(--e-text-muted); border-color: transparent; }
+/* The editor's focus ring: neutral ink, dashed, outside the edge (styles.css). */
+.is-focus { outline: 2px dashed var(--e-focus-ring); outline-offset: 2px; }
+
+.ds-ibtn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--e-border);
+  border-radius: var(--e-radius-md);
+  background: var(--e-bg-elevated);
+  color: var(--e-text-primary);
+  font-size: 15px;
+}
+
+/* ToolButton tiles (lib/styles.ts: TILE_IDLE / TILE_SELECTED / TILE_DISABLED) */
+.ds-tile {
+  display: inline-grid;
+  place-items: center;
+  min-width: 64px;
+  height: 44px;
+  padding: 0 10px;
+  border: 2px solid transparent;
+  border-radius: var(--e-radius-lg);
+  background: var(--e-bg-tertiary);
+  color: var(--e-text-muted);
+  font-size: 12px;
+}
+.ds-tile.is-sm { min-width: 0; height: 32px; }
+.ds-tile.is-on { border-color: var(--e-primary); background: var(--e-bg-elevated); color: var(--e-text-primary); }
+.ds-tile.is-disabled { opacity: 0.4; filter: grayscale(1); }
+
+/* a selection pill */
+.ds-seg-e {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--e-radius-lg);
+  background: var(--e-bg-tertiary);
+  font-size: 12px;
+}
+.ds-seg-e span { padding: 6px 12px; border-radius: var(--e-radius-md); color: var(--e-text-secondary); }
+.ds-seg-e span.is-on { background: var(--e-bg-elevated); color: var(--e-primary-strong); font-weight: 600; box-shadow: 0 0 0 2px var(--e-primary) inset; }
+
+/* fields and sliders */
+.ds-field { display: grid; gap: 4px; }
+.ds-input {
+  display: inline-flex;
+  justify-content: space-between;
+  width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--e-input);
+  border-radius: var(--e-radius-md);
+  background: var(--e-bg-primary);
+}
+.ds-ctl { display: grid; gap: 8px; }
+.ds-ctl__top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ds-track { position: relative; display: block; height: 4px; border-radius: 2px; background: var(--e-bg-tertiary); }
+.ds-track__fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--e-primary); }
+.ds-track__thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--e-primary);
+  border: 2px solid var(--e-bg-elevated);
+}
+.ds-track.is-off { opacity: 0.45; }
+
+/* type roles */
+.ds-typespec { display: grid; gap: 6px; }
+.ds-t-heading { margin: 0; font-size: 14px; font-weight: 700; }
+.ds-t-sm { margin: 0; font-size: 14px; color: var(--e-text-secondary); }
+.ds-t-label { margin: 0; font-size: 12px; font-weight: 600; color: var(--e-text-secondary); }
+.ds-t-help { margin: 0; display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--e-text-muted); }
+.ds-t-2xs { margin: 0; font-size: 10px; color: var(--e-text-muted); }
+.ds-t-mono { font-family: var(--font-outlier); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--e-text-primary); white-space: pre; }
+.ds-t-nums { display: grid; justify-items: end; width: max-content; }
+.ds-kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--e-border);
+  border-bottom-width: 2px;
+  border-radius: var(--e-radius-sm);
+  background: var(--e-bg-elevated);
+  font-family: var(--font-outlier);
+  font-size: 10px;
+  color: var(--e-text-secondary);
+}
+
+.ds-radius {
+  padding: 10px 14px;
+  border: 1px solid var(--e-border-active);
+  background: var(--e-bg-elevated);
+  font-family: var(--font-outlier);
+  font-size: 11px;
+}
+
+/* panels, dialogs, tooltips */
+.ds-panel {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--e-radius-lg);
+  background: var(--e-bg-secondary);
+  box-shadow: 0 0 0 1px var(--e-border);
+}
+.ds-panel.is-mini { gap: 10px; }
+.ds-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ds-actions.is-wide > * { flex: 1; justify-content: center; }
+.ds-dialog {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--e-radius-lg);
+  background: var(--e-popover);
+  border: 1px solid var(--e-border);
+}
+.ds-tipwrap { display: flex; align-items: center; gap: 10px; }
+.ds-tip {
+  padding: 4px 8px;
+  border-radius: var(--e-radius-md);
+  background: var(--e-text-primary);
+  color: var(--e-bg-secondary);
+  font-size: 12px;
+}
+.ds-tip .ds-kbd { background: transparent; color: inherit; border-color: currentColor; }
+
+/* feedback */
+.ds-skel {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--e-radius-md);
+  background: var(--e-muted);
+}
+.ds-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--e-bg-elevated) 60%, transparent), transparent);
+  animation: ds-shimmer 1.4s infinite;
+}
+@keyframes ds-shimmer { to { transform: translateX(100%); } }
+.ds-spin { animation: ds-spin 0.9s linear infinite; color: var(--e-primary); }
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+.ds-marks { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.ds-mark { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--e-text-secondary); }
+.ds-mark.is-ok { color: var(--e-success); }
+.ds-mark.is-warn { color: var(--e-warning); }
+.ds-mark.is-bad { color: var(--e-destructive-strong); }
+.ds-progress { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--e-bg-tertiary); overflow: hidden; }
+.ds-progress span { display: block; height: 100%; background: var(--e-primary); }
+
+/* load demo */
+.ds-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ds-thumb { display: block; aspect-ratio: 1; border-radius: var(--e-radius-md); }
+.ds-thumb--empty { background: transparent; box-shadow: inset 0 0 0 1px var(--e-border); }
+.ds-thumb--photo { background: linear-gradient(160deg, #6c8fd0 0%, #b9d1ef 48%, #5d7a4a 52%, #3f5a32 100%); }
+
+/* Reduce Motion — the OS setting. The editor's skeleton goes still; its
+   spinner keeps turning (an essential loader), and so does this one. */
+@media (prefers-reduced-motion: reduce) {
+  .ds-skel::after { animation: none; }
+}
+
+/* ── narrow ───────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ds-topbar { align-items: flex-start; flex-direction: column; }
+  .ds-scale li { grid-template-columns: 1fr 3rem 3rem; }
+  .ds-scale--wide li { grid-template-columns: 1fr 7rem 3rem; }
+  .ds-motion__lane { grid-template-columns: 6.5rem 1fr 3rem; }
+  .ds-scale__bar { max-width: 100%; }
+  .ds-table { font-size: var(--text-xs); }
+}

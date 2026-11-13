@@ -89,14 +89,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.59 — 2026-11-08
+### v9.62 — 2026-11-12
 
-**Batch gets a Masonry view, and Compare picks its two photos right in the gallery.**
+**The Design System page covers the marketing site too.**
 
-Masonry shows every photo at its own shape in scrolling columns, and zooming changes
-how many columns you get. Batch remembers which layout you left it on. Compare mode
-lets you tick two photos in the gallery. If neither one is open, the second one
-opens and the compare starts once it's loaded.
+[imagehorse.app/design-system](https://imagehorse.app/design-system) has two tabs now.
+Image Horse Editor is the one from yesterday. Image Horse Marketing shows this site's
+own colors, type, spacing, six components, motion and accessibility rules, read from
+its stylesheet with a test that fails if they drift. Each tab ends with a button that
+opens its Figma file. On the Trail Log, the month tiles fill the row and run through
+December.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

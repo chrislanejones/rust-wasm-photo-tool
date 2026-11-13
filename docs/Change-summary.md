@@ -12075,3 +12075,53 @@ shows no message; the wasm SIMD path and the worker's drain aren't run directly 
 No engine change and no Dexie migration.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #446 ran 2,231 app unit tests and 17 browser specs on the production build, and 6 of 6 mutations were caught. Not run: `imagehorse-qc`, owed since v9.55.
+
+## v9.60 Change Summary — 2026-11-11
+
+**A text box you drag to size keeps that size, however the editor brings it back.**
+
+| Area | Change |
+| --- | --- |
+| Op-log resume (#461) | Replay drew a wrapped or warped text without its wrap or perspective, so the saved log's picture didn't match the editor's and the save retired the log. A reload then came back from the archive. Replay now builds text the same way the editor does, so the log is kept. |
+| One commit, one step (#461) | Committing a text with a dragged box took three undo steps (add, width, height). They are joined into one step now, and the log records them as one. |
+| Archive resume, then undo (#461) | The undo and redo history restored after an archive resume lost each text's box, perspective, shadow and outline. Every saved text now comes back through one restore call. |
+| ADR-024-F7 (#461) | Closed, with an addendum to ADR-060 listing each path. |
+
+No format change and no Dexie migration. Engine 957,511 → 956,874 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; cargo fmt, clippy and tests with and without `tiles`; app unit tests and both production builds pass, all run after the trail data regen. PR #461 ran `e2e/text-box-survives.spec.ts` (9 of 9, three times; 8 of 9 failed before the fix) and the text, callout and op-log specs. Not run: `imagehorse-qc`, owed since v9.55.
+
+## v9.61 Change Summary — 2026-11-11
+
+**The editor's design system has its own page.**
+
+| Area | Change |
+| --- | --- |
+| Design System page (#464) | New page at `/design-system`, linked from the Learn menu, the phone menu, the Command Palette and the sitemap. Seven sections: Principles, Colors and themes, Typography, Spacing, layout and radii, Components (17), Loading and interaction states, Accessibility and consistency. |
+| Theme preview (#464) | A Both / Light / Dark switch applies to every specimen on the page. |
+| Colors stay true (#464) | The page's colors are generated from `app/src/styles.css` by `marketing/scripts/gen-editor-tokens.mjs`. `app/src/lib/editorTokens.drift.test.ts` runs with the app suite and fails if the copy drifts or a linked repo file disappears. |
+| Tabs (#464) | Image Horse Editor is live. Image Horse Marketing is shown as "Coming soon" and can't be selected. |
+| Layout (#465) | The page was centered twice, so on a 1920 px screen its heading sat 768 px from the edge where every other page sits at 384 px. It uses the site gutter alone now. |
+| Trail Log | The commit squares catch up through 11-11. |
+
+Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #464 ran `marketing/e2e/design-system.spec.ts` (13 of 13) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.
+
+## v9.62 Change Summary — 2026-11-12
+
+**The Design System page covers the marketing site too.**
+
+| Area | Change |
+| --- | --- |
+| Marketing tab (#466) | Image Horse Marketing is live on `/design-system`; it was "Coming soon". Seven sections: Principles, Colors, Typography, Spacing, layout and radii, Components (6), Motion, Accessibility. `/design-system#marketing` opens it directly. |
+| Site tokens stay true (#466) | The tab prints 89 values generated from `marketing/src/tokens.css` by `marketing/scripts/gen-site-tokens.mjs`. `app/src/lib/editorTokens.drift.test.ts` fails if the copy drifts. |
+| Same look as the other pages (#466) | The page uses the Trail Log's header and tiles: the two tabs are a pair of tiles, with arrow keys moving between them. |
+| Cards line up (#466) | In the Components sections, the titles, previews and notes of every card in a row start at the same height. |
+| Figma (#466) | Each tab ends with a row that opens its Figma file and links the written design doc. |
+| Contrast (#466) | Small gray text on the raised cards measured 4.46:1. It uses the darker ink now and passes 4.5:1. |
+| Trail Log (#466) | The month tiles fill the row evenly and run through December. A month with no releases yet is shown and can't be selected. |
+
+Marketing site only: no editor, engine, Convex or storage change, and no Dexie migration.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PR #466 ran `marketing/e2e/design-system.spec.ts` (18 passed, 1 screenshot run skipped) against a production build. Not run: `imagehorse-qc`, owed since v9.55; nothing in this release touches the canvas, tools or engine.

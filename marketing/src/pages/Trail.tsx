@@ -206,14 +206,29 @@ function Summary({ monthKey }: { monthKey: string }) {
 export default function Trail() {
   const [active, setActive] = useState("all");
 
-  // Month keys with at least one release, oldest first, with their counts.
+  // Every month from the first release through December of the latest year,
+  // oldest first, with its count. A month with no release yet still gets a
+  // tile (disabled, "0 rel"), so the row reads as the whole year and December
+  // doesn't pop in the day its first release ships.
   const months = useMemo(() => {
     const per = new Map<string, number>();
     for (const r of RELEASES) {
       const k = r.date.slice(0, 7);
       per.set(k, (per.get(k) ?? 0) + 1);
     }
-    return [...per.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const keys = [...per.keys()].sort();
+    if (!keys.length) return [];
+    const [y0, m0] = keys[0].split("-").map(Number);
+    const y1 = Number(keys[keys.length - 1].slice(0, 4));
+    const out: [string, number][] = [];
+    let y = y0;
+    let m = m0;
+    while (y <= y1) {
+      const k = `${y}-${String(m).padStart(2, "0")}`;
+      out.push([k, per.get(k) ?? 0]);
+      if (m === 12) { y += 1; m = 1; } else m += 1;
+    }
+    return out;
   }, []);
 
   // The design labels the reset tile "2026 · All". That is only true while the
@@ -277,7 +292,7 @@ export default function Trail() {
           <div className="trail-tiles__row" role="group">
             <button
               type="button"
-              className="trail-tile"
+              className="trail-tile trail-tile--all"
               aria-pressed={!isMonth}
               title={`${plural(RELEASES.length, "release", "releases")}${oneYear ? ` in ${years[0]}` : ""}`}
               onClick={() => setActive("all")}
@@ -293,8 +308,9 @@ export default function Trail() {
                   type="button"
                   className="trail-tile"
                   aria-pressed={active === key}
-                  aria-label={`${monthName(key)} — ${plural(total, "release", "releases")}`}
-                  title={`${plural(total, "release", "releases")} in ${monthName(key)}`}
+                  disabled={total === 0}
+                  aria-label={total === 0 ? `${monthName(key)} — no releases yet` : `${monthName(key)} — ${plural(total, "release", "releases")}`}
+                  title={total === 0 ? `No releases yet in ${monthName(key)}` : `${plural(total, "release", "releases")} in ${monthName(key)}`}
                   onClick={() => setActive(active === key ? "all" : key)}
                 >
                   <span className="trail-tile__label">
