@@ -462,10 +462,18 @@ test("Q5 a switch right after an edit, then a reload: each photo keeps its own e
   const pa = await screenPoint(page, 300, 300);
   await page.mouse.click(pa.x, pa.y);
   await page.locator("textarea").first().fill("ONLY A");
-  await commitAway(page, { x: 900, y: 700 });
-  await expect.poll(async () => (await texts(page)).length).toBe(1);
+  // Commit with no fixed waits, then switch at once: the op-log save is
+  // debounced 2,000 ms (oplogPersistence.ts DEBOUNCE_MS), so the switch must
+  // land inside that window to race the pending save (#447). The gap is logged.
+  const away = await screenPoint(page, 900, 700);
+  await page.mouse.click(away.x, away.y);
+  const committedAt = Date.now();
+  await expect.poll(async () => (await texts(page)).length, { intervals: [25] }).toBe(1);
+  await page.keyboard.press("Escape");
   const aHash = await hash(page);
-  // Switch at once, inside the save debounce.
+  const gap = Date.now() - committedAt;
+  console.log(`Q5 commit-to-switch gap: ${gap} ms (save debounce 2000 ms)`);
+  expect(gap, "the switch lands inside the save debounce").toBeLessThan(1500);
   await tileB.click();
   await expect.poll(async () => page.locator("canvas.main-canvas").getAttribute("height"), { timeout: 30_000 }).not.toBe("900");
   await installAnnotationProbe(page);
