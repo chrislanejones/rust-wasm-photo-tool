@@ -1,0 +1,13 @@
+{
+  "capturedAtUtc": "2026-11-13",
+  "generator": "capture-text-in-box.rs.txt (copy to tests/zz_capture.rs; OUT=<dir> cargo test --features tiles --test zz_capture -- --ignored)",
+  "document": "320x200 flat gray (240), oplog undo on",
+  "baseKeyframe": "base-keyframe-320x200.png (identical bytes)",
+  "file": "v16-text-in-box.frames.bin",
+  "crate": "master a794a3bd (v9.63, OP_FORMAT_VERSION 16)",
+  "session": "two boxed texts (130 x 150 box, white fill), then Center (cell 4) on the first and Bottom center (cell 7) on the second",
+  "ops": 12,
+  "cursor": 12,
+  "coverageAtCapture": 1,
+  "compositeFnv1a": "0xfb7e7d38afacbf22"
+}
