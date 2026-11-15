@@ -224,9 +224,11 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
     if (cmp.active) useUIStore.getState().setCompareActive(false);
   }, [cmp.active]);
 
-  // Esc leaves compare (after anything else that wanted the key).
+  // Esc leaves compare mode (after anything else that wanted the key), while
+  // two photos are compared and while still picking them.
+  const picking = useScreenshotCompareStore((s) => s.picking);
   useEffect(() => {
-    if (!cmp.active) return;
+    if (!cmp.active && !picking) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (e.key !== "Escape" || e.defaultPrevented || t?.closest("input, textarea, [contenteditable], [role=dialog]")) return;
@@ -234,7 +236,7 @@ export function CompareBar({ canvasEl, toolRef, flushToCanvas, syncState, revisi
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cmp.active, stop]);
+  }, [cmp.active, picking, stop]);
 
   // Blink: A and B swap every 600 ms, unless motion is reduced — then the
   // bar's Show A / Show B button swaps them by hand.
