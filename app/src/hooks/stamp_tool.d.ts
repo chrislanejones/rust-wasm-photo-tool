@@ -122,6 +122,10 @@ declare module "stamp_tool" {
   /** EXIF in Rust (src/exif.rs, ADR on #240) — byte-identical to lib/exif.
    *  `mode` "all" | "location". */
   export function exif_strip_metadata(bytes: Uint8Array, mode: string): Uint8Array;
+  /** Find duplicates (src/dhash.rs): a thumbnail's 64-bit dHash and average
+   *  color, as `[hashHigh, hashLow, 0xRRGGBB]`. Empty when `px` does not hold
+   *  a `w` x `h` RGBA image. */
+  export function photo_fingerprint(px: Uint8Array, w: number, h: number): Uint32Array;
   /** The TIFF/EXIF block, or undefined when there is none. */
   export function exif_read_tiff(bytes: Uint8Array, mime: string): Uint8Array | undefined;
   /** `mode` "keep" | "strip", `strip_mode` "all" | "location". */

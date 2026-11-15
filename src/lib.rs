@@ -28,6 +28,8 @@ mod capture;
 mod codec;
 mod core;
 mod describe;
+// Find duplicates (ticket 232): dHash + average color of a gallery thumbnail.
+mod dhash;
 mod diagram;
 mod drawing;
 mod edges;
