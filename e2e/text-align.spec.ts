@@ -467,3 +467,93 @@ test("a new callout label starts centered, whatever Text in Box remembers (11-10
   await commitAway(page);
   await expect.poll(async () => (await texts(page))[0]?.align).toBe(0);
 });
+
+/** The preview's ink per line, as [lo, hi] canvas columns: a screenshot of the
+ *  textarea (the overlay's frame and handles hidden, no caret) diffed against
+ *  `before`, the same page before the text tool was clicked. */
+async function previewInk(page: Page, before: Buffer): Promise<Array<[number, number]>> {
+  const hide = await page.addStyleTag({ content: "svg[data-text-overlay]{visibility:hidden!important} textarea{caret-color:transparent!important}" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(300);
+  const after = await page.screenshot();
+  await hide.evaluate((el) => el.remove());
+  return page.evaluate(async ([a, b]) => {
+    const read = async (b64: string) => {
+      const bmp = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))], { type: "image/png" }));
+      const c = new OffscreenCanvas(bmp.width, bmp.height);
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(bmp, 0, 0);
+      return ctx.getImageData(0, 0, bmp.width, bmp.height);
+    };
+    const [p, q] = [await read(a), await read(b)];
+    const ta = document.querySelector("textarea")!.getBoundingClientRect();
+    const cv = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const bands: Array<[number, number]> = [];
+    let cur: [number, number] | null = null;
+    for (let y = Math.floor(ta.top); y < Math.ceil(ta.bottom); y++) {
+      let lo = Infinity, hi = -Infinity;
+      for (let x = Math.floor(ta.left); x < Math.ceil(ta.right); x++) {
+        const i = (y * p.width + x) * 4;
+        if (Math.abs(p.data[i] - q.data[i]) + Math.abs(p.data[i + 1] - q.data[i + 1]) + Math.abs(p.data[i + 2] - q.data[i + 2]) > 60) {
+          lo = Math.min(lo, x); hi = Math.max(hi, x);
+        }
+      }
+      if (lo <= hi) cur = cur ? [Math.min(cur[0], lo), Math.max(cur[1], hi)] : [lo, hi];
+      else if (cur) { bands.push(cur); cur = null; }
+    }
+    if (cur) bands.push(cur);
+    return bands.map(([lo, hi]) => [(lo - r.left) * k, (hi + 1 - r.left) * k] as [number, number]);
+  }, [before.toString("base64"), after.toString("base64")] as const);
+}
+
+for (const [cell, align] of [["Top center", 1], ["Top right", 2]] as const) {
+  test(`${cell} with no box: the committed lines land on the preview's, before and after a reload (11-11)`, async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: "Create", exact: true }).first().click();
+    await page.getByRole("button", { name: "Text", exact: true }).first().click();
+    // A big size: the drift grew with it (0.3 em at center, 0.6 em at right).
+    const size = page.getByRole("region", { name: "Tool options" }).getByRole("slider", { name: "Font Size" });
+    await size.focus();
+    for (let i = 0; i < 24; i++) await page.keyboard.press("ArrowRight");
+    await pickCell(page, cell);
+    const blank = await composite(page);
+    const before = await page.screenshot();
+    const at = await screenPoint(page, AT.x, AT.y);
+    await page.mouse.click(at.x, at.y);
+    const input = page.locator("textarea").first();
+    await input.fill("HHHHHHHH\nHH");
+    await expect(input).toHaveCSS("text-align", align === 1 ? "center" : "right");
+    const preview = await previewInk(page, before);
+    expect(preview, "two preview lines").toHaveLength(2);
+
+    await commitAway(page);
+    await expect.poll(async () => (await texts(page)).length).toBe(1);
+    const [t] = await texts(page);
+    expect(t.align).toBe(align);
+    expect(t.wrap_width, "no box").toBe(0);
+    // The anchor the alignment keeps: a centered line's middle, a right
+    // line's right edge. (The engine draws glyphs ~10% narrower than the
+    // browser at the same size, PARKING_LOT 11-14, so a line's other edge
+    // can't match until that is fixed.)
+    // Right lands within 0.1 px. Center: the engine's block lands on the
+    // textarea's content center within 0.5 px, but Chrome draws the centered
+    // preview's ink ~1 px right of that center (measured 11-14: content
+    // center 452.5, preview ink 453.5), so center gets the same 2 px the
+    // boxed center test above allows. Before the fix both were ~17 px off.
+    const tolerance = align === 1 ? 2 : 1;
+    const mids = (bands: Array<[number, number]>) => bands.map(([lo, hi]) => (align === 1 ? (lo + hi) / 2 : hi));
+    const want = mids(preview);
+    const check = async (when: string) => {
+      const { bands } = await lineInk(page, blank, (await texts(page))[0]);
+      expect(bands, `two committed lines ${when}`).toHaveLength(2);
+      const got = mids(bands.map(([lo, hi]) => [lo, hi + 1] as [number, number]));
+      for (let i = 0; i < 2; i++)
+        expect(Math.abs(got[i] - want[i]), `line ${i + 1} ${when}: ink ${align === 1 ? "middle" : "right edge"} ${got[i]} vs preview ${want[i].toFixed(1)}`).toBeLessThanOrEqual(tolerance);
+    };
+    await check("after the commit");
+    await reloadAndResume(page, false);
+    await check("after a reload");
+  });
+}

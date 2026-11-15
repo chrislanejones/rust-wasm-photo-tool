@@ -4,11 +4,12 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
-import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
+import { measureTextAwaited, textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
+import { faceCss } from "@/lib/engineFonts";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
-import { textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { noBoxPreviewWidth, textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
 import { holdTextAlignForEdit, restoreTextAlignPreference } from "@/stores/useToolStore";
 import { joinedSetters } from "@/lib/commitSteps";
 
@@ -114,8 +115,14 @@ export const TEXT_OVERLAY_PAD_Y = 2;
  *  with the font size. For those the BOX is the anchor instead:
  *    center → the tile's box sits exactly where the preview's box was;
  *    right  → the content's right edges line up.
- *  0 for left, and for a text with no box. editAnnotation subtracts the same
- *  shift, so commit → re-edit → commit doesn't drift. */
+ *  A text with NO box (11-14-2026): the engine aligns its lines against the
+ *  widest one, while the textarea aligns them inside its own content width
+ *  (`noBoxPreviewWidth` less its padding). So the anchor is that content
+ *  box: center → the engine's block center sits on the textarea's content
+ *  center; right → their right edges meet. The block is the engine's own
+ *  widest line (`text::measure`), placed after the first glyph's bearing,
+ *  which the ink mapping already took off. 0 for left. editAnnotation subtracts the same shift, so commit → re-edit
+ *  → commit doesn't drift. */
 async function alignAnchorShift(
   tool: ImageHorseTool,
   text: string,
@@ -127,7 +134,26 @@ async function alignAnchorShift(
   scaleX: number,
 ): Promise<number> {
   const column = align % 3;
-  if (column === 0 || wrapWidth <= 0) return 0;
+  if (column === 0) return 0;
+  if (wrapWidth <= 0) {
+    const [size, plain] = await Promise.all([
+      measureTextAwaited(tool, text, fontSize, bold, fontId),
+      textInkOffsetBgAwaited(tool, text, fontSize, bold, 0, 0, fontId),
+    ]);
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!size || !size[0] || !plain || !ctx) return 0;
+    const s = scaleX || 1;
+    const sidePad = Math.ceil(fontSize * 0.25);
+    // `text::measure`: the widest line plus `side_padding` a side, rounded UP
+    // to a whole px; half a px is that rounding's expected overshoot.
+    const widest = size[0] - 2 * sidePad - 0.5;
+    const bearing = plain[0] - sidePad;
+    // The textarea's content width, canvas px, measured as CanvasArea does.
+    const fs = fontSize * s;
+    ctx.font = `${bold ? "bold" : "normal"} ${fs}px ${faceCss(fontId)}`;
+    const content = (noBoxPreviewWidth(text, fs, (l) => ctx.measureText(l).width) - 2 * TEXT_OVERLAY_PAD_X) / s;
+    return bearing + (column === 1 ? (content - widest) / 2 : content - widest);
+  }
   // The first glyph's inset with no background: the engine's side padding
   // plus the glyph's own bearing. The background margin cancels out.
   const plain = await textInkOffsetBgAwaited(tool, text, fontSize, bold, 0, 0, fontId);
