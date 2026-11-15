@@ -13,6 +13,11 @@
 // step (`adjust.commit`), so it survives a reload or a closed tab; every ↺ is
 // exact because each step is recomputed from the copy. Leaving the panel or
 // switching photo commits anything still moving (lib/pendingEdits).
+//
+// Auto (ticket 239) asks the engine for Brightness, Contrast, Shadows and
+// Highlights read off the photo's histogram (src/auto_tone.rs), moves those
+// four sliders there and commits them as ONE release: one undo step, one
+// ordinary Adjustments op, nothing new in the op log (ADR-091).
 import { useEffect, useRef, useState } from "react";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -129,13 +134,29 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId, undoCount }
     void commitNow(ADJUST_DEFAULTS);
   };
 
+  const [autoBusy, setAutoBusy] = useState(false);
+  const runAuto = async () => {
+    if (!adjust || autoBusy) return;
+    setAutoBusy(true);
+    try {
+      const picked = await adjust.auto();
+      if (!picked) return;
+      const next = { ...valuesRef.current, ...picked };
+      valuesRef.current = next;
+      setValues(next);
+      await commitNow(next);
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+
   const identity = isIdentity(values);
 
   return (
     <ToolPanel>
       <SectionHeader
         title="Adjustments"
-        info="The photo updates as you drag, and each release is one undo step. Each slider's ↺ puts just that one back, exactly; Reset puts them all back."
+        info="The photo updates as you drag, and each release is one undo step. Each slider's ↺ puts just that one back, exactly; Reset puts them all back. Auto sets Brightness, Contrast, Shadows and Highlights from the photo's histogram, as one undo step."
       />
       {SLIDERS.map((s) => (
         <SizeSlider
@@ -156,9 +177,12 @@ export function EffectsSettings({ adjust, imageReady, activePhotoId, undoCount }
           }}
         />
       ))}
-      <PanelActionBar>
+      <PanelActionBar layout="split">
         <PanelAction onClick={resetAll} disabled={!imageReady || identity}>
           Reset
+        </PanelAction>
+        <PanelAction onClick={() => void runAuto()} disabled={!imageReady || !adjust || autoBusy}>
+          Auto
         </PanelAction>
       </PanelActionBar>
     </ToolPanel>

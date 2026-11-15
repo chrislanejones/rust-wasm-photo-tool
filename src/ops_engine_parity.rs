@@ -2128,6 +2128,62 @@ fn adjustments_releases_reset_and_reload_preserve_every_undo_step() {
     }
 }
 
+// Enhance › Adjustments › Auto (ticket 239) only computes values; the panel
+// commits them as one release. So it must be one ordinary `Op::Adjustments`
+// with the values it picked, and a reload must undo it through the log.
+#[test]
+fn auto_tone_is_one_adjustments_release_that_survives_reload() {
+    for artboard in [false, true] {
+        let (w, h) = (32, 24);
+        // A dark copy of the seed, so Auto has something to do.
+        let px: Vec<u8> = seed_pixels(w, h)
+            .chunks_exact(4)
+            .flat_map(|p| [p[0] / 3, p[1] / 3, p[2] / 3, p[3]])
+            .collect();
+        let mut t = ImageHorseTool::new(w, h);
+        if artboard {
+            t.load_image_artboard(&px, w, h, 8, 20, 40, 60, 255);
+        } else {
+            t.load_image(&px);
+        }
+        t.set_oplog_undo(true);
+        let before = composite_hash(&mut t);
+        assert!(t.tonal_preview_begin());
+        let v = t.auto_tone();
+        assert_eq!(v.len(), 4);
+        let a = [v[0], v[1], 100.0, v[2], v[3], 0.0, 0.0];
+        let after = adjust_release(&mut t, a);
+        assert_ne!(after, before, "Auto moved the dark photo");
+        assert_eq!(t.oplog_op_count(), 1, "one op");
+        assert_eq!(t.undo_count(), 1, "one undo step");
+        let ops = crate::ops::decode_op_frames(&t.oplog_encoded_ops(0, 1)).expect("frames"); // allow: rust-panic
+        assert_eq!(
+            ops[0],
+            Op::Adjustments {
+                new_session: true,
+                brightness: a[0],
+                contrast: a[1],
+                saturation: 100.0,
+                shadows: a[3],
+                highlights: a[4],
+                sharpen: 0.0,
+                blur: 0.0,
+            },
+            "the values Auto picked, not a new op"
+        );
+        let mut r = restored_tool(&t);
+        assert_eq!(composite_hash(&mut r), after);
+        assert!(r.undo());
+        assert_eq!(composite_hash(&mut r), before);
+        assert!(
+            !r.oplog_is_broken(),
+            "undone through the log, not a snapshot"
+        );
+        assert!(r.redo());
+        assert_eq!(composite_hash(&mut r), after);
+    }
+}
+
 #[test]
 fn adjustments_preview_identity_duplicate_and_apply_record_only_commits() {
     let (mut t, _) = seeded_tool(32, 24);
