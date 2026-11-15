@@ -281,6 +281,32 @@ test("Recipe Instagram 1080×1350: 1080×1350 JPEGs named by the pattern; the ga
   await expect(page.getByText(/Photo: 1600×1200/).first()).toBeVisible();
 });
 
+test("a recipe file name fills the shared rename tokens (ticket 237)", async ({ page }) => {
+  test.setTimeout(180_000);
+  // Different sizes on purpose: identical drawn bytes would share one stored
+  // original (content-addressed), and so one upload name.
+  const specs = LARGE.slice(0, 2).map((s, i) => ({ ...s, w: 800 + i * 40, h: 600 }));
+  await open(page, specs);
+  const dialog = await openDownloadAll(page);
+  await dialog.getByRole("button", { name: "Save current as recipe…" }).click();
+  await dialog.getByLabel("Recipe name").fill("Dated");
+  await dialog.getByRole("radio", { name: "Keep", exact: true }).click();
+  await dialog.getByLabel("File name").fill("{original}-{width}x{height}-{ext}-{date:YYYY}");
+  await dialog.getByRole("button", { name: "Save recipe" }).click();
+  await expect(dialog.getByLabel("Recipe")).toHaveValue(/^r-/);
+
+  const button = dialog.getByRole("button", { name: "Download 2 as Dated" });
+  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120_000 }), button.click()]);
+  const names = [...readZip(readFileSync((await dl.path())!)).keys()].sort();
+  // The drawn JPEGs carry no EXIF, so {date} is the file's date: this year.
+  const year = new Date().getFullYear();
+  expect(names).toHaveLength(2);
+  for (const [i, s] of [...specs].sort((a, b) => a.name.localeCompare(b.name)).entries()) {
+    // {ext} is the exported file's type, and the extension added after it matches.
+    expect(names[i]).toMatch(new RegExp(`^${s.name}-${s.w}x${s.h}-(\\w+)-${year}\\.\\1$`));
+  }
+});
+
 test("a saved recipe survives a reload", async ({ page }) => {
   test.setTimeout(180_000);
   await open(page, LARGE.slice(0, 2).map((s) => ({ ...s, w: 800, h: 600 })));

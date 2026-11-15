@@ -22,6 +22,8 @@ import { makeWorkingCopy } from "@/lib/workingCopy";
 import { cropRgba } from "@/lib/batchCrop";
 import { findRecipe, recipeFileStem, recipeGeometry, type ExportRecipe } from "@/lib/exportRecipes";
 import { readPreferences } from "@/lib/preferences";
+import { patternNeedsNameFacts } from "@/lib/nameTokens";
+import { loadNameFacts } from "@/lib/photoNameFacts";
 import { useZipRecipeStore } from "@/stores/useZipRecipeStore";
 
 import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
@@ -159,7 +161,16 @@ export function useZipExport(deps: ZipDeps) {
                     if (exifSrc) sourceTiff = readExifTiff(new Uint8Array(exifSrc.bytes), exifSrc.mimeType);
                   }
                   bytes = applyExifToReencoded(bytes, recipe.format, mode, sourceTiff, made.width, made.height);
-                  const stem = recipeFileStem(recipe.pattern, { name: photo.name || "image", n: i + 1, w: made.width, h: made.height });
+                  // `{date}` / `{original}` read the upload original once (cached by key).
+                  const facts = patternNeedsNameFacts(recipe.pattern) ? await loadNameFacts(photo) : {};
+                  const stem = recipeFileStem(recipe.pattern, {
+                    name: photo.name || "image",
+                    n: i + 1,
+                    w: made.width,
+                    h: made.height,
+                    ext: ext.replace(/^\./, ""),
+                    ...facts,
+                  });
                   let name = `${stem}${ext}`;
                   for (let n = 2; usedNames.has(name); n++) name = `${stem}-${n}${ext}`;
                   usedNames.add(name);

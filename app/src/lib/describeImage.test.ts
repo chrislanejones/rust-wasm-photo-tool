@@ -20,6 +20,7 @@ import {
   DESCRIBE_TOKENS,
   supportedPatternTokens,
 } from "@/lib/describeImage";
+import { NAME_TOKENS } from "@/lib/nameTokens";
 
 const DESC: ImageDescription = {
   kind: "photo",
@@ -202,5 +203,34 @@ describe("token drift guard", () => {
       });
       expect(out, `${token} was left unexpanded`).not.toContain(token);
     }
+  });
+});
+
+// AI Rename shares the Rename panel's tokens through lib/nameTokens.ts rather
+// than keeping its own copy, so the two cannot drift apart.
+describe("shared name tokens in AI Rename", () => {
+  it("DESCRIBE_TOKENS lists every shared name token, once", () => {
+    const documented = DESCRIBE_TOKENS.map((t) => t.token);
+    for (const { token } of NAME_TOKENS) {
+      expect(documented.filter((t) => t === token), token).toHaveLength(1);
+    }
+  });
+
+  it("{date} and {date:FORMAT} read the EXIF date", () => {
+    const p = patternInput({ dateTaken: "2024-05-01 10:30" });
+    expect(applyDescriptionPattern("{desc}-{date}", p)).toBe("dark-blue-portrait-2024-05-01");
+    expect(applyDescriptionPattern("{date:YYYYMMDD}-{color}", p)).toBe("20240501-blue");
+  });
+
+  it("{width}, {height} and {ext}", () => {
+    const p = patternInput({ width: 4032, height: 3024 });
+    expect(applyDescriptionPattern("{color}-{width}x{height}-{ext}", p)).toBe(
+      "blue-4032x3024-jpg",
+    );
+  });
+
+  it("{original} is the upload name; {name} is the current one", () => {
+    const p = patternInput({ originalName: "beach", original: "IMG_4021" });
+    expect(applyDescriptionPattern("{original}-{name}", p)).toBe("img-4021-beach");
   });
 });

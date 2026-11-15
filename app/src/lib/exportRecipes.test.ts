@@ -36,6 +36,18 @@ describe("recipeFileStem", () => {
     );
   });
 
+  it("fills the shared rename tokens: {width} {height} {ext} {date} {original}", () => {
+    const t = { name: "beach", n: 3, w: 1080, h: 1350, ext: "jpg", original: "IMG_4021", dateTaken: "2024-05-01 10:30" };
+    expect(recipeFileStem("{name}-{width}x{height}-{ext}", t)).toBe("beach-1080x1350-jpg");
+    expect(recipeFileStem("{date}_{original}", t)).toBe("2024-05-01_IMG_4021");
+    expect(recipeFileStem("{date:YYYYMMDD}-{n}", t)).toBe("20240501-3");
+  });
+
+  it("an EXIF colon date never reaches the file name as a colon", () => {
+    const t = { name: "beach", n: 1, w: 1, h: 1, dateTaken: "2024:05:01 10:30:00" };
+    expect(recipeFileStem("{date:YYYY-MM-DD HH:mm}", t)).toBe("2024-05-01 1030");
+  });
+
   it("replaces characters a file system refuses", () => {
     expect(recipeFileStem("a/b:c", { name: "x", n: 1, w: 1, h: 1 })).toBe("a-b-c");
   });
