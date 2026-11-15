@@ -194,6 +194,38 @@ test("Compare mode: the line replaces Compress; the X and a click elsewhere end 
   await expect(compareMode(page)).not.toHaveAttribute("aria-pressed", "true");
 });
 
+test("Compare mode: Esc ends it while still picking, and no photo changes", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960);
+  await compareMode(page).click();
+  await pickBox(page, "a.png").click();
+  await expect(hint(page)).toContainText("1 of 2");
+
+  await key(page, "Escape");
+  await expect(hint(page)).toHaveCount(0);
+  await expect(compareMode(page)).not.toHaveAttribute("aria-pressed", "true");
+  // b is still the open photo, still its own size, and a was not opened.
+  await expect(tile(page, "b.png")).toHaveAttribute("aria-pressed", "true");
+  await expect(tile(page, "a.png")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("canvas.main-canvas")).toHaveAttribute("width", "960");
+});
+
+test("Compare mode: the wide top bar's Gallery toggle is not a click elsewhere", async ({ page }) => {
+  await open(page, "b.png", "a.png", 960);
+  const galleryToggle = page.getByRole("toolbar", { name: "Editor controls" }).getByRole("button", { name: "Gallery", exact: true });
+  await compareMode(page).click();
+  await pickBox(page, "a.png").click();
+  await expect(hint(page)).toContainText("1 of 2");
+
+  await galleryToggle.click();
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(0);
+  await expect(compareMode(page)).toHaveAttribute("aria-pressed", "true");
+  await galleryToggle.click();
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(2);
+  // Still in compare mode, with the pick it had.
+  await expect(compareMode(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(hint(page)).toContainText("1 of 2");
+});
+
 test("The known pair: exactly 3 changes, each box on its known area (IoU ≥ 0.89)", async ({ page }) => {
   await open(page, "b.png", "a.png", 960);
   await compareWith(page, "a.png");

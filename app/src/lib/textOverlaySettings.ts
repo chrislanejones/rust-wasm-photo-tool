@@ -128,3 +128,13 @@ export function textPreviewPadding(s: TextOverlaySettings, spare: number, padY: 
   const top = padY + (Math.max(0, spare) * alignCell(s.textAlign)[0]) / 2;
   return `${top}px ${padX}px ${padY}px`;
 }
+
+/** The open textarea's width with NO dragged box, screen px: its widest line
+ *  (at least 60 px) plus 0.6 em. CanvasArea sizes the textarea with this, and
+ *  the commit (useTextTool's `alignAnchorShift`) needs the same number to put
+ *  centered and right text where the textarea aligned it. `measure` is a 2D
+ *  context's `measureText` in the textarea's own face and size. */
+export function noBoxPreviewWidth(text: string, fs: number, measure: (line: string) => number): number {
+  const widest = Math.max(60, ...text.split("\n").map((l) => measure(l || " ")));
+  return Math.ceil(widest + fs * 0.6);
+}

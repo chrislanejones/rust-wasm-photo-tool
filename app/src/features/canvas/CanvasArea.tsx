@@ -40,7 +40,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
-import { textPreviewCss, textPreviewPadding, type TextOverlaySettings } from "@/lib/textOverlaySettings";
+import { noBoxPreviewWidth, textPreviewCss, textPreviewPadding, type TextOverlaySettings } from "@/lib/textOverlaySettings";
 import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -1488,12 +1488,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const lines = wrapPreviewLines(textInput.text || " ", wrapContentW, (t) =>
             mctx.measureText(t).width,
           );
-          const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
           // A wrapped box is the width the user DRAGGED, not the width of the
           // longest line — otherwise the box would snap inwards to the text
           // the moment they let go, and the handle would feel broken.
-          const boxW =
-            textWrapWidth > 0 ? Math.ceil(textWrapWidth * scaleX) : Math.ceil(rawW + fs * 0.6);
+          const noBoxW = noBoxPreviewWidth(textInput.text || " ", fs, (l) => mctx.measureText(l).width);
+          const boxW = textWrapWidth > 0 ? Math.ceil(textWrapWidth * scaleX) : noBoxW;
           // The height the TEXT needs. v8.41 makes this a floor rather than
           // the answer: a dragged box height overrides it when it is taller,
           // mirroring the engine, where `box_height` is a minimum and the type

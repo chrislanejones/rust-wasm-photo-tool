@@ -20,14 +20,20 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | What | Why it's left |
 | --- | --- |
 | The compact master bar has no Compare two photos button | Compare mode can only be started at desktop width (or by narrowing the window while it is on). Adding an entry to the compact chrome is its own change. |
-| Esc does nothing in compare mode until two photos are being compared | CompareBar's Esc handler only listens while a comparison is active. The X, the top bar button and a click elsewhere all work while picking. |
-| The wide top bar's Gallery toggle counts as "elsewhere" | Clicking it ends compare mode. The compact master bar's Gallery tab is exempt because the docked gallery is where the picks are made. |
+| ~~Esc does nothing in compare mode until two photos are being compared~~ | Fixed 11-14-2026 (#472): Esc ends compare mode while picking too. e2e in screenshot-compare. |
+| ~~The wide top bar's Gallery toggle counts as "elsewhere"~~ | Fixed 11-14-2026 (#472): it carries `data-compare-keep`, like the compact bar's Gallery tab. e2e in screenshot-compare. |
 
-## OPEN — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
+## OPEN — committed text is drawn ~10% narrower than its preview (found 11-14-2026, #472)
 
 | What | Why it's left |
 |---|---|
-| A text with no dragged box, set to center or right: the textarea is the measured text plus `0.6 × font size`, wider than the engine's tile (widest line plus `side_padding` a side), so the lines center in a slightly different width and the commit can land a few px off the preview | Boxed text was fixed in #462 (`alignAnchorShift`, anchored on the box). With no box there's no box to anchor on; the fix needs the engine's widest-line width at commit time and a matching inverse in `editAnnotation`. Left text is unaffected |
+| At the same font size, the engine draws text about 10% narrower than the textarea preview: `HHHHHHHH` at 48 is 241 canvas px committed, 268.6 in the preview (Liberation Sans) | ab_glyph's `PxScale` is the ascent-to-descent HEIGHT in px, CSS `font-size` is the em; for Liberation Sans that is 2048 / 2288 = 0.895. The anchors (left edge, center, right edge) land on the preview, but the far edge can't until the two sizes agree. Changing either side redraws every saved text, so it needs its own change and an ADR |
+
+## FIXED 11-14-2026 (#472) — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
+
+| What | Why it's left |
+|---|---|
+| ~~A text with no dragged box, set to center or right~~ Fixed: `alignAnchorShift` now anchors no-box text on the engine's widest line, and `editAnnotation` subtracts the same shift. e2e in text-align. Was: the textarea is the measured text plus `0.6 × font size`, wider than the engine's tile (widest line plus `side_padding` a side), so the lines center in a slightly different width and the commit can land a few px off the preview | Boxed text was fixed in #462 (`alignAnchorShift`, anchored on the box). With no box there's no box to anchor on; the fix needs the engine's widest-line width at commit time and a matching inverse in `editAnnotation`. Left text is unaffected |
 
 ## OPEN — 33a leftovers (11-09-2026)
 
