@@ -154,6 +154,7 @@ export function TopBar({
       active: showGallery,
       onToggle: onToggleGallery,
       tooltip: { label: "Gallery", shortcut: "Alt + G" },
+      compareKeep: true,
     },
     {
       key: "R",

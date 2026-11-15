@@ -29,6 +29,10 @@ export interface ToggleGroupItem {
   /** Optional rich hover tooltip (e.g. label + keyboard shortcut). When
    *  omitted the label is used as a plain `title`. */
   tooltip?: ButtonHint;
+  /** Exempt from compare mode's "click elsewhere" exit (features/canvas/
+   *  comparePick). The top bar's Gallery toggle, like the compact bar's
+   *  Gallery tab: opening or closing the gallery isn't leaving compare. */
+  compareKeep?: boolean;
 }
 
 interface ToggleButtonGroupProps {
@@ -148,12 +152,13 @@ export function ToggleButtonGroup({
       )}
       {...groupSemantics}
     >
-      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }, i) => {
+      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled, compareKeep }, i) => {
         const button = (
           <motion.button
             whileHover="hover"
             onClick={onToggle}
             disabled={disabled}
+            data-compare-keep={compareKeep ? "" : undefined}
             // SELECT: a radio in a roving group. TOGGLE: a toggle button.
             {...(isSelect ? radio.itemProps(i) : { "aria-pressed": active })}
             title={tooltip ? undefined : label}
