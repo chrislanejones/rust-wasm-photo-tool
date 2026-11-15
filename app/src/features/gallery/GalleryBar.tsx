@@ -19,6 +19,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useScreenshotCompareStore } from "@/stores/useScreenshotCompareStore";
 import { COMPARE_PICKS, toggleComparePick } from "@/features/canvas/comparePick";
+import { CompareModeTile } from "./CompareModeTile";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { MASTER_BAR_CONTENT_BOX } from "@/components/master-bar/constants";
 
@@ -157,15 +158,17 @@ function GalleryActions({
    * where there is space for icon-beside-label.
    */
   // How many tiles the compact grid holds right now, so it can pick its
-  // columns: four (Select, Unselect, Delete Selected, Export) sit 2×2 rather
-  // than three and an orphan; three sit in a row; two side by side.
+  // columns: four (Select, Compare, Delete All, Export) sit 2×2 rather than
+  // three and an orphan; three sit in a row; two side by side. Five (a
+  // selection adds Unselect) stay two wide, the last one across both columns,
+  // because a three-wide tile is too narrow for "Delete Selected".
   const tiles =
-    (totalCount > 1 ? 1 : 0) +
+    (totalCount > 1 ? (vertical ? 2 : 1) : 0) +
     (some && onClearSelection ? 1 : 0) +
     ((some ? onDeleteSelected : onDeleteAll) ? 1 : 0) +
     (onExportSelected ? 1 : 0);
   const actionRow = vertical
-    ? `grid ${tiles === 3 ? "grid-cols-3" : tiles === 1 ? "grid-cols-1" : "grid-cols-2"} gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1`
+    ? `grid ${tiles === 3 ? "grid-cols-3" : tiles === 1 ? "grid-cols-1" : "grid-cols-2 [&>:last-child:nth-child(odd)]:col-span-2"} gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1`
     : "flex flex-wrap items-center justify-end gap-1";
   // COMPACT is the exception that stays: a 3-up tile grid in a narrow column,
   // icon over label, where `default`'s horizontal padding would wrap every
@@ -193,6 +196,9 @@ function GalleryActions({
             `transfer`). Renders nothing unless some are waiting. */}
         <InboxButton labelClassName={label} className={actionBtn} />
         {totalCount > 1 && <SelectByMenu labelClassName={label} tile={vertical} />}
+        {/* Compare two photos — the compact layout's only way in; wide has
+            the top bar's button (CompareModeTile says why it lives here). */}
+        {vertical && totalCount > 1 && <CompareModeTile labelClassName={label} className={actionBtn} />}
 
         {some && onClearSelection && (
           <Button size="default" onClick={onClearSelection} title="Clear selection" className={actionBtn}>

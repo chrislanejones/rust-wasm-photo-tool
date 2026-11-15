@@ -21,15 +21,22 @@ import { isPhotoSwitching, usePhotoSwitching } from "@/hooks/usePhotoSwitching";
 /** How many photos compare mode picks. Two, for now. */
 export const COMPARE_PICKS = 2;
 
-/** The top bar's button: compare mode on (and the gallery open), or off. */
-export function toggleCompareMode(): void {
+/** Compare two photos: compare mode on (and the gallery open), or off. One
+ *  action for both layouts — the top bar's button (`wide`) and the compact
+ *  layout's tile in the docked Gallery tab (`dock`). They differ only in what
+ *  "the gallery" is: the wide strip, or the master bar's Gallery tab. The
+ *  wide flag is left alone in the dock, where it would only shift the Batch
+ *  view's inset. */
+export function toggleCompareMode(layout: "wide" | "dock" = "wide"): void {
   const cmp = useScreenshotCompareStore.getState();
   if (cmp.picking || cmp.otherId !== null) {
     cmp.stop();
     return;
   }
   cmp.beginPick();
-  useUIStore.getState().setShowGallery(true);
+  const ui = useUIStore.getState();
+  if (layout === "dock") ui.setMasterTab("gallery");
+  else ui.setShowGallery(true);
 }
 
 /** A gallery checkbox in compare mode. Unticking ends any comparison; a
