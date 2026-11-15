@@ -1491,10 +1491,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // A wrapped box is the width the user DRAGGED, not the width of the
           // longest line — otherwise the box would snap inwards to the text
           // the moment they let go, and the handle would feel broken.
-          const boxW =
-            textWrapWidth > 0
-              ? Math.ceil(textWrapWidth * scaleX)
-              : noBoxPreviewWidth(textInput.text || " ", fs, (l) => mctx.measureText(l).width);
+          const noBoxW = noBoxPreviewWidth(textInput.text || " ", fs, (l) => mctx.measureText(l).width);
+          const boxW = textWrapWidth > 0 ? Math.ceil(textWrapWidth * scaleX) : noBoxW;
           // The height the TEXT needs. v8.41 makes this a floor rather than
           // the answer: a dragged box height overrides it when it is taller,
           // mirroring the engine, where `box_height` is a minimum and the type
