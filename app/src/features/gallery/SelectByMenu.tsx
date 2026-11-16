@@ -1,6 +1,7 @@
 // Gallery › Select ▾ (Night 10-28, 233). Ticks photos by a rule: Portrait,
 // Landscape, Square, Larger than…, Edited, Unedited, Invert. Below them, Copy
-// look and Paste look to selected (Night 11-02, 228). A rule replaces
+// look and Paste look to selected (Night 11-02, 228). Find duplicates…
+// (ticket 232) opens FindDuplicatesDialog, which ticks look-alikes. A rule replaces
 // the ticks; Shift-click (or Shift+Enter) adds its matches to them. The rules
 // live in lib/selectBy.ts. The ticks are Batch's Exceptions (ADR-079).
 //
@@ -15,6 +16,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { copyLook, useLookStore } from "@/stores/useLookStore";
 import { applyRule, parseSize, type SelectRule } from "@/lib/selectBy";
 import { cn } from "@/lib/utils";
+import { FindDuplicatesDialog } from "./FindDuplicatesDialog";
 
 const RULES: { label: string; rule: SelectRule }[] = [
   { label: "Portrait", rule: { kind: "portrait" } },
@@ -44,6 +46,8 @@ export function SelectByMenu({
   const [open, setOpen] = useState(false);
   const [larger, setLarger] = useState(false);
   const [sizeText, setSizeText] = useState("500 KB");
+  // Outside the menu's `open` block: the dialog outlives the menu.
+  const [dupesOpen, setDupesOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLSpanElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -141,6 +145,18 @@ export function SelectByMenu({
               {label}
             </Button>
           ))}
+          <Button
+            variant="ghost"
+            role="menuitem"
+            className={ITEM}
+            title="Group photos that look the same and tick the extra copies"
+            onClick={() => {
+              setOpen(false);
+              setDupesOpen(true);
+            }}
+          >
+            Find duplicates…
+          </Button>
           {/* Copy look → Paste to selected (lib/look.ts): the look travels to
               the ticks, so it sits with them. */}
           <div role="separator" className="my-1 border-t border-border" />
@@ -171,6 +187,7 @@ export function SelectByMenu({
           </Button>
         </div>
       )}
+      <FindDuplicatesDialog open={dupesOpen} onOpenChange={setDupesOpen} />
     </span>
   );
 }

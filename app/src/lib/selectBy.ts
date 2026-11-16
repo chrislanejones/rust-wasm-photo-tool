@@ -14,8 +14,9 @@ export type SelectRule =
   | { kind: "unedited" }
   | { kind: "invert" };
 
-/** The photo's size as stored now — the size a resize or crop left it at. */
-function dims(p: PhotoEntry): { w: number; h: number } {
+/** The photo's size as stored now — the size a resize or crop left it at.
+ *  Also Find duplicates' "largest resolution" (lib/duplicates.ts). */
+export function photoDims(p: PhotoEntry): { w: number; h: number } {
   return { w: p.origWidth || p.workingWidth, h: p.origHeight || p.workingHeight };
 }
 
@@ -23,7 +24,7 @@ function dims(p: PhotoEntry): { w: number; h: number } {
 const SQUARE_TOLERANCE = 0.01;
 
 export function matchesRule(p: PhotoEntry, rule: SelectRule, edited: ReadonlySet<string>): boolean {
-  const { w, h } = dims(p);
+  const { w, h } = photoDims(p);
   const square = w > 0 && h > 0 && Math.abs(w - h) <= Math.max(w, h) * SQUARE_TOLERANCE;
   switch (rule.kind) {
     case "portrait":
