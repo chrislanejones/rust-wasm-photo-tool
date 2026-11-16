@@ -626,6 +626,11 @@ declare module "stamp_tool" {
       sharpen: number,
       blur: number,
     ): boolean;
+    /** Enhance › Adjustments › Auto (src/auto_tone.rs): `[brightness,
+     *  contrast, shadows, highlights]` in the panel's units, read from the
+     *  histogram of the session's untouched copy (or the active layer).
+     *  Computes only: no pixels move, nothing is recorded. Empty without a layer. */
+    auto_tone(): Float64Array;
     /** End the preview and bake as ONE undo step ("Adjustments"). */
     adjust_apply(
       brightness: number,

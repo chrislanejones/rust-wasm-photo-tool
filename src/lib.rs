@@ -52,6 +52,7 @@ mod quantize;
 // surface of its own, and visibility is a compile-time check — the emitted
 // bytes are identical either way.
 mod adjust;
+mod auto_tone;
 pub mod perspective;
 mod selection;
 mod selection_refine;
@@ -2399,21 +2400,7 @@ impl ImageHorseTool {
     /// `(R*3 + G*6 + B) / 10` keeps it float- and allocation-free — this replaces
     /// the per-resample JS path (offscreen drawImage + getImageData + pixel loop).
     pub fn calculate_histogram(&self) -> Vec<u32> {
-        let mut bins = vec![0u32; 256 * 4];
-        for px in self.composite_cache.chunks_exact(4) {
-            if px[3] == 0 {
-                continue; // ignore fully-transparent pixels
-            }
-            let r = px[0] as usize;
-            let g = px[1] as usize;
-            let b = px[2] as usize;
-            let luma = ((r * 3 + g * 6 + b) / 10).min(255);
-            bins[r] += 1;
-            bins[256 + g] += 1;
-            bins[512 + b] += 1;
-            bins[768 + luma] += 1;
-        }
-        bins
+        auto_tone::histogram_bins(&self.composite_cache)
     }
 
     // ── Selection Marker (magic-wand) ────────────────────────────────────

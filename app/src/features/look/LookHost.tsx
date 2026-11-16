@@ -122,6 +122,7 @@ function PasteLookDialog({ engine }: { engine: LiveEngine }) {
             {copied
               ? `From ${copied.fromName}, onto ${targets.length} ticked photo${targets.length === 1 ? "" : "s"}.`
               : "Copy a look first: Ctrl+Alt+C on the open photo, or Select ▾ › Copy look."}
+            {copied && kinds.includes("adjustments") && " Auto tone pastes the values it picked, not Auto itself."}
           </DialogDescription>
         </DialogHeader>
         {copied && (

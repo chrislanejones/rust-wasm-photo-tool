@@ -60,7 +60,13 @@ export interface AdjustControls {
   commit: (v: AdjustValues) => Promise<boolean>;
   /** Commit and end the session. Resolves whether pixels changed. */
   apply: (v: AdjustValues) => Promise<boolean>;
+  /** Auto (ticket 239): the four values the engine picks from the photo's
+   *  histogram. Computes only; the panel commits them like a release. */
+  auto: () => Promise<AutoToneValues | null>;
 }
+
+/** What Auto sets. Saturation, Sharpen and Blur are left as they are. */
+export type AutoToneValues = Pick<AdjustValues, "brightness" | "contrast" | "shadows" | "highlights">;
 
 /** One color preset's five components, in the engine's own units: brightness
  *  is a -1..1 fraction, contrast and saturation are factors (1 = as-is), and
@@ -633,6 +639,13 @@ export function useTransforms(engine: EngineCore) {
         adjFlushRef.current();
         adjSyncRef.current();
         return changed;
+      },
+      auto: async () => {
+        const t = toolRef.current;
+        if (!t) return null;
+        const v = await t.auto_tone();
+        if (v.length !== 4) return null;
+        return { brightness: v[0]!, contrast: v[1]!, shadows: v[2]!, highlights: v[3]! };
       },
     }),
     [toolRef],

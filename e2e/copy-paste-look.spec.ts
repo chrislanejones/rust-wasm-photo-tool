@@ -162,6 +162,8 @@ test("the look travels: B (open) and C (not open) end exactly like A, and B undo
   const dialog = await pasteDialog(page);
   await expect(dialog.getByRole("checkbox")).toHaveCount(3);
   await expect(dialog).toContainText("Paste can't be undone on photos that aren't open");
+  // Auto (ticket 239) is recorded as plain Adjustments values, so that is what pastes.
+  await expect(dialog).toContainText("Auto tone pastes the values it picked, not Auto itself.");
 
   // Peak JS heap while the paste runs (the engine's wasm memory is not in it).
   await page.evaluate(() => {
