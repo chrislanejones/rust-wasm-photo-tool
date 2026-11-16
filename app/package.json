@@ -44,7 +44,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "fake-indexeddb": "^6.2.5",
-    "jsdom": "^31.0.0",
+    "jsdom": "^31.0.1",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
