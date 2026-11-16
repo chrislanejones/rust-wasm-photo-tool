@@ -337,7 +337,7 @@ export function TopBar({
                 <IconButton
                   icon={GitCompareArrows}
                   label="Compare two photos"
-                  onClick={toggleCompareMode}
+                  onClick={() => toggleCompareMode()}
                   active={comparingOther}
                   aria-pressed={comparingOther}
                   disabled={photoCount < 2}

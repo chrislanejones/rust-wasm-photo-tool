@@ -486,3 +486,89 @@ test("C8: leaving compare (Done or Esc) puts the photo back where it was before 
   await key(page, "Alt+g");
   await expectHome();
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The compact layout (11-15-2026, an 11-12 leftover). At ≤ 1000 px the master
+// bar replaces the top bar, and compare mode could only be started from the
+// top bar. The compact entry is a tile in the docked Gallery tab (the strip
+// itself has no room for an eighth button; CompareModeTile says why) and runs
+// the SAME toggle (comparePick's toggleCompareMode). Its own tap ends compare
+// mode (the click-away must not end it first and have the tap turn it back
+// on), the tab that opens the gallery doesn't, and Esc ends a comparison.
+//
+// 768 px, NOT 390: below 600 px the phone surface (MobileShell) covers the
+// editor and loads no engine at all (phone-no-engine.spec.ts), so there is no
+// canvas to compare on and no master bar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** An iPad held upright: inside the compact layout (≤ 1000), above the phone's (< 600). */
+const TABLET_WINDOW = { width: 768, height: 1024 };
+const masterBar = (page: Page) => page.getByRole("region", { name: "Master bar" });
+const galleryTab = (page: Page) => masterBar(page).getByRole("button", { name: "Gallery", exact: true });
+/** The tile, by its name either way. The status line's X is also "Stop
+ *  comparing", but has no text. */
+const compactCompare = (page: Page, on: boolean) =>
+  on
+    ? page.getByRole("button", { name: "Stop comparing", exact: true }).filter({ hasText: "Stop comparing" })
+    : page.getByRole("button", { name: "Compare two photos", exact: true });
+
+test("Compact layout: Compare two photos in the Gallery tab picks two, and Esc ends it", async ({ page }) => {
+  await page.setViewportSize(TABLET_WINDOW);
+  await page.route("**/*", (route) => {
+    const url = new URL(route.request().url());
+    return ["localhost", "127.0.0.1"].includes(url.hostname) || ["blob:", "data:"].includes(url.protocol)
+      ? route.continue() : route.abort();
+  });
+  await page.addInitScript(() =>
+    localStorage.setItem("image-horse-prefs", JSON.stringify({ canvasArtboard: false })));
+  await page.goto("/");
+  // The "compact version" heads-up every dock-width session opens with.
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.locator('input[type="file"]').first().setInputFiles(["b.png", "a.png"].map((f) => join(DIR, f)));
+  // b, the first in, is open; the Tools tab is showing, not the gallery.
+  await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("960");
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(0);
+
+  // 1. Start compare from the compact bar: its Gallery tab, then the tile.
+  await galleryTab(page).click();
+  await expect(page.locator('[aria-label^="Select photo"]:visible')).toHaveCount(2);
+  // The docked panel slides in from the left; shoot it once it has landed.
+  await expect.poll(async () => (await compactCompare(page, false).boundingBox())?.x ?? -1).toBeGreaterThan(8);
+  await page.screenshot({ path: test.info().outputPath("compact-compare-768.png") });
+  await compactCompare(page, false).click();
+  await expect(hint(page)).toContainText("0 of 2");
+  await expect(compactCompare(page, true)).toBeVisible();
+  // The tab that brought the gallery up is not "elsewhere".
+  await galleryTab(page).click();
+  await expect(hint(page)).toContainText("0 of 2");
+
+  // The tile's own tap ends it, and it stays ended.
+  await compactCompare(page, true).click();
+  await expect(hint(page)).toHaveCount(0);
+  await expect(compactCompare(page, false)).toBeVisible();
+
+  // From the keyboard this time: Tab reaches it from Select ▾, the tile
+  // before it, the focus ring shows, and Enter toggles.
+  await page.getByRole("button", { name: "Select by", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(compactCompare(page, false)).toBeFocused();
+  expect(await compactCompare(page, false).evaluate((el) =>
+    el.matches(":focus-visible") && parseFloat(getComputedStyle(el).outlineWidth) >= 2)).toBe(true);
+  await page.keyboard.press("Enter");
+  await expect(hint(page)).toContainText("0 of 2");
+
+  // 2. Pick two photos. 3. They compare. b is open, so it is B.
+  await pickBox(page, "a.png").click();
+  await expect(hint(page)).toContainText("1 of 2");
+  await pickBox(page, "b.png").click();
+  await expect(bar(page)).toContainText("3 changes");
+  await expect(compactCompare(page, true)).toBeVisible();
+  await page.mouse.move(TABLET_WINDOW.width - 1, 1);
+  await page.screenshot({ path: test.info().outputPath("compact-compare-768-comparing.png") });
+
+  // 4. Esc ends it.
+  await key(page, "Escape");
+  await expect(bar(page)).toHaveCount(0);
+  await expect(hint(page)).toHaveCount(0);
+  await expect(compactCompare(page, false)).toBeVisible();
+});
