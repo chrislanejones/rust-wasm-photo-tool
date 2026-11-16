@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.64",
+    date: "2026-11-15",
+    headline: "Find the duplicates, and let Auto give a photo a starting point.",
+    entries: [
+      { tag: "feature", text: "Find duplicates in Select ▾ groups burst shots and re-saves, keeps the best one in each group and ticks the rest. Nothing is deleted until you say so." },
+      { tag: "feature", text: "Auto in the Adjustments panel sets Brightness, Contrast, Shadows and Highlights from the histogram. One undo step." },
+      { tag: "feature", text: "Rename and export recipes understand {date}, {width}, {height}, {ext} and {original}." },
+      { tag: "ui", text: "Start Compare from the Gallery tab on a tablet-width screen." },
+      { tag: "fix", text: "Esc leaves Compare while you're still picking, and the top bar's Gallery button no longer ends it." },
+      { tag: "fix", text: "Centered or right-aligned text with no box lands where the preview showed it." },
+      { tag: "rust", text: "The engine fingerprints thumbnails for Find duplicates and works out the Auto tone values." },
+      { tag: "infra", text: "QC pass on v9.63, and the CodeQL action updated." },
+    ],
+  },
+  {
     version: "v9.63",
     date: "2026-11-13",
     headline: "Text lines up inside its box, top to bottom and side to side.",

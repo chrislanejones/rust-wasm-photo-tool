@@ -12146,3 +12146,23 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests a
 No Dexie migration. Engine 956,874 → 960,152 B.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests and both production builds pass, all run after the trail data regen. PRs ran e2e text-align (9/9), text-commit-one-step, text-box-survives and export-matches-canvas (16/16), screenshot-compare, batch-layout and batch-exceptions (22/22), plus the text and callout specs. Not run: `imagehorse-qc`, owed since v9.55; this release changes the text tool, the engine and the gallery.
+
+## v9.64 Change Summary — 2026-11-15
+
+**Find the duplicates, and let Auto give a photo a starting point.**
+
+| Area | Change |
+| --- | --- |
+| Find duplicates (#473) | Select ▾ → Find duplicates groups look-alike photos: a 64-bit difference hash plus the average color, made by the engine from each thumbnail and kept in memory. Two photos match within 6 bits. Each group shows size, dimensions and whether it's edited. The biggest photo, or the only edited one, is marked Keep; the rest are ticked. An edited photo is never pre-ticked, and if two in a group are edited, none are. Deleting still goes through Delete Selected and its confirmation. |
+| Auto tone (#476) | An Auto button in the Adjustments panel. The engine reads the histogram, clips 0.5% at each end, aims the midtones at middle gray, and sets Brightness, Contrast, Shadows and Highlights. Saturation stays put. It's one ordinary Adjustments step on the op log, so undo and reload work as before. Copy look pastes the values it picked, and the Paste dialog says so. |
+| Rename tokens (#474) | `{date}` (EXIF, then the file's date, then today), `{date:YYYY-MM-DD}`-style formats, `{width}`, `{height}`, `{ext}` and `{original}`. Batch › Rename, AI Rename and export recipes share one formatter. Characters a filename can't hold are stripped from EXIF values. |
+| Compare on a tablet (#475) | The compact layout's Gallery tab has a Compare tile that does what the wide top bar's button does. Phone widths use the phone layout, which has no editor to compare in. |
+| Compare fixes (#472) | Esc leaves Compare while you're still picking. The wide top bar's Gallery toggle no longer ends it. |
+| Text with no box (#472) | Centered or right-aligned text with no box lands within a pixel or two of where the preview showed it, before and after a reload. |
+| QC (#471) | `imagehorse-qc` on v9.63: PASS. Written up in `docs/qc/qc-1113.md`. |
+| CI (#455) | github/codeql-action 4.39.3. |
+| Trail Log | Squares catch up through 11-15, including 11-14. |
+
+No Dexie migration and no op-log format change. Engine 960,152 → 967,840 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,335) and both production builds pass, all run after the trail data regen. cargo fmt, clippy (plain and tiles) and cargo test (1,428) pass. e2e on the combined build: find-duplicates, auto-tone, screenshot-compare, text-align, copy-paste-look, oplog-adjustments-undo, bulk-night, batch-exceptions, ui-night2-controls and compare-photo-rect, 54/54. Not run: `imagehorse-qc` on this release; Find duplicates and Auto tone change the engine and gallery.

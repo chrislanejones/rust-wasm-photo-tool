@@ -89,17 +89,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.63 — 2026-11-13
+### v9.64 — 2026-11-15
 
-**Text lines up inside its box, top to bottom and side to side.**
+**Find the duplicates, and let Auto give a photo a starting point.**
 
-The Text panel has a Text in Box grid: pick where the text sits in the box you
-dragged, left, center or right and top, middle or bottom. Your pick carries to the
-next text, but changing an old caption doesn't change it. A new callout label starts
-centered. A text with a shadow and an outline is one undo step now, not three. In the
-gallery, Compare tells you what to do where the Compress buttons were, with an X to
-leave it, and a click anywhere else leaves it too. Batch's Grid and Masonry buttons
-say their names.
+Select ▾ has Find duplicates now. It groups photos that look the same, like burst shots
+and re-saves, and shows their size and whether you've edited them. In each group it
+keeps the biggest one, or the one you edited, and ticks the rest. Nothing gets deleted
+until you press Delete Selected and say yes. The Adjustments panel has an Auto button
+that reads the histogram and sets Brightness, Contrast, Shadows and Highlights. It's one
+undo step. Rename and export recipes learned `{date}`, `{width}`, `{height}`, `{ext}`
+and `{original}`. On a tablet-width screen you can start Compare from the Gallery tab.
+Esc leaves Compare while you're still picking, and centered text with no box lands
+where the preview showed it.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
