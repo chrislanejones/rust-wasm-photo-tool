@@ -250,8 +250,10 @@ export default tseslint.config(
     rules: { "max-lines": ["error", { max: 2141 }] },
   },
   {
+    // 1428 -> 1276 (ticket 237, 11-15-2026): Batch › Rename moved out to
+    // RenameBatchPanel.tsx when it gained the shared name tokens.
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],
-    rules: { "max-lines": ["error", { max: 1428 }] },
+    rules: { "max-lines": ["error", { max: 1276 }] },
   },
   {
     // 1173 -> 991 (2026-09-26): the file had crept to 1360. The shared types

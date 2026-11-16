@@ -6,6 +6,7 @@
 // Preferences (`exportRecipes`), so they travel with the prefs document:
 // local when signed out, synced across devices when signed in (ADR-061).
 import type { ExportFormat } from "@/lib/exportImage";
+import { expandNameTokens } from "@/lib/nameTokens";
 
 // A local copy, type-checked against ExportFormat: preferences.ts imports this
 // module, and exportImage pulls in the engine, so a value import would drag
@@ -27,8 +28,10 @@ export interface ExportRecipe {
   format: ExportFormat;
   /** 1..100. PNG below 100 reduces colors (v9.40). */
   quality: number;
-  /** File name. Tokens: {name} the photo's name, {n} its position (1, 2…),
-   *  {w} and {h} the output size. The extension is added. */
+  /** File name. Tokens are the shared rename set (lib/nameTokens.ts:
+   *  {name} {original} {n} {date} {date:FORMAT} {width} {height} {ext}), where
+   *  {width}/{height}/{ext} describe the OUTPUT file. {w} and {h}, the names
+   *  before ticket 237, still work. The extension is added. */
   pattern: string;
 }
 
@@ -99,11 +102,42 @@ export function recipeGeometry(
   }
 }
 
-/** Fill the pattern. Characters a file system refuses become "-"; an empty
- *  result falls back to the photo's name. No extension — the caller adds it. */
-export function recipeFileStem(pattern: string, t: { name: string; n: number; w: number; h: number }): string {
-  const tokens: Record<string, string> = { name: t.name, n: String(t.n), w: String(t.w), h: String(t.h) };
-  const filled = pattern.replace(/\{(name|n|w|h)\}/g, (_, k: string) => tokens[k] ?? "");
+/** What `recipeFileStem` needs about one output file. */
+export interface RecipeStemInput {
+  /** The photo's gallery name. */
+  name: string;
+  /** Its position in the ZIP, from 1. */
+  n: number;
+  /** The output size. */
+  w: number;
+  h: number;
+  /** The output file type without the dot, e.g. `jpg`. */
+  ext?: string;
+  /** From lib/photoNameFacts.ts, when the pattern uses them. */
+  original?: string;
+  dateTaken?: string;
+  fileDate?: number;
+}
+
+/** Fill the pattern through the shared formatter (lib/nameTokens.ts). Then
+ *  characters a file system refuses, including any the person typed, become
+ *  "-"; an empty result falls back to the photo's name. No extension — the
+ *  caller adds it. */
+export function recipeFileStem(pattern: string, t: RecipeStemInput): string {
+  const filled = expandNameTokens(
+    pattern,
+    {
+      name: t.name,
+      original: t.original,
+      n: String(t.n),
+      width: t.w,
+      height: t.h,
+      ext: t.ext ?? "",
+      dateTaken: t.dateTaken,
+      fileDate: t.fileDate,
+    },
+    { w: String(t.w), h: String(t.h) },
+  );
   const safe = [...filled]
     .map((c) => (c.charCodeAt(0) < 32 || '\\/:*?"<>|'.includes(c) ? "-" : c))
     .join("")

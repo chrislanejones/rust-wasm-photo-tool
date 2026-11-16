@@ -28,7 +28,9 @@ import {
   UNKNOWN_DESCRIPTION,
   type ImageDescription,
 } from "@/lib/describeImage";
+import { patternNeedsNameFacts } from "@/lib/nameTokens";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { usePhotoNameFacts } from "./usePhotoNameFacts";
 import { ErrorNote, SuccessCallout } from "@/components/ui/status-note";
 
 interface Props {
@@ -173,19 +175,33 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
     [photos, described],
   );
 
+  /** EXIF date / upload name, read only once the pattern uses `{date}` or
+   *  `{original}` (lib/photoNameFacts.ts). */
+  const { facts, loading: readingFacts } = usePhotoNameFacts(
+    targets,
+    patternNeedsNameFacts(pattern),
+  );
+
   /** Final names for `targets`, in gallery order, collisions already resolved.
    *  Recomputed from the descriptions on every pattern keystroke — no re-scan. */
   const proposed = useMemo(() => {
     if (targets.length === 0) return [];
-    const raw = targets.map((p, i) =>
-      applyDescriptionPattern(pattern, {
+    const raw = targets.map((p, i) => {
+      const f = facts.get(p.id);
+      return applyDescriptionPattern(pattern, {
         description: described.get(p.id) ?? UNKNOWN_DESCRIPTION,
         originalName: p.name,
         index: i,
         start,
         pad,
-      }),
-    );
+        original: f?.original,
+        width: p.origWidth,
+        height: p.origHeight,
+        mimeType: p.mimeType,
+        dateTaken: f?.dateTaken,
+        fileDate: f?.fileDate,
+      });
+    });
     // Seed the dedupe with the names of the photos we are NOT renaming, so a
     // generated name cannot collide with one that is staying put. They are
     // first in the list, so they win and the generated names step around them.
@@ -193,10 +209,10 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
       .filter((p) => !described.has(p.id))
       .map((p) => splitExtension(p.name)[0]);
     return dedupeNames([...keeping, ...raw]).slice(keeping.length);
-  }, [photos, targets, described, pattern, start, pad]);
+  }, [photos, targets, described, pattern, start, pad, facts]);
 
   const apply = useCallback(() => {
-    if (proposed.length === 0) return;
+    if (proposed.length === 0 || readingFacts) return;
     const byId = new Map(targets.map((p, i) => [p.id, proposed[i]]));
     setPhotos((prev) =>
       prev.map((p) => {
@@ -210,7 +226,7 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
     );
     setRenamedCount(byId.size);
     toast.success(`Renamed ${byId.size} image${byId.size === 1 ? "" : "s"}`);
-  }, [targets, proposed, setPhotos]);
+  }, [targets, proposed, readingFacts, setPhotos]);
 
   const preview = targets.slice(0, 5).map((p, i) => ({
     from: p.name,
@@ -322,8 +338,13 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
           </div>
 
           <PanelActionBar>
-            <PanelAction onClick={apply} disabled={scanning || proposed.length === 0}>
-              Rename {targets.length} image{targets.length === 1 ? "" : "s"}
+            <PanelAction
+              onClick={apply}
+              disabled={scanning || readingFacts || proposed.length === 0}
+            >
+              {readingFacts
+                ? "Reading dates and names…"
+                : `Rename ${targets.length} image${targets.length === 1 ? "" : "s"}`}
             </PanelAction>
           </PanelActionBar>
         </>

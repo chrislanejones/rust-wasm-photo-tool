@@ -21,6 +21,7 @@ import {
   type RecipeSize,
 } from "@/lib/exportRecipes";
 import type { ExportFormat } from "@/lib/exportImage";
+import { NAME_TOKENS } from "@/lib/nameTokens";
 import { useZipRecipeStore } from "@/stores/useZipRecipeStore";
 import { useToolStore } from "@/stores/useToolStore";
 
@@ -163,7 +164,7 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
             <TextField label="File name" value={pattern} onChange={(e) => setPattern(e.target.value)} />
           </div>
           <p className="text-2xs text-theme-muted-foreground">
-            {`Saves as ${zipFormat.toUpperCase()}, the format above. Name tokens: {name} {n} {w} {h}.`}
+            {`Saves as ${zipFormat.toUpperCase()}, the format above. Name tokens: ${NAME_TOKENS.map((t) => t.token).join(" ")}. {width}, {height} and {ext} are the exported file's.`}
           </p>
           <div className="flex justify-end gap-2">
             <Button size="default" type="button" onClick={() => setSaving(false)}>

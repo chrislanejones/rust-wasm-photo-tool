@@ -3,9 +3,14 @@
 // token substitution, slugging, and making sure two photos never end up with
 // the same filename.
 //
+// The tokens every name pattern shares ({name}, {n}, {date}, {original}, …) live
+// in lib/nameTokens.ts, which Batch › Rename and the Export recipes use too.
+//
 // Split out of the panel on purpose: filename collisions are the part of this
 // feature that can actually lose a user's file on export, so the rules live
 // somewhere testable rather than inside a component.
+
+import { expandNameTokens, extOf, NAME_TOKENS, supportedNameTokens } from "@/lib/nameTokens";
 
 /** The shape `describe_image` returns, once parsed. Mirrors `Description` in
  *  src/describe.rs — keep the two in step. */
@@ -46,9 +51,10 @@ export const UNKNOWN_DESCRIPTION: ImageDescription = {
 };
 
 /** Tokens the Name-pattern field understands — the SINGLE source for the
- *  panel's help text. `patternTokenDrift()` asserts this list and the
- *  substitution map below cannot disagree; before v8.56 they did, and
- *  `{palette}` / `{contrast}` worked while being documented nowhere. */
+ *  panel's help text. The drift guard in `describeImage.test.ts` asserts this
+ *  list and the substitution tables cannot disagree; before v8.56 they did, and
+ *  `{palette}` / `{contrast}` worked while being documented nowhere. The shared
+ *  tokens are spread in from `NAME_TOKENS`, not restated. */
 export const DESCRIBE_TOKENS = [
   { token: "{desc}", hint: "what the engine saw, e.g. dark-blue-portrait" },
   { token: "{color}", hint: "dominant color" },
@@ -59,8 +65,7 @@ export const DESCRIBE_TOKENS = [
   { token: "{contrast}", hint: "flat / punchy" },
   { token: "{orientation}", hint: "landscape / portrait / square" },
   { token: "{detail}", hint: "busy / smooth" },
-  { token: "{name}", hint: "the original filename" },
-  { token: "{n}", hint: "sequence number" },
+  ...NAME_TOKENS,
 ] as const;
 
 /**
@@ -122,6 +127,44 @@ interface PatternInput {
   start: number;
   /** How many digits `{n}` pads to. */
   pad: number;
+  /** The name it was uploaded with, for `{original}` (lib/photoNameFacts.ts). */
+  original?: string;
+  /** The photo's pixels, for `{width}` / `{height}`. */
+  width?: number;
+  height?: number;
+  /** The stored file's type, for `{ext}` when the name carries none. */
+  mimeType?: string;
+  /** EXIF date taken and the file's own date, for `{date}`. */
+  dateTaken?: string;
+  fileDate?: number;
+}
+
+/** The description words — the ONE place their values are defined. The shared
+ *  tokens come from lib/nameTokens.ts. Both `applyDescriptionPattern` and
+ *  `supportedPatternTokens` read these, so the help text cannot document a
+ *  token the expander does not honor. */
+function descriptionValues(d: ImageDescription): Record<string, string> {
+  return {
+    desc: d.slug,
+    color: d.color,
+    subject: d.subject,
+    kind: d.kind,
+    tone: d.tone,
+    palette: d.palette,
+    contrast: d.contrast,
+    orientation: d.orientation,
+    detail: d.detail,
+  };
+}
+
+/** Every token the expander actually honors, derived from the tables
+ *  themselves rather than restated — the drift guard in
+ *  `describeImage.test.ts` compares this against `DESCRIBE_TOKENS`. */
+export function supportedPatternTokens(): string[] {
+  return [
+    ...Object.keys(descriptionValues(UNKNOWN_DESCRIPTION)).map((k) => `{${k}}`),
+    ...supportedNameTokens(),
+  ];
 }
 
 /**
@@ -132,45 +175,24 @@ interface PatternInput {
  * and their surrounding separators collapse, so `{color}-{subject}` on a
  * subjectless image gives `blue`, not `blue-`.
  */
-/** The substitution table — the ONE place a token's value is defined. Both
- *  `applyDescriptionPattern` and `supportedPatternTokens` read it, so the
- *  help text cannot document a token the expander does not honour. */
-function patternValues(
-  d: ImageDescription,
-  originalBase: string,
-  num: string,
-): Record<string, string> {
-  return {
-    "{desc}": d.slug,
-    "{color}": d.color,
-    "{subject}": d.subject,
-    "{kind}": d.kind,
-    "{tone}": d.tone,
-    "{palette}": d.palette,
-    "{contrast}": d.contrast,
-    "{orientation}": d.orientation,
-    "{detail}": d.detail,
-    "{name}": originalBase,
-    "{n}": num,
-  };
-}
-
-/** Every token the expander actually honours, derived from the table itself
- *  rather than restated — the drift guard in `describeImage.test.ts` compares
- *  this against `DESCRIBE_TOKENS`. */
-export function supportedPatternTokens(): string[] {
-  return Object.keys(patternValues(UNKNOWN_DESCRIPTION, "", ""));
-}
-
 export function applyDescriptionPattern(pattern: string, input: PatternInput): string {
   const { description: d, originalName, index, start, pad } = input;
   const [originalBase] = splitExtension(originalName);
   const num = String(start + index).padStart(Math.max(1, pad), "0");
 
-  const values = patternValues(d, originalBase, num);
-
-  const expanded = pattern.replace(/\{[a-z]+\}/g, (tok) =>
-    tok in values ? values[tok] : tok,
+  const expanded = expandNameTokens(
+    pattern,
+    {
+      name: originalBase,
+      original: input.original,
+      n: num,
+      width: input.width ?? 0,
+      height: input.height ?? 0,
+      ext: extOf(originalName, input.mimeType),
+      dateTaken: input.dateTaken,
+      fileDate: input.fileDate,
+    },
+    descriptionValues(d),
   );
   // Slug AFTER substitution so the separators the user typed are normalized
   // along with the values, and empty tokens leave no orphan dashes behind.

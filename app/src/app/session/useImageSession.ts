@@ -40,6 +40,7 @@ import type { OplogStats } from "@/lib/oplogStats";
 import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
 import { writeEditArchive } from "./archiveSave";
+import { rememberFileDate } from "@/lib/photoNameFacts";
 
 /**
  * How long the idle debounce waits before archiving — v8.35, and the number is
@@ -542,6 +543,9 @@ export function useImageSession({
           // Seed the decode cache so re-selecting this photo later is instant
           // (no IndexedDB read + re-decode). Keyed by content hash.
           putWorkingCopy(originalKey, working);
+          // The file's own date, for a rename `{date}` on a photo with no EXIF
+          // date. In memory only — nothing new is stored (lib/photoNameFacts.ts).
+          rememberFileDate(originalKey, raw.lastModified);
           const entry: PhotoEntry = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             name: f.name.replace(/\.[^.]+$/, ""),
