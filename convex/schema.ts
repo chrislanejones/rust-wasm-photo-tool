@@ -179,6 +179,39 @@ export default defineSchema({
     // transfers.expire: everything past its date, as one range.
     .index("by_expiresAt", ["expiresAt"]),
 
+  // ── Pairing: the server introduces a phone and a computer (ADR-105) ─────────
+  // One row per QR code. It holds only the WebRTC handshake: the two SDPs,
+  // each with an HMAC keyed by the QR secret, and the ICE candidates. The key
+  // is SHA-256(secret); the secret itself never reaches the server (it rides in
+  // the URL fragment). No user id, no file name, no photo data: photos go
+  // device to device over the data channel this row sets up. Written WITHOUT
+  // sign-in, so every field is capped (convex/pairLimits.ts), and each row
+  // deletes itself at `expiresAt` through a job scheduled when it is made.
+  pair_sessions: defineTable({
+    /** SHA-256 hex of the QR secret. The lookup key, and the only handle. */
+    keyHash: v.string(),
+    /** A random per-tab token the computer sends, for the per-client cap. Not
+     *  tied to an account or a device; a caller may send a new one each time. */
+    clientToken: v.string(),
+    /** The computer's SDP offer, ≤ 16 KB, and its HMAC-SHA256 under the secret. */
+    offer: v.string(),
+    offerMac: v.string(),
+    /** The phone's SDP answer and its HMAC, once it has joined. */
+    answer: v.optional(v.string()),
+    answerMac: v.optional(v.string()),
+    /** Serialized ICE candidates, ≤ 40 a side. */
+    computerCandidates: v.array(v.string()),
+    phoneCandidates: v.array(v.string()),
+    /** The first phone to join closes the door. */
+    joined: v.boolean(),
+    createdAt: v.number(),
+    /** createdAt + 5 minutes; on join, join time + 30 minutes. */
+    expiresAt: v.number(),
+  })
+    .index("by_keyHash", ["keyHash"])
+    // The per-client cap: this token's sessions that are still live.
+    .index("by_clientToken_expiresAt", ["clientToken", "expiresAt"]),
+
   // ── MCP call log (Settings › Connections › Recent activity, ADR-095) ──────
   // One row per tool call an AI app made. Never the token, the arguments or
   // the response. The rate limit counts these rows too. Kept 30 days
