@@ -5,16 +5,21 @@
 // The online switch has no other home on the phone (Settings › Security is a
 // desktop pane), so while it is off this card offers the SAME switch,
 // `useUIStore.onlineFeaturesEnabled`, as Send to computer does (ADR-102).
-import { CheckCircle2, X } from "lucide-react";
+import { useRef } from "react";
+import { CheckCircle2, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/sonner";
 import { useCloudAuth } from "@/lib/cloud";
 import { useUIStore } from "@/stores/useUIStore";
 import { useTransferBeta } from "@/features/transfer/useTransfer";
+import { PHOTO_PICKER_ACCEPT } from "@/features/transfer/send";
 import { NO_SERVER_LINE, ONLINE_OFF_LINE, isEnded, phoneLine } from "./messages";
 import { stopPairing } from "./pairController";
+import { sendFiles } from "./sendController";
+import { usePairSendStore } from "./sendStore";
 import { usePairStore } from "./pairStore";
 import { usePairAvailability, usePairSignaling } from "./usePair";
 
@@ -81,6 +86,7 @@ function Card() {
           />
         </div>
       )}
+      {availability === "ready" && status === "connected" && <SendToComputer />}
       {availability === "ready" && status === "unreachable" && <TransferInstead />}
       {availability === "ready" && isEnded(status) && status !== "unreachable" && (
         <p className="mt-2 text-xs text-text-muted">Close this to keep using the gallery.</p>
@@ -100,5 +106,40 @@ function TransferInstead() {
     <Button size="large" className="mt-3 min-h-11 w-full" onClick={() => openSettings(true)}>
       Send through the Transfer inbox instead
     </Button>
+  );
+}
+
+/** Connected: pick photos from the phone's own library or camera roll (the
+ *  same picker Send to computer offers) and send them straight over. Nothing
+ *  is processed here; each goes as the phone has it. */
+function SendToComputer() {
+  const input = useRef<HTMLInputElement>(null);
+  const moving = usePairSendStore((s) => s.view !== null && s.view.phase !== "ended");
+  return (
+    <div className="mt-3">
+      <Button size="large" className="min-h-11 w-full" disabled={moving} onClick={() => input.current?.click()}>
+        <Send className="h-4 w-4" aria-hidden="true" />
+        Send photos to computer
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        accept={PHOTO_PICKER_ACCEPT}
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="pair-send-input"
+        onChange={(e) => {
+          const files = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = "";
+          if (!files.length) return;
+          const refused = sendFiles(files);
+          if (refused.length === files.length) {
+            toast.error(`Nothing was sent. ${refused[0]!.name}: ${refused[0]!.reason}.`);
+          }
+        }}
+      />
+    </div>
   );
 }

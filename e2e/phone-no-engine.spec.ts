@@ -1,6 +1,7 @@
 import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
+import { PAIR_LAUNCH, pairUp, phoneTiles } from "./pair-harness";
 
 // Plan C §2 — a phone does not load the engine.
 //
@@ -9,6 +10,10 @@ import { join } from "node:path";
 // (`photo_limit`) is mirrored in lib/tiers.ts. Widening past 600px loads the
 // engine and the editor then. These specs count the engine's network requests;
 // they deliberately do NOT measure bytes (measured on real hardware instead).
+
+// Chrome's mDNS masking of local addresses off, for the pairing case at the
+// end (pair-harness.ts says why). No other test here opens a peer connection.
+test.use(PAIR_LAUNCH);
 
 const FIXTURES = [
   join(__dirname, "fixtures", "checker.png"),
@@ -174,4 +179,31 @@ test("with the transfer Beta, the phone's Send to computer shows and the engine 
   ).toBeVisible();
   await expect(page.getByTestId("send-to-computer-input")).toHaveCount(0);
   expect(engine).toEqual([]);
+});
+
+// Pairing, receiving (ADR-105 "Sending"): a paired computer sends its open
+// photo's original, the phone accepts, and it lands in the phone's grid
+// through the phone's own upload path, still without the engine. Real WebRTC
+// between two contexts; pair-harness.ts says what stands in for Convex.
+test.describe("pairing, receiving", () => {
+  test("a photo sent from a paired computer lands in the phone's grid, and the engine is still never requested", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    const { phone, phoneRequests } = await pairUp(browser, context, page);
+    // Nothing selected: Send to phone sends the open photo.
+    await page.getByRole("button", { name: "Send to phone" }).click();
+    const prompt = phone.page.getByTestId("pair-transfer");
+    await expect(phone.page.getByTestId("pair-transfer-title")).toHaveText(/^Computer wants to send 1 photo \(\d+ KB\)$/, {
+      timeout: 30_000,
+    });
+    await prompt.getByRole("button", { name: "Accept", exact: true }).click();
+    await expect(prompt).toHaveAttribute("data-outcome", "done", { timeout: 60_000 });
+    await prompt.getByRole("button", { name: "Done" }).click();
+    await expect(phoneTiles(phone.page)).toHaveCount(1, { timeout: 30_000 });
+    await expect(phone.page.getByRole("button", { name: "View photo checker" })).toBeVisible();
+    expect(phoneRequests.engine()).toEqual([]);
+    await phone.context.close();
+  });
 });

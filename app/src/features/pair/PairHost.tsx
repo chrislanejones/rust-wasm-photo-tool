@@ -8,11 +8,15 @@
 //    PairPhoneCard; a wider screen opened from the link gets the same card in
 //    a dialog.
 //  - Either: the online switch turned off ends any attempt at once.
+//  - Either, once connected: the photo protocol on the channel
+//    (sendController) and its dialog (PairTransferDialog).
 import { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { PairDialog } from "./PairDialog";
 import { PairPhoneCard } from "./PairPhoneCard";
+import { PairTransferDialog } from "./PairTransferDialog";
+import { watchPairChannel } from "./sendController";
 import { isPairingActive, startJoining, stopPairing } from "./pairController";
 import { usePairStore } from "./pairStore";
 import { usePairAvailability, usePairBeta, usePairSignaling } from "./usePair";
@@ -24,6 +28,9 @@ export function PairHost() {
   const invite = usePairStore((s) => s.invite);
   const bp = useBreakpoint();
   const joined = useRef<string | null>(null);
+
+  // Photos go both ways on whatever channel is connected.
+  useEffect(() => watchPairChannel(), []);
 
   // "Everything in your browser" switched on: nothing more goes to the server,
   // and an open connection is closed.
@@ -45,6 +52,7 @@ export function PairHost() {
   return (
     <>
       {beta && <PairDialog signaling={signaling} />}
+      <PairTransferDialog />
       {invite !== null && !bp.mobile && (
         <Dialog
           open
