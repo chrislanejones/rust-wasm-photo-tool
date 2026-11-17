@@ -16,6 +16,7 @@ import {
 } from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
 import { applyBetaFromUrl } from "@/lib/beta";
+import { captureInviteFromUrl } from "@/features/pair/invite";
 import { hydrateInstalledPlugins } from "@/lib/plugins/state";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 import { installDroppedRejectionHandler } from "@/lib/engine/superseded";
@@ -32,6 +33,12 @@ installActivityFetchTracker();
 // See lib/beta.ts: it writes the same localStorage keys the features already
 // read, then takes the parameter out of the URL.
 applyBetaFromUrl();
+
+// `#/pair/<secret>` — a phone opened from the computer's pairing QR code
+// (ADR-105). Taken out of the address bar HERE, before the router, GA4's
+// page_view and Vercel Analytics read the URL, so the secret stays in memory
+// only. See features/pair/invite.ts.
+captureInviteFromUrl();
 
 // The plugins this device has added (Settings → Plugins) come out of
 // IndexedDB once, here, so the Download dialog's picker has them on the first

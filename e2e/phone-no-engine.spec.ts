@@ -127,6 +127,34 @@ test("demo mode (logged out) boots at both widths", async ({ page }) => {
   }
 });
 
+// Pairing (ADR-105): a phone opened from a computer's QR code joins without
+// the engine. A stand-in signaling server (window.__ihPairRelay, see
+// pair-connection.spec.ts) answers that this code was already used, so the
+// phone shows the right line; the full connection is covered over there.
+test("a pairing link opens the phone's pairing card, and the engine is still never requested", async ({ context, page }) => {
+  await blockExternalNetwork(page);
+  const calls: string[] = [];
+  await context.exposeBinding("__ihPairRelay", (_src, op: string) => {
+    calls.push(op);
+    return op === "readOffer" ? null : { ok: false, reason: "unavailable" };
+  });
+  await page.setViewportSize(PHONE);
+  const engine = watchEngine(page);
+  const secret = "AAECAwQFBgcICQoLDA0ODw";
+  await page.goto(`/#/pair/${secret}`);
+  await dismissNotice(page);
+  const card = page.getByTestId("pair-phone");
+  // Off until this phone allows online features; nothing was asked yet.
+  await expect(card).toHaveAttribute("data-status", "online-off");
+  expect(calls).toEqual([]);
+  expect(page.url()).not.toContain(secret);
+  await card.getByRole("switch").click();
+  await expect(card).toHaveAttribute("data-status", "unavailable", { timeout: 15_000 });
+  await expect(card.getByRole("heading", { name: "This code has expired or was already used" })).toBeVisible();
+  expect(calls).toEqual(["readOffer"]);
+  expect(engine).toEqual([]);
+});
+
 // Transfer (ADR-102): the phone's Send to computer lives in its Settings sheet,
 // behind `?beta=transfer`, and must not bring the engine with it. Logged out
 // it offers no picker. This build points at a fake Convex and blocks Clerk, so

@@ -159,6 +159,18 @@ export default function PrivacyPolicy() {
               device.
             </p>
             <p>
+              You can also pair a phone with the editor on your computer (a Beta, off unless you
+              turn it on), signed in or not. The computer shows a QR code, the phone scans it, and
+              the two connect straight to each other. To introduce them, our server holds their
+              connection details: the network addresses each one can be reached at, and a scrambled
+              form of the code&rsquo;s key, never the key itself. That record is deleted when the
+              two connect, or after 5 minutes if nobody scans the code, and after 30 minutes at
+              most. Each device also asks a public STUN server run by Cloudflare for its own
+              address, so Cloudflare sees that address and nothing else. Photos never go through
+              our server or Cloudflare. Pairing is off while the &ldquo;Everything in your
+              browser&rdquo; switch is on.
+            </p>
+            <p>
               The settings sync is named in full because it is the one that happens without you
               asking each time. Three things travel: your preferences (the Settings dialog), which
               panels and tabs you last had open along with the command palette's recent list, and
