@@ -11,3 +11,10 @@
 # "photo-key-1", so the current tree scans clean. Only the weekly scheduled run
 # still went red, because it walks the full history and finds this one commit.
 3564c39bab7b0a6800290c670b5e158a550e67ac:app/src/lib/storageOrphans.test.ts:generic-api-key:34
+
+# #484 (3985a8aa), e2e/phone-no-engine.spec.ts:143: a made-up pairing secret in
+# an e2e fixture (the bytes 0..15, base64url), not a credential. generic-api-key
+# matches it because the variable is named `secret`. The next commit on the
+# branch builds the value at runtime instead, so the current tree scans clean;
+# this entry only covers the one pushed commit, which we never rewrite.
+3985a8aa717500e5325b4969d2da486f8f97b32d:e2e/phone-no-engine.spec.ts:generic-api-key:143

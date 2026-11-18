@@ -145,7 +145,9 @@ test("a pairing link opens the phone's pairing card, and the engine is still nev
   });
   await page.setViewportSize(PHONE);
   const engine = watchEngine(page);
-  const secret = "AAECAwQFBgcICQoLDA0ODw";
+  // A made-up pairing secret: the bytes 0..15, base64url. Built here rather than
+  // written out, so it never reads as a committed credential to the secret scan.
+  const secret = Buffer.from(Array.from({ length: 16 }, (_, i) => i)).toString("base64url");
   await page.goto(`/#/pair/${secret}`);
   await dismissNotice(page);
   const card = page.getByTestId("pair-phone");
