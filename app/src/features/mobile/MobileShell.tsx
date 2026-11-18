@@ -29,6 +29,7 @@ import { toast } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/UserMenu";
 import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
+import { PairPhoneCard } from "@/features/pair/PairPhoneCard";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
@@ -445,6 +446,10 @@ export function MobileShell({
         />
         <UserMenu />
       </div>
+
+      {/* Opened from a computer's pairing QR code (features/pair, ADR-105):
+          "Pairing with computer…" then "Connected". Nothing otherwise. */}
+      <PairPhoneCard />
 
       {booting ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">

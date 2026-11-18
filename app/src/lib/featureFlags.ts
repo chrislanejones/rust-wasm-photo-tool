@@ -121,6 +121,21 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     },
   },
   {
+    key: "ih_pair",
+    label: "Pair a phone",
+    kind: "optin",
+    isOn: () => rawFlagValue("ih_pair") === "1",
+    effect:
+      "Editor: the gallery gets Pair a phone, a QR code that connects a phone straight to this browser (WebRTC). The server only introduces the two; no account needed. Off while everything stays in the browser (ADR-105).",
+    source: "features/pair/",
+    beta: {
+      id: "pair",
+      label: "Pair a phone",
+      blurb:
+        "The gallery gets a Pair a phone button. It shows a QR code; scan it with your phone's camera and the two connect directly, with no sign-in. Sending photos between them comes next. Needs online features on, on both devices.",
+    },
+  },
+  {
     key: "ih_oplog_undo",
     label: "Op-log undo",
     kind: "kill",

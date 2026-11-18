@@ -23,6 +23,8 @@ import type * as mcpData from "../mcpData.js";
 import type * as mcpHttp from "../mcpHttp.js";
 import type * as mcpImage from "../mcpImage.js";
 import type * as mcpTools from "../mcpTools.js";
+import type * as pairLimits from "../pairLimits.js";
+import type * as pairSessions from "../pairSessions.js";
 import type * as photoEdits from "../photoEdits.js";
 import type * as router from "../router.js";
 import type * as shares from "../shares.js";
@@ -65,6 +67,8 @@ declare const fullApi: ApiFromModules<{
   mcpHttp: typeof mcpHttp;
   mcpImage: typeof mcpImage;
   mcpTools: typeof mcpTools;
+  pairLimits: typeof pairLimits;
+  pairSessions: typeof pairSessions;
   photoEdits: typeof photoEdits;
   router: typeof router;
   shares: typeof shares;

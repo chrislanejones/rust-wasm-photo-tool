@@ -131,6 +131,17 @@ export const NETWORK_PATHS: readonly NetworkPath[] = [
     homeRow: "Sync and share links",
   },
   {
+    id: "pair",
+    label: "Pairing a phone with a computer",
+    sends:
+      "to connect the two, the server holds their connection details (network addresses and a hash of the QR code's key, never the key itself) until they connect or 30 minutes pass, and a public STUN server (Cloudflare) sees each device's address; photos never go through either",
+    // Behind the `pair` Beta (ADR-105). Both sides refuse before the first
+    // call while the switch is off (features/pair).
+    gate: "online-switch",
+    disclosedAs: "pair a phone",
+    homeRow: "Sync and share links",
+  },
+  {
     id: "account",
     label: "Signing in",
     sends: "your email and sign-in go to the account provider",

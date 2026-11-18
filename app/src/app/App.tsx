@@ -6,6 +6,7 @@ import { CommandPalette } from "@/features/commandPalette";
 import { RouteSync, SHARE_PARAM } from "@/features/routing";
 import { MovedNotice } from "@/features/hostMove";
 import { SyncProvider } from "@/lib/sync";
+import { PairHost } from "@/features/pair/PairHost";
 
 export default function App() {
   // A `?v=<token>` link opens the read-only share viewer instead of the editor.
@@ -41,6 +42,10 @@ export default function App() {
           AppShell so it outlives IdleScreen and MultiTabScreen — a parked tab
           should come back current, not start catching up. */}
       <SyncProvider />
+      {/* Pair a phone (ADR-105): the computer's dialog and the phone's join.
+          Here, not in AppShell, so it outlives the gallery and serves both
+          layouts. Renders nothing until used; see features/pair. */}
+      <PairHost />
     </TooltipProvider>
   );
 }
