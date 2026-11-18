@@ -181,15 +181,6 @@ async function commitAway(page: Page) {
   await page.waitForTimeout(300);
 }
 
-async function undoAll(page: Page) {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  for (let i = 0; i < 5 && (await texts(page)).length > 0; i++) {
-    await page.keyboard.press("Control+z");
-    await page.waitForTimeout(300);
-  }
-  await expect.poll(async () => (await texts(page)).length).toBe(0);
-}
-
 const fmt = (b: Band) => `x ${b[0]}..${b[1]} (w ${b[1] - b[0]}), y ${b[2]}..${b[3]}`;
 
 /** Every line's four ink edges, preview against committed, within `tol` px. */
@@ -269,13 +260,15 @@ const CELLS = [
   "Bottom left", "Bottom center", "Bottom right",
 ] as const;
 
+// One test per cell: a single test looping all nine ran past its 4 min budget
+// on the CI runner (every cell's edges passed; the clean-up after the last did not).
 for (const boxed of [false, true]) {
-  test(`Liberation Sans 48, every Text in Box cell${boxed ? ", in a 300 x 240 box" : ", no box"}: the commit lands on the preview`, async ({ page }) => {
-    test.setTimeout(240_000);
-    await open(page);
-    await textTool(page);
-    await setSize(page, 48);
-    for (const cell of CELLS) {
+  for (const cell of CELLS) {
+    test(`Liberation Sans 48, Text in Box ${cell}${boxed ? ", in a 300 x 240 box" : ", no box"}: the commit lands on the preview`, async ({ page }) => {
+      test.setTimeout(90_000);
+      await open(page);
+      await textTool(page);
+      await setSize(page, 48);
       await pickCell(page, cell);
       const blank = await composite(page);
       const before = await page.screenshot();
@@ -300,9 +293,8 @@ for (const boxed of [false, true]) {
       const committed = await committedInk(page, blank, t);
       console.log(`[text-preview-size] ${JSON.stringify({ cell, boxed, preview, committed })}`);
       expectSameInk(preview, committed, `${cell}${boxed ? " boxed" : ""}`);
-      await undoAll(page);
-    }
-  });
+    });
+  }
 }
 
 test("a paragraph in a 300 px box breaks into the same lines in the preview and the commit", async ({ page }) => {
