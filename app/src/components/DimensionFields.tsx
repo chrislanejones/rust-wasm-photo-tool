@@ -1,6 +1,9 @@
 import { Lock, Unlock } from "lucide-react";
 import { SizeSlider } from "@/components/ui/size-slider";
+import type { ControlRowProps } from "@/components/ui/control-row";
 import { NumberField } from "@/components/ui/number-field";
+
+const SCALE_PRESETS = [10, 25, 50, 75, 100] as const;
 
 interface Props {
   /** Width / height as strings (controlled — lets the field hold transient input). */
@@ -17,6 +20,8 @@ interface Props {
   /** The edited dot + reset, on the Scale row (ControlRow §9): W/H are
    *  per-photo values, and Scale is the row that reads them as one number. */
   edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
+  /** A one-click icon on the Scale row, between its reset and its value. */
+  scaleAction?: ControlRowProps["action"];
   /** Put the Scale slider under width/height instead of above them. */
   scaleLast?: boolean;
 }
@@ -38,6 +43,7 @@ export function DimensionFields({
   onPercentChange,
   onToggleLock,
   edited,
+  scaleAction,
   scaleLast = false,
 }: Props) {
 
@@ -47,11 +53,17 @@ export function DimensionFields({
         label="Scale"
         value={widthPercent}
         onChange={onPercentChange}
-        min={1}
+        // The numbers variant, like Resize › Quality (11-18). The circles print
+        // bare numbers; the value and each preset's name carry the "%". The
+        // track runs 10–100%; a smaller size is still typed in width/height.
+        presets={SCALE_PRESETS}
+        variant="numbers"
+        min={10}
         max={100}
         unit="%"
         disabled={disabled}
         edited={edited}
+        action={scaleAction}
       />
   );
 

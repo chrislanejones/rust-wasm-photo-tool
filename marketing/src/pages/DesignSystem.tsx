@@ -791,13 +791,19 @@ export default function DesignSystem() {
   // A link to #marketing, or to a section on either tab, opens the right tab.
   // The section may sit in a panel that is still hidden, where a scroll does
   // nothing, so the hash is held and the scroll runs after the tab has rendered.
-  const [jump, setJump] = useState<string | null>(null);
+  // #editor and #marketing land on their tab's top: each tab's section bar
+  // carries that id (qc-1113: before it, nothing did, and an in-page
+  // #marketing switched the tab but left the page where it was). One handler
+  // for every hash. On load it jumps; an in-page change glides, unless the
+  // reader asked for less motion.
+  const [jump, setJump] = useState<{ id: string; smooth: boolean } | null>(null);
   useEffect(() => {
-    const sync = () => {
+    const sync = (e?: HashChangeEvent) => {
       const want = tabForHash(window.location.hash);
       if (!want) return;
       setTab(want);
-      setJump(window.location.hash.slice(1));
+      const smooth = !!e && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      setJump({ id: window.location.hash.slice(1), smooth });
     };
     sync();
     window.addEventListener("hashchange", sync);
@@ -805,7 +811,7 @@ export default function DesignSystem() {
   }, []);
   useEffect(() => {
     if (!jump) return;
-    document.getElementById(jump)?.scrollIntoView({ block: "start" });
+    document.getElementById(jump.id)?.scrollIntoView({ block: "start", behavior: jump.smooth ? "smooth" : "auto" });
     setJump(null);
   }, [jump, tab]);
 
@@ -865,7 +871,7 @@ export default function DesignSystem() {
         </div>
 
         <div role="tabpanel" id="ds-panel-editor" aria-labelledby="ds-tab-editor" className="ds-panel-tab" hidden={tab !== "editor"}>
-          <div className="ds-topbar">
+          <div className="ds-topbar" id="editor">
             <nav aria-label="On this page" className="ds-index">
               <ul>
                 {SECTIONS.map((s) => <li key={s.id}><a href={`#${s.id}`}>{s.title}</a></li>)}
@@ -892,7 +898,7 @@ export default function DesignSystem() {
         </div>
 
         <div role="tabpanel" id="ds-panel-marketing" aria-labelledby="ds-tab-marketing" className="ds-panel-tab" hidden={tab !== "marketing"}>
-          <div className="ds-topbar">
+          <div className="ds-topbar" id="marketing">
             <nav aria-label="On this page" className="ds-index">
               <ul>
                 {SITE_SECTIONS.map((s) => <li key={s.id}><a href={`#${s.id}`}>{s.title}</a></li>)}
