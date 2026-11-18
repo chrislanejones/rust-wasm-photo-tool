@@ -90,6 +90,63 @@ test("a link to a Marketing section opens the Marketing tab on it", async ({ pag
   await expect(page.getByRole("heading", { level: 2, name: "Colors", exact: true })).toBeInViewport();
 });
 
+// #marketing and #editor name a TAB, not a section (qc-1113): the tab
+// switched, but nothing on the page had that id, so the page stayed scrolled
+// where it was (scrollY 3000 in the QC). Each tab's top now carries the id,
+// and the one hash handler scrolls it in, on load and on an in-page change.
+// "Top" = the tab's section bar, which must clear the floating nav (the
+// scroll-margin lands it ~150px down) and sit near the top of the view.
+const tabTop = (page: Page, tab: "editor" | "marketing") =>
+  page.locator(`#ds-panel-${tab} .ds-topbar`).evaluate((el) => Math.round(el.getBoundingClientRect().top));
+
+test("a fresh load of #marketing lands on the Marketing tab's top", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/design-system#marketing");
+  await expect(page.getByRole("tab", { name: /Image Horse Marketing/ })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => tabTop(page, "marketing")).toBeGreaterThan(100);
+  await expect.poll(() => tabTop(page, "marketing")).toBeLessThan(220);
+});
+
+test("an in-page #marketing or #editor from lower down scrolls to that tab's top", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await go(page);
+  for (const tab of ["marketing", "editor"] as const) {
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(3000);
+    await page.evaluate((h) => { window.location.hash = h; }, tab);
+    await expect(page.getByRole("tab", { name: tab === "marketing" ? /Image Horse Marketing/ : /Image Horse Editor/ }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect.poll(() => tabTop(page, tab), { message: `#${tab}` }).toBeGreaterThan(100);
+    await expect.poll(() => tabTop(page, tab), { message: `#${tab}` }).toBeLessThan(220);
+  }
+});
+
+test("with Reduce Motion the in-page jump is instant, not smooth", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await go(page);
+  await page.evaluate(() => window.scrollTo(0, 3000));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(3000);
+  // Two scroll readings one frame apart once the tab has switched: a smooth
+  // scroll would still be moving.
+  const [a, b] = await page.evaluate(async () => {
+    window.location.hash = "marketing";
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+    const panel = document.getElementById("ds-panel-marketing")!;
+    for (let i = 0; i < 60 && panel.hidden; i++) await frame();
+    await frame();
+    await frame();
+    const first = window.scrollY;
+    await frame();
+    return [first, window.scrollY];
+  });
+  expect(b).toBe(a);
+  expect(a).toBeLessThan(3000);
+  const top = await tabTop(page, "marketing");
+  expect(top).toBeGreaterThan(100);
+  expect(top).toBeLessThan(220);
+});
+
 test("the Marketing tab shows the site's real token values", async ({ page }) => {
   await page.goto("/design-system#marketing");
   const swatch = page.locator(".ds-swatch").filter({ hasText: "--color-accent-ink" });

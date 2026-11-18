@@ -60,10 +60,22 @@ export function masonryTileStyle(p: Parameters<typeof photoAspect>[0]): CSSPrope
 }
 
 /** The hero (the open photo's live canvas). Grid: the 2 × 2 corner. Masonry:
- *  a tile like the rest, at its own shape — Selected, not bigger. */
+ *  a tile like the rest, at its own shape — Selected, not bigger.
+ *
+ *  In Masonry the photo also FILLS that tile, like every thumbnail beside it
+ *  (qc-1113). Left alone, the canvas inside keeps the editor's 32px canvas
+ *  margin and never grows past its own pixel size, so it sat inset in its
+ *  tile: 48px in on a 3:2 photo at 1280 wide. The two custom properties reach
+ *  the canvas wrapper and the canvas through inheritance (styles.css reads
+ *  them, with the editor's values as fallbacks), so nothing else changes and
+ *  the Grid keeps its margin. The tile is the photo's shape, so filling it
+ *  does not letterbox; object-fit: contain on the canvas covers a tile whose
+ *  shape is a hair off. */
 export function batchHeroStyle(layout: BatchLayout, active: PhotoEntry | undefined): CSSProperties {
   const base: CSSProperties = { position: "relative", overflow: "hidden", borderRadius: "0.375rem" };
-  return layout === "masonry" ? { ...base, ...masonryTileStyle(active) } : { ...base, gridArea: "1 / 1 / 3 / 3" };
+  if (layout !== "masonry") return { ...base, gridArea: "1 / 1 / 3 / 3" };
+  const fill = { "--canvas-wrapper-pad": "0px", "--main-canvas-fill": "100%" } as CSSProperties;
+  return { ...base, ...masonryTileStyle(active), ...fill };
 }
 
 interface ZoomHandlers {

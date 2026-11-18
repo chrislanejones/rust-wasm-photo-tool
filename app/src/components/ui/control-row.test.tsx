@@ -175,3 +175,39 @@ describe("ControlRow — edited", () => {
     expect(value.parentElement!.contains(container.querySelector('[data-slot="reset"]'))).toBe(true);
   });
 });
+
+// 11-18 — the right side reads: reset (only while edited), the row's action
+// icon, then the value, which stays last.
+describe("ControlRow — action", () => {
+  it("orders reset, action, value on the right and calls the action", async () => {
+    const { Zap } = await import("lucide-react");
+    let autos = 0;
+    const { container } = render(
+      <ControlRow
+        label="Quality"
+        value="80%"
+        edited={{ isEdited: true, onReset: () => {} }}
+        action={{ label: "Auto compress", icon: Zap, onClick: () => autos++ }}
+      >
+        <input aria-label="Quality" type="range" />
+      </ControlRow>,
+    );
+    const reset = container.querySelector('[data-slot="reset"]')!;
+    const action = container.querySelector('[data-slot="action"]')!;
+    const value = container.querySelector('[data-slot="value"]')!;
+    expect(reset.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(action.compareDocumentPosition(value) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(value.parentElement!.lastElementChild).toBe(value);
+    screen.getByRole("button", { name: "Auto compress" }).click();
+    expect(autos).toBe(1);
+  });
+  it("the reset sits on the value's side, not after the label", () => {
+    const { container } = render(
+      <ControlRow label="Brightness" value="+40" edited={{ isEdited: true, onReset: () => {} }}>
+        <input aria-label="Brightness" type="range" />
+      </ControlRow>,
+    );
+    const label = container.querySelector('[data-slot="label"]')!;
+    expect(label.parentElement!.contains(container.querySelector('[data-slot="reset"]'))).toBe(false);
+  });
+});

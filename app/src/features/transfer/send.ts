@@ -28,6 +28,20 @@ const TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
   svg: "image/svg+xml",
 };
 
+/** Is this a photo Transfer takes? The file's own type, or its extension's
+ *  when the browser gave none: one of the types above. Pairing (ADR-105)
+ *  checks a picked file and an incoming manifest against this same list. */
+export function isTransferImage(file: { name: string; type: string }): boolean {
+  return TRANSFER_IMAGE_TYPES.has(uploadContentType(file).split(";")[0]!.trim().toLowerCase());
+}
+
+const TRANSFER_IMAGE_TYPES: ReadonlySet<string> = new Set(Object.values(TYPE_BY_EXTENSION));
+
+/** What the phone's photo picker offers: `image/*` plus the HEIC extensions,
+ *  which some Android pickers do not count as images. Send to computer and
+ *  pairing's Send to computer both use it. */
+export const PHOTO_PICKER_ACCEPT = "image/*,.heic,.heif";
+
 /** The `Content-Type` the upload is sent with, which is what `_storage`
  *  records. The file's own type, or the extension's when the browser gave
  *  none (some Android browsers do that for HEIC). */

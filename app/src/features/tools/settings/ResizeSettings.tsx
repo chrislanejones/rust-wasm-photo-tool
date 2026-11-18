@@ -1,6 +1,6 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useState } from "react";
-import { Scaling, FileArchive } from "lucide-react";
+import { Scaling, FileArchive, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getImageWeight, type ImageWeight } from "@/lib/webPerf";
+import { getImageWeight, googleImageLimitBytes, type ImageWeight } from "@/lib/webPerf";
 import { formatFromMime, type ExportFormat } from "@/lib/exportImage";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ControlRow } from "@/components/ui/control-row";
@@ -101,6 +101,15 @@ interface ResizeSettingsProps {
   onExportFormatChange: (f: ExportFormat) => void;
   compressProgress: { completed: number; total: number };
 }
+
+// Auto (⚡, 11-18): the gallery's Compress Image(s) rules (useAutoCompress),
+// filled into BOTH sliders at once, so Apply still decides (and its label says
+// what moved). Size: fit within 2500 px a side, never larger than the photo.
+// Quality: start at 75 and step down to 50 until the encode at that size
+// passes Google's limit (the readout's own line), measured, not estimated.
+// The same ⚡ sits on the Scale row and the Quality row; both do this.
+const AUTO_MAX_SIDE = 2500;
+const AUTO_QUALITIES = [75, 70, 65, 60, 55, 50] as const;
 
 function kb(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -245,6 +254,10 @@ export function ResizeSettings({
     }
   };
 
+  const autoFit = Math.min(1, AUTO_MAX_SIDE / Math.max(1, imageWidth), AUTO_MAX_SIDE / Math.max(1, imageHeight));
+  const autoW = Math.max(1, Math.round(imageWidth * autoFit));
+  const autoH = Math.max(1, Math.round(imageHeight * autoFit));
+
   // ── Google PageSpeed preview ────────────────────────────────────────────
   // What the photo would weigh delivered as the previewed format at the
   // pending size and quality: MEASURED by encoding it (`measureApply`), with
@@ -311,6 +324,48 @@ export function ResizeSettings({
   const gain = known && originalByteSize > 0 ? Math.round((1 - bytes / originalByteSize) * 100) : 0;
   const approx = isMeasured ? "" : "≈ ";
 
+  const [autoBusy, setAutoBusy] = useState(false);
+  const runAuto = async () => {
+    if (autoBusy || disabled || imageWidth <= 0) return;
+    setWidth(String(autoW));
+    setHeight(String(autoH));
+    // PNG is lossless: quality changes nothing there, so Auto is size only.
+    if (effectiveFormat === "png" || currentByteSize <= 0) return;
+    if (!measureApply) {
+      onQualityChange(AUTO_QUALITIES[0]);
+      return;
+    }
+    setAutoBusy(true);
+    try {
+      const limit = googleImageLimitBytes(autoW, autoH);
+      let pick: number = AUTO_QUALITIES[AUTO_QUALITIES.length - 1];
+      for (const q of AUTO_QUALITIES) {
+        const m = await measureApply({
+          w: autoW,
+          h: autoH,
+          filter: FILTER_CODE[method],
+          exportFormat: effectiveFormat,
+          quality: q,
+          keepSourceEncoding: false,
+          format: effectiveFormat,
+        }).catch(() => null);
+        if (m && m.bytes <= limit) {
+          pick = q;
+          break;
+        }
+      }
+      onQualityChange(pick);
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+  const autoAction = {
+    label: "Auto compress: size and quality that pass Google's limit",
+    icon: Zap,
+    onClick: () => void runAuto(),
+    disabled: disabled || autoBusy || imageWidth <= 0,
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Resize → Compress → the Google PageSpeed box, bars at the very
@@ -319,15 +374,14 @@ export function ResizeSettings({
         <div className="space-y-4">
           <SectionHeader
             title="Resize & Compress"
-            info="New pixel size for the photo. The lock keeps its shape; Scale sizes both sides by percent."
+            info="New pixel size for the photo. The lock keeps its shape; Scale sizes both sides by percent. Method is how pixels are resampled when the size changes: Lanczos3 is sharpest, Catmull-Rom is slightly softer and faster, Nearest keeps hard pixel edges for pixel art."
           />
           {/* The same dropdown as Text › Font Family and Batch's text font
               (`SelectField`) — every dropdown in the app is that one. Never
               disabled: it is the kernel the NEXT resize uses. */}
-          <ControlRow
-            label="Method"
-            info="How pixels are resampled when the size changes. Lanczos3 is sharpest; Catmull-Rom is slightly softer and faster; Nearest keeps hard pixel edges for pixel art."
-          >
+          {/* The word sits right on its dropdown, like width / height on their
+              boxes (NumberField's 2px), not the 8px slider-row rhythm. */}
+          <ControlRow label="Method" className="space-y-0.5">
             {({ labelId }) => (
               <SelectField
                 aria-labelledby={labelId}
@@ -353,6 +407,7 @@ export function ResizeSettings({
             onPercentChange={handlePercentChange}
             onToggleLock={() => setLockAspect((v) => !v)}
             scaleLast
+            scaleAction={autoAction}
             edited={{
               isEdited: dimensionsChanged,
               onReset: () => {
@@ -382,6 +437,7 @@ export function ResizeSettings({
             max={100}
             unit="%"
             disabled={disabled}
+            action={autoAction}
             edited={{
               isEdited: qualityChanged,
               onReset: () => onQualityChange(appliedQuality),
@@ -393,7 +449,7 @@ export function ResizeSettings({
         <div className={`space-y-4 ${SECTION_SEP}`} data-testid="pagespeed-box">
           <SectionHeader
             title="Google PageSpeed"
-            info={`What this photo would weigh as each format at the size and quality above — measured by encoding it ("≈" while it measures). Google's image check allows ${known ? kb(limitBytes) : "one byte per six pixels plus 4 KB"} for ${newW}×${newH}; over that, PageSpeed lists it under "Improve image delivery". The format here is a preview: pick the real one when you export.`}
+            info={`What this photo would weigh as each format at the size and quality above — measured by encoding it ("≈" while it measures). Google's image check allows ${known ? kb(limitBytes) : "one byte per six pixels plus 4 KB"} for ${newW}×${newH}; over that, PageSpeed lists it under "Improve image delivery". Format is a preview only: WebP and AVIF are smallest for photos, JPEG works everywhere, PNG is lossless and largest. The Export dialog opens on the one you pick here.`}
           />
           <div className="space-y-2 text-2xs" data-testid="image-weight">
             <div className="flex items-center justify-between">
@@ -411,7 +467,6 @@ export function ResizeSettings({
           </div>
           <ControlRow
             label="Format"
-            info="Preview only. WebP and AVIF are smallest for photos, JPEG works everywhere, PNG is lossless and largest. The Export dialog opens on the one you pick here."
             reason={avifUnsupported ? "This browser can't encode AVIF — it would save as PNG." : undefined}
           >
             {({ labelId, reasonId }) => (
