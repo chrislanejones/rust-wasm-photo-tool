@@ -38,11 +38,13 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 | Compact Compare (#475) | The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have |
 | Compact Compare (#475) | Compact layout while comparing: two "Stop comparing" controls (the tile and the status X) |
 
-## OPEN — committed text is drawn ~10% narrower than its preview (found 11-14-2026, #472)
+## FIXED 11-18-2026 (`fix/text-preview-size`, ADR-106) — committed text is drawn ~10% narrower than its preview (found 11-14-2026, #472)
 
-| What | Why it's left |
+| What | Now |
 |---|---|
-| At the same font size, the engine draws text about 10% narrower than the textarea preview: `HHHHHHHH` at 48 is 241 canvas px committed, 268.6 in the preview (Liberation Sans) | ab_glyph's `PxScale` is the ascent-to-descent HEIGHT in px, CSS `font-size` is the em; for Liberation Sans that is 2048 / 2288 = 0.895. The anchors (left edge, center, right edge) land on the preview, but the far edge can't until the two sizes agree. Changing either side redraws every saved text, so it needs its own change and an ADR |
+| ~~At the same font size, the engine draws text about 10% narrower than the textarea preview: `HHHHHHHH` at 48 is 241 canvas px committed, 268.6 in the preview (Liberation Sans)~~ | Fixed on the PREVIEW side: the engine, every saved text and the commit are unchanged. The textarea's em is the size × `text_em_ratio` (units_per_em ÷ ascent-to-descent height, read off the engine), its line pitch, padding and pen are the engine's. Preview ink = committed ink within 1 px for every face at 24/48/96, every Text in Box cell, a wrapped paragraph and a rotated text (`e2e/text-preview-size.spec.ts`) |
+| The no-box frame is still measured at the tool's size, so it is ~10% roomier than the text | The commit's no-box Center/Right anchor (`alignAnchorShift`) is measured against that frame; shrinking it moves where those texts land for the same clicks. A change of its own |
+| Rotated: the text and its plate now pivot on the engine's pivot (the tile's top-left), the frame and its handles still on the box's | Moving the frame's pivot changes the rotate drag's geometry; a change of its own |
 
 ## FIXED 11-14-2026 (#472) — centered or right text with NO box can land off its preview (11-11-2026, #462 review)
 
