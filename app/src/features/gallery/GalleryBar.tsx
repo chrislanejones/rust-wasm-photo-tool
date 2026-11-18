@@ -12,6 +12,7 @@ import { GalleryCompareStatus } from "./GalleryCompareStatus";
 import { SelectByMenu } from "./SelectByMenu";
 import { InboxButton } from "@/features/transfer/InboxButton";
 import { PairButton } from "@/features/pair/PairButton";
+import { SendToPhoneButton } from "@/features/pair/SendToPhoneButton";
 import { PendingImportTile } from "./PendingImportTile";
 import { GalleryLoadingRegion } from "./GalleryLoadingRegion";
 import { useGalleryLoading } from "./useGalleryLoading";
@@ -199,6 +200,8 @@ function GalleryActions({
         {/* Pair a phone — a QR code that connects a phone straight to this
             browser (features/pair, Beta `pair`). */}
         <PairButton labelClassName={label} className={actionBtn} />
+        {/* Send to phone — while a phone is paired: the selection's originals. */}
+        <SendToPhoneButton labelClassName={label} className={actionBtn} />
         {totalCount > 1 && <SelectByMenu labelClassName={label} tile={vertical} />}
         {/* Compare two photos — the compact layout's only way in; wide has
             the top bar's button (CompareModeTile says why it lives here). */}

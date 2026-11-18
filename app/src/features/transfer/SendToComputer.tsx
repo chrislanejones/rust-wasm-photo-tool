@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { PaneHeading } from "@/components/ui/pane-heading";
 import { Switch } from "@/components/ui/switch";
 import { formatStorage } from "@/lib/quota";
+import { PHOTO_PICKER_ACCEPT } from "./send";
 import { useUIStore } from "@/stores/useUIStore";
 import {
   AVAILABILITY_MESSAGE,
@@ -21,9 +22,6 @@ import {
   type SendItem,
 } from "./useTransfer";
 
-/** What the picker offers. `image/*` plus the HEIC extensions, which some
- *  Android pickers do not count as images. */
-const ACCEPT = "image/*,.heic,.heif";
 
 export function SendToComputer() {
   const on = useTransferBeta();
@@ -70,7 +68,7 @@ function SendToComputerSection() {
           <input
             ref={input}
             type="file"
-            accept={ACCEPT}
+            accept={PHOTO_PICKER_ACCEPT}
             multiple
             className="sr-only"
             tabIndex={-1}

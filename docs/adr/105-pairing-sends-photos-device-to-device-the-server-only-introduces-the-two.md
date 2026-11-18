@@ -85,10 +85,49 @@ one. Mounted in `App.tsx` (`PairHost`), not AppShell; the phone card is one
 line in MobileShell. The peer and data channel are in `usePairStore`, for
 the photo protocol (PR 2).
 
+## Sending (PR 2)
+
+**11. A small protocol on the data channel** (`features/pair/photoLink.ts`,
+pure, unit-tested on a fake channel). The sender's manifest goes first: its
+device label and, per file, `name`, `type`, `bytes` and `sha256`. The
+receiver's person answers Accept or Decline ("Android phone wants to send 4
+photos (18 MB)"). Then the files, one at a time, in 16 KB messages, with the
+channel's send buffer kept under 1 MB (`bufferedAmountLowThreshold` 256 KB,
+`bufferedamountlow`). Either side can Cancel. A closed channel is
+"Disconnected". Either way the file in flight is thrown away; files already
+checked stay. The device label is a guess from the user agent ("iPhone",
+"Android phone", "Computer"), kept only if it is one of ours, never stored.
+
+**12. The receiver checks every file's SHA-256** (WebCrypto) against the
+manifest before it goes anywhere. A mismatch, or a file longer or shorter
+than declared, drops that file with an error; the rest go on.
+
+**13. Limits, checked twice.** 50 MB a photo and Transfer's image types
+(`features/transfer/send.ts`, reused, not copied); 50 photos a send. The
+sender leaves out what breaks them and says why; the RECEIVER checks the
+manifest again, because a sender can lie: over 50 is refused whole, a file
+over the limits is left out with the reason. The receiving gallery's tier
+limit applies: it asks only for what fits and says how many didn't.
+
+**14. Received photos go through the normal import.** The computer: the
+gallery's own funnel (`handleAddPhotos`, HEIC Beta included), the one
+Transfer's Inbox uses. The phone: MobileShell's own upload, with no engine.
+No new table, field or op-log change. Not one photo byte reaches Convex:
+the e2e watches both devices' network during a send.
+
+**15. Originals, not edits.** "Send to phone" sends the selected photos'
+stored originals; the dialog says edits aren't included unless the photo is
+exported first. "Send exported copy" is not built: export runs the engine
+with per-photo format choices, so it isn't cheap to bolt on here.
+
 ## Consequences
 
 + Photos can move both ways with no account, and never sit on a server.
 + A compromised or curious signaling server cannot connect to either device.
++ A photo that changed on the way, or a sender that lies about sizes or
+  counts, is caught by the receiver, not trusted.
+- A computer receiving photos loads each into the editor as it lands (the
+  normal import does that), so a 10-photo send switches the open photo 10 times.
 - Anyone can deny pairing to everyone for as long as they spend 20 calls a
   minute (5). Nothing in this design can prevent that without IPs or auth.
 - Some networks will never connect without TURN; those users get a clear

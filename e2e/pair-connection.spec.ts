@@ -1,12 +1,14 @@
 import { test, expect } from "./guard/test";
-import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { PAIR_LAUNCH, Relay, openComputer, phoneContext, turnOnlineOn, watchRequests, wire } from "./pair-harness";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pair a phone (ticket 242, ADR-105): a computer at 1280 and a phone at 390,
 // in two separate browser contexts (separate storage, like two devices),
 // connect over REAL WebRTC on this machine.
+//
+// The relay, the offline routing and the helpers live in pair-harness.ts.
 //
 // WHAT STANDS IN FOR CONVEX. e2e has no live backend (e2e/guard). Each context
 // gets `window.__ihPairRelay` (exposeBinding), a fake signaling server that
@@ -24,131 +26,9 @@ import { join } from "node:path";
 // real devices on two networks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.use({ launchOptions: { args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] } });
+test.use(PAIR_LAUNCH);
 
-const FIXTURE = join(__dirname, "fixtures", "checker.png");
-const DESKTOP = { width: 1280, height: 800 };
-const PHONE = { width: 390, height: 844 };
 const SHOTS = process.env.PAIR_SHOTS_DIR;
-
-interface Row {
-  offer: string;
-  offerMac: string;
-  answer?: string;
-  answerMac?: string;
-  joined: boolean;
-  computerCandidates: string[];
-  phoneCandidates: string[];
-}
-
-/** The fake signaling server, shared by both contexts. */
-class Relay {
-  rows = new Map<string, Row>();
-  log: string[] = [];
-  closed: string[] = [];
-  /** Swap one character of the offer's DTLS fingerprint on its way to the phone. */
-  tamperOffer = false;
-
-  handle(op: string, args: Record<string, unknown>): unknown {
-    this.log.push(`${op} ${JSON.stringify(args)}`);
-    const key = args.keyHash as string;
-    const row = this.rows.get(key);
-    switch (op) {
-      case "create":
-        this.rows.set(key, {
-          offer: args.offer as string,
-          offerMac: args.offerMac as string,
-          joined: false,
-          computerCandidates: [],
-          phoneCandidates: [],
-        });
-        return { ok: true, expiresAt: Date.now() + 5 * 60_000 };
-      case "readOffer": {
-        if (!row || row.joined) return null;
-        const offer = this.tamperOffer
-          ? row.offer.replace(/(a=fingerprint:sha-256 )([0-9A-F])/, (_m, p: string, c: string) => p + (c === "A" ? "B" : "A"))
-          : row.offer;
-        return { offer, offerMac: row.offerMac };
-      }
-      case "join":
-        if (!row || row.joined) return { ok: false, reason: "unavailable" };
-        Object.assign(row, { joined: true, answer: args.answer, answerMac: args.answerMac });
-        return { ok: true };
-      case "addCandidates": {
-        if (!row || (args.side === "phone" && !row.joined)) return { ok: false, reason: "unavailable" };
-        const list = args.side === "computer" ? row.computerCandidates : row.phoneCandidates;
-        list.push(...(args.candidates as string[]));
-        return { ok: true, accepted: (args.candidates as string[]).length };
-      }
-      case "watch":
-        return row
-          ? {
-              joined: row.joined,
-              answer: row.answer,
-              answerMac: row.answerMac,
-              computerCandidates: row.computerCandidates,
-              phoneCandidates: row.phoneCandidates,
-              expiresAt: 0,
-            }
-          : null;
-      case "close":
-        if (row) this.closed.push(key);
-        this.rows.delete(key);
-        return null;
-    }
-    throw new Error(`unknown op ${op}`);
-  }
-}
-
-/** Offline and deterministic: nothing leaves localhost. */
-async function offline(context: BrowserContext) {
-  await context.route("**/*", (route) => {
-    const url = route.request().url();
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url) || url.startsWith("blob:") || url.startsWith("data:")) {
-      return route.continue();
-    }
-    return route.abort();
-  });
-}
-
-async function wire(context: BrowserContext, relay: Relay, theme: "light" | "dark") {
-  await offline(context);
-  await context.exposeBinding("__ihPairRelay", (_source, op: string, args: Record<string, unknown>) => relay.handle(op, args));
-  await context.addInitScript((t) => localStorage.setItem("image-horse-prefs", JSON.stringify({ theme: t })), theme);
-}
-
-/** Every request a page makes, and the engine's among them. */
-function watchRequests(page: Page) {
-  const all: string[] = [];
-  page.on("request", (r) => all.push(r.url()));
-  return { all, engine: () => all.filter((u) => /stamp_tool|\.wasm(\?|$)/.test(u)) };
-}
-
-/** The computer: the editor with one photo, so the gallery (and its Pair a
- *  phone button) is on screen. */
-async function openComputer(page: Page) {
-  await page.setViewportSize(DESKTOP);
-  await page.goto("/?beta=pair");
-  await page.locator('input[type="file"]').first().setInputFiles([FIXTURE]);
-  await page.locator("canvas.main-canvas").waitFor({ state: "visible", timeout: 60_000 });
-  await expect(page.getByTestId("pair-button")).toBeVisible({ timeout: 30_000 });
-}
-
-async function turnOnlineOn(page: Page) {
-  await page.evaluate(() => {
-    window.location.hash = "#/settings/security";
-  });
-  await page.getByRole("radio", { name: "Online features" }).click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-}
-
-async function phoneContext(browser: Browser, relay: Relay, theme: "light" | "dark") {
-  const context = await browser.newContext({ viewport: PHONE, baseURL: test.info().project.use.baseURL });
-  await wire(context, relay, theme);
-  const page = await context.newPage();
-  return { context, page };
-}
 
 const THEMES: ("light" | "dark")[] = SHOTS ? ["light", "dark"] : ["dark"];
 
