@@ -25,7 +25,7 @@ const RUNS_ON: Record<RunsOn, { label: string; note: string }> = {
   },
   server: {
     label: "Runs on a server · Pro",
-    note: "The photo is sent up and the result comes back. The job is deleted afterwards.",
+    note: "The photo is sent up and the result comes back. Online features have to be switched on first.",
   },
   both: {
     label: "Mostly on your machine",

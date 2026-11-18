@@ -48,19 +48,20 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     slug: "/photo-editor",
     group: "Enhance",
     label: "Photo editor",
-    blurb: "Crop, straighten, brightness, contrast, twelve presets.",
+    blurb: "Crop, Auto tone, brightness, contrast, twelve presets.",
     title: "Free photo editor that runs in your browser — no upload",
     description:
-      "Crop, straighten and correct exposure without uploading anything. Twelve presets preview on your own photo, every step undoes, and no account is needed.",
+      "Crop and fix exposure without uploading anything. Auto picks a starting point, twelve presets preview on your photo, and every step undoes. No account needed.",
     h1: "A photo editor that never uploads your photo",
-    lede: "Crop with rule-of-thirds guides, straighten, fix brightness, contrast, shadows and highlights, or set levels against a live histogram. Twelve one-click presets preview on your own photo before you keep one. Every step is an undo entry, and nothing leaves your computer.",
+    lede: "Crop with rule-of-thirds guides, press Auto for a starting point, then fix brightness, contrast, shadows and highlights, or set levels against a live histogram. Twelve one-click presets preview on your own photo before you keep one. Every step is an undo entry, and nothing leaves your computer.",
     runsOn: "local",
     does: [
       "Crop to a ratio or freehand, with rule-of-thirds guides",
-      "Straighten a crooked horizon by dragging",
+      "Auto sets brightness, contrast, shadows and highlights from the histogram",
       "Brightness, contrast, saturation, shadows and highlights",
       "Levels, against a histogram that updates as you drag",
       "Twelve presets, previewed on your photo before you commit",
+      "Copy one photo's look and paste it onto the others",
       "Undo and redo every step, back to the original",
     ],
     sections: [
@@ -112,9 +113,9 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     blurb: "Cut the subject out cleanly. rembg, on a server.",
     title: "Background remover — cut out a subject cleanly",
     description:
-      "One click lifts the subject off its background with a clean edge, including hair. Runs on a server and needs Pro; the job is deleted once the result comes back.",
+      "One click lifts the subject off its background with a clean edge, including hair. It runs on a server we pay for, so it needs Pro and online features on.",
     h1: "Remove the background from a photo",
-    lede: "One click and the subject is lifted off its background with a clean edge. This one runs on a server we pay for, so it needs a Pro account — the photo goes up, the cut-out comes back, and the job is deleted afterwards.",
+    lede: "One click and the subject is lifted off its background with a clean edge. This one runs on a server we pay for, so it needs a Pro account and online features switched on. The photo goes up and the cut-out comes back.",
     runsOn: "server",
     does: [
       "Lift a subject off its background in one click",
@@ -129,7 +130,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       },
       {
         h2: "What happens to the photo",
-        p: "It is sent up, processed, and the result comes back. The job is deleted afterwards. It is not kept, not indexed and not used as training data. If that trade is not one you want to make for a particular picture, the local tools below do not make it at all.",
+        p: "It goes to our server and on to Replicate, which runs the model, and the cut-out comes back. It's used to make your result, and we don't train anything on it. For now our server keeps the photo and the result with the job record: a cleanup that clears them a week after the job finishes is written but not switched on yet. If that trade is not one you want to make for a particular picture, the local tools below do not make it at all.",
       },
     ],
     related: ["/remove-object-from-photo", "/photo-editor", "/image-editor-no-upload"],
@@ -177,10 +178,12 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     does: [
       "Arrows, boxes, circles, diamonds, triangles, lines and stars, in any color",
       "A handle to turn any shape, and a star with 3 to 12 points",
-      "Numbered pins that count themselves up",
+      "Numbered pins that count themselves up, and close the gap when one goes",
+      "Callouts: a pin, a label and a leader line in one click",
       "Speech bubbles and real text, in real typefaces",
       "Emoji and review stamps",
       "Snap to a nine-cell grid so things line up",
+      "Shift-click several and align, distribute or nudge them together",
       "Move, recolor or delete anything right up until export",
     ],
     sections: [
@@ -210,7 +213,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Alt-click to set the source, then paint",
       "Size, hardness, opacity and spacing all adjustable",
       "Stroke Stabilizer smooths a shaky hand",
-      "Aligned or fixed source, whichever the job wants",
+      "Each new stroke starts again from your source point",
       "Every stroke is its own undo step",
     ],
     sections: [
@@ -263,13 +266,13 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     description:
       "Brush a blur over one part of a photo or blur the whole thing with a slider. Radius and strength are yours to set, and it runs on your own machine.",
     h1: "Blur part of a photo, or all of it",
-    lede: "Brush a blur over just the part you want softened, or blur the whole photo with a slider. Radius and strength are yours to set. Runs on your machine; on some computers, on the graphics card.",
+    lede: "Brush a blur over just the part you want softened, or blur the whole photo with a slider. Radius and strength are yours to set. Runs on your machine, and with a Beta switched on, on the graphics card.",
     runsOn: "local",
     does: [
       "Brush a blur over one region, freehand",
       "Or blur the whole image with a slider",
       "Set radius and strength independently",
-      "Runs on the graphics card where the browser allows it",
+      "Beta: the whole-image blur on the graphics card, where the browser allows it",
     ],
     sections: [
       {
@@ -278,7 +281,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       },
       {
         h2: "On the graphics card",
-        p: "Where the browser exposes WebGPU, the whole-image blur runs there, which makes a large radius on a large photo effectively instant. Where it does not, the same code runs on the CPU with SIMD. You do not choose; it picks whichever is present and the result is identical either way.",
+        p: "Turn on Blur on the graphics card in Settings › Beta, and where the browser exposes WebGPU on real graphics hardware, the whole-image blur runs there. If anything goes wrong it falls back to the CPU, which runs the same blur with SIMD. It's a Beta because it's still being checked pixel for pixel against the CPU version. The blur brush always runs on the CPU.",
       },
     ],
     related: ["/pixelate-image", "/photo-editor", "/background-remover"],
@@ -293,13 +296,15 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Resize, compress, crop, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
     h1: "Edit a whole folder of photos at once",
     lede: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, crop to one shape, stamp a logo or text, rename by pattern or by what the engine sees. One pass, on your own machine, then export the lot.",
-    runsOn: "both",
+    runsOn: "local",
     does: [
       "Resize or compress every photo to the same target",
       "Crop every photo to the same ratio, for a carousel that lines up",
       "Stamp a logo, a watermark or text across the set",
       "Tick the odd few as Exceptions and give them their own settings",
-      "Rename by pattern, with a counter and the date",
+      "Copy one photo's look and paste it onto the rest",
+      "Find look-alike photos and tick the extra copies",
+      "Rename by pattern: a counter, the date it was taken, its size or its old name",
       "Or name each file from its colors, tone and subject",
       "Export the whole set as a ZIP",
     ],
@@ -310,11 +315,11 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       },
       {
         h2: "The few that need something different",
-        p: "Every Batch tool — Logo, Text, Crop, Rename and AI Rename — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop gives them a crop of their own and one button crops both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
+        p: "Every Batch tool — Crop, Resize & Compress, Logo, Text, Rename and AI Rename — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop and Resize & Compress give them settings of their own, and one button does both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
       },
       {
         h2: "See the whole set at once",
-        p: "The Grid shows a page of photos at a time. Masonry shows all of them at their own shape, in columns you scroll, and zooming changes how many columns you get. Tick two photos in the gallery to compare them, and every pixel that changed gets tinted.",
+        p: "The Grid shows a page of photos at a time. Masonry shows all of them at their own shape, in columns you scroll, and zooming changes how many columns you get. Turn on Compare and tick two photos in the gallery, and every pixel that changed gets tinted.",
       },
       {
         h2: "One pass over the whole set",
@@ -343,11 +348,11 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     sections: [
       {
         h2: "What runs on your machine",
-        p: "Everything in Edit, Mark up, Hide and all of Batch. The engine is Rust compiled to WebAssembly running in a worker thread, and your originals and edits live in the browser's own database on your disk. Pull the network cable and all of it keeps working, including export.",
+        p: "Everything in Enhance, Select, Create, Edit and Batch, apart from the server tools named below. The engine is Rust compiled to WebAssembly running in a worker thread, and your originals and edits live in the browser's own database on your disk. Pull the network cable and all of it keeps working, including export.",
       },
       {
         h2: "What does not, and why",
-        p: "Background removal and the AI object-removal pass run on servers, because the models are hundreds of megabytes and would have to be downloaded before the first click. They are on the paid tier for the same reason: each run costs money. Signing in also adds sync and share links, which are a server by definition. Every one of those is optional, and there is a switch in Settings that turns uploads off entirely.",
+        p: "Background removal, the AI object-removal pass, reading text out of an image and Create AI Image run on servers, because the models are hundreds of megabytes and would have to be downloaded before the first click. They are on the paid tier for the same reason: each run costs money. Signing in also adds sync and share links, and as a Beta, sending photos from your phone, which are a server by definition. Every one of those is optional, and the \"Everything in your browser\" switch in Settings › Security keeps every picture in the tab.",
       },
       {
         h2: "Why the distinction matters",

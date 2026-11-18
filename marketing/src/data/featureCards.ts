@@ -174,6 +174,36 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Shared color / opacity / offset / blur; offset + box-blurred silhouette rendered in Rust, tile grown so Align sees it.",
   },
+  "Text Stroke": {
+    group: "annotate",
+    title: "Text Stroke",
+    plain: "An outline around the letters, 0 to 20 px, with its own color and opacity.",
+    detail:
+      "Drawn in Rust outside the glyphs (outline_glyphs), so a thick stroke never thins the type and the letters never move. Op log v15.",
+  },
+  "Text in Box": {
+    group: "annotate",
+    title: "Text in Box",
+    plain:
+      "Line text up left, center or right, and top, middle or bottom, inside the box you dragged.",
+    detail:
+      "A 3×3 grid above Placement. Your choice carries to the next text, and to your other devices when signed in. Laid out in Rust; op log v16.",
+  },
+  "Text Background, Stroke and Drop Shadow dropdowns": {
+    group: "annotate",
+    title: "Text style dropdowns",
+    plain:
+      "Background, Stroke and Drop Shadow fold away in the Text panel. Each shut header says what's on, so nothing hides.",
+    detail: "Three collapsed sections named for what's inside them. They open by default in Background mode.",
+  },
+  "Pins and Smart Callouts": {
+    group: "annotate",
+    title: "Pins and Smart Callouts",
+    plain:
+      "Numbered pins that close the gap when one goes, and callouts: a pin, a label and a leader line in one click.",
+    detail:
+      "Next inserts a step at any number, letters too; Renumber closes gaps. Each is one undo step. A leader follows its pin or label and survives a reload.",
+  },
   "Emoji Stamp": {
     group: "annotate",
     title: "Emoji Stamp",
@@ -271,9 +301,10 @@ const CARD_COPY: Record<string, CardCopy> = {
   Adjustments: {
     group: "enhance",
     title: "Adjustments",
-    plain: "Brightness, contrast, saturation, shadows, highlights, blur and sharpen.",
+    plain:
+      "Brightness, contrast, saturation, shadows, highlights, blur and sharpen. Auto picks a starting point from the histogram.",
     detail:
-      "Enhance → Adjustments. The photo updates as you drag and letting go is one undo step. Every slider has its own reset, and it puts back exactly what was there (src/adjust.rs).",
+      "Enhance → Adjustments. The photo updates as you drag and letting go is one undo step. Every slider has its own reset, and it puts back exactly what was there (src/adjust.rs). Copy look (Ctrl+Alt+C) carries the result to other photos.",
   },
   Levels: {
     group: "enhance",
@@ -302,6 +333,14 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain: "Resize, then Compress, then what the file would weigh against Google's limit for that many pixels.",
     detail:
       "Resampling fully in WASM and lands on the exact size you type. Image weight is the measured file Apply would write; the WebP · JPEG · PNG · AVIF row is a preview, and Apply keeps the photo's own format.",
+  },
+  "PageSpeed budget (Beta: Settings › Beta)": {
+    group: "enhance",
+    title: "PageSpeed budget (Beta)",
+    plain:
+      "Beta: Compress All aims for the size Google allows each photo, instead of a flat 200 KB.",
+    detail:
+      "Bytes ≤ width × height ÷ 6, from Lighthouse's image audit, kept between 28 KB and 1 MB. For everyone, Compress All never writes a bigger file than it replaced.",
   },
   "Perspective / Distort / Skew": {
     group: "enhance",
@@ -370,6 +409,14 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Snapshots include dimensions for crop/resize/rotate correctness; status bar shows Undo NN%.",
   },
+  "History forks (Beta: Settings › Beta)": {
+    group: "layers",
+    title: "History forks (Beta)",
+    plain:
+      "Beta: undo a few steps, make a different edit, and the steps you undid stay as a branch you can click back to.",
+    detail:
+      "A Time Machine list under History. Branches live in memory only, and they are the first thing dropped when the undo budget runs short (ADR-086).",
+  },
   "Per-photo Edit Persistence": {
     group: "layers",
     title: "Per-photo edit persistence",
@@ -404,11 +451,26 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Content-addressed, zero-copy duplicates carry edits; originals preserved at full resolution in IndexedDB. A photo still importing shows a placeholder tile, a slow switch says which photo it's loading, and Download All shows its progress and skips a photo it can't read. Docked rows scroll without overlapping; hover reveals only that photo's controls. Welcome Back previews keep their space while loading and show a fallback if an image cannot be displayed.",
   },
+  "Select by": {
+    group: "export",
+    title: "Select by",
+    plain:
+      "Tick photos by rule: portrait, landscape, square, larger than a size, edited, unedited, or the opposite. Find duplicates ticks the extra copies.",
+    detail:
+      "Select ▾ in the gallery bar. The ticks are Batch's Exceptions, so a rule picks who gets the Exceptions settings. Find duplicates marks one Keep per group and never pre-ticks an edited photo.",
+  },
+  "Export recipes": {
+    group: "export",
+    title: "Export recipes",
+    plain: "Download All in one shape: Instagram 1080×1350, Web 1600, Email small, or a recipe you save.",
+    detail:
+      "A recipe sets size, format, quality and a file name pattern, and shapes the ZIP only. Saved recipes sync when you're signed in.",
+  },
   // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
   "Compare two photos": {
     group: "edit",
     title: "Compare two photos",
-    plain: "Tick two photos in the gallery and see exactly what's different. Every changed pixel gets tinted.",
+    plain: "Turn on Compare, tick two photos in the gallery, and see exactly what's different. Every changed pixel gets tinted.",
     detail:
       "Overlay, Side by side, Blink or Slider. If neither photo is open, the second one you tick opens and the compare starts once it's loaded.",
   },
@@ -427,6 +489,14 @@ const CARD_COPY: Record<string, CardCopy> = {
       "Crop every open photo to the same shape at once. Tick the exceptions and they get a crop of their own.",
     detail:
       "Batch › Crop. Main and Exceptions each keep their own ratio, and one press crops both. Nine-cell anchor, or drag each photo's own frame on the preview; the other thumbnails shade what they will lose. Shift breaks the ratio, Enter crops them all. Grid previews keep their space while loading, show when an image is unavailable, and keep the previous preview visible while an edit loads.",
+  },
+  "Batch Resize & Compress": {
+    group: "edit",
+    title: "Batch Resize & Compress",
+    plain:
+      "One size, format and quality for the whole gallery. Or set Under N KB and each photo gets the best quality that fits.",
+    detail:
+      "Batch › Resize & Compress. Every photo is done from its full-size original, one at a time, and a result bigger than the stored file is never written. Exceptions get their own size in the same pass.",
   },
   "SVG → SVG": {
     group: "export",
@@ -488,6 +558,21 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain: "Try unfinished things early — or hand a friend a link that turns one on for them.",
     detail:
       "Settings → Beta; choices kept in this browser and never sent anywhere; ?beta=none clears them all.",
+  },
+  "Photo info, handled by the engine (Beta: Settings › Beta)": {
+    group: "privacy",
+    title: "Photo info in the engine (Beta)",
+    plain: "Beta: camera info and location are read, stripped and kept by the Rust engine.",
+    detail:
+      "Checked byte for byte against the JavaScript way on every photo. If the two disagree you get the old result, and the difference goes to Diagnostics.",
+  },
+  "MCP Connections preview (Beta: Settings › Beta)": {
+    group: "privacy",
+    title: "MCP Connections preview (Beta)",
+    plain:
+      "Beta: a Settings page that shows what an AI app such as Claude could reach in your account. Nothing connects yet.",
+    detail:
+      "A readiness checklist, an access summary and three example prompts. The account-access switch stays grayed out until sign-in checks and the server side are switched on (ADR-095).",
   },
   "Light / Dark / System theme": {
     group: "privacy",
