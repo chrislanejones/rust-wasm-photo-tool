@@ -540,7 +540,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  /* Batch's Masonry sets 0 on the open photo's tile, so the photo fills it
+     like the thumbnails beside it (batchHeroStyle in batchLayout.ts). */
+  padding: var(--canvas-wrapper-pad, 32px);
   background: var(--bg-primary);
 }
 /* The checkerboard, feathered. It lives on ::before rather than on the wrapper
@@ -588,6 +590,10 @@ body {
 .main-canvas {
   max-width: 100%;
   max-height: 100%;
+  /* auto everywhere but Batch's Masonry tile, where 100%: the canvas fills
+     the tile and object-fit draws the photo in it (batchHeroStyle). */
+  width: var(--main-canvas-fill, auto);
+  height: var(--main-canvas-fill, auto);
   display: block;
   object-fit: contain;
   background: transparent;
