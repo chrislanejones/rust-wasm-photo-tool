@@ -99,11 +99,24 @@ describe("the wrapped engine methods read no engine state", () => {
       new URL("./textMetricsCache.ts", import.meta.url),
       "utf8",
     );
-    const keys = src.match(/`[mib]\$\{SEP\}[^`]*`/g) ?? [];
+    const keys = src.match(/`[mibe]\$\{SEP\}[^`]*`/g) ?? [];
     expect(keys.length, "no cache keys found — the regex above has drifted").toBeGreaterThan(3);
     for (const k of keys) {
       expect(k, `cache key omits the typeface: ${k}`).toContain("font");
     }
+  });
+
+  // ADR-106. The textarea's em is the tool's size times this ratio, cached on
+  // the face and weight alone — so it must be a property of the face, not of
+  // a document.
+  it("text_em_ratio delegates to a free function and never touches self", () => {
+    const body = fnBody(rust("fonts.rs"), "text_em_ratio");
+    expect(body).toContain("crate::fonts::em_ratio(");
+    expect(
+      body.replace(/crate::fonts::em_ratio\([^)]*\)/g, ""),
+      "text_em_ratio reads engine state — its cache key (face, weight) is now incomplete",
+    ).not.toMatch(/\bself\s*\./);
+    expect(rust("fonts.rs")).toMatch(/pub fn em_ratio\(\s*font_id:\s*&str,\s*bold:\s*bool\s*\)/);
   });
 
   it("text_ink_offset_bg delegates to a free function and never touches self", () => {
