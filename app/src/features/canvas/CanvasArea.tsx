@@ -35,12 +35,10 @@ import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
 import { PastePlacementOverlay } from "./PastePlacementOverlay";
 import type { OverlayFrame } from "./overlayFrame";
-import {
-  textInkOffset,
-  primeTextMetrics,
-} from "@/lib/engine/textMetricsCache";
+import { measureText, textEmRatio, textInkOffset, primeTextMetrics } from "@/lib/engine/textMetricsCache";
+import { engineMeasure, previewTextarea } from "@/lib/textPreviewLayout";
 import { faceCss } from "@/lib/engineFonts";
-import { noBoxPreviewWidth, textPreviewCss, textPreviewPadding, type TextOverlaySettings } from "@/lib/textOverlaySettings";
+import { noBoxPreviewWidth, textAlignEngineArg, textPreviewCss, textPreviewPadding, type TextOverlaySettings } from "@/lib/textOverlaySettings";
 import { maskCursorHalo, maskCursorInk } from "@/lib/maskCursor";
 import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -1478,16 +1476,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const mctx = offscreen.getContext("2d")!;
           const fs = effFontSize * scaleX;
           mctx.font = `${effFontWeight} ${fs}px ${effFontCss}`;
+          // The engine's em (ADR-106): its size is the ascent-to-descent height, CSS's the em.
+          const emRatio = textEmRatio(hookResult.toolRef.current, effFontWeight === "bold", effFontId);
           // v8.40 — the preview breaks lines where the ENGINE will. See
-          // `wrapPreviewLines`, which mirrors `src/text.rs::wrap`; the font it
-          // measures with is `effFontCss` above, which is the same face.
-          const wrapContentW =
-            textWrapWidth > 0
-              ? textWrapWidth * scaleX - 2 * Math.ceil(effFontSize * 0.25) * scaleX
-              : 0;
-          const lines = wrapPreviewLines(textInput.text || " ", wrapContentW, (t) =>
-            mctx.measureText(t).width,
-          );
+          // `wrapPreviewLines`, which mirrors `src/text.rs::wrap`, measuring in
+          // the same face at the engine's em, unkerned as the engine is.
+          const wrapContentW = textWrapWidth > 0 ? textWrapWidth * scaleX - 2 * Math.ceil(effFontSize * 0.25) * scaleX : 0;
+          const emMeasure = engineMeasure(`${effFontWeight} ${fs * (emRatio ?? 1)}px ${effFontCss}`);
+          const lines = wrapPreviewLines(textInput.text || " ", wrapContentW, emMeasure);
           // A wrapped box is the width the user DRAGGED, not the width of the
           // longest line — otherwise the box would snap inwards to the text
           // the moment they let go, and the handle would feel broken.
@@ -1499,6 +1495,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // is centered in whatever surplus there is (`text::box_top_inset`).
           const naturalH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
           const boxH = Math.max(naturalH, Math.ceil(textBoxHeight * scaleY));
+          // ADR-106: the textarea where the COMMIT draws (lib/textPreviewLayout); null = cache miss.
+          const [previewText, bold] = [textInput.text || " ", effFontWeight === "bold"];
+          const plainInk = textInkOffset(hookResult.toolRef.current, previewText, effFontSize, bold, effFontId);
+          const area = previewTextarea({ text: previewText, canvasX: textInput.canvasX, canvasY: textInput.canvasY,
+            scaleX, scaleY, fontSize: effFontSize, emRatio, plainInk, align: textAlignEngineArg(textSettings.textAlign),
+            measured: measureText(hookResult.toolRef.current, previewText, effFontSize, bold, effFontId),
+            wrapWidth: textWrapWidth, boxHeight: textBoxHeight, wrapped: lines, measure: emMeasure,
+            noBoxWidth: noBoxW, padX: TEXT_OVERLAY_PAD_X, padY: TEXT_OVERLAY_PAD_Y });
 
           const rotation = textInput.rotation ?? 0;
 
@@ -1765,26 +1769,22 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // this is the same geometry projected back onto the preview).
           // Cached, for the same reason as the pivot above: render position.
           // The `: sx - bgPad` branches below are the miss fallback.
-          const inkBase = showBg
-            ? textInkOffset(
-                hookResult.toolRef.current,
-                textInput.text || " ",
-                effFontSize,
-                effFontWeight === "bold",
-                effFontId,
-              )
-            : undefined;
-          const rectLeft = inkBase
-            ? sx + TEXT_OVERLAY_PAD_X - (inkBase[0] * scaleX + bgPad)
-            : sx - bgPad;
-          const rectTop = inkBase
-            ? sy + TEXT_OVERLAY_PAD_Y - (inkBase[1] * scaleY + bgPad)
-            : sy - bgPad;
+          const inkBase = showBg ? plainInk : undefined;
+          // ADR-106: `area` is the engine's text origin itself, alignment shift and rounding included.
+          const rectLeft = area ? sx + area.dx - bgPad
+            : inkBase ? sx + TEXT_OVERLAY_PAD_X - (inkBase[0] * scaleX + bgPad) : sx - bgPad;
+          const rectTop = area ? sy + area.dy - bgPad
+            : inkBase ? sy + TEXT_OVERLAY_PAD_Y - (inkBase[1] * scaleY + bgPad) : sy - bgPad;
 
           const bgLeft = rectLeft - tailMargin;
+          // The engine rotates about the tile's top-left (ADR-050); with ADR-106 the text and its plate pivot THERE.
+          const plate = showBg ? tailMargin + bgPad : 0;
+          const pivot = area ? [sx + area.dx - plate, sy + area.dy - plate] : [sx, sy];
           const bgTop = rectTop - tailMargin;
-          const bgW = boxW + (bgPad + tailMargin) * 2;
-          const bgH = boxH + (bgPad + tailMargin) * 2;
+          // The plate is the engine's text block (ADR-106), or the frame on a cache miss.
+          const [plateW, plateH] = area ? [area.plate.width, area.plate.height] : [boxW, boxH];
+          const bgW = plateW + (bgPad + tailMargin) * 2;
+          const bgH = plateH + (bgPad + tailMargin) * 2;
 
           // Triangle tail rendered as an SVG inside the rotated wrapper so it
           // tracks the textarea's orientation. Geometry matches the Rust path:
@@ -1794,8 +1794,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             if (tailAngle === null) return null;
             const rectX0 = tailMargin;
             const rectY0 = tailMargin;
-            const rectX1 = rectX0 + boxW + bgPad * 2;
-            const rectY1 = rectY0 + boxH + bgPad * 2;
+            const rectX1 = rectX0 + plateW + bgPad * 2;
+            const rectY1 = rectY0 + plateH + bgPad * 2;
             const cx = (rectX0 + rectX1) / 2;
             const cy = (rectY0 + rectY1) / 2;
             const hw = (rectX1 - rectX0) / 2;
@@ -1866,10 +1866,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     // single composite of the Rust coverage mask.
                     opacity: bgOpacity01,
                     transform: `rotate(${rotation}deg)`,
-                    // Same pivot as the text, expressed relative to the BG
-                    // wrapper's own top-left (which sits (sx−bgLeft, sy−bgTop)
-                    // up-left of the textarea anchor).
-                    transformOrigin: `${pivotLocalX + (sx - bgLeft)}px ${pivotLocalY + (sy - bgTop)}px`,
+                    // Same pivot as the text, relative to the BG wrapper's own top-left.
+                    transformOrigin: `${pivotLocalX + (pivot[0] - bgLeft)}px ${pivotLocalY + (pivot[1] - bgTop)}px`,
                   }}
                 >
                   {/* The rounded rect itself — inset by the uniform tail margin.
@@ -1880,8 +1878,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       position: "absolute",
                       left: tailMargin,
                       top: tailMargin,
-                      width: boxW + bgPad * 2,
-                      height: boxH + bgPad * 2,
+                      width: plateW + bgPad * 2,
+                      height: plateH + bgPad * 2,
                       backgroundColor: bgColorRaw,
                       borderRadius: bgRadius,
                     }}
@@ -1916,11 +1914,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 placeholder="Type text…"
                 style={{
                   position: "absolute",
-                  left: sx,
-                  top: sy,
+                  left: sx + (area?.dx ?? 0),
+                  top: sy + (area?.dy ?? 0),
                   width: boxW,
                   minHeight: boxH,
                   fontSize: fs,
+                  lineHeight: 1.3,
+                  padding: textPreviewPadding(textSettings, boxH - naturalH, TEXT_OVERLAY_PAD_Y, TEXT_OVERLAY_PAD_X),
+                  ...area?.style, // ADR-106: the engine's em, line pitch, pen and wrap width
                   fontWeight: effFontWeight,
                   color: effTextColor,
                   // THE FACE THE ENGINE WILL COMMIT. Same expression the box
@@ -1928,8 +1929,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   // — so these glyphs ARE the committed glyphs (v8.76).
                   fontFamily: effFontCss,
                   ...textPreviewCss(textSettings, scaleX), // engine-true stroke + line alignment
-                  lineHeight: 1.3,
-                  padding: textPreviewPadding(textSettings, boxH - naturalH, TEXT_OVERLAY_PAD_Y, TEXT_OVERLAY_PAD_X),
                   background: "transparent",
                   border: "none",
                   outline: "none",
@@ -1938,7 +1937,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   zIndex: 51,
                   cursor: "text",
                   transform: `rotate(${rotation}deg)`,
-                  transformOrigin: boxTransformOrigin,
+                  transformOrigin: `${pivot[0] - sx - (area?.dx ?? 0)}px ${pivot[1] - sy - (area?.dy ?? 0)}px`,
                 }}
                 autoFocus
               />

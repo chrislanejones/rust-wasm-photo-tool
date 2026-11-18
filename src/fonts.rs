@@ -147,6 +147,44 @@ pub fn is_registered(font_id: &str, bold: bool) -> bool {
     REGISTRY.with(|r| find(&r.borrow(), font_id, bold).is_some())
 }
 
+/// How many px of EM the engine draws per px of its font size, for `font_id`
+/// at `bold` — the number the text preview multiplies its CSS `font-size` by
+/// (ADR-106).
+///
+/// The engine's size is not the em. `text.rs` builds every glyph at
+/// `PxScale::from(font_size)`, and ab_glyph's scale is the face's
+/// ascent-to-descent HEIGHT in px: `as_scaled` divides by
+/// `height_unscaled()` (`ascender - descender`, from `hhea`, or `OS/2` typo
+/// metrics when the face sets USE_TYPO_METRICS — ttf-parser's choice, the
+/// same one the rasterizer gets). CSS `font-size` is the em. For Liberation
+/// Sans that is 2048 / (1854 + 434) = 0.895, which is why the textarea drew
+/// ~10% wider than the commit (HHHHHHHH at 48: 268.6 px vs 241).
+///
+/// So this is `units_per_em / height_unscaled`, but it is READ OFF the same
+/// `ScaleFont` the rasterizer uses — the horizontal scale factor at a scale
+/// of 1 px, times the em — rather than restated, so it cannot drift from how
+/// the engine actually draws. Same face resolution as everything else here
+/// ([`with_face`]): bundled and runtime-registered faces alike, and the
+/// embedded fallback for an id this binary has no bytes for.
+///
+/// Read-only and pure in its arguments, like `measure`: the registry is
+/// monotone, so a cached answer never goes stale.
+pub fn em_ratio(font_id: &str, bold: bool) -> f32 {
+    use ab_glyph::{Font, PxScale, ScaleFont};
+    with_face(font_id, bold, |f| {
+        // `units_per_em` is `Option` only by ab_glyph's signature; ttf-parser
+        // always has one. 1.0 = "draw the preview at the tool's size", the
+        // pre-ADR-106 behavior, rather than a panic across the boundary.
+        let upem = f.units_per_em().unwrap_or(0.0);
+        let ratio = f.as_scaled(PxScale::from(1.0)).h_scale_factor() * upem;
+        if ratio.is_finite() && ratio > 0.0 {
+            ratio
+        } else {
+            1.0
+        }
+    })
+}
+
 /// The embedded Bold face, directly.
 ///
 /// The red-stamp presets (`render_stamp_label`) use it unconditionally and
@@ -250,6 +288,18 @@ impl ImageHorseTool {
     pub fn has_font(&self, font_id: &str, bold: bool) -> bool {
         crate::fonts::is_registered(font_id, bold)
     }
+
+    /// CSS px of em per px of the engine's font size, for `font_id` at
+    /// `bold`: the textarea preview's `font-size` is the tool's size times
+    /// this (ADR-106). `units_per_em / (ascent - descent)`, read off the
+    /// rasterizer's own scale — see [`crate::fonts::em_ratio`].
+    ///
+    /// ⚠️ Reads NO engine state, like `measure_text`; `textMetricsCache` caches
+    /// it keyed on its arguments. Ask only after the face is registered
+    /// (`has_font`), or the answer is the fallback's.
+    pub fn text_em_ratio(&self, font_id: &str, bold: bool) -> f32 {
+        crate::fonts::em_ratio(font_id, bold)
+    }
 }
 
 #[cfg(test)]
@@ -333,6 +383,83 @@ mod tests {
             (sans - serif).abs() > 1.0,
             "registered face rendered at the SAME advance as the fallback \
              ({sans} vs {serif}) — the registry is not being consulted"
+        );
+    }
+
+    /// ADR-106. The ratio the preview scales its CSS em by is the face's
+    /// `units_per_em / (ascent - descent)` — for the embedded Liberation Sans
+    /// Regular, `hhea` 1854 / -434 on a 2048 em: 2048 / 2288.
+    #[test]
+    fn em_ratio_is_the_em_over_the_ascent_to_descent_height() {
+        let want = 2048.0 / 2288.0;
+        for id in ["", DEFAULT_FONT_ID, "nobody-has-this"] {
+            let got = em_ratio(id, false);
+            assert!((got - want).abs() < 1e-6, "{id:?}: {got} vs {want}");
+        }
+        // And for every face, the same formula from the face's own tables.
+        use ab_glyph::Font;
+        for bold in [false, true] {
+            let (upem, height) = with_face("", bold, |f| {
+                (f.units_per_em().unwrap_or(0.0), f.height_unscaled())
+            });
+            assert!((em_ratio("", bold) - upem / height).abs() < 1e-6);
+        }
+    }
+
+    /// The ratio is only worth exposing if it predicts what the rasterizer
+    /// draws: an advance at engine size S is the advance at a CSS em of
+    /// S * ratio. Checked on every glyph of a pangram, at three sizes, for
+    /// the embedded faces and a registered one.
+    #[test]
+    fn em_ratio_predicts_the_engines_own_advances() {
+        use ab_glyph::{Font, PxScale, ScaleFont};
+        let serif = serif_bytes();
+        if let Some(bytes) = &serif {
+            assert!(
+                register("test-serif-em", false, bytes).is_ok(),
+                "serif asset is readable"
+            );
+        }
+        let mut faces = vec![("", false), ("", true)];
+        if serif.is_some() {
+            faces.push(("test-serif-em", false));
+        }
+        for (id, bold) in faces {
+            let ratio = em_ratio(id, bold);
+            with_face(id, bold, |f| {
+                let upem = f.units_per_em().unwrap_or(0.0);
+                for size in [24.0f32, 48.0, 96.0] {
+                    let sf = f.as_scaled(PxScale::from(size));
+                    for c in "Sphinx of black quartz, judge my vow".chars() {
+                        let g = f.glyph_id(c);
+                        let engine = sf.h_advance(g);
+                        let css = size * ratio * f.h_advance_unscaled(g) / upem;
+                        assert!(
+                            (engine - css).abs() < 1e-3,
+                            "{id:?} bold={bold} {c:?} at {size}: engine {engine} vs em {css}"
+                        );
+                    }
+                }
+            });
+        }
+    }
+
+    #[test]
+    fn a_registered_face_answers_with_its_own_ratio() {
+        let Some(bytes) = serif_bytes() else { return };
+        assert!(
+            register("test-serif-ratio", false, &bytes).is_ok(),
+            "readable"
+        );
+        use ab_glyph::Font;
+        let own = with_face("test-serif-ratio", false, |f| {
+            f.units_per_em().unwrap_or(0.0) / f.height_unscaled()
+        });
+        let got = em_ratio("test-serif-ratio", false);
+        assert!((got - own).abs() < 1e-6, "{got} vs {own}");
+        assert!(
+            (got - em_ratio("", false)).abs() > 1e-4,
+            "the serif answered with the sans ratio — the registry is not consulted"
         );
     }
 

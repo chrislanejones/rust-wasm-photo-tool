@@ -12,6 +12,7 @@ import { useTextEditEnd } from "@/hooks/useTextEditEnd";
 import { noBoxPreviewWidth, textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
 import { holdTextAlignForEdit, restoreTextAlignPreference } from "@/stores/useToolStore";
 import { joinedSetters } from "@/lib/commitSteps";
+import { alignShiftFrom } from "@/lib/textPreviewLayout";
 
 interface TextInput {
   screenX: number;
@@ -135,6 +136,7 @@ async function alignAnchorShift(
 ): Promise<number> {
   const column = align % 3;
   if (column === 0) return 0;
+  const padX = TEXT_OVERLAY_PAD_X / (scaleX || 1);
   if (wrapWidth <= 0) {
     const [size, plain] = await Promise.all([
       measureTextAwaited(tool, text, fontSize, bold, fontId),
@@ -143,23 +145,16 @@ async function alignAnchorShift(
     const ctx = document.createElement("canvas").getContext("2d");
     if (!size || !size[0] || !plain || !ctx) return 0;
     const s = scaleX || 1;
-    const sidePad = Math.ceil(fontSize * 0.25);
-    // `text::measure`: the widest line plus `side_padding` a side, rounded UP
-    // to a whole px; half a px is that rounding's expected overshoot.
-    const widest = size[0] - 2 * sidePad - 0.5;
-    const bearing = plain[0] - sidePad;
     // The textarea's content width, canvas px, measured as CanvasArea does.
     const fs = fontSize * s;
     ctx.font = `${bold ? "bold" : "normal"} ${fs}px ${faceCss(fontId)}`;
     const content = (noBoxPreviewWidth(text, fs, (l) => ctx.measureText(l).width) - 2 * TEXT_OVERLAY_PAD_X) / s;
-    return bearing + (column === 1 ? (content - widest) / 2 : content - widest);
+    return alignShiftFrom(column, wrapWidth, fontSize, size, plain, content, padX);
   }
-  // The first glyph's inset with no background: the engine's side padding
-  // plus the glyph's own bearing. The background margin cancels out.
+  // The arithmetic lives in lib/textPreviewLayout so the open textarea can run
+  // it too (ADR-106): the preview is laid out where this commit will land.
   const plain = await textInkOffsetBgAwaited(tool, text, fontSize, bold, 0, 0, fontId);
-  if (!plain) return 0;
-  const pad = TEXT_OVERLAY_PAD_X / (scaleX || 1);
-  return column === 1 ? plain[0] - pad : plain[0] + Math.ceil(fontSize * 0.25) - 2 * pad;
+  return alignShiftFrom(column, wrapWidth, fontSize, undefined, plain, 0, padX);
 }
 
 export function useTextTool({

@@ -1049,6 +1049,11 @@ declare module "stamp_tool" {
     /** Whether `font_id` at `bold` will actually be used rather than silently
      *  falling back to the embedded Liberation Sans. v8.76. */
     has_font(font_id: string, bold: boolean): boolean;
+    /** CSS px of em per px of the engine's font size for a face and weight:
+     *  `units_per_em / (ascent - descent)`, read off the rasterizer's own
+     *  scale (`fonts::em_ratio`). The text preview's `font-size` is the
+     *  tool's size times this (ADR-106). Reads no engine state. */
+    text_em_ratio(font_id: string, bold: boolean): number;
     /** Set a text annotation's projective corner quad and rebuild its tile
      *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALIZED 0..1
      *  across the tile, in TL/TR/BR/BL order. Returns false for a wrong-length

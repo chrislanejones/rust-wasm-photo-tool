@@ -199,6 +199,26 @@ export function textInkOffset(
   return cached(`i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${fontKey(fontId)}${SEP}${text}`);
 }
 
+/**
+ * CSS px of em per px of the engine's font size, for a face and weight
+ * (`text_em_ratio`, ADR-106): the open textarea's `font-size` is the tool's
+ * size times this, so its glyphs are the engine's glyphs.
+ *
+ * Same contract as the two readers above: a pure function of its arguments in
+ * the engine (`fonts::em_ratio` reads only the monotone font registry), so
+ * the entry never goes stale; `undefined` on a miss, filled off the render
+ * path by `primeTextMetrics`. No text and no size in the key — the ratio is a
+ * property of the face alone.
+ */
+export function textEmRatio(
+  tool: ImageHorseTool | null | undefined,
+  bold: boolean,
+  fontId?: string,
+): number | undefined {
+  void tool;
+  return cached(`e${SEP}${bold ? 1 : 0}${SEP}${fontKey(fontId)}`)?.[0];
+}
+
 // `textInkOffsetBg`'s SYNCHRONOUS form was deleted in v8.14. Its only callers
 // were the text commit and re-edit paths, and both moved to
 // `textInkOffsetBgAwaited` in v8.12 — leaving a zero-reference export whose
@@ -315,6 +335,13 @@ export async function primeTextMetrics(
   }
   if (!store.has(iKey)) {
     remember(iKey, Array.from(await tool.text_ink_offset(text, fontSize, bold, font)));
+    filled = true;
+  }
+  // ADR-106. Guarded: an engine built before `text_em_ratio` (a stale local
+  // `pkg/`, a test double) leaves the textarea at the tool's size, as before.
+  const eKey = `e${SEP}${bold ? 1 : 0}${SEP}${font}`;
+  if (!store.has(eKey) && typeof tool.text_em_ratio === "function") {
+    remember(eKey, [await tool.text_em_ratio(font, bold)]);
     filled = true;
   }
   return filled;
