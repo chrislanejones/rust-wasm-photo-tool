@@ -27,11 +27,12 @@ The decisions behind them:
 
 | Work | Shipped | What changed |
 | --- | --- | --- |
-| [UI Nights 9–15](UI_NIGHTS_09_15.md) | v9.27 | gallery, preview loading, and Settings you can use from the keyboard |
-| [UI Nights 16–19](UI_NIGHTS_16_19.md) | v9.28 | loading skeletons for sign-in, AI Usage, Compare, Plan & Billing and the phone viewer |
-| [Document-state pass](ui-state-v4/08-v927-integration.md) (#348) | v9.29 | photo switching, document controls, Pen and Pins, masks, history and error messages |
+| [UI Nights 9–15](archive/UI_NIGHTS_09_15.md) | v9.27 | gallery, preview loading, and Settings you can use from the keyboard |
+| [UI Nights 16–19](archive/UI_NIGHTS_16_19.md) | v9.28, v9.29 | loading skeletons for sign-in, AI Usage, Compare, Plan & Billing and the phone viewer (v9.28); import preview, Diagnostics and the master bar (Night 19, v9.29) |
+| [Document-state pass](archive/ui-state-v4/08-v927-integration.md) (#348) | v9.29 | photo switching, document controls, Pen and Pins, masks, history and error messages |
 | UI Night 20 (#355) | v9.29 | choices, failures and fields a screen reader couldn't hear |
 
-The [seven audit records](ui-state-v4/07-audit.md) behind the document-state
-pass are in `ui-state-v4/`. Everything after v9.29 is in the
+The [seven audit records](archive/ui-state-v4/07-audit.md) behind the document-state
+pass are in `archive/ui-state-v4/`. The reports in this table are finished work,
+so they live in [archive/](archive/README.md). Everything after v9.29 is in the
 [Change Summary](Change-summary.md).

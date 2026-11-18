@@ -5,6 +5,28 @@ part of it that was still open (AppShell, CanvasArea, `lib.rs`), and records
 what the 2026-09-26 audit found elsewhere. ADR-042 is the decision this plan
 executes; this file is the *how*, with numbers.
 
+## Status, 11-18-2026 (v9.64)
+
+| File | Size in this plan (09-26) | Cap now | Size now |
+| --- | ---: | ---: | ---: |
+| `app/src/app/AppShell.tsx` | 3,649 | 3,112 | **3,112** |
+| `app/src/features/canvas/CanvasArea.tsx` | 2,802 | 2,141 | 2,140 |
+| `app/src/hooks/useDrawingTools.ts` | 991 | 954 | 947 |
+| `app/src/lib/engine/engineAsyncMigration.contract.test.ts` | 1,015 | 1,027 | 1,027 |
+| `app/src/features/tools/settings/BatchSettings.tsx` | 1,428 | 1,276 | 1,276 |
+
+- AppShell is down **537 lines** since this plan, and the cap was last lowered
+  on 11-07-2026. The cuts came from one-off extractions into hooks and
+  helpers, each logged beside the cap in `eslint.config.mjs`, not from the
+  phases below.
+- **Phases 1–3 have not started.** There is no `SessionContext.tsx`, and none
+  of `<CanvasContextMenu>`, `<ShellDialogs>`, `<SidebarDock>` or `<Workspace>`
+  exists.
+- The `lib.rs` line guardrail this plan lowers had been retired on master on
+  09-25-2026, and the #247 merge kept it retired (see the v9.1 Change Summary
+  and the note in `scripts/guardrails.sh`). `src/lib.rs` is 5,441 lines today, and
+  nothing ratchets it.
+
 ## Where things stood on 2026-09-26, before this plan
 
 The `max-lines` ratchet was pinned on 2026-08-27 as a warning. A month later:

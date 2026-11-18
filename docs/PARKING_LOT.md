@@ -15,13 +15,28 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Archive resume, then undo | Undo snapshots lost the box, quad, shadow, outline | `restoreStoredText` for every path |
 | Layer JSON, cloud, in-session undo/redo, duplicate, nudge, Perspective | Fine | Fine, and tested (cloud through the archive) |
 
-## OPEN — compare mode leftovers (feat/gallery-labels-compare-bar, 11-12-2026)
+## FIXED 11-15-2026 (#472, #475) — compare mode leftovers (feat/gallery-labels-compare-bar, 11-12-2026)
 
 | What | Why it's left |
 | --- | --- |
-| The compact master bar has no Compare two photos button | Compare mode can only be started at desktop width (or by narrowing the window while it is on). Adding an entry to the compact chrome is its own change. |
+| ~~The compact master bar has no Compare two photos button~~ | Fixed 11-15-2026 (#475, v9.64): the compact layout's Gallery tab has a Compare tile (`features/gallery/CompareModeTile.tsx`). e2e in screenshot-compare. |
 | ~~Esc does nothing in compare mode until two photos are being compared~~ | Fixed 11-14-2026 (#472): Esc ends compare mode while picking too. e2e in screenshot-compare. |
 | ~~The wide top bar's Gallery toggle counts as "elsewhere"~~ | Fixed 11-14-2026 (#472): it carries `data-compare-keep`, like the compact bar's Gallery tab. e2e in screenshot-compare. |
+
+## OPEN — v9.64 leftovers, carried from the 11-15-2026 day log (filed 11-18-2026)
+
+The day log listed these as "for PARKING_LOT, each needs your call" and never filed them. It's archived now ([archive/day-logs/2026-11-15.md](archive/day-logs/2026-11-15.md)), so they live here. Copied as written; not triaged.
+
+| From | Item |
+|---|---|
+| Find duplicates (#473) | Duplicate fingerprints aren't saved; saving them needs a Dexie migration |
+| Find duplicates (#473) | Groups chain (A~B, B~C puts A, B, C together); rotated or mirrored copies aren't found |
+| Find duplicates (#473) | The hash reads the current thumbnail, so a heavily edited photo no longer matches its original |
+| Auto tone (#476) | Auto tone on a multi-layer document reads only the active layer |
+| Rename tokens (#474) | The `{date}` file date isn't kept after a reload (needs a stored field) |
+| Rename tokens (#474) | AI Rename info text still says "colour" / "recognise" (still true 11-18-2026: `AIRenamePanel.tsx` lines 244 and 247) |
+| Compact Compare (#475) | The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have |
+| Compact Compare (#475) | Compact layout while comparing: two "Stop comparing" controls (the tile and the status X) |
 
 ## FIXED 11-18-2026 (`fix/text-preview-size`, ADR-106) — committed text is drawn ~10% narrower than its preview (found 11-14-2026, #472)
 
@@ -66,11 +81,11 @@ Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060'
 | Masonry draws the open photo inset in its tile; the others fill theirs | Visual only; the tile's shape is right |
 | An in-page `#marketing` link on `/design-system` switches the tab but keeps the scroll | No element has `id="marketing"`. A fresh load is fine. Nothing links there in-page today |
 
-## OPEN — owed after v9.59 (11-08-2026)
+## DONE 11-13-2026 — owed after v9.59 (11-08-2026)
 
 | What | Why it's left |
 | --- | --- |
-| GitHub Releases for v9.52 through v9.58 | The tags exist. Publishing a Release is done by hand, so these wait for a person. |
+| ~~GitHub Releases for v9.52 through v9.58~~ | Done: `gh release list` on 11-18-2026 shows a Release for every tag from v9.35 through v9.64. |
 | ~~`imagehorse-qc` on the production build~~ | Done 11-13-2026 on v9.63, PASS: `docs/qc/qc-1113.md`. |
 
 ## OPEN — Transfer leftovers (feat/transfer-ui, 11-04-2026, ADR-102)
@@ -491,10 +506,10 @@ remains disabled. Input/mask/output retention (row 203) is documented, not built
 | Diagnostics › Resources cuts off the Op Log, Document and Persisted values with "…" at the default dialog width | Diagnostics dialog | Lacey |
 | ~~`select-refine-mask.spec.ts:75` looks for the engine once instead of retrying, so it fails under load~~ **FIXED 10-23-2026: the engine lookup polls (`expect.poll`, landed in 27cfe4df), and the spec now uses the shared `E2E_CPU_THROTTLE` switch instead of its own `IH_CPU_THROTTLE` copy. 80/80 at 4× CPU (`--repeat-each 20`, all four tests 20/20). The old one-shot lookup fails a 1.5 s slow boot that the poll waits out.** | `e2e/` | Tara |
 | ~~`SubscriptionButton.test.tsx` hits its 5 s timeout in the full vitest run under load; it passes alone~~ **FIXED 10-23-2026: there was no slow await. Both tests are synchronous, and vitest 5 fails a sync test after the fact once it runs past 5 s. The first test was the slowest of all 2,049 (927 to 1,050 ms in the full run) because sonner injects a 97-rule stylesheet on import, and every role query after a DOM change ran jsdom's `getComputedStyle` through it. sonner is now mocked (nothing asserts a toast). Full suite 5/5 green, with that test at 634 to 833 ms. It is still the slowest test: Radix's scroll-lock stylesheet and accessible-name computation are most of what is left.** | `app/src/` | Tara |
-| IN REVIEW on `feat/adjustments-oplog-20261017`: record all seven Adjustments settings with exact session resets. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md) explains why cumulative `TonalStack` cannot represent them; label stays "Adjustments". | engine, after #368 | Silas |
+| ~~IN REVIEW on `feat/adjustments-oplog-20261017`~~ **MERGED 10-19-2026 (#382, `cd1af16f`):** record all seven Adjustments settings with exact session resets. [ADR-091](adr/091-adjustments-record-absolute-sessions-in-oplog-v14.md) explains why cumulative `TonalStack` cannot represent them; label stays "Adjustments". | engine, after #368 | Silas |
 | Captured 10-17 from production master d486fd4: real v13 TonalStack frame, base PNG, annotations and browser hash; included in the Adjustments branch with a compatibility test | `tests/fixtures/oplog/capture-harness.mjs` | Silas |
-| `docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix | — | at merge |
-| `github/codeql-action` 4.38.3 (#359) was left out of #370. It edits a workflow file, and this machine's gh token has no `workflow` scope. Merge #359 as-is. | — | Chris |
+| ~~`docs/adr/INDEX.md`: #367 (089) and #368 (090) both append a row, so whichever merges second needs a one-line fix~~ **Done:** INDEX.md has one row each for 089 and 090 (checked 11-18-2026) | — | at merge |
+| ~~`github/codeql-action` 4.38.3 (#359) was left out of #370. It edits a workflow file, and this machine's gh token has no `workflow` scope. Merge #359 as-is.~~ **MERGED 10-14-2026 (#359, `4beea4dd`).** | — | Chris |
 
 ## OPEN — work left in worktrees after the 10-13 cleanup (10-13-2026)
 
@@ -531,7 +546,7 @@ This entry rode in on a docs-only branch (#357), not a master commit, because
 the git-routine gate treats every master commit as a release (README,
 Change-summary and Trail must be staged).
 
-## IN PR #368 (10-14) — the tonal Presets op is still not recorded in the op log (10-13-2026)
+## FIXED 10-14-2026 (#368, `a5553654`) — the tonal Presets op is still not recorded in the op log (10-13-2026)
 
 #368 records a preset as `Op::TonalStack` at index 23 and bumps the format to **v13**,
 not v12. v12 had already deployed with #356, so it can't take an append (ADR-090).
@@ -541,7 +556,9 @@ variant (`SameGesture`, index 22) and bumped the format to v12. Tonal ops now st
 as amended by #356). To avoid a second format bump, the Presets op should land in
 the same release as #356.
 
-## IN PR #370 (10-14) — the weekly scheduled gitleaks scan is red on a test fixture (10-13-2026)
+## FIXED 10-14-2026 (#370, `929f21ee`) — the weekly scheduled gitleaks scan is red on a test fixture (10-13-2026)
+
+**Checked 11-18-2026:** `.gitleaksignore` is on master, and the secret scan passed on the 11-16-2026 scheduled CI run.
 
 #301 had already fixed the fixture; the finding lives in pushed commit `3564c39b`.
 #370 adds a `.gitleaksignore` that skips that one fingerprint. A full-history
@@ -611,14 +628,14 @@ and the 30th shape never committed. A person is unlikely to hit it (Enter within
 a script or a fast keyboard user can. Candidate fix: bind the listener once, reading `editStateRef`
 (it already does), or `useLayoutEffect`. Not done: no product change in a test-stability PR.
 
-## Addressed in UI Night 9 draft #339 — gallery leftovers (10-06-2026)
+## FIXED in v9.27 (10-11-2026, UI Night 9) — gallery leftovers (10-06-2026)
 
 Found while building the gallery skeleton region (`ui/night8-gallery-skeleton`).
 All three are on master as well — checked against a master build — so none is
 in that diff.
 
 UI Nights 9–15 (10-09-2026) reproduced and addressed these on the review stack;
-see [the run report](UI_NIGHTS_09_15.md). They are not yet merged.
+see [the run report](archive/UI_NIGHTS_09_15.md). They shipped in v9.27: Night 9 is `f648e0f9`, and `Thumb.tsx` uses the named `group/tile`.
 
 | What | Where | Notes |
 | --- | --- | --- |
@@ -2304,7 +2321,9 @@ Not fixed here: persisting either one is an IndexedDB schema change, so it goes
 through the `dexie-migration` skill, and it should carry BOTH in one migration
 rather than adding a second half-persisted style. Filed, not built.
 
-## OPEN — three `max-lines` pins are now stale by 5, 9 and 32 lines (2026-08-28)
+## RESOLVED 09-26-2026 (#247) — three `max-lines` pins are now stale by 5, 9 and 32 lines (2026-08-28)
+
+**Checked 11-18-2026:** #247 turned the pins into errors at measured sizes, and all three files now sit at or under their caps in `eslint.config.mjs`: AppShell 3,112 of 3,112, the contract test 1,027 of 1,027, `useDrawingTools` 947 of 954.
 
 Color Overlay pushed two pinned files past their 2026-08-27 baselines:
 

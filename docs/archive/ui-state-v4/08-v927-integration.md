@@ -4,7 +4,7 @@ Date: 10-11-2026. Review branch: `ui/state-v4-v927`.
 
 > **Shipped.** This branch merged as #348 on 10-13-2026 and went out in
 > v9.29. The text below is the review as it stood before the merge. The UI
-> docs now start at [docs/UI.md](../UI.md).
+> docs now start at [docs/UI.md](../../UI.md).
 
 The seven-night document-state pass has been reconciled with the shipped v9.27
 editor. This branch combines master `3bdee40c` and the original Night 7 head
@@ -83,7 +83,7 @@ contains the native translucent control and broader limitations.
 Run `imagehorse-qc` before release, including the live cloud/AI paths excluded
 by the offline browser guard. This review does not publish a new version.
 
-The already accepted [ADR-031](../adr/031-export-quality-lives-on-the-engine-snapshot.md)
+The already accepted [ADR-031](../../adr/031-export-quality-lives-on-the-engine-snapshot.md)
 dependency carries export quality in new captures and archives. Readers accept
 older formats; records that never saved quality restore the legacy 75 default.
 IndexedDB database versions, keys and indexes are unchanged. The operation-log

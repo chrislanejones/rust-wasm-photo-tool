@@ -27,6 +27,7 @@ Deploys are **not** driven by Actions — the hosts build on push themselves. CI
 | `e2e` | Every spec under the default Playwright config, in 2 shards. `scripts/e2e-coverage-check.mjs` checks that every eligible file is included; SW, keyless boot and archived sweeps have separate handling | — |
 | `marketing` | Builds the marketing site from `marketing/` | Vercel's `/marketing` root |
 | `convex` | Backend regression tests (`pnpm test:convex`) and typecheck always run; `convex codegen` + a `_generated` drift check run with deployment credentials | — |
+| `convex-deploy` | On a push to master only, after `web` and `convex` pass: confirms the deploy key points at the production deployment, runs `convex deploy`, then checks that every module in `convex/` is live ([`scripts/convex-deploy-check.mjs`](../scripts/convex-deploy-check.mjs)). A missing key fails the job instead of skipping it | — |
 | `deploy-sentinel` | Fetches the **live** site's glue and `.wasm` and checks content types, the 800,000-byte floor, required exports and the build-info SHA256 | The manual check that caught the five-week featureless-prod bug |
 
 Build/quality jobs are skipped on the weekly cron (`if: github.event_name != 'schedule'`) — no point rebuilding when nothing changed.

@@ -482,6 +482,6 @@ Async contexts expire on completion, failure and timeout; late progress and down
 cannot revive them. OpenRaster currently cannot cancel its underlying import, so its
 timeout communicates that limitation honestly.
 
-See [the seven audit records](ui-state-v4/07-audit.md) for regression coverage,
+See [the seven audit records](archive/ui-state-v4/07-audit.md) for regression coverage,
 screenshots, measurements, dependencies and remaining limits. Guardrail
 `legacy-photo-loading` prevents obsolete timer-based completion state returning.

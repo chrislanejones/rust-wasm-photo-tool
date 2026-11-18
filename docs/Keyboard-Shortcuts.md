@@ -63,6 +63,8 @@ Reset Zoom — that is a different chord.)
 | `Ctrl + C`         | Copy selection / canvas |
 | `Ctrl + Shift + C` | Copy to clipboard |
 | `Ctrl + V`         | Paste image into the active layer |
+| `Ctrl + Alt + C`   | Copy look: the open photo's Adjustments, Preset and Levels (`Cmd + Alt + C` on a Mac). Not in the in-app modal yet |
+| `Ctrl + Alt + V`   | Paste look to the selected photos (`Cmd + Alt + V` on a Mac). Not in the in-app modal yet |
 | `Alt + D`          | Delete all images |
 
 ## Shapes (with a shape selected)

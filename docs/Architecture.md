@@ -3,7 +3,9 @@
 > Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [Change Summary](Change-summary.md) · [ADR index](adr/INDEX.md).
 >
 > **Status:** describes what exists on `master` at **v8.61** (`7c166fc`),
-> re-verified against code on 2026-09-01 — not aspirational.
+> re-verified against code on 2026-09-01 — not aspirational. On 11-18-2026
+> (v9.64, `2f6f9214`) only the AppShell line count and the Stage 4 table
+> below were re-measured; everything else is still as of v8.61.
 >
 > This pass re-read the tree rather than patching version numbers. What was
 > checked, and what it cost: the engine's **thread** (it moved into a worker
@@ -27,7 +29,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │  React UI Shell (React 19, Tailwind CSS v4, Zustand)         │  │
 │  │                                                              │  │
-│  │  AppShell.tsx (composition root, 3,813 lines) orchestrates   │  │
+│  │  AppShell.tsx (composition root, 3,112 lines) orchestrates   │  │
 │  │  TopBar · ToolsSidebar · GalleryBar · ReviewPanel            │  │
 │  │  UploadDialog · StatusBar · ShortcutModal                    │  │
 │  │                                                              │  │
@@ -194,14 +196,14 @@ not started and no `ToolModule` type existed anywhere, which is wrong; a note
 in the backlog said Stage 4 was closed, which is also wrong. What is in the
 tree at v8.61:
 
-| | Status at v8.61 | Where |
-| --- | --- | --- |
-| `ToolModule` type | **Exists** | `app/src/features/tools/toolModules.ts:40` |
-| Registered modules | **5** — Paint, Resize & Compress, Adjust, Select, Perspective | `TOOL_MODULES`, same file |
-| `features/tools/modules/` directory | **Does not exist** | — |
-| AppShell imports `TOOL_MODULES` | **No** | nothing routes through the registry |
-| Tool hooks hand-wired in AppShell | **Still 7** | `AppShell.tsx:14-22` |
-| `AppShell.tsx` line count | **3,813** | was 2,930 at v7.8 |
+| | Status at v8.61 | Re-measured 11-18-2026 (v9.64) | Where |
+| --- | --- | --- | --- |
+| `ToolModule` type | **Exists** | Exists | `app/src/features/tools/toolModules.ts` |
+| Registered modules | **5** — Paint, Resize & Compress, Adjust, Select, Perspective | **5**, the same five | `TOOL_MODULES`, same file |
+| `features/tools/modules/` directory | **Does not exist** | Does not exist | — |
+| AppShell imports `TOOL_MODULES` | **No** | No. Only `features/tools/toolModes.ts` imports it, to read a migrated tool's modes | — |
+| Tool hooks hand-wired in AppShell | **Still 7** | **Still 7** | `AppShell.tsx:14-20` |
+| `AppShell.tsx` line count | **3,813** | **3,112**, the `max-lines` cap in `eslint.config.mjs` | was 2,930 at v7.8 |
 
 The registry file says so itself: it "only LAYS THE SHAPE", and routing —
 the `ToolsSidebar` `activeTool` switch, keyboard shortcuts, persistence keys
