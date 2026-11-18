@@ -47,8 +47,8 @@ describe("engineTextarea", () => {
     expect(bottom).toBe(sidePadding(48));
     // First baseline: CSS centers ascent + descent (= the engine size at this
     // em) in a 1.3 * size line, so 0.15 * size of the line sits above it.
-    // …plus half a pixel, so a baseline the browser floors lands on the
-    // engine's fractional one rounded.
+    // …plus BASELINE_SNAP (1 px), measured in the browser: Chrome's glyphs
+    // sit ~1 px above ab_glyph's at the same computed baseline.
     expect(top + 0.15 * 48 - 1).toBeCloseTo(sidePadding(48), 4);
   });
 

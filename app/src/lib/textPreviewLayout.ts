@@ -22,8 +22,8 @@
 /** `text::render_text_with`: lines are `font_size * 1.3` apart, in f32. */
 const LINE_PITCH = Math.fround(1.3);
 
-/** Screen px added to the top padding so a browser that floors the baseline
- *  to a whole pixel lands on the engine's fractional one rounded. */
+/** Screen px added to the top padding, measured: Chrome's baseline lands
+ *  ~1 px above the engine's at the same computed position (see `engineTextarea`). */
 const BASELINE_SNAP = 1;
 
 /** `text::side_padding`: the engine's padding on each side of the ink. */
@@ -161,11 +161,12 @@ export function engineTextarea(i: EngineTextareaInput): EngineTextarea {
   const spare = i.boxHeight > block ? i.boxHeight - block : 0;
   const rowOffset = i.row === 1 ? Math.floor(spare / 2) : i.row === 2 ? spare : 0;
   const content = i.wrapWidth > 0 ? i.wrapWidth - 2 * pad : i.widest;
-  // + half a screen px: Chrome draws each baseline on a whole pixel, rounding
-  // DOWN, while the engine's is fractional (ascent 38.9 px at 48). Measured
-  // 11-18 without it, every preview line sat 1 px above its committed ink
-  // (and 2 px on a second line); with it the browser's whole-pixel baseline
-  // is the engine's rounded to the nearest.
+  // + BASELINE_SNAP: measured, not derived. At the baseline this model
+  // computes, Chrome's glyphs sit about 1 px above ab_glyph's (Chrome draws
+  // the baseline on a whole pixel, the engine's is fractional). 11-18, 52
+  // lines over three faces at 24-96: with 0 every line's top was 1 px high,
+  // with 0.5 most still were, with 1 the tops agree on 43 of 52 and the rest
+  // are within 1 px.
   const top = (pad + rowOffset - (LINE_PITCH - 1) * i.fontSize / 2) * i.scaleY + BASELINE_SNAP;
   return {
     dx: (originX - i.canvasX) * i.scaleX,

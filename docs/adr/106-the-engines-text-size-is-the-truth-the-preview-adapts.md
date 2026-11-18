@@ -10,9 +10,9 @@ scale is the face's ascent-to-descent HEIGHT: `as_scaled` divides by
 typo metrics when a face sets USE_TYPO_METRICS). The textarea used the same
 number as its CSS `font-size`, which is the EM. For Liberation Sans that is
 2048 / (1854 + 434) = **0.895**, so the preview drew ~10% wider than the
-commit (`HHHHHHHH` at 48: 268.6 px preview, 241 px committed, PARKING_LOT
-11-14), a paragraph in a box broke in different places, and the text jumped
-**{{JUMP}}** px up on commit.
+commit (`HHHHHHHH` at 48, ink: **272 px** preview, **242 px** committed),
+a paragraph in a 300 px box broke into different lines, and the text
+jumped **14 px** up and 4 px left on commit (master, measured 11-18).
 
 ## Decision
 
@@ -34,7 +34,8 @@ commit (`HHHHHHHH` at 48: 268.6 px preview, 241 px committed, PARKING_LOT
    and aligns in the same width; the box sits on the tile origin `commitText`
    will store (its own arithmetic, `alignShiftFrom`), and the top padding puts
    the first baseline where the engine's is (CSS centers ascent + descent,
-   which at this em is exactly `size`, in the 1.3 × size line). Kerning and
+   which at this em is exactly `size`, in the 1.3 × size line), plus 1 px
+   measured in Chrome (`BASELINE_SNAP`, see Consequences). Kerning and
    ligatures off and `geometricPrecision`, because ab_glyph applies none of
    them (the Liberation faces kern only through GPOS). The text and its plate
    rotate about the engine's pivot (the tile's top-left, ADR-050), and the
@@ -45,17 +46,24 @@ commit (`HHHHHHHH` at 48: 268.6 px preview, 241 px committed, PARKING_LOT
 ## Consequences
 + Preview ink = committed ink within 1 px, every bundled face at 24 / 48 / 96,
   every Text in Box cell boxed and no-box, a paragraph breaks into the same
-  lines, and re-editing an old text opens on its own pixels: {{RESULTS}}.
-+ Every committed pixel is unchanged: {{HASHES}}.
+  lines, and re-editing an old text opens on its own pixels: 9 face/size
+  cases, 18 cells, a 6-line paragraph and a 30° rotation, every ink edge
+  ≤ 1 px (`e2e/text-preview-size.spec.ts`, all 7 red on master).
++ Every committed pixel is unchanged: the composite and annotation list
+  hashed at the end of each of the 63 existing text e2e tests that reach the
+  engine are equal on master and this branch (aggregate `c595aae83e97d82d`
+  both), and the v15/v16 op-log fixtures replay to their recorded frames.
 - The no-box frame keeps its old width (measured at the tool's size), roomier
   than the text by ~10%: the commit's Center/Right anchor is measured against
   it, so shrinking it would move where those texts land for the same clicks.
 - What stays different: the browser's rasterizer vs ab_glyph (antialiasing,
-  and Chrome snaps the baseline to whole pixels), so edges agree to ~1 px,
-  not bit for bit. A runtime face with USE_TYPO_METRICS may be measured by the
+  and Chrome draws the baseline on a whole pixel), so edges agree to ~1 px,
+  not bit for bit. The vertical needs a measured +1 px (`BASELINE_SNAP`):
+  with it 43 of 52 line tops agree exactly, the rest by 1 px; it is an
+  observation about Chrome, not derived. A runtime face with USE_TYPO_METRICS may be measured by the
   browser on other metrics than ttf-parser's; the bundled faces don't set it.
 - A miss in the metrics cache shows one frame at the old size until the prime
-  lands. wasm {{WASM}}.
+  lands. wasm 967,840 → 969,207 B (+1,367), built after the last `.rs` edit.
 
 ## Alternatives rejected
 - Draw the engine at size ÷ ratio (scale by the em): redraws every saved text,
