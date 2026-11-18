@@ -29,8 +29,12 @@
 // after the label and a reset button beside the value (Plan A §4.3), so after
 // a photo switch you can tell at a glance which numbers this photo changed.
 // Defaults show nothing. Pass `edited` only for per-photo values.
+//
+// THE RIGHT SIDE, in this order (11-18, Chris): the reset arrow (only while
+// edited), then the row's one-click `action` icon (e.g. Resize › Quality's
+// Auto), then the value. The value stays the header's last child.
 import * as React from "react";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, type LucideIcon } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { ReasonNote } from "@/components/ui/status-note";
 import { cn } from "@/lib/utils";
@@ -59,19 +63,25 @@ export interface ControlRowProps {
    *  reset button that calls `onReset`. Omit, or pass `isEdited: false`, for
    *  a default. */
   edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
+  /** A one-click icon button between the reset arrow and the value, e.g. an
+   *  Auto that fills the control in. `label` is its name and its hover title. */
+  action?: { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean };
   /** The control. Use the function form to wire the label / reason ids. */
   children: React.ReactNode | ((ids: ControlRowIds) => React.ReactNode);
   className?: string;
 }
 
-export function ControlRow({ label, info, value, reason, edited, children, className }: ControlRowProps) {
+const ROW_ICON_BUTTON =
+  "flex size-4 items-center justify-center rounded-sm text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40";
+
+export function ControlRow({ label, info, value, reason, edited, action, children, className }: ControlRowProps) {
   const baseId = React.useId();
   const labelId = `${baseId}-label`;
   const reasonId = reason ? `${baseId}-reason` : undefined;
   return (
     <div data-slot="control-row" className={cn("space-y-2", className)}>
-      <div className="flex items-center justify-between gap-2 text-2xs">
-        <span className="flex items-center gap-1 text-theme-muted-foreground">
+      <div className="flex items-center gap-1 text-2xs">
+        <span className="mr-auto flex items-center gap-1 text-theme-muted-foreground">
           <span id={labelId} data-slot="label">
             {label}
           </span>
@@ -85,24 +95,35 @@ export function ControlRow({ label, info, value, reason, edited, children, class
               className="size-1.5 rounded-full bg-theme-primary"
             />
           )}
-          {/* On the label side, so the value stays the header's last child
-              (the panel grammar pins that). */}
-          {edited?.isEdited && (
-            <button
-              type="button"
-              data-slot="reset"
-              onClick={edited.onReset}
-              disabled={edited.disabled}
-              aria-label={`Reset ${label}`}
-              title={`Reset ${label}`}
-              className="flex size-4 items-center justify-center rounded-sm text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40"
-            >
-              <RotateCcw aria-hidden className="size-3" />
-            </button>
-          )}
         </span>
+        {edited?.isEdited && (
+          <button
+            type="button"
+            data-slot="reset"
+            onClick={edited.onReset}
+            disabled={edited.disabled}
+            aria-label={`Reset ${label}`}
+            title={`Reset ${label}`}
+            className={ROW_ICON_BUTTON}
+          >
+            <RotateCcw aria-hidden className="size-3" />
+          </button>
+        )}
+        {action && (
+          <button
+            type="button"
+            data-slot="action"
+            onClick={action.onClick}
+            disabled={action.disabled}
+            aria-label={action.label}
+            title={action.label}
+            className={ROW_ICON_BUTTON}
+          >
+            <action.icon aria-hidden className="size-3" />
+          </button>
+        )}
         {value != null && (
-          <span data-slot="value" className="tabular-nums text-theme-foreground">
+          <span data-slot="value" className="ml-1 tabular-nums text-theme-foreground">
             {value}
           </span>
         )}
