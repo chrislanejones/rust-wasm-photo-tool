@@ -12,6 +12,7 @@ What is in this folder, and what deliberately is not.
 | [Features.md](Features.md) | what the editor does |
 | [Keyboard-Shortcuts.md](Keyboard-Shortcuts.md) | every chord |
 | [OpenRaster-Export-Import.md](OpenRaster-Export-Import.md) | the .ora format contract |
+| [Plugins.md](Plugins.md) | how a plugin is added from Settings → Plugins, and how to write one |
 | [CI.md](CI.md) | the gates, and which ones block |
 | [UI.md](UI.md) | start here for UI: the rules, the inventory, the exceptions, and the UI work that shipped |
 | [UI_CONSISTENCY.md](UI_CONSISTENCY.md) | the ten UI rules, and the canonical scale |
@@ -19,11 +20,14 @@ What is in this folder, and what deliberately is not.
 | [UI_EXCEPTIONS.md](UI_EXCEPTIONS.md) | every registered exception to a UI gate |
 | [MCP.md](MCP.md) | connecting an AI app to your account: the tools, the limits, and what turns it on |
 | [Deploying.md](Deploying.md) | how a release reaches production |
+| [Vercel-builds.md](Vercel-builds.md) | which pushes each Vercel project skips building, and why |
+| [AI-reference-storage.md](AI-reference-storage.md) | how a Create AI Image job owns its reference uploads, and when they are deleted |
+| [qc/](qc/) | `imagehorse-qc` write-ups, one per run, with their screenshots |
 | [Change-summary.md](Change-summary.md) | full release history |
 | [PARKING_LOT.md](PARKING_LOT.md) | problems noticed but deliberately not fixed yet |
 | [AppShell-Refactor-Plan.md](AppShell-Refactor-Plan.md) | how the big files get smaller, and what the 2026-09-26 audit found |
 | [adr/](adr/INDEX.md) | decision records — why, not what |
-| [archive/](archive/README.md) | superseded documents, kept for their reasoning |
+| [archive/](archive/README.md) | superseded documents and finished handoffs, kept for their reasoning |
 
 Three `engine-worker-*` files also live here — the feasibility note, the a12
 design and the a11-0 transferred-canvas finding. They are not in the table

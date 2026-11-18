@@ -11031,6 +11031,25 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Verified** | 1280 and 390. Every blurb ≤ 4 lines at both, nothing clipped (`scrollHeight` vs `clientHeight`), cards equal height, last card to footer **96px**, no horizontal scroll. The marketing site has no `prefers-color-scheme` and no `data-theme` — it is dark-only — so "both themes" does not apply here. |
 | **Gates** | tsc 0, build 27 URLs prerendered, eslint 0 errors, guardrails OK. |
 
+## v9.1 Change Summary — 2026-09-26
+
+**The app tells you when a stroke will change a mask.** Three PRs: Night 3 (#242), Night 4 (#246) and the entropy refactor (#247).
+
+| Area | Change |
+| --- | --- |
+| **Mask state, said three times** (#246) | `useToolStore.maskEditing` now drives the Layer Settings tile, a status-bar chip (`Editing mask · black hides, white reveals`) and the brush ring, which wears the value the stroke will paint — ink `#000` or `#fff`, halo always the opposite so it survives a dark photo or a bright sky. None of the three computes its own answer. Mask editing previously *cleared* the cursor. |
+| **Why the ring drops `difference`** | Differencing black against a photo is a no-op, so a black ring would vanish over dark pixels. The paired light/dark outline carries it over anything — the same trick the selection cursors use. |
+| **§2 not built** (#246) | The plan's layer row — thumbnails, a ring, a `⋯` menu — has nothing to attach to: the layer picker is a native `<select>` whose `<option>` labels carry state as text. Building rows is a feature, not a consistency pass. Deferred whole, with the row menu behind it. |
+| **Tool panel grammar** (#242) | One header, one row primitive, and an Advanced disclosure at the foot holding what most strokes never need. The closed header prints what is inside (`Stabilizer: Med`), so a setting that is ON is never hidden. |
+| **Entropy refactor** (#247) | `drawEditState.ts`, `drawPreview.ts`, `canvasCursor.ts`, `shapeOverlayPath.ts`, `contractScan.ts` and `useCanvasCoords.ts` split out of `useDrawingTools.ts` and `CanvasArea.tsx`. Public APIs unchanged; `useDrawingTools` re-exports every moved name so no import moved. |
+| **Engine** (#247) | Eleven wasm exports with no caller deleted, `resize_bilinear`'s input bounded, a copied bbox loop folded. **824,286 → 819,031 B, −5,255.** |
+| **Three things the merge caught** | The extraction was correct when branched and stopped being correct while it waited. (1) `getCursorForSubTool` took `combineIntent` as a hand-written `0 \| 1 \| 2`, a copy of a union that had gained **Intersect (3)** — tsc caught it. (2) The extracted copy predated Night 4 and had no `maskEditing` branch; taking it as-is would have sent the mask brush back to the Move cursor with **no test and no type error**. (3) `has_layer_mask` was deleted as "no caller" — true when branched; `tests/selection_refine.rs` arrived afterwards with #233 and calls it twice. |
+| **Which gate caught (3)** | Only `cargo clippy --all-targets` with **no features**, which is what the pre-push hook runs. `cargo test --features tiles,patchmatch` compiled it fine. Exactly the trap CLAUDE.md documents. |
+| **Three max-lines caps raised** | AppShell 3649→3716, CanvasArea 2802→2823, the async contract test 1015→1027. **Merge arithmetic, not new slop:** this branch lowered the caps while master added Refine, Night 3 and Night 4 to the same files. Each merged number is still below what master permits (3718, 2909, and no per-file error cap at all). The reasoning is written into `eslint.config.mjs`. |
+| **librs-lines stayed retired** | #247 reintroduced the `lib.rs` line ratchet at 4662. Master retired it on 09-25 with "Don't reintroduce it without asking" — master's side was kept. Flagged for Chris. |
+| **Gates** | tsc 0, eslint **0 errors** / 54 warnings, vitest **111 files / 1242 tests**, `cargo clippy --all-targets` (no features) **0**, `cargo test` no-features 0, `cargo test --features tiles,patchmatch` **578 passed**, guardrails OK, app build 0. |
+| **Verified in a browser** | Sample photo → Edit → Layers → Add mask → Show entire layer on the **merged** build: tile reads "Painting mask", the chip reads "Editing mask · black hides, white reveals", the ring is `#000` with a `#fff` halo and `mix-blend-mode: normal`. The hand-repaired cursor survives the refactor. |
+
 ## v9.2 Change Summary — 2026-09-28
 
 **The Select panel's Refine section is readable, and Pro signups are closed.** Six PRs: Night 5 part 1 (#248), Vercel build skipping (#252), billing (#254), Refine tiles (#253), the AppShell refactor (#251) and the marketing design-system sync (#250).
@@ -11050,25 +11069,6 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Two harness lessons** | A mutation that never APPLIED is neither a kill nor a survival: `sed` cannot match across lines, so two multi-line mutations silently no-opped and read as vacuous tests. And `git checkout HEAD -- <tracked file>` during a mutation run deletes a not-yet-committed change — checkpoint first. |
 | **Gates** | tsc 0, eslint **0 errors**, vitest **119 files / 1,309 tests**, guardrails at baseline, app + marketing builds 0. Engine untouched, so no cargo run and no size change. |
 | **QC** | Sections 1-2 on the production build: boots logged-out, image loads, Select panel opens, Refine tiles and the Remove tile render. Wand click 47.2% selected, Shift+click 94.4% (Add), Ctrl+Z back to 47.2%. |
-
-## v9.1 Change Summary — 2026-09-26
-
-**The app tells you when a stroke will change a mask.** Three PRs: Night 3 (#242), Night 4 (#246) and the entropy refactor (#247).
-
-| Area | Change |
-| --- | --- |
-| **Mask state, said three times** (#246) | `useToolStore.maskEditing` now drives the Layer Settings tile, a status-bar chip (`Editing mask · black hides, white reveals`) and the brush ring, which wears the value the stroke will paint — ink `#000` or `#fff`, halo always the opposite so it survives a dark photo or a bright sky. None of the three computes its own answer. Mask editing previously *cleared* the cursor. |
-| **Why the ring drops `difference`** | Differencing black against a photo is a no-op, so a black ring would vanish over dark pixels. The paired light/dark outline carries it over anything — the same trick the selection cursors use. |
-| **§2 not built** (#246) | The plan's layer row — thumbnails, a ring, a `⋯` menu — has nothing to attach to: the layer picker is a native `<select>` whose `<option>` labels carry state as text. Building rows is a feature, not a consistency pass. Deferred whole, with the row menu behind it. |
-| **Tool panel grammar** (#242) | One header, one row primitive, and an Advanced disclosure at the foot holding what most strokes never need. The closed header prints what is inside (`Stabilizer: Med`), so a setting that is ON is never hidden. |
-| **Entropy refactor** (#247) | `drawEditState.ts`, `drawPreview.ts`, `canvasCursor.ts`, `shapeOverlayPath.ts`, `contractScan.ts` and `useCanvasCoords.ts` split out of `useDrawingTools.ts` and `CanvasArea.tsx`. Public APIs unchanged; `useDrawingTools` re-exports every moved name so no import moved. |
-| **Engine** (#247) | Eleven wasm exports with no caller deleted, `resize_bilinear`'s input bounded, a copied bbox loop folded. **824,286 → 819,031 B, −5,255.** |
-| **Three things the merge caught** | The extraction was correct when branched and stopped being correct while it waited. (1) `getCursorForSubTool` took `combineIntent` as a hand-written `0 \| 1 \| 2`, a copy of a union that had gained **Intersect (3)** — tsc caught it. (2) The extracted copy predated Night 4 and had no `maskEditing` branch; taking it as-is would have sent the mask brush back to the Move cursor with **no test and no type error**. (3) `has_layer_mask` was deleted as "no caller" — true when branched; `tests/selection_refine.rs` arrived afterwards with #233 and calls it twice. |
-| **Which gate caught (3)** | Only `cargo clippy --all-targets` with **no features**, which is what the pre-push hook runs. `cargo test --features tiles,patchmatch` compiled it fine. Exactly the trap CLAUDE.md documents. |
-| **Three max-lines caps raised** | AppShell 3649→3716, CanvasArea 2802→2823, the async contract test 1015→1027. **Merge arithmetic, not new slop:** this branch lowered the caps while master added Refine, Night 3 and Night 4 to the same files. Each merged number is still below what master permits (3718, 2909, and no per-file error cap at all). The reasoning is written into `eslint.config.mjs`. |
-| **librs-lines stayed retired** | #247 reintroduced the `lib.rs` line ratchet at 4662. Master retired it on 09-25 with "Don't reintroduce it without asking" — master's side was kept. Flagged for Chris. |
-| **Gates** | tsc 0, eslint **0 errors** / 54 warnings, vitest **111 files / 1242 tests**, `cargo clippy --all-targets` (no features) **0**, `cargo test` no-features 0, `cargo test --features tiles,patchmatch` **578 passed**, guardrails OK, app build 0. |
-| **Verified in a browser** | Sample photo → Edit → Layers → Add mask → Show entire layer on the **merged** build: tile reads "Painting mask", the chip reads "Editing mask · black hides, white reveals", the ring is `#000` with a `#fff` halo and `mix-blend-mode: normal`. The hand-repaired cursor survives the refactor. |
 
 ## v9.3 Change Summary — 2026-09-28
 
@@ -11501,7 +11501,7 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **Pen** | An unfilled freehand stroke selects on its segments, not the empty area in its bounding box. Delete, undo and redo preserve that behavior. |
 | **Browser coverage** | Every eligible default browser spec runs in two CI shards, with a coverage check. Service worker and keyless builds remain separate. Existing v9.20 resize behavior gains regression coverage; it is not a new resize implementation. |
 | **Marketing and docs** | Feature descriptions, annual and October Trail Log totals and commit squares, the newest release kept visible in each summary, remaining multi-night work, README deployment instructions and the documentation index are current. Commit dates preserve the work done on Friday and Saturday; the release lands Sunday. |
-| **Validation** | Full scoped production QC passes all five sections. The combined release passes 133 browser cases; preflight passes 1,864 unit tests; the keyboard correction adds four cases proved red before the fix and green afterward. Keyless boot: 4 passes. Rust: 512 featureless / 688 tiles. TypeScript, lint (0 errors, 55 existing warnings), guardrails, builds and inert-class audit pass. [Implementation and validation report](UI_NIGHTS_09_15.md). |
+| **Validation** | Full scoped production QC passes all five sections. The combined release passes 133 browser cases; preflight passes 1,864 unit tests; the keyboard correction adds four cases proved red before the fix and green afterward. Keyless boot: 4 passes. Rust: 512 featureless / 688 tiles. TypeScript, lint (0 errors, 55 existing warnings), guardrails, builds and inert-class audit pass. [Implementation and validation report](archive/UI_NIGHTS_09_15.md). |
 | **Release records** (10-11, after the tag) | GitHub Releases backfilled for v8.98, v9.2 and v9.19–v9.26, which were tagged but never published; every version tag now has a Release. `.codex/` is gitignored, since its config holds auth tokens. |
 | **Engine** | 892,634 → 892,897 B (+263), the pen hit-test branch. No saved-edit format, IndexedDB schema, authentication or billing change. Settings only normalizes the visible category; access rules and server calls are unchanged. |
 
@@ -11519,7 +11519,7 @@ The historical cached-restore timing concern remains recorded in the implementat
 | **Compare** | The original is decoded before it shows. Nothing for 300 ms, then a skeleton in the Original half; "Original unavailable" on a decode error or after 15 s, sized to that half. |
 | **Phone viewer** | Opening a photo shows a skeleton in that photo's own shape after 300 ms, then the photo lands in the same box. A missing original says "This photo couldn't be loaded." instead of spinning for good. A swipe never shows the new photo's name with the old picture. The phone boot screen is unchanged. |
 | **Tests** | 38 new unit cases across the four changes; the old code fails each red check. Three phone-grid browser specs now count the grid's own placeholders, not the header's sign-in skeleton, which CI's placeholder Clerk key keeps on screen. |
-| **Validation** | Browser checks: Compare and the phone viewer with decode slowed to 3 s and forced to fail; Plan & Billing in a keyless build and with auth that never connects, in dark and light themes. CI green on all four PRs. Combined master: 1,902 unit tests; TypeScript, lint (0 errors, 55 existing warnings), guardrails, build and inert-class audit pass. [Implementation report](UI_NIGHTS_16_19.md). |
+| **Validation** | Browser checks: Compare and the phone viewer with decode slowed to 3 s and forced to fail; Plan & Billing in a keyless build and with auth that never connects, in dark and light themes. CI green on all four PRs. Combined master: 1,902 unit tests; TypeScript, lint (0 errors, 55 existing warnings), guardrails, build and inert-class audit pass. [Implementation report](archive/UI_NIGHTS_16_19.md). |
 | **Engine** | Unchanged, 892,897 B. No saved-edit format, IndexedDB schema, authentication or billing change. |
 
 Not seen against a real signed-in session: the sign-in, AI Usage and Plan & Billing skeletons giving way to real data. Night 19 (import preview, image info, narrow menu bar) is still to do.

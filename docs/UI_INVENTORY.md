@@ -437,4 +437,4 @@ Night 7, and it needs the prose problem in §1 solved first.
 | Local save / cloud backup | Separate completed writes; failures tracked per photo and save kind |
 | ZIP and OpenRaster feedback | Shared async lifecycle and existing status primitives; measured packaging progress where available |
 
-Regression and visual evidence: [Night 7 audit](ui-state-v4/07-audit.md).
+Regression and visual evidence: [Night 7 audit](archive/ui-state-v4/07-audit.md).

@@ -1,5 +1,7 @@
 # Night 7 — State audit and regression protection
 
+> **ARCHIVED 11-18-2026.** Night 7 of the document-state pass, merged as #348 and shipped in v9.29 (10-14-2026). The six night records it links sit beside it in this folder. Where the UI docs start is [UI.md](../../UI.md).
+
 Base: Night 6; master rechecked f4dfd6c9. Prior work is included through the stacked branches, with no merge/deploy.
 
 Verified before modification: obsolete loadProgress/finishImageLoad and their completion timer remain in useUIStore without production consumers. The remaining startImageLoad call only needs the existing isImageLoading setter. The route mirror writes a canonical hash on every store notification, including selection coverage and loading; this can overwrite an external hash before its hashchange event runs. Browser checks reproduced intermittent Layers navigation loss during selection synchronization.

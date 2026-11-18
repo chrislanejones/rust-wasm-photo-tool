@@ -47,7 +47,7 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 ## Tech Stack
 
 - **Rust** — WASM processing layer (`wasm-bindgen`, `png` crate, `ab_glyph` fonts, SIMD128 kernels)
-- **React 19** — UI framework (19.2.x, pinned through the pnpm catalog)
+- **React 19** — UI framework (19.3.x, pinned through the pnpm catalog)
 - **TypeScript** — Type safety
 - **Zustand** — Client state management (UI / tool / gallery stores; IndexedDB-persisted prefs)
 - **Vite** — Build tool with WASM support (`vite-plugin-wasm` + top-level await)
