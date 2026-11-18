@@ -29,6 +29,8 @@ import { toast } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/UserMenu";
 import { MobileSettingsSheet } from "@/features/mobile/MobileSettingsSheet";
+import { PairPhoneCard } from "@/features/pair/PairPhoneCard";
+import { usePairPhoneImport } from "@/features/pair/sendController";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
@@ -352,6 +354,9 @@ export function MobileShell({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
+  // Photos from a paired computer (features/pair) land through this same
+  // upload, like a pick from the camera roll.
+  usePairPhoneImport(onAddFiles);
 
   const pendingImports = useGalleryStore((s) => s.pendingImports);
   // Which tiles have no pixels yet (the grid's one `aria-busy`), and whether
@@ -445,6 +450,10 @@ export function MobileShell({
         />
         <UserMenu />
       </div>
+
+      {/* Opened from a computer's pairing QR code (features/pair, ADR-105):
+          "Pairing with computer…" then "Connected". Nothing otherwise. */}
+      <PairPhoneCard />
 
       {booting ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">

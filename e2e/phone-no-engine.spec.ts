@@ -1,6 +1,7 @@
 import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
+import { PAIR_LAUNCH, pairUp, phoneTiles } from "./pair-harness";
 
 // Plan C §2 — a phone does not load the engine.
 //
@@ -9,6 +10,10 @@ import { join } from "node:path";
 // (`photo_limit`) is mirrored in lib/tiers.ts. Widening past 600px loads the
 // engine and the editor then. These specs count the engine's network requests;
 // they deliberately do NOT measure bytes (measured on real hardware instead).
+
+// Chrome's mDNS masking of local addresses off, for the pairing case at the
+// end (pair-harness.ts says why). No other test here opens a peer connection.
+test.use(PAIR_LAUNCH);
 
 const FIXTURES = [
   join(__dirname, "fixtures", "checker.png"),
@@ -127,6 +132,36 @@ test("demo mode (logged out) boots at both widths", async ({ page }) => {
   }
 });
 
+// Pairing (ADR-105): a phone opened from a computer's QR code joins without
+// the engine. A stand-in signaling server (window.__ihPairRelay, see
+// pair-connection.spec.ts) answers that this code was already used, so the
+// phone shows the right line; the full connection is covered over there.
+test("a pairing link opens the phone's pairing card, and the engine is still never requested", async ({ context, page }) => {
+  await blockExternalNetwork(page);
+  const calls: string[] = [];
+  await context.exposeBinding("__ihPairRelay", (_src, op: string) => {
+    calls.push(op);
+    return op === "readOffer" ? null : { ok: false, reason: "unavailable" };
+  });
+  await page.setViewportSize(PHONE);
+  const engine = watchEngine(page);
+  // A made-up pairing secret: the bytes 0..15, base64url. Built here rather than
+  // written out, so it never reads as a committed credential to the secret scan.
+  const secret = Buffer.from(Array.from({ length: 16 }, (_, i) => i)).toString("base64url");
+  await page.goto(`/#/pair/${secret}`);
+  await dismissNotice(page);
+  const card = page.getByTestId("pair-phone");
+  // Off until this phone allows online features; nothing was asked yet.
+  await expect(card).toHaveAttribute("data-status", "online-off");
+  expect(calls).toEqual([]);
+  expect(page.url()).not.toContain(secret);
+  await card.getByRole("switch").click();
+  await expect(card).toHaveAttribute("data-status", "unavailable", { timeout: 15_000 });
+  await expect(card.getByRole("heading", { name: "This code has expired or was already used" })).toBeVisible();
+  expect(calls).toEqual(["readOffer"]);
+  expect(engine).toEqual([]);
+});
+
 // Transfer (ADR-102): the phone's Send to computer lives in its Settings sheet,
 // behind `?beta=transfer`, and must not bring the engine with it. Logged out
 // it offers no picker. This build points at a fake Convex and blocks Clerk, so
@@ -146,4 +181,31 @@ test("with the transfer Beta, the phone's Send to computer shows and the engine 
   ).toBeVisible();
   await expect(page.getByTestId("send-to-computer-input")).toHaveCount(0);
   expect(engine).toEqual([]);
+});
+
+// Pairing, receiving (ADR-105 "Sending"): a paired computer sends its open
+// photo's original, the phone accepts, and it lands in the phone's grid
+// through the phone's own upload path, still without the engine. Real WebRTC
+// between two contexts; pair-harness.ts says what stands in for Convex.
+test.describe("pairing, receiving", () => {
+  test("a photo sent from a paired computer lands in the phone's grid, and the engine is still never requested", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    const { phone, phoneRequests } = await pairUp(browser, context, page);
+    // Nothing selected: Send to phone sends the open photo.
+    await page.getByRole("button", { name: "Send to phone" }).click();
+    const prompt = phone.page.getByTestId("pair-transfer");
+    await expect(phone.page.getByTestId("pair-transfer-title")).toHaveText(/^Computer wants to send 1 photo \(\d+ KB\)$/, {
+      timeout: 30_000,
+    });
+    await prompt.getByRole("button", { name: "Accept", exact: true }).click();
+    await expect(prompt).toHaveAttribute("data-outcome", "done", { timeout: 60_000 });
+    await prompt.getByRole("button", { name: "Done" }).click();
+    await expect(phoneTiles(phone.page)).toHaveCount(1, { timeout: 30_000 });
+    await expect(phone.page.getByRole("button", { name: "View photo checker" })).toBeVisible();
+    expect(phoneRequests.engine()).toEqual([]);
+    await phone.context.close();
+  });
 });
