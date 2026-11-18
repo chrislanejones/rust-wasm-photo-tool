@@ -33,8 +33,19 @@ export const GROUPS: Group[] = [
         body: "Open a .psd with its layers, and save your work as one. The plugin is built and public, and Settings → Plugins takes it from a file or a link. What is left is a real place to get it, instead of a raw file in a repo.",
       },
       {
-        name: "Send a photo to your other device",
-        body: "One photo from your phone to your desktop, one tap — and the server forgets it as soon as the other machine has it.",
+        name: "Send photos from your phone",
+        body: "Pick photos on your phone and they wait in an Inbox in the editor's gallery until you add them. The server copy goes as soon as your computer has it. Needs sign-in on both devices. Already behind a flag.",
+        beta: "transfer",
+      },
+      {
+        name: "Trash for share links",
+        body: "Delete a share link and it goes to a Trash in Settings › Shared, where you can bring it back at the same address. Needs sign-in. Already behind a flag.",
+        beta: "trash",
+      },
+      {
+        name: "Connect an AI app to your account",
+        body: "A Settings page that shows what an app like Claude would be able to reach in your account, and what it never could. Nothing connects yet; this is the preview. Already behind a flag.",
+        beta: "mcp-connector",
       },
       {
         name: "Offline",

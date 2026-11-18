@@ -43,7 +43,7 @@ const TOOLS = [
   { id: "emoji", label: "Emoji", Icon: EmojiIcon, blurb: "drop one on the photo, sized however you like" },
   { id: "eraser", label: "Eraser", Icon: EraserIcon, blurb: "rub out strokes or mask parts of a layer" },
   { id: "wand", label: "Wand", Icon: WandIcon, blurb: "select by color, then blur, cut or recolor it" },
-  { id: "crop", label: "Crop", Icon: CropIcon, blurb: "straighten, fix perspective, trim to a ratio" },
+  { id: "crop", label: "Crop", Icon: CropIcon, blurb: "trim to a ratio, flip, rotate, fix perspective" },
   { id: "resize", label: "Resize", Icon: ResizeIcon, blurb: "to a pixel size or a file size, one or forty at once" },
   { id: "layers", label: "Layers", Icon: LayersIcon, blurb: "a real stack, with opacity and masks" },
   { id: "undo", label: "Undo", Icon: UndoIcon, blurb: "a thousand steps back, kept between visits" },

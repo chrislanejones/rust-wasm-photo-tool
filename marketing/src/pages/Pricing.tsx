@@ -118,7 +118,7 @@ const MATRIX: { name: string; rows: Row[] }[] = [
       row("Undo / redo", [Y, Y, Y]),
       row("Export PNG · JPEG · WebP · AVIF", [Y, Y, Y]),
       row("OpenRaster export and import", [Y, Y, Y], "layers intact, opens in Krita"),
-      row("Batch", [Y, Y, Y], "logo, text, crop, rename, AI rename — all local"),
+      row("Batch", [Y, Y, Y], "crop, resize, logo, text, rename, AI rename — all local"),
     ],
   },
   {
@@ -138,6 +138,8 @@ const MATRIX: { name: string; rows: Row[] }[] = [
       row("Persistent history", [N, Y, Y]),
       row("Annotations sync", [N, Y, Y]),
       row("Share links", [N, Y, Y]),
+      row("Trash for share links", [N, "7 days", "30 days"], "Beta · restore a deleted link"),
+      row("Send photos from your phone", [N, Y, Y], "Beta · counts toward storage while it waits"),
     ],
   },
   {
@@ -146,6 +148,7 @@ const MATRIX: { name: string; rows: Row[] }[] = [
       row("Background removal", [N, N, Y], "rembg"),
       row("Object removal", [N, N, Y], "LaMa"),
       row("Read text out of an image", [N, N, Y], "OCR"),
+      row("Create AI Image", [N, N, Y], "six models, from a prompt"),
       row("Daily AI passes", [N, N, "50 a day"], "resets every 24 hours"),
       row("Monthly AI passes", [N, N, "300 a month"], "resets every 30 days"),
     ],

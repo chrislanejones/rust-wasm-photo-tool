@@ -216,10 +216,11 @@ export default function Home() {
               Every tool you&rsquo;d reach for. None you&rsquo;d have to learn.
             </h2>
             <p className="editor__run">
-              Crop · Resize · Brightness and contrast · Twelve presets · Blur · Arrows, boxes and
-              pins · Text bubbles in three typefaces · Emoji · Blur, pixelate and black-box
-              redaction · Magic-wand select · Magic eraser · Layers · Undo to a thousand steps ·
-              Batch crop and logo stamping · Export to PNG, JPEG, WebP or AVIF
+              Crop · Resize · Brightness and contrast · Auto tone · Twelve presets · Copy a look to
+              other photos · Blur · Arrows, boxes, pins and callouts · Text bubbles in three
+              typefaces · Emoji · Blur, pixelate and black-box redaction · Magic-wand select · Magic
+              eraser · Layers · Undo to a thousand steps · Compare two screenshots · Find duplicates
+              · Batch crop, resize and logo stamping · Export to PNG, JPEG, WebP or AVIF
             </p>
             <p className="lede editor__lede">
               All of it is free and works offline. Your edits are kept in this browser between
@@ -296,10 +297,11 @@ export default function Home() {
           </p>
         </section>
 
-        {/* The one measurement on this page that has not shipped yet.
-            ⚠️ The copy deliberately does NOT say "blur runs on your GPU". No
-            pixel in the app goes near the GPU yet — the flag attaches a
-            correctness harness and nothing more. The section sells the
+        {/* The one measurement on this page that is not on for everyone yet.
+            ⚠️ The copy deliberately does NOT say "blur runs on your GPU" as a
+            default. Since 09-22-2026 the whole-image blur DOES run on WebGPU,
+            but only with the `gpu-blur` Beta switched on (lib/featureFlags.ts),
+            and it falls back to the CPU on any failure. The section sells the
             measurement, which is real, and the cubes are the honest demo: they
             ARE drawn by WebGPU where the machine has it. */}
         <section className="gpu" id="gpu" aria-labelledby="gpu-title">
@@ -314,8 +316,9 @@ export default function Home() {
               once the blur gets wide.
             </p>
             <p className="gpu__caveat">
-              It isn&rsquo;t switched on in the editor yet &mdash; it&rsquo;s still being checked
-              pixel for pixel against the current engine. When it lands, nothing about your workflow
+              It&rsquo;s a Beta for now &mdash; switch on Blur on the graphics card in Settings
+              &rsaquo; Beta and a whole-image blur runs there, falling back to your processor if
+              anything goes wrong. When it&rsquo;s on for everyone, nothing about your workflow
               changes. It just finishes sooner.
             </p>
             <p className="gpu__hint">The letters are live. Hover to ripple them, drag to scatter, or press a key.</p>

@@ -29,7 +29,7 @@ const FILTERS = [
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
   demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the editor everyone gets, and it is the whole editor.",
-  free: "Signing in adds sync, history and share links. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
+  free: "Signing in adds sync, history and share links, and as Betas, a trash for share links and sending photos from your phone. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
   pro: "Everything that ships today. Paid is the only entitlement where a photo of yours reaches an inference server. An admin is entitled to all of this by role, not by purchase.",
 };
 
@@ -41,6 +41,7 @@ const EDGE: Node[] = [
   ["Convex", "settings across devices · entitlements · gallery", "free pro"],
   ["AI proxy → Replicate", "the server holds the provider key", "pro"],
   ["Share delivery", "ShareViewer · view counts, timestamps only", "free pro"],
+  ["Transfer inbox", "Beta · phone → your computer · owner-only", "free pro"],
 ];
 
 interface Group {
@@ -63,7 +64,7 @@ const GROUPS: Group[] = [
     items: [
       ["React App", "Vite + React 19 · Vercel static SPA", "demo free pro"],
       ["Canvas Engine", "Engine worker · zero-copy blit to an OffscreenCanvas", "demo free pro"],
-      ["Zustand State", "11 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
+      ["Zustand State", "17 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
     ],
   },
   {
@@ -81,8 +82,9 @@ const GROUPS: Group[] = [
       ["perspective", "Four-corner warp for shapes, text and pixels · homography solved in Rust", "demo free pro"],
       ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust", "demo free pro"],
       ["describe", "Local image description — names a photo from its content, no account", "demo free pro"],
-      // OP_FORMAT_VERSION in src/ops.rs is 11 (10-08-2026).
-      ["codec · history", "PNG encode (Rust) · undo snapshots · op log at format v11", "demo free pro"],
+      ["diff · dhash · look · auto tone", "Compare two photos pixel by pixel · look-alike fingerprints for Find duplicates · Copy look read from the op log · Auto tone from the histogram", "demo free pro"],
+      // OP_FORMAT_VERSION in src/ops.rs is 16 (11-13-2026, v9.63).
+      ["codec · history", "PNG encode (Rust) · palette PNGs · undo snapshots · op log at format v16", "demo free pro"],
       ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill", "demo free pro"],
       ["simd", "v128/f32x4 kernels · scalar fallback", "demo free pro"],
     ],
@@ -110,9 +112,14 @@ const GROUPS: Group[] = [
       ["users.ts", "account row · me() with tier, role and entitlement", "free pro"],
       ["entitlement.ts", "the one ladder: none → free → paid · a preview may only take away", "free pro"],
       ["photoEdits.ts", "save / getEdit", "free pro"],
-      ["ai.ts", "dispatch to Replicate · 3 models wired", "pro"],
+      ["ai.ts", "dispatch to Replicate · 3 editing models, 6 image models", "pro"],
       ["aiJobs.ts", "job status (useQuery) · daily and monthly caps", "pro"],
+      ["aiJobFiles.ts", "AI files expire 7 days after the job · a dry run until switched on", "pro"],
       ["shares.ts", "public share links · pause, view cap, expiry", "free pro"],
+      ["trash.ts", "Beta share-link trash · 7 days free, 30 paid · purge is a dry run until switched on", "free pro"],
+      ["transfers.ts", "Beta phone → computer inbox · 50 photos, 50 MiB each", "free pro"],
+      ["storageUsage.ts", "an exact count of each account's stored bytes", "free pro"],
+      ["mcp*.ts", "an MCP endpoint for AI apps · off by default, every route answers 404", "free pro"],
       ["textHistory.ts", "recent texts", "free pro"],
       ["sync.ts", "settings across devices · compare-and-set on rev", "free pro"],
       ["userColors.ts", "saved color palette · 32 per user", "free pro"],
@@ -127,7 +134,7 @@ const GROUPS: Group[] = [
     surface: "wasm",
     items: [
       ["IndexedDB (Dexie)", "Originals · SHA-256 content-addressed · your machine", "demo free pro"],
-      ["Convex File Storage", "Edit archives · shares · AI frames · a server", "free pro"],
+      ["Convex File Storage", "Edit archives · shares · AI frames · phone transfers · a server", "free pro"],
     ],
   },
   {
@@ -140,6 +147,7 @@ const GROUPS: Group[] = [
       ["cjwbw/rembg", "background removal", "pro"],
       ["text-extract-ocr", "text extract", "pro"],
       ["remove-object", "object removal (masked, LaMa)", "pro"],
+      ["Create AI Image", "Flux Schnell · Dev · 1.1 Pro · Kontext Pro · SD 3.5 Large · Ideogram v3 Turbo", "pro"],
       ["Real-ESRGAN", "4× upscale", "planned", "soon"],
     ],
   },
@@ -163,6 +171,8 @@ const TABLE_BADGE: Record<string, string> = {
   shares: "public read",
   share_views: "new · timestamps only",
   ai_jobs: "Replicate",
+  transfers: "Beta",
+  mcp_calls: "off by default",
 };
 
 const RELS: [string, string, string][] = [
@@ -174,6 +184,9 @@ const RELS: [string, string, string][] = [
   ["users", "1 ─ ∞", "shares"],
   ["shares", "1 ─ ∞", "share_views"],
   ["users", "1 ─ ∞", "ai_jobs"],
+  ["users", "1 ─ ∞", "transfers"],
+  ["users", "1 ─ 1", "storage_usage"],
+  ["users", "1 ─ ∞", "mcp_calls"],
 ];
 
 // A relationship is only drawn when both ends are tables the schema actually
@@ -194,7 +207,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.27, 10-11-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.64, 11-15-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -246,7 +259,7 @@ export default function Architecture() {
             <div className="arch-plane__head">
               <span className="arch-plane__name">Browser</span>
               <span className="arch-plane__note">
-                no server in the edit path · one 893 KB engine
+                no server in the edit path · one 968 KB engine
               </span>
             </div>
 
@@ -259,8 +272,9 @@ export default function Architecture() {
                   <li>Tool registry — 5 modules registered; routing still hand-wired in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask · resize &amp; compress · shapes</li>
                   <li>
-                    11 Zustand stores — UI · tool · gallery · annotation · guides · perspective ·
-                    text box · batch crop · batch group · history branches · SVG source
+                    17 Zustand stores — UI · view · tool · gallery · annotation · guides ·
+                    perspective · text box · batch crop · batch group · batch resize · batch view ·
+                    history branches · look · screenshot compare · SVG source · ZIP recipes
                   </li>
                 </ul>
               </article>
@@ -291,7 +305,8 @@ export default function Architecture() {
                     kernel
                   </li>
                   <li className={`arch-node__planned${dim("planned")}`}>
-                    WebGPU backend — one blur kernel and a self-test; nothing on the pixel path
+                    WebGPU backend — the whole-image blur, behind a Beta switch, back to the CPU
+                    on any failure
                   </li>
                 </ul>
               </article>
@@ -301,7 +316,7 @@ export default function Architecture() {
                 <p className="arch-node__sub">IndexedDB · Dexie</p>
                 <ul className="arch-node__list">
                   <li>originals — content-addressed (SHA-256), immutable</li>
-                  <li>opLogs + keyframes — the op format is at v9</li>
+                  <li>opLogs + keyframes — the op format is at v16</li>
                   <li>gallery manifest</li>
                   <li>renderCache — disposable</li>
                 </ul>
@@ -464,7 +479,8 @@ export default function Architecture() {
             <article className="arch-note">
               <h4 className="arch-note__title">File storage</h4>
               <p className="arch-note__body">
-                Blob storage for edit archives, share snapshots and AI frames via{" "}
+                Blob storage for edit archives, share snapshots, AI frames and photos waiting in
+                the Transfer inbox via{" "}
                 <span className="arch-mono">storage.getUrl()</span>.
               </p>
             </article>

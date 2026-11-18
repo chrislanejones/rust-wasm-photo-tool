@@ -278,7 +278,7 @@ export const ROUTES: readonly Route[] = [
     label: "Photo editor",
     title: "Free photo editor that runs in your browser — no upload",
     description:
-      "Crop, straighten and correct exposure without uploading anything. Twelve presets preview on your own photo, every step undoes, and no account is needed.",
+      "Crop and fix exposure without uploading anything. Auto picks a starting point, twelve presets preview on your photo, and every step undoes. No account needed.",
     sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
     toolPage: true,
   },
@@ -298,7 +298,7 @@ export const ROUTES: readonly Route[] = [
     label: "Background remover",
     title: "Background remover — cut out a subject cleanly",
     description:
-      "One click lifts the subject off its background with a clean edge, including hair. Runs on a server and needs Pro; the job is deleted once the result comes back.",
+      "One click lifts the subject off its background with a clean edge, including hair. It runs on a server we pay for, so it needs Pro and online features on.",
     sources: ["marketing/src/pages/ToolLanding.tsx", "marketing/src/data/toolPages.ts"],
     toolPage: true,
   },
