@@ -228,8 +228,11 @@ export default tseslint.config(
     // object became one `textOverlaySettings(toolSettings)` (lib/textOverlaySettings.ts).
     // 3128 -> 3112 (Batch Masonry, 11-07-2026): the Batch grid's container
     // and hero styles moved to features/canvas/batchLayout.ts.
+    // 3112 -> 3093 (fill-first shapes, 11-19-2026): the two copies of the
+    // edit overlay's nine `drawSettings` fields became one call each to
+    // features/canvas/shapeDrawSettings.ts, which now picks them by kind.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["error", { max: 3112 }] },
+    rules: { "max-lines": ["error", { max: 3093 }] },
   },
   {
     // 2950 -> 2909: the Perspective tool's canvas wiring moved out to

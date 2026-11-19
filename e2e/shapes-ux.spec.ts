@@ -7,9 +7,17 @@ import { join } from "node:path";
 //
 //   1. Delete / Backspace on a selected shape removes it.
 //   2. Ctrl+Z is ONE history step, not two.
-//   3. Clicking the EMPTY INTERIOR of an unfilled rect does not select it —
-//      so a shape can be drawn inside another shape.
-//   4. Clicking the STROKE of that same rect still selects it.
+//   3. A rect's interior selects it when there is something there to click.
+//      On 2026-08-28 a new rect was an OUTLINE, and the finding was that its
+//      empty middle must not select it, so a shape could be drawn inside
+//      another. Since 11-19-2026 (ADR-107) a new rect is FILLED, with no
+//      stroke, so its middle is the shape: a drag started there selects it
+//      and draws nothing. The outline rule still holds for every shape with
+//      no fill (older documents, diagram shapes) and is pinned where such a
+//      shape can still be made: `annotation-multiselect.spec.ts` ("an
+//      unfilled shape is picked by its outline"), `annotationHitTest.test.ts`
+//      and the engine's own tests.
+//   4. Clicking the EDGE of that same rect still selects it.
 //
 // Runs against the PRODUCTION build in logged-out demo mode, driving the real
 // mouse path (rubber-band drag → overlay → commit) rather than the engine, so
@@ -211,23 +219,25 @@ test("shapes: delete key, single-step undo, interior vs stroke selection", async
   expect.soft(undoBefore - undoAfter, "one Ctrl+Z = one history step").toBe(1);
   expect.soft(afterUndo, "one Ctrl+Z removes ONE rect").toBe(after3 - 1);
 
-  // ── 3. Empty INTERIOR of A (unfilled) does not select it: a drag started
-  // there draws a NEW rect inside A.
+  // ── 3. The INTERIOR of A selects it. A new rect is filled (ADR-107), so a
+  // drag started inside it is a press on the shape, not on bare canvas: A is
+  // selected, and no new rect is drawn inside it.
   const before = await shapeCount(page);
-  await drag(page, [25, 25], [45, 45]); // wholly inside A, off its stroke
+  await drag(page, [25, 25], [45, 45]); // wholly inside A, off its edge
   const overlayAfterInteriorDrag = await selectedShapeOverlay(page);
   await clickCanvas(page, 252, 252); // commit whatever is pending
   const afterInterior = await shapeCount(page);
   console.log(
     `[shapes] drag inside A: overlay=${overlayAfterInteriorDrag}, shapes ${before} → ${afterInterior}`,
   );
-  expect.soft(afterInterior, "a drag inside an unfilled rect draws a new shape").toBe(before + 1);
+  expect.soft(overlayAfterInteriorDrag, "a press inside a filled rect selects it").toBe(true);
+  expect.soft(afterInterior, "a drag inside a filled rect draws no new shape").toBe(before);
 
-  // ── 4. The STROKE still selects. A's left edge is x=10; y=35 is mid-height.
+  // ── 4. The EDGE still selects. A's left edge is x=10; y=35 is mid-height.
   await clickCanvas(page, 10, 35);
   const selectedOnStroke = await selectedShapeOverlay(page);
-  console.log(`[shapes] click on A's stroke: selected=${selectedOnStroke}`);
-  expect.soft(selectedOnStroke, "clicking the stroke selects the shape").toBe(true);
+  console.log(`[shapes] click on A's edge: selected=${selectedOnStroke}`);
+  expect.soft(selectedOnStroke, "clicking the edge selects the shape").toBe(true);
 
   // ── 1. Delete removes the selected shape.
   const beforeDelete = await shapeCount(page);

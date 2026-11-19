@@ -108,7 +108,10 @@ export interface ToolSettings extends StampSettings {
    *  the Shapes tool has selected. Absent = the arrow. */
   arrowShape?: "arrow" | DiagramShapeName;
 
-  // Shape interior fill (rect + circle only). Painted under the stroke.
+  // Interior fill, painted under the stroke — the STROKE-FIRST set's: a
+  // diagram shape's Fill dropdown and the Pen's Background. The Shapes tab's
+  // own shapes read `shapeFillMode` / `shapeFillColor` below instead, and
+  // share only the gradient's second stop, its angle and the mosaic block.
   /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2,
    *  "pixelate" = mosaic the pixels beneath (a re-selectable redaction box). */
   fillMode: "none" | "solid" | "gradient" | "pixelate";
@@ -116,6 +119,21 @@ export interface ToolSettings extends StampSettings {
   fillColor2: string;      // gradient stop 1 (hex)
   gradientAngle: number;   // degrees: 0 →, 45 ↘, 90 ↓, 135 ↙
   fillBlock: number;       // mosaic block size (px) for fillMode "pixelate"
+
+  // The Shapes tab's shapes with an interior — rect, circle, oval, diamond,
+  // star, triangle — are FILL FIRST (11-19-2026): the panel leads with Fill
+  // Color and the stroke is an optional extra, off by default. They read these
+  // four instead of `strokeColor` / `strokeWidth` / `fillMode` / `fillColor`,
+  // which stay with the stroke-first things (line, arrow, diagram shapes,
+  // pins, pen) — one shared width could not be 0 for a square and 3 for the
+  // arrow drawn next. `drawEditState.panelShapeStyle` is the one place that
+  // picks between the two sets.
+  /** "solid" unless a reselected older shape brought its own mode with it. */
+  shapeFillMode: "none" | "solid" | "gradient" | "pixelate";
+  shapeFillColor: string;
+  shapeStrokeColor: string;
+  /** px; 0 = no stroke, the default. */
+  shapeStrokeWidth: number;
 
   /** Shape stroke sloppiness 0-100: how hand-drawn the outline is. 0 = firm
    *  straight/clean edges; 100 = the old hand-drawn look (wobbly, ends that

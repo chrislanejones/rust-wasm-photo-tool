@@ -1,4 +1,5 @@
 // ===== FILE: app/src/lib/defaultToolSettings.ts =====
+import { TEXT_COLORS } from "./colors";
 import type { ToolSettings } from "./types";
 
 export const defaultToolSettings: ToolSettings = {
@@ -13,6 +14,12 @@ export const defaultToolSettings: ToolSettings = {
   fillColor2: "#ec4899",
   gradientAngle: 0,
   fillBlock: 16,
+  // A new shape is filled with the palette's first color (white, as the
+  // palette stands) and has no stroke.
+  shapeFillMode: "solid",
+  shapeFillColor: TEXT_COLORS[0],
+  shapeStrokeColor: "#000000",
+  shapeStrokeWidth: 0,
   sloppiness: 0,
   starPoints: 5,
   cornerRadii: [0, 0, 0, 0],

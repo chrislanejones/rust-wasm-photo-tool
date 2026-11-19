@@ -13,6 +13,7 @@ import {
   Diamond,
   Star,
   Triangle,
+  Ban,
 } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -25,7 +26,7 @@ import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
-import { shapeCanFill, SHAPE_KIND_NAME } from "@/lib/drawEditState";
+import { FILL_FIRST_KINDS, SHAPE_KIND_NAME, SHAPE_NAME_KIND } from "@/lib/drawEditState";
 import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
 import type { DiagramShapeName } from "@/lib/types";
 import { isDiagramKind } from "@/lib/diagramShapes";
@@ -59,6 +60,12 @@ const ARROW_STYLES = [
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
+
+// A fill-first shape's optional stroke: None first, because none is the
+// default, then three widths. The width a stroke is turned on at when its
+// color is picked while it is still None is the first real one.
+const SHAPE_STROKE_PRESETS = [0, 2, 4, 8] as const;
+const SHAPE_STROKE_ON = SHAPE_STROKE_PRESETS[1];
 
 // Corner radius presets, px — numbers variant like Points. Square, a soft
 // round, a card, and a pill on most shapes (the engine clamps to what fits).
@@ -97,7 +104,7 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
     id: "shapes",
     label: "Shapes",
     icon: ShapesIcon,
-    info: "Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°), the dots inside the corners to round them (Shift rounds one corner only), and a circle's oval handle — left of its box — to stretch it into an oval.",
+    info: "Pick a shape and its fill color, then click-drag on the canvas to draw it. A shape is filled and has no outline until you give it one under Stroke. It stays live-editable until you commit it: drag the handles to resize, the hook below the box to rotate (Shift snaps to 15°), the dots inside the corners to round them (Shift rounds one corner only), and a circle's oval handle — left of its box — to stretch it into an oval.",
   },
   {
     id: "pens",
@@ -141,6 +148,11 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   const radii = canonicalCornerRadii(radiusShape ?? "rect", settings.cornerRadii);
   const cornersUsed = radiusShape === "triangle" ? 3 : radiusShape === "star" ? 1 : 4;
   const mixed = radii.slice(0, cornersUsed).some((r) => r !== radii[0]);
+  // Fill first, or stroke first? The shape in hand decides — the reselected
+  // one if there is one, else the tile. Everything with an interior on this
+  // tab is fill first; the line (and a reselected pin or arrow) has only a
+  // stroke, so it leads with that, like the Arrows tab.
+  const fillFirst = FILL_FIRST_KINDS.has(editingKind ?? SHAPE_NAME_KIND[currentShape] ?? -1);
   // Arrows panel: the line arrow is picked (the default), or a diagram shape.
   // A reselected diagram shape shows its own controls whatever is picked —
   // the starPoints rule above.
@@ -176,6 +188,31 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     onChange={(id) => onChange({ ...settings, shape: id })}
                   />
 
+                  {/* THE COLOR PALETTE COMES FIRST (Chris, 11-19-2026) — a
+                      design-system rule since, UI_CONSISTENCY §8: the color is
+                      the first thing chosen about a shape, so it is the first
+                      control under the tiles. A shape with an interior is
+                      FILL FIRST: this is its fill, and its stroke is the
+                      closed Stroke section at the foot. The line has no
+                      interior, so its one color is its stroke and the width
+                      follows it directly, as on the Arrows tab. */}
+                  {fillFirst ? (
+                    <ColorSwatchGrid
+                      label="Fill Color"
+                      colors={TEXT_COLORS}
+                      value={settings.shapeFillColor}
+                      // A reselected older shape may be outline-only, a
+                      // gradient or a pixelate box: then no swatch is its
+                      // fill, and picking one makes it a solid.
+                      selected={settings.shapeFillMode === "solid"}
+                      onChange={(color) =>
+                        onChange({ ...settings, shapeFillMode: "solid", shapeFillColor: color })
+                      }
+                    />
+                  ) : (
+                    <StrokeFirst settings={settings} onChange={onChange} />
+                  )}
+
                   {/* Points — the star only. The count lives on the star rather
                       than the triangle because a star with 4 or 8 points is
                       still a star; a triangle with 5 is a pentagon. */}
@@ -205,25 +242,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     />
                   )}
 
-                  {/* Stroke Width */}
-                  <SizeSlider
-                    label="Stroke Width"
-                    value={settings.strokeWidth}
-                    min={1}
-                    max={10}
-                    onChange={(v) => onChange({ ...settings, strokeWidth: v })}
-                    presets={STROKE_WIDTH_PRESETS}
-                    renderPreset={(preset) => (
-                      <span
-                        className="rounded-full bg-theme-foreground"
-                        style={{ width: preset * 2, height: preset * 2 }}
-                      />
-                    )}
-                  />
-
-                  {/* Stroke Sloppiness — how hand-drawn the outline is. Same
-                      SizeSlider as Stroke Width/Opacity (numbers variant), so
-                      firm (0) → hand-drawn (100) with the max at the top. */}
+                  {/* Sloppiness — how hand-drawn the outline is, firm (0) →
+                      hand-drawn (100). It roams the STROKE, never the fill,
+                      so on a shape with no stroke there is nothing to roam. */}
                   <SizeSlider
                     label="Sloppiness"
                     value={settings.sloppiness ?? 0}
@@ -233,19 +254,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     unit="%"
                   />
 
-                  {/* Stroke Color */}
-                  <ColorSwatchGrid
-                    colors={TEXT_COLORS}
-                    value={settings.strokeColor}
-                    onChange={(color) => onChange({ ...settings, strokeColor: color })}
-                  />
-
-                  {/* Fill — every shape that encloses an area: rect, circle,
-                      diamond, star, triangle. The line is the one shape with no
-                      interior, so it is the one without this section. */}
-                  {shapeCanFill(currentShape) && (
-                    <FillSection settings={settings} onChange={onChange} />
-                  )}
+                  {fillFirst && <ShapeStrokeSection settings={settings} onChange={onChange} />}
                 </>
               );
 
@@ -268,28 +277,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                   {/* Next number (insert a step) and Renumber. */}
                   <PinStepsControls letters={settings.pinLabel === "letters"} />
 
-                  {/* Pin size — reuses the Stroke Width slider. */}
-                  <SizeSlider
-                    label="Stroke Width"
-                    value={settings.strokeWidth}
-                    min={1}
-                    max={10}
-                    onChange={(v) => onChange({ ...settings, strokeWidth: v })}
-                    presets={STROKE_WIDTH_PRESETS}
-                    renderPreset={(preset) => (
-                      <span
-                        className="rounded-full bg-theme-foreground"
-                        style={{ width: preset * 2, height: preset * 2 }}
-                      />
-                    )}
-                  />
-
-                  {/* Color (pin fill). */}
-                  <ColorSwatchGrid
-                    colors={TEXT_COLORS}
-                    value={settings.strokeColor}
-                    onChange={(color) => onChange({ ...settings, strokeColor: color })}
-                  />
+                  {/* Color (pin fill), then the pin's size — which reuses the
+                      Stroke Width slider. Palette first, as on every tab. */}
+                  <StrokeFirst settings={settings} onChange={onChange} colorLabel="Color" />
                 </>
               );
 
@@ -333,21 +323,10 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     </ControlRow>
                   ))}
 
-                  {/* Stroke Width */}
-                  <SizeSlider
-                    label="Stroke Width"
-                    value={settings.strokeWidth}
-                    min={1}
-                    max={10}
-                    onChange={(v) => onChange({ ...settings, strokeWidth: v })}
-                    presets={STROKE_WIDTH_PRESETS}
-                    renderPreset={(preset) => (
-                      <span
-                        className="rounded-full bg-theme-foreground"
-                        style={{ width: preset * 2, height: preset * 2 }}
-                      />
-                    )}
-                  />
+                  {/* Stroke Color, then Stroke Width: an arrow is only a
+                      stroke, and a diagram shape is read by its outline, so
+                      this tab stays stroke first — palette first all the same. */}
+                  <StrokeFirst settings={settings} onChange={onChange} />
 
                   {/* Sloppiness — a diagram shape only; the arrow has none. */}
                   {diagramInHand && (
@@ -360,13 +339,6 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       unit="%"
                     />
                   )}
-
-                  {/* Color */}
-                  <ColorSwatchGrid
-                    colors={TEXT_COLORS}
-                    value={settings.strokeColor}
-                    onChange={(color) => onChange({ ...settings, strokeColor: color })}
-                  />
 
                   {/* Every diagram shape is closed, so every one fills. */}
                   {diagramInHand && <FillSection settings={settings} onChange={onChange} />}
@@ -403,15 +375,97 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   );
 }
 
-/** Fill — None / Solid / Gradient / Pixelate, and each one's controls. One
- *  section for every shape with an interior, in both the Shapes and the
- *  Arrows & Diagram Shapes panels.
+type PanelProps = Pick<ShapesSettingsProps, "settings" | "onChange">;
+
+/** The four growing dots every Stroke Width row shows above its track. */
+const strokeDot = (preset: number) => (
+  <span
+    className="rounded-full bg-theme-foreground"
+    style={{ width: preset * 2, height: preset * 2 }}
+  />
+);
+
+/** Stroke Color, then Stroke Width — the two controls of everything that is
+ *  drawn as a stroke: the line, the arrow, a diagram shape's outline, and a
+ *  pin (whose "stroke width" is its size, and whose color is just Color).
+ *  One component so the order is one decision: the palette first. */
+function StrokeFirst({
+  settings,
+  onChange,
+  colorLabel = "Stroke Color",
+}: PanelProps & { colorLabel?: string }) {
+  return (
+    <>
+      <ColorSwatchGrid
+        label={colorLabel}
+        colors={TEXT_COLORS}
+        value={settings.strokeColor}
+        onChange={(color) => onChange({ ...settings, strokeColor: color })}
+      />
+      <SizeSlider
+        label="Stroke Width"
+        value={settings.strokeWidth}
+        min={1}
+        max={10}
+        onChange={(v) => onChange({ ...settings, strokeWidth: v })}
+        presets={STROKE_WIDTH_PRESETS}
+        renderPreset={strokeDot}
+      />
+    </>
+  );
+}
+
+/** Stroke — a fill-first shape's optional outline, closed like Placement.
+ *  None is the default (Chris, 11-19-2026: "default stroke is none"), and the
+ *  shut header says so, or says the width once there is one, so a stroke
+ *  that is ON is never hidden.
+ *
+ *  Picking a Stroke Color while the stroke is still None turns it on at the
+ *  first width: a color click that changed nothing on the canvas would read
+ *  as broken. An OUTLINE-ONLY shape (a reselected older one) cannot go back
+ *  to None — with no fill either it would be an invisible object. */
+function ShapeStrokeSection({ settings, onChange }: PanelProps) {
+  const width = settings.shapeStrokeWidth;
+  const least = settings.shapeFillMode === "none" ? 1 : 0;
+  return (
+    <CollapsibleSection label="Stroke" summary={width > 0 ? `${width} px` : "None"}>
+      <ColorSwatchGrid
+        label="Stroke Color"
+        colors={TEXT_COLORS}
+        value={settings.shapeStrokeColor}
+        selected={width > 0}
+        onChange={(color) =>
+          onChange({
+            ...settings,
+            shapeStrokeColor: color,
+            shapeStrokeWidth: width > 0 ? width : SHAPE_STROKE_ON,
+          })
+        }
+      />
+      <SizeSlider
+        label="Stroke Width"
+        value={width}
+        valueDisplay={width > 0 ? undefined : "None"}
+        onChange={(v) => onChange({ ...settings, shapeStrokeWidth: Math.max(least, v) })}
+        presets={SHAPE_STROKE_PRESETS}
+        renderPreset={(preset) =>
+          preset > 0 ? strokeDot(preset) : <Ban aria-hidden className="size-3.5 text-theme-muted-foreground" />
+        }
+      />
+    </CollapsibleSection>
+  );
+}
+
+/** Fill — None / Solid / Gradient / Pixelate, and each one's controls. The
+ *  DIAGRAM shapes' section only since 11-19-2026: the Shapes tab's shapes are
+ *  fill first, so their fill is the Fill Color palette at the top of the
+ *  panel and this dropdown left that tab.
  *
  *  Collapsed, like Placement (Chris, 11-07-2026: "treat like placement and
  *  do a closed dropdown"). The header is the word itself, so the mode tiles
  *  carry no second heading; their accessible name is still "Fill". The
  *  closed summary shows the mode, so a fill that is ON is never hidden. */
-function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings" | "onChange">) {
+function FillSection({ settings, onChange }: PanelProps) {
   const mode = settings.fillMode ?? "none";
   return (
     <CollapsibleSection
@@ -429,7 +483,7 @@ function FillSection({ settings, onChange }: Pick<ShapesSettingsProps, "settings
 
       {settings.fillMode === "solid" && (
         <ColorSwatchGrid
-          label="Fill color"
+          label="Fill Color"
           colors={TEXT_COLORS}
           value={settings.fillColor}
           onChange={(color) => onChange({ ...settings, fillColor: color })}

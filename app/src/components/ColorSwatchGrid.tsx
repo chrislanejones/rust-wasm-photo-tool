@@ -17,6 +17,10 @@ interface Props {
    * swatches. Defaults to true so all pickers share the global user palette.
    */
   allowCustom?: boolean;
+  /** False when the thing being edited has NO color of this kind right now —
+   *  a reselected outline-only shape's Fill Color. No swatch is checked or
+   *  lit; `value` is still what the "+" picker opens on. Default true. */
+  selected?: boolean;
   /** Grays out every swatch and the "+" button, and stops them being
    *  keyboard-reachable. The CALLER owns the explanation — a disabled control
    *  with no stated reason is the thing this repo's a11y pass keeps finding. */
@@ -35,6 +39,7 @@ export function ColorSwatchGrid({
   onChange,
   label = "Color",
   allowCustom = true,
+  selected = true,
   disabled = false,
 }: Props) {
   const { userColors, removeColor } = useUserColors();
@@ -53,7 +58,7 @@ export function ColorSwatchGrid({
   // FIRST is the one checked, and both still light, as before.
   const shown = allowCustom ? [...colors, ...userColors] : [...colors];
   const radioIds = shown.map((c, i) => `${i}:${c}`);
-  const firstIndex = shown.indexOf(value);
+  const firstIndex = selected ? shown.indexOf(value) : -1;
   const radio = useRadioGroup({
     ids: radioIds,
     selected: firstIndex >= 0 ? radioIds[firstIndex] : undefined,
@@ -74,7 +79,7 @@ export function ColorSwatchGrid({
                 <Swatch
                   key={color}
                   color={color}
-                  active={value === color}
+                  active={selected && value === color}
                   onClick={() => onChange(color)}
                   disabled={disabled}
                   radio={radio.itemProps(i)}
@@ -85,7 +90,7 @@ export function ColorSwatchGrid({
                   <Swatch
                     key={`user:${color}`}
                     color={color}
-                    active={value === color}
+                    active={selected && value === color}
                     onClick={() => onChange(color)}
                     onRemove={() => removeColor(color)}
                     disabled={disabled}

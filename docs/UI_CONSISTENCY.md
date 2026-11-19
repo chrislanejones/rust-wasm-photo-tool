@@ -355,6 +355,33 @@ Pinned by `e2e/ui-night8-finish.spec.ts` on 14 panels (in CI).
 `ToolButtonGroup` has no `label` any more: ControlRow's slot is the one place
 a control's words go.
 
+**The color palette comes first (11-19-2026, ADR-107).** When a tool has a
+color, its palette (`ColorSwatchGrid`) is the first control row: directly
+under the primary control (the shape tiles, a mode row), above every slider.
+The color is the first thing chosen about a mark, and the swatches are the
+one row that shows the current state at a glance. The palette is named for
+what it colors, in Title Case like the slider labels: **Fill Color** where
+the color is the shape's interior, **Stroke Color** where it is the line.
+Rows that only some picks have (the star's Points) come after it, not before.
+
+| Panel | Order under the primary control |
+| --- | --- |
+| Shapes › Shapes (rect, circle, oval, diamond, star, triangle) | Fill Color · Points (star) · Corner Radius · Sloppiness · **Stroke** ▸ (Stroke Color · Stroke Width; None by default) · Placement ▸ |
+| Shapes › Shapes (line) | Stroke Color · Stroke Width · Sloppiness · Placement ▸ |
+| Shapes › Arrows & Diagram Shapes | Stroke Color · Stroke Width · Sloppiness (diagram) · Fill ▸ (diagram) · Placement ▸ |
+| Shapes › Pins | Color · Stroke Width (the pin's size) · Placement ▸ |
+
+The same order holds INSIDE a collapsed section that has a color: Stroke
+opens to Stroke Color, then Stroke Width. Pinned by
+`ShapeSettings.fillFirst.test.tsx`.
+
+**Not moved yet:** Paint › Pen (Stroke Width, then the palette), the Brush
+(size, opacity, hardness, then Color) and Text (font and size, then Color; its Stroke
+section shows the width first because the color only appears once there is a
+width). They change when each panel is next touched, not in one sweep: the
+rule was decided on Shapes, and the other three have not been looked at with
+it in mind.
+
 **390px has no tool panels.** Phone width is the "Mobile version" (upload and
 download only). The panel's small-window surface is 960px dock mode, which the
 Night 3 screenshots add.

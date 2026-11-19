@@ -19,11 +19,16 @@ import { describe, it, expect } from "vitest";
 import { panelStylePatch, pendingShapeType } from "./useDrawingTools";
 import type { DrawEditState } from "./useDrawingTools";
 import {
+  FILL_FIRST_KINDS,
   FILL_KIND_MODE,
   FILL_MODE_KIND,
   FILLABLE_KINDS,
+  panelFieldsForStyle,
+  panelShapeStyle,
   shapeCanFill,
 } from "@/lib/drawEditState";
+import { defaultToolSettings } from "@/lib/defaultToolSettings";
+import { TEXT_COLORS } from "@/lib/colors";
 import type { ToolSettings } from "@/lib/types";
 
 /** A settings object shaped like the Shapes panel's defaults. */
@@ -155,6 +160,90 @@ describe("panelStylePatch", () => {
     const green = settings({ strokeColor: "#00ff00" });
     expect(panelStylePatch(red, green)).toEqual({ strokeColor: "#00ff00" });
     expect(panelStylePatch(green, red)).toEqual({ strokeColor: "#ff0000" });
+  });
+});
+
+// ── fill first ──────────────────────────────────────────────────────────────
+// Chris, 11-19-2026: a shape is its Fill Color first, and its stroke is an
+// optional extra that starts at none. The panel therefore holds TWO stroke-
+// and-fill sets — `shape*` for the Shapes tab's shapes with an interior, the
+// shared one for the line, the arrow, the diagram shapes and the pins — and
+// `panelShapeStyle` is the one place that picks. If the commit and the diff
+// ever read different sets, a width change lands on the wrong shape.
+describe("panelShapeStyle: which stroke and fill a shape of this kind means", () => {
+  const panel = {
+    ...defaultToolSettings,
+    strokeColor: "#ff0000",
+    strokeWidth: 3,
+    fillMode: "none",
+    fillColor: "#3b82f6",
+    shapeStrokeColor: "#00ff00",
+    shapeStrokeWidth: 0,
+    shapeFillMode: "solid",
+    shapeFillColor: "#ffffff",
+  } satisfies ToolSettings;
+
+  it("the fill-first kinds are the Shapes tab's shapes with an interior", () => {
+    // rect, circle, diamond, star, triangle, oval — not the line (2), and not
+    // a diagram shape (11..=40), which fills but stays stroke first.
+    expect([...FILL_FIRST_KINDS].sort((a, b) => a - b)).toEqual([0, 1, 8, 9, 10, 41]);
+    for (const k of FILL_FIRST_KINDS) expect(FILLABLE_KINDS.has(k)).toBe(true);
+  });
+
+  it("a square reads the shape set; a line, an arrow and a diagram shape the shared one", () => {
+    const fillFirst = {
+      strokeColor: "#00ff00", strokeWidth: 0, fillMode: "solid", fillColor: "#ffffff",
+    };
+    const strokeFirst = {
+      strokeColor: "#ff0000", strokeWidth: 3, fillMode: "none", fillColor: "#3b82f6",
+    };
+    for (const kind of [0, 1, 8, 9, 10, 41]) expect(panelShapeStyle(panel, kind)).toEqual(fillFirst);
+    for (const kind of [2, 4, 5, 11, 40, undefined]) {
+      expect(panelShapeStyle(panel, kind)).toEqual(strokeFirst);
+    }
+  });
+
+  it("a new shape is filled with the palette's first color and has no stroke", () => {
+    const style = panelShapeStyle(defaultToolSettings, 0);
+    expect(style.fillMode).toBe("solid");
+    expect(style.fillColor).toBe(TEXT_COLORS[0]);
+    expect(style.strokeWidth).toBe(0);
+    // …and the arrow drawn next still has a stroke to be seen by.
+    expect(panelShapeStyle(defaultToolSettings, 4).strokeWidth).toBeGreaterThan(0);
+  });
+
+  it("reselect writes a shape's style back into the fields it is edited through", () => {
+    const style = {
+      strokeColor: "#111111", strokeWidth: 6, fillMode: "gradient" as const, fillColor: "#222222",
+    };
+    expect(panelFieldsForStyle({ ...style, kindByte: 9 })).toEqual({
+      shapeStrokeColor: "#111111",
+      shapeStrokeWidth: 6,
+      shapeFillMode: "gradient",
+      shapeFillColor: "#222222",
+    });
+    expect(panelFieldsForStyle({ ...style, kindByte: 4 })).toEqual(style);
+    // Round trip: what reselect writes is what the commit reads back.
+    for (const kindByte of [0, 2, 20]) {
+      const synced = { ...panel, ...panelFieldsForStyle({ ...style, kindByte }) };
+      expect(panelShapeStyle(synced, kindByte)).toEqual(style);
+    }
+  });
+
+  it("the restyle diff reads the same set: a square's stroke is `shapeStroke*`", () => {
+    const wider = { ...panel, shapeStrokeWidth: 4 };
+    expect(panelStylePatch(panel, wider, 0)).toEqual({ strokeWidth: 4 });
+    // The same panel change is NOT an edit to a reselected arrow…
+    expect(panelStylePatch(panel, wider, 4)).toBeNull();
+    // …and the Arrows tab's width is not an edit to a reselected square.
+    expect(panelStylePatch(panel, { ...panel, strokeWidth: 9 }, 0)).toBeNull();
+    expect(panelStylePatch(panel, { ...panel, strokeWidth: 9 }, 4)).toEqual({ strokeWidth: 9 });
+  });
+
+  it("picking a Fill Color on an outline-only square is two fields, one patch", () => {
+    const hollow = { ...panel, shapeFillMode: "none" as const };
+    const picked = { ...hollow, shapeFillMode: "solid" as const, shapeFillColor: "#ef4444" };
+    expect(panelStylePatch(hollow, picked, 0)).toEqual({ fillMode: "solid", fillColor: "#ef4444" });
   });
 });
 

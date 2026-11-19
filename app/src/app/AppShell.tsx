@@ -104,6 +104,7 @@ import { brushCursorSize } from "@/lib/brushCursorSize";
 import { useCanvasOps } from "./session/useCanvasOps";
 import { useResizeCompress } from "./session/useResizeCompress";
 import { ShapeActionsOverlay } from "@/features/canvas/ShapeActionsOverlay";
+import { shapeDrawSettings } from "@/features/canvas/shapeDrawSettings";
 import { usePhotoSwitchReset } from "@/app/session/usePhotoSwitchReset";
 import { BatchCropOverlay } from "@/features/canvas/BatchCropOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
@@ -2775,17 +2776,7 @@ export function AppShell() {
                           colorPickerActive={colorPickerActive}
                           drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                           onDrawEditChange={drawingTools.updateEditGeometry}
-                          drawSettings={{
-                            strokeColor: toolSettings.strokeColor,
-                            strokeWidth: toolSettings.strokeWidth,
-                            arrowStyle: toolSettings.arrowStyle,
-                            shape: toolSettings.shape ?? "rect",
-                            sloppiness: toolSettings.sloppiness ?? 0,
-                            fillMode: toolSettings.fillMode,
-                            fillColor: toolSettings.fillColor,
-                            fillColor2: toolSettings.fillColor2,
-                            gradientAngle: toolSettings.gradientAngle,
-                          }}
+                          drawSettings={shapeDrawSettings(toolSettings, drawingTools.editState ?? drawingTools.settlingEdit)}
                           penActive={penActive}
                           penColor={toolSettings.strokeColor}
                           penStrokeWidth={toolSettings.strokeWidth}
@@ -2890,17 +2881,7 @@ export function AppShell() {
                       colorPickerActive={colorPickerActive}
                       drawEditState={drawingTools.editState ?? drawingTools.settlingEdit}
                       onDrawEditChange={drawingTools.updateEditGeometry}
-                      drawSettings={{
-                        strokeColor: toolSettings.strokeColor,
-                        strokeWidth: toolSettings.strokeWidth,
-                        arrowStyle: toolSettings.arrowStyle,
-                        shape: toolSettings.shape ?? "rect",
-                        sloppiness: toolSettings.sloppiness ?? 0,
-                        fillMode: toolSettings.fillMode,
-                        fillColor: toolSettings.fillColor,
-                        fillColor2: toolSettings.fillColor2,
-                        gradientAngle: toolSettings.gradientAngle,
-                      }}
+                      drawSettings={shapeDrawSettings(toolSettings, drawingTools.editState ?? drawingTools.settlingEdit)}
                       penActive={penActive}
                       penColor={toolSettings.strokeColor}
                       penStrokeWidth={toolSettings.strokeWidth}

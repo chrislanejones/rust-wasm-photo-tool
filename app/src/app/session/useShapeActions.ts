@@ -15,7 +15,7 @@ import {
   type PortTarget,
   type Pt,
 } from "@/lib/shapePorts";
-import { SHAPE_NAME_KIND, type ShapeMeta } from "@/lib/drawEditState";
+import { panelShapeStyle, SHAPE_NAME_KIND, type ShapeMeta } from "@/lib/drawEditState";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
 
@@ -195,8 +195,11 @@ export function useShapeActions(
       const cur = drawingTools.editState;
       if (!cur || !boxy) return;
       const panel = useToolStore.getState().toolSettings;
-      const color = cur.style?.strokeColor ?? panel.strokeColor;
-      const width = cur.style?.strokeWidth ?? panel.strokeWidth;
+      // A shape with no stroke (the fill-first default) has no color or width
+      // to lend, and a width-0 arrow is not drawn: its connector takes the
+      // Arrows panel's stroke, which is what an arrow drawn by hand would get.
+      const own = cur.style ?? panelShapeStyle(panel, kind ?? undefined);
+      const { strokeColor: color, strokeWidth: width } = own.strokeWidth > 0 ? own : panel;
       void roundTrip(async () => {
         const tool = stamp.toolRef.current;
         if (!tool) return;
@@ -223,7 +226,7 @@ export function useShapeActions(
         await afterEngineChange();
       });
     },
-    [drawingTools.editState, boxy, roundTrip, stamp, afterEngineChange],
+    [drawingTools.editState, boxy, kind, roundTrip, stamp, afterEngineChange],
   );
 
   // Every OTHER box shape is somewhere a pigtail can land.

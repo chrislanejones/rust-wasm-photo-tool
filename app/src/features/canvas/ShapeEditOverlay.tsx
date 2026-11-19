@@ -404,7 +404,8 @@ export function ShapeEditOverlay({
   const EP_R = 6; // endpoint-circle radius — screen px
   const RADIUS_DOT_R = 4; // corner-radius dot — screen px, smaller than a resize square
   const strokeW = Math.max(1, eff.strokeWidth * sx);
-  const color = eff.strokeColor;
+  // Width 0 is "no stroke" (a fill-first shape's default), not a hairline.
+  const color = eff.strokeWidth > 0 ? eff.strokeColor : "none";
   // Sketchy outline? Read live so a panel tweak while the overlay is
   // open immediately rewobbles the preview. Mirrors the engine rule:
   // 0 → clean strokes, > 0 → the wobbly path generator.
