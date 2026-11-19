@@ -31,6 +31,14 @@ sent the engine a width of 0: the slider started at 1.
    Color · Points (star) · Corner Radius · Sloppiness · **Stroke ▸**. A new
    one is a solid fill in `TEXT_COLORS[0]` (white) with no stroke. The Fill
    dropdown leaves this tab.
+
+   *"The first color you see, unless someone changed their palette"*
+   (checked 11-19-2026): that first swatch is always `TEXT_COLORS[0]`. The
+   built-in row is a constant, and `ColorSwatchGrid` puts the person's own
+   colors (`useUserColors`, localStorage or `user_colors`) AFTER it, never
+   before. So the default stays a constant rather than a read of the palette
+   at draw time. A Fill Color the person picks is the next shape's fill (it
+   is the setting), and stays so for the shapes after it.
 3. **Stroke is a closed section** (the Placement pattern): Stroke Color,
    then Stroke Width with presets None / 2 / 4 / 8. The shut header reads
    `None` or `4 px`. Picking a color while the stroke is None turns it on at
@@ -72,7 +80,11 @@ sent the engine a width of 0: the slider started at 1.
   "fill will be taken away" as asked; the smallest repair is a "no fill"
   swatch at the head of Fill Color.
 - Sloppiness roams the stroke only, so on the default (strokeless) shape the
-  slider changes nothing visible.
+  slider changes nothing visible. The row stays (hiding it would move the
+  panel under the cursor when a stroke is turned on) and, while there is no
+  stroke, its lightbulb says "Sloppiness shapes the outline: add a stroke
+  under Stroke to see it." Corner Radius needs no such note: `fill_shape`
+  clips by the same rounded `corner_outline`, so the fill rounds too.
 - A build from before this ADR that replays a log holding a width-0 shape
   strokes it at width 0, which `draw_line_thick` renders as a dotted outline.
 - Connect from a strokeless shape has no stroke to copy, so the connector
@@ -80,8 +92,11 @@ sent the engine a width of 0: the slider started at 1.
 - A white fill dragged over a white page was invisible until release, so the
   rubber band of a strokeless shape draws a two-tone dashed guide
   (`drawShapePreview`). It is the band's only; nothing of it is committed.
-- wasm size not measured: this session could not fetch the pinned binaryen
-  117, so no optimized build was made. The Rust change is two guards.
+- Engine 969,207 → 969,240 B (+33, the two guards; measured 11-19-2026 with
+  the pinned toolchain).
+- Arrows, a diagram shape, a pin and a Smart Callout drawn through the panel
+  with its defaults give the same composite and the same shape list as on
+  master (SHA-256 match, `e2e/archive/pixelhash-stroke-shapes-1119.spec.ts`).
 
 ## Alternatives rejected
 - **One shared stroke width, clamped to ≥ 1 for arrows:** the Arrows slider

@@ -75,6 +75,10 @@ const CORNER_RADIUS_PRESETS = [0, 8, 24, 64] as const;
 // Eraser's Opacity slider. 0 (firm) is a real preset, then 25/50/100, so the
 // hand-drawn range tops out at 100%.
 const SLOPPINESS_PRESETS = [0, 25, 50, 100] as const;
+// Sloppiness wobbles the stroke and never the fill, so a strokeless shape —
+// the fill-first default — shows no change.
+const SLOPPINESS_NEEDS_STROKE =
+  "Sloppiness shapes the outline: add a stroke under Stroke to see it.";
 
 const FILL_MODES = [
   { id: "none",     label: "None"     },
@@ -244,9 +248,17 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 
                   {/* Sloppiness — how hand-drawn the outline is, firm (0) →
                       hand-drawn (100). It roams the STROKE, never the fill,
-                      so on a shape with no stroke there is nothing to roam. */}
+                      so on a shape with no stroke there is nothing to roam.
+                      The row stays (hiding it would move the panel under the
+                      cursor when a stroke is added); its lightbulb says why
+                      it does nothing yet. */}
                   <SizeSlider
                     label="Sloppiness"
+                    labelInfo={
+                      fillFirst && settings.shapeStrokeWidth <= 0
+                        ? SLOPPINESS_NEEDS_STROKE
+                        : undefined
+                    }
                     value={settings.sloppiness ?? 0}
                     onChange={(v) => onChange({ ...settings, sloppiness: v })}
                     presets={SLOPPINESS_PRESETS}

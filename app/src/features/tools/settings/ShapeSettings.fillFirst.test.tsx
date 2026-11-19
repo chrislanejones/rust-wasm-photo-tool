@@ -172,3 +172,25 @@ it("Pins: Color, then the size", () => {
   expect(labels.indexOf("Color")).toBeGreaterThan(-1);
   expect(labels.indexOf("Color")).toBeLessThan(labels.indexOf("Stroke Width"));
 });
+
+it("Sloppiness says why it does nothing on a strokeless shape, and only then", () => {
+  // Default: fill-first square, stroke None. The row stays, with a lightbulb.
+  const first = renderPanel();
+  expect(screen.getByRole("button", { name: "Sloppiness info" })).toBeTruthy();
+  first.container.remove();
+  // A stroke is on: the hint is gone (sloppiness now visibly roams it).
+  renderPanel({ shapeStrokeWidth: 4 });
+  expect(screen.queryByRole("button", { name: "Sloppiness info" })).toBeNull();
+});
+
+it("the default fill is the Fill Color row's first swatch, white — user colors come after it", () => {
+  // The night-11-19 question: does "the first color you see" ever change? The
+  // built-in row is a constant and ColorSwatchGrid appends the person's own
+  // colors AFTER it, so the first swatch is always TEXT_COLORS[0].
+  expect(TEXT_COLORS[0]).toBe("#ffffff");
+  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[0]);
+  renderPanel();
+  const group = screen.getByRole("radiogroup", { name: "Fill Color" });
+  const firstSwatch = group.querySelector('[role="radio"]')!;
+  expect(firstSwatch.getAttribute("aria-checked")).toBe("true");
+});

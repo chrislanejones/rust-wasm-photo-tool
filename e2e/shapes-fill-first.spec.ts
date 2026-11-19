@@ -221,3 +221,20 @@ test("an outline-only shape from before keeps its style, and a Fill Color fills 
   });
   expect(await pixels(page, [MIDDLE])).toEqual([[0xea, 0xb3, 0x08]]);
 });
+
+test("a Fill Color picked with nothing in hand is the next square's fill, and the one after", async ({ page }) => {
+  await open(page);
+  await shapesTab(page);
+  // Nothing drawn yet: pick red (the palette's second swatch).
+  await swatch(page, "Fill Color", 1).click();
+  await drag(page, ...BOX);
+  await key(page, "Enter");
+  await expect.poll(async () => (await shapes(page)).length).toBe(1);
+  // A second square, away from the first, keeps the pick.
+  await drag(page, 700, 250, 900, 420);
+  await key(page, "Enter");
+  await expect.poll(async () => (await shapes(page)).length).toBe(2);
+  for (const s of await shapes(page)) {
+    expect(s).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
+  }
+});
