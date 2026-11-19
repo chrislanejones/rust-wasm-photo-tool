@@ -34,9 +34,9 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 | Find duplicates (#473) | The hash reads the current thumbnail, so a heavily edited photo no longer matches its original |
 | Auto tone (#476) | Auto tone on a multi-layer document reads only the active layer |
 | Rename tokens (#474) | The `{date}` file date isn't kept after a reload (needs a stored field) |
-| Rename tokens (#474) | AI Rename info text still says "colour" / "recognise" (still true 11-18-2026: `AIRenamePanel.tsx` lines 244 and 247) |
-| Compact Compare (#475) | The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have |
-| Compact Compare (#475) | Compact layout while comparing: two "Stop comparing" controls (the tile and the status X) |
+| Rename tokens (#474) | ~~AI Rename info text still says "colour" / "recognise"~~ **FIXED 11-19-2026** (`fix/v964-leftover-words`): "color" / "recognize" |
+| Compact Compare (#475) | ~~The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have~~ **FIXED 11-19-2026**: on compact it names the Gallery tab's Stop comparing button |
+| Compact Compare (#475) | ~~Compact layout while comparing: two "Stop comparing" controls (the tile and the status X)~~ **FIXED 11-19-2026**: the X shows on the wide layout only; compact keeps the tile |
 
 ## FIXED 11-18-2026 (`fix/text-preview-size`, ADR-106) — committed text is drawn ~10% narrower than its preview (found 11-14-2026, #472)
 

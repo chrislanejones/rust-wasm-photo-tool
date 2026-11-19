@@ -505,8 +505,8 @@ test("C8: leaving compare (Done or Esc) puts the photo back where it was before 
 const TABLET_WINDOW = { width: 768, height: 1024 };
 const masterBar = (page: Page) => page.getByRole("region", { name: "Master bar" });
 const galleryTab = (page: Page) => masterBar(page).getByRole("button", { name: "Gallery", exact: true });
-/** The tile, by its name either way. The status line's X is also "Stop
- *  comparing", but has no text. */
+/** The tile, by its name either way. (The wide layout's status line has an
+ *  X that is also "Stop comparing"; compact has only the tile, 11-19-2026.) */
 const compactCompare = (page: Page, on: boolean) =>
   on
     ? page.getByRole("button", { name: "Stop comparing", exact: true }).filter({ hasText: "Stop comparing" })
@@ -538,6 +538,8 @@ test("Compact layout: Compare two photos in the Gallery tab picks two, and Esc e
   await compactCompare(page, false).click();
   await expect(hint(page)).toContainText("0 of 2");
   await expect(compactCompare(page, true)).toBeVisible();
+  // ONE way out on this layout: the tile. The status line has no X here.
+  await expect(page.locator('button[aria-label="Stop comparing"]:visible')).toHaveCount(1);
   // The tab that brought the gallery up is not "elsewhere".
   await galleryTab(page).click();
   await expect(hint(page)).toContainText("0 of 2");
