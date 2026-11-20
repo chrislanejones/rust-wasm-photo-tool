@@ -241,10 +241,10 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
         info={
           <>
             Scans each photo in the Rust engine and names it from what it sees —
-            dominant colour, tone, whether it&rsquo;s a photo, a graphic or a
+            dominant color, tone, whether it&rsquo;s a photo, a graphic or a
             screenshot, and a coarse subject guess (portrait / nature / sky).
             Runs offline, no account needed. It describes an image; it
-            doesn&rsquo;t recognise objects in it, so expect{" "}
+            doesn&rsquo;t recognize objects in it, so expect{" "}
             <span className="font-mono">dark-blue-portrait</span>, not{" "}
             <span className="font-mono">golden-retriever</span>. Tokens:{" "}
             {DESCRIBE_TOKENS.map(({ token, hint }, i) => (

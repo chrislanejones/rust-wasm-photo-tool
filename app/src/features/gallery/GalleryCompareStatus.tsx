@@ -2,7 +2,8 @@
 // Compress buttons were — they go away in compare mode — and reads like the
 // count readout ("# photos · # max"): muted text, numbers in TinyNumberBoxes,
 // a lightbulb for the explanation and an X to leave, the same tiny close the
-// New dialog (Alt + N) has. It replaced a floating pill over the bar's top
+// New dialog (Alt + N) has (wide layout only: compact's Compare tile is its
+// way out). It replaced a floating pill over the bar's top
 // edge. Its own file because GalleryBar is under the max-lines ratchet.
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,14 +65,28 @@ export function GalleryCompareStatus({ vertical }: { vertical?: boolean }) {
             Side by side, Blink or Slider. Untick one to pick another.
             <br />
             <br />
-            The X here, the top bar&apos;s Compare button or a click outside
-            the gallery ends compare mode.
+            {vertical ? (
+              <>
+                The Stop comparing button in this tab or a click outside the
+                gallery ends compare mode.
+              </>
+            ) : (
+              <>
+                The X here, the top bar&apos;s Compare button or a click outside
+                the gallery ends compare mode.
+              </>
+            )}
           </>
         }
       />
-      <Button size="tiny" onClick={stop} aria-label="Stop comparing">
-        <X className="h-4 w-4" />
-      </Button>
+      {/* Compact has no top bar, so its Gallery tab carries the Compare tile,
+          which reads "Stop comparing" while comparing. An X beside it would
+          be a second control for the same thing, so only the wide bar has it. */}
+      {!vertical && (
+        <Button size="tiny" onClick={stop} aria-label="Stop comparing">
+          <X className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }

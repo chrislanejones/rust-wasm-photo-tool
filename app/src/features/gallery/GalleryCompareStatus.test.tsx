@@ -38,3 +38,9 @@ it("has the lightbulb, and its X ends compare mode", () => {
   fireEvent.click(screen.getByRole("button", { name: "Stop comparing" }));
   expect(useScreenshotCompareStore.getState()).toMatchObject({ picking: false, picks: [], otherId: null });
 });
+
+it("compact (vertical): no X — the Gallery tab's Compare tile is the one way out", () => {
+  render(<TooltipProvider><GalleryCompareStatus vertical /></TooltipProvider>);
+  expect(screen.getByRole("button", { name: "Compare info" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Stop comparing" })).toBeNull();
+});
