@@ -1,0 +1,196 @@
+// @vitest-environment jsdom
+//
+// The Shapes panel is FILL FIRST and PALETTE FIRST (Chris, 11-19-2026):
+//
+//   tiles → Fill Color → Points → Corner Radius → Sloppiness → Stroke ▸
+//
+// The color palette is the first control under the tiles on every tab — a
+// design-system rule since (UI_CONSISTENCY §8). On the Shapes tab that color
+// is the shape's FILL, and its stroke is a closed dropdown at the foot whose
+// default is None. The old Fill dropdown (None | Solid | Gradient | Pixelate)
+// left this tab; the diagram shapes on the Arrows tab, which stay stroke
+// first, keep it.
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterAll, expect, it, vi } from "vitest";
+
+// Demo mode, whatever the checkout's .env.local says — see the same note in
+// TextSettings.sections.test.tsx (the color grid's useUserColors).
+vi.hoisted(() => {
+  vi.stubEnv("VITE_CONVEX_URL", "");
+  vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
+});
+afterAll(() => vi.unstubAllEnvs());
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { defaultToolSettings } from "@/lib/defaultToolSettings";
+import { TEXT_COLORS } from "@/lib/colors";
+import type { ToolSettings } from "@/lib/types";
+import type { ShapesMode } from "@/stores/useToolStore";
+import { ShapesSettings } from "./ShapeSettings";
+
+function renderPanel(overrides: Partial<ToolSettings> = {}, mode: ShapesMode = "shapes") {
+  const onChange = vi.fn();
+  const { container } = render(
+    <ShapesSettings
+      settings={{ ...defaultToolSettings, shape: "rect", ...overrides }}
+      onChange={onChange}
+      activeMode={mode}
+    />,
+    { wrapper: TooltipProvider },
+  );
+  return { onChange, container };
+}
+
+/** The disclosure header named `name`, or undefined. */
+const section = (name: RegExp) =>
+  screen
+    .queryAllByRole("button", { name })
+    .find((b) => b.hasAttribute("aria-expanded"));
+
+/** Every control row's label, top to bottom — the panel's order as read. */
+const rowLabels = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll('[data-slot="control-row"] [data-slot="label"]')).map(
+    (el) => el.textContent?.trim(),
+  );
+
+const checkedIn = (group: HTMLElement) =>
+  Array.from(group.querySelectorAll('[role="radio"][aria-checked="true"]'));
+
+it("a rectangle: Fill Color first, then Corner Radius, Sloppiness, and Stroke shut at None", () => {
+  const { container } = renderPanel();
+  // Stroke's two rows are in the DOM, inside its hidden region, hence last.
+  expect(rowLabels(container)).toEqual([
+    "Fill Color", "Corner Radius", "Sloppiness", "Stroke Color", "Stroke Width",
+  ]);
+  const stroke = section(/^Stroke/)!;
+  expect(stroke.getAttribute("aria-expanded")).toBe("false");
+  expect(stroke.textContent).toContain("None");
+  expect(
+    screen.getByRole("radiogroup", { name: "Stroke Color", hidden: true }).closest("[hidden]"),
+  ).not.toBeNull();
+  // The Fill dropdown is gone from this tab.
+  expect(section(/^Fill/)).toBeUndefined();
+});
+
+it("the star keeps Points, between Fill Color and Corner Radius", () => {
+  const { container } = renderPanel({ shape: "star" });
+  expect(rowLabels(container).slice(0, 4)).toEqual([
+    "Fill Color", "Points", "Corner Radius", "Sloppiness",
+  ]);
+});
+
+it("the default fill is the palette's first color, and it is the one checked", () => {
+  renderPanel();
+  const checked = checkedIn(screen.getByRole("radiogroup", { name: "Fill Color" }));
+  expect(checked).toHaveLength(1);
+  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[0]);
+  expect(defaultToolSettings.shapeStrokeWidth).toBe(0);
+});
+
+it("picking a Fill Color makes the fill solid — on an outline-only shape too", () => {
+  // A reselected older shape: no fill, a stroke. No swatch stands for "none".
+  const { onChange } = renderPanel({ shapeFillMode: "none", shapeStrokeWidth: 3 });
+  const group = screen.getByRole("radiogroup", { name: "Fill Color" });
+  expect(checkedIn(group)).toHaveLength(0);
+  fireEvent.click(group.querySelectorAll('[role="radio"]')[1]!);
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ shapeFillMode: "solid", shapeFillColor: TEXT_COLORS[1] }),
+  );
+});
+
+it("Stroke opens to Stroke Color then Stroke Width, and a color pick turns a None stroke on", () => {
+  const { onChange } = renderPanel();
+  fireEvent.click(section(/^Stroke/)!);
+  expect(section(/^Stroke/)!.getAttribute("aria-expanded")).toBe("true");
+  const color = screen.getByRole("radiogroup", { name: "Stroke Color" });
+  // None: no stroke color is lit, and the width row says so.
+  expect(checkedIn(color)).toHaveLength(0);
+  expect(screen.getByRole("slider", { name: "Stroke Width" }).getAttribute("aria-valuetext"))
+    .toBe("None");
+  fireEvent.click(color.querySelectorAll('[role="radio"]')[1]!);
+  const sent = onChange.mock.lastCall![0] as ToolSettings;
+  expect(sent.shapeStrokeColor).toBe(TEXT_COLORS[1]);
+  expect(sent.shapeStrokeWidth).toBeGreaterThan(0);
+  // The shared stroke — the arrow's, the pin's — is not touched by any of it.
+  expect(sent.strokeWidth).toBe(defaultToolSettings.strokeWidth);
+  expect(sent.strokeColor).toBe(defaultToolSettings.strokeColor);
+});
+
+it("a stroke that is ON shows in the shut header, and a width preset sets it", () => {
+  const { onChange } = renderPanel({ shapeStrokeWidth: 4 });
+  expect(section(/^Stroke/)!.textContent).toContain("4 px");
+  fireEvent.click(section(/^Stroke/)!);
+  fireEvent.click(screen.getByRole("radio", { name: "Stroke Width 8" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shapeStrokeWidth: 8 }));
+  fireEvent.click(screen.getByRole("radio", { name: "Stroke Width 0" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shapeStrokeWidth: 0 }));
+});
+
+it("an outline-only shape cannot lose its stroke too", () => {
+  // No fill and no stroke would be an object nobody can see.
+  const { onChange } = renderPanel({ shapeFillMode: "none", shapeStrokeWidth: 3 });
+  fireEvent.click(section(/^Stroke/)!);
+  fireEvent.click(screen.getByRole("radio", { name: "Stroke Width 0" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shapeStrokeWidth: 1 }));
+});
+
+it("the line has no interior: Stroke Color, then Stroke Width, and no dropdown", () => {
+  const { container, onChange } = renderPanel({ shape: "line" });
+  expect(rowLabels(container)).toEqual(["Stroke Color", "Stroke Width", "Sloppiness"]);
+  expect(section(/^Stroke/)).toBeUndefined();
+  expect(section(/^Fill/)).toBeUndefined();
+  // Its stroke is the shared one, which is never None.
+  fireEvent.click(screen.getByRole("radio", { name: "Stroke Width 8" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ strokeWidth: 8 }));
+});
+
+it("Arrows & Diagram Shapes: Stroke Color, then Stroke Width, under the tiles", () => {
+  const { container } = renderPanel({}, "arrows");
+  const labels = rowLabels(container);
+  const at = labels.indexOf("Stroke Color");
+  expect(at).toBeGreaterThan(-1);
+  expect(labels[at + 1]).toBe("Stroke Width");
+  // Nothing but the shape tiles sits above the palette.
+  expect(labels.slice(0, at)).toEqual(["Arrow", "Flowchart", "Basic", "Block arrows"].slice(0, at));
+});
+
+it("a diagram shape keeps its Fill dropdown: None | Solid | Gradient | Pixelate", () => {
+  const { onChange } = renderPanel({ arrowShape: "terminator", fillMode: "gradient" }, "arrows");
+  const fill = section(/^Fill/)!;
+  expect(fill.getAttribute("aria-expanded")).toBe("false");
+  expect(fill.textContent).toContain("Gradient");
+  fireEvent.click(fill);
+  const group = screen.getByRole("radiogroup", { name: "Fill" });
+  const names = Array.from(group.querySelectorAll('[role="radio"]')).map((r) => r.textContent);
+  expect(names).toEqual(["None", "Solid", "Gradient", "Pixelate"]);
+  fireEvent.click(screen.getByRole("radio", { name: "Pixelate" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ fillMode: "pixelate" }));
+});
+
+it("Pins: Color, then the size", () => {
+  const { container } = renderPanel({}, "pens");
+  const labels = rowLabels(container);
+  expect(labels.indexOf("Color")).toBeGreaterThan(-1);
+  expect(labels.indexOf("Color")).toBeLessThan(labels.indexOf("Stroke Width"));
+});
+
+it("Sloppiness says why it does nothing on a strokeless shape, and only then", () => {
+  // Default: fill-first square, stroke None. The row stays, with a lightbulb.
+  const first = renderPanel();
+  expect(screen.getByRole("button", { name: "Sloppiness info" })).toBeTruthy();
+  first.container.remove();
+  // A stroke is on: the hint is gone (sloppiness now visibly roams it).
+  renderPanel({ shapeStrokeWidth: 4 });
+  expect(screen.queryByRole("button", { name: "Sloppiness info" })).toBeNull();
+});
+
+it("the default fill is the Fill Color row's first swatch, white — user colors come after it", () => {
+  // The night-11-19 question: does "the first color you see" ever change? The
+  // built-in row is a constant and ColorSwatchGrid appends the person's own
+  // colors AFTER it, so the first swatch is always TEXT_COLORS[0].
+  expect(TEXT_COLORS[0]).toBe("#ffffff");
+  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[0]);
+  renderPanel();
+  const group = screen.getByRole("radiogroup", { name: "Fill Color" });
+  const firstSwatch = group.querySelector('[role="radio"]')!;
+  expect(firstSwatch.getAttribute("aria-checked")).toBe("true");
+});

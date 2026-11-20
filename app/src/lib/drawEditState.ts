@@ -213,14 +213,19 @@ export function pendingStarAndCorners(
 export function panelStylePatch(
   prev: ToolSettings,
   next: ToolSettings,
+  /** The reselected shape's kind byte: it decides WHICH panel fields are its
+   *  stroke and fill (`panelShapeStyle`). Absent = the stroke-first set. */
+  kind?: number,
 ): ShapeStylePatch | null {
   const patch: ShapeStylePatch = {};
-  if (next.strokeColor !== prev.strokeColor) patch.strokeColor = next.strokeColor;
-  if (next.strokeWidth !== prev.strokeWidth) patch.strokeWidth = next.strokeWidth;
+  const was = panelShapeStyle(prev, kind);
+  const now = panelShapeStyle(next, kind);
+  if (now.strokeColor !== was.strokeColor) patch.strokeColor = now.strokeColor;
+  if (now.strokeWidth !== was.strokeWidth) patch.strokeWidth = now.strokeWidth;
   if (next.arrowStyle !== prev.arrowStyle) patch.arrowStyle = next.arrowStyle;
   if (next.sloppiness !== prev.sloppiness) patch.sloppiness = next.sloppiness;
-  if (next.fillMode !== prev.fillMode) patch.fillMode = next.fillMode;
-  if (next.fillColor !== prev.fillColor) patch.fillColor = next.fillColor;
+  if (now.fillMode !== was.fillMode) patch.fillMode = now.fillMode;
+  if (now.fillColor !== was.fillColor) patch.fillColor = now.fillColor;
   if (next.fillColor2 !== prev.fillColor2) patch.fillColor2 = next.fillColor2;
   if (next.gradientAngle !== prev.gradientAngle)
     patch.gradientAngle = next.gradientAngle;
@@ -343,10 +348,62 @@ export const FILLABLE_KINDS: ReadonlySet<number> = new Set([
   ...DIAGRAM_SHAPES.map((d) => d.kind),
 ]);
 
-/** Does this shape NAME take a Fill section in the Shapes panel? The name twin
- *  of `FILLABLE_KINDS`, for the panel and the overlay, which work in names. */
+/** Can this shape NAME hold an interior fill? The name twin of
+ *  `FILLABLE_KINDS`, for the panel and the overlay, which work in names. */
 export function shapeCanFill(shape: ShapeName): boolean {
   return FILLABLE_KINDS.has(SHAPE_NAME_KIND[shape] ?? -1);
+}
+
+/** The FILL-FIRST kinds: the Shapes tab's shapes with an interior — rect,
+ *  circle, diamond, star, triangle, oval. Their panel leads with Fill Color
+ *  and their stroke is optional, none by default (Chris, 11-19-2026).
+ *
+ *  Not `FILLABLE_KINDS`: a diagram shape fills too, but it stays stroke first
+ *  with the arrows it is drawn beside. Half of them carry detail strokes — the
+ *  bars of a predefined process, the lid of a database — that a shape with no
+ *  stroke would lose, and a flowchart is read by its outlines. */
+export const FILL_FIRST_KINDS: ReadonlySet<number> = new Set([0, 1, 8, 9, 10, 41]);
+
+/** The four style fields that live in two places on the panel. */
+export type PanelShapeStyle = Pick<
+  ToolSettings,
+  "strokeColor" | "strokeWidth" | "fillMode" | "fillColor"
+>;
+
+/** What the panel holds for a shape of this `kind`: the `shape*` fields for a
+ *  fill-first shape, the shared stroke and fill for everything else. The ONE
+ *  place that picks — the commit, the previews and the restyle diff all read
+ *  it, so they cannot disagree about which Stroke Width a square means. */
+export function panelShapeStyle(s: ToolSettings, kind: number | undefined): PanelShapeStyle {
+  return FILL_FIRST_KINDS.has(kind ?? -1)
+    ? {
+        strokeColor: s.shapeStrokeColor,
+        strokeWidth: s.shapeStrokeWidth,
+        fillMode: s.shapeFillMode,
+        fillColor: s.shapeFillColor,
+      }
+    : {
+        strokeColor: s.strokeColor,
+        strokeWidth: s.strokeWidth,
+        fillMode: s.fillMode,
+        fillColor: s.fillColor,
+      };
+}
+
+/** The inverse, for reselect: a shape's own stroke and fill, as the panel
+ *  fields a shape of its kind is edited through. Spread into the settings. */
+export function panelFieldsForStyle(
+  style: PanelShapeStyle & { kindByte?: number },
+): Partial<ToolSettings> {
+  const { strokeColor, strokeWidth, fillMode, fillColor } = style;
+  return FILL_FIRST_KINDS.has(style.kindByte ?? -1)
+    ? {
+        shapeStrokeColor: strokeColor,
+        shapeStrokeWidth: strokeWidth,
+        shapeFillMode: fillMode,
+        shapeFillColor: fillColor,
+      }
+    : { strokeColor, strokeWidth, fillMode, fillColor };
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {

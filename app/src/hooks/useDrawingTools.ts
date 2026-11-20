@@ -19,6 +19,8 @@ import {
   editStateFromShape,
   FILL_MODE_KIND,
   FILLABLE_KINDS,
+  panelFieldsForStyle,
+  panelShapeStyle,
   panelStylePatch,
   pendingStarAndCorners,
   pendingShapeType,
@@ -234,18 +236,15 @@ export function useDrawingTools({
     // current toolbar settings live — except the TYPE, which every pending
     // shape pins at draw time (see `pendingShapeType` / `drawnShape`).
     const shapeName = pendingShapeType(es, s.shape);
-    const strokeColor = es.style?.strokeColor ?? s.strokeColor;
-    const strokeWidth = es.style?.strokeWidth ?? s.strokeWidth;
     const arrowStyle = es.style?.arrowStyle ?? s.arrowStyle;
     // Keep the real kind across an edit (a pin = kind 5 shows as a circle handle, commits as a pin).
     const kind =
       es.style?.kindByte ??
       (es.kind === "arrow" ? 4 : (SHAPE_NAME_KIND[shapeName] ?? 0));
     const arrowByte = arrowStyle === "double" ? 1 : 0;
-    // Interior fill (FILLABLE_KINDS; line/arrow/pin commit 0). Edits keep the captured
-    // fill so move/resize doesn't swap it; new shapes read the live panel, like strokeColor.
-    const fillMode = es.style?.fillMode ?? s.fillMode;
-    const fillColor = es.style?.fillColor ?? s.fillColor;
+    // Stroke and interior fill (FILLABLE_KINDS; line/arrow/pin commit 0). Edits keep the captured
+    // style so move/resize doesn't swap it; new shapes read the live panel, by kind.
+    const { strokeColor, strokeWidth, fillMode, fillColor } = es.style ?? panelShapeStyle(s, kind);
     const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
     const gradientAngle = es.style?.gradientAngle ?? s.gradientAngle;
     const fillBlock = es.style?.fillBlock ?? s.fillBlock;
@@ -387,12 +386,9 @@ export function useDrawingTools({
       // stale panel color along with it.
       const synced: ToolSettings = {
         ...settingsRef.current,
-        strokeColor: next.style!.strokeColor,
-        strokeWidth: next.style!.strokeWidth,
+        ...panelFieldsForStyle(next.style!),
         arrowStyle: next.style!.arrowStyle,
         sloppiness: next.style!.sloppiness,
-        fillMode: next.style!.fillMode,
-        fillColor: next.style!.fillColor,
         fillColor2: next.style!.fillColor2,
         gradientAngle: next.style!.gradientAngle,
         fillBlock: next.style!.fillBlock,
@@ -565,7 +561,8 @@ export function useDrawingTools({
     const es = editStateRef.current;
     // No snapshot = a brand-new shape, which already reads the panel live.
     if (!es?.style) return;
-    const patch = dot ? { ...panelStylePatch(prev, settings), cornerRadii: dot } : panelStylePatch(prev, settings);
+    const restyle = panelStylePatch(prev, settings, es.style.kindByte);
+    const patch = dot ? { ...restyle, cornerRadii: dot } : restyle;
     if (!patch) return;
     editDirtyRef.current = true;
     setEditState((cur) => {
@@ -846,16 +843,18 @@ export function useDrawingTools({
           settings.arrowStyle,
         );
       } else if (drawn) {
+        const style = panelShapeStyle(settings, SHAPE_NAME_KIND[drawn]);
         drawShapePreview(
           ctx,
           start,
           p,
           drawn,
-          settings.strokeColor,
-          settings.strokeWidth,
+          style.strokeColor,
+          style.strokeWidth,
           settings.sloppiness ?? 0,
           settings.starPoints ?? 5,
           canonicalCornerRadii(drawn, settings.cornerRadii),
+          style.fillMode === "solid" ? style.fillColor : undefined,
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.

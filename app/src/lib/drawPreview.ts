@@ -79,6 +79,9 @@ export function drawShapePreview(
   sloppiness: number,
   starPoints: number,
   cornerRadii?: CornerRadii,
+  /** A solid interior, painted under the stroke on the CLEAN outline — the
+   *  engine's rule: sloppiness roams the stroke, never the fill. */
+  fill?: string,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -108,6 +111,50 @@ export function drawShapePreview(
   const outline = closedOutline(shape, from, to, starPoints, cornerRadii);
   const rounded = hasRadius(cornerRadii);
 
+  /** The clean outline as a path: the fill's clip, and the firm stroke. */
+  const cleanPath = () => {
+    ctx.beginPath();
+    if (outline) {
+      ctx.moveTo(outline[0].x, outline[0].y);
+      for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
+      ctx.closePath();
+    } else if (shape === "circle") {
+      ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+    } else if (shape === "oval") {
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    } else {
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+    }
+  };
+  if (fill && shape !== "line") {
+    ctx.fillStyle = fill;
+    cleanPath();
+    ctx.fill();
+  }
+  if (width <= 0) {
+    // A shape with no stroke has only its fill to be seen by, and a white
+    // fill dragged over a white page is not seen at all. So the band gets a
+    // guide of its own: a two-tone dashed outline, dark then light, which
+    // shows on any photo. It is the band's, not the shape's — the edit box
+    // takes over on release and nothing of it is committed. Sized off the
+    // canvas because this context is in IMAGE pixels: 1 px of a 4000 px photo
+    // fitted to the window is a quarter of a screen pixel.
+    const px = Math.max(1, ctx.canvas.width / 800);
+    ctx.save();
+    ctx.lineWidth = px;
+    ctx.setLineDash([4 * px, 4 * px]);
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    cleanPath();
+    ctx.stroke();
+    ctx.lineDashOffset = 4 * px;
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    cleanPath();
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   if (sloppiness > 0) {
     // Mirrors Rust: at sloppiness > 0 EVERY shape routes through the
     // sketchy path generator so the preview and the committed pixels match
@@ -135,27 +182,11 @@ export function drawShapePreview(
       return;
     }
     // No sketchy path (a circle too small to wobble) — fall through to the
-    // clean branches, which is what the engine does.
+    // clean branch, which is what the engine does.
   }
 
-  ctx.beginPath();
-  if (outline) {
-    ctx.moveTo(outline[0].x, outline[0].y);
-    for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
-    ctx.closePath();
-    ctx.stroke();
-  } else if (shape === "circle") {
-    const r = Math.min(w, h) / 2;
-    ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (shape === "oval") {
-    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  } else {
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-  }
+  cleanPath();
+  ctx.stroke();
 }
 
 /** The crop rubber band: everything outside `r` dimmed, `r` outlined with a

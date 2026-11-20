@@ -221,6 +221,11 @@ test(`reselect, restyle (${restyle}), commit at ${cpu}× CPU: no stray rectangle
   // 3. Reselect the star by its tip, then change a style control.
   await clickCanvas(page, 190, 21);
   expect(await selectedShapeOverlay(page), "the tip click reselected the star").toBe(true);
+  // Stroke Width lives in the shut Stroke section since shapes became fill
+  // first (ADR-107). Opening it is a click inside the panel, which must not
+  // commit the reselected star either.
+  await page.locator('[data-slot="collapsible"] > div > button', { hasText: "Stroke" }).click();
+  expect(await selectedShapeOverlay(page), "opening Stroke kept the star selected").toBe(true);
   const stroke = page.getByRole("slider", { name: /Stroke Width/ }).first();
   if (restyle === "keyboard") {
     await stroke.focus();

@@ -794,6 +794,14 @@ pub fn draw_shape(
     radii: [f64; 4],
     rot: Option<Rotation>,
 ) {
+    // Width 0 is "no stroke": a fill-first shape is its fill alone unless the
+    // panel's Stroke section gives it an outline. Returning here rather than
+    // letting 0 reach the primitives matters — `draw_line_thick` at width 0
+    // still inks every sample that lands exactly on a pixel center, so a
+    // "strokeless" square would get a dotted outline.
+    if stroke_width <= 0.0 {
+        return;
+    }
     let wi = w as i32;
     let hi = h as i32;
     let seed = shape_wobble_seed(from_x, from_y, to_x, to_y);
