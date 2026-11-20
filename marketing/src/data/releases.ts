@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.65",
+    date: "2026-11-19",
+    headline: "Pair a phone with a QR code, and the text you type is the text you get.",
+    entries: [
+      { tag: "feature", text: "Pair a phone (Beta): scan a QR code and send photos either way, straight from one device to the other. The side receiving says yes first." },
+      { tag: "fix", text: "The text you type shows at the size it lands at. It used to shrink about 10% on commit, and lines in a box could break somewhere else." },
+      { tag: "ui", text: "Resize & Compress: the ⚡ button picks a size and quality that pass Google's image check, and Scale has number presets." },
+      { tag: "fix", text: "In Batch's Masonry view the open photo fills its tile." },
+      { tag: "rust", text: "The engine tells the editor each font's size ratio, so the preview can match it." },
+      { tag: "infra", text: "Dependencies updated, the docs tidied, and the marketing pages caught up with what ships." },
+    ],
+  },
+  {
     version: "v9.64",
     date: "2026-11-15",
     headline: "Find the duplicates, and let Auto give a photo a starting point.",

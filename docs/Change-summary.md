@@ -12166,3 +12166,23 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests a
 No Dexie migration and no op-log format change. Engine 960,152 → 967,840 B.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,335) and both production builds pass, all run after the trail data regen. cargo fmt, clippy (plain and tiles) and cargo test (1,428) pass. e2e on the combined build: find-duplicates, auto-tone, screenshot-compare, text-align, copy-paste-look, oplog-adjustments-undo, bulk-night, batch-exceptions, ui-night2-controls and compare-photo-rect, 54/54. Not run: `imagehorse-qc` on this release; Find duplicates and Auto tone change the engine and gallery.
+
+## v9.65 Change Summary — 2026-11-19
+
+**Pair a phone with a QR code, and the text you type is the text you get.**
+
+| Area | Change |
+| --- | --- |
+| Pair a phone (#484) | Beta `pair`, computer side only. Pair a phone shows a QR code; the phone opens the link and the two connect over WebRTC (one Cloudflare STUN server, no TURN). The server only introduces them: a `pair_sessions` row with no user, no file names and no photo data, gone after 5 minutes unjoined or 30 joined. Each side signs its offer with the shared secret, and a mismatch is dropped. New dependency `uqr` 0.1.3 (MIT, ~4.9 KB gzipped, loaded only when the dialog opens). ADR-105 (draft). |
+| Send photos both ways (#485) | Over the pairing channel: the receiver sees "<device> wants to send 4 photos (18 MB)" and accepts or declines. Files go in 16 KB chunks, one at a time, and either side can cancel. The receiver checks every file's SHA-256 and the limits again (50 MB a file, 50 a send, image types, its gallery's room). Received photos go through the normal import. The computer sends originals, not edits. 10 photos / 40 MB took a median **5.27 s** on localhost. |
+| Text preview size (#487) | The box you type in now draws text at the engine's size. The engine sizes text by the font's ascent-to-descent height, the browser by the em, so the preview was about 10% wider than the committed text (HHHHHHHH at 48: 272 vs 242 px) and could break lines in different places. A new read-only engine call, `text_em_ratio`, gives the ratio per font; every edge now lands within 1 px. Committed text, exports and the op log are unchanged: the 63 existing text e2e hashes match v9.64. ADR-106 (draft). |
+| Resize & Compress (#489) | ⚡ Auto on the Scale and Quality rows moves both sliders, using the gallery's auto-compress rules: fit within 2500 px a side, then the highest quality from 75 down to 50 that passes Google's limit, measured. Apply still decides. Scale has number presets (10 25 50 75 100). On every edited slider row, the reset arrow now sits beside the value. The Format and Method tips moved into their section's lightbulb. |
+| Batch Masonry (#486) | The photo open in the editor fills its tile like the others (it was inset 48 px). `/design-system#marketing` scrolls to the Marketing tab. |
+| Dependencies (#483) | @tailwindcss/vite 4.3.5, zustand 5.1.0, three 0.187, jsdom 31.0.1, convex 1.50. |
+| Docs (#490, #488) | Finished handoffs moved to `docs/archive/`; ADR-095's missing index row added; Features.md caught up. Day log for 11-17 → 11-18. |
+| Marketing (#491) | Cards for 11 shipped features; claims that weren't true removed (a Straighten tool, "the job is deleted afterwards", automatic GPU blur); Architecture re-measured. |
+| Trail Log | Squares catch up through 11-18, including 11-16 and 11-17. |
+
+No Dexie migration and no op-log format change. New Convex table `pair_sessions` (deployed by CI on merge). Engine 967,840 → 969,207 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,447) and both production builds pass, all run after the trail data regen. cargo fmt, clippy (plain and tiles) and cargo test pass on this engine source (run 11-18; no Rust change since). e2e on the release build: pair-connection, pair-send, phone-no-engine, text-preview-size, text-align, text-box-survives, export-matches-canvas, batch-masonry-open-tile, resize-apply-placement, resize-photo-size and beta-switches, 75/75. Not run: `imagehorse-qc` on this release; pairing and the text preview change the editor.

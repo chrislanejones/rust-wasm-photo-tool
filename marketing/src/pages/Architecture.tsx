@@ -207,7 +207,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.64, 11-15-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.65, 11-19-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -259,7 +259,7 @@ export default function Architecture() {
             <div className="arch-plane__head">
               <span className="arch-plane__name">Browser</span>
               <span className="arch-plane__note">
-                no server in the edit path · one 968 KB engine
+                no server in the edit path · one 969 KB engine
               </span>
             </div>
 

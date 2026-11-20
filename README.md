@@ -89,19 +89,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.64 — 2026-11-15
+### v9.65 — 2026-11-19
 
-**Find the duplicates, and let Auto give a photo a starting point.**
+**Pair a phone with a QR code, and the text you type is the text you get.**
 
-Select ▾ has Find duplicates now. It groups photos that look the same, like burst shots
-and re-saves, and shows their size and whether you've edited them. In each group it
-keeps the biggest one, or the one you edited, and ticks the rest. Nothing gets deleted
-until you press Delete Selected and say yes. The Adjustments panel has an Auto button
-that reads the histogram and sets Brightness, Contrast, Shadows and Highlights. It's one
-undo step. Rename and export recipes learned `{date}`, `{width}`, `{height}`, `{ext}`
-and `{original}`. On a tablet-width screen you can start Compare from the Gallery tab.
-Esc leaves Compare while you're still picking, and centered text with no box lands
-where the preview showed it.
+Switch on the `pair` Beta on your computer and Pair a phone shows a QR code. Scan it
+and the phone and the computer talk to each other directly, so photos go either way
+without passing through the server. The side receiving says yes first, and every file
+is checked when it lands. Text you type now shows at the size it will be when you
+commit it. It used to shrink about 10%, and in a box the lines could break somewhere
+else. In Resize & Compress, the ⚡ button picks a size and a quality that pass Google's
+image check, and Scale has the same number presets as Quality. In Batch's Masonry view
+the open photo fills its tile.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
