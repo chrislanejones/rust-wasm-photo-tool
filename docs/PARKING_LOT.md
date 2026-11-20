@@ -4,6 +4,30 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — callout-leader §4 flakes on CI (11-19-2026)
+
+`e2e/callout-leader.spec.ts` §4 (Align ▾ on the callout alone, Align ▾ in a group, an
+arrow-key nudge) failed on 5 CI runs across 4 branches on 11-18 and 11-19, including
+#484, #485 and #487 before they merged. It is on master, not one branch.
+
+| Tried | Result |
+|---|---|
+| Redraw the leader inside the group move, before the flush (`useAnnotationSelection`) | No better: 1/24 failed with it, 0/24 without, both at 4× CPU on one core. Not shipped |
+| Local, normal speed | 0 failures |
+
+What fails: after the reload, Undo lands on a layer with no shapes and a text with a
+different id, instead of the layer before the move. The cause is not known yet. Next
+step: log the op-log bytes at the moment of the reload in a failing run.
+
+## OPEN — "Convex deploy (prod functions)" job red on master since 11-18-2026
+
+The deploy step works ("✔ Deployed Convex functions"). The check after it,
+`scripts/convex-deploy-check.mjs`, fails: it says 7 modules are not on the
+deployment (`mcp.testkit`, `mcpAuth`, `mcpClaims`, `mcpHttp`, `mcpImage`, `mcpTools`,
+`pairLimits`). These look like modules with no exported functions, so the check
+probably counts them wrongly. Not checked against the deployment: Convex was off
+limits that night.
+
 ## FIXED 11-09-2026 (night/1109-text-box-survives) — ADR-024-F7: a dragged text box lost on some ways back
 
 Every resume path forced in `e2e/text-box-survives.spec.ts`. Details in ADR-060's 11-09 addendum.

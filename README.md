@@ -89,18 +89,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.65 — 2026-11-19
+### v9.66 — 2026-11-19
 
-**Pair a phone with a QR code, and the text you type is the text you get.**
+**Shapes start filled, with no outline.**
 
-Switch on the `pair` Beta on your computer and Pair a phone shows a QR code. Scan it
-and the phone and the computer talk to each other directly, so photos go either way
-without passing through the server. The side receiving says yes first, and every file
-is checked when it lands. Text you type now shows at the size it will be when you
-commit it. It used to shrink about 10%, and in a box the lines could break somewhere
-else. In Resize & Compress, the ⚡ button picks a size and a quality that pass Google's
-image check, and Scale has the same number presets as Quality. In Batch's Masonry view
-the open photo fills its tile.
+A new square, circle, oval, diamond, triangle or star is filled with the first color
+in the palette, which is white, and has no outline. Fill Color is the first thing on
+the Shapes panel. The outline lives under Stroke, which starts at None; pick a Stroke
+Color and you get a 2 px outline. Sloppiness only bends the outline, so with no
+stroke its lightbulb tells you to add one. Arrows, pins, callouts and diagram shapes
+work the way they did. On a tablet-width screen, compare mode has one Stop comparing
+button now instead of two.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.66",
+    date: "2026-11-19",
+    headline: "Shapes start filled, with no outline.",
+    entries: [
+      { tag: "ui", text: "Shapes start filled with the palette's first color and no outline. Fill Color leads the Shapes panel, and Stroke is a closed section that starts at None." },
+      { tag: "ui", text: "Sloppiness only bends the outline, so on a shape with no stroke its lightbulb says to add one." },
+      { tag: "rust", text: "A shape with no stroke draws no outline at all, and resizing the image doesn't give it a hairline." },
+      { tag: "fix", text: "Compare mode on a tablet-width screen has one Stop comparing button, not two, and AI Rename's tips use US spelling." },
+      { tag: "infra", text: "QC pass on everything since v9.64: no regressions." },
+    ],
+  },
+  {
     version: "v9.65",
     date: "2026-11-19",
     headline: "Pair a phone with a QR code, and the text you type is the text you get.",

@@ -12186,3 +12186,19 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (
 No Dexie migration and no op-log format change. New Convex table `pair_sessions` (deployed by CI on merge). Engine 967,840 → 969,207 B.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,447) and both production builds pass, all run after the trail data regen. cargo fmt, clippy (plain and tiles) and cargo test pass on this engine source (run 11-18; no Rust change since). e2e on the release build: pair-connection, pair-send, phone-no-engine, text-preview-size, text-align, text-box-survives, export-matches-canvas, batch-masonry-open-tile, resize-apply-placement, resize-photo-size and beta-switches, 75/75. Not run: `imagehorse-qc` on this release; pairing and the text preview change the editor.
+
+## v9.66 Change Summary — 2026-11-19
+
+**Shapes start filled, with no outline.**
+
+| Area | Change |
+| --- | --- |
+| Fill-first shapes (#492) | A new square, circle, oval, diamond, triangle or star is filled with the Fill Color row's first swatch (white: the built-in row never changes and your own colors come after it) and has no stroke. The Shapes panel reads Fill Color, then Points (star), Corner Radius, Sloppiness, then a closed Stroke section with Stroke Color and Stroke Width, presets None / 2 / 4 / 8. A Fill Color you pick is the next shape's fill. Sloppiness moves only the outline, so on a strokeless shape its lightbulb says to add a stroke. Corner Radius rounds the fill. Arrows, diagram shapes, pins and callouts are unchanged (same pixels and shape list as v9.65). Engine: width 0 draws no outline at all, and resizing the image doesn't give a strokeless shape a hairline. Old outline-only shapes keep their style. ADR-107 (draft). |
+| Small fixes | AI Rename's info text uses US spelling. In the compact layout, compare mode has one Stop comparing control (the Gallery tab's tile), and its lightbulb no longer points at a top bar that layout doesn't have. |
+| QC | `imagehorse-qc` on master `1b863827`: PASS. Written up in `docs/qc/qc-1119.md`. |
+| Docs | Day log for 11-19; two items parked (the callout-leader §4 CI flake, and the Convex deploy check that goes red while the deploy works). |
+| Trail Log | Squares catch up through 11-19. |
+
+No Dexie migration and no op-log format change. Engine 969,207 → 969,240 B.
+
+Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,464) and both production builds pass, all run after the trail data regen (the regen renamed the Fill feature, so its marketing card was rekeyed to Fill Color and Stroke). Engine rebuilt after the last Rust change: 969,240 B. e2e on master `1b863827`: shapes-fill-first, shapes-ux, shape-corner-radius and screenshot-compare 25/25, and the `imagehorse-qc` pass in `docs/qc/qc-1119.md` (99 suite specs, 7 QC tests, 0 broken marketing links).

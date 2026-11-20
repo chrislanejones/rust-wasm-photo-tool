@@ -151,11 +151,11 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Rendered in WASM; Create → Shapes, with Arrow and Pins as their own sub-tools. Rotation is an angle beside the upright box, so a turned shape stays crisp and keeps its fill; Shift snaps to 15°.",
   },
-  Fill: {
+  "Fill Color and Stroke": {
     group: "annotate",
-    title: "Fill",
+    title: "Fill Color and Stroke",
     plain:
-      "Every shape with an inside can be filled — rectangle, circle, diamond, triangle, star — as a solid color, a gradient, or the photo underneath pixelated. The line is the one shape without it.",
+      "A new shape starts filled with the first color in the palette and no outline. Fill Color comes first on the Shapes panel, and the outline lives under Stroke, which starts at None. Diagram shapes can still fill with a gradient or the photo underneath pixelated.",
     detail:
       "An even-odd point-in-polygon clip against the same vertex list the engine strokes, so the fill and the outline cannot disagree; a star's missed corners stay empty. A filled shape rotates on the warp route, so gradient direction and pixelate grid turn with it.",
   },
