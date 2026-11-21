@@ -192,6 +192,14 @@ test("a marquee picks exactly what is inside it, and a callout's three parts", a
   const input = page.getByRole("textbox", { name: "Callout label" });
   await input.fill("Crack");
   await input.press("Enter");
+  // The label commits asynchronously. Read the layer once it holds the callout,
+  // the way callout-leader.spec.ts does; one read straight after Enter raced it
+  // and found none (CI, #493's PR run, 11-20-2026).
+  await expect(input).toHaveCount(0);
+  await expect.poll(async () => {
+    const now = await layer(page);
+    return findCallouts(now.shapes, now.texts).length;
+  }).toBe(1);
   await page.getByRole("radio", { name: "Pin", exact: true }).click();
   const l = await layer(page);
   const callout = findCallouts(l.shapes, l.texts);

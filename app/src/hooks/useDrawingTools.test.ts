@@ -19,6 +19,9 @@ import { describe, it, expect } from "vitest";
 import { panelStylePatch, pendingShapeType } from "./useDrawingTools";
 import type { DrawEditState } from "./useDrawingTools";
 import {
+  editStateFromShape,
+  withLatePanelRestyle,
+  type ShapeMeta,
   FILL_FIRST_KINDS,
   FILL_KIND_MODE,
   FILL_MODE_KIND,
@@ -314,5 +317,55 @@ describe("the fill tables", () => {
     for (const mode of ["none", "solid", "gradient", "pixelate"] as const) {
       expect(FILL_KIND_MODE[FILL_MODE_KIND[mode]], mode).toBe(mode);
     }
+  });
+});
+
+// ── A panel change Enter beat to the edit state (CI, 11-20/21-2026) ────────────
+describe("withLatePanelRestyle", () => {
+  // A white, strokeless rectangle reselected, and the panel synced to it the
+  // way `selectShape` does. A rectangle is fill-first, so its fill is the
+  // panel's `shapeFillColor`.
+  const white = editStateFromShape({
+    id: 7, kind: 0, x0: 300, y0: 250, x1: 620, y1: 470, r: 0, g: 0, b: 0, stroke_width: 0,
+    fill_kind: 1, fill_r: 255, fill_g: 255, fill_b: 255, fill2_r: 0, fill2_g: 0, fill2_b: 0, fill_angle: 0,
+  } as ShapeMeta);
+  const baseline = settings(panelFieldsForStyle(white.style!));
+
+  it("carries a Fill Color pick the restyle effect has not delivered yet", () => {
+    const dirty = { current: false };
+    const out = withLatePanelRestyle(white, baseline, { ...baseline, shapeFillColor: "#ef4444" }, dirty);
+    expect(out?.style?.fillColor).toBe("#ef4444");
+    expect(dirty.current).toBe(true);
+  });
+
+  it("changes nothing when the effect already delivered it", () => {
+    const delivered = { ...white, style: { ...white.style!, fillColor: "#ef4444" } };
+    const dirty = { current: false };
+    const out = withLatePanelRestyle(delivered, baseline, { ...baseline, shapeFillColor: "#ef4444" }, dirty);
+    expect(out).toBe(delivered);
+    expect(dirty.current).toBe(false);
+  });
+
+  it("changes nothing when the panel still matches the shape", () => {
+    const dirty = { current: false };
+    expect(withLatePanelRestyle(white, baseline, baseline, dirty)).toBe(white);
+    expect(dirty.current).toBe(false);
+  });
+
+  it("leaves a brand-new shape alone: it reads the panel live", () => {
+    const fresh: DrawEditState = { kind: "shape", start: { x: 0, y: 0 }, end: { x: 9, y: 9 } };
+    const dirty = { current: false };
+    expect(withLatePanelRestyle(fresh, baseline, { ...baseline, shapeFillColor: "#ef4444" }, dirty)).toBe(fresh);
+    expect(dirty.current).toBe(false);
+  });
+
+  it("leaves corner radii to their own live path", () => {
+    const dirty = { current: false };
+    const out = withLatePanelRestyle(white, baseline, { ...baseline, cornerRadii: [8, 8, 8, 8] }, dirty);
+    expect(out).toBe(white);
+  });
+
+  it("passes null through", () => {
+    expect(withLatePanelRestyle(null, baseline, baseline, { current: false })).toBeNull();
   });
 });

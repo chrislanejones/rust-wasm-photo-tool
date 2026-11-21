@@ -26,6 +26,7 @@ import {
   pendingShapeType,
   SHAPE_NAME_KIND,
   withEditGeometry,
+  withLatePanelRestyle,
   type CropSelection,
   type DrawEditState,
   type ShapeMeta,
@@ -188,6 +189,8 @@ export function useDrawingTools({
   // opening, and reading it from below its own declaration is needlessly
   // fragile.
   const prevStyleSettingsRef = useRef(settings);
+  // The panel as `selectShape` synced it, never advanced: see `withLatePanelRestyle`.
+  const selectedStyleBaselineRef = useRef<ToolSettings | null>(null);
   // Live shape annotations (for the Reselect list + canvas hit-test).
   const [shapes, setShapes] = useState<ShapeMeta[]>([]);
   // Mirror for callbacks that read the CURRENT draw order without being re-created
@@ -225,7 +228,8 @@ export function useDrawingTools({
    * pending, so every trigger can call it unconditionally.
    */
   const commitEdit = useCallback(async () => {
-    const es = takeLiveEdit(editStateRef.current, editDirtyRef); // a drag in flight included
+    const live = takeLiveEdit(editStateRef.current, editDirtyRef); // a drag in flight included
+    const es = withLatePanelRestyle(live, selectedStyleBaselineRef.current, useToolStore.getState().toolSettings, editDirtyRef);
     if (!es) return;
     editStateRef.current = null;
     const settled = settle(es); // cleared before the engine drew it, shapes vanished on Apply
@@ -396,6 +400,7 @@ export function useDrawingTools({
         cornerRadii: next.style!.cornerRadii,
       };
       prevStyleSettingsRef.current = synced;
+      selectedStyleBaselineRef.current = synced;
       useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
       // Selecting a shape — from the canvas OR the Reselect list — makes it
       // the object the Align/Placement grid acts on. Previously only the

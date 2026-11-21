@@ -76,8 +76,15 @@ async function key(page: Page, combo: string) {
   await page.keyboard.press(combo);
 }
 
-/** The edit box of the shape in hand (the action bar carries the marker too). */
-const editBox = (page: Page) => page.locator("svg[data-draw-overlay]").first();
+/** The edit box of the shape in hand (the action bar carries the marker too).
+ *
+ *  NOT `data-settling`: a commit leaves a click-through copy of the box on
+ *  screen, with the same `data-draw-overlay` marker, until the engine has drawn
+ *  the shape, so the old locator could pass before the click's (asynchronous)
+ *  reselect had finished. Tightened 11-21-2026. It was not the cause of the
+ *  CI failures of these tests; that was an app race, pinned by the last test
+ *  in this file. */
+const editBox = (page: Page) => page.locator("svg[data-draw-overlay]:not([data-settling])").first();
 const swatch = (page: Page, group: string, n: number) =>
   page.getByRole("radiogroup", { name: group, exact: true }).getByRole("radio").nth(n);
 const strokeHeader = (page: Page) => page.locator('[data-slot="collapsible"] > div > button', { hasText: "Stroke" });
@@ -237,4 +244,29 @@ test("a Fill Color picked with nothing in hand is the next square's fill, and th
   for (const s of await shapes(page)) {
     expect(s).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
   }
+});
+
+// A Fill Color pick on a reselected shape, with Enter arriving before React has
+// rendered the pick. The restyle effect delivers a panel change on the next
+// render; Enter is a window listener, and on a loaded CI runner Chrome ran it
+// first, so the shape kept its old fill while the panel showed the new one
+// (CI 11-20 and 11-21-2026). The swatch click and the Enter keydown fire in ONE
+// task here, which makes that order certain: 3 of 3 failed before the fix.
+test("a Fill Color picked and Enter pressed in the same moment still recolors the reselected shape", async ({ page }) => {
+  await open(page);
+  await shapesTab(page);
+  await drag(page, ...BOX);
+  await key(page, "Enter");
+  await expect.poll(async () => (await shapes(page)).length).toBe(1);
+  await expect(page.locator("svg[data-draw-overlay]")).toHaveCount(0);
+  const mid = await screenPoint(page, ...MIDDLE);
+  await page.mouse.click(mid.x, mid.y);
+  await expect(page.locator("svg[data-draw-overlay]:not([data-settling])").first()).toBeAttached();
+  const red = await swatch(page, "Fill Color", 1).elementHandle();
+  await red!.evaluate((el) => {
+    (el as HTMLElement).click();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  });
+  await expect.poll(async () => (await shapes(page))[0]?.fill_r).toBe(0xef);
+  expect((await shapes(page))[0]).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
 });

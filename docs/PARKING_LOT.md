@@ -17,21 +17,42 @@ arrow-key nudge) failed on 5 CI runs across 4 branches on 11-18 and 11-19, inclu
 
 What fails: after the reload, Undo lands on a layer with no shapes and a text with a
 different id, instead of the layer before the move. The cause is not known yet. Next
-step: log the op-log bytes at the moment of the reload in a failing run.
+step: log the op-log bytes at the moment of the reload in a failing run. Failing
+E2E shards now upload their screenshots (see the fill-first entry below).
 
-## OPEN — `shapes-fill-first.spec.ts` flakes on CI (11-20-2026)
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `shapes-fill-first.spec.ts` CI flake was an app race
 
-The spec #492 added failed on 2 of the 4 CI runs that had it, a different test
-each time. It passed locally (25/25 with the other shape specs) and on the next
-master run.
+`:97` and `:191` failed on 4 CI runs (11-20, 11-21), never locally (0 of 56 at
+4× and 8× CPU). The first failure artifact showed the pick checked in the panel,
+the shape unchanged, and no edit box open.
 
-| Run | Commit | Failed |
-|---|---|---|
-| 44678976543 | #492 branch | `:191` outline-only shape keeps its style (and `pair-send.spec.ts:68` in the same shard) |
-| 44680710246 | master `1b863827` | `:97` a new rectangle is its Fill Color: after picking red + Enter, `fill_r` stayed **255** for 15 s |
+The cause: a panel change reaches a reselected shape through an effect that
+updates the edit state on React's NEXT render, and Enter is a window listener.
+When Chrome ran the Enter keydown first, `commitEdit` committed the style from
+before the pick. A swatch click and Enter in one task reproduced it **3 of 3**.
 
-Observation only; the cause is not known. Next step: run the spec at 4× CPU on
-one core, the way the callout flake was reproduced.
+Fix: `commitEdit` now applies `withLatePanelRestyle`, a diff of the store
+against the panel as the shape was selected, so the commit no longer depends
+on render order. Repro 0/3 → 3/3; 41/41 shape and callout specs.
+
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `pair-send.spec.ts:68` "nothing goes to a server" flake
+
+Failed on #492's run and #494's run with 3 lines: a websocket to the build's
+placeholder Convex deployment and two frames (156 B, 209 B). Caught locally in
+1 run of 3: the Convex client reconnecting on its own timer, sending `Connect`
+and a `ModifyQuerySet` for the signed-out app's `users:me` and
+`subscriptions:getByUser`. No photo bytes. The check now ignores exactly those
+two message shapes on the placeholder host, the way it already ignored Clerk's
+loader retry. Any Mutation, Action, Authenticate or other query still fails it.
+12 of 12 passed locally.
+
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `annotation-multiselect.spec.ts:179` marquee flake
+
+Failed once on #493's PR run: "Expected length: 1, Received length: 0" for the
+callout. The test read the layer once, straight after Enter on the callout
+label, before the label had committed. It now waits for the input to close and
+polls for the callout, the way `callout-leader.spec.ts` already did. 5 of 5
+passed at 4× CPU on one core.
 
 ## FIXED 11-20-2026 (`fix/convex-deploy-check-helpers`) — "Convex deploy (prod functions)" job red on master since 11-18-2026
 

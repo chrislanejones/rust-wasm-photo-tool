@@ -237,6 +237,39 @@ export function panelStylePatch(
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
+/**
+ * A reselected shape about to be committed, with any panel change the restyle
+ * effect has not delivered yet.
+ *
+ * The effect in `useDrawingTools` carries a panel change into the edit state,
+ * but only on React's next render, and Enter is a plain window listener. When
+ * the Enter keydown ran first (CI under load, 11-20/21-2026), `commitEdit` read
+ * the style from before the pick: the shape kept its color while the panel
+ * showed the new one. Swatch click and Enter in one task reproduced it 3 of 3.
+ *
+ * Diffing the store against the panel as the shape was selected (`baseline`)
+ * gives the same answer whether or not the effect has run: fields it already
+ * applied compare equal and change nothing. Corner radii are left to their own
+ * live path (`takeLiveEdit`). New shapes (no `style`) read the panel live and
+ * are returned untouched.
+ */
+export function withLatePanelRestyle(
+  es: DrawEditState | null,
+  baseline: ToolSettings | null,
+  now: ToolSettings,
+  dirty: { current: boolean },
+): DrawEditState | null {
+  if (!es?.style || es.editId == null || !baseline) return es;
+  const patch = panelStylePatch(baseline, now, es.style.kindByte);
+  if (!patch) return es;
+  delete patch.cornerRadii;
+  const style = { ...es.style, ...patch };
+  const changed = (Object.keys(patch) as (keyof typeof patch)[]).some((k) => style[k] !== es.style![k]);
+  if (!changed) return es;
+  dirty.current = true;
+  return { ...es, style };
+}
+
 function sameRadii(a: CornerRadii | undefined, b: CornerRadii | undefined): boolean {
   const x = a ?? [0, 0, 0, 0];
   const y = b ?? [0, 0, 0, 0];
