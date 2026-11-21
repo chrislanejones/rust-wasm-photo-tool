@@ -12202,3 +12202,16 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (
 No Dexie migration and no op-log format change. Engine 969,207 → 969,240 B.
 
 Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (2,464) and both production builds pass, all run after the trail data regen (the regen renamed the Fill feature, so its marketing card was rekeyed to Fill Color and Stroke). Engine rebuilt after the last Rust change: 969,240 B. e2e on master `1b863827`: shapes-fill-first, shapes-ux, shape-corner-radius and screenshot-compare 25/25, and the `imagehorse-qc` pass in `docs/qc/qc-1119.md` (99 suite specs, 7 QC tests, 0 broken marketing links).
+
+## v9.67 Change Summary — 2026-11-20
+
+**The deploy check tells the truth again.**
+
+| Area | Change |
+| --- | --- |
+| CI (#493) | The "Convex deploy (prod functions)" job had been red on every master run since 11-18 while the deploy worked. A `convex/*.ts` module is now expected live only if its source exports a `query`, `mutation`, `action` or an internal one; the hand-kept helper list is gone. File names follow Convex's own bundler rule (no dotfiles, nothing with more than one dot), which is why `mcp.testkit` was never deployed. New guard: a module the scan calls a helper that IS live fails the job, since the scan missed a registration form. Against prod: expected 21, live 21. |
+| Trail Log | Squares catch up through 11-20. |
+
+Nothing in the editor or the engine changed. No Dexie migration and no op-log format change.
+
+Verification: `scripts/convex-deploy-check.test.mjs` 18/18 (6 failed on the old check first); `pnpm test:convex` 234/234; guardrails pass; lint 0 errors. The first master run after the merge: 16/16 jobs green, deploy check 21/21.

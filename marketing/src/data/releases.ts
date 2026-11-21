@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.67",
+    date: "2026-11-20",
+    headline: "The deploy check tells the truth again.",
+    entries: [
+      { tag: "infra", text: "The check that runs after each backend deploy reads which files really hold functions, so it stopped going red while the deploy worked. Master's checks are all green again." },
+    ],
+  },
+  {
     version: "v9.66",
     date: "2026-11-19",
     headline: "Shapes start filled, with no outline.",

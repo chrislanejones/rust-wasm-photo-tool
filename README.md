@@ -89,17 +89,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.66 — 2026-11-19
+### v9.67 — 2026-11-20
 
-**Shapes start filled, with no outline.**
+**The deploy check tells the truth again.**
 
-A new square, circle, oval, diamond, triangle or star is filled with the first color
-in the palette, which is white, and has no outline. Fill Color is the first thing on
-the Shapes panel. The outline lives under Stroke, which starts at None; pick a Stroke
-Color and you get a 2 px outline. Sloppiness only bends the outline, so with no
-stroke its lightbulb tells you to add one. Arrows, pins, callouts and diagram shapes
-work the way they did. On a tablet-width screen, compare mode has one Stop comparing
-button now instead of two.
+Nothing changes in the editor. The check that runs after every deploy to the
+backend had gone red on every run since 11-18 while the deploy itself worked. It
+now reads which backend files really hold functions, and it skips the files the
+backend never deploys, so a red run means something again. Master's checks are
+all green for the first time since 11-18.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
