@@ -20,40 +20,20 @@ different id, instead of the layer before the move. The cause is not known yet. 
 step: log the op-log bytes at the moment of the reload in a failing run. Failing
 E2E shards now upload their screenshots (see the fill-first entry below).
 
-## OPEN — `shapes-fill-first.spec.ts` flakes on CI (11-20-2026)
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `shapes-fill-first.spec.ts` CI flake was an app race
 
-The spec #492 added failed on 2 of the 4 CI runs that had it, a different test
-each time. It passed locally (25/25 with the other shape specs) and on the next
-master run.
+`:97` and `:191` failed on 4 CI runs (11-20, 11-21), never locally (0 of 56 at
+4× and 8× CPU). The first failure artifact showed the pick checked in the panel,
+the shape unchanged, and no edit box open.
 
-| Run | Commit | Failed |
-|---|---|---|
-| 44678976543 | #492 branch | `:191` outline-only shape keeps its style (the `pair-send.spec.ts:68` failure in the same shard is fixed, below) |
-| 44680710246 | master `1b863827` | `:97` a new rectangle is its Fill Color: after picking red + Enter, `fill_r` stayed **255** for 15 s |
+The cause: a panel change reaches a reselected shape through an effect that
+updates the edit state on React's NEXT render, and Enter is a window listener.
+When Chrome ran the Enter keydown first, `commitEdit` committed the style from
+before the pick. A swatch click and Enter in one task reproduced it **3 of 3**.
 
-Observation only; the cause is not known. Both failures are the same step: a
-reselected shape, a Fill Color swatch click, Enter, and the fill never changes.
-
-| Tried 11-21-2026 | Result |
-|---|---|
-| 4× CPU on one core, 8 repeats | **0 of 32** failed |
-| 8× CPU on one core, 6 repeats | **0 of 24** failed |
-
-From 11-21-2026 a failing E2E shard uploads `test-results/` (screenshot +
-error-context.md) as `e2e-failures-shard-N`, kept 7 days. The first artifact
-(#494, run 44935079602, both `:97` and `:191` failed in one shard) shows:
-
-| At the failure | `:97` | `:191` |
-|---|---|---|
-| Panel's checked Fill Color | **red** (the pick) | **yellow** (the pick) |
-| The shape | still white | still no fill |
-| Edit box open | no | no |
-
-So the pick reached the panel and not the shape. One weakness found and
-tightened: the spec's "shape is in hand" check matched the click-through copy a
-commit leaves on screen (`data-settling`), and a click's reselect finishes
-asynchronously. Not proven to be the cause. If it fails again, read the next
-artifact before changing the app.
+Fix: `commitEdit` now applies `withLatePanelRestyle`, a diff of the store
+against the panel as the shape was selected, so the commit no longer depends
+on render order. Repro 0/3 → 3/3; 41/41 shape and callout specs.
 
 ## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `pair-send.spec.ts:68` "nothing goes to a server" flake
 
