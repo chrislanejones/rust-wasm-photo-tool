@@ -19,14 +19,27 @@ What fails: after the reload, Undo lands on a layer with no shapes and a text wi
 different id, instead of the layer before the move. The cause is not known yet. Next
 step: log the op-log bytes at the moment of the reload in a failing run.
 
-## OPEN — "Convex deploy (prod functions)" job red on master since 11-18-2026
+## OPEN — `shapes-fill-first.spec.ts` flakes on CI (11-20-2026)
 
-The deploy step works ("✔ Deployed Convex functions"). The check after it,
-`scripts/convex-deploy-check.mjs`, fails: it says 7 modules are not on the
-deployment (`mcp.testkit`, `mcpAuth`, `mcpClaims`, `mcpHttp`, `mcpImage`, `mcpTools`,
-`pairLimits`). These look like modules with no exported functions, so the check
-probably counts them wrongly. Not checked against the deployment: Convex was off
-limits that night.
+The spec #492 added failed on 2 of the 4 CI runs that had it, a different test
+each time. It passed locally (25/25 with the other shape specs) and on the next
+master run.
+
+| Run | Commit | Failed |
+|---|---|---|
+| 44678976543 | #492 branch | `:191` outline-only shape keeps its style (and `pair-send.spec.ts:68` in the same shard) |
+| 44680710246 | master `1b863827` | `:97` a new rectangle is its Fill Color: after picking red + Enter, `fill_r` stayed **255** for 15 s |
+
+Observation only; the cause is not known. Next step: run the spec at 4× CPU on
+one core, the way the callout flake was reproduced.
+
+## FIXED 11-20-2026 (`fix/convex-deploy-check-helpers`) — "Convex deploy (prod functions)" job red on master since 11-18-2026
+
+The deploy worked; the check after it was wrong. It skipped helper modules by a
+hand-kept list that MCP and pairing never joined, and it expected
+`mcp.testkit.ts`, which Convex never bundles (two dots in the name). The check
+now reads the source: a module must be live only if it exports a query,
+mutation or action. Run against prod: 21 expected, 21 live.
 
 ## FIXED 11-09-2026 (night/1109-text-box-survives) — ADR-024-F7: a dragged text box lost on some ways back
 
