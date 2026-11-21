@@ -76,8 +76,16 @@ async function key(page: Page, combo: string) {
   await page.keyboard.press(combo);
 }
 
-/** The edit box of the shape in hand (the action bar carries the marker too). */
-const editBox = (page: Page) => page.locator("svg[data-draw-overlay]").first();
+/** The edit box of the shape in hand (the action bar carries the marker too).
+ *
+ *  NOT `data-settling`: a commit leaves a click-through copy of the box on
+ *  screen, with the same `data-draw-overlay` marker, until the engine has drawn
+ *  the shape, so the old locator could pass before the click's (asynchronous)
+ *  reselect had finished. Tightened 11-21-2026 after CI failures where the
+ *  panel showed the picked color, the shape kept its old one, and no edit box
+ *  was open. Whether this was the cause is NOT proven: it never failed locally
+ *  (0 of 56 at 4x and 8x CPU). See PARKING_LOT. */
+const editBox = (page: Page) => page.locator("svg[data-draw-overlay]:not([data-settling])").first();
 const swatch = (page: Page, group: string, n: number) =>
   page.getByRole("radiogroup", { name: group, exact: true }).getByRole("radio").nth(n);
 const strokeHeader = (page: Page) => page.locator('[data-slot="collapsible"] > div > button', { hasText: "Stroke" });

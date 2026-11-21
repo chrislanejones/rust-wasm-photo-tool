@@ -39,9 +39,21 @@ reselected shape, a Fill Color swatch click, Enter, and the fill never changes.
 | 4× CPU on one core, 8 repeats | **0 of 32** failed |
 | 8× CPU on one core, 6 repeats | **0 of 24** failed |
 
-CI kept nothing from either failure. From 11-21-2026 a failing E2E shard uploads
-`test-results/` (screenshot + error-context.md) as `e2e-failures-shard-N`, kept
-7 days. Next step: read that artifact the next time it goes red.
+From 11-21-2026 a failing E2E shard uploads `test-results/` (screenshot +
+error-context.md) as `e2e-failures-shard-N`, kept 7 days. The first artifact
+(#494, run 44935079602, both `:97` and `:191` failed in one shard) shows:
+
+| At the failure | `:97` | `:191` |
+|---|---|---|
+| Panel's checked Fill Color | **red** (the pick) | **yellow** (the pick) |
+| The shape | still white | still no fill |
+| Edit box open | no | no |
+
+So the pick reached the panel and not the shape. One weakness found and
+tightened: the spec's "shape is in hand" check matched the click-through copy a
+commit leaves on screen (`data-settling`), and a click's reselect finishes
+asynchronously. Not proven to be the cause. If it fails again, read the next
+artifact before changing the app.
 
 ## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `pair-send.spec.ts:68` "nothing goes to a server" flake
 
