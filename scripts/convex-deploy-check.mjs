@@ -27,7 +27,9 @@
 // serves, rather than trusting the deploy command's own exit code. A deploy
 // that silently pushed nothing exits 0 too.
 import { execFileSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const CONVEX_DIR = "convex";
 
@@ -40,37 +42,60 @@ const CONVEX_DIR = "convex";
  *  expected modules would make this check permanently, wrongly red. */
 const NOT_A_MODULE = new Set(["schema", "auth.config", "tsconfig", "http", "router"]);
 
-/** Modules with no callable exports of their own.
+/** Does Convex bundle this file at all?
  *
- *  `crons` declares scheduled jobs; the deployment runs them but does not list
- *  them as functions. `entitlement` is a pure rule module — the tier / role /
- *  entitlement ladder, imported by `users.ts` and by the client — so it has no
- *  function for `function-spec` to report, and a client cannot call it
- *  directly either, which is the failure this check exists to catch (#121).
- *  The v9.16 helpers are the same kind: each registers no query, mutation or
- *  action and is only imported by modules that do — `aiCaps` (aiJobs),
- *  `storageOrphans` + `storageQuota` (storageSweep, photoEdits, shares),
- *  `storedFiles` + `testAccount` (photoEdits, shares, testAccountWipe).
- *  Keep this list SHORT and justified — every entry is a module this check can
- *  no longer vouch for. */
-const NO_CALLABLE_EXPORTS = new Set([
-  "crons",
-  "entitlement",
-  "aiCaps",
-  "storageOrphans",
-  "storageQuota",
-  "storedFiles",
-  "testAccount",
-]);
+ *  Mirrors the entry-point rules in convex/dist/cjs/bundler/index.js (1.50):
+ *  no dotfiles, no `#` editor temp files, and nothing with more than one dot in
+ *  its name. The last rule is the one that matters here: it is why `*.test.ts`
+ *  and `mcp.testkit.ts` never deploy. This used to match only `.test`/`.spec`,
+ *  so it expected `mcp.testkit` on the deployment and went red for it. */
+function isEntryPoint(file) {
+  if (!file.endsWith(".ts")) return false;
+  if (file.startsWith(".") || file.startsWith("#")) return false;
+  return (file.match(/\./g) ?? []).length === 1;
+}
 
-function repoModules() {
-  return readdirSync(CONVEX_DIR)
-    // Convex test/spec files exercise functions locally; they register no
-    // production endpoints and must not be required by function-spec.
-    .filter((f) => f.endsWith(".ts") && !/\.(test|spec)\.ts$/.test(f))
-    .map((f) => f.replace(/\.ts$/, ""))
-    .filter((m) => !NOT_A_MODULE.has(m) && !NO_CALLABLE_EXPORTS.has(m))
-    .sort();
+/** The builders whose exports `function-spec` lists by module name. HTTP
+ *  actions are left out on purpose: they are reported by route path. */
+const BUILDERS = "query|mutation|action|internalQuery|internalMutation|internalAction";
+
+/** `export const f = query(` and the forms around it: a type annotation, the
+ *  builder on the next line, a type argument (`query<T>(`), a wrapper call
+ *  (`withUser(mutation(`), and `export default action(`. On 11-20-2026 the repo
+ *  used only the plain form; the others are pinned in the tests so a refactor
+ *  to one of them cannot quietly turn a module into a "helper". */
+const REGISTERS = new RegExp(
+  "^export\\s+(?:const\\s+[A-Za-z_$][\\w$]*\\s*(?::[^=;]+)?=|default)\\s*" +
+    "(?:[A-Za-z_$][\\w$.]*\\s*\\(\\s*)*" +
+    `(?:${BUILDERS})\\s*[(<]`,
+  "m",
+);
+
+/** True when the source exports at least one registered Convex function.
+ *  Block comments are dropped first; a `//` line never starts with `export`. */
+export function registersFunction(source) {
+  return REGISTERS.test(source.replace(/\/\*[\s\S]*?\*\//g, ""));
+}
+
+/** Which modules must be live on the deployment, and which are helpers.
+ *
+ *  Derived from the source, not a hand-kept list. The list this replaces
+ *  (`NO_CALLABLE_EXPORTS`) was right when written and wrong two features later:
+ *  MCP and pairing added six helpers (`mcpAuth`, `mcpClaims`, `mcpHttp`,
+ *  `mcpImage`, `mcpTools`, `pairLimits`), nobody added them to the list, and
+ *  master's deploy job was red from 11-18-2026 on a deploy that worked.
+ *
+ *  A helper registers no query, mutation or action, so `function-spec` never
+ *  names it and a client cannot call it — there is nothing for #121 to break. */
+export function classifyModules(dir = CONVEX_DIR) {
+  const expected = [];
+  const helpers = [];
+  for (const file of readdirSync(dir).filter(isEntryPoint).sort()) {
+    const name = file.replace(/\.ts$/, "");
+    if (NOT_A_MODULE.has(name)) continue;
+    (registersFunction(readFileSync(join(dir, file), "utf8")) ? expected : helpers).push(name);
+  }
+  return { expected, helpers };
 }
 
 /** Passed through to every CLI call, so `--prod` selects the deployment for
@@ -167,13 +192,24 @@ function main() {
     return;
   }
 
-  const expected = repoModules();
+  const { expected, helpers } = classifyModules();
   const { url, modules: live } = deployed();
   const missing = expected.filter((m) => !live.has(m));
+  // The guard on the derivation itself. A helper cannot be live, so one that
+  // IS means the scan missed a registration form, and every module written that
+  // way would be silently unchecked. Fail loudly instead.
+  const misread = helpers.filter((m) => live.has(m));
 
   console.log(`deployment:       ${url ?? "(unreported)"}`);
-  console.log(`repo modules:     ${expected.length}`);
+  console.log(`expected live:    ${expected.length}`);
+  console.log(`helpers (no callable exports): ${helpers.join(", ") || "(none)"}`);
   console.log(`live on backend:  ${live.size}`);
+
+  if (misread.length) {
+    console.error(`::error::${misread.length} module(s) the scan called helpers ARE on the deployment: ${misread.join(", ")}`);
+    console.error("They register a function in a form REGISTERS does not match. Teach the scan that form; a module it misreads is a module this check cannot vouch for.");
+    process.exit(1);
+  }
 
   if (missing.length) {
     console.error(`::error::${missing.length} module(s) in the repo are NOT on the deployment: ${missing.join(", ")}`);
@@ -181,7 +217,8 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`ok  every repo module is live (${expected.join(", ")})`);
+  console.log(`ok  every module that registers a function is live (${expected.join(", ")})`);
 }
 
-main();
+// Run only as a script, so the tests can import classifyModules.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
