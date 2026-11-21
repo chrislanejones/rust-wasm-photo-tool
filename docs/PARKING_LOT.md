@@ -28,7 +28,7 @@ master run.
 
 | Run | Commit | Failed |
 |---|---|---|
-| 44678976543 | #492 branch | `:191` outline-only shape keeps its style (and `pair-send.spec.ts:68` in the same shard) |
+| 44678976543 | #492 branch | `:191` outline-only shape keeps its style (the `pair-send.spec.ts:68` failure in the same shard is fixed, below) |
 | 44680710246 | master `1b863827` | `:97` a new rectangle is its Fill Color: after picking red + Enter, `fill_r` stayed **255** for 15 s |
 
 Observation only; the cause is not known. Both failures are the same step: a
@@ -42,6 +42,17 @@ reselected shape, a Fill Color swatch click, Enter, and the fill never changes.
 CI kept nothing from either failure. From 11-21-2026 a failing E2E shard uploads
 `test-results/` (screenshot + error-context.md) as `e2e-failures-shard-N`, kept
 7 days. Next step: read that artifact the next time it goes red.
+
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `pair-send.spec.ts:68` "nothing goes to a server" flake
+
+Failed on #492's run and #494's run with 3 lines: a websocket to the build's
+placeholder Convex deployment and two frames (156 B, 209 B). Caught locally in
+1 run of 3: the Convex client reconnecting on its own timer, sending `Connect`
+and a `ModifyQuerySet` for the signed-out app's `users:me` and
+`subscriptions:getByUser`. No photo bytes. The check now ignores exactly those
+two message shapes on the placeholder host, the way it already ignored Clerk's
+loader retry. Any Mutation, Action, Authenticate or other query still fails it.
+12 of 12 passed locally.
 
 ## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `annotation-multiselect.spec.ts:179` marquee flake
 

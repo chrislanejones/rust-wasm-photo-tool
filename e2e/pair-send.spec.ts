@@ -40,11 +40,31 @@ const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
  *  One exception, named: Clerk's loader re-requesting its own script
  *  (`clerk.browser.js`) from the build's placeholder `.invalid` host, on its
  *  own retry timer. It is a bodiless GET, aborted offline, and unrelated to
- *  the send; it landed inside the window on one run in three. */
+ *  the send; it landed inside the window on one run in three.
+ *
+ *  A second, just as narrow: the Convex client reconnecting to the build's
+ *  PLACEHOLDER deployment on its own timer. Each reconnect opens the sync
+ *  socket and sends exactly two frames, measured 11-21-2026:
+ *    {"type":"Connect", "connectionCount":3, "sessionId":…}            ~156 B
+ *    {"type":"ModifyQuerySet", "modifications":[Add users:me {},
+ *                              Add subscriptions:getByUser {}]}       ~209 B
+ *  That is the signed-out app's own two subscriptions, unrelated to the send;
+ *  it failed CI twice (#492's run, #494's run) when a reconnect landed inside
+ *  the window. Only those two message shapes, on that host, are ignored: a
+ *  Mutation, an Action, an Authenticate, or any other query still counts. */
 function serverTraffic(contexts: BrowserContext[]) {
   const seen: string[] = [];
   const local = (u: string) => /^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(u) || u.startsWith("blob:") || u.startsWith("data:");
   const clerkLoader = (u: string) => /^https:\/\/clerk\.[a-z0-9-]+\.invalid\/npm\/@clerk\/clerk-js@[^/]+\/dist\/clerk\.browser\.js$/.test(u);
+  const placeholderSync = (u: string) => /^wss:\/\/smoke-placeholder-[0-9]+\.convex\.cloud\/api\/[^/]+\/sync$/.test(u);
+  const SIGNED_OUT_QUERIES = new Set(["users:me", "subscriptions:getByUser"]);
+  const reconnectHandshake = (payload: string) => {
+    let m: { type?: string; modifications?: { type?: string; udfPath?: string; args?: unknown }[] };
+    try { m = JSON.parse(payload); } catch { return false; }
+    if (m.type === "Connect") return true;
+    return m.type === "ModifyQuerySet" && Array.isArray(m.modifications) && m.modifications.every((q) =>
+      q.type === "Add" && SIGNED_OUT_QUERIES.has(q.udfPath ?? "") && JSON.stringify(q.args) === "[{}]");
+  };
   const onRequest = (r: Request) => {
     const u = r.url();
     const carries = r.method() !== "GET" || r.postDataBuffer() !== null || /convex|storage|upload/i.test(u);
@@ -54,8 +74,13 @@ function serverTraffic(contexts: BrowserContext[]) {
     c.on("request", onRequest);
     for (const p of c.pages()) {
       p.on("websocket", (ws) => {
-        seen.push(`WEBSOCKET ${ws.url()}`);
-        ws.on("framesent", (f) => seen.push(`FRAME ${ws.url()} ${String(f.payload).length} B`));
+        const reconnect = placeholderSync(ws.url());
+        if (!reconnect) seen.push(`WEBSOCKET ${ws.url()}`);
+        ws.on("framesent", (f) => {
+          const payload = String(f.payload);
+          if (reconnect && reconnectHandshake(payload)) return;
+          seen.push(`FRAME ${ws.url()} ${payload.length} B`);
+        });
       });
     }
   }
