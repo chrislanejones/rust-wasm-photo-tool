@@ -488,6 +488,20 @@ jobs:
         run: node scripts/e2e-coverage-check.mjs
       - name: E2E shard ${{ matrix.shard }}/2
         run: pnpm exec playwright test --shard=${{ matrix.shard }}/2
+      # Keep what a failure leaves behind. Playwright writes a screenshot and an
+      # error-context.md (the page's accessibility tree at the moment it failed)
+      # into test-results/, and until 11-21-2026 the runner threw them away.
+      # Three CI-only flakes (callout-leader §4, shapes-fill-first,
+      # annotation-multiselect) could not be reproduced locally, and the logs
+      # alone could not say what the page looked like when they failed.
+      - name: Keep the failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failures-shard-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   # ---------- Service-worker e2e (ADR-049 gate 1) ----------
   # ADR-049 found that this repo had NINE CI jobs and none of them ran

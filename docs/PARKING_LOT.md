@@ -17,7 +17,8 @@ arrow-key nudge) failed on 5 CI runs across 4 branches on 11-18 and 11-19, inclu
 
 What fails: after the reload, Undo lands on a layer with no shapes and a text with a
 different id, instead of the layer before the move. The cause is not known yet. Next
-step: log the op-log bytes at the moment of the reload in a failing run.
+step: log the op-log bytes at the moment of the reload in a failing run. Failing
+E2E shards now upload their screenshots (see the fill-first entry below).
 
 ## OPEN — `shapes-fill-first.spec.ts` flakes on CI (11-20-2026)
 
@@ -30,8 +31,25 @@ master run.
 | 44678976543 | #492 branch | `:191` outline-only shape keeps its style (and `pair-send.spec.ts:68` in the same shard) |
 | 44680710246 | master `1b863827` | `:97` a new rectangle is its Fill Color: after picking red + Enter, `fill_r` stayed **255** for 15 s |
 
-Observation only; the cause is not known. Next step: run the spec at 4× CPU on
-one core, the way the callout flake was reproduced.
+Observation only; the cause is not known. Both failures are the same step: a
+reselected shape, a Fill Color swatch click, Enter, and the fill never changes.
+
+| Tried 11-21-2026 | Result |
+|---|---|
+| 4× CPU on one core, 8 repeats | **0 of 32** failed |
+| 8× CPU on one core, 6 repeats | **0 of 24** failed |
+
+CI kept nothing from either failure. From 11-21-2026 a failing E2E shard uploads
+`test-results/` (screenshot + error-context.md) as `e2e-failures-shard-N`, kept
+7 days. Next step: read that artifact the next time it goes red.
+
+## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `annotation-multiselect.spec.ts:179` marquee flake
+
+Failed once on #493's PR run: "Expected length: 1, Received length: 0" for the
+callout. The test read the layer once, straight after Enter on the callout
+label, before the label had committed. It now waits for the input to close and
+polls for the callout, the way `callout-leader.spec.ts` already did. 5 of 5
+passed at 4× CPU on one core.
 
 ## FIXED 11-20-2026 (`fix/convex-deploy-check-helpers`) — "Convex deploy (prod functions)" job red on master since 11-18-2026
 
