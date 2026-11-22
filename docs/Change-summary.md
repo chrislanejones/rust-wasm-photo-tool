@@ -12230,3 +12230,22 @@ Verification: `scripts/convex-deploy-check.test.mjs` 18/18 (6 failed on the old 
 Still open: the `callout-leader` §4 CI flake. It passed 20/20 at 4× CPU both on #494 and on master, so it needs a CI-side look. No Dexie migration, no op-log format change, no engine change.
 
 Verification: vitest 2,470/2,470 (6 new unit tests); eight shape and callout specs 41/41; tsc 0; lint 0 errors; guardrails pass; `e2e-coverage-check` 89/89 specs run. PR CI: 18 pass, 2 skipped.
+
+## v9.69 Change Summary — 2026-11-22
+
+**Hide the same spot on every screenshot, and location leaves only when you say so.**
+
+| Area | Change |
+| --- | --- |
+| Batch › Redact (#495) | A new Batch tile. Drag up to 10 boxes on the open photo, pick **Pixelate**, **Blur** or **Solid**, and every photo in the batch is redacted in the same place. **Same spot** (the default) keeps each box at the same fractions of width and height, so a 1x and a 2x screenshot of one screen line up; **Pinned to a corner** keeps its size in pixels and its distance from one of the nine Placement cells. Floors make it a redaction, not a soft focus: block size at least 12 px, blur strength at least 20, measured on the built engine over 12 px text (no glyph pixel survives). Main \| Exceptions per ADR-079, and a group with no boxes is skipped. The open photo is one undo step (`ShapeAdd` / `Op::Blur`, no new op); other photos are redacted from their stored originals at full size, with no undo, and the panel says so. A not-open photo with its own edits, or an open photo with more than one layer, is skipped with a reason. ADR-108 (draft). |
+| Camera info on export (#496) | **Keep all · Remove location · Remove all** in the Download dialog (Selected and All), recipes and the phone's Save. Stored in the two preferences Settings › Security already had, so no new field and no prefs bump. Remove location scrubs the GPS on every path now; it used to reach only a verbatim Download All entry. Remove all on a turned JPEG copied as is keeps a 26-byte Orientation-only TIFF so it stays upright. A recipe carries the choice it was saved with. The default is unchanged: **Remove all**. ADR-108 asks whether it should become Remove location. |
+| Batch › Strip info (#496) | A new Batch tile that applies Remove location or Remove all to every stored photo. It asks first ("This removes location from 12 photos. It can't be undone."), it's lossless (metadata only), and it rewrites the upload copy too, or a later Keep all export would put the location back. |
+| Fix (#496) | Keep all used to write a portrait phone photo sideways: the pixels were already upright, and the copied EXIF still said to turn them. The transplant now sets Orientation to 1. An upright photo exports byte for byte as before. |
+| Rust (#496) | `exif_prepare_tiff` and the orientation-only rule in `src/exif.rs`. The oracle goes from 281 to 373 rows, and all 281 old goldens are unchanged. |
+| QC | `imagehorse-qc` on master `a35705a4`: PASS. Written up in `docs/qc/qc-1122.md`. |
+| Docs | ADR-108 (draft), the 11-22 day log with the 100% crops and the camera-info dump, Features for Redact, Camera info and Strip info, and their marketing cards. |
+| Trail Log | Squares catch up through 11-22. |
+
+No Dexie migration, no op-log format change. Engine 969,240 → 971,432 B (+2,192).
+
+Verification: run after the trail data regen. `cargo fmt --check`, `cargo clippy --all-targets -D warnings` and `cargo test --features tiles` pass; engine rebuilt after the last Rust change at 971,432 B. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,507/2,507; app and marketing builds pass, with 0 broken internal links across 30 pages. e2e on master `a35705a4` against a production build: the full suite 328 passed, 11 skipped; the `imagehorse-qc` slice `e2e/archive/qc-1122.spec.ts` 4/4 (`docs/qc/qc-1122.md`).

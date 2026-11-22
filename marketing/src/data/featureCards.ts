@@ -498,6 +498,21 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Batch › Resize & Compress. Every photo is done from its full-size original, one at a time, and a result bigger than the stored file is never written. Exceptions get their own size in the same pass.",
   },
+  "Batch Redact": {
+    group: "edit",
+    title: "Batch Redact",
+    plain:
+      "Hide the email in the nav bar on every screenshot at once. Draw the box once; Pixelate, Blur or Solid.",
+    detail:
+      "Batch › Redact. Up to 10 boxes, at the same spot on every photo or pinned to a corner. Strong enough that 12 px text can't be read. The open photo is one undo step; the rest are redacted in their stored files.",
+  },
+  "Batch Strip info": {
+    group: "privacy",
+    title: "Batch Strip info",
+    plain: "Take the location out of every photo you've stored, before any of them leave.",
+    detail:
+      "Batch › Strip info. Remove location or all camera info from the stored files. It asks first, and only the metadata changes, never a pixel.",
+  },
   "SVG → SVG": {
     group: "export",
     title: "SVG in, SVG out",
@@ -534,6 +549,13 @@ const CARD_COPY: Record<string, CardCopy> = {
       "Share a link anyone can open. See how often it was viewed, and let it switch off after N views or on a date.",
     detail:
       "Export → Share link uploads a flattened PNG; Settings → Shared lists every link. Each opening is stored as a time only. The public image shows a loading placeholder until it is ready, with Try again if it fails. List previews load near the viewport and keep the previous picture while a renewed image address loads.",
+  },
+  "Camera info on export": {
+    group: "export",
+    title: "Camera info on export",
+    plain: "Keep all, Remove location or Remove all, right in the Download dialog. Location goes only when you say so.",
+    detail:
+      "The same setting as Settings › Security, in the Download dialog, recipes and the phone's Save. Kept camera info no longer turns a portrait photo sideways.",
   },
   "Security tab": {
     group: "export",

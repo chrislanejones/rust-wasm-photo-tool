@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.69",
+    date: "2026-11-22",
+    headline: "Hide the same spot on every screenshot, and location leaves only when you say so.",
+    entries: [
+      { tag: "feature", text: "Batch › Redact: draw up to 10 boxes once and every photo gets them, Pixelate, Blur or Solid. A 1x and a 2x screenshot of the same screen line up, or pin a box to a corner." },
+      { tag: "feature", text: "Camera info in the Download dialog, recipes and the phone's Save: Keep all, Remove location or Remove all. It's the same setting as Settings › Security." },
+      { tag: "feature", text: "Batch › Strip info takes the location, or all camera info, out of every stored photo. It asks first and never changes a pixel." },
+      { tag: "fix", text: "Keeping camera info no longer exports a portrait phone photo sideways." },
+      { tag: "rust", text: "The Rust camera-info path (Beta) does the same, byte for byte: 373 checks against the JavaScript one, up from 281." },
+      { tag: "infra", text: "QC pass on everything since v9.66." },
+    ],
+  },
+  {
     version: "v9.68",
     date: "2026-11-21",
     headline: "Pick a Fill Color and press Enter, and the shape keeps it.",

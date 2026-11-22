@@ -89,15 +89,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.68 — 2026-11-21
+### v9.69 — 2026-11-22
 
-**Pick a Fill Color and press Enter, and the shape keeps it.**
+**Hide the same spot on every screenshot, and location leaves only when you say so.**
 
-Reselect a shape, pick a new Fill Color, press Enter straight away, and the
-shape could commit with the color it had before. The pick now always lands,
-however quickly you press Enter. Three tests that failed now and then for test
-reasons are fixed, and when a test does fail in CI, its screenshots are kept
-for a week.
+**Batch › Redact:** drag a box over the email in the nav bar once, pick Pixelate,
+Blur or Solid, and it's hidden in the same spot on every photo in the batch. It
+lines up on a 1x and a 2x screenshot of the same screen, or you can pin it to a
+corner. It can't be set weak enough to leave small text readable. The open photo
+is one undo step.
+
+**Camera info:** the Download dialog, recipes and the phone's Save each have Keep
+all, Remove location or Remove all. Remove location takes out the GPS and keeps
+the date and camera. **Batch › Strip info** does the same to every stored photo
+at once, without touching a pixel. Kept camera info no longer turns a portrait
+phone photo sideways. Exports still drop all camera info unless you choose
+otherwise.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
