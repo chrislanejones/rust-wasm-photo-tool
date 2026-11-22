@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.68",
+    date: "2026-11-21",
+    headline: "Pick a Fill Color and press Enter, and the shape keeps it.",
+    entries: [
+      { tag: "fix", text: "Pick a new Fill Color for a shape and press Enter straight away, and the shape keeps the new color. It could commit with the old one." },
+      { tag: "infra", text: "Three tests that failed now and then for test reasons are fixed, and a failing CI run keeps its screenshots for a week." },
+    ],
+  },
+  {
     version: "v9.67",
     date: "2026-11-20",
     headline: "The deploy check tells the truth again.",

@@ -89,15 +89,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.67 — 2026-11-20
+### v9.68 — 2026-11-21
 
-**The deploy check tells the truth again.**
+**Pick a Fill Color and press Enter, and the shape keeps it.**
 
-Nothing changes in the editor. The check that runs after every deploy to the
-backend had gone red on every run since 11-18 while the deploy itself worked. It
-now reads which backend files really hold functions, and it skips the files the
-backend never deploys, so a red run means something again. Master's checks are
-all green for the first time since 11-18.
+Reselect a shape, pick a new Fill Color, press Enter straight away, and the
+shape could commit with the color it had before. The pick now always lands,
+however quickly you press Enter. Three tests that failed now and then for test
+reasons are fixed, and when a test does fail in CI, its screenshots are kept
+for a week.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -12215,3 +12215,18 @@ Verification: TypeScript clean; lint 0 errors; guardrails pass; app unit tests (
 Nothing in the editor or the engine changed. No Dexie migration and no op-log format change.
 
 Verification: `scripts/convex-deploy-check.test.mjs` 18/18 (6 failed on the old check first); `pnpm test:convex` 234/234; guardrails pass; lint 0 errors. The first master run after the merge: 16/16 jobs green, deploy check 21/21.
+
+## v9.68 Change Summary — 2026-11-21
+
+**Pick a Fill Color and press Enter, and the shape keeps it.**
+
+| Area | Change |
+| --- | --- |
+| Shapes (#494) | A panel change reaches a reselected shape through an effect that runs on React's next render, and Enter is a plain window listener. When the keydown ran first, which a loaded CI runner did and a quick keyboard pick could too, the commit used the style from before the pick. `commitEdit` now applies `withLatePanelRestyle`, which diffs the store against the panel as `selectShape` synced it, so render order no longer matters. Corner radii keep their own live path; new shapes are untouched. A new e2e clicks a swatch and presses Enter in one task: 0/3 before, 3/3 after. |
+| Tests (#494) | Three e2e flakes fixed as test races: `annotation-multiselect` polls for the callout after its label closes, `shapes-fill-first` waits for a real edit box rather than the settling copy, and `pair-send` ignores the Convex client's own reconnect handshake on the placeholder host (photo bytes and every other message are still counted). |
+| CI (#494) | A failing e2e shard uploads its `test-results/` (screenshots plus the page's accessibility tree) as `e2e-failures-shard-N`, kept 7 days. Green runs are unchanged. |
+| Trail Log | Squares catch up through 11-21. |
+
+Still open: the `callout-leader` §4 CI flake. It passed 20/20 at 4× CPU both on #494 and on master, so it needs a CI-side look. No Dexie migration, no op-log format change, no engine change.
+
+Verification: vitest 2,470/2,470 (6 new unit tests); eight shape and callout specs 41/41; tsc 0; lint 0 errors; guardrails pass; `e2e-coverage-check` 89/89 specs run. PR CI: 18 pass, 2 skipped.
