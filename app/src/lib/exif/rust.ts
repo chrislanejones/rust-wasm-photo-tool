@@ -34,6 +34,7 @@ interface RustExif {
   read(bytes: Bytes, mime: string): Uint8Array | undefined;
   verbatim(bytes: Bytes, mime: string, mode: string, stripMode: string): Uint8Array;
   reencoded(encoded: Bytes, format: string, mode: string, tiff: Bytes | undefined, w: number, h: number): Uint8Array;
+  prepare(tiff: Bytes, mode: string): Uint8Array;
 }
 
 let rust: RustExif | null = null;
@@ -49,6 +50,7 @@ export async function primeRustExif(): Promise<void> {
       read: m.exif_read_tiff,
       verbatim: m.exif_apply_verbatim,
       reencoded: m.exif_apply_reencoded,
+      prepare: m.exif_prepare_tiff,
     };
     // One line, so a tester (and the e2e) can see the Rust path is live.
     console.info("EXIF in Rust: engine functions loaded (Beta)");

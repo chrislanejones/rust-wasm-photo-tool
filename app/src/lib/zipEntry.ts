@@ -15,9 +15,9 @@
 // format conversion, not an edit — no pixel is changed on the way through —
 // so it does not route through the engine, which owns EDITS.
 
-import { applyExifToReencoded, applyExifToVerbatim, readExifTiff } from "@/lib/exif";
-import type { MetadataStripMode } from "@/lib/exif";
-import type { ExifMode } from "@/lib/exif/codecs";
+import { readExifTiff } from "@/lib/exif";
+import { cameraInfoForReencoded, cameraInfoForVerbatim, carriesSourceTiff } from "@/lib/exif/cameraInfo";
+import type { CameraInfo } from "@/lib/exif/cameraInfo";
 import { encodeRgba, extFromMime, formatFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 
@@ -58,14 +58,15 @@ export async function untouchedZipEntry(
   stored: StoredBytes,
   target: ExportFormat,
   quality01: number,
-  exif: { mode: ExifMode; stripMode: MetadataStripMode },
+  cameraInfo: CameraInfo,
   decode: DecodeToRgba = decodeToRgba,
 ): Promise<ZipEntryBytes> {
   const src = new Uint8Array(stored.bytes);
   if (zipKeepsStoredBytes(stored.mimeType, target)) {
-    // Keep passes the bytes through; strip scrubs EXIF/GPS on the way out.
+    // Keep all passes the bytes through; Remove location / Remove all scrub
+    // on the way out (a turned JPEG keeps its Orientation tag — ADR-108).
     return {
-      bytes: applyExifToVerbatim(src, stored.mimeType, exif.mode, exif.stripMode),
+      bytes: cameraInfoForVerbatim(src, stored.mimeType, cameraInfo),
       mime: stored.mimeType,
       ext: extFromMime(stored.mimeType),
     };
@@ -76,16 +77,14 @@ export async function untouchedZipEntry(
   // PNG where the browser cannot encode AVIF, and the name must say so.
   const mime = enc.type || `image/${target}`;
   const encodedFormat = formatFromMime(mime) ?? target;
-  // Keep → carry the original's metadata onto the re-encode (JPEG/WebP hold
-  // it); strip → the re-encode is already clean.
-  const tiff =
-    exif.mode === "keep" && (encodedFormat === "jpeg" || encodedFormat === "webp")
-      ? readExifTiff(src, stored.mimeType)
-      : null;
-  const bytes = applyExifToReencoded(
+  // Keep all / Remove location → carry the original's metadata onto the
+  // re-encode (JPEG/WebP hold it), upright and, for location, without GPS;
+  // Remove all → the re-encode is already clean.
+  const tiff = carriesSourceTiff(cameraInfo, encodedFormat) ? readExifTiff(src, stored.mimeType) : null;
+  const bytes = cameraInfoForReencoded(
     new Uint8Array(await enc.arrayBuffer()),
     encodedFormat,
-    exif.mode,
+    cameraInfo,
     tiff,
     width,
     height,

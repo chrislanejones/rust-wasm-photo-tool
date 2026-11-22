@@ -15,7 +15,8 @@ import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { compositeSavedEdit, encodeRgba, EXT, includeCanvasInExport } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { untouchedZipEntry } from "@/lib/zipEntry";
-import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
+import { readExifTiff } from "@/lib/exif";
+import { CAMERA_INFO_LABEL, cameraInfoForReencoded, cameraInfoOf, carriesSourceTiff } from "@/lib/exif/cameraInfo";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { makeWorkingCopy } from "@/lib/workingCopy";
@@ -40,8 +41,6 @@ interface ZipDeps {
   quality: number;
   canvasBgTransparent: boolean;
   exportCanvasBackground: Parameters<typeof includeCanvasInExport>[0]["exportCanvasBackground"];
-  exifKeep: boolean;
-  exifStripMode: "all" | "location";
   loadPhotoEdit: Persistence["loadPhotoEdit"];
   savePhotoEdit: Persistence["savePhotoEdit"];
 }
@@ -108,11 +107,14 @@ export function useZipExport(deps: ZipDeps) {
             const { default: JSZip } = await import("jszip");
             const zip = new JSZip();
             const usedNames = new Set<string>();
-            const mode = d.exifKeep ? "keep" : "strip";
             let skipped = 0;
             // A recipe picked in the Export dialog reshapes every file in the
             // ZIP; without one this is the plain format-and-quality ZIP.
-            const recipe = findRecipe(useZipRecipeStore.getState().recipeId, readPreferences().exportRecipes);
+            const prefs = readPreferences();
+            const recipe = findRecipe(useZipRecipeStore.getState().recipeId, prefs.exportRecipes);
+            // Camera info (ADR-108): a recipe that saved its own choice uses
+            // it; otherwise the one in the dialog / Settings › Security.
+            const mode = recipe?.cameraInfo ?? cameraInfoOf(prefs);
 
             for (const [i, photo] of list.entries()) {
               if (!isCurrent()) return { skipped, mode };
@@ -156,11 +158,11 @@ export function useZipExport(deps: ZipDeps) {
                   mime = made.blob.type || "application/octet-stream";
                   ext = EXT[recipe.format];
                   let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-                  if (mode === "keep" && (recipe.format === "jpeg" || recipe.format === "webp")) {
+                  if (carriesSourceTiff(mode, recipe.format)) {
                     const exifSrc = await getOriginal(photo.uploadKey ?? photo.originalKey);
                     if (exifSrc) sourceTiff = readExifTiff(new Uint8Array(exifSrc.bytes), exifSrc.mimeType);
                   }
-                  bytes = applyExifToReencoded(bytes, recipe.format, mode, sourceTiff, made.width, made.height);
+                  bytes = cameraInfoForReencoded(bytes, recipe.format, mode, sourceTiff, made.width, made.height);
                   // `{date}` / `{original}` read the upload original once (cached by key).
                   const facts = patternNeedsNameFacts(recipe.pattern) ? await loadNameFacts(photo) : {};
                   const stem = recipeFileStem(recipe.pattern, {
@@ -190,13 +192,14 @@ export function useZipExport(deps: ZipDeps) {
                   bytes = new Uint8Array(await enc.arrayBuffer());
                   mime = enc.type || "application/octet-stream";
                   ext = EXT[d.exportFormat];
-                  // The re-encode carries no EXIF; keep → transplant the original's.
+                  // The re-encode carries no EXIF; Keep all / Remove location
+                  // transplant the original's (upright; GPS-free for location).
                   let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-                  if (mode === "keep" && (d.exportFormat === "jpeg" || d.exportFormat === "webp")) {
+                  if (carriesSourceTiff(mode, d.exportFormat)) {
                     const src = await getOriginal(photo.uploadKey ?? photo.originalKey);
                     if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
                   }
-                  bytes = applyExifToReencoded(bytes, d.exportFormat, mode, sourceTiff, w, h);
+                  bytes = cameraInfoForReencoded(bytes, d.exportFormat, mode, sourceTiff, w, h);
                 } else {
                   // Never edited, or compressed only: originalKey already holds
                   // the bytes to ship (lib/zipEntry.ts re-encodes when needed).
@@ -205,10 +208,7 @@ export function useZipExport(deps: ZipDeps) {
                     skipped++;
                     continue;
                   }
-                  ({ bytes, mime, ext } = await untouchedZipEntry(orig, d.exportFormat, d.quality / 100, {
-                    mode,
-                    stripMode: d.exifStripMode,
-                  }));
+                  ({ bytes, mime, ext } = await untouchedZipEntry(orig, d.exportFormat, d.quality / 100, mode));
                 }
                 const base = photo.name || "image";
                 let name = `${base}${ext}`;
@@ -253,12 +253,12 @@ export function useZipExport(deps: ZipDeps) {
               : `Zipped ${list.length} photo${list.length === 1 ? "" : "s"}`,
             {
               description: usedRecipe
-                ? `Recipe: ${usedRecipe.name}`
-                : mode === "strip"
-                  ? d.exifStripMode === "location"
-                    ? "GPS removed — camera info kept"
-                    : "EXIF + GPS removed"
-                  : undefined,
+                ? `Recipe: ${usedRecipe.name} · Camera info: ${CAMERA_INFO_LABEL[mode]}`
+                : mode === "location"
+                  ? "GPS removed — camera info kept"
+                  : mode === "all"
+                    ? "EXIF + GPS removed"
+                    : undefined,
             },
           );
         } else if (result.status === "failed") {

@@ -20,7 +20,8 @@ import {
   tiffTypeSize,
 } from "./codecs";
 import type { ExportFormat } from "@/lib/exportImage";
-import { stripJpegGps, stripPngGps, stripWebpGps } from "./gps";
+import { stripGpsFromTiff, stripJpegGps, stripPngGps, stripWebpGps } from "./gps";
+import { orientationOnlyTiff, tiffOrientation, uprightTiff } from "./orientation";
 import { crossCheck, rustExif } from "./rust";
 
 // `extractWebpExifTiff` was a public export of the original single-file module
@@ -141,9 +142,45 @@ function applyExifToVerbatimTs(
 ): Bytes {
   if (mode === "keep") return bytes;
   if (mime === "image/jpeg" || mime === "image/png" || mime === "image/webp") {
-    return stripMetadataTs(bytes, stripMode);
+    const out = stripMetadataTs(bytes, stripMode);
+    // "Remove all" on a turned JPEG: the file's pixels are as the camera wrote
+    // them and the tag is what turns them, so write the tag back alone rather
+    // than leave the photo sideways (lib/exif/orientation.ts, ADR-108). JPEG
+    // only: WebP needs the canvas size to grow a VP8X header and PNG viewers
+    // mostly ignore eXIf orientation, so those two stay a documented gap.
+    if (stripMode === "all" && isJpeg(bytes)) {
+      let o: number;
+      try {
+        o = tiffOrientation(extractJpegExifTiff(bytes));
+      } catch {
+        o = 1;
+      }
+      if (o !== 1) return injectJpegExif(out, orientationOnlyTiff(o));
+    }
+    return out;
   }
   return bytes; // avif / unknown — left as-is
+}
+
+// ── Camera info, the export choice (Night 11-21, 231, ADR-108) ─────────────
+
+/**
+ * The source TIFF, made ready to transplant into a RE-ENCODED (and therefore
+ * already upright) export: Orientation set to 1, and with `"location"` the
+ * GPS IFD scrubbed. Same length as the input.
+ */
+export function prepareExifTiff(tiff: Bytes, mode: "keep" | "location"): Bytes {
+  const ts = prepareExifTiffTs(tiff, mode);
+  const r = rustExif();
+  return r ? crossCheck("prepareExifTiff", () => r.prepare(tiff, mode), ts) : ts;
+}
+
+function prepareExifTiffTs(tiff: Bytes, mode: "keep" | "location"): Bytes {
+  try {
+    return uprightTiff(mode === "location" ? stripGpsFromTiff(tiff) : tiff);
+  } catch {
+    return tiff.slice();
+  }
 }
 
 // ── EXIF reading (for display) ─────────────────────────────────────────────

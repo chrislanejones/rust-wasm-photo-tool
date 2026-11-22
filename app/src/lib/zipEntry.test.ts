@@ -19,6 +19,7 @@ vi.mock("@/lib/exif", () => ({
   readExifTiff: vi.fn(() => new Uint8Array([9])),
   applyExifToVerbatim: vi.fn((b: Uint8Array) => b),
   applyExifToReencoded: vi.fn((b: Uint8Array) => b),
+  prepareExifTiff: vi.fn((b: Uint8Array) => b),
 }));
 
 import { untouchedZipEntry, zipKeepsStoredBytes, type DecodeToRgba } from "./zipEntry";
@@ -26,7 +27,7 @@ import { applyExifToVerbatim, readExifTiff } from "@/lib/exif";
 
 const png = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer, mimeType: "image/png" };
 const jpeg = { bytes: new Uint8Array([0xff, 0xd8, 0xff]).buffer, mimeType: "image/jpeg" };
-const keep = { mode: "keep" as const, stripMode: "all" as const };
+const keep = "keep" as const;
 
 let decodes = 0;
 const fakeDecode: DecodeToRgba = async () => {
@@ -89,7 +90,7 @@ describe("untouchedZipEntry", () => {
   });
 
   it("reads no metadata at all when stripping", async () => {
-    await untouchedZipEntry(png, "jpeg", 0.8, { mode: "strip", stripMode: "all" }, fakeDecode);
+    await untouchedZipEntry(png, "jpeg", 0.8, "all", fakeDecode);
     expect(readExifTiff).not.toHaveBeenCalled();
   });
 });

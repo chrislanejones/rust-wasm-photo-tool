@@ -28,6 +28,7 @@ import { toast } from "@/components/ui/sonner";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SyncPane } from "@/components/SyncPane";
 import { SendToComputer } from "@/features/transfer/SendToComputer";
+import { CameraInfoPicker } from "@/components/CameraInfoPicker";
 import { setSyncEnabled, useSyncEnabled } from "@/lib/sync";
 import {
   serializePreferences,
@@ -130,7 +131,7 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               other dialog in the app and re-toning all of them is its own
               session — see the report. */}
           <DialogDescription className="text-xs">
-            Theme and motion, and whether this device syncs with your account.
+            Theme and motion, camera info on saved photos, and whether this device syncs with your account.
           </DialogDescription>
         </DialogHeader>
 
@@ -165,6 +166,14 @@ export function MobileSettingsSheet({ open, onOpenChange }: Props) {
               only get the 44px touch floor, not the stacked layout above. */}
           <div className="[&_button]:min-h-11">
             <SyncPane draftEnabled={syncDraft} onDraftEnabledChange={setSyncDraft} />
+          </div>
+          {/* Camera info for Save (ADR-108): the same preference as the
+              desktop Export dialog. It saves as it is picked, like the
+              dialog's picker, rather than waiting for Apply: it is one shared
+              control, and a second, draft-only copy of it would be a second
+              source of truth. */}
+          <div className="[&_button]:min-h-11">
+            <CameraInfoPicker />
           </div>
           {/* Behind the `transfer` Beta (renders nothing when it is off). An
               action, like Sync's Send: it happens when pressed, not on Apply. */}

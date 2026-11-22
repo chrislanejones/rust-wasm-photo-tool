@@ -11,6 +11,9 @@
 //                   glyph: Download, Share link, Clipboard.
 //   2b. All       — one full-width Download (N) that zips every image.
 //
+// Both panes carry Camera info (Keep all · Remove location · Remove all,
+// ADR-108), the same preference as Settings › Security.
+//
 // SVG sits in both Format pickers and is disabled until an SVG is open: on
 // Selected, when the image being worked on was uploaded as an SVG; on All, when
 // any of them was. It writes the uploaded SVG back out, cropped the way the
@@ -60,6 +63,7 @@ import type {
 import type { ActiveFormat } from "@/lib/plugins";
 import { ControlRow } from "@/components/ui/control-row";
 import { ZipRecipePicker } from "@/components/ZipRecipePicker";
+import { CameraInfoPicker } from "@/components/CameraInfoPicker";
 import { useZipRecipe } from "@/stores/useZipRecipeStore";
 
 /** The format picker's ids: every real download format, the formats the
@@ -324,6 +328,8 @@ function DownloadPanes({
               ext={ext}
               onSubmit={onDownload}
             />
+            {/* Camera info (ADR-108): what of the photo's EXIF leaves with it. */}
+            <CameraInfoPicker />
             <PanelActionBar layout="thirds">
               <PanelAction icon={Download} onClick={onDownload}>
                 {downloadLabel}
@@ -361,6 +367,7 @@ function DownloadPanes({
             {/* Recipes (Night 10-28): a named size + format + quality + name
                 pattern for the whole ZIP. Not for SVG, which keeps its vector. */}
             {!allSvg && <ZipRecipePicker zipFormat={zipFormat} />}
+            {!allSvg && <CameraInfoPicker recipeChoice={recipe?.cameraInfo} />}
             <DialogDescription>
               {allSvg ? (
                 <>

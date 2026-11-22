@@ -11,11 +11,12 @@ use std::fs;
 use std::path::PathBuf;
 
 use stamp_tool::exif::{
-    exif_apply_reencoded, exif_apply_verbatim, exif_read_tiff, exif_strip_metadata,
+    exif_apply_reencoded, exif_apply_verbatim, exif_prepare_tiff, exif_read_tiff,
+    exif_strip_metadata,
 };
 
 /// Pinned in `exifOracle.test.ts` too. A shrunk manifest would pass vacuously.
-const EXPECTED_ROWS: usize = 281;
+const EXPECTED_ROWS: usize = 373;
 
 fn dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/exif")
@@ -77,6 +78,10 @@ fn every_row_matches_the_ts_oracle_byte_for_byte() {
             "reencoded_strip_a" => Some(exif_apply_reencoded(
                 &input, format, "strip", tiff, width, height,
             )),
+            "prepare_keep" => exif_read_tiff(&input, mime).map(|t| exif_prepare_tiff(&t, "keep")),
+            "prepare_location" => {
+                exif_read_tiff(&input, mime).map(|t| exif_prepare_tiff(&t, "location"))
+            }
             o if o.starts_with("reencoded_keep") => Some(exif_apply_reencoded(
                 &input, format, "keep", tiff, width, height,
             )),

@@ -3,6 +3,7 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { batchOutcome } from "@/lib/batchOutcome";
+import { StripInfoBatchPanel } from "./StripInfoBatchPanel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
@@ -610,6 +611,8 @@ function BatchToolPanel({
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
         <AIRenamePanel photos={photos} setPhotos={setPhotos} />
+      ) : m === "stripinfo" ? (
+        <StripInfoBatchPanel photos={allPhotos} activePhotoId={activePhotoId} setPhotos={setPhotos} />
       ) : m === "resize" ? (
         <ResizeBatchPanel {...panelProps} photos={allPhotos} />
       ) : m === "redact" ? (

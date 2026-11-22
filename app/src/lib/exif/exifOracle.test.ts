@@ -21,7 +21,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { applyExifToReencoded, applyExifToVerbatim, readExifTiff, stripMetadata } from "@/lib/exif";
+import { applyExifToReencoded, applyExifToVerbatim, prepareExifTiff, readExifTiff, stripMetadata } from "@/lib/exif";
 import type { ExportFormat } from "@/lib/exportImage";
 
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -34,7 +34,7 @@ const WRITE = process.env.IH_WRITE_EXIF_GOLDENS === "1";
 
 // Every row the manifest must carry. A shrunk manifest would pass vacuously, so
 // the count is pinned here and in tests/exif_oracle.rs.
-const EXPECTED_ROWS = 281;
+const EXPECTED_ROWS = 373;
 
 // ── Operations (one name per row; both sides dispatch on the same name) ────
 
@@ -49,6 +49,10 @@ const OPS = [
   "reencoded_keep_b",
   "reencoded_keep_null",
   "reencoded_strip_a",
+  // Night 11-21 (231): the fixture's own TIFF made ready for a re-encoded
+  // export — Orientation → 1, and GPS scrubbed for "location".
+  "prepare_keep",
+  "prepare_location",
 ] as const;
 type Op = (typeof OPS)[number] | "reencoded_keep_big";
 
@@ -86,6 +90,11 @@ function runOracle(row: Row, input: Bytes, tiff: Bytes | null): Bytes | null {
       return applyExifToVerbatim(input, row.mime, "strip", "location");
     case "reencoded_strip_a":
       return applyExifToReencoded(input, row.format, "strip", tiff, row.width, row.height);
+    case "prepare_keep":
+    case "prepare_location": {
+      const own = readExifTiff(input, row.mime);
+      return own ? prepareExifTiff(own, row.op === "prepare_keep" ? "keep" : "location") : null;
+    }
     default:
       return applyExifToReencoded(input, row.format, "keep", tiff, row.width, row.height);
   }
@@ -104,6 +113,7 @@ interface ExifWasm {
     width: number,
     height: number,
   ): Uint8Array;
+  exif_prepare_tiff(tiff: Uint8Array, mode: string): Uint8Array;
 }
 
 function runEngine(w: ExifWasm, row: Row, input: Bytes, tiff: Bytes | null): Uint8Array | null {
@@ -122,6 +132,11 @@ function runEngine(w: ExifWasm, row: Row, input: Bytes, tiff: Bytes | null): Uin
       return w.exif_apply_verbatim(input, row.mime, "strip", "location");
     case "reencoded_strip_a":
       return w.exif_apply_reencoded(input, row.format, "strip", tiff ?? undefined, row.width, row.height);
+    case "prepare_keep":
+    case "prepare_location": {
+      const own = w.exif_read_tiff(input, row.mime);
+      return own ? w.exif_prepare_tiff(own, row.op === "prepare_keep" ? "keep" : "location") : null;
+    }
     default:
       return w.exif_apply_reencoded(input, row.format, "keep", tiff ?? undefined, row.width, row.height);
   }
@@ -153,7 +168,7 @@ interface Ent {
 }
 
 /** One TIFF with IFD0 → (Exif IFD, GPS IFD). `le` picks II vs MM. */
-function tiff(opts: { le: boolean; gpsType?: number; gpsPtrOverride?: number; pad?: number }): Bytes {
+function tiff(opts: { le: boolean; gpsType?: number; gpsPtrOverride?: number; pad?: number; orientation?: number }): Bytes {
   const { le } = opts;
   const out: number[] = [];
   const u16 = (v: number) => (le ? [v & 0xff, (v >> 8) & 0xff] : [(v >> 8) & 0xff, v & 0xff]);
@@ -198,7 +213,7 @@ function tiff(opts: { le: boolean; gpsType?: number; gpsPtrOverride?: number; pa
   const mkIfd0 = (exifOff: number, gpsOff: number): Ent[] => [
     { tag: 0x010f, type: 2, count: 8, data: str("TestCam") },
     { tag: 0x0110, type: 2, count: 8, data: str("Model X") },
-    { tag: 0x0112, type: 3, count: 1, data: u16(1) },
+    { tag: 0x0112, type: 3, count: 1, data: u16(opts.orientation ?? 1) },
     { tag: 0x8769, type: 4, count: 1, data: u32(exifOff) },
     { tag: 0x8825, type: opts.gpsType ?? 4, count: 1, data: u32(opts.gpsPtrOverride ?? gpsOff) },
   ];
@@ -293,6 +308,17 @@ function buildFixtures(): Fixture[] {
     J("jpeg_gps_short_type", [0xff, 0xd8, ...seg(0xe1, jpegExifPayload(tiff({ le: true, gpsType: 3 }))), ...sosEoi(5)]),
     J("jpeg_gps_ptr_oob", [0xff, 0xd8, ...seg(0xe1, jpegExifPayload(tiff({ le: true, gpsPtrOverride: 0x7fff0000 }))), ...sosEoi(6)]),
     J("jpeg_exif_be_padded", [0xff, 0xd8, ...seg(0xe1, jpegExifPayload(tiff({ le: false, pad: 3 }))), ...sosEoi(8)]),
+    // Night 11-21 (231): turned photos. A portrait phone shot is Orientation 6.
+    J("jpeg_exif_rot6", [0xff, 0xd8, ...seg(0xe1, jpegExifPayload(tiff({ le: true, orientation: 6 }))), ...sosEoi(12)]),
+    J(
+      "jpeg_exif_rot8_be_icc",
+      [
+        0xff, 0xd8,
+        ...seg(0xe2, ascii("ICC_PROFILE\0\x01\x01fakeprofile")),
+        ...seg(0xe1, jpegExifPayload(tiff({ le: false, orientation: 8 }))),
+        ...sosEoi(13),
+      ],
+    ),
     // PNG
     P("png_exif", [...PNG_SIG, ...pngChunk("IHDR", IHDR), ...pngChunk("eXIf", tLe), ...pngChunk("tEXt", ascii("Comment\0hello")), ...idat, ...pngChunk("IEND", [])]),
     P("png_plain", [...PNG_SIG, ...pngChunk("IHDR", IHDR), ...idat, ...pngChunk("IEND", [])]),
@@ -315,6 +341,7 @@ function buildFixtures(): Fixture[] {
     P("png_exif_gps_oob", [...PNG_SIG, ...pngChunk("IHDR", IHDR), ...pngChunk("eXIf", tiff({ le: true, gpsPtrOverride: 60000 })), ...idat, ...pngChunk("IEND", [])]),
     // WebP
     W("webp_vp8l_exif", riff([wchunk("VP8L", vp8l(false)), wchunk("EXIF", tLe)])),
+    W("webp_vp8l_exif_rot6", riff([wchunk("VP8L", vp8l(false)), wchunk("EXIF", tiff({ le: true, orientation: 6 }))])),
     W("webp_vp8l_plain", riff([wchunk("VP8L", vp8l(false))])),
     W("webp_vp8l_alpha", riff([wchunk("VP8L", vp8l(true))]), 640, 480),
     W("webp_vp8_plain", riff([wchunk("VP8 ", scan(4, 13))]), 17, 9),

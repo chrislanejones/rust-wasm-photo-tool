@@ -62,8 +62,10 @@ function zeroGpsSubIfd(
   zeroRange(out, gpsPtr, 2 + gn * 12 + 4);
 }
 
-/** Strip the GPS sub-IFD from a raw TIFF/Exif block. Returns a same-length copy. */
-function stripGpsFromTiff(tiff: Bytes): Bytes {
+/** Strip the GPS sub-IFD from a raw TIFF/Exif block. Returns a same-length copy.
+ *  Exported for the camera-info choice: "Remove location" on a RE-ENCODED
+ *  export scrubs the source TIFF before it is transplanted (lib/exif/index.ts). */
+export function stripGpsFromTiff(tiff: Bytes): Bytes {
   const out = tiff.slice(); // always operate on (and return) a fresh copy
   if (out.length < 8) return out;
   const dv = new DataView(out.buffer, out.byteOffset, out.byteLength);
