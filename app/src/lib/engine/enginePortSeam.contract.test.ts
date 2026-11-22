@@ -52,7 +52,7 @@ describe("worker selection stays behind the port", () => {
 // file should stand alone for the property it names — duplicated assertions are
 // cheap, whereas a property nobody owns is how ONE PORT PER DOCUMENT erodes.
 describe("throwaway engines stay off the live port", () => {
-  const THROWAWAY = ["lib/exportImage.ts", "features/tools/settings/BatchSettings.tsx"];
+  const THROWAWAY = ["lib/exportImage.ts", "features/tools/settings/BatchSettings.tsx", "lib/redactEngine.ts"];
 
   it("no throwaway document routes through attachLivePort", () => {
     for (const f of THROWAWAY) {

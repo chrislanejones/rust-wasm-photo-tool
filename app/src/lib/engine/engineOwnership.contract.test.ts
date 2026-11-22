@@ -79,6 +79,11 @@ const THROWAWAY_ENGINES: Record<string, string> = {
     "blur_whole_image, one by the GPU hand-off — and diffs their layer buffers. " +
     "Neither is a document the user has open, and it only runs when a console " +
     "calls __ihGpuBlurEngineParity()",
+  "lib/redactEngine.ts":
+    "Batch › Redact (ADR-108) on a photo that is NOT open: its stored original at " +
+    "full resolution in a disposable engine, the boxes applied with the shape and " +
+    "Blur-brush calls, pixels read back, freed in a finally. The open photo goes " +
+    "through the live engine instead, so nothing here touches the live op log",
   "features/look/pasteLook.ts":
     "Paste look (ADR-100) on a ticked photo that is NOT open: its stored original " +
     "at full resolution in a disposable engine, the look applied, pixels read back, " +

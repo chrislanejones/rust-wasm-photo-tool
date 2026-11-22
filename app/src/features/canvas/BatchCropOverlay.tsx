@@ -38,6 +38,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { BatchExceptionCheckbox } from "./BatchExceptionCheckbox";
+import { BatchRedactFrame } from "./BatchRedactFrame";
 
 // On-photo colors are inline, not theme tokens: they sit on the user's
 // picture, where only a black shade and a white line read on anything — the
@@ -63,12 +64,15 @@ interface Props extends OverlayFrame {
   historyNode: number;
 }
 
-/** The preview frame plus the "Exception" checkbox for the photo on screen. */
+/** The preview frame plus the "Exception" checkbox for the photo on screen.
+ *  Batch › Redact's boxes ride the same mount (each frame renders nothing
+ *  outside its own mode), so AppShell's overlay slot stays one line. */
 export function BatchCropOverlay(props: Props) {
   return (
     <>
       <BatchExceptionCheckbox />
       <BatchCropFrame {...props} />
+      <BatchRedactFrame {...props} />
     </>
   );
 }

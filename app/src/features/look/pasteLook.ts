@@ -51,7 +51,9 @@ export function pasteTargets(fromId: string): PhotoEntry[] {
   return photos.filter((p) => selectedIds.has(p.id) && p.id !== fromId);
 }
 
-async function hasOwnEdits(photo: PhotoEntry): Promise<boolean> {
+/** Shared with Batch › Redact (lib/batchRedactRun.ts), which skips such a photo
+ *  for the same reason. */
+export async function hasOwnEdits(photo: PhotoEntry): Promise<boolean> {
   if (useGalleryStore.getState().modifiedPhotos.has(photo.id)) return true;
   if (await hasPersistedOplog(photo.id)) return true;
   return (await loadPhotoEdit(photo.id)) !== null;

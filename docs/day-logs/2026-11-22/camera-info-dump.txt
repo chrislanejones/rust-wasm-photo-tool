@@ -1,0 +1,125 @@
+== turned.0-original.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=6
+  PhotographicSensitivity=400
+== turned.reencoded-all.jpg (51945 B)
+== turned.reencoded-keep.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== turned.reencoded-location.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== turned.verbatim-all.jpg (51981 B)
+  Orientation=6
+== turned.verbatim-keep.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=6
+  PhotographicSensitivity=400
+== turned.verbatim-location.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=6
+  PhotographicSensitivity=400
+== upright.0-original.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== upright.reencoded-all.jpg (51945 B)
+== upright.reencoded-keep.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== upright.reencoded-location.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== upright.verbatim-all.jpg (51945 B)
+== upright.verbatim-keep.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  GPSAltitude=12/1
+  GPSLatitude=37/1,46/1,3050/100
+  GPSLatitudeRef=N
+  GPSLongitude=122/1,25/1,10/1
+  GPSLongitudeRef=W
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400
+== upright.verbatim-location.jpg (52280 B)
+  DateTimeOriginal=2026:09:25 01:02:03
+  ExposureTime=1/250
+  FNumber=28/10
+  LensModel=50mm f/1.8
+  Make=TestCam
+  Model=Model X
+  Orientation=1
+  PhotographicSensitivity=400

@@ -58,6 +58,7 @@ import {
   Pipette,
   Ruler,
   Scaling,
+  EyeOff,
   Scan,
   ScanEye,
   ScanText,
@@ -790,6 +791,17 @@ const batchGroup: ToolGroupDefinition = {
       tool: "emoji",
       mode: "resize",
       keywords: ["resize", "compress", "shrink", "width", "long edge", "kb", "webp", "bulk"],
+    },
+    {
+      // Night 11-21 (230, ADR-108): boxes drawn once, pixelated / blurred /
+      // filled on every photo in the same place. Main | Exceptions.
+      id: "redact",
+      label: "Redact",
+      description: "Hide the same spot on every photo — an email, an account number, a face",
+      icon: EyeOff,
+      tool: "emoji",
+      mode: "redact",
+      keywords: ["redact", "hide", "pixelate", "blur", "censor", "privacy", "screenshot", "email", "bulk"],
     },
   ],
 };
