@@ -17,6 +17,7 @@ const fake = (strip: (b: Uint8Array) => Uint8Array) => ({
   read: () => undefined,
   verbatim: (b: Uint8Array) => b,
   reencoded: (b: Uint8Array) => b,
+  prepare: (b: Uint8Array) => b,
 });
 
 afterEach(() => {

@@ -1,7 +1,8 @@
 // Canvas viewport + single-image export/clipboard/histogram actions, extracted
 // verbatim from AppShell (stage 2). Everything routes through the WASM `stamp`
-// handle; the export path also needs the active format/quality/EXIF-keep choice
-// (passed in) and reads the gallery photos/active id from useGalleryStore.
+// handle; the export path also needs the active format/quality (passed in),
+// reads the camera-info choice from Preferences at export time, and reads the
+// gallery photos/active id from useGalleryStore.
 import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -9,7 +10,9 @@ import { useViewStore } from "@/stores/useViewStore";
 import { toast } from "@/components/ui/sonner";
 import { dropSuperseded, isSuperseded } from "@/lib/engine/superseded";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
-import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
+import { readExifTiff } from "@/lib/exif";
+import { cameraInfoForReencoded, cameraInfoOf, carriesSourceTiff } from "@/lib/exif/cameraInfo";
+import { readPreferences } from "@/lib/preferences";
 import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { compareBaselineKey } from "@/lib/compareBaseline";
@@ -20,14 +23,12 @@ export function useCanvasActions({
   stamp,
   exportFormat,
   quality,
-  exifKeep,
   exportCanvasBackground,
   canvasBgTransparent,
 }: {
   stamp: ReturnType<typeof useCloneStamp>;
   exportFormat: ExportFormat;
   quality: number;
-  exifKeep: boolean;
   /** Settings → General → "Canvas background on export". Off (default) ⇒
    *  leave the artboard's backing "Background" layer out of the exported/
    *  copied pixels — see `get_image_data_excluding_background` in Rust. */
@@ -231,21 +232,19 @@ export function useCanvasActions({
     if (!blob) return;
 
     let bytes = new Uint8Array(await blob.arrayBuffer());
-    // The canvas export is always freshly re-encoded, so it carries no EXIF.
-    // Keep → transplant the true original's EXIF (JPEG/WebP); strip → leave clean.
+    // The canvas export is always freshly re-encoded (and upright), so it
+    // carries no EXIF. Camera info (Download dialog / Settings › Security, read
+    // NOW so a change made in the dialog a moment ago counts): Keep all and
+    // Remove location transplant the true original's EXIF into JPEG/WebP —
+    // Orientation reset to 1, and GPS scrubbed for Remove location; Remove all
+    // leaves it clean. ADR-108.
+    const choice = cameraInfoOf(readPreferences());
     let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-    if (exifKeep && entry && (exportFormat === "jpeg" || exportFormat === "webp")) {
+    if (entry && carriesSourceTiff(choice, exportFormat)) {
       const orig = await getOriginal(compareBaselineKey(entry) ?? "");
       if (orig) sourceTiff = readExifTiff(new Uint8Array(orig.bytes), orig.mimeType);
     }
-    bytes = applyExifToReencoded(
-      bytes,
-      exportFormat,
-      exifKeep ? "keep" : "strip",
-      sourceTiff,
-      exportW,
-      exportH,
-    );
+    bytes = cameraInfoForReencoded(bytes, exportFormat, choice, sourceTiff, exportW, exportH);
 
     const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
     const a = document.createElement("a");
@@ -268,7 +267,7 @@ export function useCanvasActions({
     // (switching photos, changing format), which is what made it look
     // intermittent rather than broken. `handleCopyToClipboard` above always
     // had it; only this path did not.
-  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground, canvasBgTransparent]);
+  }, [stamp, exportFormat, quality, photos, activePhotoId, exportCanvasBackground, canvasBgTransparent]);
 
   // Every caller fires this and forgets (the dialog has already closed), so a
   // failure used to vanish — no file, no word. The Error state says so and

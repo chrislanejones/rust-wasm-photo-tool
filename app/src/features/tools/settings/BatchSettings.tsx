@@ -3,12 +3,14 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { batchOutcome } from "@/lib/batchOutcome";
+import { StripInfoBatchPanel } from "./StripInfoBatchPanel";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, Crop, FileEdit, ScanEye, Scaling, X } from "lucide-react";
+import { ImagePlus, X } from "lucide-react";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ToolModeToggle, type ToolMode } from "@/components/ui/tool-mode-toggle";
+import { batchToolModes } from "@/features/tools/toolModes";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
@@ -46,20 +48,9 @@ const WEIGHT_OPTIONS = [
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
-/** Batch's sub-modes for the shared ToolModeToggle — same 3-column icon-grid
- *  pattern as Stamps/Shapes/Ratio. No `info` field: each panel below already
- *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
- *  own components), so ToolModeToggle only contributes the icon-row selector
- *  and stays silent on the header row rather than duplicating it. */
-// Labels mirror toolGroups.ts's Batch sub-tools. The ids never move.
-const BATCH_TOOL_MODES: readonly ToolMode<BatchMode>[] = [
-  { id: "logo", label: "Logo", icon: ImagePlus },
-  { id: "text", label: "Text", icon: Type },
-  { id: "crop", label: "Crop", icon: Crop },
-  { id: "rename", label: "Rename", icon: FileEdit },
-  { id: "airename", label: "AI Rename", icon: ScanEye },
-  { id: "resize", label: "Resize & Compress", icon: Scaling },
-];
+// Batch's tiles come from toolModes.ts, the palette's own list (ids, labels,
+// icons), so a new tile is one entry there and none here.
+const BATCH_TOOL_MODES = batchToolModes() as readonly ToolMode<BatchMode>[];
 
 // Batch positions now use the shared 9-cell placement grid.
 type LogoPosition = PlacementCell;
@@ -619,6 +610,8 @@ function BatchToolPanel({
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : m === "airename" ? (
         <AIRenamePanel photos={photos} setPhotos={setPhotos} />
+      ) : m === "stripinfo" ? (
+        <StripInfoBatchPanel photos={allPhotos} activePhotoId={activePhotoId} setPhotos={setPhotos} />
       ) : m === "resize" ? (
         <ResizeBatchPanel {...panelProps} photos={allPhotos} />
       ) : (

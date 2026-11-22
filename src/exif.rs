@@ -3,9 +3,9 @@
 //! ORACLE. `tests/exif_oracle.rs` and `app/src/lib/exif/exifOracle.test.ts` hold
 //! the two sides to identical output on every committed fixture.
 //!
-//! Not wired into the app yet: the export path still calls the TS module. The
-//! two run side by side behind the oracle test; switching the export path over
-//! is an attended decision.
+//! Wired behind the `exif-rust` Beta (`app/src/lib/exif/rust.ts`): with the
+//! switch on, every call runs both sides and the Rust bytes are used only when
+//! they match the TS bytes exactly.
 //!
 //! What it does (see the TS module for the policy notes, which apply verbatim):
 //!   • strip "all"      — JPEG APP1 (EXIF/XMP) + APP13 (IPTC); PNG eXIf, tEXt,
@@ -29,6 +29,7 @@ use wasm_bindgen::prelude::*;
 const EXIF_ID: &[u8; 6] = b"Exif\0\0";
 const PNG_SIG: &[u8; 8] = &[137, 80, 78, 71, 13, 10, 26, 10];
 const GPS_IFD_TAG: u16 = 0x8825;
+const ORIENTATION_TAG: u16 = 0x0112;
 
 // ── bounds-checked helpers ─────────────────────────────────────────────────
 
@@ -632,12 +633,111 @@ pub fn apply_exif_to_reencoded(
 }
 
 /// EXIF policy for a VERBATIM original: keep passes it through; strip scrubs
-/// JPEG/PNG/WebP ("all", or GPS only when `location`).
+/// JPEG/PNG/WebP ("all", or GPS only when `location`). "All" on a turned JPEG
+/// writes the Orientation tag back alone (orientation.ts, ADR-108).
 pub fn apply_exif_to_verbatim(b: &[u8], mime: &str, keep: bool, location: bool) -> Vec<u8> {
     if keep || !matches!(mime, "image/jpeg" | "image/png" | "image/webp") {
         return b.to_vec();
     }
-    strip_metadata(b, location)
+    let out = strip_metadata(b, location);
+    if !location && is_jpeg(b) {
+        let o = extract_jpeg_exif_tiff(b).map_or(1, |t| tiff_orientation(&t));
+        if o != 1 {
+            return inject_jpeg_exif(&out, &orientation_only_tiff(o));
+        }
+    }
+    out
+}
+
+// ── Orientation (orientation.ts) ───────────────────────────────────────────
+
+/// Offset of the IFD0 Orientation entry and the byte order, when it is a
+/// well-formed SHORT×1. Anything else is left alone, as the oracle does.
+fn find_orientation(t: &[u8]) -> Option<(u64, Tiff)> {
+    let len = t.len() as u64;
+    if len < 8 {
+        return None;
+    }
+    let bom = be16(t, 0)?;
+    let tf = Tiff { le: bom == 0x4949 };
+    if !tf.le && bom != 0x4d4d {
+        return None;
+    }
+    if tf.u16(t, 2)? != 42 {
+        return None;
+    }
+    let ifd0 = u64::from(tf.u32(t, 4)?);
+    if ifd0 == 0 || ifd0 + 2 > len {
+        return None;
+    }
+    let n = u64::from(tf.u16(t, ifd0)?);
+    let start = ifd0 + 2;
+    if start + n * 12 > len {
+        return None;
+    }
+    for i in 0..n {
+        let p = start + i * 12;
+        if tf.u16(t, p)? != ORIENTATION_TAG {
+            continue;
+        }
+        let ok = tf.u16(t, p + 2)? == 3 && tf.u32(t, p + 4)? == 1;
+        return ok.then_some((p, tf));
+    }
+    None
+}
+
+/// The Orientation value (1..=8), or 1 when absent or invalid.
+pub fn tiff_orientation(t: &[u8]) -> u16 {
+    find_orientation(t)
+        .and_then(|(p, tf)| tf.u16(t, p + 8))
+        .filter(|v| (1..=8).contains(v))
+        .unwrap_or(1)
+}
+
+/// A same-length copy with Orientation set to 1.
+pub fn upright_tiff(t: &[u8]) -> Vec<u8> {
+    let mut out = t.to_vec();
+    if let Some((p, tf)) = find_orientation(t) {
+        let v = if tf.le {
+            1u16.to_le_bytes()
+        } else {
+            1u16.to_be_bytes()
+        };
+        if let (Ok(s), Ok(e)) = (usize::try_from(p + 8), usize::try_from(p + 10)) {
+            if let Some(r) = out.get_mut(s..e) {
+                r.copy_from_slice(&v);
+            }
+        }
+    }
+    out
+}
+
+/// A 26-byte little-endian TIFF whose only tag is Orientation = `o`.
+pub fn orientation_only_tiff(o: u16) -> Vec<u8> {
+    let mut out = Vec::with_capacity(26);
+    out.extend_from_slice(b"II");
+    out.extend_from_slice(&42u16.to_le_bytes());
+    out.extend_from_slice(&8u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&ORIENTATION_TAG.to_le_bytes());
+    out.extend_from_slice(&3u16.to_le_bytes());
+    out.extend_from_slice(&1u32.to_le_bytes());
+    out.extend_from_slice(&o.to_le_bytes());
+    out.extend_from_slice(&[0, 0]);
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out
+}
+
+/// A source TIFF made ready for a re-encoded (already upright) export:
+/// Orientation 1, and with `location` the GPS IFD scrubbed. Same length.
+pub fn prepare_exif_tiff(t: &[u8], location: bool) -> Vec<u8> {
+    let mut out = t.to_vec();
+    // A failed GPS parse returns the input untouched, as the oracle's catch
+    // does (it never reaches the orientation step).
+    if location && strip_gps_from_tiff(&mut out).is_none() {
+        return t.to_vec();
+    }
+    upright_tiff(&out)
 }
 
 // ── wasm surface — string modes, mirroring the TS signatures ────────────────
@@ -659,6 +759,12 @@ pub fn exif_read_tiff(bytes: &[u8], mime: &str) -> Option<Vec<u8>> {
 #[wasm_bindgen]
 pub fn exif_apply_verbatim(bytes: &[u8], mime: &str, mode: &str, strip_mode: &str) -> Vec<u8> {
     apply_exif_to_verbatim(bytes, mime, mode == "keep", strip_mode != "all")
+}
+
+/// `prepareExifTiff(tiff, mode)`: `mode` `"keep"` | `"location"`.
+#[wasm_bindgen]
+pub fn exif_prepare_tiff(tiff: &[u8], mode: &str) -> Vec<u8> {
+    prepare_exif_tiff(tiff, mode == "location")
 }
 
 /// `applyExifToReencoded(encoded, format, mode, sourceTiff, width, height)`.

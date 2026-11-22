@@ -34,6 +34,8 @@ import { usePairPhoneImport } from "@/features/pair/sendController";
 import { useUIStore } from "@/stores/useUIStore";
 import { formatBytes } from "@/lib/format";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
+import { cameraInfoForVerbatim, cameraInfoOf } from "@/lib/exif/cameraInfo";
+import { readPreferences } from "@/lib/preferences";
 import { useViewerOriginal, viewerBox } from "@/features/mobile/useViewerOriginal";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import { extFromMime } from "@/lib/mimeExt";
@@ -197,8 +199,8 @@ function MobileViewer({
   /**
    * Save the photo's STORED bytes to the device. Deliberately not a render or
    * an export: there is no editor on a phone, so the file you brought in is
-   * exactly the file you get back, and a re-encode would only lose quality on
-   * the way.
+   * the file you get back, and a re-encode would only lose quality on the
+   * way. Only its camera info follows the Camera info choice.
    *
    * Revokes inside the same function that created the URL — a split between a
    * memo and an effect is what broke gallery thumbnails under StrictMode once.
@@ -212,10 +214,16 @@ function MobileViewer({
         toast.error("Couldn't find this image's file");
         return;
       }
-      // StoredOriginal carries raw `bytes` + `mimeType`, not a Blob.
-      const url = URL.createObjectURL(
-        new Blob([stored.bytes], { type: stored.mimeType }),
+      // StoredOriginal carries raw `bytes` + `mimeType`, not a Blob. Camera
+      // info (Settings sheet / desktop Export, ADR-108) applies on the way
+      // out: a metadata scrub of the stored bytes, never a re-encode, so the
+      // phone still loads no engine and the picture is the one you brought in.
+      const out = cameraInfoForVerbatim(
+        new Uint8Array(stored.bytes),
+        stored.mimeType,
+        cameraInfoOf(readPreferences()),
       );
+      const url = URL.createObjectURL(new Blob([out], { type: stored.mimeType }));
       const a = document.createElement("a");
       a.href = url;
       // The stored name has its extension stripped on import, so the saved

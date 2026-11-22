@@ -35,6 +35,7 @@ import {
   FileEdit,
   ImagePlus,
   MapPin,
+  MapPinOff,
   PaintBucket,
   ScanEye,
   Scaling,
@@ -116,6 +117,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
       icon: ScanEye,
       keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
     },
+    { id: "stripinfo", label: "Strip info", icon: MapPinOff, keywords: ["strip", "exif", "gps", "location", "privacy", "metadata", "batch"] },
     { id: "resize", label: "Resize & Compress", icon: Scaling, keywords: ["resize", "compress", "shrink", "width", "kb", "webp", "batch"] },
   ],
   // `effects` is three tiles on one tool id: Adjustments, Levels and Presets.
@@ -207,6 +209,14 @@ function modesFor(tool: ToolType): ToolModeInfo[] {
     }));
   }
   return LEGACY_SUBMODES[tool] ?? [];
+}
+
+/** Batch's tiles, for BatchSettings' ToolModeToggle: the same list the
+ *  palette and routes use, so a new Batch tile is ONE entry above instead of
+ *  this one plus a hand-kept copy in BatchSettings (which also put that file
+ *  over its max-lines cap the night two tiles were added at once). */
+export function batchToolModes(): readonly ToolModeInfo[] {
+  return LEGACY_SUBMODES.emoji ?? [];
 }
 
 /** Switch a tool's sub-mode. No-op when the id isn't one of that tool's modes

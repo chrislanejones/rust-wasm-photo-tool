@@ -6,12 +6,15 @@
 // Preferences (`exportRecipes`), so they travel with the prefs document:
 // local when signed out, synced across devices when signed in (ADR-061).
 import type { ExportFormat } from "@/lib/exportImage";
+import type { CameraInfo } from "@/lib/exif/cameraInfo";
 import { expandNameTokens } from "@/lib/nameTokens";
 
 // A local copy, type-checked against ExportFormat: preferences.ts imports this
 // module, and exportImage pulls in the engine, so a value import would drag
 // the codec into every prefs reader.
 const FORMATS: readonly ExportFormat[] = ["png", "jpeg", "webp", "avif"];
+// Same reason: a type-checked local copy of lib/exif/cameraInfo's choices.
+const CAMERA_INFO: readonly CameraInfo[] = ["keep", "location", "all"];
 
 export type RecipeSize =
   /** Fill exactly W×H, cropping the overflow from the center. Upscales when
@@ -33,6 +36,11 @@ export interface ExportRecipe {
    *  {width}/{height}/{ext} describe the OUTPUT file. {w} and {h}, the names
    *  before ticket 237, still work. The extension is added. */
   pattern: string;
+  /** Camera info for this recipe's files (Night 11-21, 231, ADR-108). Absent
+   *  = whatever the Download dialog says at export time; the built-ins are
+   *  absent. A device older than this field drops it on its next save, which
+   *  degrades to that same "use the dialog's choice". */
+  cameraInfo?: CameraInfo;
 }
 
 export const BUILT_IN_RECIPES: readonly ExportRecipe[] = [
@@ -203,6 +211,7 @@ export function normalizeRecipes(v: unknown): ExportRecipe[] {
       format: r.format as ExportFormat,
       quality: Math.min(100, Math.max(1, Math.round(r.quality))),
       pattern: r.pattern.slice(0, 120) || "{name}",
+      ...(CAMERA_INFO.includes(r.cameraInfo as CameraInfo) ? { cameraInfo: r.cameraInfo as CameraInfo } : {}),
     });
     if (out.length === MAX_SAVED_RECIPES) break;
   }

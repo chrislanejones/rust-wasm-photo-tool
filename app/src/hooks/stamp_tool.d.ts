@@ -144,6 +144,9 @@ declare module "stamp_tool" {
     width: number,
     height: number,
   ): Uint8Array;
+  /** A source TIFF made ready for a re-encoded (upright) export: Orientation
+   *  → 1, and GPS scrubbed when `mode` is "location" (ADR-108). */
+  export function exif_prepare_tiff(tiff: Uint8Array, mode: string): Uint8Array;
 
   /**
    * Stateless bilinear resize of an RGBA buffer.

@@ -370,13 +370,6 @@ export function AppShell() {
 
   // App-wide preferences (Settings → General), persisted to localStorage.
   const [prefs, applyPreferences] = usePreferences();
-  // EXIF keep/strip now lives in preferences (Settings → Security); all export
-  // paths read this committed value.
-  const exifKeep = prefs.exifKeep;
-  // Strip scope when exifKeep is false: 'all' (default) or 'location' (GPS
-  // only). Only the verbatim-original export path needs this — re-encoded
-  // canvas exports are already EXIF-free unless keeping.
-  const exifStripMode = prefs.exifStripMode;
   // Canvas background on export (Settings → General); all export/share/copy
   // paths read this committed value.
   const exportCanvasBackground = prefs.exportCanvasBackground;
@@ -987,7 +980,6 @@ export function AppShell() {
     stamp,
     exportFormat,
     quality,
-    exifKeep,
     exportCanvasBackground,
     canvasBgTransparent,
   });
@@ -2048,8 +2040,6 @@ export function AppShell() {
     quality,
     canvasBgTransparent,
     exportCanvasBackground,
-    exifKeep,
-    exifStripMode,
     loadPhotoEdit,
     savePhotoEdit,
   });

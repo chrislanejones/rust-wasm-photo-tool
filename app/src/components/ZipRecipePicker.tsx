@@ -11,6 +11,7 @@ import { ControlRow } from "@/components/ui/control-row";
 import { SelectField } from "@/components/ui/select-field";
 import { NumberField, TextField } from "@/components/ui/number-field";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { CAMERA_INFO_LABEL, cameraInfoOf } from "@/lib/exif/cameraInfo";
 import { usePreferences } from "@/lib/preferences";
 import {
   BUILT_IN_RECIPES,
@@ -63,6 +64,8 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
       format: zipFormat,
       quality: Math.min(100, Math.max(1, Math.round(q))),
       pattern: pattern.trim() || "{name}",
+      // The recipe carries the Camera info chosen in the dialog right now.
+      cameraInfo: cameraInfoOf(prefs),
     };
     applyPrefs({ ...prefs, exportRecipes: [...saved, r] });
     setRecipeId(r.id);
@@ -111,7 +114,9 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
       </div>
       {recipe && (
         <p className="text-2xs text-theme-muted-foreground">
-          {`${describeRecipe(recipe)}, quality ${recipe.quality}, named ${recipe.pattern}. The gallery is not changed.`}
+          {`${describeRecipe(recipe)}, quality ${recipe.quality}, named ${recipe.pattern}${
+            recipe.cameraInfo ? `, camera info ${CAMERA_INFO_LABEL[recipe.cameraInfo]}` : ""
+          }. The gallery is not changed.`}
         </p>
       )}
 
@@ -164,7 +169,7 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
             <TextField label="File name" value={pattern} onChange={(e) => setPattern(e.target.value)} />
           </div>
           <p className="text-2xs text-theme-muted-foreground">
-            {`Saves as ${zipFormat.toUpperCase()}, the format above. Name tokens: ${NAME_TOKENS.map((t) => t.token).join(" ")}. {width}, {height} and {ext} are the exported file's.`}
+            {`Saves as ${zipFormat.toUpperCase()}, the format above, with Camera info ${CAMERA_INFO_LABEL[cameraInfoOf(prefs)]}. Name tokens: ${NAME_TOKENS.map((t) => t.token).join(" ")}. {width}, {height} and {ext} are the exported file's.`}
           </p>
           <div className="flex justify-end gap-2">
             <Button size="default" type="button" onClick={() => setSaving(false)}>

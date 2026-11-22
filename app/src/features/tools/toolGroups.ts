@@ -48,6 +48,7 @@ import {
   Grid2x2,
   ImagePlus,
   Lasso,
+  MapPinOff,
   Layers,
   Move3d,
   PackageOpen,
@@ -779,6 +780,17 @@ const batchGroup: ToolGroupDefinition = {
         "auto name",
         "bulk",
       ],
+    },
+    {
+      // Night 11-21 (231, ADR-108): remove location (or all camera info) from
+      // every photo's stored file. Main | Exceptions like the others.
+      id: "stripinfo",
+      label: "Strip info",
+      description: "Remove the location, or all camera info, from every photo's stored file",
+      icon: MapPinOff,
+      tool: "emoji",
+      mode: "stripinfo",
+      keywords: ["strip", "exif", "gps", "location", "privacy", "metadata", "camera info", "bulk"],
     },
     {
       // Night 10-28 (227): one size, format and quality for the whole
