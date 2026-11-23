@@ -890,9 +890,9 @@ export default function DesignSystem() {
             id="editor-coda"
             title="Why write it down"
             lede="Because consistency is the feature. An editor where every slider, tile and dialog works the same way is one you stop thinking about, and that only lasts if the rules live somewhere a person can read them."
-            origin={<>Everything above is drawn from <span className="arch-mono arch-coda__file">docs/UI_CONSISTENCY.md</span> and the editor's own stylesheet. The Figma file is the same page as layers you can pull apart.</>}
+            origin={<>Everything above is drawn from <span className="arch-mono arch-coda__file">docs/06.1-UI-Consistency.md</span> and the editor's own stylesheet. The Figma file is the same page as layers you can pull apart.</>}
             figma={FIGMA_FILES.editor}
-            doc={{ label: "Read the UI consistency doc", path: "docs/UI_CONSISTENCY.md" }}
+            doc={{ label: "Read the UI consistency doc", path: "docs/06.1-UI-Consistency.md" }}
             foot={<>{num(Object.keys(EDITOR_TOKENS.light).length)} color tokens · {num(COMPONENTS.length)} components · {num(2)} themes</>}
           />
         </div>

@@ -28,7 +28,7 @@ export default function OfflineByConstruction() {
     <>
       <p className="post__sourcenote">
         Describes what ships in v8.85. Everything below is read out of the repository:{" "}
-        <a href={repoFile("docs/Architecture.md")} {...external}>
+        <a href={repoFile("docs/02-Architecture.md")} {...external}>
           Architecture.md
         </a>
         , the code that saves your work, and the decision records it cites.
@@ -517,7 +517,7 @@ export default function OfflineByConstruction() {
 
       <p className="post__sources">
         Sources:{" "}
-        <a href={repoFile("docs/Architecture.md")} {...external}>
+        <a href={repoFile("docs/02-Architecture.md")} {...external}>
           Architecture.md
         </a>{" "}
         ·{" "}

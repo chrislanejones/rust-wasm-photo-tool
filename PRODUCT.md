@@ -14,7 +14,7 @@ Image Horse edits pixels locally through Rust/WASM and keeps originals and edits
 
 ## Brand Personality
 
-Direct, practical, and trustworthy. Controls should explain the state of the current document and preserve the established warm paper and earth-tone visual identity. Sources: docs/UI_CONSISTENCY.md and app/src/styles.css.
+Direct, practical, and trustworthy. Controls should explain the state of the current document and preserve the established warm paper and earth-tone visual identity. Sources: docs/06.1-UI-Consistency.md and app/src/styles.css.
 
 ## Anti-references
 
@@ -30,4 +30,4 @@ Avoid duplicate primitives, arbitrary spacing and colors, decorative motion, sta
 
 ## Accessibility & Inclusion
 
-WCAG 2.1 AA, keyboard reach, visible focus, named controls, reduced-motion support, and the established desktop, dock/tablet, and phone behavior. Sources: CLAUDE.md and docs/UI_CONSISTENCY.md.
+WCAG 2.1 AA, keyboard reach, visible focus, named controls, reduced-motion support, and the established desktop, dock/tablet, and phone behavior. Sources: CLAUDE.md and docs/06.1-UI-Consistency.md.

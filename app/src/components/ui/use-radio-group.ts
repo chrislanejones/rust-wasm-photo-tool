@@ -1,4 +1,4 @@
-// SELECT mode for the two group primitives (docs/UI_CONSISTENCY.md §7): the
+// SELECT mode for the two group primitives (docs/06.1-UI-Consistency.md §7): the
 // roles and the keyboard of a radio group, in one place, so
 // `tool-button-group` and `toggle-button-group` cannot drift apart on it.
 //

@@ -1,4 +1,6 @@
-# Create AI Image reference storage
+# 10. Create AI Image reference storage
+
+[← 9. MCP](09-MCP.md) · [Contents](README.md) · [11. CI →](11-CI.md)
 
 Released in v9.32, 2026-10-18, with #367 and #381.
 
@@ -59,3 +61,7 @@ not yet safely consumed. Define handling for missed webhooks and abandoned jobs,
 then test retries, races, missing files and cross-job ownership. Historical jobs
 need an explicit migration/backfill policy. This PR does not implement that
 retention policy, enable a sweep, or delete existing live files.
+
+---
+
+[← 9. MCP](09-MCP.md) · [Contents](README.md) · [11. CI →](11-CI.md)

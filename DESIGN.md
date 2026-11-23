@@ -1,6 +1,6 @@
 # Image Horse design context
 
-The editor preserves its existing light warm-paper and dark earth-tone themes. app/src/styles.css is the source of truth for colors, fonts, radii, elevation, motion, and stacking. docs/UI_CONSISTENCY.md defines the measured vocabulary; docs/UI_EXCEPTIONS.md records exceptions.
+The editor preserves its existing light warm-paper and dark earth-tone themes. app/src/styles.css is the source of truth for colors, fonts, radii, elevation, motion, and stacking. docs/06.1-UI-Consistency.md defines the measured vocabulary; docs/06.3-UI-Exceptions.md records exceptions.
 
 Typography uses DM Sans for interface text and JetBrains Mono for numeric or code-like readouts. Interface sizes are text-2xs, text-xs, and text-sm. Spacing uses 0, 0.5, 1, 1.5, 2, 3, 4, 6, and 8 Tailwind units. Radius classes are rounded-sm, rounded-md, rounded-lg, and rounded-full.
 

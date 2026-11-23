@@ -43,7 +43,7 @@ interface Props<T extends string> {
    *  PASSING THE PROP AT ALL is what makes this a SELECT group — a radio group
    *  to assistive tech, one Tab stop, arrow keys. Presence, not value: a
    *  select whose state has not loaded yet (`value={undefined}`) is still a
-   *  select, with nothing checked. docs/UI_CONSISTENCY.md §7. */
+   *  select, with nothing checked. docs/06.1-UI-Consistency.md §7. */
   value?: T;
   onChange: (id: T) => void;
   /** Column count for the grid. Defaults to 2. */

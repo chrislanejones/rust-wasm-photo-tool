@@ -1,4 +1,6 @@
-# Image Horse MCP
+# 9. Image Horse MCP
+
+[← 8. Plugins](08-Plugins.md) · [Contents](README.md) · [10. AI Reference Storage →](10-AI-Reference-Storage.md)
 
 Connect Claude, Cursor or another AI app to your Image Horse account. It's built, and it's off until the server switch is turned on. See [ADR-095](adr/095-image-horse-mcp-for-signed-in-users.md).
 
@@ -46,3 +48,7 @@ An app can only reach your own account's server data. It can't open your gallery
 Limits: 60 calls a minute. Images follow the phone's rules: 50 MB, image types only, 50 waiting, and they count against storage. Base64 images stop at about 15 MB, so use a public https URL for bigger ones.
 
 Settings → Connections shows the last 20 calls. The log keeps the app, the tool, the time and whether it worked, for 30 days. It never keeps tokens, arguments or results.
+
+---
+
+[← 8. Plugins](08-Plugins.md) · [Contents](README.md) · [10. AI Reference Storage →](10-AI-Reference-Storage.md)

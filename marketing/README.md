@@ -29,7 +29,7 @@ Commit dates come from the original author dates. Recheck the generated data
 after the release commit, before pushing, so today's square includes it too.
 
 Refresh [src/data/featureCards.ts](src/data/featureCards.ts) and
-[../docs/Features.md](../docs/Features.md) when behavior changes. Keep
+[../docs/04-Features.md](../docs/04-Features.md) when behavior changes. Keep
 [src/data/comingSoon.ts](src/data/comingSoon.ts) honest: it feeds both
 `/in-the-works` and the home page. Completed work belongs in the Trail Log;
 work still under review stays in the register.

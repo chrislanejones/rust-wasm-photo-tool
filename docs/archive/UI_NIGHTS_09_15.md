@@ -1,6 +1,6 @@
 # UI Nights 9–15
 
-> **ARCHIVED 11-18-2026.** A run report for UI Nights 9–15. All of it shipped in v9.27 (10-11-2026). The branch names, draft PRs and evidence paths below describe the review stack, not master. The rules this work followed are in [UI_CONSISTENCY.md](../UI_CONSISTENCY.md); where the UI docs start is [UI.md](../UI.md).
+> **ARCHIVED 11-18-2026.** A run report for UI Nights 9–15. All of it shipped in v9.27 (10-11-2026). The branch names, draft PRs and evidence paths below describe the review stack, not master. The rules this work followed are in [UI_CONSISTENCY.md](../06.1-UI-Consistency.md); where the UI docs start is [UI.md](../06.0-UI.md).
 
 **Release status — 10-11-2026:** Published together in v9.27 with the reconciled
 pen hit-test fix, full browser coverage and gallery keyboard correction.

@@ -274,7 +274,7 @@ export function PluginsPane() {
 
       <p className="text-2xs leading-relaxed text-text-muted">
         Removing a plugin deletes its file from this browser. Adding a newer
-        file with the same plugin id replaces the old one. See docs/Plugins.md
+        file with the same plugin id replaces the old one. See docs/08-Plugins.md
         for how a plugin is written.
       </p>
     </div>

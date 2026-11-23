@@ -509,7 +509,7 @@ const createGroup: ToolGroupDefinition = {
     },
     {
       // One name everywhere (Night 10-28): this tile, the panel header, the
-      // palette and docs/Features.md. "Arrows & Shapes" sat next to the
+      // palette and docs/04-Features.md. "Arrows & Shapes" sat next to the
       // Shapes tile and read as the same tool. The id stays `arrow` — URLs.
       id: "arrow",
       label: "Arrows & Diagram Shapes",

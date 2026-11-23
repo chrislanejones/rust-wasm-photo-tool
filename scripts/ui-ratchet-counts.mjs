@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The three UI rules a machine can check without reading a sentence as code.
 //
-// UI Night 7 (docs/UI_CONSISTENCY.md §6): R1 (spacing off the scale), R3 (radius
+// UI Night 7 (docs/06.1-UI-Consistency.md §6): R1 (spacing off the scale), R3 (radius
 // that routes around the house tokens) and raw <button> elements outside
 // components/ui/. guardrails.sh ratchets the numbers this prints.
 //
@@ -41,7 +41,7 @@ const ts = createRequire(join(ROOT, "app", "package.json"))("typescript");
 const SRC = join(ROOT, "app", "src");
 const UI_DIR = join(SRC, "components", "ui");
 
-// R1 — the eight steps of docs/UI_CONSISTENCY.md, plus 0.
+// R1 — the eight steps of docs/06.1-UI-Consistency.md, plus 0.
 const SPACING_SCALE = new Set(["0", "0.5", "1", "1.5", "2", "3", "4", "6", "8"]);
 // The same prefixes scripts/ui-inventory.mjs measures, so the two agree.
 const SPACING = /^(p|px|py|pt|pb|pl|pr|gap|gap-x|gap-y|space-x|space-y)-(\[[0-9.]+px\]|[0-9]+(?:\.[0-9]+)?)$/;

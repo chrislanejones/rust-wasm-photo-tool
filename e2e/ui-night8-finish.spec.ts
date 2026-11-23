@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 //     while a per-photo value is off its default, and Reset puts it back.
 //   • §4 the panel grammar, measured: every converted panel has the ToolPanel
 //     frame, its header at the top, 16px between rows and 8px from a label to
-//     its control (docs/UI_CONSISTENCY.md §8).
+//     its control (docs/06.1-UI-Consistency.md §8).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FIX = join(__dirname, "fixtures");
@@ -137,7 +137,7 @@ test("§4 Stamp: a picked preset is not still lit after Stamps › Clone Stamp �
 });
 
 // ── §4 the panel grammar, measured ──────────────────────────────────────────
-// docs/UI_CONSISTENCY.md §8: the ToolPanel frame; its first row at the top of
+// docs/06.1-UI-Consistency.md §8: the ToolPanel frame; its first row at the top of
 // the scrolling body (no -mt-2 tuck); 16px between the frame's rows; 8px from
 // a ControlRow's label to its control. Measured in one evaluate so nothing
 // moves between reads.

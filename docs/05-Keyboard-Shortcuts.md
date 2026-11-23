@@ -1,6 +1,8 @@
-# Keyboard Shortcuts
+# 5. Keyboard Shortcuts
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md) · [Change Summary](Change-summary.md).
+[← 4. Features](04-Features.md) · [Contents](README.md) · [6. UI →](06.0-UI.md)
+
+> See also: [Architecture](02-Architecture.md) · [File Map](03-File-Map.md) · [Change Summary](Change-summary.md).
 >
 > **The in-app modal is the source of truth — press `Alt + /`.** Its tool-digit
 > rows are generated from the five-group registry
@@ -189,3 +191,7 @@ shifted pair is now the layer reorder above.
 | -------------- | ------ |
 | `Alt + Delete` | Toggle the Diagnostics Window |
 | `Ctrl + \`     | Shipping celebration (was an undocumented easter egg) |
+
+---
+
+[← 4. Features](04-Features.md) · [Contents](README.md) · [6. UI →](06.0-UI.md)

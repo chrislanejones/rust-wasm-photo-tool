@@ -10,7 +10,7 @@
 // twice. 384 squash merges: 378 credited to their commits' days,
 // 6 already in history, 0 on their merge day (no cache entry).
 //
-// 1486 commits across 161 active days, 2026-02-25 → 2026-11-23.
+// 1487 commits across 161 active days, 2026-02-25 → 2026-11-23.
 
 export const COMMITS: Record<string, number> = {
   "2026-02-25": 2,
@@ -173,5 +173,5 @@ export const COMMITS: Record<string, number> = {
   "2026-11-20": 2,
   "2026-11-21": 5,
   "2026-11-22": 4,
-  "2026-11-23": 6,
+  "2026-11-23": 7,
 };

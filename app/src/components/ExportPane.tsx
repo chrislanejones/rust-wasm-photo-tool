@@ -39,7 +39,7 @@ export interface OpenRasterControls {
 /**
  * Settings → Import / Export pane. Round-trips the full project (every layer)
  * through OpenRaster (.ora) — an open, layered ZIP container that also opens
- * in Krita, GIMP, and other editors. See docs/OpenRaster-Export-Import.md.
+ * in Krita, GIMP, and other editors. See docs/07-OpenRaster.md.
  *
  * v1 scope: layer name/opacity/visibility/active-layer survive the round
  * trip; live text/shape annotations are flattened into pixels on export

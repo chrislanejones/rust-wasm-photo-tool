@@ -65,7 +65,7 @@ import { PhotoFooter } from "./PhotoFooter";
  * already visible as the `showRulersPanel` carve-out at the call site — a
  * special case bolted on because the set said "tool" where it meant "sub-tool".
  *
- * Per-photo is decided from `docs/UI_CONSISTENCY.md` §9, whose table lists the
+ * Per-photo is decided from `docs/06.1-UI-Consistency.md` §9, whose table lists the
  * panels in each kind. The ones left OUT deliberately:
  *   - `rulers` — an app preference, not a per-photo value
  *   - `select`, `batch` — the selection is cleared by `usePhotoSwitchReset`, and

@@ -1,5 +1,5 @@
 // Build a .ora archive from the live WASM tool. See
-// docs/OpenRaster-Export-Import.md for the format.
+// docs/07-OpenRaster.md for the format.
 import type { ImageHorseTool } from "stamp_tool";
 import type { LayerInfo } from "@/hooks/useCloneStamp";
 import { buildStackXml } from "./stackXml";

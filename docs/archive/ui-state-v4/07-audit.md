@@ -1,6 +1,6 @@
 # Night 7 — State audit and regression protection
 
-> **ARCHIVED 11-18-2026.** Night 7 of the document-state pass, merged as #348 and shipped in v9.29 (10-14-2026). The six night records it links sit beside it in this folder. Where the UI docs start is [UI.md](../../UI.md).
+> **ARCHIVED 11-18-2026.** Night 7 of the document-state pass, merged as #348 and shipped in v9.29 (10-14-2026). The six night records it links sit beside it in this folder. Where the UI docs start is [UI.md](../../06.0-UI.md).
 
 Base: Night 6; master rechecked f4dfd6c9. Prior work is included through the stacked branches, with no merge/deploy.
 

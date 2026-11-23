@@ -3,7 +3,7 @@
 > **ARCHIVED 2026-08-04 — superseded.** The prioritised list here has been overtaken by the work actually done (AppShell decomposition, the Zustand stores, the engine-in-a-worker spike, the five-group toolbar). Treat the P-numbers as historical. Live planning happens in `docs/Engine-Roadmap.md` and the ADRs.
 
 
-> Part of the [Image Horse](../../README.md) docs. See also: [Architecture](../Architecture.md) · [State Management](State-Management.md) · [File Map](../File-Map.md) · `docs/internal/Security-Hardening.md` (internal, untracked).
+> Part of the [Image Horse](../../README.md) docs. See also: [Architecture](../02-Architecture.md) · [State Management](State-Management.md) · [File Map](../03-File-Map.md) · `docs/internal/Security-Hardening.md` (internal, untracked).
 >
 > The next evolution isn't "add another tool" — it's tightening the architecture so the app stays fast and maintainable as it grows: a **document-based editor** (React = UI, Zustand = app state, Rust/WASM = image document, Workers = heavy processing, Dexie = persistence, WebGPU = acceleration where available). This maps that target onto the *actual* repo and is honest about how much already exists.
 

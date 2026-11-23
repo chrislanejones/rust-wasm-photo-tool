@@ -3,7 +3,7 @@
 > **ARCHIVED 2026-08-04.** An investigation write-up, not a reference — the decisions it argues for shipped long ago (Dexie content layer, the Zustand persist adapter, content-addressed originals). Any schema change goes through the `dexie-migration` procedure, not this file.
 
 
-> Part of the [Image Horse](../../README.md) docs. See also: [State Management](State-Management.md) · [Service Workers & Caching](Service-Workers-Caching.md) · [Architecture](../Architecture.md).
+> Part of the [Image Horse](../../README.md) docs. See also: [State Management](State-Management.md) · [Service Workers & Caching](Service-Workers-Caching.md) · [Architecture](../02-Architecture.md).
 >
 > **Status:** the three IndexedDB databases described in §2 are **live in production**. The Zustand ↔ IndexedDB persistence adapter (§3–§4) landed on the `zustand-build` branch (`app/src/stores/storage/idbStorage.ts`). Service-worker caching (referenced in §8) is still investigation-only.
 
@@ -44,7 +44,7 @@ We are **already IndexedDB-first for heavy data** — three hand-rolled database
 Plus two non-IDB persistence layers:
 
 - **`localStorage`** (`image-horse-prefs`, [`app/src/lib/preferences.ts`](../../app/src/lib/preferences.ts)) — the Settings blob (theme, history depth, idle timeout, rulers/grid, reduce-motion, EXIF-keep, reopen-last-session). Tiny, read synchronously at boot, so `localStorage` is the right tool.
-- **Convex** (`users` row) — when signed in, the same preferences blob is mirrored server-side as JSON + its SHA-256, so settings follow the user across devices. Logged-out users stay `localStorage`-only. See [Architecture](../Architecture.md).
+- **Convex** (`users` row) — when signed in, the same preferences blob is mirrored server-side as JSON + its SHA-256, so settings follow the user across devices. Logged-out users stay `localStorage`-only. See [Architecture](../02-Architecture.md).
 
 > ⚠️ **Measured 2026-07-28, and the table above is now out of date in one
 > place.** A read-only reachability audit found **no `image-horse-originals`

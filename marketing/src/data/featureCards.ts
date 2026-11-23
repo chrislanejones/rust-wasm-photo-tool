@@ -1,6 +1,6 @@
 /* The /features cards — hand-maintained, keyed by the GENERATED feature name.
  *
- * features.ts is regenerated from docs/Features.md and carries each feature's
+ * features.ts is regenerated from docs/04-Features.md and carries each feature's
  * name and its engineering line. It does not carry what the card grid needs on
  * top: which of eight "what are you trying to do" groups a feature sits in, a
  * shorter display name, a plain-language line for someone who has never heard
@@ -8,7 +8,7 @@
  * Features v2 design and have no source in the repo docs, so they live here.
  *
  * The page iterates features.ts, not this file. So the count is always the
- * real one: a feature added to docs/Features.md without an entry here still
+ * real one: a feature added to docs/04-Features.md without an entry here still
  * renders, in "Under the hood", with its own name and its full repo line. An
  * entry here whose key no longer matches a generated name renders nothing —
  * `unmatchedCardKeys` lists those so a rename in the docs is easy to spot.
@@ -487,7 +487,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "A recipe sets size, format, quality and a file name pattern, and shapes the ZIP only. Saved recipes sync when you're signed in.",
   },
-  // Keyed by the feature name in features.ts (docs/Features.md); the two move together.
+  // Keyed by the feature name in features.ts (docs/04-Features.md); the two move together.
   "Compare two photos": {
     group: "edit",
     title: "Compare two photos",

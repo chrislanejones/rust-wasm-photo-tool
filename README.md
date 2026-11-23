@@ -25,24 +25,32 @@ engine. After changing anything under `src/`, run `build:wasm` again, or use
 
 Convex and Clerk are optional: with no keys set the app runs fully logged-out,
 which is a supported path and not a degraded one. Full setup, deploy notes and
-environment variables → **[Getting Started](docs/Getting-Started.md)**.
+environment variables → **[1. Getting Started](docs/01-Getting-Started.md)**.
 
 ## Documentation
 
-- **[Getting Started](docs/Getting-Started.md)** — install it, run the app and the marketing site, set up Convex, deploy.
-- **[Architecture](docs/Architecture.md)** — how it fits together: layers and compositing, why one WASM binary, the Rust ↔ Convex bridge.
-- **[File Map](docs/File-Map.md)** — where everything lives, in both the Rust crate (`src/`) and the React app (`app/src/`).
-- **[Features](docs/Features.md)** — what it can actually do, end to end.
-- **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
-- **[OpenRaster (.ora)](docs/OpenRaster-Export-Import.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
-- **[Plugins](docs/Plugins.md)** — features from outside the app, added from Settings → Plugins and kept on the device; the Photoshop PSD plugin lives in its own repository, and this is how to write one.
-- **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
-- **[Deploying](docs/Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
-- **[Change Summary](docs/Change-summary.md)** — the full dated release history.
-- **[UI](docs/UI.md)** — the UI rules, what the UI is built from, and the UI work that shipped.
-- **[MCP](docs/MCP.md)** — connecting Claude or Cursor to your Image Horse account: the tools, the limits, and what turns it on.
+The docs read like a book: numbered chapters, each linking to the next.
+Start at **[the Contents](docs/README.md)**, or jump in:
 
-Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
+1. **[Getting Started](docs/01-Getting-Started.md)** — install it, run the app and the marketing site, set up Convex, deploy.
+2. **[Architecture](docs/02-Architecture.md)** — how it fits together: layers and compositing, why one WASM binary, the Rust ↔ Convex bridge.
+3. **[File Map](docs/03-File-Map.md)** — where everything lives, in both the Rust crate (`src/`) and the React app (`app/src/`).
+4. **[Features](docs/04-Features.md)** — what it can actually do, end to end.
+5. **[Keyboard Shortcuts](docs/05-Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
+6. **[UI](docs/06.0-UI.md)** — the UI rules, what the UI is built from, and the UI work that shipped. Sections 6.1–6.3 are the rules, the inventory and the exceptions.
+7. **[OpenRaster (.ora)](docs/07-OpenRaster.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
+8. **[Plugins](docs/08-Plugins.md)** — features from outside the app, added from Settings → Plugins and kept on the device; the Photoshop PSD plugin lives in its own repository, and this is how to write one.
+9. **[MCP](docs/09-MCP.md)** — connecting Claude or Cursor to your Image Horse account: the tools, the limits, and what turns it on.
+10. **[AI Reference Storage](docs/10-AI-Reference-Storage.md)** — how a Create AI Image job owns the images you attach, and when they're deleted.
+11. **[CI](docs/11-CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
+12. **[Deploying](docs/12-Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
+13. **[Vercel Builds](docs/13-Vercel-Builds.md)** — which pushes each Vercel project skips building, and why.
+14. **[The AppShell Refactor](docs/14-AppShell-Refactor.md)** — how the biggest files get smaller.
+
+At the back: the **[Change Summary](docs/Change-summary.md)** (every release, dated),
+the **[decisions](docs/adr/INDEX.md)** behind the design, the
+**[Parking Lot](docs/PARKING_LOT.md)** of known problems, and an
+**[archive](docs/archive/README.md)** of superseded notes, each one saying what went stale about it.
 
 ## Tech Stack
 

@@ -1,7 +1,7 @@
 // A TEST plugin — the smallest real format plugin there is, so the plugin
 // machinery (Settings → Plugins → Add, the Download dialog tile, Import /
 // Export, the engine bridge) can be proved without shipping any real codec in
-// this repo. Real plugins live in their own repositories; see docs/Plugins.md.
+// this repo. Real plugins live in their own repositories; see docs/08-Plugins.md.
 //
 // The format is "IHL": the layer stack as JSON, pixels base64. Not for real
 // work — a 12 MP layer is 64 MB of text — but every byte round-trips.

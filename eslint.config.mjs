@@ -154,7 +154,7 @@ export default tseslint.config(
   //   contract test       1027 merged  —  master has no per-file ERROR cap
   //                                        for it at all, only the 900 warn
   // Every one is stricter than master. Lower them again when the extractions
-  // in docs/AppShell-Refactor-Plan.md land.
+  // in docs/14-AppShell-Refactor.md land.
 
   // ── THE max-lines RATCHET ──
     //
@@ -200,7 +200,7 @@ export default tseslint.config(
   // What that means in practice: a change that grows one of these files past
   // its cap fails `pnpm lint`, and the fix is to move something OUT of the
   // file in the same PR — never to raise the number. The caps below are the
-  // measured sizes on 2026-09-26; docs/AppShell-Refactor-Plan.md is the plan
+  // measured sizes on 2026-09-26; docs/14-AppShell-Refactor.md is the plan
   // for driving them down.
   {
     // 3716 -> 3564: three extractions, measured. The effect brush (blur /

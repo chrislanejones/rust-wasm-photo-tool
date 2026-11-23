@@ -126,7 +126,7 @@ export const POSTS: readonly Post[] = [
     ogImage: "/og/blog/offline-by-construction.webp",
     sources: [
       "marketing/src/posts/offline-by-construction.tsx",
-      "docs/Architecture.md",
+      "docs/02-Architecture.md",
       "app/src/lib/oplogPersistence.ts",
       "docs/adr/019-opt-in-precache-service-worker.md",
       "docs/adr/049-the-service-worker-is-blocked-on-eviction-reach-not-the-precache.md",

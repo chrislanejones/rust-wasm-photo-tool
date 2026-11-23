@@ -5,7 +5,7 @@ Date: 2026-09-02   Status: draft
 > 2026-08-27 → 2026-09-26 without being lowered, and three other pinned files
 > went over theirs unnoticed because the ratchet was `warn`. The ratchet is
 > now `error`, and the two structural changes are sequenced with numbers in
-> [`docs/AppShell-Refactor-Plan.md`](../AppShell-Refactor-Plan.md).
+> [`docs/AppShell-Refactor-Plan.md`](../14-AppShell-Refactor.md).
 
 ## Context
 `AppShell.tsx` is 3,718 lines after the first #45 extraction, and the whole

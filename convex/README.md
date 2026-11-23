@@ -45,4 +45,4 @@ Test files sit beside the functions as `*.test.ts`; the Convex bundler skips any
 
 ⚠️ **`convex deploy` targets a different deployment than the one production talks to.** Confirm which deployment you are pointed at before running it; the prod app and local dev do not share a Clerk instance either, so "signed in locally" proves nothing about prod.
 
-CI runs `convex codegen` plus a `_generated` drift check, but only when the `CONVEX_DEPLOY_KEY` repo secret is set — use a preview/CI key, never prod. Without it the job prints "skipped" and stays green. See [docs/CI.md](../docs/CI.md).
+CI runs `convex codegen` plus a `_generated` drift check, but only when the `CONVEX_DEPLOY_KEY` repo secret is set — use a preview/CI key, never prod. Without it the job prints "skipped" and stays green. See [docs/11-CI.md](../docs/11-CI.md).

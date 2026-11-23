@@ -1,6 +1,8 @@
-# Architecture
+# 2. Architecture
 
-> Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [Change Summary](Change-summary.md) · [ADR index](adr/INDEX.md).
+[← 1. Getting Started](01-Getting-Started.md) · [Contents](README.md) · [3. File Map →](03-File-Map.md)
+
+> See also: [File Map](03-File-Map.md) · [Change Summary](Change-summary.md) · [ADR index](adr/INDEX.md).
 >
 > **Status:** describes what exists on `master` at **v8.61** (`7c166fc`),
 > re-verified against code on 2026-09-01 — not aspirational. On 11-18-2026
@@ -477,7 +479,7 @@ editing path.
 ---
 
 Create AI Image reference ownership and transactional terminal-job cleanup
-are documented in [AI reference storage](AI-reference-storage.md).
+are documented in [AI reference storage](10-AI-Reference-Storage.md).
 
 ## The op-log pipeline (live since v7.36)
 
@@ -561,3 +563,7 @@ render mode. Callers provide all old/new ink bounds; unsupported scenes fall
 back to full recomposition. Its persistent scratch buffer costs four bytes
 per canvas pixel. Normal builds exclude the prototype. Browser drag timings
 measure the SVG overlay separately from engine commits.
+
+---
+
+[← 1. Getting Started](01-Getting-Started.md) · [Contents](README.md) · [3. File Map →](03-File-Map.md)
