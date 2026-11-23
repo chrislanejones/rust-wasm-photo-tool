@@ -28,6 +28,19 @@ const MIN_LONG_SIDE = 1024;
 const MAX_LONG_SIDE = 4096;
 const FALLBACK_LONG_SIDE = 2048;
 
+/** SVG Files whose root tag already carries the size the user chose (Paste
+ *  SVG, lib/pastedSvg). They skip the size policy above: a 512×512 typed into
+ *  the step lands at 512×512, not scaled up to 1024. A WeakSet so the mark
+ *  travels with the File object through the import with no field added to it,
+ *  and is gone with the File. */
+const exactSize = new WeakSet<File>();
+
+/** Mark an SVG File as already sized: rasterize it at exactly its own size. */
+export function markExactSvgSize(file: File): File {
+  exactSize.add(file);
+  return file;
+}
+
 /** Pull an aspect ratio (w/h) out of a viewBox when the SVG declares no
  *  width/height. Returns 1 (square) when there is no parsable viewBox. */
 function viewBoxAspect(svgText: string): number {
@@ -68,7 +81,8 @@ export async function rasterizeSvgToPng(file: File): Promise<File> {
       h = aspect >= 1 ? Math.round(FALLBACK_LONG_SIDE / aspect) : FALLBACK_LONG_SIDE;
     }
     const long = Math.max(w, h);
-    const scale = long < MIN_LONG_SIDE ? MIN_LONG_SIDE / long
+    const scale = exactSize.has(file) ? 1
+      : long < MIN_LONG_SIDE ? MIN_LONG_SIDE / long
       : long > MAX_LONG_SIDE ? MAX_LONG_SIDE / long
       : 1;
     const outW = Math.max(1, Math.round(w * scale));

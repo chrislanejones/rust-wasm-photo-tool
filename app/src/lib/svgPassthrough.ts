@@ -172,7 +172,7 @@ function parseAspect(v: string | undefined): AspectRule {
 }
 
 /** The viewBox the root declares, or one implied by a unitless/px size. */
-function effectiveViewBox(attrs: Map<string, string>): Frame | null {
+export function effectiveViewBox(attrs: Map<string, string>): Frame | null {
   const vb = parseViewBox(attrs.get("viewBox"));
   if (vb) return vb;
   const w = parseLength(attrs.get("width"));
@@ -363,7 +363,7 @@ function num(v: number): string {
   return Object.is(r, -0) ? "0" : String(r);
 }
 
-function setAttr(tag: string, name: string, value: string): string {
+export function setAttr(tag: string, name: string, value: string): string {
   const re = new RegExp(`(\\s${name}\\s*=\\s*)("[^"]*"|'[^']*')`);
   if (re.test(tag)) return tag.replace(re, `$1"${value}"`);
   // Insert right after the element name.

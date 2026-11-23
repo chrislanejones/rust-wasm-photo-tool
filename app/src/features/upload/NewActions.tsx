@@ -1,6 +1,6 @@
-// The shared "start a new image" actions — Browse / Paste / Sample / Blank
-// Canvas, the drag-and-drop zone, the New Canvas setup panel, and the
-// marketing links. Extracted so the SAME body renders in two places:
+// The shared "start a new image" actions — Browse / Paste / New Canvas /
+// Sample / Create AI Image / Paste SVG, the drag-and-drop zone, the New Canvas
+// and Paste SVG setup panels, and the marketing links. Extracted so the SAME body renders in two places:
 //   • full-page first-run surface (FirstRunScreen) on cold start
 //   • compact modal (UploadDialog) mid-session (Alt+N)
 // The wrappers own the logo/title header, sign-in, close button, and any shake.
@@ -14,6 +14,7 @@ import {
   SquarePen,
   Link,
   Sparkles,
+  FileCode,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
@@ -32,6 +33,7 @@ import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 import { DEFAULT_IMAGE_MODEL_ID } from "./aiImageDraft";
 import { CreateAIImagePanel } from "./CreateAIImagePanel";
+import { PasteSvgPanel } from "./PasteSvgPanel";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import { namePastedImage } from "@/lib/pastedImageName";
 import { ControlRow } from "@/components/ui/control-row";
@@ -166,8 +168,10 @@ interface Props {
  * "Nothing leaves your tab by accident" — against a tile whose job is to send
  * a prompt to a server. Hiding it kept the promise by deleting the feature; a
  * switch keeps it by making the send a CHOICE.
- * `useUIStore.onlineFeaturesEnabled`, default OFF, persisted. Off: four
- * in-browser tiles. On: the fifth joins and Create AI Image is reachable.
+ * `useUIStore.onlineFeaturesEnabled`, default OFF, persisted. Off: Create AI
+ * Image shows but is disabled. On: it opens. (Until 11-23-2026 the tile was
+ * removed while off; Chris asked for it always shown, so the grid keeps one
+ * shape: two rows of three.)
  *
  * ⚠️ NAMED FOR THE AXIS, NOT FOR AI — settled BEFORE shipping because it is a
  * persisted key: rename it after real browsers have written it and you owe a
@@ -211,6 +215,11 @@ export function NewActions({
   // checked state below stay on the raw value: they ARE the switch.
   const aiGenerationAllowed = isNetworkPathAllowed("ai_generation", onlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
+  // Paste SVG — the third step of this menu. Holds the code when the Paste
+  // tile found SVG TEXT on the clipboard rather than an image, so the step
+  // opens already filled in; null while the step is closed.
+  const [svgText, setSvgText] = useState<string | null>(null);
+  const svgMode = svgText !== null;
   // Publish that step to the store so Settings → Security can lock ITS copy of
   // the online-features switch for the same reason this one locks: flipping off
   // mid-step unmounts the tile that owns the prompt. Local state is invisible to
@@ -241,12 +250,12 @@ export function NewActions({
   // the logo would be a second title. Fires on mount (false) too, so
   // reopening the dialog restores it.
   useEffect(() => {
-    onBlankModeChange?.(blankMode || aiMode);
-  }, [blankMode, aiMode, onBlankModeChange]);
+    onBlankModeChange?.(blankMode || aiMode || svgMode);
+  }, [blankMode, aiMode, svgMode, onBlankModeChange]);
 
   // Which pane is showing, and which way the swap slides: into a sub-pane is
   // forward, back to the tile grid is backward (see PaneSwap).
-  const pane = blankMode ? "blank" : aiMode ? "ai" : "default";
+  const pane = blankMode ? "blank" : aiMode ? "ai" : svgMode ? "svg" : "default";
   const paneDirection = pane === "default" ? -1 : 1;
 
   const processFiles = useCallback(
@@ -371,6 +380,16 @@ export function NewActions({
         processFiles(files);
         return;
       }
+      // SVG copied as code (an icon site's "Copy SVG", a text editor) is
+      // text, not an image. Open Paste SVG with it rather than say "no image".
+      for (const item of items) {
+        if (!item.types.includes("text/plain")) continue;
+        const text = await (await item.getType("text/plain")).text();
+        if (/<svg[\s>]/i.test(text)) {
+          setSvgText(text);
+          return;
+        }
+      }
       toast.info("No image on the clipboard. Copy an image, then try again.");
     } catch (err) {
       console.warn("Clipboard read failed — use Ctrl+V:", err);
@@ -432,7 +451,7 @@ export function NewActions({
             className={
               pane === "blank"
                 ? "flex flex-col gap-4"
-                : pane === "ai"
+                : pane === "ai" || pane === "svg"
                   ? // SCROLLS, unlike its siblings, because it is the tallest
                     // panel in this frame and the dialog card around it is
                     // `overflow-hidden` (UploadDialog) — content past the fold
@@ -440,7 +459,9 @@ export function NewActions({
                     // so Generate would be unreachable on a short laptop
                     // screen with nothing on screen to say why. A capped
                     // height with its own scroll keeps the whole step
-                    // reachable at any window size.
+                    // reachable at any window size. Paste SVG scrolls for
+                    // the same reason: its big code field puts Create Canvas
+                    // under the fold of a 720px window.
                     "flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-0.5"
                   : "flex flex-1 flex-col items-center gap-4"
             }
@@ -545,6 +566,16 @@ export function NewActions({
                   <PanelAction onClick={createBlank}>Create Canvas</PanelAction>
                 </PanelActionBar>
               </>
+            ) : pane === "svg" ? (
+              <PasteSvgPanel
+                initialText={svgText ?? ""}
+                onBack={() => setSvgText(null)}
+                closable={inDialog}
+                onCreate={(file) => {
+                  setSvgText(null);
+                  processFiles([file]);
+                }}
+              />
             ) : pane === "ai" ? (
               <>
                 {/* The draft itself lives in its own file — see
@@ -563,15 +594,17 @@ export function NewActions({
               </>
             ) : (
               <>
-                {/* Three columns of stacked tiles — the same ActionTile the
-                    tool panels use (Select → Magic Wand), icon on top. While
-                    `Create AI Image` is off (onlineFeaturesEnabled) there are
-                    four tiles, laid out 2×2 — in three columns the fourth sat
-                    alone beside a blank gap and read as something missing.
-                    Five tiles in three columns when it returns. */}
-                <div
-                  className={`grid ${aiGenerationAllowed ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
-                >
+                {/* Two rows of three stacked tiles — the same ActionTile the
+                    tool panels use (Select → Magic Wand), icon on top
+                    (Chris, 11-23-2026):
+                      Browse Files · Paste · New Canvas
+                      Sample Images · Create AI Image · Paste SVG
+                    Create AI Image is ALWAYS there now, disabled while the
+                    online-features switch is off, so the grid never changes
+                    shape when the switch flips. Its title says why it is
+                    off. The gate on Generate is unchanged (see the switch
+                    note above). */}
+                <div className="grid grid-cols-3 gap-3 w-full">
                   <ActionTile
                     ref={firstButtonRef}
                     icon={FolderOpen}
@@ -584,6 +617,12 @@ export function NewActions({
                     onClick={handlePasteClick}
                   />
                   <ActionTile
+                    icon={SquarePen}
+                    label="New Canvas"
+                    onClick={() => setBlankMode(true)}
+                    title="Start with a new canvas"
+                  />
+                  <ActionTile
                     // Spinner stands in for the icon while the samples load —
                     // same slot, so the tile does not change shape.
                     icon={loadingTest ? () => <Spinner size={24} /> : Images}
@@ -592,25 +631,23 @@ export function NewActions({
                     disabled={loadingTest}
                   />
                   <ActionTile
-                    icon={SquarePen}
-                    label="New Canvas"
-                    onClick={() => setBlankMode(true)}
-                    title="Start with a new canvas"
+                    icon={Sparkles}
+                    label="Create AI Image"
+                    onClick={() => setAiMode(true)}
+                    disabled={!aiGenerationAllowed}
+                    pro
+                    title={
+                      aiGenerationAllowed
+                        ? "Generate an image from a description (Pro)"
+                        : "Turn on Online features (the switch below) to use this. It sends your prompt to a server."
+                    }
                   />
-                  {/* Off, not disabled — see the switch note above. When it
-                      returns it opens for everyone; the gate is on Generate,
-                      so a free user sees the whole flow and meets the upsell
-                      at the moment they understand what they would be buying.
-                      The key says which it is before they start. */}
-                  {aiGenerationAllowed && (
-                    <ActionTile
-                      icon={Sparkles}
-                      label="Create AI Image"
-                      onClick={() => setAiMode(true)}
-                      pro
-                      title="Generate an image from a description (Pro)"
-                    />
-                  )}
+                  <ActionTile
+                    icon={FileCode}
+                    label="Paste SVG"
+                    onClick={() => setSvgText("")}
+                    title="Paste SVG code and make a canvas from it"
+                  />
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is
@@ -655,7 +692,7 @@ export function NewActions({
 
       {/* Marketing links — only in the default upload view, not the Blank
           Canvas panel (keeps that panel uncluttered). */}
-      {showLinks && !blankMode && (
+      {showLinks && !blankMode && !svgMode && (
         // Sign-in lives HERE now — the same compact IconButton the top bar
         // uses — instead of as a 64px tile in the dialog's corner. Four
         // identical 30px icon buttons: sign-in, website, GitHub, Codeberg. No
