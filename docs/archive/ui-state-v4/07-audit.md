@@ -68,12 +68,12 @@ draft PR compares against that predecessor. Nothing is merged or deployed.
 
 | Night | Record | Draft PR | Result |
 | --- | --- | --- | --- |
-| 1 | [Photo switching](01-photo-switch.md) | [328](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/328) | Immediate document lock, truthful delayed loading, stale completion/retry protection |
-| 2 | [Document controls](02-document-controls.md) | [329](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/329) | Quality draft/commit/undo/restoration agreement, histogram ownership |
-| 3 | [Canvas feedback](03-canvas-feedback.md) | [330](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/330) | Pen updates once per frame; opaque-layer Pins composite about 5× faster at 4000×3000 |
-| 4 | [Selection and masks](04-selection-mask.md) | [331](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/331) | Refinement session teardown and valid mask editing target |
-| 5 | [History and saves](05-history-save.md) | [332](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/332) | Save failures preserve recoverable edits; actual current history position |
-| 6 | [Async feedback](06-async-feedback.md) | [333](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/333) | Persistent errors, timeout ownership, duplicate submission protection, measured ZIP packaging |
+| 1 | Photo switching | [328](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/328) | Immediate document lock, truthful delayed loading, stale completion/retry protection |
+| 2 | Document controls | [329](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/329) | Quality draft/commit/undo/restoration agreement, histogram ownership |
+| 3 | Canvas feedback | [330](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/330) | Pen updates once per frame; opaque-layer Pins composite about 5× faster at 4000×3000 |
+| 4 | Selection and masks | [331](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/331) | Refinement session teardown and valid mask editing target |
+| 5 | History and saves | [332](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/332) | Save failures preserve recoverable edits; actual current history position |
+| 6 | Async feedback | [333](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/333) | Persistent errors, timeout ownership, duplicate submission protection, measured ZIP packaging |
 | 7 | This audit | [334](https://github.com/chrislanejones/rust-wasm-photo-tool/pull/334) | Readiness/routing/lasso/diagnostics regression protection and visual evidence |
 
 ## Screenshots

@@ -3,7 +3,7 @@
 > **ARCHIVED 2026-08-04.** An investigation write-up, not a reference — the decisions it argues for shipped long ago (Dexie content layer, the Zustand persist adapter, content-addressed originals). Any schema change goes through the `dexie-migration` procedure, not this file.
 
 
-> Part of the [Image Horse](../../README.md) docs. See also: [State Management](State-Management.md) · [Service Workers & Caching](Service-Workers-Caching.md) · [Architecture](../02-Architecture.md).
+> Part of the [Image Horse](../../README.md) docs. See also: [State Management](State-Management.md) · Service Workers & Caching · [Architecture](../02-Architecture.md).
 >
 > **Status:** the three IndexedDB databases described in §2 are **live in production**. The Zustand ↔ IndexedDB persistence adapter (§3–§4) landed on the `zustand-build` branch (`app/src/stores/storage/idbStorage.ts`). Service-worker caching (referenced in §8) is still investigation-only.
 
@@ -180,7 +180,7 @@ IndexedDB is async, so a `persist`-backed store **hydrates after first paint**. 
 1. Keep the three dedicated IDB stores (`originals` / `edits` / `gallery`) for raw bytes — they are the source of truth for heavy data.
 2. Back **Zustand `useUIStore`** (and, selectively, last-used `useToolStore` settings) with the IndexedDB adapter for "remember my choice" prefs — `partialize`d to durable fields only.
 3. Leave undo/redo history in **WASM memory**; snapshot to `editPersistence` on photo switch (already the design).
-4. Pair this with a **service worker** to cache the app shell + the large WASM binary for instant repeat loads and offline editing — see [Service Workers & Caching](Service-Workers-Caching.md).
+4. Pair this with a **service worker** to cache the app shell + the large WASM binary for instant repeat loads and offline editing — see Service Workers & Caching.
 
 ### Pros / cons of leaning harder on IndexedDB
 
@@ -199,4 +199,4 @@ IndexedDB is async, so a `persist`-backed store **hydrates after first paint**. 
 - [x] Dexie content-layer module (`app/src/lib/dexie/db.ts` + `USAGE.md`) — parallel `image-horse-dexie` DB, not yet wired into call sites.
 - [ ] Backfill + cut the four `originalsStore` call sites over to Dexie (see USAGE.md migration path).
 - [ ] Persist the engine-coupled `useToolStore` settings (`stampSettings` / `toolSettings`) — needs a rehydrate→WASM sync; do it with the AppShell wiring.
-- [ ] Service-worker caching of the app shell + WASM binary — see [Service Workers & Caching](Service-Workers-Caching.md).
+- [ ] Service-worker caching of the app shell + WASM binary — see Service Workers & Caching.
