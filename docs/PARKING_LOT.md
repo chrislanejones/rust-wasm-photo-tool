@@ -4,21 +4,39 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — callout-leader §4 flakes on CI (11-19-2026)
+## FIXED 11-22-2026 (`test/callout-leader-s4-cause`) — callout-leader §4 flakes: a leader follow that read two states
 
-`e2e/callout-leader.spec.ts` §4 (Align ▾ on the callout alone, Align ▾ in a group, an
-arrow-key nudge) failed on 5 CI runs across 4 branches on 11-18 and 11-19, including
-#484, #485 and #487 before they merged. It is on master, not one branch.
+One bug, seen three times: `e2e/callout-leader.spec.ts` §4 (Align ▾ alone, Align ▾ in
+a group, an arrow-key nudge) failed once each on #452 and #454 (11-09), and on 5 CI
+runs across 4 branches on 11-18 and 11-19 (#484, #485 and #487 before they merged).
+The 10-31 row under "two e2e failures on master after v9.45" is the same test and
+very likely the same race (no dump survives from it).
 
-| Tried | Result |
+What failed: after the reload, Undo landed on a layer with no shapes and a text with
+a different id. The cause, found with op-log dumps plus a trace of every engine call
+(`E2E_OPLOG_DUMP=1`, day log 2026-11-22): `followLabels` (hooks/usePinSteps, run by
+useTextTool) read the shapes and the texts in two worker round trips. A Ctrl+Z
+between them paired the moved pin with the label's old place, and the follow
+redrew a leader that needed nothing onto the rewound log. That dropped the redo
+tail (12 ops → 8), the redo fell back to snapshot restore and broke the log, a
+broken log is never saved, and the resume used the archive, whose undo steps hold
+no shapes. Fixed by posting both reads in one tick.
+
+| Measured | Result |
 |---|---|
-| Redraw the leader inside the group move, before the flush (`useAnnotationSelection`) | No better: 1/24 failed with it, 0/24 without, both at 4× CPU on one core. Not shipped |
-| Local, normal speed | 0 failures |
+| 4× CPU, one worker | 0/200 failed (also 0/40 on 11-21) |
+| 4× CPU, one worker, `taskset -c 0`, before | **5/200 failed**, every one with the stray leader write in its trace |
+| Same, after | **200/200 passed** |
+| Forced-order unit test, real engine (`usePinSteps.test.ts`) | red before (log 8 ops, broken), green after |
+| Tried 11-19: redraw the leader inside the group move | No better (1/24 vs 0/24). Not shipped; not the cause |
 
-What fails: after the reload, Undo lands on a layer with no shapes and a text with a
-different id, instead of the layer before the move. The cause is not known yet. Next
-step: log the op-log bytes at the moment of the reload in a failing run. Failing
-E2E shards now upload their screenshots (see the fill-first entry below).
+Left open, each its own change:
+
+| What | Why it's left |
+|---|---|
+| The archive's undo steps (`SnapEntry`) store texts and no shapes, and restored texts get fresh ids | Any resume that falls back to the archive loses shapes from undo. This bug was one way in; the gap is a persistence change (`dexie-migration` rules apply to the archive record too). `e2e/text-placement-undo.spec.ts` case 4 is already a `test.fixme` for exactly this |
+| The follow can still write after a key press that lands between its reads' reply and its write | With one consistent read it writes only when a label really moved; not seen in 400 runs |
+| `usePinSteps`' pin-follow pairs React's shape list with an engine text read | Its "the leader moved itself → skip" rule kept it out of every run; same shape of risk |
 
 ## FIXED 11-21-2026 (`test/e2e-flakes-1121`) — `shapes-fill-first.spec.ts` CI flake was an app race
 
@@ -116,12 +134,6 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 |---|---|
 | Restored texts get fresh ids, and a history snapshot's copy a different one | Was already so; nothing found that keys on a text's id across a reload |
 
-## OPEN — callout-leader e2e flakes on Align (seen 11-09-2026 on #452 and #454)
-
-| What | Why it's left |
-| --- | --- |
-| `e2e/callout-leader.spec.ts`, the Align ▾ cases, failed once each on #452 and #454 | #452 changes no editor code and #453 passed, so it isn't MCP. Cause not found yet. |
-
 ## OPEN — MCP needs an attended check before it's switched on (#452, #453, #454, 11-09-2026)
 
 | What | Why it's left |
@@ -197,7 +209,7 @@ it anyway: it subtracts only when no row of the user still points at the file. T
 
 | Test | What is true now | Why it waited |
 |---|---|---|
-| `callout-leader.spec.ts:156` Align ▾ on the callout alone | Master CI on v9.45 (run 41209062771, shard 1) failed at **line 134**: after the reload the label is moved but its leader is back at its pre-align spot. Every failure before #419 was at line 136 (the empty undo step #419 fixed), so this is a new way to fail. Local, master build at 8× CPU: **0 in 40**. Probes saw the live log and the disk log match (10–11 ops) every run. Guess, not verified: the archive autosave keys (`undoCount`, `hasBeenModified`, `layerRevision`) do not change on a joined (`continue_step`) leader follow, so an autosave taken between the align and its follow could win on restore. May be the same thing as the "2 runs in 32 short log" note under the v9.45 fix.<br>**Night 11-02: the guess tested, and it is not this failure.** A test hold paused the leader's follow (useTextTool's follow effect) for 8 s after Align bottom so both autosaves could land in between, then reloaded: joined after the reload, 3 of 3. But the probe during the hold showed the callout ALREADY joined with the pin moved too (y 433 → 866): Align ▾ on the picked callout moves pin, label and leader together in one step, so there is no "label moved, leader not" window in this test for an autosave to catch. Whatever moved the leader back on CI is something else. callout-leader + smart-callout: 15 of 15 on the night's build. The experiment was not kept | Could not reproduce; a fix without a repro is a guess 11-07-2026 count: line 134 also fails in the Align group (:163) and nudge (:205) tests, 9 CI runs since 10-31. Two were after the v9.55 op log coverage check, seven before it. Repro on one core: `E2E_CPU_THROTTLE=4 taskset -c 0 pnpm exec playwright test callout-leader -g "Align|nudge" --repeat-each 8`: 2 of 24 ended with the log broken at 6 ops and failed at the undo after the reload. 40 healthy runs all had coverage 1 and no stale log. What breaks it is still unknown. |
+| `callout-leader.spec.ts:156` Align ▾ on the callout alone | Master CI on v9.45 (run 41209062771, shard 1) failed at **line 134**: after the reload the label is moved but its leader is back at its pre-align spot. Every failure before #419 was at line 136 (the empty undo step #419 fixed), so this is a new way to fail. Local, master build at 8× CPU: **0 in 40**. Probes saw the live log and the disk log match (10–11 ops) every run. Guess, not verified: the archive autosave keys (`undoCount`, `hasBeenModified`, `layerRevision`) do not change on a joined (`continue_step`) leader follow, so an autosave taken between the align and its follow could win on restore. May be the same thing as the "2 runs in 32 short log" note under the v9.45 fix.<br>**Night 11-02: the guess tested, and it is not this failure.** A test hold paused the leader's follow (useTextTool's follow effect) for 8 s after Align bottom so both autosaves could land in between, then reloaded: joined after the reload, 3 of 3. But the probe during the hold showed the callout ALREADY joined with the pin moved too (y 433 → 866): Align ▾ on the picked callout moves pin, label and leader together in one step, so there is no "label moved, leader not" window in this test for an autosave to catch. Whatever moved the leader back on CI is something else. callout-leader + smart-callout: 15 of 15 on the night's build. The experiment was not kept | Could not reproduce; a fix without a repro is a guess 11-07-2026 count: line 134 also fails in the Align group (:163) and nudge (:205) tests, 9 CI runs since 10-31. Two were after the v9.55 op log coverage check, seven before it. Repro on one core: `E2E_CPU_THROTTLE=4 taskset -c 0 pnpm exec playwright test callout-leader -g "Align|nudge" --repeat-each 8`: 2 of 24 ended with the log broken at 6 ops and failed at the undo after the reload. 40 healthy runs all had coverage 1 and no stale log. What breaks it is still unknown. **11-22-2026: found and fixed, see the FIXED callout-leader §4 entry at the top.** |
 | ~~`TextSettings.sections.test.tsx` (#420), unit~~ | **FIXED 10-31-2026.** It failed 3 of 4 in a checkout with cloud keys in `app/.env.local`: `ColorSwatchGrid` → `useUserColors` → the real `useConvexAuth` with no provider. The test now blanks both keys in `vi.hoisted` before `lib/cloud.ts` loads, like `cloud.test.ts`. The full suite passes with placeholder keys set (240 files / 2,154 tests) | — |
 | ~~`photo-switch-state.spec.ts:178` §0.5 bounce~~ | **FIXED 11-02-2026 (fix/photo-switch-bounce).** The click back to A took the "abandon a failed switch" shortcut: the ownership marker still said A because B's load, already past its last stale check, had not claimed yet, so A returned "already loaded" and B landed after. The shortcut now waits the load queue out and asks again, loading A back if B won. `e2e/photo-switch-bounce.spec.ts` holds B's load at that point (lib/testHold.ts): 5 of 5 red before, 50 of 50 green after at 4× CPU; §0.5 50 of 50 at 4× CPU; all 22 photo-switch tests green | — |
 

@@ -1,8 +1,10 @@
 import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 import { installAnnotationProbe, screenPoint } from "./annotation-benchmark-harness";
 import { findCallouts, leaderFor, type CalloutShape, type CalloutText } from "../app/src/lib/callouts";
+import { dumpOplogState, installEngineTrace, watchPersistConsole, OPLOG_DUMP } from "./oplog-dump";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Smart Callout leaders (Night 10-23).
@@ -40,6 +42,7 @@ async function open(page: Page) {
   });
   await page.addInitScript(() =>
     localStorage.setItem("image-horse-prefs", JSON.stringify({ canvasArtboard: false })));
+  await installEngineTrace(page);
   await page.goto("/");
   await page.locator('input[type="file"]').first().setInputFiles(FIXTURE_PNG);
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
@@ -100,12 +103,14 @@ const labelOf = (l: Layer) => {
 /** Wait out the autosave, reload, resume — the op log is all undo has left. */
 async function reloadAndResume(page: Page) {
   await page.waitForTimeout(6000);
+  await dumpOplogState(page, test.info(), "1-before-reload");
   await page.reload();
   await page.getByRole("button", { name: /Resume editing/i }).click();
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe("1200");
   // The app drops an undo press until the resumed photo stops loading.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await installAnnotationProbe(page);
+  await dumpOplogState(page, test.info(), "2-after-restore");
 }
 
 /** `act` moves the label (`moved` says how we know), the leader follows, and
@@ -115,6 +120,7 @@ async function followsInOneStep(
   act: () => Promise<void>,
   moved: (before: Text, now: Text) => boolean,
 ) {
+  const persistLog = watchPersistConsole(page);
   const before = await layer(page);
   const was = labelOf(before);
   await act();
@@ -130,10 +136,28 @@ async function followsInOneStep(
   await expect.poll(() => layer(page)).toEqual(before);
   await key(page, "Control+Shift+z");
   await expect.poll(() => layer(page)).toEqual(after);
-  await reloadAndResume(page);
-  await expect.poll(() => layer(page)).toEqual(after);
-  await key(page, "Control+z");
-  await expect.poll(() => layer(page)).toEqual(before);
+  await dumpOplogState(page, test.info(), "0-after-undo-redo");
+  try {
+    await reloadAndResume(page);
+    await expect.poll(() => layer(page)).toEqual(after);
+    await key(page, "Control+z");
+    try {
+      await expect.poll(() => layer(page)).toEqual(before);
+      await dumpOplogState(page, test.info(), "3-after-undo");
+    } catch (e) {
+      await dumpOplogState(page, test.info(), "3-after-undo-FAILED");
+      throw e;
+    }
+  } catch (e) {
+    await dumpOplogState(page, test.info(), "9-failed").catch(() => undefined);
+    throw e;
+  } finally {
+    if (OPLOG_DUMP) {
+      const file = test.info().outputPath("oplog-console.txt");
+      writeFileSync(file, persistLog.join("\n") || "(none)");
+      await test.info().attach("oplog-console.txt", { path: file, contentType: "text/plain" });
+    }
+  }
 }
 
 const bar = (page: Page) => page.getByTestId("multi-select-bar");

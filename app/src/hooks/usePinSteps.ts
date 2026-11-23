@@ -142,10 +142,20 @@ export async function rerouteCallouts(
  *  undo's follow pair the undone label with the REDONE leader, "follow" it
  *  back, and the redo's follow put it forward again: a step of its own, which
  *  a later Ctrl+Z spent doing nothing. Read now, a label and its leader come
- *  from one state; after an undo or redo they already match, nothing moves. */
+ *  from one state; after an undo or redo they already match, nothing moves.
+ *
+ *  ⚠️ BOTH READS GO OUT IN ONE TICK. On the worker each is a round trip, and
+ *  "one right after the other" with an `await` between was two states: an undo
+ *  pressed while the first reply was in flight ran between them, so the moved
+ *  pin met the label's old place and a leader that needed nothing was redrawn
+ *  onto the rewound log. That dropped the redo tail; the redo fell back to
+ *  snapshot restore and broke the log, and the reload resumed from the archive,
+ *  whose undo steps carry no shapes (callout-leader.spec.ts §4, 11-22-2026).
+ *  Posted together they are adjacent in the worker's FIFO queue, and a key
+ *  press can only land before both or after both. */
 export async function followLabels(tool: ImageHorseTool, before: readonly CalloutText[]): Promise<boolean> {
-  const shapes = await readShapes(tool);
-  return rerouteCallouts(tool, { shapes, texts: before }, { shapes, texts: await readTexts(tool) });
+  const [shapes, texts] = await Promise.all([readShapes(tool), readTexts(tool)]);
+  return rerouteCallouts(tool, { shapes, texts: before }, { shapes, texts });
 }
 
 export function usePinSteps({ toolRef, settingsRef, shapes, afterChange }: Options) {
