@@ -153,8 +153,7 @@ async function exportOpenPng(page: Page): Promise<number[]> {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  const selected = dialog.getByText(/^Download Selected Image/);
-  if (await selected.count()) await selected.click();
+  // One step: Download Selected is the first row's default.
   await dialog.locator('[title^="PNG"]').first().click();
   const [dl] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),

@@ -34,7 +34,16 @@ const FIT_OPTIONS = [
 ] as const;
 type Fit = (typeof FIT_OPTIONS)[number]["id"];
 
-export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
+export function ZipRecipePicker({
+  zipFormat,
+  disabled = false,
+}: {
+  zipFormat: ExportFormat;
+  /** Shown but off: a recipe shapes a ZIP, so with Download Selected it is
+   *  greyed out rather than hidden, and the Export dialog keeps one shape
+   *  (Chris, 11-23-2026). */
+  disabled?: boolean;
+}) {
   const [prefs, applyPrefs] = usePreferences();
   const recipeId = useZipRecipeStore((s) => s.recipeId);
   const setRecipeId = useZipRecipeStore((s) => s.setRecipeId);
@@ -79,13 +88,22 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-end gap-2">
-        <div className="flex flex-1 flex-col gap-0.5">
-          <label htmlFor={selectId} className="text-xs text-text-secondary">
-            Recipe
-          </label>
-          <SelectField id={selectId} value={recipeId ?? ""} onChange={(e) => setRecipeId(e.target.value || null)}>
+    <div className={disabled ? "space-y-2 opacity-50" : "space-y-2"}>
+      <label htmlFor={selectId} className="block text-xs font-semibold text-text-muted">
+        Recipe
+      </label>
+      {/* The menu takes three quarters of the row and Save the last quarter
+          (Chris, 11-23-2026). Delete sits inside the menu's share, beside it,
+          only while a saved recipe is picked. */}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-[3] items-center gap-2">
+          <div className="min-w-0 flex-1">
+          <SelectField
+            id={selectId}
+            value={recipeId ?? ""}
+            disabled={disabled}
+            onChange={(e) => setRecipeId(e.target.value || null)}
+          >
             <option value="">None — the format above, each at its size</option>
             <optgroup label="Built in">
               {BUILT_IN_RECIPES.map((r) => (
@@ -104,15 +122,31 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
               </optgroup>
             )}
           </SelectField>
+          </div>
+          {recipe && !recipe.id.startsWith("builtin:") && (
+            <Button
+              size="default"
+              disabled={disabled}
+              title={`Delete the recipe "${recipe.name}"`}
+              onClick={() => remove(recipe.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="sr-only">Delete recipe</span>
+            </Button>
+          )}
         </div>
-        {recipe && !recipe.id.startsWith("builtin:") && (
-          <Button size="default" title={`Delete the recipe "${recipe.name}"`} onClick={() => remove(recipe.id)}>
-            <Trash2 className="h-3.5 w-3.5" />
-            <span className="sr-only">Delete recipe</span>
-          </Button>
-        )}
+        <Button
+          size="default"
+          className="flex-1"
+          onClick={() => setSaving(true)}
+          disabled={disabled || saving || saved.length >= MAX_SAVED_RECIPES}
+          title="Save the current format, size and name as a recipe"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Save…
+        </Button>
       </div>
-      {recipe && (
+      {recipe && !disabled && (
         <p className="text-2xs text-theme-muted-foreground">
           {`${describeRecipe(recipe)}, quality ${recipe.quality}, named ${recipe.pattern}${
             recipe.cameraInfo ? `, camera info ${CAMERA_INFO_LABEL[recipe.cameraInfo]}` : ""
@@ -120,12 +154,7 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
         </p>
       )}
 
-      {!saving ? (
-        <Button size="default" onClick={() => setSaving(true)} disabled={saved.length >= MAX_SAVED_RECIPES}>
-          <Save className="h-3.5 w-3.5" />
-          Save current as recipe…
-        </Button>
-      ) : (
+      {saving && !disabled && (
         <form
           aria-label="New recipe"
           className="space-y-2 rounded-md border border-border p-2"
@@ -166,7 +195,7 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
           )}
           <div className="flex gap-2">
             <NumberField label="Quality" min={1} max={100} value={q} onChange={(e) => setQ(Number(e.target.value))} />
-            <TextField label="File name" value={pattern} onChange={(e) => setPattern(e.target.value)} />
+            <TextField label="Name pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} />
           </div>
           <p className="text-2xs text-theme-muted-foreground">
             {`Saves as ${zipFormat.toUpperCase()}, the format above, with Camera info ${CAMERA_INFO_LABEL[cameraInfoOf(prefs)]}. Name tokens: ${NAME_TOKENS.map((t) => t.token).join(" ")}. {width}, {height} and {ext} are the exported file's.`}

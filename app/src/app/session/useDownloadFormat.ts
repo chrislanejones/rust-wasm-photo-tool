@@ -39,7 +39,7 @@ const DOWNLOAD_FORMATS: DownloadFormatOption[] = [
   { value: "png", label: "PNG", hint: "Lossless · transparency" },
   { value: "webp", label: "WebP", hint: "Small · transparency" },
   { value: "avif", label: "AVIF", hint: "Smallest · modern" },
-  { value: "ora", label: "ORA", hint: "Layered · full project" },
+  { value: "ora", label: "ORA", hint: "Krita · GIMP" },
 ];
 
 /** What the browser will ACTUALLY write, given what it can encode.

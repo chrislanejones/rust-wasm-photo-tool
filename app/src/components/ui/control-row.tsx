@@ -69,19 +69,29 @@ export interface ControlRowProps {
   /** The control. Use the function form to wire the label / reason ids. */
   children: React.ReactNode | ((ids: ControlRowIds) => React.ReactNode);
   className?: string;
+  /** `row` (default): a tool panel's small muted label. `section`: a
+   *  dialog's section heading, the same face as the Export dialog's File Name
+   *  label (text-xs, semibold), for a pane whose rows are its sections
+   *  (Image Format · File Name · Camera Info, Chris 11-23-2026). */
+  variant?: "row" | "section";
 }
 
 const ROW_ICON_BUTTON =
   "flex size-4 items-center justify-center rounded-sm text-theme-muted-foreground hover:text-theme-foreground disabled:opacity-40";
 
-export function ControlRow({ label, info, value, reason, edited, action, children, className }: ControlRowProps) {
+export function ControlRow({ label, info, value, reason, edited, action, children, className, variant = "row" }: ControlRowProps) {
   const baseId = React.useId();
   const labelId = `${baseId}-label`;
   const reasonId = reason ? `${baseId}-reason` : undefined;
   return (
     <div data-slot="control-row" className={cn("space-y-2", className)}>
-      <div className="flex items-center gap-1 text-2xs">
-        <span className="mr-auto flex items-center gap-1 text-theme-muted-foreground">
+      <div className={cn("flex items-center gap-1", variant === "section" ? "text-xs" : "text-2xs")}>
+        <span
+          className={cn(
+            "mr-auto flex items-center gap-1",
+            variant === "section" ? "font-semibold text-text-muted" : "text-theme-muted-foreground",
+          )}
+        >
           <span id={labelId} data-slot="label">
             {label}
           </span>

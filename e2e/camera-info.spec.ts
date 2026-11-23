@@ -58,9 +58,9 @@ async function openExport(page: Page, pane: "Selected" | "All") {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  // With one photo the dialog skips the Selected / All choice.
-  const tile = dialog.getByText(pane === "All" ? /^Download All Images/ : /^Download Selected Image/);
-  if (pane === "All" || (await tile.count()) > 0) await tile.click();
+  // One step now: pick Selected or All in the first row (All is off with
+  // one photo, and Selected is already picked).
+  if (pane === "All") await dialog.getByRole("radio", { name: /^Download All/ }).click();
   return dialog;
 }
 
@@ -128,7 +128,7 @@ test("Download All with a recipe: the recipe carries the Camera info it was save
   // Save a recipe while the dialog says Remove location.
   await chooseCameraInfo(dialog, "Remove location");
   await dialog.locator('[title^="JPEG"]').first().click();
-  await dialog.getByRole("button", { name: "Save current as recipe…" }).click();
+  await dialog.getByRole("button", { name: "Save…", exact: true }).click();
   await dialog.getByLabel("Recipe name").fill("No GPS");
   await dialog.getByRole("button", { name: "Save recipe" }).click();
   await expect(dialog.getByText(/camera info Remove location/)).toBeVisible();
@@ -141,7 +141,7 @@ test("Download All with a recipe: the recipe carries the Camera info it was save
   await dialog.getByLabel("Recipe").selectOption({ label: "No GPS" });
   const [dl] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),
-    dialog.getByRole("button", { name: /^Download 2 as No GPS/ }).click(),
+    dialog.getByRole("button", { name: /^Download ZIP \(2 as No GPS/ }).click(),
   ]);
   const zip = readFileSync((await dl.path())!);
   // JSZip stores without compression, so each JPEG's bytes sit in the zip.

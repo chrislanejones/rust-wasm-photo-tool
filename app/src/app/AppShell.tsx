@@ -2069,7 +2069,12 @@ export function AppShell() {
   // The single Download button always opens the chooser dialog (Canvas Image /
   // All / Clipboard Copy). The "All" button is hidden when only one image is
   // loaded. The plural label ("JPEGs") reflects the gallery count.
-  const handleExportClick = useCallback(() => setExportDialogOpen(true), []);
+  // Alt+E opens Export too (Chris, 11-23-2026), like the top bar button, the
+  // command palette and their "Alt + E" hints always said. It used to download
+  // straight away instead. Nothing open, nothing to export.
+  const handleExportClick = useCallback(() => {
+    if (photos.length > 0) setExportDialogOpen(true);
+  }, [photos.length]);
 
   // Ctrl+[ / Ctrl+] — resize the active brush. Routes to whichever brush the
   // current tool uses (paint / blur / clone+redaction stamp / emoji), each
@@ -2148,7 +2153,7 @@ export function AppShell() {
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
-    onExport: handleExport,
+    onExport: handleExportClick,
     onExportAll: handleExportAll,
     onDeleteAll: handleDeleteAll,
     onSelectAll: handleSelectAll,
@@ -2923,7 +2928,6 @@ export function AppShell() {
           <ContextMenuItem onClick={handleExport} disabled={!hasImage}>
             <Download className="h-4 w-4 mr-2" /> Export{" "}
             {formatName(exportFormat)}
-            <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
           {photos.length > 1 && (
             <ContextMenuItem onClick={handleExportAll}>
