@@ -381,6 +381,13 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "FHD / Square / Story / 4×6 / 5×7 / 8×10; the fill is generated in Rust (blank_png → codec::export_png).",
   },
+  "Paste SVG": {
+    group: "edit",
+    title: "Paste SVG",
+    plain: "Paste SVG code and get a canvas: pick the size and background, then Create Canvas.",
+    detail:
+      "An icon copied from a web page works. The size keeps the drawing's shape, and it can still go back out as an SVG.",
+  },
   "Create AI Image": {
     group: "edit",
     title: "Create AI Image",

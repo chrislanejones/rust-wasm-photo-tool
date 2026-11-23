@@ -12231,6 +12231,26 @@ Still open: the `callout-leader` §4 CI flake. It passed 20/20 at 4× CPU both o
 
 Verification: vitest 2,470/2,470 (6 new unit tests); eight shape and callout specs 41/41; tsc 0; lint 0 errors; guardrails pass; `e2e-coverage-check` 89/89 specs run. PR CI: 18 pass, 2 skipped.
 
+## v9.69 Change Summary — 2026-11-22
+
+**Hide the same spot on every screenshot, and location leaves only when you say so.**
+
+| Area | Change |
+| --- | --- |
+| Batch › Redact (#495) | A new Batch tile. Drag up to 10 boxes on the open photo, pick **Pixelate**, **Blur** or **Solid**, and every photo in the batch is redacted in the same place. **Same spot** (the default) keeps each box at the same fractions of width and height, so a 1x and a 2x screenshot of one screen line up; **Pinned to a corner** keeps its size in pixels and its distance from one of the nine Placement cells. Floors make it a redaction, not a soft focus: block size at least 12 px, blur strength at least 20, measured on the built engine over 12 px text (no glyph pixel survives). Main \| Exceptions per ADR-079, and a group with no boxes is skipped. The open photo is one undo step (`ShapeAdd` / `Op::Blur`, no new op); other photos are redacted from their stored originals at full size, with no undo, and the panel says so. A not-open photo with its own edits, or an open photo with more than one layer, is skipped with a reason. ADR-108 (draft). |
+| Camera info on export (#496) | **Keep all · Remove location · Remove all** in the Download dialog (Selected and All), recipes and the phone's Save. Stored in the two preferences Settings › Security already had, so no new field and no prefs bump. Remove location scrubs the GPS on every path now; it used to reach only a verbatim Download All entry. Remove all on a turned JPEG copied as is keeps a 26-byte Orientation-only TIFF so it stays upright. A recipe carries the choice it was saved with. The default is unchanged: **Remove all**. ADR-108 asks whether it should become Remove location. |
+| Batch › Strip info (#496) | A new Batch tile that applies Remove location or Remove all to every stored photo. It asks first ("This removes location from 12 photos. It can't be undone."), it's lossless (metadata only), and it rewrites the upload copy too, or a later Keep all export would put the location back. |
+| Fix (#496) | Keep all used to write a portrait phone photo sideways: the pixels were already upright, and the copied EXIF still said to turn them. The transplant now sets Orientation to 1. An upright photo exports byte for byte as before. |
+| Rust (#496) | `exif_prepare_tiff` and the orientation-only rule in `src/exif.rs`. The oracle goes from 281 to 373 rows, and all 281 old goldens are unchanged. |
+| QC | `imagehorse-qc` on master `a35705a4`: PASS. Written up in `docs/qc/qc-1122.md`. |
+| Docs | ADR-108 (draft), the 11-22 day log with the 100% crops and the camera-info dump, Features for Redact, Camera info and Strip info, and their marketing cards. |
+| Trail Log | Squares catch up through 11-22. |
+
+No Dexie migration, no op-log format change. Engine 969,240 → 971,432 B (+2,192).
+
+Verification: run after the trail data regen. `cargo fmt --check`, `cargo clippy --all-targets -D warnings` and `cargo test --features tiles` pass; engine rebuilt after the last Rust change at 971,432 B. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,507/2,507; app and marketing builds pass, with 0 broken internal links across 30 pages. e2e on master `a35705a4` against a production build: the full suite 328 passed, 11 skipped; the `imagehorse-qc` slice `e2e/archive/qc-1122.spec.ts` 4/4 (`docs/qc/qc-1122.md`).
+
+
 ## v9.70 Change Summary — 2026-11-23
 
 **Find duplicates spots a turned or mirrored copy, and PNG Compress shows the real size.**
@@ -12250,19 +12270,20 @@ No Dexie migration, no op-log format change. Engine 971,432 → 973,825 B (+2,39
 Verification: run after the trail data regen. `cargo fmt --check` and `cargo clippy --all-targets -D warnings` pass; engine rebuilt at 973,825 B. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,515/2,515; app and marketing builds pass (29 URLs prerendered). e2e on a production build: png-compress-estimate, find-duplicates and callout-leader 10/10; the no-keys boot suite 4/4.
 
 
-**Hide the same spot on every screenshot, and location leaves only when you say so.**
+## v9.71 Change Summary — 2026-11-23
+
+**Paste SVG code and get a canvas, and the architecture chart comes as a PDF.**
 
 | Area | Change |
 | --- | --- |
-| Batch › Redact (#495) | A new Batch tile. Drag up to 10 boxes on the open photo, pick **Pixelate**, **Blur** or **Solid**, and every photo in the batch is redacted in the same place. **Same spot** (the default) keeps each box at the same fractions of width and height, so a 1x and a 2x screenshot of one screen line up; **Pinned to a corner** keeps its size in pixels and its distance from one of the nine Placement cells. Floors make it a redaction, not a soft focus: block size at least 12 px, blur strength at least 20, measured on the built engine over 12 px text (no glyph pixel survives). Main \| Exceptions per ADR-079, and a group with no boxes is skipped. The open photo is one undo step (`ShapeAdd` / `Op::Blur`, no new op); other photos are redacted from their stored originals at full size, with no undo, and the panel says so. A not-open photo with its own edits, or an open photo with more than one layer, is skipped with a reason. ADR-108 (draft). |
-| Camera info on export (#496) | **Keep all · Remove location · Remove all** in the Download dialog (Selected and All), recipes and the phone's Save. Stored in the two preferences Settings › Security already had, so no new field and no prefs bump. Remove location scrubs the GPS on every path now; it used to reach only a verbatim Download All entry. Remove all on a turned JPEG copied as is keeps a 26-byte Orientation-only TIFF so it stays upright. A recipe carries the choice it was saved with. The default is unchanged: **Remove all**. ADR-108 asks whether it should become Remove location. |
-| Batch › Strip info (#496) | A new Batch tile that applies Remove location or Remove all to every stored photo. It asks first ("This removes location from 12 photos. It can't be undone."), it's lossless (metadata only), and it rewrites the upload copy too, or a later Keep all export would put the location back. |
-| Fix (#496) | Keep all used to write a portrait phone photo sideways: the pixels were already upright, and the copied EXIF still said to turn them. The transplant now sets Orientation to 1. An upright photo exports byte for byte as before. |
-| Rust (#496) | `exif_prepare_tiff` and the orientation-only rule in `src/exif.rs`. The oracle goes from 281 to 373 rows, and all 281 old goldens are unchanged. |
-| QC | `imagehorse-qc` on master `a35705a4`: PASS. Written up in `docs/qc/qc-1122.md`. |
-| Docs | ADR-108 (draft), the 11-22 day log with the 100% crops and the camera-info dump, Features for Redact, Camera info and Strip info, and their marketing cards. |
-| Trail Log | Squares catch up through 11-22. |
+| New › Paste SVG (#507) | A sixth tile. Paste SVG code (the text, not a file), pick width × height and a background color or transparent (the default), and **Create Canvas** makes the image. The size is locked to the drawing's shape and starts where a dropped SVG would (a 24px icon starts at 1024). The code becomes an `.svg` File and takes the normal import: rasterized through an `<img>`, where scripts don't run, with the text kept so **SVG → SVG export** works on it. Only the root `<svg>` tag changes: the chosen size, an `xmlns` when the paste left it off (icons copied from a web page usually do, and an `<img>` then draws nothing), a viewBox for a size-only SVG, and one background `<rect>` when a color is picked. The rasterizer uses the chosen size exactly instead of the 1024–4096 rule (`lib/pastedSvg.ts`, `markExactSvgSize`). |
+| Paste tile (#507) | With SVG code on the clipboard, Paste opens Paste SVG filled in instead of saying there's no image. |
+| New menu (#507) | Two rows of three: Browse Files · Paste · New Canvas, then Sample Images · Create AI Image · Paste SVG. Create AI Image is always shown with its Pro key, disabled while Online features is off, so the grid keeps one shape. Paste SVG's step scrolls inside the New dialog, so Create Canvas is reachable on a 640px-tall window. |
+| Architecture PDF (#508) | /architecture has **Download it as a PDF** under the .mermaid button. `marketing/scripts/gen-mermaid-pdf.mjs` renders `system-architecture.mermaid` at 1:1 (30.9 × 35.1 in; Letter landscape put it at 0.21 scale, 3px text) with DM Sans loaded before mermaid measures anything, and refuses to write the PDF if a label leaves its box, boxes or words overlap, an edge label sits on a box, any of the 29 lines runs through a box or another line's label, or a group title leaves its group. Group titles sit where the fewest lines cross and are painted on top: 4 lines pass under a title chip, none over words. Six deliberately broken copies of the script all failed the check. `mermaid` is a marketing devDependency only. |
+| Website | Features and a card for Paste SVG. |
+| Docs | The v9.70 entry here had overwritten the `## v9.69` heading, leaving v9.69's notes under v9.70's; the heading is back and the two are in order. |
+| Trail Log | Squares catch up through 11-23. |
 
-No Dexie migration, no op-log format change. Engine 969,240 → 971,432 B (+2,192).
+No Dexie migration, no op-log format change, no engine change (973,825 B).
 
-Verification: run after the trail data regen. `cargo fmt --check`, `cargo clippy --all-targets -D warnings` and `cargo test --features tiles` pass; engine rebuilt after the last Rust change at 971,432 B. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,507/2,507; app and marketing builds pass, with 0 broken internal links across 30 pages. e2e on master `a35705a4` against a production build: the full suite 328 passed, 11 skipped; the `imagehorse-qc` slice `e2e/archive/qc-1122.spec.ts` 4/4 (`docs/qc/qc-1122.md`).
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529 (14 new for `lib/pastedSvg.ts`); `e2e-coverage-check` 93/93 specs run; app and marketing builds pass (29 URLs prerendered); marketing script tests 8/8. e2e on a production build of #507: the full suite 333 passed, 11 skipped, including the 4 new `paste-svg` tests (3 runs in a row), `pane-header-row` and `svg-passthrough`. #508: the PDF generator's checks pass on the shipped flowchart and fail on all 6 deliberately broken copies; /architecture checked at 1440 and 390 wide, the PDF served as `application/pdf`. No Rust changed, so no cargo gates.

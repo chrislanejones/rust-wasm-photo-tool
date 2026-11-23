@@ -89,25 +89,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.70 — 2026-11-23
+### v9.71 — 2026-11-23
 
-**Find duplicates spots a turned or mirrored copy, and PNG Compress shows the real size.**
+**Paste SVG code and get a canvas, and the architecture chart comes as a PDF.**
 
-**Find duplicates:** a copy turned a quarter turn, or flipped left to right, now
-lands in the same group as the original. Groups also stop chaining: a photo joins
-a group only if it looks like that group's first photo, so a run of shots that
-each look a bit like the next no longer piles up into one group.
+**Paste SVG:** a new tile in the New menu. Paste the code of an SVG (an icon
+copied off a web page works), pick the size and a background or transparent,
+and Create Canvas makes the image. The size keeps the drawing's shape, so it
+never stretches. It imports like a dropped .svg file, so it can still go back
+out as an SVG. If the clipboard holds SVG code, the Paste tile opens it for you.
 
-**PNG Compress:** below Quality 100 a PNG is color-reduced, and the Image weight
-readout used to show the full-color size first, nearly 4× too big on flat art.
-It now waits for the real number, and falls back to the estimate only if the
-measurement fails.
+**The New menu** is now two rows of three: Browse Files, Paste, New Canvas, then
+Sample Images, Create AI Image and Paste SVG. Create AI Image is always there,
+grayed out until you turn on Online features.
 
-**Callouts:** undo right after moving a callout pin could lose the redo steps and,
-after a reload, undo onto a layer with no shapes. Fixed.
-
-**The website** catches up with everything here, including the Pair a phone Beta,
-and the Privacy Policy now says which cleanup jobs aren't switched on yet.
+**The architecture chart** on /architecture now downloads as a PDF too. It's
+drawn at full size, and checked before it's written so no box, line or label
+lands on another.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

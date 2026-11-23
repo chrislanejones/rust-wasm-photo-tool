@@ -9,7 +9,7 @@
     "docs/adr/024-engine-in-a-worker.md": "2026-09-16",
     "docs/adr/049-the-service-worker-is-blocked-on-eviction-reach-not-the-precache.md": "2026-09-08",
     "docs/engine-worker-feasibility.md": "2026-09-22",
-    "eslint.config.mjs": "2026-11-19",
+    "eslint.config.mjs": "2026-11-23",
     "marketing/src/components/OraSubPage.tsx": "2026-10-05",
     "marketing/src/components/OraViewer.tsx": "2026-09-25",
     "marketing/src/data/designSystem.ts": "2026-11-12",

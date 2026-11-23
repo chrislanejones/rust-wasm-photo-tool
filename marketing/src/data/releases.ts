@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.71",
+    date: "2026-11-23",
+    headline: "Paste SVG code and get a canvas, and the architecture chart comes as a PDF.",
+    entries: [
+      { tag: "feature", text: "New › Paste SVG: paste SVG code, pick the size and a background, and Create Canvas makes the image. It can still go back out as an SVG." },
+      { tag: "feature", text: "With SVG code on the clipboard, the Paste tile opens Paste SVG for you." },
+      { tag: "ui", text: "The New menu is two rows of three. Create AI Image is always there, grayed out until Online features is on." },
+      { tag: "ui", text: "The architecture chart downloads as a PDF, checked so no box, line or label lands on another." },
+    ],
+  },
+  {
     version: "v9.70",
     date: "2026-11-23",
     headline: "Find duplicates spots a turned or mirrored copy, and PNG Compress shows the real size.",

@@ -1,7 +1,7 @@
 // GENERATED — do not edit. Run: node marketing/scripts/gen-trail-data.mjs
 //
 // The feature list, from docs/Features.md — the repo's own canonical list.
-// 83 features across 2 groups.
+// 84 features across 2 groups.
 
 export interface Feature {
   name: string;
@@ -60,6 +60,7 @@ export const FEATURES: FeatureGroup[] = [
       { name: "Batch Strip info", body: "remove location, or all camera info, from every stored photo at once (Batch → Strip info), so later exports, the phone's Save and pairing sends carry the stripped file. It asks first (\"This removes location from 12 photos. It can't be undone.\"), and Exceptions start on Leave as is. Lossless: only the metadata changes, never a pixel" },
       { name: "Export", body: "PNG via the Rust encoder, written in the smallest lossless layout (a palette for 256 colors or fewer, RGB when nothing is transparent, RGBA otherwise); a Quality below 100 cuts a PNG to 256, 128, 64 or 32 colors and keeps whichever file is smaller (src/quantize.rs, ADR-094), JPEG/WebP via browser, AVIF through a real encoder (@jsquash/avif, a ~3.5 MB wasm chunk fetched on the first AVIF export, never in the initial bundle — the browser silently wrote a PNG before)" },
       { name: "Blank Canvas", body: "start a new document from the upload dialog: dimensions + a page-size preset (FHD / Square / Story / 4×6 / 5×7 / 8×10) and a White / Black / hex / Transparent background; the fill is generated in Rust (blank_png → codec::export_png) with no canvas round-trip" },
+      { name: "Paste SVG", body: "New › Paste SVG takes SVG code as text (an icon copied from a web page, or a file's contents) and makes a canvas from it: width × height locked to the drawing's shape, a background color or transparent, then Create Canvas. It imports like a dropped .svg, so SVG → SVG export works on it. With SVG code on the clipboard, the Paste tile opens it filled in (lib/pastedSvg.ts)" },
       { name: "Create AI Image", body: "New › Create AI Image turns a prompt into a new photo in your gallery. Pick one of six models from the dropdown: Flux Schnell, Flux Dev, Flux 1.1 Pro, Flux Kontext Pro, Stable Diffusion 3.5 Large or Ideogram v3 Turbo; they differ in speed, cost and whether they can take a reference image. Choose an aspect ratio and, for the three models that read them, attach reference images. The tile shows only with online features on, Generate is a Paid feature checked on the server before anything is sent to Replicate, and the image arrives as an ordinary upload. Reference inputs stay protected while the job runs and are released when it finishes; shared files survive" },
       { name: "Thumbnails", body: "256px WebP thumbnails built from the already-decoded working pixels via Rust resize_pixels (uploads decode once, not twice); working canvas stays at ≤2048px" },
       { name: "Copy/Paste Regions", body: "Cross-photo pixel compositing with alpha blending; paste from clipboard supported; the placement box moves, resizes and rotates about its centre (Shift snaps to 15°) before it commits — nearest-neighbour while dragging, bilinear on commit, and a rotated paste is a \"Rotate Layer\" history step" },
@@ -75,7 +76,7 @@ export const FEATURES: FeatureGroup[] = [
     name: "UI (React)",
     items: [
       { name: "Fast drags are never dropped", body: "on the Shapes, Arrows & Diagram Shapes and Crop canvases a press is recorded the instant it lands, its moves and release are buffered while the engine answers the hit-test, then replayed in order; a quick second drag commits the first instead of overtaking it. Thirty fast drags in a row land thirty shapes (they used to land 19–24) (lib/pressQueue.ts)" },
-      { name: "One header row on every second-step dialog", body: "New Canvas, Create AI Image, Selected Image and All Images share one header: ‹ Back on the left, the title centered, ✕ on the right, Back the same 24px button as the close. One close per dialog (PaneHeader, a 1fr auto 1fr grid)" },
+      { name: "One header row on every second-step dialog", body: "New Canvas, Create AI Image, Paste SVG, Selected Image and All Images share one header: ‹ Back on the left, the title centered, ✕ on the right, Back the same 24px button as the close. One close per dialog (PaneHeader, a 1fr auto 1fr grid)" },
       { name: "Sign in from Settings", body: "a labeled Sign in button on the far right of the Settings footer (your avatar once you are signed in), as well as the person icon in the top bar" },
       { name: "Animated Panels", body: "Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)" },
       { name: "Pan (H or Space)", body: "H is the hand key: hold it and the pan ends on release, tap it and the pan stays on until the next tap or Esc. Holding Space still pans. All tool handlers are bypassed during a pan, and typing h in a text field does nothing" },
