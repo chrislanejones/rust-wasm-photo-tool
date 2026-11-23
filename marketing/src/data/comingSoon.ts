@@ -38,6 +38,11 @@ export const GROUPS: Group[] = [
         beta: "transfer",
       },
       {
+        name: "Pair a phone",
+        body: "Scan a QR code with your phone and it connects straight to the editor on your computer, no sign-in needed. Send photos either way; our server only introduces the two and never sees a photo. Already behind a flag.",
+        beta: "pair",
+      },
+      {
         name: "Trash for share links",
         body: "Delete a share link and it goes to a Trash in Settings › Shared, where you can bring it back at the same address. Needs sign-in. Already behind a flag.",
         beta: "trash",

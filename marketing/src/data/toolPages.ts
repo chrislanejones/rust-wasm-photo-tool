@@ -91,6 +91,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Resize to the exact width and height you type, or by Scale",
       "See the real file size against Google's image limit, Pass or Over",
       "See how much smaller or bigger it is than your upload",
+      "Or press ⚡ Auto: the size and the highest quality that pass, found by real encodes",
       "Compare WebP, JPEG, PNG and AVIF before you export",
       "Compress a whole gallery in one pass",
     ],
@@ -244,6 +245,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Or drop a hard black box over it",
       "Works on faces, plates, addresses, passwords, account numbers",
       "Exports flattened, so the original pixels are not in the file",
+      "Batch › Redact covers the same spot on every photo in a set",
     ],
     sections: [
       {
@@ -295,12 +297,14 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     description:
       "Resize, compress, crop, stamp a logo or text, and rename a whole folder of photos in one pass. Runs on your own machine and exports the lot as a ZIP.",
     h1: "Edit a whole folder of photos at once",
-    lede: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, crop to one shape, stamp a logo or text, rename by pattern or by what the engine sees. One pass, on your own machine, then export the lot.",
+    lede: "Load a folder's worth of photos and do one thing to all of them: resize, compress to a size, crop to one shape, stamp a logo or text, hide the same spot on every one, rename by pattern or by what the engine sees. One pass, on your own machine, then export the lot.",
     runsOn: "local",
     does: [
       "Resize or compress every photo to the same target",
       "Crop every photo to the same ratio, for a carousel that lines up",
       "Stamp a logo, a watermark or text across the set",
+      "Redact the same spot on every photo: pixelate, blur or a solid box",
+      "Strip the location, or all camera info, from every stored photo",
       "Tick the odd few as Exceptions and give them their own settings",
       "Copy one photo's look and paste it onto the rest",
       "Find look-alike photos and tick the extra copies",
@@ -315,7 +319,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       },
       {
         h2: "The few that need something different",
-        p: "Every Batch tool — Crop, Resize & Compress, Logo, Text, Rename and AI Rename — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop and Resize & Compress give them settings of their own, and one button does both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
+        p: "Every Batch tool — Crop, Resize & Compress, Redact, Logo, Text, Rename, AI Rename and Strip info — has a Main | Exceptions switch. Tick photos in the gallery, or tick Exception on the canvas, and they move to Exceptions. Crop, Resize & Compress, Redact and Strip info give them settings of their own, and one button does both groups: Crop 8 to 1:1 · 2 to 4:5. The other tools run on whichever group is showing.",
       },
       {
         h2: "See the whole set at once",
@@ -352,7 +356,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       },
       {
         h2: "What does not, and why",
-        p: "Background removal, the AI object-removal pass, reading text out of an image and Create AI Image run on servers, because the models are hundreds of megabytes and would have to be downloaded before the first click. They are on the paid tier for the same reason: each run costs money. Signing in also adds sync and share links, and as a Beta, sending photos from your phone, which are a server by definition. Every one of those is optional, and the \"Everything in your browser\" switch in Settings › Security keeps every picture in the tab.",
+        p: "Background removal, the AI object-removal pass, reading text out of an image and Create AI Image run on servers, because the models are hundreds of megabytes and would have to be downloaded before the first click. They are on the paid tier for the same reason: each run costs money. Signing in also adds sync and share links, and as a Beta, sending photos from your phone, which are a server by definition. Pair a phone, another Beta, works signed out: our server introduces your phone to your computer, and the photos go straight between the two without passing through it. Every one of those is optional, and the \"Everything in your browser\" switch in Settings › Security keeps every picture in the tab.",
       },
       {
         h2: "Why the distinction matters",

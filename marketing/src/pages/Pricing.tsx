@@ -117,8 +117,9 @@ const MATRIX: { name: string; rows: Row[] }[] = [
       row("Layers", ["8 per image", "8 per image", "16 per image"], "client-side stack"),
       row("Undo / redo", [Y, Y, Y]),
       row("Export PNG · JPEG · WebP · AVIF", [Y, Y, Y]),
+      row("Camera info on export", [Y, Y, Y], "keep all, remove location, or remove all"),
       row("OpenRaster export and import", [Y, Y, Y], "layers intact, opens in Krita"),
-      row("Batch", [Y, Y, Y], "crop, resize, logo, text, rename, AI rename — all local"),
+      row("Batch", [Y, Y, Y], "crop, resize, redact, logo, text, rename, AI rename, strip info — all local"),
     ],
   },
   {
@@ -126,6 +127,7 @@ const MATRIX: { name: string; rows: Row[] }[] = [
     rows: [
       row("Gallery", ["12 images", "24 images", "100 images"]),
       row("Auto compress all", [Y, Y, Y]),
+      row("Pair a phone", [Y, Y, Y], "Beta · photos go straight between the two, no sign-in"),
       row("Edit persistence", [Y, Y, Y], "kept in this browser between visits"),
       row("Off-device copy of your edits", [N, Y, Y], "once you sign in"),
       row("Original files", ["on your device", "on your device", "on your device"]),

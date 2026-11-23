@@ -26,7 +26,7 @@ export default function PrivacyPolicy() {
         <header className="legal-head">
           <div className="legal-head__lead">
             <p className="legal-head__eyebrow">
-              Privacy Policy &middot; updated <time dateTime="2026-09-22">09-22-2026</time>
+              Privacy Policy &middot; updated <time dateTime="2026-11-23">11-23-2026</time>
             </p>
             <h1 className="legal-head__title">Four things leave your device. Here they are.</h1>
           </div>
@@ -227,9 +227,11 @@ export default function PrivacyPolicy() {
                 keeps every picture in the tab.
               </li>
               <li className="legal-board__card">
-                <strong>Strip metadata on export.</strong> Settings &rsaquo; Security removes EXIF,
-                GPS, XMP and IPTC from what you save, or removes only the location and keeps the
-                camera details.
+                <strong>Strip metadata on export.</strong> Camera info in the Download dialog, the
+                same setting as Settings &rsaquo; Security, removes EXIF, GPS, XMP and IPTC from what
+                you save, or removes only the location and keeps the camera details. Removing all of
+                it is the default. Batch &rsaquo; Strip info does the same to every photo you have
+                stored.
               </li>
               <li className="legal-board__card">
                 <strong>Clear your site data</strong> to delete the local gallery, or block cookies

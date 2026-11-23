@@ -1,8 +1,9 @@
-%%-- Image Horse — whole-app system architecture (AS SHIPPED, v8.81, 2026-09-21)
+%%-- Image Horse — whole-app system architecture (AS SHIPPED, v9.69, 11-22-2026)
 %%--
 %%-- The downloadable source behind the hand-drawn map on /architecture. Both
-%%-- are maintained BY HAND and have drifted apart before; when they disagree,
-%%-- check the code, not either picture.
+%%-- are maintained BY HAND and have drifted apart before (this file sat at
+%%-- v8.81 for two months while the page moved on); when they disagree, check
+%%-- the code, not either picture.
 %%--
 %%-- The dashed "Network" plane is optional: sever it and the solid client
 %%-- subgraph is a complete, working editor. Demo mode is sacred.
@@ -13,24 +14,33 @@
 %%--   - The engine runs in a WORKER and has been the default since v8.32
 %%--     (ADR-024). Main-thread blocking per heavy operation went 129-137 ms
 %%--     to 0. The OffscreenCanvas belongs to the ENGINE worker, not the codec.
-%%--   - The service worker is BUILT BUT OFF. The default build statically
-%%--     removes it (__IH_SW_MODE__ === "off", ADR-019). It has never shipped
-%%--     on, which is why this file does NOT say "works offline" — a cold load
-%%--     with no network fails.
-%%--   - WebGPU is one blur kernel plus a self-test, with ZERO consumers on the
-%%--     pixel path. It is not a backend the engine renders through.
+%%--   - The service worker is WRITTEN BUT DARK. It is precache-only and
+%%--     tested, and the default build still removes it statically
+%%--     (__IH_SW_MODE__ === "off", ADR-019). It is blocked on eviction reach,
+%%--     not on the precache (ADR-049). So this file does NOT say "works
+%%--     offline": a cold load with no network fails.
+%%--   - WebGPU is the whole-image blur only, behind the gpu-blur Beta, and it
+%%--     falls back to the CPU on any failure (ADR-030). The blur BRUSH is
+%%--     always CPU. It is not a backend the engine renders through.
 %%--   - The rayon worker pool is GONE, not planned: measured 8-31x SLOWER than
 %%--     single-threaded and rejected. No SharedArrayBuffer, no COOP/COEP, no
 %%--     wasm threads anywhere.
 %%--   - PatchMatch SHIPPED in v7.46 (Magic Eraser). Built --features
 %%--     tiles,patchmatch.
-%%--   - React 19, not 18. Seven Zustand stores, not five.
+%%--   - Nineteen Zustand stores in app/src/stores, not seven. Feature
+%%--     folders (pair, transfer) keep small stores of their own.
 %%--   - The cloud copy is the EDIT ARCHIVE, uploaded for ANY signed-in user
-%%--     (useEditPersistence.ts). It is not the op log and it is not Pro-only;
-%%--     this file used to draw it as both.
+%%--     (useEditPersistence.ts). It is not the op log and it is not Pro-only.
 %%--   - Fonts are NOT in the wasm beyond one fallback face. Liberation Sans,
 %%--     Serif and Mono are static files, fetched at runtime and handed to the
 %%--     engine through register_font (ADR-058).
+%%--   - Pair a phone (Beta) is the one network piece a SIGNED-OUT visitor can
+%%--     use. Convex only introduces the two devices (pair_sessions: no user,
+%%--     no photo) and Cloudflare's STUN server tells each device its own
+%%--     address. Photos go device to device over the WebRTC data channel and
+%%--     never touch either server (ADR-105).
+%%--   - The codec worker loads NO engine wasm. Its one wasm is the AVIF
+%%--     encoder, fetched lazily.
 %%--
 %%-- ⚠️ EVERY COMMENT LINE HERE CARRIES CHARACTERS AFTER THE %% ON PURPOSE.
 %%-- Mermaid strips comments with [^\n]+, which needs at least one character
@@ -44,43 +54,50 @@ flowchart TB
         direction TB
 
         subgraph ui["UI plane · main thread · React 19 + TypeScript + Vite"]
-            SHELL["AppShell<br/>composition + layout only<br/>(being dismantled, stage 4)"]
-            REG["Tool registry<br/>ToolModule per tool"]
-            SESS["Session hooks<br/>image · selection · canvas · mask"]
-            STORES["Zustand · 7 stores<br/>UI · Tool · Gallery · Annotation<br/>Guides · Perspective · TextBox"]
+            SHELL["AppShell<br/>composition + layout only<br/>(being dismantled)"]
+            REG["Tool registry<br/>5 modules · routing still hand-wired in AppShell"]
+            SESS["Session hooks<br/>image · selection · canvas · mask<br/>resize & compress · shapes · pen"]
+            STORES["Zustand · 19 stores<br/>UI · view · tool · gallery · annotation · guides<br/>perspective · text box · look · history branches<br/>batch crop · group · redact · resize · strip info · view<br/>screenshot compare · SVG source · ZIP recipes"]
+            PAIR["Pair a phone · Beta<br/>QR code · WebRTC peer + data channel<br/>features/pair"]
         end
 
         subgraph ew["Engine worker · THE DEFAULT since v8.32 (ADR-024)"]
-            ENGINE["WASM engine · stamp_tool<br/>own wasm instance + ImageHorseTool<br/>kernels · TileBuffer · OpLog · PatchMatch<br/>built --features tiles,patchmatch"]
+            ENGINE["WASM engine · stamp_tool · 971 KB<br/>kernels · TileBuffer · OpLog · PatchMatch<br/>describe · dhash · look · auto tone · exif<br/>built --features tiles,patchmatch"]
             OSC[("Transferred OffscreenCanvas<br/>composite drawn from THIS thread")]
         end
 
-        subgraph cw["Codec worker · no wasm"]
-            CODEC["encode · thumbnail · resize<br/>OffscreenCanvas.convertToBlob / drawImage"]
+        subgraph cw["Codec worker · no engine wasm"]
+            CODEC["WebP / JPEG encode · thumbnails · resize<br/>AVIF through its own wasm encoder, loaded lazily"]
         end
 
         subgraph persist["Persistence plane · IndexedDB / Dexie · no backup, no server copy"]
             ORIG["originals<br/>SHA-256 content-addressed · immutable"]
-            OPS["opLogs + keyframes"]
+            OPS["opLogs + keyframes<br/>op format v16"]
             GAL["gallery manifest"]
             CACHE["renderCache<br/>disposable"]
         end
 
-        LOCAL["localStorage<br/>lightweight prefs · kill switches"]
+        LOCAL["localStorage<br/>lightweight prefs · kill switches · Beta switches"]
+        BCAST["BroadcastChannel<br/>keeps every tab on this device in step"]
         FONTS["Static font files<br/>Liberation Sans · Serif · Mono<br/>fetched at runtime, same origin"]
-        SW["Service worker · BUILT, NOT SHIPPED<br/>statically removed from the default<br/>build (ADR-019) — never registered"]
-        WGPU["WebGPU · one blur kernel + self-test<br/>zero consumers on the pixel path"]
+        SW["Service worker · precache only<br/>written and tested, ships DARK<br/>statically removed (ADR-019, ADR-049)"]
+        WGPU["WebGPU · gpu-blur Beta<br/>whole-image blur only<br/>CPU on any failure (ADR-030)"]
     end
 
     subgraph edge["NETWORK — optional, additive only"]
         direction TB
         CLERK["Clerk<br/>identity"]
-        CONVEX["Convex<br/>prefs sync · entitlements · gallery"]
-        AIPROXY["AI proxy → Replicate<br/>the server holds the provider key"]
-        SHARE["Share delivery<br/>ShareViewer"]
+        CONVEX["Convex<br/>settings sync · entitlements · edit archive"]
+        AIPROXY["AI proxy → Replicate<br/>paid only · the server holds the provider key"]
+        SHARE["Share delivery<br/>ShareViewer · view counts, timestamps only"]
+        INBOX["Transfer inbox · Beta<br/>phone → computer · signed in · 7 days"]
+        PAIRSIG["Pair signaling · Beta<br/>Convex pair_sessions · no sign-in<br/>no user, no photo · gone in 30 min"]
+        STUN["Cloudflare STUN<br/>each device learns its own address"]
+        PHONE["Your phone<br/>paired over WebRTC"]
+        MCP["MCP endpoint<br/>for AI apps · off by default, every route 404"]
     end
 
-    %% core editing path — every pixel operation crosses into the worker
+    %%-- core editing path — every pixel operation crosses into the worker
     SHELL --> STORES
     STORES --> REG
     REG -->|ToolContext| ENGINE
@@ -88,34 +105,48 @@ flowchart TB
     ENGINE -->|zero-copy blit| OSC
     OSC -->|presented in place| SHELL
     FONTS -->|register_font| ENGINE
+    SESS -.->|gpu-blur Beta: whole-image blur| WGPU
 
-    %% encode + persist
+    %%-- encode + persist
     SESS -->|pixels transferable| CODEC
     CODEC -->|Blob| CACHE
     SESS --> ORIG
     SESS --> OPS
     SESS --> GAL
     STORES --> LOCAL
+    STORES -->|prefs, every tab| BCAST
     CACHE -.->|invalid → keyframe + replay| ENGINE
 
-    %% kill switch: ih_engine_worker=0 drops the engine back onto the main thread
+    %%-- kill switch: ih_engine_worker=0 drops the engine back onto the main thread
     LOCAL -.->|ih_engine_worker=0 opts out| ENGINE
 
-    %% optional network plane
+    %%-- optional network plane
     ui -. auth .-> CLERK
-    STORES -. signed in .-> CONVEX
+    STORES -. signed in: settings sync .-> CONVEX
     SESS -. signed in: edit archive .-> CONVEX
     SESS -. paid: server op .-> AIPROXY
     AIPROXY -. result .-> SESS
-    GAL -. free+: create link .-> SHARE
+    GAL -. signed in: create link .-> SHARE
+    INBOX -. signed in: Add to gallery .-> GAL
+    MCP -. once switched on: your account .-> CONVEX
+
+    %%-- pairing: the servers introduce, the photos go straight across
+    PAIR -. offer · answer · candidates .-> PAIRSIG
+    PAIR -. own address .-> STUN
+    PAIR -. data channel: photos both ways .-> PHONE
+    PAIR -->|received photos: the normal import| GAL
 
     classDef optional stroke-dasharray:5 4;
-    class edge,CLERK,CONVEX,AIPROXY,SHARE optional;
+    class edge,CLERK,CONVEX,AIPROXY,SHARE,INBOX,PAIRSIG,STUN,PHONE,MCP optional;
 
-    %% Built but not on the shipped path — present in the repo, absent at runtime.
+    %%-- Built but not on the shipped path — present in the repo, absent at runtime.
     classDef dark stroke-dasharray:3 3;
-    class SW,WGPU dark;
+    class SW dark;
 
-    %% The only two stores that are the user's irreplaceable truth.
+    %%-- Behind a Beta switch: off until you turn it on in Settings › Beta.
+    classDef beta stroke-dasharray:1 3;
+    class PAIR,WGPU beta;
+
+    %%-- The only two stores that are the user's irreplaceable truth.
     classDef truth fill:transparent,stroke-width:2px;
     class ORIG,OPS truth;
