@@ -11,8 +11,8 @@
  * the new text the same day (Emma, widened stereo, edge-tts 7.3.1).
  *
  * Every figure in here is in the repository. The blocking times and the
- * round-trip numbers come from docs/engine-worker-feasibility.md and
- * docs/engine-worker-a11-0-finding.md; the invariant, the stage table and the
+ * round-trip numbers come from docs/15.1-Engine-Worker-Feasibility.md and
+ * docs/15.2-Engine-Worker-A11-Finding.md; the invariant, the stage table and the
  * kill switch come from docs/adr/024-engine-in-a-worker.md. Nothing is
  * estimated, and nothing is rounded to sound better than it measured.
  *
@@ -102,11 +102,11 @@ export default function EngineInAWorker() {
           ADR-024
         </a>
         , the{" "}
-        <a href={repoFile("docs/engine-worker-feasibility.md")} {...external}>
+        <a href={repoFile("docs/15.1-Engine-Worker-Feasibility.md")} {...external}>
           feasibility note
         </a>{" "}
         that opened the question, and the{" "}
-        <a href={repoFile("docs/engine-worker-a11-0-finding.md")} {...external}>
+        <a href={repoFile("docs/15.2-Engine-Worker-A11-Finding.md")} {...external}>
           transferred-canvas finding
         </a>{" "}
         that closed the last objection.
@@ -626,11 +626,11 @@ export default function EngineInAWorker() {
         move, and the real obstacle turned out to be a counting problem.
       </p>
 
-      <blockquote className="post__quote" cite={repoFile("docs/engine-worker-feasibility.md")}>
+      <blockquote className="post__quote" cite={repoFile("docs/15.1-Engine-Worker-Feasibility.md")}>
         <p>Latency is not the obstacle. The obstacle is 117 synchronous reads.</p>
         <cite className="post__quote-cite">
-          <a href={repoFile("docs/engine-worker-feasibility.md")} {...external}>
-            docs/engine-worker-feasibility.md
+          <a href={repoFile("docs/15.1-Engine-Worker-Feasibility.md")} {...external}>
+            docs/15.1-Engine-Worker-Feasibility.md
           </a>
         </cite>
       </blockquote>
@@ -755,11 +755,11 @@ export default function EngineInAWorker() {
 
       <p className="post__sources">
         Sources:{" "}
-        <a href={repoFile("docs/engine-worker-feasibility.md")} {...external}>
+        <a href={repoFile("docs/15.1-Engine-Worker-Feasibility.md")} {...external}>
           Phase 0 feasibility
         </a>{" "}
         ·{" "}
-        <a href={repoFile("docs/engine-worker-a12-design.md")} {...external}>
+        <a href={repoFile("docs/15.3-Engine-Worker-A12-Design.md")} {...external}>
           a12 design and gates
         </a>{" "}
         ·{" "}

@@ -3974,7 +3974,7 @@ exists, and would otherwise be a third guard with no traffic.
 
 **Stage 4's prerequisites are now 1, 2 and 3 all done.** The transfer is gated
 on Stage 3.5 alone. Full record in
-[docs/engine-worker-a11-0-finding.md](engine-worker-a11-0-finding.md).
+[docs/engine-worker-a11-0-finding.md](15.2-Engine-Worker-A11-Finding.md).
 
 **Gates.** 461 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Stage 3.5 gate holds at 93. Engine untouched — no product code in this

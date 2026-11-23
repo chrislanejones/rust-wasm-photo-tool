@@ -2752,7 +2752,7 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   a12.1's wiring can be built behind the flag but **cannot be verified** —
   all three a12.3 gates need the flag ON, and the cross-implementation
   matrix dies on the first lasso drag.
-  **Latency is NOT the objection** — `docs/engine-worker-feasibility.md`
+  **Latency is NOT the objection** — `docs/15.1-Engine-Worker-Feasibility.md`
   measured a 0.100 ms median round trip (0.6% of a frame) and says so in its
   headline. The real work is that an async per-move handler can overlap
   itself (the v8.19 `finish()` shape), plus three sites needing restructure

@@ -46,6 +46,8 @@ Start at **[the Contents](docs/README.md)**, or jump in:
 12. **[Deploying](docs/12-Deploying.md)** — the two Vercel projects, the prerender step that makes the marketing site indexable, DNS, and how the editor came off Netlify.
 13. **[Vercel Builds](docs/13-Vercel-Builds.md)** — which pushes each Vercel project skips building, and why.
 14. **[The AppShell Refactor](docs/14-AppShell-Refactor.md)** — how the biggest files get smaller.
+15. **[The Engine Worker](docs/15.0-Engine-Worker.md)** — why the image engine runs in a web worker, and the three notes that got it there.
+16. **[Accessibility](docs/16-Accessibility.md)** — keyboard, focus, screen-reader names and announcements, reduced motion: what the editor does and how it's tested.
 
 At the back: the **[Change Summary](docs/Change-summary.md)** (every release, dated),
 the **[decisions](docs/adr/INDEX.md)** behind the design, the

@@ -1,6 +1,6 @@
 # 14. AppShell refactor plan — and the rest of the entropy ledger
 
-[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md)
+[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md) · [15. The Engine Worker →](15.0-Engine-Worker.md)
 
 Written 2026-09-26. Supersedes the deleted `Entropy-Refactor-Plan.md` for the
 part of it that was still open (AppShell, CanvasArea, `lib.rs`), and records
@@ -390,4 +390,4 @@ already.
 
 ---
 
-[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md)
+[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md) · [15. The Engine Worker →](15.0-Engine-Worker.md)

@@ -147,7 +147,7 @@ export const POSTS: readonly Post[] = [
     sources: [
       "marketing/src/posts/engine-in-a-worker.tsx",
       "docs/adr/024-engine-in-a-worker.md",
-      "docs/engine-worker-feasibility.md",
+      "docs/15.1-Engine-Worker-Feasibility.md",
     ],
   },
 ] as const;

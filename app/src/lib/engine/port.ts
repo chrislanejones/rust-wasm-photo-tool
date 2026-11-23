@@ -8,7 +8,7 @@
 // is reached the engine has already been built and image-loaded on the main
 // thread, and a worker cannot adopt that handle. Construction is the thing that
 // moves, so the five load paths call the factory and it decides where the
-// engine lives. `docs/engine-worker-a12-design.md`.
+// engine lives. `docs/15.3-Engine-Worker-A12-Design.md`.
 //
 // THE INVARIANT, corrected. ADR-024 states it as "every mutation reaches the
 // engine through a single message queue". That is one word wrong, and the wrong
@@ -51,7 +51,7 @@ import { NO_CANVAS } from "./canvasGeneration";
  * spike did not have.
  *
  * ⚠️ **"ONE BODY TO REPLACE AND NO CALL SITE CHANGES" IS WRONG, and a12 cannot
- * be built on it** (found 2026-08-12, `docs/engine-worker-a12-design.md`). This
+ * be built on it** (found 2026-08-12, `docs/15.3-Engine-Worker-A12-Design.md`). This
  * function receives an engine that has ALREADY been constructed and loaded with
  * an image on the main thread — all five call sites in `useEngineCore` do
  * `new Tool(w, h)` + `load_image(...)` and only then hand it over. A worker port
@@ -156,7 +156,7 @@ export function liveEnginePort(): EngineWorkerClient | null {
  * adopt that handle, and building one on each side is disqualified by this
  * file's own invariant — two engines are two op logs. So construction is what
  * has to move, and this factory is where the decision is made. See
- * `docs/engine-worker-a12-design.md`.
+ * `docs/15.3-Engine-Worker-A12-Design.md`.
  *
  * The boundary is deliberately narrow: **create the engine and load its base
  * image, nothing else.** Callers that then apply an artboard border, rebuild a
