@@ -24,6 +24,11 @@ links to the one before and after it, and back here.
 | 12 | [Deploying](12-Deploying.md) | how a release reaches production |
 | 13 | [Vercel Builds](13-Vercel-Builds.md) | which pushes each Vercel project skips building, and why |
 | 14 | [The AppShell Refactor](14-AppShell-Refactor.md) | how the big files get smaller, and what the 2026-09-26 audit found |
+| 15 | [The Engine Worker](15.0-Engine-Worker.md) | why the engine runs in a web worker, and what it took |
+| 15.1 | [Feasibility](15.1-Engine-Worker-Feasibility.md) | can the engine leave the main thread, and what a round trip costs |
+| 15.2 | [The a11.0 Finding](15.2-Engine-Worker-A11-Finding.md) | a real engine inside a worker that owns a transferred canvas |
+| 15.3 | [The a12 Design](15.3-Engine-Worker-A12-Design.md) | the transfer, and three things that blocked the first plan |
+| 16 | [Accessibility](16-Accessibility.md) | keyboard, focus, names, announcements, motion: what the editor does, and how it's tested |
 
 ## Back matter
 
@@ -38,15 +43,12 @@ on them.
 | [QC runs](qc/) | `imagehorse-qc` write-ups, one per run, with their screenshots |
 | [Day logs](day-logs/) | what a day or a night of work did, with its screenshots (older ones in [archive/day-logs](archive/day-logs/)) |
 | [Benchmarks](benchmarks/) | measured numbers behind engine decisions |
-| [The engine worker](engine-worker-feasibility.md) | three notes on moving the engine off the main thread: the [feasibility study](engine-worker-feasibility.md), the [a12 design](engine-worker-a12-design.md) and the [a11-0 finding](engine-worker-a11-0-finding.md) |
 | [Archive](archive/README.md) | superseded documents and finished handoffs, kept for their reasoning |
 
 ## Why some names stay put
 
 - `Change-summary.md` and `PARKING_LOT.md` are named by the release hook, the
   skills and the repo's CLAUDE.md.
-- The three `engine-worker-*` notes are linked by URL from a published blog
-  post.
 - `adr/`, `qc/` and `day-logs/` are where the decision, QC and day-log
   procedures write.
 
@@ -75,6 +77,9 @@ worse than a name you have to map. The map:
 | `Deploying.md` | [12-Deploying.md](12-Deploying.md) |
 | `Vercel-builds.md` | [13-Vercel-Builds.md](13-Vercel-Builds.md) |
 | `AppShell-Refactor-Plan.md` | [14-AppShell-Refactor.md](14-AppShell-Refactor.md) |
+| `engine-worker-feasibility.md` | [15.1-Engine-Worker-Feasibility.md](15.1-Engine-Worker-Feasibility.md) |
+| `engine-worker-a11-0-finding.md` | [15.2-Engine-Worker-A11-Finding.md](15.2-Engine-Worker-A11-Finding.md) |
+| `engine-worker-a12-design.md` | [15.3-Engine-Worker-A12-Design.md](15.3-Engine-Worker-A12-Design.md) |
 
 On 2026-09-17, eighteen finished working documents (audits, spikes, one-off
 findings, superseded plans) were moved out of the repository. Git history still

@@ -46,7 +46,7 @@ describe("only useEngineCore owns the live engine handle", () => {
     // This used to require `attachLivePort(...)` literally. That function could
     // never have been the swap point: it receives an engine already built and
     // image-loaded on the main thread, and a worker cannot adopt that handle
-    // (`docs/engine-worker-a12-design.md`). Construction moved into
+    // (`docs/15.3-Engine-Worker-A12-Design.md`). Construction moved into
     // `createLiveEngine()`, so the assignments now read `= tool` where `tool`
     // came from an awaited factory call.
     //

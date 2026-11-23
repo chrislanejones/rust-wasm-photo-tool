@@ -5,7 +5,7 @@
 // `createLiveEngine()` replaced `attachLivePort()` as the place the local/worker
 // decision is made, because `attachLivePort` receives an engine that has ALREADY
 // been built and image-loaded on the main thread and a worker cannot adopt that
-// handle (`docs/engine-worker-a12-design.md`).
+// handle (`docs/15.3-Engine-Worker-A12-Design.md`).
 //
 // Two properties are worth pinning, and the second is the one with consequences:
 //
