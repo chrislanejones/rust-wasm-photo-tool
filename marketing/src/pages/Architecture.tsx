@@ -533,6 +533,19 @@ export default function Architecture() {
               <DownloadIcon />
               Download the .mermaid source
             </a>
+            {/* The same flowchart drawn and laid out on a Letter landscape
+                page, for anyone without a mermaid renderer. Generated from
+                the file above by scripts/gen-mermaid-pdf.mjs, which refuses
+                to write a page where anything overlaps. */}
+            <a
+              className="arch-btn"
+              href="/system-architecture.pdf"
+              download="system-architecture.pdf"
+              type="application/pdf"
+            >
+              <DownloadIcon />
+              Download it as a PDF
+            </a>
             <a
               className="arch-btn"
               href={`${GITHUB_URL}/blob/master/docs/Architecture.md`}

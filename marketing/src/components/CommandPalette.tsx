@@ -49,6 +49,7 @@ const ITEMS: Item[] = [
   { group: "On this site", label: "In the editor", hint: "The whole tool list", href: "/#editor", kind: "route" },
   { group: "On this site", label: "The Convex schema", hint: "13 tables, every field and index", href: "/architecture#schema", kind: "route" },
   { group: "On this site", label: "Download the .mermaid source", hint: "The system flowchart", href: "/system-architecture.mermaid", kind: "asset" },
+  { group: "On this site", label: "Download the architecture PDF", hint: "The system flowchart, drawn", href: "/system-architecture.pdf", kind: "asset" },
 
   { group: "Open", label: "Open the beta", hint: "No account, no upload", href: EDITOR_URL, kind: "external" },
   { group: "Open", label: "Source on GitHub", hint: "chrislanejones/rust-wasm-photo-tool", href: GITHUB_URL, kind: "external" },
