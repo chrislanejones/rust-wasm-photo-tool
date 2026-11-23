@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.70",
+    date: "2026-11-23",
+    headline: "Find duplicates spots a turned or mirrored copy, and PNG Compress shows the real size.",
+    entries: [
+      { tag: "feature", text: "Find duplicates groups a photo turned a quarter turn, or flipped left to right, with its original." },
+      { tag: "fix", text: "Find duplicates groups stop chaining: a photo joins only if it looks like the group's first photo." },
+      { tag: "fix", text: "PNG Compress waits for the real size below Quality 100, instead of showing the full-color size first." },
+      { tag: "fix", text: "Undo right after moving a callout pin no longer loses the redo steps." },
+      { tag: "rust", text: "One pass over the pixels hashes a thumbnail in all 8 orientations: 200 photos in under 0.1 s." },
+      { tag: "ui", text: "The website catches up: Pair a phone, Batch Redact and Strip info on every page they belong on, and a redrawn architecture chart." },
+    ],
+  },
+  {
     version: "v9.69",
     date: "2026-11-22",
     headline: "Hide the same spot on every screenshot, and location leaves only when you say so.",

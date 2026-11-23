@@ -83,7 +83,7 @@ const GROUPS: Group[] = [
       ["perspective", "Four-corner warp for shapes, text and pixels · homography solved in Rust", "demo free pro"],
       ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, registered at runtime, rasterized in Rust", "demo free pro"],
       ["describe", "Local image description — names a photo from its content, no account", "demo free pro"],
-      ["diff · dhash · look · auto tone", "Compare two photos pixel by pixel · look-alike fingerprints for Find duplicates · Copy look read from the op log · Auto tone from the histogram", "demo free pro"],
+      ["diff · dhash · look · auto tone", "Compare two photos pixel by pixel · look-alike fingerprints in all 8 orientations for Find duplicates · Copy look read from the op log · Auto tone from the histogram", "demo free pro"],
       // OP_FORMAT_VERSION in src/ops.rs is 16 (11-13-2026, v9.63).
       ["codec · history", "PNG encode (Rust) · palette PNGs · undo snapshots · op log at format v16", "demo free pro"],
       ["exif", "Camera info read, kept or stripped · checked byte for byte against the JavaScript way · Beta", "demo free pro"],
@@ -211,7 +211,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.69, 11-22-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.70, 11-23-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -263,7 +263,7 @@ export default function Architecture() {
             <div className="arch-plane__head">
               <span className="arch-plane__name">Browser</span>
               <span className="arch-plane__note">
-                no server in the edit path · one 971 KB engine
+                no server in the edit path · one 974 KB engine
               </span>
             </div>
 

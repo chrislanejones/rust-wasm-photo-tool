@@ -12231,7 +12231,24 @@ Still open: the `callout-leader` §4 CI flake. It passed 20/20 at 4× CPU both o
 
 Verification: vitest 2,470/2,470 (6 new unit tests); eight shape and callout specs 41/41; tsc 0; lint 0 errors; guardrails pass; `e2e-coverage-check` 89/89 specs run. PR CI: 18 pass, 2 skipped.
 
-## v9.69 Change Summary — 2026-11-22
+## v9.70 Change Summary — 2026-11-23
+
+**Find duplicates spots a turned or mirrored copy, and PNG Compress shows the real size.**
+
+| Area | Change |
+| --- | --- |
+| Find duplicates (#498) | The engine hashes each thumbnail in all 8 orientations (4 turns, each mirrored) in one pass over the pixels (`fingerprint_turns`, `src/dhash.rs`), so a quarter-turned or mirrored copy groups with its original: 33 and 22 bits apart before, 0–1 now. A match through a turn has its own limit, 5 bits (straight stays 6), because 8 tries give a different photo 8 chances to land close by luck. Groups form around a center: in gallery order, the first ungrouped photo leads, and only photos that look like it join, so A~B and B~C no longer pull A and C together. 200 photos hash in 74–90 ms (was 21.5). Fingerprints still aren't saved, and a heavily edited photo still doesn't match its original. |
+| PNG Compress (#498) | Below Quality 100 a PNG is color-reduced, and what that saves depends on the picture, so no formula can estimate it. The Image weight readout shows a skeleton until the real size is measured, instead of the lossless "≈" (57 KB shown, 15 KB real, on a flat-art test PNG). If the measurement fails, the estimate comes back. Lossless PNG and the other formats keep their "≈". |
+| Fix (#497) | Callouts: moving a pin made the leader follow read the shapes and the texts in two engine round trips, and an undo between them redrew the leader onto the rewound log. That dropped the redo steps and broke the log, and after a reload undo landed on a layer with no shapes. Both reads now go out in one tick. This was the callout-leader §4 CI flake. |
+| Website (#506) | Brought up to v9.69: Pair a phone (Beta) on Architecture, Features, In the works, Pricing and the no-upload page; Batch Redact, Strip info and Camera info where they belong; cards for the 4 features that showed as raw text (83 of 83 carded); the schema at 13 tables; `system-architecture.mermaid` redrawn from v8.81. |
+| Privacy Policy (#506) | Now says what runs today: phone-inbox photos and trashed share links stay until you delete them, because the jobs that remove them after 7 days (30 for paid Trash) aren't switched on yet; Vercel Web Analytics collects nothing; the AI tools are the only part where a picture is *processed* on a server. Dated 11-23-2026. |
+| App copy (#506) | The Pair a phone Beta text no longer says sending photos "comes next". |
+| Trail Log | Squares catch up through 11-23. |
+
+No Dexie migration, no op-log format change. Engine 971,432 → 973,825 B (+2,393).
+
+Verification: run after the trail data regen. `cargo fmt --check` and `cargo clippy --all-targets -D warnings` pass; engine rebuilt at 973,825 B. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,515/2,515; app and marketing builds pass (29 URLs prerendered). e2e on a production build: png-compress-estimate, find-duplicates and callout-leader 10/10; the no-keys boot suite 4/4.
+
 
 **Hide the same spot on every screenshot, and location leaves only when you say so.**
 

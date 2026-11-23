@@ -469,9 +469,9 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Find duplicates": {
     group: "export",
     title: "Find duplicates",
-    plain: "Find the burst shots and re-saves in your gallery and tick the extra copies.",
+    plain: "Find the burst shots, re-saves and turned or mirrored copies in your gallery, and tick the extras.",
     detail:
-      "Select ▾ → Find duplicates…. The engine fingerprints each thumbnail. The biggest copy, or the only edited one, is marked Keep, and an edited photo is never ticked for you. Nothing is deleted until you confirm.",
+      "Select ▾ → Find duplicates…. The engine fingerprints each thumbnail in all 8 orientations. The biggest copy, or the only edited one, is marked Keep, and an edited photo is never ticked for you. Nothing is deleted until you confirm.",
   },
   "Export recipes": {
     group: "export",

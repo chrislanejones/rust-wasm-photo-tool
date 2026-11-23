@@ -1,4 +1,4 @@
-%%-- Image Horse — whole-app system architecture (AS SHIPPED, v9.69, 11-22-2026)
+%%-- Image Horse — whole-app system architecture (AS SHIPPED, v9.70, 11-23-2026)
 %%--
 %%-- The downloadable source behind the hand-drawn map on /architecture. Both
 %%-- are maintained BY HAND and have drifted apart before (this file sat at
@@ -62,7 +62,7 @@ flowchart TB
         end
 
         subgraph ew["Engine worker · THE DEFAULT since v8.32 (ADR-024)"]
-            ENGINE["WASM engine · stamp_tool · 971 KB<br/>kernels · TileBuffer · OpLog · PatchMatch<br/>describe · dhash · look · auto tone · exif<br/>built --features tiles,patchmatch"]
+            ENGINE["WASM engine · stamp_tool · 974 KB<br/>kernels · TileBuffer · OpLog · PatchMatch<br/>describe · dhash · look · auto tone · exif<br/>built --features tiles,patchmatch"]
             OSC[("Transferred OffscreenCanvas<br/>composite drawn from THIS thread")]
         end
 
