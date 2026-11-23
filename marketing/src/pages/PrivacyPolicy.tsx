@@ -49,8 +49,8 @@ export default function PrivacyPolicy() {
             <p className="legal-summary__label">Leaves your device</p>
             <p className="legal-summary__text">
               Anonymous usage analytics, your account details if you make an account, the cloud
-              features that only run when you are signed in, and the AI tools, which are off until
-              you switch them on.
+              features that run when you are signed in or pair a phone, and the AI tools, which are
+              off until you switch them on.
             </p>
           </div>
         </div>
@@ -66,8 +66,9 @@ export default function PrivacyPolicy() {
             </p>
             <p>
               Four things do leave your device, and each one is listed below: anonymous usage
-              analytics, your account details if you make an account, the cloud features that only
-              run when you are signed in, and the AI tools, which are off until you switch them on.
+              analytics, your account details if you make an account, the cloud features that
+              run when you are signed in or pair a phone, and the AI tools, which are off until you
+              switch them on.
             </p>
           </section>
 
@@ -97,8 +98,9 @@ export default function PrivacyPolicy() {
               separate properties.
             </p>
             <p>
-              The editor also runs Vercel Web Analytics, which counts page views without cookies
-              and without identifying you.
+              The editor also carries Vercel Web Analytics, which would count page views without
+              cookies and without identifying you. It is switched off for the editor, so today it
+              collects nothing.
             </p>
           </section>
 
@@ -126,13 +128,13 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="legal-board__section">
-            <h2>Cloud features, when you are signed in</h2>
+            <h2>Cloud features, when you are signed in or pair a phone</h2>
             <p>
               Signing in enables features that need a server: share links, syncing your settings
               across devices, your saved colors, and keeping edit history off-device. These run on
               Convex. What is stored there is the material those features need — the document you
               chose to share or sync, the colors you saved, and the account it belongs to. Signed
-              out, none of it runs.
+              out, none of it runs, apart from pairing a phone, described below.
             </p>
             <p>
               Keeping edit history off-device means a flattened copy of an edited photo, stored
@@ -147,14 +149,22 @@ export default function PrivacyPolicy() {
               opened, and the time of each opening — the time only. Nothing about who opened it is
               recorded: no address, no browser, no account. Settings &rsaquo; Shared shows every
               link you have made with those counts, lets you stop a link after a number of views or
-              on a date, pause and resume it, or delete it, which removes the image too.
+              on a date, pause and resume it, or delete it, which removes the image too. With the
+              Trash for share links Beta on, Delete moves a link to a Trash instead: it stops
+              working at once, and its image is kept so you can bring it back. Delete now in the
+              Trash, or Empty trash, removes the image. Each link in the Trash says how long it has
+              left, 7 days on the free tier and 30 on paid, but the job that removes it when that
+              runs out is not switched on yet, so until it is, a link stays in the Trash until you
+              delete it there.
             </p>
             <p>
               Photos you send from your phone to the editor (a Beta, off unless you turn it on) are
               kept under your account exactly as the phone sent them, with the file name, its size
-              and which kind of phone it came from. They wait at most 7 days and count toward your
-              storage while they do. Adding one to the gallery on your computer removes the server
-              copy; so does deleting it, or the 7 days running out. Nothing is sent while the
+              and which kind of phone it came from. They count toward your storage while they wait.
+              Adding one to the gallery on your computer removes the server copy, and so does
+              deleting it from the Inbox. The Inbox gives each photo 7 days, but the job that
+              removes a photo when its 7 days run out is not switched on yet, so until it is, a
+              photo stays until you add it or delete it. Nothing is sent while the
               &ldquo;Everything in your browser&rdquo; switch is on, and that switch is set on each
               device.
             </p>
@@ -195,8 +205,8 @@ export default function PrivacyPolicy() {
             <h2>The AI tools</h2>
             <p>
               <strong>
-                These are off by default and they are the only part of the editor that sends a
-                picture to a server.
+                These are off by default and they are the only part of the editor where a picture
+                is processed on a server.
               </strong>{" "}
               The switch for online features is in the New dialog and in Settings &rsaquo;
               Security; while it is off, the AI tools are not offered. When you turn it on and use
