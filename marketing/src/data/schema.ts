@@ -202,6 +202,26 @@ export const TABLES: Table[] = [
     note: "Beta. Photos sent from a phone, waiting for the editor's Inbox. Owner-only, and removed when the computer adds the photo",
   },
   {
+    name: "pair_sessions",
+    tiers: "demo free pro",
+    fields: [
+      { name: "_id", type: "Id<'pair_sessions'>", key: "pk" },
+      { name: "keyHash", type: "string", key: "unique", indexed: true, comment: "SHA-256 of the QR code's secret, never the secret" },
+      { name: "clientToken", type: "string", indexed: true, comment: "random per tab, for the per-client cap" },
+      { name: "offer", type: "string", comment: "the computer's connection offer, ≤ 16 KB" },
+      { name: "offerMac", type: "string", comment: "HMAC-SHA256 under the secret" },
+      { name: "answer", type: "string?", comment: "the phone's reply, once it joins" },
+      { name: "answerMac", type: "string?" },
+      { name: "computerCandidates", type: "string[]", comment: "network addresses, ≤ 40 a side" },
+      { name: "phoneCandidates", type: "string[]" },
+      { name: "joined", type: "boolean", comment: "the first phone to join closes the door" },
+      { name: "createdAt", type: "number" },
+      { name: "expiresAt", type: "number", indexed: true, comment: "5 minutes; 30 once joined" },
+    ],
+    indexes: ["by_keyHash", "by_clientToken_expiresAt"],
+    note: "Beta. Introduces a phone to a computer for Pair a phone. No user, no file names, no photo data, and no sign-in needed. Each row deletes itself when it expires",
+  },
+  {
     name: "storage_usage",
     tiers: "free pro",
     fields: [

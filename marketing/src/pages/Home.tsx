@@ -220,7 +220,7 @@ export default function Home() {
               other photos · Blur · Arrows, boxes, pins and callouts · Text bubbles in three
               typefaces · Emoji · Blur, pixelate and black-box redaction · Magic-wand select · Magic
               eraser · Layers · Undo to a thousand steps · Compare two screenshots · Find duplicates
-              · Batch crop, resize and logo stamping · Export to PNG, JPEG, WebP or AVIF
+              · Batch crop, resize, redaction and logo stamping · Export to PNG, JPEG, WebP or AVIF
             </p>
             <p className="lede editor__lede">
               All of it is free and works offline. Your edits are kept in this browser between

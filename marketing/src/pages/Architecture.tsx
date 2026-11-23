@@ -28,7 +28,7 @@ const FILTERS = [
  * `performance.getEntriesByType("resource")` for origins that are not ours. */
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
-  demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the editor everyone gets, and it is the whole editor.",
+  demo: "No account, and no photo ever goes to a server — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane stays shut, apart from one Beta: Pair a phone asks the server to introduce your phone to this browser, and the photos then go straight between the two. This is the editor everyone gets, and it is the whole editor.",
   free: "Signing in adds sync, history and share links, and as Betas, a trash for share links and sending photos from your phone. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
   pro: "Everything that ships today. Paid is the only entitlement where a photo of yours reaches an inference server. An admin is entitled to all of this by role, not by purchase.",
 };
@@ -42,6 +42,7 @@ const EDGE: Node[] = [
   ["AI proxy → Replicate", "the server holds the provider key", "pro"],
   ["Share delivery", "ShareViewer · view counts, timestamps only", "free pro"],
   ["Transfer inbox", "Beta · phone → your computer · owner-only", "free pro"],
+  ["Pair a phone", "Beta · the server introduces the two · photos go device to device over WebRTC", "demo free pro"],
 ];
 
 interface Group {
@@ -64,7 +65,7 @@ const GROUPS: Group[] = [
     items: [
       ["React App", "Vite + React 19 · Vercel static SPA", "demo free pro"],
       ["Canvas Engine", "Engine worker · zero-copy blit to an OffscreenCanvas", "demo free pro"],
-      ["Zustand State", "17 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
+      ["Zustand State", "19 stores · atomic selectors · prefs persisted to IndexedDB", "demo free pro"],
     ],
   },
   {
@@ -85,6 +86,7 @@ const GROUPS: Group[] = [
       ["diff · dhash · look · auto tone", "Compare two photos pixel by pixel · look-alike fingerprints for Find duplicates · Copy look read from the op log · Auto tone from the histogram", "demo free pro"],
       // OP_FORMAT_VERSION in src/ops.rs is 16 (11-13-2026, v9.63).
       ["codec · history", "PNG encode (Rust) · palette PNGs · undo snapshots · op log at format v16", "demo free pro"],
+      ["exif", "Camera info read, kept or stripped · checked byte for byte against the JavaScript way · Beta", "demo free pro"],
       ["ops · tiles · patchmatch", "Op log · tile buffer · Magic Eraser fill", "demo free pro"],
       ["simd", "v128/f32x4 kernels · scalar fallback", "demo free pro"],
     ],
@@ -104,7 +106,7 @@ const GROUPS: Group[] = [
   },
   {
     label: "Convex functions",
-    muted: "— signed-in only",
+    muted: "— signed-in only, apart from pairing",
     min: "12rem",
     surface: "net",
     mono: true,
@@ -118,6 +120,7 @@ const GROUPS: Group[] = [
       ["shares.ts", "public share links · pause, view cap, expiry", "free pro"],
       ["trash.ts", "Beta share-link trash · 7 days free, 30 paid · purge is a dry run until switched on", "free pro"],
       ["transfers.ts", "Beta phone → computer inbox · 50 photos, 50 MiB each", "free pro"],
+      ["pairSessions.ts", "Beta pairing · no sign-in, no user id · each row deletes itself after 5 or 30 minutes", "demo free pro"],
       ["storageUsage.ts", "an exact count of each account's stored bytes", "free pro"],
       ["mcp*.ts", "an MCP endpoint for AI apps · off by default, every route answers 404", "free pro"],
       ["textHistory.ts", "recent texts", "free pro"],
@@ -172,6 +175,7 @@ const TABLE_BADGE: Record<string, string> = {
   share_views: "new · timestamps only",
   ai_jobs: "Replicate",
   transfers: "Beta",
+  pair_sessions: "Beta · no user",
   mcp_calls: "off by default",
 };
 
@@ -207,7 +211,7 @@ export default function Architecture() {
       <main id="main" className="architecture">
         <header className="arch-head">
           <div className="arch-head__lead">
-            <p className="arch-head__eyebrow">Architecture · as of v9.66, 11-19-2026</p>
+            <p className="arch-head__eyebrow">Architecture · as of v9.69, 11-22-2026</p>
             <h1 className="arch-head__title">One half is the editor. The other half is optional.</h1>
           </div>
           <p className="arch-head__deck">
@@ -259,7 +263,7 @@ export default function Architecture() {
             <div className="arch-plane__head">
               <span className="arch-plane__name">Browser</span>
               <span className="arch-plane__note">
-                no server in the edit path · one 969 KB engine
+                no server in the edit path · one 971 KB engine
               </span>
             </div>
 
@@ -272,9 +276,10 @@ export default function Architecture() {
                   <li>Tool registry — 5 modules registered; routing still hand-wired in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask · resize &amp; compress · shapes</li>
                   <li>
-                    17 Zustand stores — UI · view · tool · gallery · annotation · guides ·
-                    perspective · text box · batch crop · batch group · batch resize · batch view ·
-                    history branches · look · screenshot compare · SVG source · ZIP recipes
+                    19 Zustand stores — UI · view · tool · gallery · annotation · guides ·
+                    perspective · text box · batch crop · batch group · batch redact · batch resize ·
+                    batch strip info · batch view · history branches · look · screenshot compare ·
+                    SVG source · ZIP recipes
                   </li>
                 </ul>
               </article>
@@ -344,7 +349,9 @@ export default function Architecture() {
             <span className="arch-seam__rule" />
           </div>
 
-          <div className={`arch-plane arch-plane--edge${dim("free pro")}`}>
+          {/* Not dimmed as a whole: Pair a phone is open to a logged-out
+              visitor, so each node dims itself instead. */}
+          <div className="arch-plane arch-plane--edge">
             <div className="arch-plane__head">
               <span className="arch-plane__name">Network</span>
               <span className="arch-plane__note">
@@ -405,8 +412,9 @@ export default function Architecture() {
             <h2 className="arch-big-title">What the server keeps, table by table.</h2>
             <p className="arch-schema__deck">
               Every table the app reads or writes, with its fields and indexes. Each row hangs
-              straight off <code>users</code>, keyed by the editor&rsquo;s own <code>photoKey</code>.
-              Never a pixel: edited images stay in the browser that made them.
+              straight off <code>users</code>, keyed by the editor&rsquo;s own <code>photoKey</code>,
+              except a pairing, which belongs to nobody and lasts 30 minutes at most. Never a pixel:
+              edited images stay in the browser that made them.
             </p>
           </header>
 
@@ -533,7 +541,7 @@ export default function Architecture() {
               Read the full architecture doc
             </a>
             <p className="arch-coda__foot">
-              flowchart TB · <span className="arch-coda__num">121</span> lines · the dashed
+              flowchart TB · <span className="arch-coda__num">152</span> lines · the dashed
               subgraph is the plane you can cut
             </p>
           </div>

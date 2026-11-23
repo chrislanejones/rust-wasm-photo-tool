@@ -320,6 +320,13 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Five numbers run through filters the engine already had (apply_stack in src/presets.rs). No hue control, so Warm and Cool are saturation looks.",
   },
+  "Copy look / Paste look": {
+    group: "enhance",
+    title: "Copy look / Paste look",
+    plain: "Get one photo looking right, then give the rest the same look.",
+    detail:
+      "Ctrl+Alt+C copies the open photo's Adjustments, Preset and Levels; Ctrl+Alt+V pastes them, with a checkbox per kind. Every photo gets the same values, not the same nudge. The open photo is one undo step; the rest have their stored files rewritten, and photos with edits of their own are skipped and named.",
+  },
   Histogram: {
     group: "enhance",
     title: "Histogram",
@@ -459,6 +466,13 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Select ▾ in the gallery bar. The ticks are Batch's Exceptions, so a rule picks who gets the Exceptions settings. Find duplicates marks one Keep per group and never pre-ticks an edited photo.",
   },
+  "Find duplicates": {
+    group: "export",
+    title: "Find duplicates",
+    plain: "Find the burst shots and re-saves in your gallery and tick the extra copies.",
+    detail:
+      "Select ▾ → Find duplicates…. The engine fingerprints each thumbnail. The biggest copy, or the only edited one, is marked Keep, and an edited photo is never ticked for you. Nothing is deleted until you confirm.",
+  },
   "Export recipes": {
     group: "export",
     title: "Export recipes",
@@ -595,6 +609,20 @@ const CARD_COPY: Record<string, CardCopy> = {
       "Beta: a Settings page that shows what an AI app such as Claude could reach in your account. Nothing connects yet.",
     detail:
       "A readiness checklist, an access summary and three example prompts. The account-access switch stays grayed out until sign-in checks and the server side are switched on (ADR-095).",
+  },
+  "Send photos from your phone (Beta: Settings › Beta)": {
+    group: "privacy",
+    title: "Send photos from your phone (Beta)",
+    plain: "Beta: pick photos on your phone and they wait in an Inbox in the editor's gallery.",
+    detail:
+      "Needs sign-in on both devices. Up to 50 photos of 50 MB each, kept for 7 days. A photo leaves the server only after the gallery on your computer has saved it.",
+  },
+  "Pair a phone (Beta: Settings › Beta)": {
+    group: "privacy",
+    title: "Pair a phone (Beta)",
+    plain: "Beta: scan a QR code and your phone and computer connect straight to each other. No sign-in.",
+    detail:
+      "Send to phone, and the phone's own send, move photos either way, up to 50 at a time. The server only introduces the two devices, and no photo goes through it (ADR-105).",
   },
   "Light / Dark / System theme": {
     group: "privacy",

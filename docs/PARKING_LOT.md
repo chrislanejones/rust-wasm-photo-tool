@@ -4,6 +4,13 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## FIXED 11-23-2026 (`marketing/facts-v969`) — marketing facts sweep leftovers
+
+| Where | Was stale | Now |
+|---|---|---|
+| `app/src/lib/featureFlags.ts`, `ih_pair` | Settings › Beta said "Sending photos between them comes next", though #485 (11-18) shipped sending | Names Send to phone and the phone's Send photos to computer |
+| `marketing/public/system-architecture.mermaid` | Dated v8.81: 7 stores, no Transfer, MCP or Pair, the old service-worker and WebGPU story | Redrawn at v9.69, checked with mermaid's own parser (plus a broken-edge control that fails) |
+
 ## FIXED 11-22-2026 (`test/callout-leader-s4-cause`) — callout-leader §4 flakes: a leader follow that read two states
 
 One bug, seen three times: `e2e/callout-leader.spec.ts` §4 (Align ▾ alone, Align ▾ in
