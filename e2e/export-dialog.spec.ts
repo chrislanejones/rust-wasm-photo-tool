@@ -9,7 +9,7 @@ import { join } from "node:path";
 //   4. Camera Info · 5. Recipe · 5.5 File Name
 //   6. Selected: Download <format> · Share link · Clipboard
 //      All:      Download ZIP (N as <format>) · Share All · Soon (off)
-// Rows that don't apply are greyed out, not removed. Alt+E opens it.
+// Rows that don't apply are grayed out, not removed. Alt+E opens it.
 
 const FIXTURES = [join(__dirname, "fixtures", "checker.png"), join(__dirname, "fixtures", "sky-building.png")];
 

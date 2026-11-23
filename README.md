@@ -97,23 +97,25 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.71 — 2026-11-23
+### v9.72 — 2026-11-23
 
-**Paste SVG code and get a canvas, and the architecture chart comes as a PDF.**
+**Export is one screen, Alt+E opens it, and the docs read like a book.**
 
-**Paste SVG:** a new tile in the New menu. Paste the code of an SVG (an icon
-copied off a web page works), pick the size and a background or transparent,
-and Create Canvas makes the image. The size keeps the drawing's shape, so it
-never stretches. It imports like a dropped .svg file, so it can still go back
-out as an SVG. If the clipboard holds SVG code, the Paste tile opens it for you.
+**Export** used to walk you through steps. Now it's one screen: Download
+Selected or Download All at the top, then Raster, Vector or With Layers, then
+the format. Camera Info, Recipe and File Name sit below, and anything that
+doesn't apply to what you picked is grayed out instead of disappearing. It
+opens on Raster every time.
 
-**The New menu** is now two rows of three: Browse Files, Paste, New Canvas, then
-Sample Images, Create AI Image and Paste SVG. Create AI Image is always there,
-grayed out until you turn on Online features.
+**Alt+E** opens Export, the way the top bar's hint always said it did. It used
+to download straight away.
 
-**The architecture chart** on /architecture now downloads as a PDF too. It's
-drawn at full size, and checked before it's written so no box, line or label
-lands on another.
+**Paste SVG:** on a slow machine, the step could pull your cursor out of the
+width box mid-typing. Fixed.
+
+**The docs** are numbered chapters now, starting with
+[1. Getting Started](docs/01-Getting-Started.md), each linking to the next,
+with a [Contents](docs/README.md) page.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

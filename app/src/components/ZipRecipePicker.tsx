@@ -40,7 +40,7 @@ export function ZipRecipePicker({
 }: {
   zipFormat: ExportFormat;
   /** Shown but off: a recipe shapes a ZIP, so with Download Selected it is
-   *  greyed out rather than hidden, and the Export dialog keeps one shape
+   *  grayed out rather than hidden, and the Export dialog keeps one shape
    *  (Chris, 11-23-2026). */
   disabled?: boolean;
 }) {

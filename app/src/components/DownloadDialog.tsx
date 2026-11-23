@@ -1,6 +1,6 @@
 // The Export dialog: one step, six rows (Chris, 11-23-2026). It used to be a
 // wizard (Choose → Selected Image / All Images, swapped in with a slide);
-// everything is on one screen now, and the rows that do not apply are greyed
+// everything is on one screen now, and the rows that do not apply are grayed
 // out rather than gone, so the dialog keeps its shape.
 //
 //   1. What        Download Selected | Download All (N)
@@ -11,8 +11,8 @@
 //                  (Raster: JPEG PNG WebP AVIF + plugin formats · Vector: SVG ·
 //                  With Layers: ORA, PSD + layered plugin formats)
 //   4. Camera Info Keep all · Remove location · Remove all (ADR-108)
-//   5. Recipe      menu + Save… (Download All only; greyed for Selected)
-//   5.5 File Name  (Download Selected; greyed for All — each image in the ZIP
+//   5. Recipe      menu + Save… (Download All only; grayed for Selected)
+//   5.5 File Name  (Download Selected; grayed for All — each image in the ZIP
 //                  keeps its own name)
 //   6. Actions     Selected: Download <format> · Share link · Clipboard
 //                  All:      Download ZIP (N as <format>) · Share all (paid,
@@ -381,10 +381,10 @@ function ExportBody({
           <CameraInfoPicker variant="section" recipeChoice={scope === "all" ? recipe?.cameraInfo : undefined} />
         )}
 
-        {/* 5. Recipe — shapes a ZIP, so greyed out for Download Selected. */}
+        {/* 5. Recipe — shapes a ZIP, so grayed out for Download Selected. */}
         {kind === "raster" && <ZipRecipePicker zipFormat={zipFormat} disabled={scope === "selected"} />}
 
-        {/* 5.5 File Name — Download Selected; greyed for All, where each
+        {/* 5.5 File Name — Download Selected; grayed for All, where each
             image in the ZIP keeps its own name. */}
         <ExportFileNameField
           value={fileName.value}

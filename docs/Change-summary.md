@@ -12287,3 +12287,19 @@ Verification: run after the trail data regen. `cargo fmt --check` and `cargo cli
 No Dexie migration, no op-log format change, no engine change (973,825 B).
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529 (14 new for `lib/pastedSvg.ts`); `e2e-coverage-check` 93/93 specs run; app and marketing builds pass (29 URLs prerendered); marketing script tests 8/8. e2e on a production build of #507: the full suite 333 passed, 11 skipped, including the 4 new `paste-svg` tests (3 runs in a row), `pane-header-row` and `svg-passthrough`. #508: the PDF generator's checks pass on the shipped flowchart and fail on all 6 deliberately broken copies; /architecture checked at 1440 and 390 wide, the PDF served as `application/pdf`. No Rust changed, so no cargo gates.
+
+## v9.72 Change Summary — 2026-11-23
+
+**Export is one screen, Alt+E opens it, and the docs read like a book.**
+
+| Area | Change |
+| --- | --- |
+| Export (#511) | One step instead of a wizard (Choose → Selected Image / All Images). Rows: **Download Selected \| Download All (N)** · **Raster \| Vector \| With Layers**, Raster on every open · that kind's format tiles · Camera Info · Recipe (menu 75%, Save… 25%; grayed for Selected) · File Name (grayed for All, where each image keeps its own name) · Download / Share link / Clipboard, or Download ZIP (N as format) / Share All · Soon (off). Vector is off unless an SVG is open; With Layers is off on Download All, and switching to All falls back to Raster. Rows 1–2 are the top bar's `ToggleButtonGroup` (select mode), row 3 the Shapes picker's `ToolButtonGroup`. New: `ControlRow variant="section"` and a `disabled` prop on the recipe picker and the file-name field. No kind words on a tile ("Keeps crop", ORA "Krita · GIMP"). The recipe form's "File name" is now "Name pattern". |
+| Alt+E (#511) | Opens Export, only with an image open, as the top bar's and the command palette's hints said. It used to download straight away. The right-click Export PNG keeps its quick download without the wrong Alt+E hint. |
+| Fix (#510) | Paste SVG: the step's 50 ms autofocus fired late on a busy machine and pulled the caret out of the width box, so "512" landed in the SVG code (seen on CI). It now focuses only if you aren't already in a field. Regression test makes the timer late on purpose; seen red without the fix. |
+| Docs (#509) | `docs/` is a book: chapters 01–14 (6.0–6.3 for UI), a Contents page, Previous / Contents / Next on every chapter, the README's Documentation section as the numbered list. Change Summary, Parking Lot, the engine-worker notes, ADRs, QC and day logs keep their names. Nine archive files nobody linked to were removed; 0 broken relative links across 165 .md files. |
+| Trail Log | Squares catch up through 11-23. |
+
+No Dexie migration, no op-log format change, no engine change (973,825 B).
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529; `e2e-coverage-check` 94/94 specs run; app and marketing builds pass (29 URLs prerendered); 0 broken relative links in the live docs. e2e on a production build: all 31 dialog-touching tests (the new `export-dialog` spec plus `export-file-name`, `camera-info`, `svg-passthrough`, `plugins`, `zip-export`, `bulk-night`, `beta-switches`, `batch-redact`, `pane-header-row`); `paste-svg` 5/5 with the late-autofocus regression test, seen red without the fix. No Rust changed, so no cargo gates.

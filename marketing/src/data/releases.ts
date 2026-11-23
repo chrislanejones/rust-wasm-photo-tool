@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.72",
+    date: "2026-11-23",
+    headline: "Export is one screen, Alt+E opens it, and the docs read like a book.",
+    entries: [
+      { tag: "ui", text: "Export is one screen: Download Selected or All, then Raster, Vector or With Layers, then the format. What doesn't apply is grayed out." },
+      { tag: "ui", text: "Alt+E opens Export, the way the top bar's hint always said." },
+      { tag: "fix", text: "Paste SVG no longer pulls your cursor out of the width box on a slow machine." },
+      { tag: "infra", text: "The docs are numbered chapters with a Contents page, each linking to the next." },
+    ],
+  },
+  {
     version: "v9.71",
     date: "2026-11-23",
     headline: "Paste SVG code and get a canvas, and the architecture chart comes as a PDF.",
