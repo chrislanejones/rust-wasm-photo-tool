@@ -1,6 +1,8 @@
-# Plugins
+# 8. Plugins
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md) · [OpenRaster (.ora)](OpenRaster-Export-Import.md) · [ADR-076](adr/076-a-plugin-is-a-file-a-person-adds-from-settings-kept-on-the-device-and-a-format-plugin-never-touches-the-engine.md).
+[← 7. OpenRaster (.ora)](07-OpenRaster.md) · [Contents](README.md) · [9. MCP →](09-MCP.md)
+
+> See also: [Architecture](02-Architecture.md) · [File Map](03-File-Map.md) · [OpenRaster (.ora)](07-OpenRaster.md) · [ADR-076](adr/076-a-plugin-is-a-file-a-person-adds-from-settings-kept-on-the-device-and-a-format-plugin-never-touches-the-engine.md).
 
 A plugin is a feature that comes from **outside** Image Horse and stays **off**
 until a person adds it and turns it on in **Settings → Plugins**. The first one
@@ -127,3 +129,7 @@ app/src/app/session/usePluginDownload.ts the Download dialog's plugin half
 app/src/components/PluginsPane.tsx       Settings → Plugins
 e2e/fixtures/layered-json.plugin.js      the test plugin
 ```
+
+---
+
+[← 7. OpenRaster (.ora)](07-OpenRaster.md) · [Contents](README.md) · [9. MCP →](09-MCP.md)

@@ -1,7 +1,7 @@
 /* The content of /design-system, kept apart from its presentation.
  *
  * Two halves, one per tab. The first is about the EDITOR (app/): the rules in
- * docs/UI_CONSISTENCY.md, the colors in app/src/styles.css (read through the
+ * docs/06.1-UI-Consistency.md, the colors in app/src/styles.css (read through the
  * generated editorTokens.ts), the components in app/src/components/ui/. The
  * second, every export that starts SITE_, is about THIS site: its tokens in
  * marketing/src/tokens.css (read through the generated siteTokens.ts) and the
@@ -52,7 +52,7 @@ export const TYPE_SCALE: readonly { cls: string; px: string; use: string }[] = [
   { cls: "text-lg", px: "17–20px", use: "Headings only (fluid)" },
 ];
 
-/** R1 in docs/UI_CONSISTENCY.md: eight steps, in Tailwind units. */
+/** R1 in docs/06.1-UI-Consistency.md: eight steps, in Tailwind units. */
 export const SPACING: readonly { unit: string; px: number }[] = [
   { unit: "0.5", px: 2 }, { unit: "1", px: 4 }, { unit: "1.5", px: 6 }, { unit: "2", px: 8 },
   { unit: "3", px: 12 }, { unit: "4", px: 16 }, { unit: "6", px: 24 }, { unit: "8", px: 32 },
@@ -119,10 +119,10 @@ export const A11Y_RULES: readonly { title: string; body: string }[] = [
 ];
 
 export const DOCS: readonly { label: string; path: string; what: string }[] = [
-  { label: "UI Consistency", path: "docs/UI_CONSISTENCY.md", what: "The ten rules, the scales, and when a control is a toggle or a radio group" },
-  { label: "UI Exceptions", path: "docs/UI_EXCEPTIONS.md", what: "Every place that breaks a rule on purpose, and why" },
-  { label: "UI Inventory", path: "docs/UI_INVENTORY.md", what: "What the UI is actually built from, counted" },
-  { label: "UI overview", path: "docs/UI.md", what: "Where to start, and the UI work that shipped" },
+  { label: "UI Consistency", path: "docs/06.1-UI-Consistency.md", what: "The ten rules, the scales, and when a control is a toggle or a radio group" },
+  { label: "UI Exceptions", path: "docs/06.3-UI-Exceptions.md", what: "Every place that breaks a rule on purpose, and why" },
+  { label: "UI Inventory", path: "docs/06.2-UI-Inventory.md", what: "What the UI is actually built from, counted" },
+  { label: "UI overview", path: "docs/06.0-UI.md", what: "Where to start, and the UI work that shipped" },
   { label: "Editor stylesheet", path: "app/src/styles.css", what: "The tokens: colors, fonts, radii, elevation, motion" },
   { label: "Shared class strings", path: "app/src/lib/styles.ts", what: "Tile states, the hover ring, confirm buttons" },
 ];

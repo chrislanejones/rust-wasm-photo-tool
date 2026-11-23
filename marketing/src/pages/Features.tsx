@@ -10,7 +10,7 @@ import { featureSlug, getFeatureIcon } from "../data/featureIcons";
 /* /features — everything the editor does, in plain words.
  *
  * Every card is one entry in features.ts, which is generated from
- * docs/Features.md, so the count on this page is the repo's own count and
+ * docs/04-Features.md, so the count on this page is the repo's own count and
  * cannot drift. featureCards.ts adds what the docs don't carry: the group a
  * feature belongs to by what you're trying to do, a plain line first, and the
  * engineering line trimmed to fit underneath.

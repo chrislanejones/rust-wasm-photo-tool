@@ -3,7 +3,7 @@
 > **ARCHIVED 2026-08-04 — stale.** Written before AppShell was split into the session hooks (`useImageSession`, `useSelectionActions`, `useCanvasActions`, `useMaskActions`, `useCopyRegionAction`) and before the clone-stamp split; it mentions none of them. §5's "`/zustand` blueprint (planned hook extraction)" describes a plan that was carried out differently. The store list in §2 is still broadly right; everything about *where the extraction is going* is not. Kept for the `SetArg` migration pattern, which is still what the stores use.
 
 
-> Part of the [Image Horse](../../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [File Map](../File-Map.md) · [Architecture](../Architecture.md).
+> Part of the [Image Horse](../../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [File Map](../03-File-Map.md) · [Architecture](../02-Architecture.md).
 >
 > **Status:** stores live under `app/src/stores/`; the `zustand-build` branch merged to `master` in v5.8 (9e614fc). AppShell's `useState`s that map to the three stores below have been fully swapped for selector bindings — verified 2026-06-30 via grep (all §2 "Replaces" entries are bound in `AppShell.tsx`; zero duplicate local `useState`s remain for them). What's still open is hook extraction and `useAnnotationStore` — see §8.
 

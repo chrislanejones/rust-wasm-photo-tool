@@ -3,7 +3,7 @@
 //
 //   src/data/commits.ts   ← `git log master`             (the Trail Log squares)
 //   src/data/squash-prs.json ← `gh pr view N` per squash merge (cache; see trail-days.mjs)
-//   src/data/features.ts  ← docs/Features.md             (the /features list)
+//   src/data/features.ts  ← docs/04-Features.md             (the /features list)
 //   src/data/source-dates.json ← git log, per page source (the sitemap lastmod)
 //
 // Run it as part of the release routine, from anywhere:
@@ -148,8 +148,8 @@ console.log(
 );
 
 // ── features.ts ─────────────────────────────────────────────────────────
-// docs/Features.md is "### Group" headings over "- **Name** — body" bullets.
-const md = readFileSync(resolve(root, "docs", "Features.md"), "utf8");
+// docs/04-Features.md is "### Group" headings over "- **Name** — body" bullets.
+const md = readFileSync(resolve(root, "docs", "04-Features.md"), "utf8");
 
 // Rendered as text, so markdown emphasis has to come out or it shows literally.
 const plain = (s) =>
@@ -181,14 +181,14 @@ for (const line of md.split("\n")) {
 
 const kept = groups.filter((g) => g.items.length);
 if (!kept.length) {
-  console.error("gen-trail-data: parsed 0 features from docs/Features.md — refusing to write an empty list.");
+  console.error("gen-trail-data: parsed 0 features from docs/04-Features.md — refusing to write an empty list.");
   process.exit(1);
 }
 const featureCount = kept.reduce((n, g) => n + g.items.length, 0);
 
 let f = `// GENERATED — do not edit. Run: node marketing/scripts/gen-trail-data.mjs
 //
-// The feature list, from docs/Features.md — the repo's own canonical list.
+// The feature list, from docs/04-Features.md — the repo's own canonical list.
 // ${featureCount} features across ${kept.length} groups.
 
 export interface Feature {

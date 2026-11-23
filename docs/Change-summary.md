@@ -488,7 +488,7 @@ speedup and a CI clippy fix. **Behavior-preserving** (the app works exactly as
 before); verified by `tsc -b` + `vite build` and in-browser including persist
 hydration on refresh. fallow's unused-files count dropped 10 → 5 (the 5 store files
 are now reachable). This is the groundwork for splitting the 3k-line `AppShell` into
-per-feature modules (see [Architecture Roadmap](archive/Architecture-Roadmap.md)).
+per-feature modules (see Architecture Roadmap).
 
 | #   | Change | Status |
 | --- | ------ | ------ |

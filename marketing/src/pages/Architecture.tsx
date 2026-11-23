@@ -548,7 +548,7 @@ export default function Architecture() {
             </a>
             <a
               className="arch-btn"
-              href={`${GITHUB_URL}/blob/master/docs/Architecture.md`}
+              href={`${GITHUB_URL}/blob/master/docs/02-Architecture.md`}
               {...external}
             >
               Read the full architecture doc

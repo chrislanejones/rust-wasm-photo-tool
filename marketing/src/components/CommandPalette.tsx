@@ -16,7 +16,7 @@ import { SearchIcon } from "./Icons";
 //
 // FEATURES ARE THE EXCEPTION, and for the same reason rather than against it:
 // they are DERIVED from `features.ts`, which is generated from
-// docs/Features.md — the repo's own canonical list, and the exact data
+// docs/04-Features.md — the repo's own canonical list, and the exact data
 // /features renders. Deriving from the source the page itself uses is the
 // opposite of scraping the page: a feature cannot appear here and not there,
 // and both use `featureSlug` so the deep link cannot rot either. Hand-typing

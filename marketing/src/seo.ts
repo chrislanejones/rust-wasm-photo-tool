@@ -16,7 +16,7 @@ import { POSTS, postPath, type Post } from "./data/posts";
 import { OPENRASTER_FAQ, ORA_TO_PNG_FAQ, ORA_TO_PSD_FAQ, WHAT_IS_ORA_FAQ } from "./data/openraster";
 import { FEATURES } from "./data/features";
 
-/** Counted, not typed: the feature list is generated from docs/Features.md, so a
+/** Counted, not typed: the feature list is generated from docs/04-Features.md, so a
  *  number written into a description goes stale the next time a feature lands. */
 const FEATURE_COUNT = FEATURES.reduce((n, g) => n + g.items.length, 0);
 

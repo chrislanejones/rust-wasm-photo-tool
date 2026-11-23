@@ -115,7 +115,7 @@ n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
       -g '!**/GalleryBar.tsx' -g '!**/Thumb.tsx' | wc -l)
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
-# ── UI rules R1, R3 and raw <button> (UI Night 7, docs/UI_CONSISTENCY.md §6) ──
+# ── UI rules R1, R3 and raw <button> (UI Night 7, docs/06.1-UI-Consistency.md §6) ──
 # Counted by scripts/ui-ratchet-counts.mjs from the TypeScript syntax tree, NOT
 # by rg: a grep here would go red on a comment explaining the rule, which this
 # repo has already done twice. Comments are not syntax nodes, so they cannot
@@ -148,29 +148,29 @@ ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
 # DOES change pixels (12px → 10px). The chrome family (Tools/Gallery cards, top
 # bar, master bar) and the modal surfaces stay: changing one of a family alone
 # splits it, and picking the family's radius is a call for Chris.
-check "ui-spacing" 41 "spacing off the scale — docs/UI_CONSISTENCY.md R1" "$(ui_count ui-spacing)"
+check "ui-spacing" 41 "spacing off the scale — docs/06.1-UI-Consistency.md R1" "$(ui_count ui-spacing)"
 check "ui-radius" 22 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
 check "ui-raw-button" 13 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # ── The exception registry explains every row (UI Night 8, 10-06-2026) ──
-# docs/UI_EXCEPTIONS.md is where an escape hatch says WHY. A row reading
+# docs/06.3-UI-Exceptions.md is where an escape hatch says WHY. A row reading
 # "unknown" is an exclusion nobody can defend; the last one (AppShell's three
 # z-index literals) closed on Night 8. Counted case-insensitively as a word,
 # so "unknown" anywhere in the file — table or prose — is a violation. Write
 # what you found, or what you have not checked yet and when you will.
-[ -f docs/UI_EXCEPTIONS.md ] || { echo "FATAL: docs/UI_EXCEPTIONS.md is missing — a missing file must not read as zero." >&2; exit 1; }
-n_unknown=$(rg -ciw 'unknown' docs/UI_EXCEPTIONS.md || true)
-check "exceptions-unknown" 0 "every row in docs/UI_EXCEPTIONS.md gives a reason (R10)" "${n_unknown:-0}"
+[ -f docs/06.3-UI-Exceptions.md ] || { echo "FATAL: docs/06.3-UI-Exceptions.md is missing — a missing file must not read as zero." >&2; exit 1; }
+n_unknown=$(rg -ciw 'unknown' docs/06.3-UI-Exceptions.md || true)
+check "exceptions-unknown" 0 "every row in docs/06.3-UI-Exceptions.md gives a reason (R10)" "${n_unknown:-0}"
 
 # ── Every raw <button> left is a REGISTERED one (UI Night 8) ──
 # ui-raw-button counts them; this checks each file that still has one is named
-# in docs/UI_EXCEPTIONS.md §5, so the ratchet's floor is a list of reasons and
+# in docs/06.3-UI-Exceptions.md §5, so the ratchet's floor is a list of reasons and
 # not a number. A file missing from the registry is one violation.
 n_unreg=0
 for f in $(node scripts/ui-ratchet-counts.mjs --list | awk -F'\t' '$1=="button" {split($2,a,":"); print a[1]}' | sort -u); do
-  rg -qF "\`${f#app/src/}\`" docs/UI_EXCEPTIONS.md || { echo "  unregistered raw <button>: $f"; n_unreg=$((n_unreg+1)); }
+  rg -qF "\`${f#app/src/}\`" docs/06.3-UI-Exceptions.md || { echo "  unregistered raw <button>: $f"; n_unreg=$((n_unreg+1)); }
 done
-check "unregistered-raw-button" 0 "a raw <button> outside components/ui/ needs a row in docs/UI_EXCEPTIONS.md §5" "$n_unreg"
+check "unregistered-raw-button" 0 "a raw <button> outside components/ui/ needs a row in docs/06.3-UI-Exceptions.md §5" "$n_unreg"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
 #

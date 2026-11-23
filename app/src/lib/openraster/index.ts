@@ -1,5 +1,5 @@
 // OpenRaster (.ora) export/import — the full public surface. See
-// docs/OpenRaster-Export-Import.md for the format and v1 scope.
+// docs/07-OpenRaster.md for the format and v1 scope.
 export { exportOra, type ExportOraResult } from "./export";
 // `importOra` is deliberately NOT re-exported: it is an internal step of
 // `importOraAsNewPhoto` (the only entry point the app uses), so exporting it

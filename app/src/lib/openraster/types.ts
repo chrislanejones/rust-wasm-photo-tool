@@ -1,5 +1,5 @@
 // Shared types for the OpenRaster (.ora) export/import module. See
-// docs/OpenRaster-Export-Import.md for the format + the v1 scope this
+// docs/07-OpenRaster.md for the format + the v1 scope this
 // implements (flatten annotations on export; name/opacity/visibility survive
 // import; layer masks + lossless annotation round-tripping are Phase 3).
 

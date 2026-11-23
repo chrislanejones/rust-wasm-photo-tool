@@ -1,6 +1,8 @@
-# OpenRaster (.ora) Export / Import
+# 7. OpenRaster (.ora) Export / Import
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md).
+[← 6.3 UI Exceptions](06.3-UI-Exceptions.md) · [Contents](README.md) · [8. Plugins →](08-Plugins.md)
+
+> See also: [Architecture](02-Architecture.md) · [File Map](03-File-Map.md).
 >
 > **Status: SHIPPED.** Corrected 2026-07-30 — this said "planning only — not
 > implemented ... the serializer does not exist yet", which stopped being true
@@ -113,3 +115,7 @@ app/src/lib/openraster/
 **Import:** rebuild via `begin/push_restored_layer/finish_layer_restore`, restoring name/opacity/visibility; ignore unknown extensions (with a notice).
 
 Ships a genuinely useful interop feature without over-engineering. This is a **supervised build** (user-facing, touches the layer system) — verify a 3-layer round-trip in-browser before enabling the `ExportPane` button.
+
+---
+
+[← 6.3 UI Exceptions](06.3-UI-Exceptions.md) · [Contents](README.md) · [8. Plugins →](08-Plugins.md)

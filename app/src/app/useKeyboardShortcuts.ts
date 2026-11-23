@@ -381,7 +381,7 @@ export function useKeyboardShortcuts({
         // Both handlers below sat outside any shift test, so Ctrl+Shift+] and
         // Ctrl+Shift+[ ALSO did brush size — silently, undocumented, and
         // occupying the two chords Photoshop uses for bring-to-front and
-        // send-to-back. `docs/Keyboard-Shortcuts.md` listed only the unshifted
+        // send-to-back. `docs/05-Keyboard-Shortcuts.md` listed only the unshifted
         // pair, so anyone checking for a collision would have concluded the
         // shifted pair was free. It was not; it was bound by omission.
         //

@@ -1,4 +1,4 @@
-// Hand-maintained — features.ts is regenerated from docs/Features.md, this
+// Hand-maintained — features.ts is regenerated from docs/04-Features.md, this
 // isn't. Add an entry here whenever a new feature lands; a card falls back
 // to a plain dot for anything unmapped rather than erroring.
 
@@ -109,7 +109,7 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Rulers & Grids": Ruler,
   "State management (Zustand)": Database,
 
-  // v8.6x tool-registry arc. These shipped in docs/Features.md — which
+  // v8.6x tool-registry arc. These shipped in docs/04-Features.md — which
   // regenerates features.ts — while this file, which is hand-maintained, was
   // not updated, so all eight rendered as the fallback.
   "Five-group toolbar": PanelLeft,
@@ -138,7 +138,7 @@ export function getFeatureIcon(name: string): ElementType {
 /** The anchor id a feature renders under on /features.
  *
  *  Lives HERE, not in features.ts — that file is regenerated from
- *  docs/Features.md and anything added to it is wiped on the next run. It sits
+ *  docs/04-Features.md and anything added to it is wiped on the next run. It sits
  *  beside the icon map because both are the hand-written half of the feature
  *  data.
  *

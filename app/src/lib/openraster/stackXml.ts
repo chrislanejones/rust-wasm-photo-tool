@@ -1,5 +1,5 @@
 // Build + parse OpenRaster's stack.xml — the layer manifest. See
-// docs/OpenRaster-Export-Import.md for the format and the "order gotcha":
+// docs/07-OpenRaster.md for the format and the "order gotcha":
 // the engine's own layer order is bottom-first, but the real OpenRaster
 // convention (and what Krita/GIMP/MyPaint expect) is <stack> children listed
 // TOP-FIRST. `OraStack.layers` is always top-first — export.ts/import.ts each

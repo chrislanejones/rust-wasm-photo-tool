@@ -1,6 +1,8 @@
-# File Map
+# 3. File Map
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [Change Summary](Change-summary.md).
+[← 2. Architecture](02-Architecture.md) · [Contents](README.md) · [4. Features →](04-Features.md)
+
+> See also: [Architecture](02-Architecture.md) · [Change Summary](Change-summary.md).
 
 The seasonal `features/fall-back/` module was removed in v9.51. The start
 screen and `TopBar` render their regular layout without a seasonal banner.
@@ -178,7 +180,7 @@ app/src/
 │   ├── ParkedScreen.tsx              "This tab is parked" card behind IdleScreen + MultiTabScreen
 │   ├── PluginsPane.tsx               Settings → Plugins: the master "Allow plugins" switch, Add from
 │   │                                 file / from a link, and a row per added plugin; commits as
-│   │                                 pressed (ADR-076, docs/Plugins.md)
+│   │                                 pressed (ADR-076, docs/08-Plugins.md)
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
 │   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
@@ -319,7 +321,7 @@ app/src/
     ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
     │                                 parallel image-horse-dexie DB) — staged migration target for the
     │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
-    ├── plugins/                      Plugins (ADR-076, docs/Plugins.md): a file a person adds from
+    ├── plugins/                      Plugins (ADR-076, docs/08-Plugins.md): a file a person adds from
     │                                 Settings, kept in its own IndexedDB and loaded as a blob: module.
     │                                 load.ts checks it field by field, store.ts keeps it, state.ts
     │                                 holds the list + the two switches, document.ts is the
@@ -357,3 +359,7 @@ app/src/
     │   └── SyncProvider.tsx          Mounts it. Renders nothing; lives at the composition root
     └── utils.ts                      cn() utility
 ```
+
+---
+
+[← 2. Architecture](02-Architecture.md) · [Contents](README.md) · [4. Features →](04-Features.md)

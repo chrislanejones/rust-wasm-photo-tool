@@ -9,9 +9,9 @@ across every family. Night 1 of 7 arrived with a proposed spacing scale,
 `4 6 8 12 16 20 24 32`, written from memory rather than from the tree. One of its
 steps is wrong for this codebase; a step it leaves out is used more than that one;
 and a third nobody proposed is in real use and has to be retired on purpose.
-Survey: [UI_INVENTORY.md](../UI_INVENTORY.md). Rules:
-[UI_CONSISTENCY.md](../UI_CONSISTENCY.md). Registry:
-[UI_EXCEPTIONS.md](../UI_EXCEPTIONS.md). **No component, class or baseline
+Survey: [UI_INVENTORY.md](../06.2-UI-Inventory.md). Rules:
+[UI_CONSISTENCY.md](../06.1-UI-Consistency.md). Registry:
+[UI_EXCEPTIONS.md](../06.3-UI-Exceptions.md). **No component, class or baseline
 changed tonight.**
 
 ## Decision

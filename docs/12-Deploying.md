@@ -1,4 +1,6 @@
-# Deploying
+# 12. Deploying
+
+[← 11. CI](11-CI.md) · [Contents](README.md) · [13. Vercel Builds →](13-Vercel-Builds.md)
 
 ## Which config belongs to which project
 
@@ -261,3 +263,7 @@ One-time, and none of it can be done from the repo:
   not `200`. A `200` means a catch-all rewrite came back.
 - **Re-scrape the share cards** — X, LinkedIn and Facebook each cache the old
   unfurl per URL. Their debuggers force a refresh.
+
+---
+
+[← 11. CI](11-CI.md) · [Contents](README.md) · [13. Vercel Builds →](13-Vercel-Builds.md)

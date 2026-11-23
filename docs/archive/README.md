@@ -6,23 +6,34 @@ Kept, not deleted. Everything here was accurate when it was written and is not a
 
 | Doc | Retired | Why, and what's still worth reading |
 | --- | --- | --- |
-| [Service-Workers-Caching.md](Service-Workers-Caching.md) | 2026-08-04 | **The most wrong file here.** Its status line says "investigation only — no service worker ships today" and "nothing here is wired yet". Both were true when written; **Phase 1 and Phase 2 have since shipped.** The SW ships dark behind `__IH_SW_MODE__` (ADR-019, v7.41) and the Phase 2 update prompt is live as `UpdatePrompt.tsx`. Phase 3 (installable PWA) really is unstarted. The never-cache deny-list reasoning is still sound. |
 | [State-Management.md](State-Management.md) | 2026-08-04 | Predates the AppShell split — names none of the five session hooks, and its §5 "`/zustand` blueprint (planned hook extraction)" describes a plan that was carried out differently. The store list and the `SetArg` migration pattern are still what the app does. |
 | [IndexedDB-Investigation.md](IndexedDB-Investigation.md) | 2026-08-04 | An investigation, not a reference. Everything it argues for shipped: the Dexie content layer, the Zustand persist adapter, content-addressed originals. **Any schema change goes through the `dexie-migration` procedure, not this file.** |
-| [Architecture-Roadmap.md](Architecture-Roadmap.md) | 2026-08-04 | Overtaken by the work actually done (AppShell decomposition, the Zustand stores, the engine-in-a-worker spike, the five-group toolbar). Treat its P-numbers as historical. Live planning was in `Engine-Roadmap.md` (moved out of the repo 2026-09-17, still in git history) and is now in the [ADRs](../adr/INDEX.md). |
-| [Refactor-Playbook.md](Refactor-Playbook.md) | 2026-08-04 | Not stale — **moved because it is a contributor playbook, not a visitor's question.** Still the canonical source for the single-source-of-truth conventions (color / type / z-index tokens) that the CI `guardrails` job enforces; the checks themselves are in [CI.md](../CI.md). |
+| [Refactor-Playbook.md](Refactor-Playbook.md) | 2026-08-04 | Not stale — **moved because it is a contributor playbook, not a visitor's question.** Still the canonical source for the single-source-of-truth conventions (color / type / z-index tokens) that the CI `guardrails` job enforces; the checks themselves are in [CI.md](../11-CI.md). |
 | [toolbar-migration-map.md](toolbar-migration-map.md) | 2026-08-04 | Working map for the five-group toolbar migration, shipped across v7.51–v7.53. |
-| [Tool-Arc-Plan.md](Tool-Arc-Plan.md) | 2026-08-04 | Planning doc for the tool-registry arc. |
 | [vector-tool-verdict-2026-08-01.md](vector-tool-verdict-2026-08-01.md) | 2026-08-04 | The merge-or-delete verdict on `feat/vector-tool`. Still the best worked example in this repo of deciding a decaying branch with measurements rather than vibes. The branch was deleted and preserved as the annotated tag `abandoned/vector-tool` on both remotes — see its Outcome section. |
 | [FINDINGS-oplog-and-text-0919.md](FINDINGS-oplog-and-text-0919.md) | 10-05-2026 | The 09-19 overnight diagnosis of "a text edit loses its settings after a reload", plus the v7/v8 op-log fixture capture. It stopped at a format decision and left red tests behind for an attended session. That session happened: ADR-060 records the decision and #195 shipped the repair, so the red tests are green and its "next session" list is done. Still the best account of why the archive allowlist alone could not fix the bug. Moved from the repo root. |
 | [UI_NIGHTS_09_15.md](UI_NIGHTS_09_15.md) | 11-18-2026 | The run report for UI Nights 9–15: gallery overlap, preview loading, Shared, Batch thumbnails and keyboard-reachable Settings. All of it shipped in v9.27. Its no-merge and pending-QC notes describe the review stack before that release. Still useful for why each fix took the shape it did. Moved from `docs/`. |
 | [UI_NIGHTS_16_19.md](UI_NIGHTS_16_19.md) | 11-18-2026 | The plan and run report for UI Nights 16–19, loading skeletons for the surfaces Nights 9–15 missed. Nights 16–18 shipped in v9.28, Night 19 in v9.29. The "Not in these nights" table still says why the mobile boot spinner stayed. Moved from `docs/`. |
-| [ui-state-v4/](ui-state-v4/07-audit.md) | 11-18-2026 | The document-state pass: six night records, the Night 7 audit with its screenshots in `evidence/`, and the v9.27 integration review. Merged as #348, shipped in v9.29. The rules it settled are in [UI_CONSISTENCY.md](../UI_CONSISTENCY.md). Moved from `docs/ui-state-v4/`. |
+| [ui-state-v4/](ui-state-v4/07-audit.md) | 11-18-2026 | The document-state pass: the Night 7 audit with its screenshots in `evidence/`, and the v9.27 integration review. Merged as #348, shipped in v9.29. The rules it settled are in [UI_CONSISTENCY.md](../06.1-UI-Consistency.md). Moved from `docs/ui-state-v4/`. |
 | [day-logs/2026-11-15.md](day-logs/2026-11-15.md) | 11-18-2026 | The 11-15-2026 day log: Find duplicates, Auto tone, rename tokens and Compare on the compact bar, one PR each, with screenshots in `day-logs/2026-11-15/`. All four shipped in v9.64, so its merge order and "When you're back" list are done. Its eight leftovers are now in [PARKING_LOT.md](../PARKING_LOT.md). Moved from `docs/day-logs/`. |
+
+## Removed 11-23-2026
+
+Nine files were deleted outright rather than kept here: nothing linked to them,
+and what they said is either wrong now or already said better somewhere else.
+
+| File | Why it went |
+| --- | --- |
+| `Service-Workers-Caching.md` | The most wrong file here: it said no service worker ships. One does, dark, behind `__IH_SW_MODE__` (ADR-019, ADR-049). |
+| `Architecture-Roadmap.md` | Overtaken by the work actually done; the planning it did lives in the ADRs. |
+| `Tool-Arc-Plan.md` | The plan for the tool-registry arc, which shipped. Its links pointed at a file moved out on 09-17. |
+| `ui-state-v4/01`–`06` | Six short night records. The [audit](ui-state-v4/07-audit.md) sums them up and links each night's PR (#328–#333), which holds the same detail. |
+
+Every one is still in git history: `git log --all --oneline -- docs/archive/<file>`.
 
 ## Two files that were merged rather than archived
 
-`GitHub-Actions.md` and `CI-Guardrails.md` became **[CI.md](../CI.md)** on 2026-08-04. Same subject, two files, and they had drifted into contradicting each other — one said the local git hooks were "not yet installed" while the other documented them as installed, and the last section still told you to bypass `lefthook`, which this project rejected. Recoverable from git history if you want the originals.
+`GitHub-Actions.md` and `CI-Guardrails.md` became **[CI.md](../11-CI.md)** on 2026-08-04. Same subject, two files, and they had drifted into contradicting each other — one said the local git hooks were "not yet installed" while the other documented them as installed, and the last section still told you to bypass `lefthook`, which this project rejected. Recoverable from git history if you want the originals.
 
 ## Also not here
 

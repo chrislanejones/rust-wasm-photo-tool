@@ -1,6 +1,6 @@
 # UI Nights 16–19: skeletons for the surfaces Nights 9–15 did not reach
 
-> **ARCHIVED 11-18-2026.** The plan and run report for UI Nights 16–19. Every surface marked **Done** below shipped: Nights 16–18 in v9.28 (10-12-2026), Night 19 (#354) in v9.29 (10-14-2026). Line numbers like `MobileShell.tsx ~302` are from that week and have moved since. Where the UI docs start is [UI.md](../UI.md).
+> **ARCHIVED 11-18-2026.** The plan and run report for UI Nights 16–19. Every surface marked **Done** below shipped: Nights 16–18 in v9.28 (10-12-2026), Night 19 (#354) in v9.29 (10-14-2026). Line numbers like `MobileShell.tsx ~302` are from that week and have moved since. Where the UI docs start is [UI.md](../06.0-UI.md).
 
 Nights 9–15 (shipped in v9.27) covered the gallery, Welcome Back, Shared,
 Shared links and Batch. A survey on 10-11-2026 found the remaining surfaces

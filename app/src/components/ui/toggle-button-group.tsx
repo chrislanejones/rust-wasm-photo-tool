@@ -62,7 +62,7 @@ interface ToggleButtonGroupProps {
    *
    *  Declared rather than inferred, unlike `tool-button-group`'s mode: every
    *  item here carries `active` either way, and "one is on right now" does
-   *  not prove "only one can be". docs/UI_CONSISTENCY.md §7.
+   *  not prove "only one can be". docs/06.1-UI-Consistency.md §7.
    *
    *  ⚠️ REQUIRED, and it used to default to `"toggle"`. Counted before
    *  changing it: of 16 call sites, **14 pass `"select"`** and 2 rely on the

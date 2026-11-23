@@ -1,5 +1,5 @@
 // Rebuild the engine's layer stack from a .ora archive. See
-// docs/OpenRaster-Export-Import.md for the format. v1 scope: name/opacity/
+// docs/07-OpenRaster.md for the format. v1 scope: name/opacity/
 // visibility/active-layer survive; text/shape annotations were flattened at
 // export time and are not restored as live objects (Phase 3).
 import type { ImageHorseTool } from "stamp_tool";
@@ -60,7 +60,7 @@ async function importOra(
   }
 
   // stack.xml is top-first; push_restored_layer expects bottom-first (the
-  // engine's own convention — see docs/OpenRaster-Export-Import.md).
+  // engine's own convention — see docs/07-OpenRaster.md).
   const bottomFirst = [...stack.layers].reverse();
   const activeIndexBottomFirst =
     stack.activeIndex === null

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The four-mode contract (docs/UI_CONSISTENCY.md §7) for the two group
+// The four-mode contract (docs/06.1-UI-Consistency.md §7) for the two group
 // primitives, asserted on RENDERED attributes, never on source text: Night 1
 // counted `aria-pressed` three times from a grep and two of the three numbers
 // were inflated by comments explaining the attribute. A test that reads text

@@ -1,6 +1,8 @@
-# Getting Started
+# 1. Getting Started
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md) · [Keyboard Shortcuts](Keyboard-Shortcuts.md) · [Change Summary](Change-summary.md).
+[Contents](README.md) · [2. Architecture →](02-Architecture.md)
+
+> See also: [Architecture](02-Architecture.md) · [File Map](03-File-Map.md) · [Keyboard Shortcuts](05-Keyboard-Shortcuts.md) · [Change Summary](Change-summary.md).
 
 This is a **single pnpm workspace** (`app` + `marketing`) with shared dependency
 versions declared in the `pnpm-workspace.yaml` catalog — so install once at the
@@ -37,3 +39,7 @@ Set up `app/.env.local` (never committed — see `.gitignore`):
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 VITE_CLERK_PUBLISHABLE_KEY=pk_...
 ```
+
+---
+
+[Contents](README.md) · [2. Architecture →](02-Architecture.md)

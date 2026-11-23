@@ -1,4 +1,6 @@
-# AppShell refactor plan — and the rest of the entropy ledger
+# 14. AppShell refactor plan — and the rest of the entropy ledger
+
+[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md)
 
 Written 2026-09-26. Supersedes the deleted `Entropy-Refactor-Plan.md` for the
 part of it that was still open (AppShell, CanvasArea, `lib.rs`), and records
@@ -281,9 +283,9 @@ document; the rest are the queue, cheapest first.
   `share-links-auth-mismatch`) or at `docs/X.md` for files now in
   `docs/archive/`. Fixed in 17 files; the moved-out ones now say so.
   **done**
-- `docs/Architecture.md` described `lib/security/imageFirewall.ts`, which
+- `docs/02-Architecture.md` described `lib/security/imageFirewall.ts`, which
   does not exist, and `lib/exif.ts`, which is now a directory.
-  `docs/File-Map.md` listed five deleted files and called the 1,428-line
+  `docs/03-File-Map.md` listed five deleted files and called the 1,428-line
   `BatchSettings` a "coming-soon panel". Corrected. **done**
 - Root `public/` held byte-identical copies of the marketing hero and logo;
   only the September hero is referenced (README). Two files deleted. **done**
@@ -326,7 +328,7 @@ document; the rest are the queue, cheapest first.
 - `scripts/engine-rmw-audit.mjs` reports 0 and is cited only by a closed
   PARKING_LOT item; archive it. `snapshot-parameter-audit.mjs` and
   `inert-class-audit.mjs` run nowhere — add to guardrails or list as manual
-  in `docs/CI.md`. `preview-nocache.py` and `push-all-remotes.sh` are
+  in `docs/11-CI.md`. `preview-nocache.py` and `push-all-remotes.sh` are
   referenced nowhere.
 
 ### Next, organisation (each a mechanical move, no behaviour)
@@ -358,7 +360,7 @@ document; the rest are the queue, cheapest first.
 - ~~`FINDINGS-oplog-and-text-0919.md` sits at the repo root → `docs/archive/`~~
   **Moved 10-05-2026.** The citations in `lib/textBoxSurvivesReload.test.ts`
   and the root `Cargo.toml` still name it without a path.
-- `docs/File-Map.md` covers 75 of 332 non-test files (none of `app/session/`,
+- `docs/03-File-Map.md` covers 75 of 332 non-test files (none of `app/session/`,
   `lib/engine`, `lib/sync`, four of six stores). Regenerate it from the tree
   or shrink it to directory level; a hand-kept file map of 332 files will
   always be wrong.
@@ -385,3 +387,7 @@ The pinned caps in `eslint.config.mjs` only ever go down, and the date next to
 each one is recent. If a cap goes a month without moving, this plan has
 stalled — that is ADR-042's warning sign, and it is the one that fired once
 already.
+
+---
+
+[← 13. Vercel Builds](13-Vercel-Builds.md) · [Contents](README.md)

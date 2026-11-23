@@ -1,4 +1,6 @@
-# Vercel builds — what skips, and why
+# 13. Vercel builds — what skips, and why
+
+[← 12. Deploying](12-Deploying.md) · [Contents](README.md) · [14. The AppShell Refactor →](14-AppShell-Refactor.md)
 
 Two Vercel projects are git-linked to this repo. Both used to build on every
 push to every branch. They now skip a push that cannot change what they serve.
@@ -80,3 +82,7 @@ Step command returned exit code 0"). The build minutes and the queue slot are
 saved; whether a CANCELED deployment counts toward the 100-a-day cap, Vercel's
 docs do not say — assume it may. Only `git.deploymentEnabled` stops a
 deployment from existing at all, and it works by branch, not by path.
+
+---
+
+[← 12. Deploying](12-Deploying.md) · [Contents](README.md) · [14. The AppShell Refactor →](14-AppShell-Refactor.md)
