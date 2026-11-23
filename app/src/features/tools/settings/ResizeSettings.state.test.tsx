@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ResizeSettings } from "./ResizeSettings";
 vi.mock('@/lib/encodeSupport', () => ({ canEncode: async () => false }));
-vi.mock('@/lib/webPerf', () => ({ getImageWeight: async () => null, googleImageLimitBytes: () => 20_000 }));
+const weightMock = vi.hoisted(() => ({ value: null as null | { projectedBytes: number; limitBytes: number; pass: boolean; gainPercent: number } }));
+vi.mock('@/lib/webPerf', () => ({ getImageWeight: async () => weightMock.value, googleImageLimitBytes: () => 20_000 }));
 const props = () => ({ disabled: false, imageWidth: 256, imageHeight: 256, currentByteSize: 4000, originalByteSize: 4000, activePhotoId: 'A', quality: 60, appliedQuality: 75, onQualityChange: vi.fn(), onQualityCommit: vi.fn(), onResize: vi.fn(), onResizeOnly: vi.fn(), exportFormat: 'webp' as const, onExportFormatChange: vi.fn(), compressProgress: { completed: 0, total: 0 } });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  weightMock.value = null;
+});
 it('Reset restores the committed quality and follows undo, even on the same photo', async () => {
   const p = props();
   const h = render(<ResizeSettings {...p} />, { wrapper: TooltipProvider });
@@ -55,4 +59,51 @@ it('Auto on PNG moves only the size: quality changes nothing there', async () =>
   });
   expect([width(), height()]).toEqual(['2500', '2500']);
   expect(p.onQualityChange).not.toHaveBeenCalled();
+});
+
+// PNG Compress (10-27 leftover, fixed 11-23-2026). Below Quality 100 a PNG is
+// color-reduced, and how much that saves depends on the picture (a logo
+// shrinks a lot, a photo hardly), so the formula's "≈" can only be the
+// LOSSLESS size, and it showed for the ~350 ms before the measurement landed.
+// Now the readout is a skeleton until the measured number is in.
+describe('PNG below Quality 100: no lossless estimate before the measurement', () => {
+  const lossless = { projectedBytes: 90_000, limitBytes: 20_000, pass: false, gainPercent: -50 };
+  const readout = () => screen.getByTestId('image-weight');
+  it('shows a skeleton, never "≈ 88 KB", until the measured size lands', async () => {
+    vi.useFakeTimers();
+    weightMock.value = lossless;
+    let land!: (m: { bytes: number; kept: boolean }) => void;
+    const measureApply = vi.fn(() => new Promise<{ bytes: number; kept: boolean }>((r) => (land = r)));
+    render(<ResizeSettings {...props()} exportFormat="png" quality={60} measureApply={measureApply} />, { wrapper: TooltipProvider });
+    await act(async () => {});
+    expect(readout().textContent).not.toMatch(/≈/);
+    expect(readout().textContent).not.toMatch(/88 KB/);
+    expect(readout().querySelector('[aria-busy="true"]')).not.toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(measureApply).toHaveBeenCalled();
+    expect(readout().textContent).not.toMatch(/≈/);
+    await act(async () => { land({ bytes: 12_000, kept: false }); });
+    expect(readout().textContent).toMatch(/^Image weight12 KB \/ 20 KB · Pass/);
+    expect(readout().querySelector('[aria-busy="true"]')).toBeNull();
+  });
+  it('falls back to the "≈" estimate when the measurement fails, so it never waits forever', async () => {
+    vi.useFakeTimers();
+    weightMock.value = lossless;
+    const measureApply = vi.fn(async () => { throw new Error('encode failed'); });
+    render(<ResizeSettings {...props()} exportFormat="png" quality={60} measureApply={measureApply} />, { wrapper: TooltipProvider });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(readout().textContent).toMatch(/≈ /);
+  });
+  it('keeps the "≈" estimate for a lossless PNG (Quality 100): there it is the right number', async () => {
+    weightMock.value = lossless;
+    render(<ResizeSettings {...props()} exportFormat="png" quality={100} appliedQuality={100} measureApply={vi.fn(() => new Promise<never>(() => {}))} />, { wrapper: TooltipProvider });
+    await act(async () => {});
+    expect(readout().textContent).toMatch(/≈ /);
+  });
+  it('keeps the "≈" estimate for WebP: its formula follows quality', async () => {
+    weightMock.value = { ...lossless, projectedBytes: 9_000, pass: true };
+    render(<ResizeSettings {...props()} exportFormat="webp" quality={60} measureApply={vi.fn(() => new Promise<never>(() => {}))} />, { wrapper: TooltipProvider });
+    await act(async () => {});
+    expect(readout().textContent).toMatch(/≈ /);
+  });
 });

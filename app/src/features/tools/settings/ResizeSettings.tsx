@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Scaling, FileArchive, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/ui/size-slider";
@@ -289,6 +290,9 @@ export function ResizeSettings({
   // slider's quality showed one size and wrote another (10-27).
   const keepSourceEncoding = !compressionChanged && formatFromMime(currentMime ?? "") === effectiveFormat;
   const [measured, setMeasured] = useState<{ key: string; bytes: number } | null>(null);
+  /** The key of a measurement that failed or came back empty: the readout
+   *  falls back to the estimate for it rather than waiting forever. */
+  const [measureFailed, setMeasureFailed] = useState<string | null>(null);
   const measureKey = `${activePhotoId}:${currentByteSize}:${newW}x${newH}:${method}:${effectiveFormat}:${quality}:${keepSourceEncoding}`;
   useEffect(() => {
     if (disabled || !measureApply || currentByteSize <= 0) return;
@@ -305,8 +309,11 @@ export function ResizeSettings({
       })
         .then((m) => {
           if (alive && m) setMeasured({ key: measureKey, bytes: m.bytes });
+          else if (alive) setMeasureFailed(measureKey);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (alive) setMeasureFailed(measureKey);
+        });
     }, 350);
     return () => {
       alive = false;
@@ -319,9 +326,20 @@ export function ResizeSettings({
   const bytes = isMeasured && measured ? measured.bytes : (weight?.projectedBytes ?? 0);
   const limitBytes = weight?.limitBytes ?? 0;
   const known = currentByteSize > 0 && weight !== null;
-  const pass = known && bytes <= limitBytes;
-  const usedPct = known && limitBytes > 0 ? (bytes / limitBytes) * 100 : 0;
-  const gain = known && originalByteSize > 0 ? Math.round((1 - bytes / originalByteSize) * 100) : 0;
+  // A PNG re-encoded below Quality 100 is COLOR-REDUCED, and what that saves
+  // depends on the picture: a flat logo shrinks a lot, a photo hardly. The
+  // formula cannot see the picture, so its "≈" is the LOSSLESS size, and it
+  // showed for the ~350 ms until the measurement landed (10-27 leftover).
+  // There the readout is a skeleton until the measured number is in (the
+  // async grammar's Loading), and falls back to the "≈" estimate only if the
+  // measurement fails, so it never waits forever (11-23-2026).
+  const pngReduces = effectiveFormat === "png" && !keepSourceEncoding && quality < 100;
+  const awaitingMeasure =
+    known && pngReduces && !isMeasured && !!measureApply && !disabled && measureFailed !== measureKey;
+  const shown = known && !awaitingMeasure;
+  const pass = shown && bytes <= limitBytes;
+  const usedPct = shown && limitBytes > 0 ? (bytes / limitBytes) * 100 : 0;
+  const gain = shown && originalByteSize > 0 ? Math.round((1 - bytes / originalByteSize) * 100) : 0;
   const approx = isMeasured ? "" : "≈ ";
 
   const [autoBusy, setAutoBusy] = useState(false);
@@ -449,20 +467,28 @@ export function ResizeSettings({
         <div className={`space-y-4 ${SECTION_SEP}`} data-testid="pagespeed-box">
           <SectionHeader
             title="Google PageSpeed"
-            info={`What this photo would weigh as each format at the size and quality above — measured by encoding it ("≈" while it measures). Google's image check allows ${known ? kb(limitBytes) : "one byte per six pixels plus 4 KB"} for ${newW}×${newH}; over that, PageSpeed lists it under "Improve image delivery". Format is a preview only: WebP and AVIF are smallest for photos, JPEG works everywhere, PNG is lossless and largest. The Export dialog opens on the one you pick here.`}
+            info={`What this photo would weigh as each format at the size and quality above — measured by encoding it ("≈" while it measures; a PNG below Quality 100 waits for the measurement, because how much fewer colors save depends on the picture). Google's image check allows ${known ? kb(limitBytes) : "one byte per six pixels plus 4 KB"} for ${newW}×${newH}; over that, PageSpeed lists it under "Improve image delivery". Format is a preview only: WebP and AVIF are smallest for photos, JPEG works everywhere, PNG is lossless and largest. The Export dialog opens on the one you pick here.`}
           />
           <div className="space-y-2 text-2xs" data-testid="image-weight">
             <div className="flex items-center justify-between">
               <span className="text-theme-muted-foreground">Image weight</span>
-              <span className={`tabular-nums ${known ? (pass ? "text-success" : "text-destructive") : ""}`} aria-live="polite">
-                {known ? `${approx}${kb(bytes)} / ${kb(limitBytes)} · ${pass ? "Pass" : "Over"}` : "—"}
-              </span>
+              {awaitingMeasure ? (
+                <Skeleton variant="line" className="w-28" aria-label="Measuring image weight" />
+              ) : (
+                <span className={`tabular-nums ${shown ? (pass ? "text-success" : "text-destructive") : ""}`} aria-live="polite">
+                  {shown ? `${approx}${kb(bytes)} / ${kb(limitBytes)} · ${pass ? "Pass" : "Over"}` : "—"}
+                </span>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-theme-muted-foreground">Than upload</span>
-              <span className="tabular-nums text-theme-foreground">
-                {known ? `${approx}${gain >= 0 ? `${gain}% smaller` : `${-gain}% bigger`}` : "—"}
-              </span>
+              {awaitingMeasure ? (
+                <Skeleton variant="line" decorative className="w-20" />
+              ) : (
+                <span className="tabular-nums text-theme-foreground">
+                  {shown ? `${approx}${gain >= 0 ? `${gain}% smaller` : `${-gain}% bigger`}` : "—"}
+                </span>
+              )}
             </div>
           </div>
           <ControlRow

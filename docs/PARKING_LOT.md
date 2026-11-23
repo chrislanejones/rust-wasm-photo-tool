@@ -106,9 +106,9 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 | From | Item |
 |---|---|
 | Find duplicates (#473) | Duplicate fingerprints aren't saved; saving them needs a Dexie migration |
-| Find duplicates (#473) | Groups chain (A~B, B~C puts A, B, C together); rotated or mirrored copies aren't found |
+| Find duplicates (#473) | ~~Groups chain (A~B, B~C puts A, B, C together); rotated or mirrored copies aren't found~~ **FIXED 11-23-2026** (`feat/dupes-png-estimate`): groups form around their first photo, and the hash is matched in all 8 turns and flips (5 bits through a turn, 6 straight). See the day log 11-23 |
 | Find duplicates (#473) | The hash reads the current thumbnail, so a heavily edited photo no longer matches its original |
-| Auto tone (#476) | Auto tone on a multi-layer document reads only the active layer |
+| Auto tone (#476) | ~~Auto tone on a multi-layer document reads only the active layer~~ **CLOSED 11-23-2026, as designed**: Auto only sets the Adjustments sliders, and Adjustments edit the active layer alone (`tonal_preview_begin` copies `self.active`; `adjust_commit` writes that layer back). Reading the layer it will change is right; reading the whole document would tune one layer to the others' pixels |
 | Rename tokens (#474) | The `{date}` file date isn't kept after a reload (needs a stored field) |
 | Rename tokens (#474) | ~~AI Rename info text still says "colour" / "recognise"~~ **FIXED 11-19-2026** (`fix/v964-leftover-words`): "color" / "recognize" |
 | Compact Compare (#475) | ~~The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have~~ **FIXED 11-19-2026**: on compact it names the Gallery tab's Stop comparing button |
@@ -148,8 +148,8 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 | What | Why it's left |
 | --- | --- |
 | After an op-log resume, the next archive the photo writes has no undo history, so an archive resume (log retired) comes back with undo 0. Pixels and texts are right | The same on v9.55 (e2e/archive/qc-1113.spec.ts Q2d/Q2e), so it isn't new. Fixing it means the archive carrying history only the op log holds, which goes through `dexie-migration` |
-| Masonry draws the open photo inset in its tile; the others fill theirs | Visual only; the tile's shape is right |
-| An in-page `#marketing` link on `/design-system` switches the tab but keeps the scroll | No element has `id="marketing"`. A fresh load is fine. Nothing links there in-page today |
+| ~~Masonry draws the open photo inset in its tile; the others fill theirs~~ | **FIXED 11-17-2026 (#486, `8c89a7c6`)**: the open tile fills like the others (inset 48 px → 0, `e2e/batch-masonry-open-tile.spec.ts`) |
+| ~~An in-page `#marketing` link on `/design-system` switches the tab but keeps the scroll~~ | **FIXED 11-17-2026 (#486, `8c89a7c6`)**: each tab's section bar carries the id and scrolls in (`marketing/e2e/design-system.spec.ts`) |
 
 ## DONE 11-13-2026 — owed after v9.59 (11-08-2026)
 
@@ -278,9 +278,18 @@ Out of the night's scope: the plan asked for the Arrows name only.
   dither (dither noise costs bytes; the target case is logos). A PNG *photo*
   compressed below Quality 100 can band in skies and gradients. Look at one
   before deciding whether to add dithering.
-- **The "≈" estimate ignores color reduction.** `getImageWeight` forces PNG to
+- ~~**The "≈" estimate ignores color reduction.** `getImageWeight` forces PNG to
   relative quality 100, so a PNG Compress shows the lossless estimate for the
-  ~350 ms before the real measurement lands.
+  ~350 ms before the real measurement lands.~~ **FIXED 11-23-2026**
+  (`feat/dupes-png-estimate`): a PNG re-encoded below Quality 100 shows a
+  skeleton until the measured size lands (falls back to "≈" only if the
+  measurement fails). On a flat-art PNG the old "≈" said 57 KB; measured 15 KB.
+  `e2e/png-compress-estimate.spec.ts`.
+- **OPEN (11-23-2026): picking a format shows the previous format's "≈" for a
+  moment.** The weight estimate is state set by an effect, so on the click the
+  readout shows the old format's number under the new one until the engine
+  answers (seen: WebP's "≈ 13 KB" under PNG). Same family as the fix above;
+  keying the estimate by its inputs would close it.
 - **Apply Resize on a flat-art PNG still grows it** (honestly): Lanczos adds
   edge colors and Apply Resize is lossless. Dragging Quality is what shrinks
   it. A hint line in the panel was offered and declined on 10-27.

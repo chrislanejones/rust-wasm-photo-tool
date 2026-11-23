@@ -7,12 +7,20 @@
 // selection (ADR-079), so the photos leave only through the gallery's own
 // Delete Selected and its confirmation.
 
-/** One photo's fingerprint as the engine returns it: the 64-bit hash split
- *  into two 32-bit halves, and the average color as 0xRRGGBB. */
-export interface Fingerprint {
+/** One 64-bit hash, split into two 32-bit halves. */
+export interface Hash64 {
   hi: number;
   lo: number;
+}
+
+/** One photo's fingerprint as the engine returns it: the 64-bit hash of the
+ *  photo as stored, the average color as 0xRRGGBB, and (11-23-2026) the hash
+ *  of the photo in its other 7 orientations: 3 turns, and all 4 mirrored. */
+export interface Fingerprint extends Hash64 {
   rgb: number;
+  /** Orientations 1–7 (src/dhash.rs `ORIENTATIONS`). Absent or empty means
+   *  only the straight hash is known. */
+  turns?: readonly Hash64[];
 }
 
 /**
@@ -31,6 +39,17 @@ export interface Fingerprint {
 export const LOOKS_SAME_BITS = 6;
 
 /**
+ * A match through a turn or a flip has to be closer: at most this many bits
+ * (11-23-2026). Trying 8 orientations gives a different photo 8 chances to
+ * land near by luck, and on the fixtures it does: the two pier shots are 11
+ * bits apart straight and 8 in their closest orientation. Measured 11-23-2026:
+ *   a turned or flipped copy (lake-rot90, lake-mirror)    0–1 bits
+ *   different photos, closest orientation                 8–14 bits
+ * 5 sits in that gap the way 6 sits in the straight one, with room both sides.
+ */
+export const LOOKS_SAME_TURNED_BITS = 5;
+
+/**
  * And the average colors are within this much on every channel (0–255). The
  * hash cannot tell a black frame from a white one (no edges: every bit is 0)
  * and ignores color altogether; this is what catches those. Same-photo pairs
@@ -47,8 +66,29 @@ function popcount32(n: number): number {
 }
 
 /** How many of the 64 bits differ. */
-export function hashDistance(a: Fingerprint, b: Fingerprint): number {
+export function hashDistance(a: Hash64, b: Hash64): number {
   return popcount32((a.hi ^ b.hi) >>> 0) + popcount32((a.lo ^ b.lo) >>> 0);
+}
+
+/**
+ * The distance between two photos in the orientation where they are closest
+ * (11-23-2026). A copy turned a quarter or flipped left to right has a
+ * different straight hash, but its straight hash is close to one of the
+ * original's turns, so this is the smallest of: straight to straight, each of
+ * A's turns to B's straight, and each of B's turns to A's straight. Both
+ * directions, so the answer does not depend on which photo came first.
+ */
+export function lookAlikeDistance(a: Fingerprint, b: Fingerprint): number {
+  return Math.min(hashDistance(a, b), turnedDistance(a, b));
+}
+
+/** The closest of the turned and flipped pairings alone (Infinity when
+ *  neither photo carries turns). */
+export function turnedDistance(a: Fingerprint, b: Fingerprint): number {
+  let d = Infinity;
+  for (const t of a.turns ?? []) d = Math.min(d, hashDistance(t, b));
+  for (const t of b.turns ?? []) d = Math.min(d, hashDistance(a, t));
+  return d;
 }
 
 /** The largest per-channel difference of the two average colors. */
@@ -59,42 +99,41 @@ export function colorDistance(a: Fingerprint, b: Fingerprint): number {
 }
 
 function looksSame(a: Fingerprint, b: Fingerprint): boolean {
-  return hashDistance(a, b) <= LOOKS_SAME_BITS && colorDistance(a, b) <= COLOR_LIMIT;
+  if (colorDistance(a, b) > COLOR_LIMIT) return false;
+  return hashDistance(a, b) <= LOOKS_SAME_BITS || turnedDistance(a, b) <= LOOKS_SAME_TURNED_BITS;
 }
 
 /**
- * Groups of look-alikes: every pair within the limits is joined, and joins
- * chain (A~B and B~C put A, B and C together even when A and C are further
- * apart). Groups of one are dropped. `ids` order is kept inside a group, and
- * groups come in the order of their first photo, so the dialog reads in
- * gallery order.
+ * Groups of look-alikes, each formed AROUND A CENTER (11-23-2026). In gallery
+ * order, the first photo not yet in a group is a center, and every later
+ * photo not yet in a group that looks the same as THAT photo joins it. So
+ * every member is within the limits of its group's first photo.
+ *
+ * It used to join every close pair and let the joins chain: A~B and B~C put
+ * A, B and C together even when A and C were far apart, and a run of small
+ * steps (a burst panning across a scene) could pull very different photos
+ * into one group. Around a center, A and C stay apart: B joins A's group and
+ * C is left with whatever it matches on its own.
+ *
+ * Groups of one are dropped. `ids` order is kept inside a group, and groups
+ * come in the order of their center, so the dialog reads in gallery order.
  */
 export function groupLookAlikes(items: readonly { id: string; fp: Fingerprint }[]): string[][] {
-  const parent = items.map((_, i) => i);
-  const find = (i: number): number => {
-    while (parent[i] !== i) {
-      parent[i] = parent[parent[i]!]!;
-      i = parent[i]!;
-    }
-    return i;
-  };
+  const taken = new Array<boolean>(items.length).fill(false);
+  const groups: string[][] = [];
   for (let i = 0; i < items.length; i++) {
+    if (taken[i]) continue;
+    taken[i] = true;
+    const center = items[i]!;
+    const group = [center.id];
     for (let j = i + 1; j < items.length; j++) {
-      if (!looksSame(items[i]!.fp, items[j]!.fp)) continue;
-      const a = find(i);
-      const b = find(j);
-      // The smaller index stays root, so a group is named by its first photo.
-      if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+      if (taken[j] || !looksSame(center.fp, items[j]!.fp)) continue;
+      taken[j] = true;
+      group.push(items[j]!.id);
     }
+    if (group.length > 1) groups.push(group);
   }
-  const byRoot = new Map<number, string[]>();
-  items.forEach((it, i) => {
-    const r = find(i);
-    const g = byRoot.get(r);
-    if (g) g.push(it.id);
-    else byRoot.set(r, [it.id]);
-  });
-  return [...byRoot.values()].filter((g) => g.length > 1);
+  return groups;
 }
 
 /** What the plan needs to know about a photo. */

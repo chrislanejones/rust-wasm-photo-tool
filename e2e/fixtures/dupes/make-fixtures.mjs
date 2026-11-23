@@ -11,6 +11,9 @@
 //             lake-320.jpg     ...and at 320 x 240
 //             lake-resave.jpg  lake-960.jpg decoded and saved again at q 0.55
 //             lake-crop.jpg    lake-960.jpg with 1 px cropped off the left
+//             lake-rot90.jpg   lake-960.jpg turned a quarter clockwise, 720 x 960
+//                              (added 11-23-2026: the gallery found no rotated copy)
+//             lake-mirror.jpg  lake-960.jpg flipped left to right (11-23-2026)
 //   beach   a burst: two frames 1/10 s apart. The walker moves 12 px, the
 //           exposure drifts 2 levels, the sensor noise is fresh.
 //             beach-burst-1.jpg, beach-burst-2.jpg
@@ -169,6 +172,16 @@ const out = await page.evaluate(async () => {
   const crop = new OffscreenCanvas(959, 720);
   crop.getContext("2d").drawImage(lakeBmp, 1, 0, 959, 720, 0, 0, 959, 720);
   files["lake-crop.jpg"] = await jpeg(crop, 0.9);
+  const rot = new OffscreenCanvas(720, 960);
+  const rctx = rot.getContext("2d");
+  rctx.setTransform(0, 1, -1, 0, 720, 0); // a quarter turn clockwise
+  rctx.drawImage(lakeBmp, 0, 0);
+  files["lake-rot90.jpg"] = await jpeg(rot, 0.9);
+  const mir = new OffscreenCanvas(960, 720);
+  const mctx = mir.getContext("2d");
+  mctx.setTransform(-1, 0, 0, 1, 960, 0); // left to right
+  mctx.drawImage(lakeBmp, 0, 0);
+  files["lake-mirror.jpg"] = await jpeg(mir, 0.9);
   files["beach-burst-1.jpg"] = await jpeg(draw("beach", 960, 720, { seed: 2 }), 0.9);
   files["beach-burst-2.jpg"] = await jpeg(draw("beach", 960, 720, { seed: 3, walker: 12 / 960, exposure: 2 }), 0.9);
   files["pier-wide.jpg"] = await jpeg(draw("pier", 960, 720, { seed: 4 }), 0.9);
