@@ -18,7 +18,8 @@ import type { PhotoEntry } from "./GalleryBar";
 import type { Fingerprint } from "@/lib/duplicates";
 import { importEngine } from "@/lib/engineGate";
 
-/** The engine call: `[hashHigh, hashLow, 0xRRGGBB]`, empty on bad input. */
+/** The engine call: `[hashHigh, hashLow, 0xRRGGBB]` then the 7 other
+ *  orientations' `hi, lo` pairs (17 numbers), empty on bad input. */
 type FingerprintFn = (px: Uint8Array, w: number, h: number) => Uint32Array;
 /** Thumbnail → RGBA. */
 type DecodeFn = (blob: Blob) => Promise<{ rgba: Uint8Array; w: number; h: number }>;
@@ -30,9 +31,18 @@ interface Entry {
 
 const cache = new Map<string, Entry>();
 
-/** The engine's three numbers as a `Fingerprint`, or null for an empty one. */
+/** The engine's numbers as a `Fingerprint`, or null for an empty answer.
+ *  17 numbers carry the 7 other orientations (11-23-2026); 3 are the straight
+ *  hash only (the shape before that, kept so an older engine still works). */
 export function toFingerprint(raw: Uint32Array | readonly number[]): Fingerprint | null {
-  return raw.length === 3 ? { hi: raw[0]! >>> 0, lo: raw[1]! >>> 0, rgb: raw[2]! >>> 0 } : null;
+  if (raw.length !== 3 && raw.length !== 17) return null;
+  const fp: Fingerprint = { hi: raw[0]! >>> 0, lo: raw[1]! >>> 0, rgb: raw[2]! >>> 0 };
+  if (raw.length === 17) {
+    const turns = [];
+    for (let i = 3; i < 17; i += 2) turns.push({ hi: raw[i]! >>> 0, lo: raw[i + 1]! >>> 0 });
+    fp.turns = turns;
+  }
+  return fp;
 }
 
 async function decodeThumb(blob: Blob): Promise<{ rgba: Uint8Array; w: number; h: number }> {

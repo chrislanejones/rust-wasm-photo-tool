@@ -4,6 +4,7 @@ import {
   colorDistance,
   groupLookAlikes,
   hashDistance,
+  lookAlikeDistance,
   LOOKS_SAME_BITS,
   planDuplicates,
   planGroup,
@@ -51,13 +52,43 @@ describe("groupLookAlikes", () => {
     expect(groupLookAlikes([{ id: "k", fp: black }, { id: "w", fp: white }])).toEqual([]);
     expect(groupLookAlikes([{ id: "k", fp: black }, { id: "n", fp: nearBlack }])).toEqual([["k", "n"]]);
   });
-  it("chains pairs: A~B and B~C is one group even when A and C are further apart", () => {
+  it("groups around a center, never by chaining: A~B and B~C leaves C out when A and C differ", () => {
     const b = flipped(a, 4);
     const c = { ...b, hi: (b.hi ^ 0xf) >>> 0 }; // 4 more bits away from b, 8 from a
+    expect(hashDistance(a, b)).toBe(4);
+    expect(hashDistance(b, c)).toBe(4);
     expect(hashDistance(a, c)).toBe(8);
-    expect(groupLookAlikes([{ id: "a", fp: a }, { id: "x", fp: fp(0, 0) }, { id: "c", fp: c }, { id: "b", fp: b }])).toEqual([
-      ["a", "c", "b"],
+    const groups = groupLookAlikes([{ id: "a", fp: a }, { id: "x", fp: fp(0, 0) }, { id: "c", fp: c }, { id: "b", fp: b }]);
+    expect(groups.some((g) => g.includes("a") && g.includes("c"))).toBe(false);
+    // a is first in the gallery, so it is the center; b is within 6 of it.
+    expect(groups).toEqual([["a", "b"]]);
+  });
+  it("every member is within the limit of its group's first photo", () => {
+    // A chain of five, each 3 bits from the last: a straight run that a chain
+    // would make one group of five. Around a center it splits.
+    const run = [a];
+    for (let i = 1; i < 5; i++) run.push({ ...run[i - 1]!, hi: (run[i - 1]!.hi ^ (0x7 << (3 * i))) >>> 0 });
+    const items = run.map((f, i) => ({ id: `r${i}`, fp: f }));
+    const groups = groupLookAlikes(items);
+    for (const g of groups) {
+      const head = items.find((it) => it.id === g[0])!.fp;
+      for (const id of g) expect(hashDistance(head, items.find((it) => it.id === id)!.fp)).toBeLessThanOrEqual(LOOKS_SAME_BITS);
+    }
+    expect(groups).toEqual([
+      ["r0", "r1", "r2"],
+      ["r3", "r4"],
     ]);
+  });
+  it("matches a turned or flipped copy through its 8 orientations", () => {
+    // The engine sends the hash of the photo in all 8 turns and flips. A
+    // turned copy's straight hash is one of the original's other seven.
+    const turned: Fingerprint = { hi: 0x0f0f0000, lo: 0x00ff00ff, rgb: 0x808080 };
+    const orig: Fingerprint = { ...a, turns: [fp(1, 2), turned, fp(3, 4), fp(5, 6), fp(7, 8), fp(9, 10), fp(11, 12)] };
+    const copy: Fingerprint = { ...flipped(turned, 2), turns: [] };
+    expect(hashDistance(orig, copy)).toBeGreaterThan(LOOKS_SAME_BITS);
+    expect(lookAlikeDistance(orig, copy)).toBe(2);
+    expect(lookAlikeDistance(copy, orig)).toBe(2);
+    expect(groupLookAlikes([{ id: "o", fp: orig }, { id: "c", fp: copy }])).toEqual([["o", "c"]]);
   });
   it("drops lone photos and keeps gallery order", () => {
     const other = fp(0xffff0000, 0x0000ffff);

@@ -26,6 +26,21 @@ describe("toFingerprint", () => {
     expect(toFingerprint(new Uint32Array([0xffffffff, 1, 0x102030]))).toEqual({ hi: 0xffffffff, lo: 1, rgb: 0x102030 });
     expect(toFingerprint(new Uint32Array(0))).toBeNull();
   });
+  it("reads the 7 other orientations when the engine sends 17 numbers", () => {
+    const raw = new Uint32Array(17).map((_, i) => i + 1);
+    const fp = toFingerprint(raw)!;
+    expect(fp).toMatchObject({ hi: 1, lo: 2, rgb: 3 });
+    expect(fp.turns).toEqual([
+      { hi: 4, lo: 5 },
+      { hi: 6, lo: 7 },
+      { hi: 8, lo: 9 },
+      { hi: 10, lo: 11 },
+      { hi: 12, lo: 13 },
+      { hi: 14, lo: 15 },
+      { hi: 16, lo: 17 },
+    ]);
+    expect(toFingerprint(new Uint32Array(5))).toBeNull();
+  });
 });
 
 describe("fingerprintPhotos — the in-memory cache", () => {
