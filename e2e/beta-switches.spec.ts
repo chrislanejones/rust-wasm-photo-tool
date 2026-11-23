@@ -63,9 +63,7 @@ test("EXIF in Rust ON: the engine functions load and an export cross-checks with
   await expect.poll(() => consoleLines.some((l) => l.includes("EXIF in Rust: engine functions loaded")), { timeout: 30_000 }).toBe(true);
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  // With one photo the dialog skips the Selected / All choice.
-  const selected = dialog.getByRole("button", { name: "Download Selected Image" });
-  if (await selected.count()) await selected.click();
+  // One step: Download Selected is the first row's default.
   const [dl] = await Promise.all([
     page.waitForEvent("download"),
     dialog.getByRole("button", { name: /^Download (PNG|JPEG|WebP|AVIF)/ }).click(),

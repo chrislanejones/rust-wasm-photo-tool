@@ -1,30 +1,38 @@
-// The Export dialog (Download, Copy, Share) — a MULTI-PANE dialog, in the same frame
-// as the New dialog's New Canvas and Create AI Image panes (PaneSwap +
-// PaneHeader, components/ui/dialog-pane.tsx).
+// The Export dialog: one step, six rows (Chris, 11-23-2026). It used to be a
+// wizard (Choose → Selected Image / All Images, swapped in with a slide);
+// everything is on one screen now, and the rows that do not apply are greyed
+// out rather than gone, so the dialog keeps its shape.
 //
-//   1. Choose     — Selected Image or All Images, two stacked tiles (the tool
-//                   panels' icon-on-top buttons, as in Magic Wand → Selection /
-//                   Refine). Skipped when only one image is open: there is
-//                   nothing to choose between.
-//   2a. Selected  — Image format (tiles, not radio cards), Layered file (ORA,
-//                   PSD), File name, and three actions in a row, each with a
-//                   glyph: Download, Share link, Clipboard.
-//   2b. All       — one full-width Download (N) that zips every image.
+//   1. What        Download Selected | Download All (N)
+//   2. Kind        Raster | Vector | With Layers — Raster on every open
+//                  (Vector: only when an SVG is open; With Layers: one image
+//                  only, a ZIP holds flat files)
+//   3. Format      the tiles for that kind, the Shapes picker's stacked tiles
+//                  (Raster: JPEG PNG WebP AVIF + plugin formats · Vector: SVG ·
+//                  With Layers: ORA, PSD + layered plugin formats)
+//   4. Camera Info Keep all · Remove location · Remove all (ADR-108)
+//   5. Recipe      menu + Save… (Download All only; greyed for Selected)
+//   5.5 File Name  (Download Selected; greyed for All — each image in the ZIP
+//                  keeps its own name)
+//   6. Actions     Selected: Download <format> · Share link · Clipboard
+//                  All:      Download ZIP (N as <format>) · Share all (paid,
+//                            not wired yet, so off)
 //
-// Both panes carry Camera info (Keep all · Remove location · Remove all,
-// ADR-108), the same preference as Settings › Security.
+// Rows 1 and 2 are the top bar's ToggleButtonGroup in select mode — a radio
+// group each, one Tab stop, arrow keys. Row 3 is the Shapes picker's
+// ToolButtonGroup (stacked). Row 3 is ONE radio group per kind: the kind row
+// is a separate, real choice now, so the old one-group-for-all-formats rule
+// (a format and its kind were one choice) moves up a level.
 //
-// SVG sits in both Format pickers and is disabled until an SVG is open: on
-// Selected, when the image being worked on was uploaded as an SVG; on All, when
-// any of them was. It writes the uploaded SVG back out, cropped the way the
-// image was cropped (lib/svgPassthrough.ts) — a zip of them on All.
+// The parent (AppShell) still decides what a download writes from `format`:
+// "svg" on Download All zips the SVGs, anything else zips in `zipFormat`.
+// Picking a kind here therefore just picks that kind's format.
 //
-// The action rows are the tool panels' PanelActionBar — the Apply Crop button
-// — so the bottom of every pane looks like the bottom of every tool panel.
+// SVG passthrough: the SVG tile writes the uploaded SVG back out, cropped the
+// way the image was cropped (lib/svgPassthrough.ts), a zip of them on All.
 //
-// The pane state lives in `DownloadPanes`, INSIDE DialogContent, on purpose:
-// Radix unmounts the content when the dialog closes, so every open starts
-// back on the first pane with no reset effect to keep in sync.
+// State lives INSIDE DialogContent on purpose: Radix unmounts the content when
+// the dialog closes, so every open starts fresh with no reset effect.
 import type { ExportFormat } from "@/lib/exportImage";
 import * as React from "react";
 import {
@@ -32,6 +40,9 @@ import {
   Download,
   FolderArchive,
   Image as ImageIcon,
+  Layers,
+  PenTool,
+  Share2,
 } from "lucide-react";
 import {
   Dialog,
@@ -41,10 +52,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ActionTile } from "@/components/ui/action-tile";
-import { PaneHeader, PaneSwap, type PaneDirection } from "@/components/ui/dialog-pane";
 import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { ExportFileNameField } from "@/components/ExportFileNameField";
 import {
   FileAvifIcon,
@@ -61,7 +71,6 @@ import type {
   DownloadFormatOption,
 } from "@/app/session/useDownloadFormat";
 import type { ActiveFormat } from "@/lib/plugins";
-import { ControlRow } from "@/components/ui/control-row";
 import { ZipRecipePicker } from "@/components/ZipRecipePicker";
 import { CameraInfoPicker } from "@/components/CameraInfoPicker";
 import { useZipRecipe } from "@/stores/useZipRecipeStore";
@@ -69,17 +78,21 @@ import { useZipRecipe } from "@/stores/useZipRecipeStore";
 /** The format picker's ids: every real download format, the formats the
  *  active plugins add (Settings → Plugins, lib/plugins — their manifest ids,
  *  "psd" for the PSD plugin), plus PSD as a placeholder while NO plugin
- *  provides it: shown disabled ("Activate with plugin") and never pickable.
- *  PSD export ships as a separate plugin (its own repo), added from Settings. */
+ *  provides it: shown disabled ("Activate with plugin") and never pickable. */
 type FormatTileId = DownloadFormat | "psd";
+type Scope = "selected" | "all";
+type Kind = "raster" | "vector" | "layers";
 
-/** The whole-project files — they hold every layer of the project rather than
- *  one flattened picture, so they are described as such. Still ONE exclusive
- *  choice with the rest (see the single `ToolButtonGroup` in the Selected
- *  pane): a reason to say so, not a second radiogroup. */
+/** Files that hold every layer of the project rather than one picture. */
 const LAYERED_IDS: FormatTileId[] = ["ora", "psd"];
+/** A plugin format is "With Layers" when its id is one of those, or its own
+ *  hint says so ("Layered · Photoshop"). */
+const isLayeredPlugin = (p: ActiveFormat) =>
+  LAYERED_IDS.includes(p.format.id as FormatTileId) || /^Layered\b/i.test(p.format.hint);
 
-const SVG_HINT = "Vector · keeps crop";
+// No kind words ("vector", "layered") on a tile: the Kind row says which kind
+// it is (Chris, 11-23-2026).
+const SVG_HINT = "Keeps crop";
 const SVG_OFF_HINT = "SVG uploads only";
 
 /** The file-type glyphs carry lettering, so they get a larger slot than the
@@ -113,7 +126,7 @@ function pluginTileIcon(label: string): React.ComponentType {
 interface DownloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** How many images are open — decides whether the Choose pane shows. */
+  /** How many images are open — Download All needs two or more. */
   photoCount: number;
   formats: DownloadFormatOption[];
   /** Formats the active plugins add, after the built-ins. Whole-project
@@ -151,18 +164,13 @@ export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogPr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        {/* The "Export" header is drawn by DownloadPanes: on the first pane it
-            is the dialog's header; on a sub-pane the pane's own row
-            ([<] title [X]) replaces it, so there is one header and one ✕. */}
-        <DownloadPanes {...rest} />
+        <ExportBody {...rest} />
       </DialogContent>
     </Dialog>
   );
 }
 
-type Pane = "choose" | "selected" | "all";
-
-function DownloadPanes({
+function ExportBody({
   photoCount,
   formats,
   pluginFormats,
@@ -181,63 +189,98 @@ function DownloadPanes({
 }: Omit<DownloadDialogProps, "open" | "onOpenChange">) {
   const multi = photoCount > 1;
   const recipe = useZipRecipe();
-  const [picked, setPicked] = React.useState<Pane>(multi ? "choose" : "selected");
-  const [direction, setDirection] = React.useState<PaneDirection>(1);
-  // An image deleted down to one while the dialog is open leaves nothing to
-  // choose between — land on Selected rather than on a dead pane.
-  const pane: Pane = multi ? picked : "selected";
-
-  const go = (next: Pane) => {
-    setDirection(next === "choose" ? -1 : 1);
-    setPicked(next);
-  };
-  const back = multi ? () => go("choose") : undefined;
-
-  const svgTile = (enabled: boolean) => ({
-    id: "svg" as const,
-    label: enabled ? SVG_HINT : SVG_OFF_HINT,
-    icon: FORMAT_TILE_ICONS.svg,
-    title: enabled
-      ? `SVG — ${SVG_HINT}. Painting and filters stay in the other formats.`
-      : "SVG — only for images uploaded as SVG.",
-    disabled: !enabled,
-  });
-  // An SVG pick that the pane cannot honor (picked on All, then Selected on a
-  // raster image) shows the raster format the button will actually write.
-  const selectedValue: FormatTileId = format === "svg" && !svg.selected ? zipFormat : format;
-  const allSvg = format === "svg" && svg.all > 0;
+  const [picked, setPicked] = React.useState<Scope>("selected");
+  // An image deleted down to one while the dialog is open: back to Selected.
+  const scope: Scope = multi ? picked : "selected";
 
   const pluginIds = new Set(pluginFormats.map((p) => p.format.id));
-  const formatOptions = [
-    ...formats.map((f) => ({
-      id: f.value as FormatTileId,
-      label: f.hint,
-      icon: FORMAT_TILE_ICONS[f.value],
-      title: `${f.label} — ${f.hint}`,
-    })),
-    svgTile(svg.selected),
-    // Every plugin format gets a tile. The layered ones (ORA, PSD) sort to the
-    // END of the one grid, so the flattened formats keep reading order and
-    // "holds every layer" is a caption rather than a second group. Compared on
-    // the hint so the order is stable when a plugin's hint text changes.
-    // (#297 filtered this list to the layered ids while merging the two
-    // groups, which silently dropped every other plugin format — e2e
-    // plugins.spec caught it with its .ihl fixture.)
-    ...[...pluginFormats]
-      .sort(
-        (a, b) =>
-          Number(LAYERED_IDS.includes(a.format.id as FormatTileId)) -
-            Number(LAYERED_IDS.includes(b.format.id as FormatTileId)) ||
-          a.format.hint.localeCompare(b.format.hint),
-      )
-      .map(({ plugin, format: f }) => ({
-        id: f.id as FormatTileId,
+  const kindOfFormat = (f: DownloadFormat): Kind =>
+    f === "svg"
+      ? "vector"
+      : LAYERED_IDS.includes(f) || pluginFormats.some((p) => p.format.id === f && isLayeredPlugin(p))
+        ? "layers"
+        : "raster";
+
+  const vectorOn = scope === "selected" ? svg.selected : svg.all > 0;
+  const layersOn = scope === "selected";
+  // The kind the format already is, unless this scope cannot have it.
+  const wanted = kindOfFormat(format);
+  const kind: Kind =
+    (wanted === "vector" && !vectorOn) || (wanted === "layers" && !layersOn) ? "raster" : wanted;
+
+  // Every open starts on Raster (Chris, 11-23-2026), whatever was picked last
+  // time: an ORA or SVG pick is for that one download, not a new default.
+  // This body mounts fresh on each open (Radix unmounts closed content), so
+  // a mount effect is "on open".
+  React.useEffect(() => {
+    if (kindOfFormat(format) !== "raster") onFormatChange(zipFormat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on open only
+  }, []);
+
+  /** Pick a kind: it lands on that kind's format — the raster one the store
+   *  already holds, SVG, or ORA (or the first layered plugin format). */
+  const pickKind = (k: Kind) => {
+    if (k === "raster") onFormatChange(zipFormat);
+    else if (k === "vector") onFormatChange("svg");
+    else onFormatChange((kindOfFormat(format) === "layers" ? format : "ora") as DownloadFormat);
+  };
+  const pickScope = (next: Scope) => {
+    setPicked(next);
+    // Leaving a kind the new scope cannot have: the parent writes from
+    // `format`, so it moves to the raster format too.
+    const k = kindOfFormat(format);
+    if ((next === "all" && k === "layers") || (k === "vector" && !(next === "selected" ? svg.selected : svg.all > 0))) {
+      onFormatChange(zipFormat);
+    }
+  };
+
+  // ── Row 3's tiles, per kind ────────────────────────────────────────────
+  const pluginTile = ({ plugin, format: f }: ActiveFormat) => ({
+    id: f.id as FormatTileId,
+    // The plugin's hint names its kind ("Layered · Photoshop"); the Kind row
+    // says that now, so the tile keeps the rest.
+    label: f.hint.replace(/^Layered\s*·\s*/i, "") || f.hint,
+    icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
+    title: `${f.label} — ${f.hint} (${plugin.name} plugin).`,
+  });
+  const rasterTiles = [
+    ...formats
+      .filter((f) => kindOfFormat(f.value) === "raster")
+      .map((f) => ({
+        id: f.value as FormatTileId,
         label: f.hint,
-        icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
-        title: `${f.label} — ${f.hint} (${plugin.name} plugin).${
-          LAYERED_IDS.includes(f.id as FormatTileId) ? " Holds every layer." : ""
-        }`,
+        icon: FORMAT_TILE_ICONS[f.value],
+        title: `${f.label} — ${f.hint}`,
       })),
+    // Plugin formats write one image each, so they are Selected only.
+    ...(scope === "selected"
+      ? [...pluginFormats]
+          .filter((p) => !isLayeredPlugin(p))
+          .sort((a, b) => a.format.hint.localeCompare(b.format.hint))
+          .map(pluginTile)
+      : []),
+  ];
+  const vectorTiles = [
+    {
+      id: "svg" as const,
+      label: vectorOn ? SVG_HINT : SVG_OFF_HINT,
+      icon: FORMAT_TILE_ICONS.svg,
+      title: vectorOn
+        ? `SVG — ${SVG_HINT}. Painting and filters stay in the other formats.`
+        : "SVG — only for images uploaded as SVG.",
+      disabled: !vectorOn,
+    },
+  ];
+  const layerTiles = [
+    ...formats
+      .filter((f) => kindOfFormat(f.value) === "layers")
+      .map((f) => ({
+        id: f.value as FormatTileId,
+        label: f.hint,
+        icon: FORMAT_TILE_ICONS[f.value],
+        title: `${f.label} — ${f.hint}. Keeps every layer.`,
+      })),
+    ...[...pluginFormats].filter(isLayeredPlugin).map(pluginTile),
     // The placeholder, only while no plugin provides PSD.
     ...(pluginIds.has("psd")
       ? []
@@ -251,150 +294,135 @@ function DownloadPanes({
           },
         ]),
   ];
-  const isPlaceholder = (id: string) => id === "psd" && !pluginIds.has("psd");
+  const tiles = kind === "raster" ? rasterTiles : kind === "vector" ? vectorTiles : layerTiles;
+  const tileValue: FormatTileId = kind === "raster" ? (kindOfFormat(format) === "raster" ? format : zipFormat) : format;
+  const allSvg = scope === "all" && kind === "vector";
+
+  const zipAs = allSvg ? "SVG" : recipe ? recipe.name : zipLabel;
+  const zipCount = allSvg ? svg.all : photoCount;
 
   return (
     <>
-    {pane === "choose" ? (
       <DialogHeader>
         <DialogTitle>Export</DialogTitle>
       </DialogHeader>
-    ) : (
-      // Still the dialog's accessible name; the pane header shows the title.
-      <DialogTitle className="sr-only">Export</DialogTitle>
-    )}
-    <DialogBody>
-      <PaneSwap paneKey={pane} direction={direction} className="flex flex-col gap-4">
-        {pane === "choose" ? (
-          <>
-            <DialogDescription>
-              One image, or all {photoCount} as a{" "}
-              <span className="font-mono">.zip</span>.
-            </DialogDescription>
-            <div className="grid grid-cols-2 gap-3">
-              <ActionTile
-                icon={ImageIcon}
-                label="Download Selected Image"
-                onClick={() => go("selected")}
-                className="py-5 [&_svg]:h-8 [&_svg]:w-8"
-              />
-              <ActionTile
-                icon={FolderArchive}
-                label={`Download All Images (${photoCount})`}
-                onClick={() => go("all")}
-                className="py-5 [&_svg]:h-8 [&_svg]:w-8"
-              />
-            </div>
-          </>
-        ) : pane === "selected" ? (
-          <>
-            <PaneHeader title="Selected Image" onBack={back} closable />
-            {/* ONE group for ONE exclusive choice.
-                This was two `ToolButtonGroup`s — "Image format" and "Layered
-                file" — and BOTH passed `value`, which is exactly what makes a
-                `ToolButtonGroup` a SELECT: a named radiogroup with one Tab stop
-                and arrow keys between its own tiles. So one choice (JPEG / PNG /
-                WebP / AVIF / SVG / ORA / PSD) was two radio groups, and arrow
-                keys inside the first could not reach ORA or PSD because they
-                were somewhere else entirely. The visible state was right — the
-                code passed `undefined` to whichever group did not own the value
-                — which is why it read correctly and announced wrongly.
+      <DialogBody className="flex flex-col gap-4">
+        <DialogDescription className="sr-only">
+          Download the selected image or all images, share a link, or copy to the clipboard.
+        </DialogDescription>
 
-                The split is presentational and still is: ORA and PSD hold every
-                layer of the project rather than one flattened picture, so they
-                sit in their own grid with a caption. One radiogroup, two visual
-                rows. `formatGroups` below is the layout; the semantics are
-                `ToolButtonGroup`'s, which already span rows in a 3-column grid. */}
-            <ControlRow label="Image format">
-              {({ labelId }) => (
-                <ToolButtonGroup<FormatTileId>
-                  aria-labelledby={labelId}
-                  stacked
-                  columns={3}
-                  value={selectedValue}
-                  onChange={(id) => {
-                    if (!isPlaceholder(id)) onFormatChange(id);
-                  }}
-                  options={formatOptions}
-                />
-              )}
-            </ControlRow>
-            {/* File name only here: a zip of every image keeps each image's
-                own name. */}
-            <ExportFileNameField
-              value={fileName.value}
-              defaultStem={fileName.defaultStem}
-              onChange={fileName.onChange}
-              ext={ext}
-              onSubmit={onDownload}
-            />
-            {/* Camera info (ADR-108): what of the photo's EXIF leaves with it. */}
-            <CameraInfoPicker />
-            <PanelActionBar layout="thirds">
-              <PanelAction icon={Download} onClick={onDownload}>
-                {downloadLabel}
-              </PanelAction>
-              {shareAction}
-              <PanelAction icon={ClipboardCopy} onClick={onCopy}>
-                Clipboard
-              </PanelAction>
-            </PanelActionBar>
-          </>
-        ) : (
-          <>
-            <PaneHeader title="All Images" onBack={back} closable />
-            {/* The same tiles as Selected, on the same grid, minus the two that
-                are whole-project files rather than one image each (ORA, PSD).
-                Every image in the zip is written in this format; one already
-                in it goes in untouched (lib/zipEntry.ts). SVG is live here
-                when ANY open image is an SVG, and zips just those. */}
-            <ControlRow label="Image format">
-              {({ labelId }) => (
-                <ToolButtonGroup<FormatTileId>
-                  aria-labelledby={labelId}
-                  stacked
-                  columns={3}
-                  value={allSvg ? "svg" : zipFormat}
-                  onChange={(id) => {
-                    if (!isPlaceholder(id) && id !== "ora" && !pluginIds.has(id)) onFormatChange(id);
-                  }}
-                  options={formatOptions
-                    .filter((o) => o.id !== "ora" && o.id !== "psd" && !pluginIds.has(o.id))
-                    .map((o) => (o.id === "svg" ? svgTile(svg.all > 0) : o))}
-                />
-              )}
-            </ControlRow>
-            {/* Recipes (Night 10-28): a named size + format + quality + name
-                pattern for the whole ZIP. Not for SVG, which keeps its vector. */}
-            {!allSvg && <ZipRecipePicker zipFormat={zipFormat} />}
-            {!allSvg && <CameraInfoPicker recipeChoice={recipe?.cameraInfo} />}
-            <DialogDescription>
-              {allSvg ? (
-                <>
-                  Every image uploaded as SVG, each with its crop, in one{" "}
-                  <span className="font-mono">.zip</span>
-                  {svg.all < photoCount ? " — the others are left out." : "."}
-                </>
-              ) : (
-                <>
-                  Every open image, each with its edits, in one{" "}
-                  <span className="font-mono">.zip</span>.
-                </>
-              )}
-            </DialogDescription>
-            <PanelActionBar>
-              <PanelAction icon={FolderArchive} onClick={onDownloadAll}>
-                {allSvg
-                  ? `Download ${svg.all} as SVG`
-                  : recipe
-                    ? `Download ${photoCount} as ${recipe.name}`
-                    : `Download ${photoCount} as ${zipLabel}`}
-              </PanelAction>
-            </PanelActionBar>
-          </>
+        {/* 1. What */}
+        <ToggleButtonGroup
+          mode="select"
+          aria-label="What to export"
+          fill
+          items={[
+            {
+              key: "selected",
+              icon: ImageIcon,
+              label: "Download Selected",
+              active: scope === "selected",
+              onToggle: () => pickScope("selected"),
+            },
+            {
+              key: "all",
+              icon: FolderArchive,
+              label: `Download All (${photoCount})`,
+              active: scope === "all",
+              onToggle: () => pickScope("all"),
+              disabled: !multi,
+            },
+          ]}
+        />
+
+        {/* 2. Kind */}
+        <ToggleButtonGroup
+          mode="select"
+          aria-label="Kind of file"
+          fill
+          items={[
+            { key: "raster", icon: ImageIcon, label: "Raster", active: kind === "raster", onToggle: () => pickKind("raster") },
+            {
+              key: "vector",
+              icon: PenTool,
+              label: "Vector",
+              active: kind === "vector",
+              onToggle: () => pickKind("vector"),
+              disabled: !vectorOn,
+              tooltip: { label: vectorOn ? "Vector: the SVG you uploaded" : "Vector: only for images uploaded as SVG" },
+            },
+            {
+              key: "layers",
+              icon: Layers,
+              label: "With Layers",
+              active: kind === "layers",
+              onToggle: () => pickKind("layers"),
+              disabled: !layersOn,
+              tooltip: { label: layersOn ? "With Layers: every layer kept, to open in another editor" : "With Layers: one image at a time, not in a ZIP" },
+            },
+          ]}
+        />
+
+        {/* 3. Format — the Shapes picker's tiles */}
+        <ToolButtonGroup<FormatTileId>
+          aria-label="Format"
+          stacked
+          columns={3}
+          value={tileValue}
+          onChange={(id) => {
+            const t = tiles.find((o) => o.id === id);
+            if (t && !("disabled" in t && t.disabled)) onFormatChange(id as DownloadFormat);
+          }}
+          options={tiles}
+        />
+
+        {/* 4. Camera Info (ADR-108). An SVG carries no camera info. */}
+        {kind !== "vector" && (
+          <CameraInfoPicker variant="section" recipeChoice={scope === "all" ? recipe?.cameraInfo : undefined} />
         )}
-      </PaneSwap>
-    </DialogBody>
+
+        {/* 5. Recipe — shapes a ZIP, so greyed out for Download Selected. */}
+        {kind === "raster" && <ZipRecipePicker zipFormat={zipFormat} disabled={scope === "selected"} />}
+
+        {/* 5.5 File Name — Download Selected; greyed for All, where each
+            image in the ZIP keeps its own name. */}
+        <ExportFileNameField
+          value={fileName.value}
+          defaultStem={fileName.defaultStem}
+          onChange={fileName.onChange}
+          ext={ext}
+          onSubmit={onDownload}
+          disabled={scope === "all"}
+        />
+
+        {allSvg && svg.all < photoCount && (
+          <p className="text-2xs text-theme-muted-foreground">
+            {`Only the ${svg.all} images uploaded as SVG go in the ZIP; the others are left out.`}
+          </p>
+        )}
+
+        {/* 6. Actions */}
+        {scope === "selected" ? (
+          <PanelActionBar layout="thirds">
+            <PanelAction icon={Download} onClick={onDownload}>
+              {downloadLabel}
+            </PanelAction>
+            {shareAction}
+            <PanelAction icon={ClipboardCopy} onClick={onCopy}>
+              Clipboard
+            </PanelAction>
+          </PanelActionBar>
+        ) : (
+          <PanelActionBar layout="halves">
+            <PanelAction icon={FolderArchive} onClick={onDownloadAll}>
+              {`Download ZIP (${zipCount} as ${zipAs})`}
+            </PanelAction>
+            <PanelAction icon={Share2} disabled title="Share all: a paid feature, coming soon">
+              Share All · Soon
+            </PanelAction>
+          </PanelActionBar>
+        )}
+      </DialogBody>
     </>
   );
 }

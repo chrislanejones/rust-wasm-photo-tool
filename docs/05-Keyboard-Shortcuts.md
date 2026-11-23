@@ -182,7 +182,7 @@ shifted pair is now the layer reorder above.
 
 | Shortcut          | Action |
 | ----------------- | ------ |
-| `Alt + E`         | Export current image |
+| `Alt + E`         | Open Export |
 | `Alt + Shift + E` | Export all images (ZIP) |
 
 ## Dev tools

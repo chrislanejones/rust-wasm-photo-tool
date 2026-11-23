@@ -29,11 +29,18 @@ const SAYS: Record<CameraInfo, string> = {
   all: "No date, camera or location.",
 };
 
-export function CameraInfoPicker({ recipeChoice }: { recipeChoice?: CameraInfo }) {
+export function CameraInfoPicker({
+  recipeChoice,
+  variant = "row",
+}: {
+  recipeChoice?: CameraInfo;
+  /** `section` in the Export dialog, where it is one of the pane's sections. */
+  variant?: "row" | "section";
+}) {
   const [prefs, applyPrefs] = usePreferences();
   const value = recipeChoice ?? cameraInfoOf(prefs);
   return (
-    <ControlRow label="Camera info">
+    <ControlRow label="Camera Info" variant={variant}>
       {({ labelId }) => (
         <div className="space-y-1">
           <ToolButtonGroup<CameraInfo>

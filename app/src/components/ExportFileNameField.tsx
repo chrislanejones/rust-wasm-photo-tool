@@ -9,21 +9,25 @@ interface Props {
   ext: string;
   /** Enter in the field downloads, same as the Download tile. */
   onSubmit: () => void;
+  /** Download All: shown but off — each image in the ZIP keeps its own name
+   *  (a recipe's name pattern can change that). */
+  disabled?: boolean;
 }
 
 /** "File name" for the export dialog's single-image Download. */
-export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmit }: Props) {
+export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmit, disabled = false }: Props) {
   return (
-    <div className="space-y-2">
+    <div className={disabled ? "space-y-2 opacity-50" : "space-y-2"}>
       <label htmlFor="export-file-name" className="text-xs font-semibold text-text-muted">
-        File name
+        File Name
       </label>
       <div className="flex items-center gap-2">
         <input
           id="export-file-name"
           type="text"
-          value={value}
-          placeholder={defaultStem}
+          value={disabled ? "" : value}
+          placeholder={disabled ? "Each image keeps its own name" : defaultStem}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           onFocus={(e) => e.currentTarget.select()}
           onKeyDown={(e) => {
@@ -36,7 +40,7 @@ export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmi
           autoComplete="off"
           className={`${FIELD_TEXT} min-w-0 flex-1`}
         />
-        <span className="shrink-0 font-mono text-sm text-text-muted">{ext}</span>
+        {!disabled && <span className="shrink-0 font-mono text-sm text-text-muted">{ext}</span>}
       </div>
     </div>
   );

@@ -111,7 +111,7 @@ export const SHORTCUT_GROUPS = [
   {
     title: "Export",
     shortcuts: [
-      { keys: ["Alt", "E"], action: "Export current image" },
+      { keys: ["Alt", "E"], action: "Open Export" },
       { keys: ["Alt", "Shift", "E"], action: "Export all images (ZIP)" },
     ],
   },

@@ -85,14 +85,16 @@ test("New dialog: New Canvas and Create AI Image headers are [<] title [X]", asy
   }
 });
 
-test("Export dialog: Selected Image header is [<] title [X], one close", async ({ page }) => {
+test("Export dialog: one step — one Export header, one close, no Back", async ({ page }) => {
+  // The Selected Image / All Images steps are gone (Chris, 11-23-2026): the
+  // choice is the first row of the one step, so there is nothing to go Back to.
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Download Selected Image" }).click();
-  await expectRow(dialog, "Selected Image", "pane-header-selected");
-  await dialog.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(dialog.getByRole("heading", { name: "Export", exact: true }), "the first pane keeps its Export header").toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Close", exact: true })).toHaveCount(1);
-  await dialog.getByRole("button", { name: /Download All Images/ }).click();
-  await expectRow(dialog, "All Images", "pane-header-all");
+  await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  await expect(dialog.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  await dialog.screenshot({ path: "test-results/export-one-step.png" });
 });
