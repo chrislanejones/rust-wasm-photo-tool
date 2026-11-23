@@ -59,8 +59,21 @@ export function PasteSvgPanel({ onBack, closable, initialText = "", onCreate }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the shape on purpose
   }, [shapeKey]);
 
+  // Focus the code field once the step opens — unless you're already typing
+  // somewhere. The timer can fire late on a busy machine, and an unguarded
+  // focus() then pulled the caret out of the width box mid-word: "512" landed
+  // at the end of the SVG code and the size stayed 1024 (CI, PR #509; repro:
+  // e2e/paste-svg.spec.ts "a late autofocus").
   useEffect(() => {
-    const t = window.setTimeout(() => areaRef.current?.focus(), 50);
+    const t = window.setTimeout(() => {
+      const el = document.activeElement;
+      const typing =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (!typing) areaRef.current?.focus();
+    }, 50);
     return () => window.clearTimeout(t);
   }, []);
 
