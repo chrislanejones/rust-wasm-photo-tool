@@ -13,6 +13,7 @@
     "build:ssr": "vite build --ssr src/entry-server.tsx --outDir dist-ssr",
     "prerender": "node scripts/prerender.mjs",
     "gen:og": "node scripts/gen-og-images.mjs",
+    "gen:mermaid-pdf": "node scripts/gen-mermaid-pdf.mjs",
     "gen:tokens": "node scripts/gen-editor-tokens.mjs && node scripts/gen-site-tokens.mjs"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@types/react-dom": "catalog:",
     "@types/three": "0.187.0",
     "@vitejs/plugin-react": "catalog:",
+    "mermaid": "^12.3.0",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

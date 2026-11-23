@@ -327,4 +327,15 @@ export default tseslint.config(
       globals: { document: "readonly", requestAnimationFrame: "readonly" },
     },
   },
+
+  {
+    // gen-mermaid-pdf.mjs, the same split: its `page.evaluate` body runs in the
+    // page, where mermaid lives on `window`, the overlap checks read
+    // `getComputedStyle` and compare paint order with `Node`. Those four, and
+    // nothing else from the browser.
+    files: ["marketing/scripts/gen-mermaid-pdf.mjs"],
+    languageOptions: {
+      globals: { document: "readonly", window: "readonly", getComputedStyle: "readonly", Node: "readonly" },
+    },
+  },
 );
