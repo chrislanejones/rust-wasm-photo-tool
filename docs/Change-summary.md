@@ -12303,3 +12303,18 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No Dexie migration, no op-log format change, no engine change (973,825 B).
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529; `e2e-coverage-check` 94/94 specs run; app and marketing builds pass (29 URLs prerendered); 0 broken relative links in the live docs. e2e on a production build: all 31 dialog-touching tests (the new `export-dialog` spec plus `export-file-name`, `camera-info`, `svg-passthrough`, `plugins`, `zip-export`, `bulk-night`, `beta-switches`, `batch-redact`, `pane-header-row`); `paste-svg` 5/5 with the late-autofocus regression test, seen red without the fix. No Rust changed, so no cargo gates.
+
+## v9.73 Change Summary — 2026-11-23
+
+**Two new chapters: the engine worker, and accessibility.**
+
+| Area | Change |
+| --- | --- |
+| Docs (#512) | **15. The Engine Worker**: a new 15.0 overview (the engine in a web worker since v8.32, ADR-024: main thread blocked 129–137 ms per heavy edit before, 0 after; the OffscreenCanvas; the codec worker; the `ih_engine_worker=0` kill switch) over the three engine-worker notes, now 15.1 Feasibility (07-27), 15.2 the a11.0 finding (08-10) and 15.3 the a12 design (08-12). The blog post, `posts.ts`, three `lib/engine` comments, the Parking Lot and one ADR link follow the new paths. |
+| Docs (#512) | **16. Accessibility**, new: keyboard, radio groups with one Tab stop, `aria-pressed` toggles, ADR-025's focus channel, names from visible labels, live regions, dialogs, reduce motion (the OS setting and Settings › Appearance), 44 px phone targets, contrast tokens; the specs that pin them; the two known limits. |
+| Docs | Contents and the README list gain 15 and 16; every chapter's Previous / Next is regenerated. |
+| Trail Log | Squares catch up through 11-23. |
+
+No app code change apart from three comments. No engine change (973,825 B).
+
+Verification: run after the trail data regen. 0 broken relative links across 167 .md files; TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529; marketing build passes. Every row of the Accessibility chapter was checked against the code; two claims were narrowed to what the code shows. No Rust changed.

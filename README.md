@@ -99,25 +99,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.72 — 2026-11-23
+### v9.73 — 2026-11-23
 
-**Export is one screen, Alt+E opens it, and the docs read like a book.**
+**Two new chapters: the engine worker, and accessibility.**
 
-**Export** used to walk you through steps. Now it's one screen: Download
-Selected or Download All at the top, then Raster, Vector or With Layers, then
-the format. Camera Info, Recipe and File Name sit below, and anything that
-doesn't apply to what you picked is grayed out instead of disappearing. It
-opens on Raster every time.
+**[15. The Engine Worker](docs/15.0-Engine-Worker.md)** explains why the image
+engine runs in a web worker (a heavy edit used to freeze the page for over a
+tenth of a second; now it doesn't freeze it at all) and puts the three notes
+that got it there in order, 15.1 to 15.3.
 
-**Alt+E** opens Export, the way the top bar's hint always said it did. It used
-to download straight away.
-
-**Paste SVG:** on a slow machine, the step could pull your cursor out of the
-width box mid-typing. Fixed.
-
-**The docs** are numbered chapters now, starting with
-[1. Getting Started](docs/01-Getting-Started.md), each linking to the next,
-with a [Contents](docs/README.md) page.
+**[16. Accessibility](docs/16-Accessibility.md)** is new: what the editor does
+for keyboard, focus, screen readers and reduced motion, the tests that hold it
+in place, and its known limits.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

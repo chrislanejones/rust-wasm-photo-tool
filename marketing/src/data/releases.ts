@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.73",
+    date: "2026-11-23",
+    headline: "Two new chapters: the engine worker, and accessibility.",
+    entries: [
+      { tag: "infra", text: "Docs chapter 15 explains why the image engine runs in a web worker, with its three notes in order." },
+      { tag: "infra", text: "Docs chapter 16, Accessibility: keyboard, focus, screen readers and reduced motion, and how it's tested." },
+    ],
+  },
+  {
     version: "v9.72",
     date: "2026-11-23",
     headline: "Export is one screen, Alt+E opens it, and the docs read like a book.",
