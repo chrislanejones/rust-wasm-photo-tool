@@ -169,3 +169,28 @@ test("mid-session, the New dialog's Paste SVG reaches Create Canvas and adds a s
   await create.click();
   await expect(page.locator(".photo-thumb")).toHaveCount(2, { timeout: 30_000 });
 });
+
+test("a late autofocus never pulls the caret out of a field you're typing in", async ({ page }) => {
+  // CI on PR #509: the step's 50ms autofocus fired seconds late on a starved
+  // runner, stole focus from the width box, and "512" landed at the end of the
+  // SVG code. Make every 50ms timer that late, on purpose, and type anyway.
+  await page.addInitScript(() => {
+    const orig = window.setTimeout;
+    // @ts-expect-error — deliberately widened to stretch one delay
+    window.setTimeout = (fn: TimerHandler, ms?: number, ...rest: unknown[]) =>
+      orig(fn, ms === 50 ? 2500 : ms, ...rest);
+  });
+  await page.reload();
+  await page.locator('input[type="file"]').first().waitFor({ state: "attached" });
+  await page.getByRole("button", { name: "Paste SVG", exact: true }).click();
+  const code = page.getByRole("textbox", { name: "SVG code" });
+  await code.fill(ICON);
+  const width = page.getByRole("spinbutton", { name: "width" });
+  await expect(width).toHaveValue("1024");
+  await width.click();
+  await page.waitForTimeout(2700); // the late timer fires while width has focus
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("512");
+  await expect(page.getByRole("spinbutton", { name: "height" })).toHaveValue("512");
+  await expect(code).toHaveValue(ICON);
+});
