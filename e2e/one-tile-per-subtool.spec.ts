@@ -9,8 +9,11 @@ import { join } from "node:path";
 // Shapes panel in whatever mode was used last — after Arrows & Shapes, the
 // whole arrow and diagram-shape picker, under a different tile.
 //
-// Pass means: exactly one control on screen opens Arrows & Shapes, and the
-// Select objects tile opens a panel of its own, whatever mode came before it.
+// Pass means: exactly one control on screen opens Arrows & Shapes, and
+// Select objects opens a panel of its own, whatever mode came before it.
+//
+// 11-23: Select objects is no longer a Create tile at all. Its ways in are the
+// arrow in Review › Reselect, the canvas right-click menu and bare V.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FIXTURE_PNG = join(__dirname, "fixtures", "paper-1200x900.png");
@@ -56,7 +59,8 @@ test("exactly one tile opens Arrows & Diagram Shapes", async ({ page }) => {
   // Every control on screen that opens the arrow and diagram-shape picker.
   await expect(page.getByRole("button", { name: "Arrows & Diagram Shapes", exact: true })).toHaveCount(1);
 
-  await subTools(page).getByRole("button", { name: "Select objects", exact: true }).click();
+  await expect(subTools(page).getByRole("button", { name: "Select objects", exact: true })).toHaveCount(0);
+  await page.keyboard.press("v");
   await shot(page, "1280-select-objects");
   await expect(panel(page).getByText("Arrows & Diagram Shapes")).toHaveCount(0);
   await expect(panel(page).getByRole("radiogroup", { name: "Arrow" })).toHaveCount(0);
@@ -67,7 +71,7 @@ test("Select objects keeps its own panel after Shapes and after Pins", async ({ 
   await open(page);
   for (const before of ["Shapes", "Pins"]) {
     await createTool(page, before);
-    await subTools(page).getByRole("button", { name: "Select objects", exact: true }).click();
+    await page.keyboard.press("v");
     await expect(panel(page).getByText("Select objects", { exact: true })).toBeVisible();
     await expect(panel(page).getByRole("radiogroup", { name: "Shape" })).toHaveCount(0);
   }
@@ -82,6 +86,23 @@ test("the route still lands on Arrows & Diagram Shapes, and Select objects on it
   await expect(panel(page).getByText("Arrows & Diagram Shapes")).toHaveCount(0);
 });
 
+test("Select objects: the Reselect arrow and the right-click menu both open it", async ({ page }) => {
+  await open(page);
+  await createTool(page, "Shapes");
+  const review = page.getByRole("complementary", { name: "Review" });
+  if (!(await review.isVisible())) await page.keyboard.press("Alt+r");
+  const arrow = review.getByRole("button", { name: "Select objects", exact: true });
+  await expect(arrow).toHaveAttribute("aria-pressed", "false");
+  await arrow.click();
+  await expect(panel(page).getByText("Select objects", { exact: true })).toBeVisible();
+  await expect(arrow).toHaveAttribute("aria-pressed", "true");
+
+  await createTool(page, "Shapes");
+  await page.locator("canvas.main-canvas").click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Select Objects/ }).click();
+  await expect(panel(page).getByText("Select objects", { exact: true })).toBeVisible();
+});
+
 test("phone width: no tile is lost", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -93,7 +114,7 @@ test("phone width: no tile is lost", async ({ page }) => {
   const create = page.getByRole("button", { name: "Create", exact: true }).first();
   if (!(await create.isVisible())) test.skip(true, "the phone layout has no tool rail");
   await createTool(page, "Arrows & Diagram Shapes");
-  await subTools(page).getByRole("button", { name: "Select objects", exact: true }).click();
+  await page.keyboard.press("v");
   await shot(page, "390-select-objects");
   await expect(panel(page).getByText("Arrows & Diagram Shapes")).toHaveCount(0);
 });

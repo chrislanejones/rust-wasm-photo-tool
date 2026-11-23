@@ -202,7 +202,7 @@ test("group drag: 100 annotations, 20 picked, local", async ({ page }, info) => 
     await tool.clear_history();
   });
   await page.getByRole("button", { name: "Create", exact: true }).first().click();
-  await page.getByRole("button", { name: "Select objects", exact: true }).first().click();
+  await page.keyboard.press("v"); // Select objects — no Create tile since 11-23
   const m0 = await screenPoint(page, 10, 10);
   const m1 = await screenPoint(page, 420, 430);
   await page.mouse.move(m0.x, m0.y);

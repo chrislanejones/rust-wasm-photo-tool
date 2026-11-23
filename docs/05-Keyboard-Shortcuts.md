@@ -79,6 +79,7 @@ the arrows.
 
 | Keys                          | Action |
 |-------------------------------|--------|
+| `V`                           | Select objects (Create › Select objects) — also the arrow in Review → Reselect and the canvas right-click menu |
 | `Ctrl + Shift + ↑`            | Bring the selected shape forward one step |
 | `Ctrl + Shift + ↓`            | Send the selected shape backward one step |
 | `Ctrl + Shift + Alt + ↑`      | Bring the selected shape to the front |

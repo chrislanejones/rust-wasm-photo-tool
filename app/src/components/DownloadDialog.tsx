@@ -367,7 +367,9 @@ function ExportBody({
         <ToolButtonGroup<FormatTileId>
           aria-label="Format"
           stacked
-          columns={3}
+          // Four to a row, not three (11-23): the raster set wrapped to a
+          // second row of one or two. Same tiles, the group's own 4 variant.
+          columns={4}
           value={tileValue}
           onChange={(id) => {
             const t = tiles.find((o) => o.id === id);
