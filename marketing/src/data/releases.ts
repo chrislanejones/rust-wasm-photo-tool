@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.75",
+    date: "2026-11-24",
+    headline: "Export shows only what applies.",
+    entries: [
+      { tag: "ui", text: "Export leaves out what doesn't apply instead of graying it out: File Name on one image, Recipe and Batch settings on all of them." },
+      { tag: "ui", text: "Format tiles say JPEG, PNG, WebP and AVIF, with a line about the one you picked." },
+      { tag: "ui", text: "Camera info sits in a Privacy & metadata drop-down that shows its setting while closed." },
+      { tag: "ui", text: "Export's footer says what you'll get, and Download is the one solid button." },
+      { tag: "fix", text: "Screen readers no longer hear each export format twice." },
+      { tag: "infra", text: "The Annotate page and the architecture diagram catch up with v9.74's editable stamps and engine size." },
+    ],
+  },
+  {
     version: "v9.74",
     date: "2026-11-23",
     headline: "Stamps you can edit, color first in the tool panels, and V for Select Objects.",

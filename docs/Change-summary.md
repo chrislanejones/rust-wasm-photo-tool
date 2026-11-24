@@ -12335,3 +12335,21 @@ Verification: run after the trail data regen. 0 broken relative links across 167
 Engine: **979,674 B** (was 973,825; +5,849 for the border). One fix on landing #514: `STAMP_TILT_DEG` loses its unused `export` (the dead-exports guardrail was red on the PR).
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,545/2,545; marketing build passes. e2e on a production build, 15 specs touched by the three changes (`stamps`, `ui-night8-finish`, `annotation-multiselect`, `callout-leader`, `one-tile-per-subtool`, `text-box-survives`, `export-dialog`, `diagram-shapes`, `shapes-fill-first`, `ui-night3-panels`, `text-align`, `text-commit-one-step`, `text-placement-undo`, `text-preview-size`, `annotation-performance`): 108 passed, 9 skipped (opt-in), 0 failed. Rust gates run by the pre-push hook.
+
+## v9.75 Change Summary — 2026-11-24
+
+**Export shows only what applies.**
+
+| Area | Change |
+| --- | --- |
+| Export (#515) | Adapts to the task; nothing is grayed out to keep the dialog's shape. **Selected image \| All images (N)**. Selected: **File Name** with the extension inside the same box (`FIELD_BASE_GROUP`). All: **Recipe** + Save recipe, then **Batch settings** (Size, Naming, Camera info, Packaging). Raster \| Vector \| With Layers, With Layers left out on All. |
+| Export (#515) | Format tiles named **JPEG / PNG / WebP / AVIF** (plugin formats by their name), one line under them for the picked one. Camera Info moves into a closed **Privacy & metadata** drop-down (`CollapsibleSection`) with its choice on the right. Footer: "name.jpg · 1 image · JPEG", Share link, Clipboard and **one solid primary** (`CONFIRM_AFFIRMATIVE`). 512 → 576 px. |
+| Accessibility (#515) | The file-type icons are `aria-hidden`: with the format as the label, their lettering made a screen reader say "JPEG JPEG". |
+| Docs | Features chapter; Parking Lot gains the design review's "eventually" list (size estimate, quality slider, resize on export, compression preview, single-image recipes), the trail-data UTC day quirk and the emoji lazy-load size win. |
+| Marketing | The Annotate page no longer says "red review stamps": stamps take any word and can be retyped later (v9.74). The architecture diagram's engine reads 980 KB (979,674 B), and its PDF is regenerated (overlap check passed). |
+| Trail Log | Squares catch up through 11-24. |
+
+No engine change (979,674 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,548/2,548 (3 new in `DownloadDialog.adapts.test.tsx`); marketing build passes. e2e on a production build, 10 export specs (`export-dialog`, `camera-info`, `bulk-night`, `svg-passthrough`, `zip-export`, `pane-header-row`, `plugins`, `beta-switches`, `batch-redact`, `export-file-name`): 31 passed; one stale assertion updated, then `camera-info` 4/4.
+

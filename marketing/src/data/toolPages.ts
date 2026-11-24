@@ -174,7 +174,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
     description:
       "Add arrows, boxes, numbered pins, speech bubbles, real text and emoji. Everything stays editable until export, snaps to a grid, and never leaves your machine.",
     h1: "Annotate a screenshot or a photo",
-    lede: "Arrows, boxes, circles, diamonds, triangles, stars, numbered pins, speech bubbles, text in real typefaces, emoji and red review stamps. Turn any shape by its handle. Everything stays an object you can move, recolor or delete until you export. Snap to a nine-cell grid to line things up.",
+    lede: "Arrows, boxes, circles, diamonds, triangles, stars, numbered pins, speech bubbles, text in real typefaces, emoji, and stamps with any word (APPROVED, PAID…) that you can retype later. Turn any shape by its handle. Everything stays an object you can move, recolor or delete until you export. Snap to a nine-cell grid to line things up.",
     runsOn: "local",
     does: [
       "Arrows, boxes, circles, diamonds, triangles, lines and stars, in any color",
@@ -182,7 +182,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Numbered pins that count themselves up, and close the gap when one goes",
       "Callouts: a pin, a label and a leader line in one click",
       "Speech bubbles and real text, in real typefaces",
-      "Emoji and review stamps",
+      "Emoji, and stamps you can move, retype and recolor",
       "Snap to a nine-cell grid so things line up",
       "Shift-click several and align, distribute or nudge them together",
       "Move, recolor or delete anything right up until export",

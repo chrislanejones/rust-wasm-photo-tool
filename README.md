@@ -99,22 +99,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.74 — 2026-11-23
+### v9.75 — 2026-11-24
 
-**Stamps you can edit, color first in the tool panels, and V for Select Objects.**
+**Export shows only what applies.**
 
-**Stamps** used to be burned into the picture the moment you clicked. Now a
-stamp is a text in a stamp's style: a bold word in a bordered box, tilted a
-little. After you place it you can move it, rotate it, retype it, recolor it
-and resize it, and any word works (PAID, FINAL, SOLD…). Stamps you placed
-before this stay as they are. Text also gets a **Border** of its own, under
-Background.
+The Export dialog used to gray out the rows that didn't fit what you were
+doing. Now it leaves them out. **Selected image** shows the **File Name**, with
+the extension right in the same box. **All images** shows the **Recipe** and a
+short **Batch settings** list (size, naming, camera info, ZIP) instead.
 
-**Color comes first** in Brush, Pen, Text and Arrows & Diagram Shapes, so the
-palette is the first thing you see. Text's swatches are labeled **Text Color**.
-
-**Select Objects** left the Create tiles. Press **V**, use the arrow on
-Review › Reselect, or right-click the canvas.
+The format tiles say **JPEG, PNG, WebP, AVIF** in plain words, with one line
+under them about the one you picked. Camera info moved into a closed
+**Privacy & metadata** drop-down that still shows its setting. The bottom says
+what you'll get ("photo.jpg · 1 image · JPEG"), and **Download** is the one
+solid button.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
