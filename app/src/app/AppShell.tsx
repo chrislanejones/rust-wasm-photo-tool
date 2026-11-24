@@ -48,7 +48,9 @@ import { StatusBar, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
 import type { GeneralControls } from "@/components/GeneralPane";
-import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
+import { usePreferences, canvasBgToRgba, readPreferences } from "@/lib/preferences";
+import { findRecipe } from "@/lib/exportRecipes";
+import { useZipRecipeStore } from "@/stores/useZipRecipeStore";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
@@ -1027,7 +1029,10 @@ export function AppShell() {
       plugin.download(exportName.stem());
       return;
     }
-    void handleExportAs(exportName.stem());
+    // The recipe picked under the name field, if any (Raster only — the
+    // branches above return first).
+    const prefsNow = readPreferences();
+    void handleExportAs(exportName.stem(), findRecipe(useZipRecipeStore.getState().recipeId, prefsNow.exportRecipes));
   };
 
   const handleDeleteAll = useCallback(() => {

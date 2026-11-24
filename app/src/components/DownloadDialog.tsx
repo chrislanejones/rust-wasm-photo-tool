@@ -5,16 +5,24 @@
 //
 //   Selected image                     All images (N)
 //   1. What        Selected image | All images (N)
-//   2. File Name   name + its extension, one box     Recipe: menu + Save recipe,
-//                                                    then Batch settings
+//   2. File Name   name + its extension, one box,    Recipe: menu + Save recipe,
+//                  then Recipe (Raster): menu +       then Batch settings
+//                  Save recipe, the image's settings
 //   3. Kind        Raster | Vector | With Layers     Raster | Vector (no layers
 //                  — Raster on every open             in a ZIP)
 //   4. Format      tiles named for the format (JPEG PNG WebP AVIF + plugins ·
 //                  SVG · ORA, PSD), one line under them saying what it's for
-//   5. Privacy & metadata   a drop-down, shut, its choice on the right (ADR-108)
-//   6. Footer      what you'll get ("photo.jpg · 1 image · JPEG"), the quiet
-//                  actions (Share link, Clipboard / Share All · Soon) and ONE
-//                  solid primary: Download JPEG / Download ZIP
+//   5. Privacy & Metadata   a drop-down, shut, its choice on the right (ADR-108)
+//   6. Footer      what you'll get ("photo.jpg · 1 image · JPEG" / "3 images ·
+//                  JPEG · ZIP") with how compressed it is pushed to the right
+//                  ("42% compressed" / "2 of 3 compressed"), the quiet actions
+//                  (Share link, Clipboard / Share All · Soon) and ONE solid
+//                  primary: Download JPEG / Download ZIP
+//
+// A recipe (row 2) applies to a Raster download of either scope (Chris,
+// 11-24-2026: "can single image have recipe too"). On Selected it shapes the
+// one file — size, format, quality, camera info — and the name stays the
+// field's; the extension, the summary and the button follow its format.
 //
 // Rows 1 and 3 are the top bar's ToggleButtonGroup in select mode — a radio
 // group each, one Tab stop, arrow keys. Row 4 is the Shapes picker's
@@ -70,6 +78,8 @@ import type { ActiveFormat } from "@/lib/plugins";
 import { ZipRecipePicker } from "@/components/ZipRecipePicker";
 import { CameraInfoPicker } from "@/components/CameraInfoPicker";
 import { useZipRecipe } from "@/stores/useZipRecipeStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { sizeDeltaPercent } from "@/lib/sizeDelta";
 import { CONFIRM_AFFIRMATIVE, PANEL_DIVIDER } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +103,11 @@ const isLayeredPlugin = (p: ActiveFormat) =>
 // (Chris, 11-23-2026).
 const SVG_HINT = "Keeps crop";
 const PSD_OFF_HINT = "Turn on the PSD plugin in Settings › Plugins to save PSD.";
+
+/** What a recipe's format writes — local copies, because lib/exportImage
+ *  pulls in the engine and this dialog imports its types only. */
+const RECIPE_EXT: Record<ExportFormat, string> = { jpeg: ".jpg", png: ".png", webp: ".webp", avif: ".avif" };
+const RECIPE_LABEL: Record<ExportFormat, string> = { jpeg: "JPEG", png: "PNG", webp: "WebP", avif: "AVIF" };
 
 /** The file-type glyphs carry lettering, so they get a larger slot than the
  *  tile's default 24px icon. Inline size, not a class: ToolButton's
@@ -188,7 +203,10 @@ function ExportBody({
   svg,
 }: Omit<DownloadDialogProps, "open" | "onOpenChange">) {
   const multi = photoCount > 1;
-  const recipe = useZipRecipe();
+  const pickedRecipe = useZipRecipe();
+  const photos = useGalleryStore((s) => s.photos);
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const imageSavings = useGalleryStore((s) => s.imageSavings);
   const [picked, setPicked] = React.useState<Scope>("selected");
   // An image deleted down to one while the dialog is open: back to Selected.
   const scope: Scope = multi ? picked : "selected";
@@ -306,12 +324,33 @@ function ExportBody({
   const pickedTile = tiles.find((t) => t.id === tileValue);
   const psdOff = kind === "layers" && !pluginIds.has("psd");
   const allSvg = scope === "all" && kind === "vector";
+  // A recipe shapes a Raster download in a built-in format; a plugin format
+  // writes its own file and takes none.
+  const recipeFits = kind === "raster" && !pluginIds.has(tileValue);
+  const recipe = recipeFits ? pickedRecipe : null;
 
   const zipAs = allSvg ? "SVG" : recipe ? recipe.name : zipLabel;
   const zipCount = allSvg ? svg.all : photoCount;
+  // On Selected the recipe's format is what gets written.
+  const fileExt = scope === "selected" && recipe ? RECIPE_EXT[recipe.format] : ext;
+  const primaryLabel = scope === "selected" && recipe ? `Download ${RECIPE_LABEL[recipe.format]}` : downloadLabel;
   // The footer's "what you'll get" line.
-  const formatName = downloadLabel.replace(/^Download\s+/, "");
-  const fileTitle = `${fileName.value.trim() || fileName.defaultStem}${ext}`;
+  const formatName = recipe ? recipe.name : downloadLabel.replace(/^Download\s+/, "");
+  const fileTitle = `${fileName.value.trim() || fileName.defaultStem}${fileExt}`;
+
+  // How compressed it is, on the footer's right: the open image's size against
+  // its upload (the gallery badge's number, lib/sizeDelta), or how many of the
+  // ZIP's images are smaller than their upload. An SVG ZIP is the uploads as
+  // they are, so it says nothing.
+  const deltaOf = (p: (typeof photos)[number]) => sizeDeltaPercent(p) ?? imageSavings[p.id]?.savingsPercent ?? 0;
+  const active = photos.find((p) => p.id === activePhotoId);
+  let compressed = "";
+  if (scope === "selected") {
+    const d = active ? deltaOf(active) : 0;
+    compressed = d > 0 ? `${d}% compressed` : d < 0 ? `${-d}% larger` : "Not compressed";
+  } else if (!allSvg) {
+    compressed = `${photos.filter((p) => deltaOf(p) > 0).length} of ${photos.length} compressed`;
+  }
 
   return (
     <>
@@ -347,20 +386,24 @@ function ExportBody({
           ]}
         />
 
-        {/* 2. File Name (Selected) or Recipe + Batch settings (All). Each
-            image in a ZIP keeps its own name, so All has no name field; a
-            recipe shapes a ZIP, so Selected has no recipe. An SVG ZIP is the
-            uploaded files as they are, so it takes no recipe either. */}
+        {/* 2. File Name + Recipe (Selected) or Recipe + Batch settings (All).
+            Each image in a ZIP keeps its own name, so All has no name field.
+            A recipe is for Raster: an SVG is the uploaded file as it is, a
+            layered file is the whole project, and a plugin format writes
+            its own file. */}
         {scope === "selected" ? (
-          <ExportFileNameField
-            value={fileName.value}
-            defaultStem={fileName.defaultStem}
-            onChange={fileName.onChange}
-            ext={ext}
-            onSubmit={onDownload}
-          />
+          <>
+            <ExportFileNameField
+              value={fileName.value}
+              defaultStem={fileName.defaultStem}
+              onChange={fileName.onChange}
+              ext={fileExt}
+              onSubmit={onDownload}
+            />
+            {recipeFits && <ZipRecipePicker zipFormat={zipFormat} scope="selected" />}
+          </>
         ) : (
-          kind === "raster" && <ZipRecipePicker zipFormat={zipFormat} />
+          recipeFits && <ZipRecipePicker zipFormat={zipFormat} />
         )}
 
         {/* 3. Kind. With Layers is one file at a time, so All leaves it out. */}
@@ -419,25 +462,33 @@ function ExportBody({
           )}
         </div>
 
-        {/* 5. Privacy & metadata (ADR-108), a drop-down. An SVG carries no
+        {/* 5. Privacy & Metadata (ADR-108), a drop-down. An SVG carries no
             camera info. */}
         {kind !== "vector" && (
-          <CameraInfoPicker variant="dropdown" recipeChoice={scope === "all" ? recipe?.cameraInfo : undefined} />
+          <CameraInfoPicker variant="dropdown" recipeChoice={recipe?.cameraInfo} />
         )}
 
         {/* 6. Footer: what you'll get, the quiet actions, ONE primary — the
             confirm dialogs' solid "yes, do it" fill. */}
         <div data-slot="export-footer" className={cn(PANEL_DIVIDER, "space-y-3")}>
-          <p id="export-summary" className="truncate text-2xs text-theme-muted-foreground">
-            {scope === "selected" ? (
-              <>
-                <span className="font-mono text-text-primary">{fileTitle}</span>
-                {` · 1 image · ${formatName}`}
-              </>
-            ) : (
-              `${zipCount} images · ${zipAs} · ZIP`
+          {/* What you'll get on the left, how compressed on the right. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 text-2xs text-theme-muted-foreground">
+            <p id="export-summary" className="truncate">
+              {scope === "selected" ? (
+                <>
+                  <span className="font-mono text-text-primary">{fileTitle}</span>
+                  {` · 1 image · ${formatName}`}
+                </>
+              ) : (
+                `${zipCount} images · ${zipAs} · ZIP`
+              )}
+            </p>
+            {compressed && (
+              <p data-testid="export-compressed" className="text-right tabular-nums">
+                {compressed}
+              </p>
             )}
-          </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {scope === "selected" ? (
               <>
@@ -451,7 +502,7 @@ function ExportBody({
                   aria-describedby="export-summary"
                   className={cn("ml-auto", CONFIRM_AFFIRMATIVE)}
                 >
-                  {downloadLabel}
+                  {primaryLabel}
                 </PanelAction>
               </>
             ) : (

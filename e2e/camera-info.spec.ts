@@ -61,8 +61,8 @@ async function openExport(page: Page, pane: "Selected" | "All") {
   // One step now: pick Selected or All in the first row (All is off with
   // one photo, and Selected is already picked).
   if (pane === "All") await dialog.getByRole("radio", { name: /^All images/ }).click();
-  // Camera Info lives in the shut "Privacy & metadata" drop-down: open it.
-  const privacy = dialog.getByRole("button", { name: /^Privacy & metadata/ });
+  // Camera Info lives in the shut "Privacy & Metadata" drop-down: open it.
+  const privacy = dialog.getByRole("button", { name: /^Privacy & Metadata/ });
   if ((await privacy.getAttribute("aria-expanded")) === "false") await privacy.click();
   return dialog;
 }

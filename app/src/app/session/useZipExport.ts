@@ -20,8 +20,8 @@ import { CAMERA_INFO_LABEL, cameraInfoForReencoded, cameraInfoOf, carriesSourceT
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { makeWorkingCopy } from "@/lib/workingCopy";
-import { cropRgba } from "@/lib/batchCrop";
-import { findRecipe, recipeFileStem, recipeGeometry, type ExportRecipe } from "@/lib/exportRecipes";
+import { findRecipe, recipeFileStem } from "@/lib/exportRecipes";
+import { applyRecipe } from "@/lib/applyRecipe";
 import { readPreferences } from "@/lib/preferences";
 import { patternNeedsNameFacts } from "@/lib/nameTokens";
 import { loadNameFacts } from "@/lib/photoNameFacts";
@@ -48,37 +48,8 @@ interface ZipDeps {
 /** Ten minutes: a 100-photo gallery re-encoded on a slow laptop, with room. */
 const ZIP_TIMEOUT_MS = 600_000;
 
-const LANCZOS3 = 3;
 /** Larger than any photo the pixel budget lets through: decode at full size. */
 const FULL_RESOLUTION = Number.MAX_SAFE_INTEGER;
-
-/**
- * One photo through a recipe (Night 10-28, 229): crop for an exact size,
- * scale with the engine's Lanczos3, encode at the recipe's format and
- * quality. Works on a COPY of the photo's pixels — the gallery never changes.
- */
-async function applyRecipe(
-  pixels: Uint8Array,
-  w: number,
-  h: number,
-  recipe: ExportRecipe,
-): Promise<{ blob: Blob; width: number; height: number }> {
-  const mod = await import("stamp_tool");
-  await mod.default();
-  const g = recipeGeometry(w, h, recipe.size);
-  const whole = g.crop.width === w && g.crop.height === h;
-  let out = whole ? pixels : cropRgba(pixels, w, g.crop);
-  if (g.width !== g.crop.width || g.height !== g.crop.height) {
-    out = mod.resize_pixels_filter(out, g.crop.width, g.crop.height, g.width, g.height, LANCZOS3);
-  }
-  const blob =
-    recipe.format === "png"
-      ? new Blob([new Uint8Array(mod.encode_png_pixels_quality(out, g.width, g.height, recipe.quality))], {
-          type: "image/png",
-        })
-      : await encodeRgba(out === pixels ? out.slice() : out, g.width, g.height, recipe.format, recipe.quality / 100);
-  return { blob, width: g.width, height: g.height };
-}
 
 export function useZipExport(deps: ZipDeps) {
   const { run, state } = useAsyncTask();
