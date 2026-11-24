@@ -66,5 +66,11 @@ export const defaultToolSettings: ToolSettings = {
   textStrokeWidth: 0,
   textStrokeColor: "#000000",
   textStrokeOpacity: 100,
+  textBorderWidth: 0,
+  textBorderColor: "#000000",
+  textBorderOpacity: 100,
+  stampLabel: "APPROVED",
+  stampColor: "#22c55e", // PALETTE.green, APPROVED's
+  stampSize: 48,
   pinLabel: "numbers",
 };

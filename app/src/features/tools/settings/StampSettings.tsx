@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
-import { Copy, Stamp as StampIcon, Smile } from "lucide-react";
+import { Copy, Smile } from "lucide-react";
 import type { StampSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { StabilizerRow } from "./StabilizerRow";
@@ -9,7 +9,6 @@ import { useToolStore } from "@/stores/useToolStore";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { useResolvedTheme } from "@/lib/useTheme";
-import { useRadioGroup } from "@/components/ui/use-radio-group";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
@@ -27,33 +26,19 @@ interface StampSettingsPanelProps {
   onModeChange?: (mode: StampMode) => void;
 }
 
-/** Red stamp presets that get rendered via OffscreenCanvas → Rust stamp_pixels */
-const RED_STAMP_PRESETS = [
-  { id: "rejected", label: "REJECTED", color: "#dc2626" },
-  { id: "approved", label: "APPROVED", color: "#16a34a" },
-  { id: "draft", label: "DRAFT", color: "#d97706" },
-  { id: "confidential", label: "CONFIDENTIAL", color: "#dc2626" },
-  { id: "review", label: "UNDER REVIEW", color: "#2563eb" },
-] as const;
-const RED_STAMP_IDS = RED_STAMP_PRESETS.map((p) => p.id);
+/** "red" (Red Stamps) moved to the Text tool as its Stamps mode in v17
+ *  (ADR-109): a stamp is an editable text now. */
+export type StampMode = "clone" | "emojis";
 
-export type StampMode = "clone" | "red" | "emojis";
-
-/** Stamp's sub-modes for the shared ToolModeToggle — same 3-column icon-grid
- *  pattern the Ratio picker uses (see ShapeSettings.tsx's SHAPES_TOOL_MODES
- *  for the identical treatment). */
+/** Stamp's sub-modes for the shared ToolModeToggle — the icon-grid pattern
+ *  the Ratio picker uses (see ShapeSettings.tsx's SHAPES_TOOL_MODES for the
+ *  identical treatment). */
 const STAMP_TOOL_MODES: readonly ToolMode<StampMode>[] = [
   {
     id: "clone",
     label: "Clone Stamp",
     icon: Copy,
     info: "Alt+Click to set the clone source, then paint elsewhere on the canvas to stamp copies of it.",
-  },
-  {
-    id: "red",
-    label: "Stamps",
-    icon: StampIcon,
-    info: "Select a stamp, then click on the image to place it. Full undo/redo via Rust.",
   },
   {
     id: "emojis",
@@ -76,7 +61,6 @@ export function StampSettingsPanel({
   const [internalMode, setInternalMode] = useState<StampMode>("clone");
   const mode = activeMode ?? internalMode;
   const emojiTheme = useResolvedTheme();
-  const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
   // The stroke stabilizer is a ToolSettings field shared by paint, eraser,
   // blur and the clone stamp; this panel is handed StampSettings, so it reads
   // and writes the one shared field directly rather than growing a copy.
@@ -86,38 +70,13 @@ export function StampSettingsPanel({
   const handleModeChange = (id: string) => {
     const m = id as StampMode;
     setInternalMode(m);
-    // Sub-mode teardown clears the armed stamp (useStampTeardown), so the
-    // panel's own selection highlight must not survive the switch either —
-    // otherwise a stamp looks selected while clicks no longer place it.
-    setSelectedStampId(null);
     onModeChange?.(m);
   };
-
-  const handleStampPreset = (id: string, label: string, color: string) => {
-    setSelectedStampId(id);
-    window.dispatchEvent(
-      new CustomEvent("red-stamp-select", {
-        detail: { label, color },
-      }),
-    );
-  };
-
-  // The presets pick exactly one stamp, so they are a named radio group. The
-  // chosen one showed only as a solid border and a dot.
-  const stampRadio = useRadioGroup({
-    ids: RED_STAMP_IDS,
-    selected: selectedStampId ?? undefined,
-    isDisabled: () => false,
-    onSelect: (id) => {
-      const stamp = RED_STAMP_PRESETS.find((p) => p.id === id)!;
-      handleStampPreset(stamp.id, stamp.label, stamp.color);
-    },
-  });
 
   return (
     <ToolModeToggle
       modes={STAMP_TOOL_MODES}
-      columns={3}
+      columns={2}
       activeMode={mode}
       onModeChange={handleModeChange}
     >
@@ -178,74 +137,6 @@ export function StampSettingsPanel({
                     setToolSettings((p) => ({ ...p, paintStabilizer }))
                   }
                 />
-              </>
-            );
-
-          // ── Red Stamps ──
-          case "red":
-            return (
-              <>
-                {/* Brush Size */}
-                <SizeSlider
-                  label="Brush Size"
-                  value={settings.brushSize}
-                  min={4}
-                  max={64}
-                  onChange={(v) => onChange({ ...settings, brushSize: v })}
-                  presets={SIZE_PRESETS}
-                />
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-2" {...stampRadio.groupProps} aria-label="Stamp">
-                    {RED_STAMP_PRESETS.map((stamp, i) => {
-                      const isSelected = selectedStampId === stamp.id;
-                      return (
-                        <button
-                          key={stamp.id}
-                          type="button"
-                          {...stampRadio.itemProps(i)}
-                          onClick={() =>
-                            handleStampPreset(stamp.id, stamp.label, stamp.color)
-                          }
-                          className="relative flex items-center justify-center py-3 px-4 rounded-lg border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                          style={{
-                            borderStyle: isSelected ? "solid" : "dashed",
-                            borderColor: isSelected
-                              ? stamp.color
-                              : stamp.color + "60",
-                            backgroundColor: isSelected
-                              ? stamp.color + "20"
-                              : stamp.color + "08",
-                            boxShadow: isSelected
-                              ? `0 0 0 1px ${stamp.color}40, 0 0 12px ${stamp.color}25`
-                              : "none",
-                          }}
-                        >
-                          {isSelected && (
-                            <span
-                              className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: stamp.color }}
-                            />
-                          )}
-                          <span
-                            className="text-sm font-bold tracking-[0.15em] uppercase"
-                            style={{
-                              color: stamp.color,
-                              fontFamily: '"Arial Black", "Impact", sans-serif',
-                              transform: "rotate(-2deg)",
-                              display: "inline-block",
-                              textShadow: isSelected
-                                ? `0 0 20px ${stamp.color}50`
-                                : `0 0 20px ${stamp.color}20`,
-                            }}
-                          >
-                            [{stamp.label}]
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </>
             );
 

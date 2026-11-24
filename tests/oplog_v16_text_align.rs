@@ -40,6 +40,24 @@ fn fnv(bytes: &[u8]) -> u64 {
     })
 }
 
+/// The same frames with each frame's version byte set to the current one.
+///
+/// Re-encoding a log writes the CURRENT version byte. v17 (ADR-109) moved it
+/// on and changed no v16 payload, so a v16 log re-encodes to these bytes:
+/// every frame identical after its version byte. Frame layout:
+/// `[u32 LE length][version u8] postcard(op)`.
+fn as_current_version(frames: &[u8]) -> Vec<u8> {
+    let mut out = frames.to_vec();
+    let mut at = 0;
+    while at + 4 < out.len() {
+        let len = u32::from_le_bytes([out[at], out[at + 1], out[at + 2], out[at + 3]]) as usize;
+        out[at + 4] = stamp_tool::ops::OP_FORMAT_VERSION;
+        at += 4 + len;
+    }
+    assert_eq!(at, out.len(), "the frames parse end to end");
+    out
+}
+
 fn resume(annotations: &[u8], frames: &[u8], cursor: u32) -> ImageHorseTool {
     let mut t = ImageHorseTool::new(320, 200);
     assert!(
@@ -96,8 +114,12 @@ fn a_v16_log_round_trips_the_alignment() {
         V16_COMPOSITE,
         "the pixels it was written with"
     );
-    // Re-encoding what was read gives back the same bytes.
-    assert_eq!(t.oplog_encoded_ops(0, V16_OPS), V16_FRAMES);
+    // Re-encoding what was read gives back the same ops, under the current
+    // version byte.
+    assert_eq!(
+        t.oplog_encoded_ops(0, V16_OPS),
+        as_current_version(V16_FRAMES)
+    );
 
     // Back two ops: before Center and Right, both Left again.
     let t = resume(V16_ANNOTATIONS, V16_FRAMES, V16_OPS - 2);
@@ -132,8 +154,8 @@ fn a_v16_log_round_trips_the_vertical_row() {
     );
     assert_eq!(
         t.oplog_encoded_ops(0, BOX_OPS),
-        BOX_FRAMES,
-        "re-encodes to the same bytes"
+        as_current_version(BOX_FRAMES),
+        "re-encodes to the same ops under the current version byte"
     );
     let (mid_top, mid_bottom) = ink_rows(&t, 20, 166);
     let (low_top, low_bottom) = ink_rows(&t, 170, 316);

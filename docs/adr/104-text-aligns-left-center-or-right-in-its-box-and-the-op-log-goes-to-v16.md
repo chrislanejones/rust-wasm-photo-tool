@@ -113,6 +113,14 @@ text open is saved as the preference (`holdTextAlignForEdit` /
 `isTextAlignHeldForEdit` in `stores/useToolStore`). Re-aligning an old caption
 no longer changes where the next new text starts. No format change.
 
+### Addendum, 11-23-2026: re-editing keeps the text's look (ADR-109)
+
+The cost listed above, "the panel does not load the text's own values", is
+closed for the look: opening an existing text now holds its background,
+shadow, outline and box border in the panel for the edit, as the Text in Box
+cell already was (`holdTextLookForEdit`, `releaseTextEditHold`). The face is
+still the panel's. See ADR-109.
+
 ### Addendum, 11-12-2026: a new callout label starts centered (11-10 Q3)
 
 A callout label used to take the Text panel's remembered cell. A NEW label

@@ -211,12 +211,12 @@ const CARD_COPY: Record<string, CardCopy> = {
     detail:
       "Browser renders to OffscreenCanvas; pixels sent to WASM stamp_pixels() for alpha compositing.",
   },
-  "Red Stamps": {
+  "Stamps": {
     group: "annotate",
-    title: "Red Stamps",
-    plain: "REJECTED, APPROVED, DRAFT, CONFIDENTIAL, UNDER REVIEW — one click each.",
+    title: "Stamps",
+    plain: "APPROVED, REJECTED, DRAFT, or any word you type — then move, retype or recolor it.",
     detail:
-      'JS renders the label to OffscreenCanvas; Rust scales to brush size via bilinear resize and composites with a "Red Stamp" history entry.',
+      "A stamp is an editable text: a bold word in a bordered, transparent box, tilted a few degrees. The engine draws the border inside the box edge, so it stays sharp at any size and undoes, reloads and syncs like any text.",
   },
   "Clone Stamp": {
     group: "annotate",

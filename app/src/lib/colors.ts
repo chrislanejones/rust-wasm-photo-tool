@@ -1,6 +1,7 @@
 /** Shared color palettes for tool settings panels. */
 
-const PALETTE = {
+/** The one palette every panel's swatches are drawn from. */
+export const PALETTE = {
   white:  "#ffffff",
   black:  "#000000",
   red:    "#ef4444",

@@ -19,7 +19,6 @@
 // gesture carries no `cursor`, and those are exactly the ones that idle here.
 // Cursor and handlers are two views of one fact, so they are declared together
 // (toolGroups.ts) and read together.
-import type { MouseEvent } from "react";
 import type { useCloneStamp } from "./useCloneStamp";
 import type { useColorPicker } from "./useColorPicker";
 import type { useMoveLayerTool } from "./useMoveLayerTool";
@@ -27,7 +26,6 @@ import type { useDrawingTools } from "./useDrawingTools";
 import type { usePaintTool } from "./usePaintTool";
 import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
-import type { useRedStampTool } from "./useRedStampTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 
 type Stamp = ReturnType<typeof useCloneStamp>;
@@ -53,7 +51,6 @@ interface UseEffectiveToolParams {
   blurUp: Stamp["onMouseUp"];
   paintTool: ReturnType<typeof usePaintTool>;
   emojiTool: ReturnType<typeof useEmojiTool>;
-  redStampTool: ReturnType<typeof useRedStampTool>;
 }
 
 export function useEffectiveTool({
@@ -73,7 +70,6 @@ export function useEffectiveTool({
   blurUp,
   paintTool,
   emojiTool,
-  redStampTool,
 }: UseEffectiveToolParams): Stamp {
   // Idle handlers for sub-tools that don't paint on the canvas. The clone
   // stamp's own onMouseDown/Move/Up ride along on `...stamp`; without
@@ -212,24 +208,10 @@ export function useEffectiveTool({
         case "emoji":
           return use(emojiTool);
         case "clone-stamp":
-        case "stamps": {
-          // Both keep the clone stamp's full surface (source point, preview),
-          // with the red/batch stamp taking the press when one is pending —
-          // preserved exactly as it behaved under the old `stamp` branch.
-          // `async` + `await` on the stamp branch: since Stage 3.5 its
-          // onMouseDown is async, and dropping the promise here would make the
-          // press fire-and-forget — the caller could not sequence anything
-          // after it, and a rejection would surface as an unhandled rejection
-          // rather than at the call site. The red-stamp branch is still sync.
-          const combinedDown: typeof stamp.onMouseDown = async (e) => {
-            if (redStampTool.hasPendingStamp()) {
-              redStampTool.onMouseDown(e as MouseEvent<HTMLCanvasElement>);
-            } else {
-              await stamp.onMouseDown(e);
-            }
-          };
-          return { ...stamp, onMouseDown: combinedDown };
-        }
+          // The clone stamp's full surface (source point, preview). Stamps
+          // shared this branch until v17, when a pending red stamp took the
+          // press; Stamps are a Text mode now (ADR-109), dispatched below.
+          return stamp;
         case "shapes":
         case "pins":
         case "arrow":
@@ -238,9 +220,11 @@ export function useEffectiveTool({
         case "select-objects":
         case "text":
         case "ocr":
-          // Text placement is handled a level up (useTextTool via CanvasArea)
-          // and OCR reads the whole image from the panel — both idle here, as
-          // `text` did before this rewrite.
+        case "stamps":
+          // Text placement — and a stamp, which is a text (ADR-109) — is
+          // handled a level up (useTextTool via CanvasArea), and OCR reads the
+          // whole image from the panel — all idle here, as `text` did before
+          // this rewrite.
           return idle;
         default:
           return idle;

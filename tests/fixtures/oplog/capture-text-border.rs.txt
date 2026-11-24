@@ -1,0 +1,52 @@
+// Fixture generator (ADR-109, op log v17). Not part of the suite: copy to
+// tests/zz_capture.rs and run with
+// OUT=<dir> cargo test --features tiles --test zz_capture -- --ignored
+use stamp_tool::ImageHorseTool;
+
+#[test]
+#[ignore]
+fn capture() {
+    let out = std::env::var("OUT").expect("OUT"); // allow: rust-panic
+    let (w, h) = (320u32, 200u32);
+    let mut t = ImageHorseTool::new(w, h);
+    t.load_image(&vec![240u8; (w * h * 4) as usize]);
+    t.set_oplog_undo(true);
+    // A stamp: bold green word, transparent box, tilted -5°, centered, with a
+    // border — placed as ONE step (the joined commit the Stamps panel makes).
+    let a = t.add_text_annotation(
+        "APPROVED", 28.0, 22, 163, 74, true, 30, 30, -5.0, 1, 22, 163, 74, 0, 9, 4, 0, "",
+    );
+    t.recomposite();
+    t.continue_step();
+    t.set_text_align(a, 1);
+    t.continue_step();
+    t.set_text_border(a, 3, "#16a34a", 255);
+    t.recomposite();
+    // A white speech bubble, then a red border on it as a step of its own.
+    let b = t.add_text_annotation(
+        "Hello", 22.0, 20, 20, 20, false, 170, 110, 0.0, 2, 255, 255, 255, 255, 10, 12, 135, "",
+    );
+    t.recomposite();
+    t.set_text_border(b, 2, "#dc2626", 255);
+    t.recomposite();
+    let n = t.oplog_op_count() as u32;
+    std::fs::write(format!("{out}/frames.bin"), t.oplog_encoded_ops(0, n)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/annotations.bin"), t.oplog_keyframe_annotations(0)).unwrap(); // allow: rust-panic
+    std::fs::write(format!("{out}/base.png"), t.oplog_keyframe_png(0)).unwrap(); // allow: rust-panic
+    let px = t.get_image_data();
+    let fnv = px.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| {
+        (h ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    std::fs::write(
+        format!("{out}/meta.txt"),
+        format!(
+            "ops {n} cursor {} broken {} coverage {} undo {} fnv {fnv:#018x}\n{}",
+            t.oplog_cursor(),
+            t.oplog_is_broken(),
+            t.oplog_coverage(),
+            t.undo_count(),
+            t.get_text_annotations()
+        ),
+    )
+    .unwrap(); // allow: rust-panic
+}

@@ -4,9 +4,10 @@ use crate::{transform, ImageHorseTool};
 /// the text tool and red stamp presets — the browser is no longer involved in
 /// font rasterisation, everything runs inside the WASM binary.
 ///
-/// Two public entry points:
-///   render_text       — plain multi-line text (text tool)
-///   render_stamp_label — bordered, slightly-rotated stamp label (red stamps)
+/// Public entry point: `render_text`, plain multi-line text (text tool).
+/// Stamps are text annotations too since v17 (ADR-109) — a bordered box
+/// drawn by `layer::build_annotation_tile` — so this module no longer has a
+/// stamp renderer of its own.
 ///
 /// ## The `font_id` parameter
 ///
@@ -220,69 +221,6 @@ fn render_text_with(
         width: canvas_w,
         height: canvas_h,
     }
-}
-
-/// Render a stamp label (e.g. "REJECTED") with a border rect, at `font_size`,
-/// and rotate the whole result by -5 degrees.
-/// The caller scales the result to brush size via `resize_bilinear`.
-pub fn render_stamp_label(
-    label: &str,
-    font_size: f32,
-    r: u8,
-    g: u8,
-    b: u8,
-    angle_deg: f32,
-) -> RenderedText {
-    let font = crate::fonts::embedded_bold();
-    let scale = PxScale::from(font_size);
-    let sf = font.as_scaled(scale);
-
-    let text_w = line_width(label, &font, scale).ceil() as u32;
-    let text_h = font_size.ceil() as u32;
-    let ascent = sf.ascent();
-
-    let pad: u32 = (font_size * 0.4).ceil() as u32;
-    let canvas_w = text_w + pad * 2;
-    let canvas_h = text_h + pad * 2;
-
-    let mut pixels = vec![0u8; (canvas_w * canvas_h * 4) as usize];
-
-    // Border rect (3px wide)
-    let border = 3u32;
-    for y in 0..canvas_h {
-        for x in 0..canvas_w {
-            let on_border =
-                x < border || x >= canvas_w - border || y < border || y >= canvas_h - border;
-            if on_border {
-                let idx = ((y * canvas_w + x) * 4) as usize;
-                pixels[idx] = r;
-                pixels[idx + 1] = g;
-                pixels[idx + 2] = b;
-                pixels[idx + 3] = 220; // ~86% opacity
-            }
-        }
-    }
-
-    // Text centered, 85% opacity
-    let text_start_x = pad as f32;
-    let baseline_y = pad as f32 + ascent;
-    rasterise_line(
-        label,
-        &font,
-        scale,
-        text_start_x,
-        baseline_y,
-        canvas_w,
-        canvas_h,
-        r,
-        g,
-        b,
-        0.85,
-        &mut pixels,
-    );
-
-    // Rotate by the caller-supplied tilt (red stamps default to -5°).
-    rotate_pixels(&pixels, canvas_w, canvas_h, angle_deg)
 }
 
 /// The horizontal padding `measure`/`render_text` add on EACH side of the
@@ -660,6 +598,7 @@ impl ImageHorseTool {
             crate::annotations::TextStroke::default(),
             0, // left: this path has no box
             0,
+            crate::annotations::TextBorder::default(),
         );
 
         self.snap("Text");

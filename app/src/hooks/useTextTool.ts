@@ -9,8 +9,10 @@ import { faceCss } from "@/lib/engineFonts";
 import { findForeignAnnotation } from "@/lib/annotationHitTest";
 import { followLabels, removeText } from "@/hooks/usePinSteps";
 import { useTextEditEnd } from "@/hooks/useTextEditEnd";
-import { noBoxPreviewWidth, textAlignEngineArg, textAlignFromEngine, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
-import { holdTextAlignForEdit, restoreTextAlignPreference } from "@/stores/useToolStore";
+import { noBoxPreviewWidth, textAlignEngineArg, textAlignFromEngine, textBorderEngineArgs, textStrokeEngineArgs } from "@/lib/textOverlaySettings";
+import { holdTextAlignForEdit, holdTextLookForEdit, releaseTextEditHold, useToolStore } from "@/stores/useToolStore";
+import { textLookOf, type AnnotationLook } from "@/lib/textLook";
+import { placeStamp } from "@/lib/stamps";
 import { joinedSetters } from "@/lib/commitSteps";
 import { alignShiftFrom } from "@/lib/textPreviewLayout";
 
@@ -30,7 +32,7 @@ interface TextInput {
 }
 
 /** Shape of one entry returned from `tool.get_text_annotations()`. */
-interface AnnotationMeta {
+interface AnnotationMeta extends AnnotationLook {
   id: number;
   text: string;
   x: number;
@@ -282,7 +284,7 @@ export function useTextTool({
           textInputRef.current = null;
           setTextInput(null);
           tool.set_editing_text(-1);
-          restoreTextAlignPreference();
+          releaseTextEditHold();
         }
       }
       // Drop stale hover.
@@ -496,9 +498,13 @@ export function useTextTool({
         async (id) => {
           if (id !== null && id >= 0) await tool.set_text_stroke(id, ...textStrokeEngineArgs(s));
         },
+        // v17 — the box border (ADR-109), same contract.
+        async (id) => {
+          if (id !== null && id >= 0) await tool.set_text_border(id, ...textBorderEngineArgs(s));
+        },
       ],
     );
-    restoreTextAlignPreference();
+    releaseTextEditHold();
     await refreshAnnotations();
     flushToCanvas();
     syncState();
@@ -600,6 +606,9 @@ export function useTextTool({
       // it, and a grid change stays with this text; closing the editor puts
       // the saved choice back (restoreTextAlignPreference).
       holdTextAlignForEdit(textAlignFromEngine(ann.align));
+      // …and its whole box look, for the same reason: a commit reads the panel,
+      // so the panel has to hold what this text already is (ADR-109).
+      holdTextLookForEdit(textLookOf(ann));
       textInputRef.current = next;
       setTextInput(next);
       // Suppress this annotation's baked tile while the textarea overlay is
@@ -635,6 +644,21 @@ export function useTextTool({
       if (ann) await editAnnotation(ann);
     },
     [toolRef, editAnnotation],
+  );
+
+  /** Place the Stamps panel's stamp centered on (x, y), one undo step, and
+   *  make it the selected object, as a committed text is. */
+  const stampAt = useCallback(
+    async (tool: ImageHorseTool, x: number, y: number) => {
+      const { stampLabel, stampColor, stampSize } = settingsRef.current;
+      const id = await placeStamp(tool, { label: stampLabel, color: stampColor, size: stampSize }, x, y);
+      if (id === null) return;
+      await refreshAnnotations();
+      flushToCanvas();
+      syncState();
+      useAnnotationStore.getState().setSelectedObject({ key: `t${id}`, type: "text", id, label: "Stamp" });
+    },
+    [refreshAnnotations, flushToCanvas, syncState],
   );
 
   const onCanvasClick = useCallback(
@@ -711,6 +735,14 @@ export function useTextTool({
         }
       }
 
+      // Stamps (ADR-109): a miss places the panel's stamp instead of opening
+      // a blank box. A hit already opened that stamp for editing above.
+      if (useToolStore.getState().textMode === "stamps") {
+        if (textInputRef.current) await commitText();
+        if (tool) await stampAt(tool, canvasX, canvasY);
+        return;
+      }
+
       // Else open a fresh blank text input at the click position.
       if (textInputRef.current) await commitText();
       const { fontSize, fontWeight, textColor } = settingsRef.current;
@@ -742,6 +774,7 @@ export function useTextTool({
       commitText,
       pendingText,
       editAnnotation,
+      stampAt,
     ],
   );
 

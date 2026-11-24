@@ -41,7 +41,7 @@
 │  │                                                              │  │
 │  │  Tool hooks — still hand-wired in AppShell (see Planned):    │  │
 │  │  useEmojiTool, usePaintTool, useMoveLayerTool,               │  │
-│  │  usePastePlacementTool, useTextTool, useRedStampTool,        │  │
+│  │  usePastePlacementTool, useTextTool (and Stamps),            │  │
 │  │  dispatched via useEffectiveTool. A registry SHAPE exists    │  │
 │  │  (features/tools/toolModules.ts, 5 modules) but nothing      │  │
 │  │  routes through it yet.                                      │  │

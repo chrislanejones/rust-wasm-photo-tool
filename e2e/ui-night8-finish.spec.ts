@@ -112,28 +112,28 @@ test("§7 Canvas Size: no dot at the original canvas; a new width shows one; Res
   await expect(width).toHaveValue("1200");
 });
 
-// ── §4 Stamp: the preset highlight must not outlive the armed stamp ─────────
-// docs/PARKING_LOT.md (09-22-2026): switching Stamps › Clone Stamp › Stamps
-// disarms the stamp (useStampTeardown) but the panel kept its own highlight,
-// so a stamp looked picked while clicks no longer placed it.
+// ── §4 Stamp: the lit preset is what a click places ─────────────────────────
+// docs/PARKING_LOT.md (09-22-2026) was a highlight that outlived the armed
+// stamp. Since v17 (ADR-109) nothing is armed: the pick is a Text setting
+// (stampLabel / stampColor) that a click reads, so it stays lit across a trip
+// through the sibling tools — and it is still what the next click places.
 const litStamps = (page: Page) =>
-  page.getByRole("region", { name: "Tool options" }).locator("button").evaluateAll(
-    (els) => els.filter((e) => (e as HTMLElement).style.borderStyle === "solid").length,
-  );
+  page
+    .getByRole("region", { name: "Tool options" })
+    .getByRole("radiogroup", { name: "Stamp" })
+    .getByRole("radio", { checked: true })
+    .allTextContents();
 
-test("§4 Stamp: a picked preset is not still lit after Stamps › Clone Stamp › Stamps", async ({ page }) => {
+test("§4 Stamp: the picked preset stays lit, and stays what a click places, across Clone Stamp and Emoji", async ({ page }) => {
   await openTool(page, "Create", "Stamps");
-  await page.getByRole("region", { name: "Tool options" }).getByText("[APPROVED]").click();
-  await expect.poll(() => litStamps(page)).toBe(1);
+  await page.getByRole("region", { name: "Tool options" }).getByRole("radio", { name: "Draft" }).click();
+  await expect.poll(() => litStamps(page)).toEqual(["Draft"]);
   await openTool(page, "Create", "Clone Stamp");
   await openTool(page, "Create", "Stamps");
-  await expect.poll(() => litStamps(page)).toBe(0);
-  // And through the other sibling sub-tool.
-  await page.getByRole("region", { name: "Tool options" }).getByText("[DRAFT]").click();
-  await expect.poll(() => litStamps(page)).toBe(1);
+  await expect.poll(() => litStamps(page)).toEqual(["Draft"]);
   await openTool(page, "Create", "Emoji");
   await openTool(page, "Create", "Stamps");
-  await expect.poll(() => litStamps(page)).toBe(0);
+  await expect.poll(() => litStamps(page)).toEqual(["Draft"]);
 });
 
 // ── §4 the panel grammar, measured ──────────────────────────────────────────

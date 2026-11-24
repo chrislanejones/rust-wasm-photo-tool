@@ -537,6 +537,10 @@ pub(crate) fn build_annotation_tile(
     // against the widest line). Appended for the same reason as `font_id`.
     align: u8,
     box_w: u32,
+    // The border around the BOX (v17, ADR-109); `TextBorder::default()` =
+    // none. Drawn only on the background path: with no box there is nothing
+    // to go around. Appended for the same reason as `font_id`.
+    border: crate::annotations::TextBorder,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     // `align` is a 3×3 cell (ADR-104): the column places each line, the row
     // places the block in a box taller than the text.
@@ -767,6 +771,16 @@ pub(crate) fn build_annotation_tile(
 
     crate::drawing::blend_coverage(&mut tile, &cov, bg_r, bg_g, bg_b, bg_a);
 
+    // BOX BORDER (v17, ADR-109) — over the fill, under the text. A ring of the
+    // same coverage mask the fill used, so it follows the rounded corners and
+    // a bubble's tail with no second geometry to keep in step, and it sits
+    // INSIDE the box edge, so the tile, the anchor and the ink offset are
+    // exactly what they were with no border.
+    if border.is_on() {
+        let ring = box_border_ring(&cov, tile_w, tile_h, border.width);
+        crate::drawing::blend_coverage(&mut tile, &ring, border.r, border.g, border.b, border.a);
+    }
+
     crate::transform::paste_region(
         &mut tile,
         tile_w as i32,
@@ -780,6 +794,120 @@ pub(crate) fn build_annotation_tile(
 
     // Rotate the composed tile (background + text together).
     finish_tile(tile, tile_w, tile_h, rotation_deg, st)
+}
+
+/// The `width`-px band just inside the edge of a coverage mask, as coverage:
+/// what the box border (v17, ADR-109) paints.
+///
+/// Works on the mask, not on the shape that made it, so the rect, the rounded
+/// rect and the bubble (rect ∪ tail) all get the same treatment: each pixel's
+/// Euclidean distance to the nearest pixel OUTSIDE the mask (coverage < ½,
+/// the tile's surround counting as outside) decides whether it is in the band.
+/// A pixel touching the outside is at distance 1, so a band of `width` keeps
+/// distances `1..=width` at full strength and fades over the next pixel. The
+/// outer edge keeps the mask's own anti-aliasing (the band is `cov` times the
+/// inner fade), so the border's outside is exactly the fill's outside.
+///
+/// An exact distance transform (Felzenszwalb–Huttenlocher, two separable
+/// passes), so the cost is linear in the tile and the same at any width —
+/// the lesson of ADR-099's pre-mortem, where the outline's disc splat grows
+/// with the square of the width.
+pub(crate) fn box_border_ring(cov: &[f32], w: u32, h: u32, width: u32) -> Vec<f32> {
+    let (w, h) = (w as usize, h as usize);
+    if width == 0 || w == 0 || h == 0 {
+        return vec![0f32; w * h];
+    }
+    // A one-pixel OUTSIDE frame, so a box that fills its tile edge to edge
+    // still has an outside to measure from.
+    let (pw, ph) = (w + 2, h + 2);
+    let mut grid = vec![0f64; pw * ph];
+    for y in 0..h {
+        for x in 0..w {
+            if cov[y * w + x] >= 0.5 {
+                grid[(y + 1) * pw + x + 1] = EDT_INF;
+            }
+        }
+    }
+    let n = pw.max(ph);
+    let mut f = vec![0f64; n];
+    let mut d = vec![0f64; n];
+    let mut v: Vec<usize> = Vec::with_capacity(n);
+    let mut z: Vec<f64> = Vec::with_capacity(n);
+    for x in 0..pw {
+        for y in 0..ph {
+            f[y] = grid[y * pw + x];
+        }
+        edt_1d(&f[..ph], &mut d[..ph], &mut v, &mut z);
+        for y in 0..ph {
+            grid[y * pw + x] = d[y];
+        }
+    }
+    for y in 0..ph {
+        let row = y * pw..(y + 1) * pw;
+        f[..pw].copy_from_slice(&grid[row.clone()]);
+        edt_1d(&f[..pw], &mut d[..pw], &mut v, &mut z);
+        grid[row].copy_from_slice(&d[..pw]);
+    }
+    let wf = width as f64;
+    let mut ring = vec![0f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let c = cov[y * w + x];
+            if c <= 0.0 {
+                continue;
+            }
+            let dist = grid[(y + 1) * pw + x + 1].sqrt();
+            ring[y * w + x] = c * (wf + 1.0 - dist).clamp(0.0, 1.0) as f32;
+        }
+    }
+    ring
+}
+
+/// "Inside the mask": not a source of distance.
+const EDT_INF: f64 = f64::INFINITY;
+
+/// One pass of the squared Euclidean distance transform: `d[q]` =
+/// `min_p (q − p)² + f[p]` over the finite `p`. The lower envelope of the
+/// parabolas rooted at each finite sample; infinite samples are skipped
+/// rather than pushed, so no ∞ − ∞ ever reaches the intersection formula.
+/// `v`/`z` are scratch (parabola roots and their left boundaries).
+fn edt_1d(f: &[f64], d: &mut [f64], v: &mut Vec<usize>, z: &mut Vec<f64>) {
+    v.clear();
+    z.clear();
+    for q in 0..f.len() {
+        if !f[q].is_finite() {
+            continue;
+        }
+        let fq = f[q] + (q * q) as f64;
+        while let Some(&p) = v.last() {
+            let s = (fq - (f[p] + (p * p) as f64)) / (2.0 * (q as f64 - p as f64));
+            if z.last().is_some_and(|&zl| s <= zl) {
+                v.pop();
+                z.pop();
+                continue;
+            }
+            v.push(q);
+            z.push(s);
+            break;
+        }
+        if v.is_empty() {
+            v.push(q);
+            z.push(f64::NEG_INFINITY);
+        }
+    }
+    if v.is_empty() {
+        d.fill(EDT_INF);
+        return;
+    }
+    let mut k = 0;
+    for (q, out) in d.iter_mut().enumerate() {
+        while k + 1 < v.len() && z[k + 1] < q as f64 {
+            k += 1;
+        }
+        let p = v[k];
+        let dq = q as f64 - p as f64;
+        *out = dq * dq + f[p];
+    }
 }
 
 /// The shared tail of both `build_annotation_tile` paths: rotate (if at all)
@@ -2123,6 +2251,14 @@ impl ImageHorseTool {
         // Where the text sits in its box, `row * 3 + column` (v16, ADR-104).
         // An archive written before it has none and JS passes 0: top-left.
         align: u8,
+        // The BOX BORDER (v17, ADR-109), as `annotations_to_json` writes it.
+        // An archive written before it has none and JS passes zeros: width 0
+        // is "no border", exactly what that document meant.
+        border_width: u32,
+        border_r: u8,
+        border_g: u8,
+        border_b: u8,
+        border_a: u8,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -2176,6 +2312,13 @@ impl ImageHorseTool {
                 stroke_a,
             ),
             align,
+            crate::annotations::TextBorder::new(
+                border_width,
+                border_r,
+                border_g,
+                border_b,
+                border_a,
+            ),
         );
         let layer = match self.text_restore_target {
             (0, _) => self.layers.get_mut(self.active),
@@ -2560,6 +2703,7 @@ mod tests {
                                 Default::default(),
                                 0,
                                 0,
+                                Default::default(),
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
@@ -2614,6 +2758,7 @@ mod tests {
                 Default::default(),
                 0,
                 0,
+                Default::default(),
             );
             let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)
@@ -2699,8 +2844,36 @@ mod text_stroke_tile_tests {
 
     fn tile(kind: u8, rot: f64, stroke: TextStroke) -> (Vec<u8>, u32, u32, i32, i32) {
         build_annotation_tile(
-            "Hg", 32.0, 0, 255, 255, 255, true, rot, kind, 0, 0, 255, 255, 6, 16, 135, false,
-            false, 0, 0, 0, 0, 0, 0, 0, "", stroke, 0, 0,
+            "Hg",
+            32.0,
+            0,
+            255,
+            255,
+            255,
+            true,
+            rot,
+            kind,
+            0,
+            0,
+            255,
+            255,
+            6,
+            16,
+            135,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            stroke,
+            0,
+            0,
+            Default::default(),
         )
     }
 
@@ -2769,5 +2942,242 @@ mod text_stroke_tile_tests {
             tile(1, 0.0, TextStroke::default()),
             tile(1, 0.0, TextStroke::new(0, 255, 0, 0, 255))
         );
+    }
+}
+
+#[cfg(test)]
+mod text_border_tile_tests {
+    //! The box border (v17, ADR-109): a ring of the box's own coverage mask,
+    //! inside its edge, so it never moves the text or grows the tile.
+    use super::*;
+    use crate::annotations::TextBorder;
+
+    /// Green text on a transparent rect (bg alpha 0), square corners, padding
+    /// 10 — the stamp's own recipe.
+    fn tile(kind: u8, rot: f64, border: TextBorder) -> (Vec<u8>, u32, u32, i32, i32) {
+        build_annotation_tile(
+            "OK",
+            32.0,
+            0,
+            0,
+            160,
+            0,
+            true,
+            rot,
+            kind,
+            0,
+            160,
+            0,
+            0,
+            10,
+            0,
+            90,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            Default::default(),
+            1,
+            0,
+            border,
+        )
+    }
+
+    /// Brute force: for each inside pixel, the distance to the nearest
+    /// outside pixel center (the surround counts as outside).
+    fn brute_ring(cov: &[f32], w: u32, h: u32, width: u32) -> Vec<f32> {
+        let (w, h) = (w as i32, h as i32);
+        let outside =
+            |x: i32, y: i32| x < 0 || y < 0 || x >= w || y >= h || cov[(y * w + x) as usize] < 0.5;
+        let mut out = vec![0f32; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                let c = cov[(y * w + x) as usize];
+                if c <= 0.0 {
+                    continue;
+                }
+                let mut best = f64::INFINITY;
+                for oy in -1..=h {
+                    for ox in -1..=w {
+                        if outside(ox, oy) {
+                            let d = (((ox - x).pow(2) + (oy - y).pow(2)) as f64).sqrt();
+                            best = best.min(d);
+                        }
+                    }
+                }
+                out[(y * w + x) as usize] = c * (width as f64 + 1.0 - best).clamp(0.0, 1.0) as f32;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_ring_matches_a_brute_force_distance_on_any_mask() {
+        // A rounded rect, a bubble-ish union, and a noisy blob.
+        let (w, h) = (37u32, 29u32);
+        let mut masks: Vec<Vec<f32>> = Vec::new();
+        let mut rr = vec![0f32; (w * h) as usize];
+        crate::drawing::rounded_rect_coverage(&mut rr, w, h, 3, 4, 30, 24, 7);
+        masks.push(rr.clone());
+        crate::drawing::triangle_coverage(
+            &mut rr,
+            w as i32,
+            h as i32,
+            (20.0, 22.0),
+            (28.0, 22.0),
+            (34.0, 28.0),
+        );
+        masks.push(rr);
+        let mut seed = 0x2545_f491u32;
+        masks.push(
+            (0..w * h)
+                .map(|_| {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 17;
+                    seed ^= seed << 5;
+                    (seed % 1000) as f32 / 999.0
+                })
+                .collect(),
+        );
+        masks.push(vec![1.0; (w * h) as usize]); // fills the tile edge to edge
+        for (m, cov) in masks.iter().enumerate() {
+            for width in [1u32, 2, 3, 6] {
+                let fast = box_border_ring(cov, w, h, width);
+                let slow = brute_ring(cov, w, h, width);
+                for (i, (a, b)) in fast.iter().zip(&slow).enumerate() {
+                    assert!(
+                        (a - b).abs() < 1e-4,
+                        "mask {m} width {width} px {i}: {a} vs {b}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_square_box_gets_a_band_exactly_width_pixels_wide() {
+        let (w, h) = (20u32, 12u32);
+        let mut cov = vec![0f32; (w * h) as usize];
+        crate::drawing::rounded_rect_coverage(&mut cov, w, h, 2, 2, 18, 10, 0);
+        let ring = box_border_ring(&cov, w, h, 3);
+        // Middle row, walking in from the left edge of the box at x = 2.
+        let row = 6 * w as usize;
+        let along: Vec<f32> = (0..10).map(|x| ring[row + x]).collect();
+        assert_eq!(&along[..2], &[0.0, 0.0], "outside the box");
+        assert_eq!(&along[2..5], &[1.0, 1.0, 1.0], "3 px of border");
+        assert_eq!(along[5], 0.0, "then the inside is untouched");
+    }
+
+    /// The border is inside the box: the tile, its offset and the letters are
+    /// exactly where they were, for a rect, a bubble, and rotated.
+    #[test]
+    fn a_border_never_moves_the_tile_or_the_text() {
+        let red = TextBorder::new(4, 255, 0, 0, 255);
+        for (kind, rot) in [(1u8, 0.0), (2, 0.0), (1, -5.0)] {
+            let (p, pw, ph, px, py) = tile(kind, rot, TextBorder::default());
+            let (o, ow, oh, ox, oy) = tile(kind, rot, red);
+            assert_eq!((ow, oh, ox, oy), (pw, ph, px, py), "kind {kind} rot {rot}");
+            if rot == 0.0 {
+                // Every pixel of the plain tile that has ink — the green
+                // letters — is identical in the bordered one.
+                for (i, (a, b)) in p.chunks_exact(4).zip(o.chunks_exact(4)).enumerate() {
+                    if a[3] == 255 && a[1] == 160 {
+                        assert_eq!(a, b, "kind {kind}: letter pixel {i}");
+                    }
+                }
+            }
+            assert!(
+                o.chunks_exact(4).any(|c| c == [255, 0, 0, 255]),
+                "kind {kind}: the border is drawn"
+            );
+        }
+    }
+
+    #[test]
+    fn no_box_means_no_border_and_off_means_byte_identical() {
+        let red = TextBorder::new(4, 255, 0, 0, 255);
+        assert_eq!(
+            tile(0, 0.0, TextBorder::default()),
+            tile(0, 0.0, red),
+            "kind 0 has no box"
+        );
+        assert_eq!(
+            tile(1, 0.0, TextBorder::default()),
+            tile(1, 0.0, TextBorder::new(0, 255, 0, 0, 255)),
+            "width 0 is off"
+        );
+        assert_eq!(
+            tile(1, 0.0, TextBorder::default()),
+            tile(1, 0.0, TextBorder::new(4, 255, 0, 0, 0)),
+            "alpha 0 is off"
+        );
+    }
+
+    /// A bubble's tail is bordered along its sides, and the mouth where it
+    /// meets the body stays open — no line drawn across it.
+    #[test]
+    fn a_bubble_border_follows_the_tail_and_leaves_its_mouth_open() {
+        let red = TextBorder::new(3, 255, 0, 0, 255);
+        // Tail pointing straight down (90°): it leaves the bottom edge.
+        let (o, w, h, _, _) = build_annotation_tile(
+            "OK",
+            32.0,
+            0,
+            0,
+            160,
+            0,
+            true,
+            0.0,
+            2,
+            255,
+            255,
+            255,
+            255,
+            10,
+            0,
+            90,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            Default::default(),
+            1,
+            0,
+            red,
+        );
+        let is_red = |x: u32, y: u32| {
+            let i = ((y * w + x) * 4) as usize;
+            o[i] > 200 && o[i + 1] < 60 && o[i + 3] > 200
+        };
+        let cx = w / 2;
+        // Walk up from the bottom of the tile through the apex into the body:
+        // red at the tail's tip, white inside the tail, and NO red band where
+        // the body's bottom edge would cross the tail.
+        let column: Vec<bool> = (0..h).map(|y| is_red(cx, y)).collect();
+        let first_red = column
+            .iter()
+            .rposition(|&r| r)
+            .expect("tail tip is bordered"); // allow: rust-panic
+        let red_runs = column[..=first_red]
+            .windows(2)
+            .filter(|p| p[0] != p[1])
+            .count();
+        // Top edge of the body (one red run) and the tip (one red run): two
+        // runs → four transitions at most; a band across the mouth would add
+        // a third run.
+        assert!(red_runs <= 4, "a line crosses the tail's mouth: {column:?}");
+        let _ = h;
     }
 }

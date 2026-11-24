@@ -73,6 +73,7 @@ fn a_text(id: u32, text: &str) -> TextParams {
         font_id: String::new(),
         stroke: Default::default(),
         align: 0,
+        border: Default::default(),
         text: text.into(),
         x: 4,
         y: 6,
