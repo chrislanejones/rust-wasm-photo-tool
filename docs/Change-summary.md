@@ -12318,3 +12318,20 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No app code change apart from three comments. No engine change (973,825 B).
 
 Verification: run after the trail data regen. 0 broken relative links across 167 .md files; TypeScript clean; lint 0 errors (54 warnings); guardrails pass; vitest 2,529/2,529; marketing build passes. Every row of the Accessibility chapter was checked against the code; two claims were narrowed to what the code shows. No Rust changed.
+
+## v9.74 Change Summary — 2026-11-23
+
+**Stamps you can edit, color first in the tool panels, and V for Select Objects.**
+
+| Area | Change |
+| --- | --- |
+| Stamps (#514) | **Create › Stamps** places a text in a stamp's style (a bold word in a transparent box with a border, tilted −5°) instead of burning pixels. It can be moved, rotated, retyped, recolored and resized after placing; any word works. One click = one undo step. Stamps placed before this stay pixels. ADR-109. |
+| Text (#514) | **Text › Background › Border** (width, color, opacity), with a matching preview. Re-editing a text now shows its own background, shadow, outline and border in the panel (`lib/textLook`). |
+| Engine (#514) | `TextAnnotation.border`, drawn by `layer::box_border_ring` inside the box's coverage mask (rect and bubble, tail included). **Op log v16 → v17**: `Op::TextBorder` (index 27) and a 15th `encode_annotations` tail; v16 fixtures still replay to their pixels. Archive `border_*` fields are optional; no Dexie bump. Retired: `commit_red_stamp`, `render_stamp_label`, `useRedStampTool`, the `red-stamp-select` CustomEvent. `#/tool/stamps/red` still opens Stamps. |
+| Select Objects (#513) | Off the Create tiles (`hiddenFromRail`). Reached by bare **V**, the arrow on Review › Reselect, or the canvas right-click menu. Review's counts become `review-section-count` spans; the status bar's shortcut hints animate when they change. |
+| Panels (ADR-107) | Color first: Brush (Color, Brush Size, Opacity, Hardness), Pen (Color, Stroke Width), Text (**Text Color**, Font Size, Font Family, Font Weight), Arrows & Diagram Shapes (Stroke Color, Stroke Width, Arrows, Flowchart, Basic, Block arrows). New `paletteFirst.test.tsx` pins the order. |
+| Trail Log | Squares catch up through 11-23. |
+
+Engine: **979,674 B** (was 973,825; +5,849 for the border). One fix on landing #514: `STAMP_TILT_DEG` loses its unused `export` (the dead-exports guardrail was red on the PR).
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,545/2,545; marketing build passes. e2e on a production build, 15 specs touched by the three changes (`stamps`, `ui-night8-finish`, `annotation-multiselect`, `callout-leader`, `one-tile-per-subtool`, `text-box-survives`, `export-dialog`, `diagram-shapes`, `shapes-fill-first`, `ui-night3-panels`, `text-align`, `text-commit-one-step`, `text-placement-undo`, `text-preview-size`, `annotation-performance`): 108 passed, 9 skipped (opt-in), 0 failed. Rust gates run by the pre-push hook.

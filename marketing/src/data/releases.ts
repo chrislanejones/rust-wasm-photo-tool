@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.74",
+    date: "2026-11-23",
+    headline: "Stamps you can edit, color first in the tool panels, and V for Select Objects.",
+    entries: [
+      { tag: "feature", text: "A stamp is now an editable text in a bordered box: move, rotate, retype, recolor or resize it after you place it, with any word." },
+      { tag: "feature", text: "Text › Background has a Border: width, color and opacity." },
+      { tag: "ui", text: "Brush, Pen, Text and Arrows & Diagram Shapes show their colors first. Text's are labeled Text Color." },
+      { tag: "ui", text: "Select Objects moved off the Create tiles: press V, use Review › Reselect, or right-click the canvas." },
+      { tag: "rust", text: "The engine draws a border around a text's box, and the edit history format goes to version 17." },
+    ],
+  },
+  {
     version: "v9.73",
     date: "2026-11-23",
     headline: "Two new chapters: the engine worker, and accessibility.",

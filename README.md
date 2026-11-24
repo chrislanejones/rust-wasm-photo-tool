@@ -99,18 +99,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.73 — 2026-11-23
+### v9.74 — 2026-11-23
 
-**Two new chapters: the engine worker, and accessibility.**
+**Stamps you can edit, color first in the tool panels, and V for Select Objects.**
 
-**[15. The Engine Worker](docs/15.0-Engine-Worker.md)** explains why the image
-engine runs in a web worker (a heavy edit used to freeze the page for over a
-tenth of a second; now it doesn't freeze it at all) and puts the three notes
-that got it there in order, 15.1 to 15.3.
+**Stamps** used to be burned into the picture the moment you clicked. Now a
+stamp is a text in a stamp's style: a bold word in a bordered box, tilted a
+little. After you place it you can move it, rotate it, retype it, recolor it
+and resize it, and any word works (PAID, FINAL, SOLD…). Stamps you placed
+before this stay as they are. Text also gets a **Border** of its own, under
+Background.
 
-**[16. Accessibility](docs/16-Accessibility.md)** is new: what the editor does
-for keyboard, focus, screen readers and reduced motion, the tests that hold it
-in place, and its known limits.
+**Color comes first** in Brush, Pen, Text and Arrows & Diagram Shapes, so the
+palette is the first thing you see. Text's swatches are labeled **Text Color**.
+
+**Select Objects** left the Create tiles. Press **V**, use the arrow on
+Review › Reselect, or right-click the canvas.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
