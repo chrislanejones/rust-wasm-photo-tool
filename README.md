@@ -99,20 +99,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.75 — 2026-11-24
+### v9.76 — 2026-11-24
 
-**Export shows only what applies.**
+**Recipes work on one image too.**
 
-The Export dialog used to gray out the rows that didn't fit what you were
-doing. Now it leaves them out. **Selected image** shows the **File Name**, with
-the extension right in the same box. **All images** shows the **Recipe** and a
-short **Batch settings** list (size, naming, camera info, ZIP) instead.
+The **Recipe** picker now sits under **File Name** when you export the
+**Selected image**, not just on All images. Pick one and that one file gets
+the recipe's size, format, quality and camera info. It keeps the name you
+typed.
 
-The format tiles say **JPEG, PNG, WebP, AVIF** in plain words, with one line
-under them about the one you picked. Camera info moved into a closed
-**Privacy & metadata** drop-down that still shows its setting. The bottom says
-what you'll get ("photo.jpg · 1 image · JPEG"), and **Download** is the one
-solid button.
+The bottom of Export also says how much your download is compressed ("Not
+compressed" when it isn't), or on All images, how many of them are.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

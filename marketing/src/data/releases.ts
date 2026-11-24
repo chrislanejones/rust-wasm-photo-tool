@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.76",
+    date: "2026-11-24",
+    headline: "Recipes work on one image too.",
+    entries: [
+      { tag: "feature", text: "Export's Recipe picker works on the selected image too: its size, format, quality and camera info, with the name you typed." },
+      { tag: "ui", text: "Export's footer says how much your download is compressed, or how many of your images are." },
+      { tag: "fix", text: "Switching to All images after a plugin format no longer hides the recipe the ZIP is about to use." },
+    ],
+  },
+  {
     version: "v9.75",
     date: "2026-11-24",
     headline: "Export shows only what applies.",

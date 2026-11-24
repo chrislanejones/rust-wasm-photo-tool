@@ -12336,6 +12336,25 @@ Engine: **979,674 B** (was 973,825; +5,849 for the border). One fix on landing #
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,545/2,545; marketing build passes. e2e on a production build, 15 specs touched by the three changes (`stamps`, `ui-night8-finish`, `annotation-multiselect`, `callout-leader`, `one-tile-per-subtool`, `text-box-survives`, `export-dialog`, `diagram-shapes`, `shapes-fill-first`, `ui-night3-panels`, `text-align`, `text-commit-one-step`, `text-placement-undo`, `text-preview-size`, `annotation-performance`): 108 passed, 9 skipped (opt-in), 0 failed. Rust gates run by the pre-push hook.
 
+## v9.76 Change Summary — 2026-11-24
+
+**Recipes work on one image too.**
+
+| Area | Change |
+| --- | --- |
+| Export (#516) | The **Recipe** picker sits under **File Name** on Selected image too. A picked recipe sets the one file's size, format, quality and camera info; the name stays the field's (the recipe's name pattern is for ZIPs). Raster built-in formats only: plugin, Vector and With Layers downloads take none. The extension and the Download label follow the recipe's format. |
+| Export (#516) | `applyRecipe()` moves from `useZipExport.ts` to `lib/applyRecipe.ts`, shared by the ZIP and the single download (same Lanczos3 resize and encoder). |
+| Export (#516) | The footer says how much the download is compressed, or "Not compressed"; on All images, "2 of 3 compressed". Read from the gallery's saved Resize & Compress results. |
+| Export (#516) | The settings list is named for the task: **Image settings** (Size, Camera info) on Selected, **Batch settings** on All. Privacy & Metadata shows the full choice when closed ("Keep All Metadata"). |
+| Fix (landing) | A one-image plugin format picked on Selected stayed picked on All images. That hid the recipe and showed the Settings camera-info choice, while the ZIP still used the hidden recipe's camera info. Moving to All now resets a plugin format to the raster one. Found by CodeRabbit; new regression test, which fails with the fix reverted. |
+| Structure (landing) | The dialog's recipe lookup is `pickedRecipe()` in `useZipRecipeStore.ts`, so AppShell grows by 2 lines, not 5. |
+| Docs | Features chapter; the Parking Lot marks single-image recipes done. |
+| Trail Log | Squares catch up through 11-24. |
+
+No engine change (979,674 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,549/2,549 (1 new); e2e on a production build, 10 export specs (`export-dialog`, `zip-export`, `camera-info`, `pasted-export-name`, `paste-svg`, `svg-passthrough`, `pane-header-row`, `bulk-night`, `stamps`, `oplog-preset-undo`): 36/36. PR CI: 19 pass, 1 skipped.
+
 ## v9.75 Change Summary — 2026-11-24
 
 **Export shows only what applies.**
