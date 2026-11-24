@@ -80,6 +80,15 @@ export function activateSubTool(resolved: ResolvedSubTool): void {
   void group;
 }
 
+/** Create › Select objects — no tile of its own (`hiddenFromRail`), so the
+ *  three ways in (Review › Reselect's arrow, the canvas right-click menu and
+ *  bare `V`) all come through here. */
+export const SELECT_OBJECTS_KEY = "create/select-objects";
+export function activateSelectObjects(): void {
+  const t = subToolByKey(SELECT_OBJECTS_KEY);
+  if (t) activateSubTool(t);
+}
+
 /** Activate a group's rail tile — its first live sub-tool. */
 export function activateGroup(group: ToolGroupDefinition): void {
   const first = defaultSubToolOf(group);

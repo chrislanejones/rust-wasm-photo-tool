@@ -62,6 +62,8 @@ async function key(page: Page, combo: string) {
 
 async function createTool(page: Page, name: string) {
   await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  // Select objects has no Create tile (11-23); V is one of its ways in.
+  if (name === "Select objects") return page.keyboard.press("v");
   await page.getByRole("button", { name, exact: true }).first().click();
 }
 

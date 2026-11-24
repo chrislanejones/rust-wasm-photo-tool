@@ -4,6 +4,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { copyLook, useLookStore } from "@/stores/useLookStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
+import { activateSelectObjects } from "@/features/tools/activateSubTool";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
 
@@ -474,6 +475,17 @@ export function useKeyboardShortcuts({
           t.setMaskPaintValue(t.maskPaintValue < 128 ? 255 : 0);
           return;
         }
+      }
+
+      // ─── Bare V → Select objects ───────────────────────────────────
+      // Photoshop's V (Move/Selection). The sub-tool lost its Create tile
+      // (11-23), so this, the Review › Reselect arrow and the canvas
+      // right-click menu are its ways in. Alt+V (flip vertical) is handled
+      // above and never reaches here; typing contexts are guarded at the top.
+      if (e.code === "KeyV" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        if (!isPhotoSwitching()) activateSelectObjects();
+        return;
       }
 
       // ─── Bare digits 1-5 → tool GROUP switching ────────────────────

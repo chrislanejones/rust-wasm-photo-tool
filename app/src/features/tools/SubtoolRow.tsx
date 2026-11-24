@@ -168,7 +168,7 @@ export function SubtoolRow({ disabled = false }: Props) {
             role="toolbar"
             aria-label={`${group.label} sub-tools`}
           >
-            {group.subTools.map((subTool) => {
+            {group.subTools.filter((s) => !(!s.comingSoon && s.hiddenFromRail)).map((subTool) => {
               // Coming Soon tiles render disabled with their note and are not
               // clickable. They are also absent from LIVE_SUB_TOOLS, which is
               // what keeps them off routes and out of the palette.

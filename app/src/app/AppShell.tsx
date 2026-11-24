@@ -60,7 +60,7 @@ import { useTabClaim } from "@/hooks/useTabClaim";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { groupById } from "@/features/tools/toolGroups";
-import { activateGroup, useActiveSubTool } from "@/features/tools/activateSubTool";
+import { activateGroup, activateSelectObjects, useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
@@ -165,6 +165,7 @@ import {
   RotateCcw,
   Archive,
   ImagePlus,
+  MousePointer2,
   Pipette,
 } from "lucide-react";
 
@@ -2940,6 +2941,10 @@ export function AppShell() {
             disabled={!hasImage}
           >
             <Pipette className="h-4 w-4 mr-2" /> Activate Eyedropper
+          </ContextMenuItem>
+          <ContextMenuItem onClick={activateSelectObjects} disabled={!hasImage}>
+            <MousePointer2 className="h-4 w-4 mr-2" /> Select Objects
+            <ContextMenuShortcut>V</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={handleZoomIn}>

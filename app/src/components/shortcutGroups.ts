@@ -68,6 +68,7 @@ export const SHORTCUT_GROUPS = [
     // is taken (brush size, layer front/back), so shapes take the arrows.
     title: "Shapes (selected shape)",
     shortcuts: [
+      { keys: ["V"], action: "Select Objects" },
       { keys: ["Ctrl", "Shift", "↑"], action: "Bring Shape Forward" },
       { keys: ["Ctrl", "Shift", "↓"], action: "Send Shape Backward" },
       { keys: ["Ctrl", "Shift", "Alt", "↑"], action: "Bring Shape to Front" },

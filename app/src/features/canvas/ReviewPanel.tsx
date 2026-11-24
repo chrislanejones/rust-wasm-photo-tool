@@ -10,6 +10,7 @@ import {
   History,
   Layers,
   Layers2,
+  MousePointer2,
   MousePointerSquareDashed,
   Plus,
   Settings,
@@ -26,14 +27,18 @@ import { HistoryBranches } from "./HistoryBranches";
 // Cross-feature import with precedent (CanvasArea, routing do the same):
 // `activateSubTool` is deliberately callable from anywhere — "the rail, the
 // router and the command palette" — and now this gear.
-import { activateSubTool } from "@/features/tools/activateSubTool";
+import {
+  activateSelectObjects,
+  activateSubTool,
+  SELECT_OBJECTS_KEY,
+  useActiveSubTool,
+} from "@/features/tools/activateSubTool";
 import { subToolByKey } from "@/features/tools/toolGroups";
 import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 // The ✕ lives in row-actions now — it was defined identically here and in
 // reselect-bar.tsx, so a change to one never reached the other.
 import { RowAction } from "@/components/ui/row-actions";
-import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
@@ -287,6 +292,9 @@ export function ReviewPanel({
   // order `get_shape_annotations()` returns them, which IS the z-order.
   const shapeIds = objects.filter((o) => o.type === "shape").map((o) => o.id);
   const picked = useAnnotationStore((s) => s.picked);
+  // The lit sub-tool, not the raw stored key: the key can be stale after a
+  // reload or a panel's own mode toggle (see useActiveSubTool).
+  const selectObjectsOn = useActiveSubTool()?.key === SELECT_OBJECTS_KEY;
 
   // ── Combine ──────────────────────────────────────────────────────────────
   // Read straight from the store rather than threaded as props: the field is
@@ -363,6 +371,9 @@ export function ReviewPanel({
             <div className="review-section-head">
               <History className="h-3.5 w-3.5" />
               <span className="review-section-name">History</span>
+              {/* The count sits beside the title (11-23), not boxed among the
+                  buttons — a bordered box there read as one more button. */}
+              <span className="review-section-count">{history.length}</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <Button size="tiny" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo">
                   <Undo2 className="h-3.5 w-3.5" />
@@ -370,11 +381,10 @@ export function ReviewPanel({
                 <Button size="tiny" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo">
                   <Redo2 className="h-3.5 w-3.5" />
                 </Button>
-                <TinyNumberBox>{history.length}</TinyNumberBox>
                 {/* History was the one section you could not close from its own
                     head — Reselect, Layers, Histogram and Combine all could
                     (Chris, 09-30-2026). Same control, same place: last in the
-                    row, after the count. */}
+                    row. */}
                 <Button
                   size="tiny"
                   onClick={() => toggle("history")}
@@ -429,8 +439,21 @@ export function ReviewPanel({
             <div className="review-section-head">
               <MousePointerSquareDashed className="h-3.5 w-3.5" />
               <span className="review-section-name">Reselect</span>
+              <span className="review-section-count">{objects.length}</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <TinyNumberBox>{objects.length}</TinyNumberBox>
+                {/* Select objects lives here now, not as a Create tile
+                    (11-23): this is the list of the very objects it picks.
+                    Also on the canvas right-click menu and bare V. */}
+                <Button
+                  size="tiny"
+                  onClick={activateSelectObjects}
+                  aria-pressed={selectObjectsOn}
+                  aria-label="Select objects"
+                  title="Select objects (V) — click, Shift-click or drag a box on the canvas"
+                  className={selectObjectsOn ? "border-border-active text-theme-foreground" : undefined}
+                >
+                  <MousePointer2 className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="tiny"
                   onClick={() => toggle("reselect")}
                   aria-label="Close section"
@@ -494,12 +517,15 @@ export function ReviewPanel({
             <div className="review-section-head">
               <Layers className="h-3.5 w-3.5" />
               <span className="review-section-name">Layers</span>
+              {/* Actual layer count (consistent with History/Reselect counts);
+                  the per-tier allowance lives in the tooltip. */}
+              <span
+                className="review-section-count"
+                title={`${layers.length} layer${layers.length === 1 ? "" : "s"}${tierPending ? "" : ` · limit ${TIERS[userMode].layersLabel}`}`}
+              >
+                {layers.length}
+              </span>
               <div className="ml-auto flex items-center gap-1.5">
-                {/* Actual layer count (consistent with History/Reselect counts);
-                    the per-tier allowance lives in the tooltip. */}
-                <TinyNumberBox title={`${layers.length} layer${layers.length === 1 ? "" : "s"}${tierPending ? "" : ` · limit ${TIERS[userMode].layersLabel}`}`}>
-                  {layers.length}
-                </TinyNumberBox>
                 {/* v8.38 — the signpost to where the mask buttons went: the
                     Layers tool (Edit → Layers). Same store-driven activation
                     the rail and command palette use; hand-built route strings

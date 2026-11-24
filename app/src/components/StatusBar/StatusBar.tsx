@@ -21,6 +21,7 @@ import { PhotoSwitchAnnouncer } from "./PhotoSwitchAnnouncer";
 import { StatusMark } from "@/components/ui/status-mark";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { PaneSwap } from "@/components/ui/dialog-pane";
 
 export interface ShortcutHint {
   keys: string;
@@ -235,12 +236,21 @@ export function StatusBar({
       </div>
 
       <div className="status-section status-center">
+        {/* Keyed by SLOT, so a slot whose hint changes (the tool you hold,
+            or the 3-minute rotation) plays the swap instead of remounting.
+            The swap is `PaneSwap` — the Export dialog's own blur-and-slide
+            (lib/animations `panelSwap`), not a second effect for the same
+            job. A pinned slot never changes key, so it never animates. */}
         {hints.map((h, i) => (
-          <Fragment key={`${h.keys}-${h.label}`}>
+          <Fragment key={i}>
             {i > 0 && <span className="status-divider" />}
-            <span className="status-shortcut-hint">
+            <PaneSwap
+              paneKey={`${h.keys}-${h.label}`}
+              direction={1}
+              className="status-shortcut-hint"
+            >
               <Kbd>{h.keys}</Kbd> {h.label}
-            </span>
+            </PaneSwap>
           </Fragment>
         ))}
       </div>

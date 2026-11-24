@@ -1062,6 +1062,17 @@ textarea:focus-visible {
   color: var(--text-muted);
 }
 
+/* The section's count, right beside its name (11-23) — it used to be a
+   bordered TinyNumberBox among the head's buttons and read as one of them. */
+.review-section-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  margin-left: -2px;
+}
+
 .review-coming-soon {
   flex: 1;
   min-height: 0;

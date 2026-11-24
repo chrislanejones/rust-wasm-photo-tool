@@ -155,6 +155,11 @@ export interface LiveSubTool extends SubToolBase {
    *  add/subtract badge (Shift/Alt held) and Resize Layer's `move` (only while
    *  the Move toggle is on). */
   cursor?: string;
+  /** Live and routable (URL, palette, shortcut) but not drawn as a tile in
+   *  the sub-tool row. Select objects (11-23): it is reached from the arrow in
+   *  Review › Reselect, the canvas right-click menu and `V`, and a tile in
+   *  Create read as one more drawing tool. */
+  hiddenFromRail?: boolean;
 }
 
 /** A sub-tool that is announced but not built. Renders disabled with a
@@ -505,6 +510,7 @@ const createGroup: ToolGroupDefinition = {
       description: "Pick several annotations — click, Shift-click or drag a box — then move, align or delete them together",
       icon: MousePointer2,
       tool: "shapes",
+      hiddenFromRail: true,
       keywords: ["select", "multi", "several", "align", "distribute", "marquee", "group"],
     },
     {
