@@ -301,7 +301,14 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
             case "arrows":
               return (
                 <>
-                  <ControlRow label="Arrow">
+                  {/* Stroke Color, then Stroke Width, ABOVE the shape tiles
+                      (Chris, 11-23-2026): an arrow is only a stroke and a
+                      diagram shape is read by its outline, so the color and
+                      width come first, then Arrows · Flowchart · Basic ·
+                      Block arrows. */}
+                  <StrokeFirst settings={settings} onChange={onChange} />
+
+                  <ControlRow label="Arrows">
                     {({ labelId }) => (
                       <ToolButtonGroup
                         aria-labelledby={labelId}
@@ -334,11 +341,6 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       )}
                     </ControlRow>
                   ))}
-
-                  {/* Stroke Color, then Stroke Width: an arrow is only a
-                      stroke, and a diagram shape is read by its outline, so
-                      this tab stays stroke first — palette first all the same. */}
-                  <StrokeFirst settings={settings} onChange={onChange} />
 
                   {/* Sloppiness — a diagram shape only; the arrow has none. */}
                   {diagramInHand && (

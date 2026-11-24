@@ -231,6 +231,15 @@ export function TextSettings({
 
         {m === "text" && (
           <div className="space-y-4">
+            {/* Text Color first (ADR-107; named, Chris 11-23-2026): the
+                palette, then Font Size. */}
+            <ColorSwatchGrid
+              label="Text Color"
+              colors={TEXT_COLORS}
+              value={settings.textColor}
+              onChange={(color) => onChange({ ...settings, textColor: color })}
+            />
+
             {/* Font Size */}
             <SizeSlider
               label="Font Size"
@@ -295,12 +304,6 @@ export function TextSettings({
               )}
             </ControlRow>
 
-            {/* Color */}
-            <ColorSwatchGrid
-              colors={TEXT_COLORS}
-              value={settings.textColor}
-              onChange={(color) => onChange({ ...settings, textColor: color })}
-            />
           </div>
         )}
 

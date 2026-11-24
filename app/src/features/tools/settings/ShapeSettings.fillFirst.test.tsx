@@ -4,8 +4,9 @@
 //
 //   tiles → Fill Color → Points → Corner Radius → Sloppiness → Stroke ▸
 //
-// The color palette is the first control under the tiles on every tab — a
-// design-system rule since (UI_CONSISTENCY §8). On the Shapes tab that color
+// The color palette is the first control on every tab — a design-system
+// rule since (UI_CONSISTENCY §8). On the Arrows tab it sits above the tiles
+// too (11-23-2026). On the Shapes tab that color
 // is the shape's FILL, and its stroke is a closed dropdown at the foot whose
 // default is None. The old Fill dropdown (None | Solid | Gradient | Pixelate)
 // left this tab; the diagram shapes on the Arrows tab, which stay stroke
@@ -143,14 +144,18 @@ it("the line has no interior: Stroke Color, then Stroke Width, and no dropdown",
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ strokeWidth: 8 }));
 });
 
-it("Arrows & Diagram Shapes: Stroke Color, then Stroke Width, under the tiles", () => {
+it("Arrows & Diagram Shapes: Stroke Color, then Stroke Width, ABOVE the shape tiles", () => {
+  // Chris, 11-23-2026: Stroke Color · Stroke Width · Arrows · Flowchart ·
+  // Basic · Block arrows. The color and width lead, the tiles follow.
   const { container } = renderPanel({}, "arrows");
-  const labels = rowLabels(container);
-  const at = labels.indexOf("Stroke Color");
-  expect(at).toBeGreaterThan(-1);
-  expect(labels[at + 1]).toBe("Stroke Width");
-  // Nothing but the shape tiles sits above the palette.
-  expect(labels.slice(0, at)).toEqual(["Arrow", "Flowchart", "Basic", "Block arrows"].slice(0, at));
+  expect(rowLabels(container).slice(0, 6)).toEqual([
+    "Stroke Color",
+    "Stroke Width",
+    "Arrows",
+    "Flowchart",
+    "Basic",
+    "Block arrows",
+  ]);
 });
 
 it("a diagram shape keeps its Fill dropdown: None | Solid | Gradient | Pixelate", () => {

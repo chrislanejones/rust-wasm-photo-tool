@@ -123,6 +123,14 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
           case "paint":
             return (
               <>
+                {/* Color first (ADR-107, Chris 11-23-2026): the palette is the
+                    panel's first row, then Brush Size. */}
+                <ColorSwatchGrid
+                  colors={TEXT_COLORS}
+                  value={settings.brushColor}
+                  onChange={(color) => onChange({ ...settings, brushColor: color })}
+                />
+
                 {/* Brush Size */}
                 <SizeSlider
                   label="Brush Size"
@@ -153,13 +161,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   presets={HARDNESS_PRESETS}
                   variant="numbers"
                   unit="%"
-                />
-
-                {/* Color */}
-                <ColorSwatchGrid
-                  colors={TEXT_COLORS}
-                  value={settings.brushColor}
-                  onChange={(color) => onChange({ ...settings, brushColor: color })}
                 />
 
                 {/* ── Smart Brush (behind ih_smart_edge; see lib/smartEdge.ts) ──
@@ -288,6 +289,12 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
           case "pen":
             return (
               <>
+                <ColorSwatchGrid
+                  colors={TEXT_COLORS}
+                  value={settings.strokeColor}
+                  onChange={(color) => onChange({ ...settings, strokeColor: color })}
+                />
+
                 <SizeSlider
                   label="Stroke Width"
                   value={settings.strokeWidth}
@@ -295,12 +302,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   max={40}
                   onChange={(v) => onChange({ ...settings, strokeWidth: v })}
                   presets={PEN_WIDTH_PRESETS}
-                />
-
-                <ColorSwatchGrid
-                  colors={TEXT_COLORS}
-                  value={settings.strokeColor}
-                  onChange={(color) => onChange({ ...settings, strokeColor: color })}
                 />
 
                 {/* Background — fills the closed path's interior (under the
