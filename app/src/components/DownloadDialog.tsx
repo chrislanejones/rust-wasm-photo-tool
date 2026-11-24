@@ -1,31 +1,27 @@
-// The Export dialog: one step, six rows (Chris, 11-23-2026). It used to be a
-// wizard (Choose → Selected Image / All Images, swapped in with a slide);
-// everything is on one screen now, and the rows that do not apply are grayed
-// out rather than gone, so the dialog keeps its shape.
+// The Export dialog: one step, and it adapts to the task (Chris, 11-24-2026,
+// after a design review: "a settings panel, not an export dialog"). Nothing is
+// shown grayed out just to keep the dialog's shape; a row that cannot apply is
+// left out, and the dialog's height follows what you are doing.
 //
-//   1. What        Download Selected | Download All (N)
-//   2. Kind        Raster | Vector | With Layers — Raster on every open
-//                  (Vector: only when an SVG is open; With Layers: one image
-//                  only, a ZIP holds flat files)
-//   3. Format      the tiles for that kind, the Shapes picker's stacked tiles
-//                  (Raster: JPEG PNG WebP AVIF + plugin formats · Vector: SVG ·
-//                  With Layers: ORA, PSD + layered plugin formats)
-//   4. Camera Info Keep all · Remove location · Remove all (ADR-108)
-//   5. Recipe      menu + Save… (Download All only; grayed for Selected)
-//   5.5 File Name  (Download Selected; grayed for All — each image in the ZIP
-//                  keeps its own name)
-//   6. Actions     Selected: Download <format> · Share link · Clipboard
-//                  All:      Download ZIP (N as <format>) · Share all (paid,
-//                            not wired yet, so off)
+//   Selected image                     All images (N)
+//   1. What        Selected image | All images (N)
+//   2. File Name   name + its extension, one box     Recipe: menu + Save recipe,
+//                                                    then Batch settings
+//   3. Kind        Raster | Vector | With Layers     Raster | Vector (no layers
+//                  — Raster on every open             in a ZIP)
+//   4. Format      tiles named for the format (JPEG PNG WebP AVIF + plugins ·
+//                  SVG · ORA, PSD), one line under them saying what it's for
+//   5. Privacy & metadata   a drop-down, shut, its choice on the right (ADR-108)
+//   6. Footer      what you'll get ("photo.jpg · 1 image · JPEG"), the quiet
+//                  actions (Share link, Clipboard / Share All · Soon) and ONE
+//                  solid primary: Download JPEG / Download ZIP
 //
-// Rows 1 and 2 are the top bar's ToggleButtonGroup in select mode — a radio
-// group each, one Tab stop, arrow keys. Row 3 is the Shapes picker's
-// ToolButtonGroup (stacked). Row 3 is ONE radio group per kind: the kind row
-// is a separate, real choice now, so the old one-group-for-all-formats rule
-// (a format and its kind were one choice) moves up a level.
+// Rows 1 and 3 are the top bar's ToggleButtonGroup in select mode — a radio
+// group each, one Tab stop, arrow keys. Row 4 is the Shapes picker's
+// ToolButtonGroup (stacked), one radio group per kind.
 //
 // The parent (AppShell) still decides what a download writes from `format`:
-// "svg" on Download All zips the SVGs, anything else zips in `zipFormat`.
+// "svg" on All images zips the SVGs, anything else zips in `zipFormat`.
 // Picking a kind here therefore just picks that kind's format.
 //
 // SVG passthrough: the SVG tile writes the uploaded SVG back out, cropped the
@@ -52,7 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PanelAction, PanelActionBar } from "@/components/ui/panel-action-bar";
+import { PanelAction } from "@/components/ui/panel-action-bar";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { ExportFileNameField } from "@/components/ExportFileNameField";
@@ -74,6 +70,8 @@ import type { ActiveFormat } from "@/lib/plugins";
 import { ZipRecipePicker } from "@/components/ZipRecipePicker";
 import { CameraInfoPicker } from "@/components/CameraInfoPicker";
 import { useZipRecipe } from "@/stores/useZipRecipeStore";
+import { CONFIRM_AFFIRMATIVE, PANEL_DIVIDER } from "@/lib/styles";
+import { cn } from "@/lib/utils";
 
 /** The format picker's ids: every real download format, the formats the
  *  active plugins add (Settings → Plugins, lib/plugins — their manifest ids,
@@ -90,10 +88,11 @@ const LAYERED_IDS: FormatTileId[] = ["ora", "psd"];
 const isLayeredPlugin = (p: ActiveFormat) =>
   LAYERED_IDS.includes(p.format.id as FormatTileId) || /^Layered\b/i.test(p.format.hint);
 
-// No kind words ("vector", "layered") on a tile: the Kind row says which kind
-// it is (Chris, 11-23-2026).
+// A tile is named for its format ("JPEG"); the line under the row says what
+// it is for. No kind words ("vector", "layered"): the Kind row says that
+// (Chris, 11-23-2026).
 const SVG_HINT = "Keeps crop";
-const SVG_OFF_HINT = "SVG uploads only";
+const PSD_OFF_HINT = "Turn on the PSD plugin in Settings › Plugins to save PSD.";
 
 /** The file-type glyphs carry lettering, so they get a larger slot than the
  *  tile's default 24px icon. Inline size, not a class: ToolButton's
@@ -163,7 +162,8 @@ interface DownloadDialogProps {
 export function DownloadDialog({ open, onOpenChange, ...rest }: DownloadDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      {/* ~600px (max-w-xl, 576): the format tiles fit four across. */}
+      <DialogContent className="max-w-xl">
         <ExportBody {...rest} />
       </DialogContent>
     </Dialog>
@@ -234,51 +234,57 @@ function ExportBody({
     }
   };
 
-  // ── Row 3's tiles, per kind ────────────────────────────────────────────
-  const pluginTile = ({ plugin, format: f }: ActiveFormat) => ({
+  // ── Row 4's tiles, per kind ────────────────────────────────────────────
+  // Each tile is named for its format; `hint` is the line under the row.
+  type Tile = { id: FormatTileId; label: string; icon: React.ComponentType; title: string; hint: string; disabled?: boolean };
+  const pluginTile = ({ plugin, format: f }: ActiveFormat): Tile => ({
     id: f.id as FormatTileId,
-    // The plugin's hint names its kind ("Layered · Photoshop"); the Kind row
-    // says that now, so the tile keeps the rest.
-    label: f.hint.replace(/^Layered\s*·\s*/i, "") || f.hint,
+    label: f.label,
     icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
     title: `${f.label} — ${f.hint} (${plugin.name} plugin).`,
+    // The plugin's hint names its kind ("Layered · Photoshop"); the Kind row
+    // says that, so the line keeps the rest.
+    hint: f.hint.replace(/^Layered\s*·\s*/i, "") || f.hint,
   });
-  const rasterTiles = [
+  const rasterTiles: Tile[] = [
     ...formats
       .filter((f) => kindOfFormat(f.value) === "raster")
       .map((f) => ({
         id: f.value as FormatTileId,
-        label: f.hint,
+        label: f.label,
         icon: FORMAT_TILE_ICONS[f.value],
         title: `${f.label} — ${f.hint}`,
+        hint: f.hint,
       })),
     // Plugin formats write one image each, so they are Selected only.
     ...(scope === "selected"
       ? [...pluginFormats]
           .filter((p) => !isLayeredPlugin(p))
-          .sort((a, b) => a.format.hint.localeCompare(b.format.hint))
+          .sort((a, b) => a.format.label.localeCompare(b.format.label))
           .map(pluginTile)
       : []),
   ];
-  const vectorTiles = [
+  const vectorTiles: Tile[] = [
     {
-      id: "svg" as const,
-      label: vectorOn ? SVG_HINT : SVG_OFF_HINT,
+      id: "svg",
+      label: "SVG",
       icon: FORMAT_TILE_ICONS.svg,
       title: vectorOn
         ? `SVG — ${SVG_HINT}. Painting and filters stay in the other formats.`
         : "SVG — only for images uploaded as SVG.",
+      hint: `${SVG_HINT}. Painting and filters stay in the other formats.`,
       disabled: !vectorOn,
     },
   ];
-  const layerTiles = [
+  const layerTiles: Tile[] = [
     ...formats
       .filter((f) => kindOfFormat(f.value) === "layers")
       .map((f) => ({
         id: f.value as FormatTileId,
-        label: f.hint,
+        label: f.label,
         icon: FORMAT_TILE_ICONS[f.value],
         title: `${f.label} — ${f.hint}. Keeps every layer.`,
+        hint: `${f.hint}. Keeps every layer.`,
       })),
     ...[...pluginFormats].filter(isLayeredPlugin).map(pluginTile),
     // The placeholder, only while no plugin provides PSD.
@@ -287,19 +293,25 @@ function ExportBody({
       : [
           {
             id: "psd" as const,
-            label: "Activate with plugin",
+            label: "PSD",
             icon: FORMAT_TILE_ICONS.psd,
             title: "PSD — layered Photoshop file. Activate with the PSD plugin in Settings.",
+            hint: PSD_OFF_HINT,
             disabled: true,
           },
         ]),
   ];
   const tiles = kind === "raster" ? rasterTiles : kind === "vector" ? vectorTiles : layerTiles;
   const tileValue: FormatTileId = kind === "raster" ? (kindOfFormat(format) === "raster" ? format : zipFormat) : format;
+  const pickedTile = tiles.find((t) => t.id === tileValue);
+  const psdOff = kind === "layers" && !pluginIds.has("psd");
   const allSvg = scope === "all" && kind === "vector";
 
   const zipAs = allSvg ? "SVG" : recipe ? recipe.name : zipLabel;
   const zipCount = allSvg ? svg.all : photoCount;
+  // The footer's "what you'll get" line.
+  const formatName = downloadLabel.replace(/^Download\s+/, "");
+  const fileTitle = `${fileName.value.trim() || fileName.defaultStem}${ext}`;
 
   return (
     <>
@@ -320,14 +332,14 @@ function ExportBody({
             {
               key: "selected",
               icon: ImageIcon,
-              label: "Download Selected",
+              label: "Selected image",
               active: scope === "selected",
               onToggle: () => pickScope("selected"),
             },
             {
               key: "all",
               icon: FolderArchive,
-              label: `Download All (${photoCount})`,
+              label: `All images (${photoCount})`,
               active: scope === "all",
               onToggle: () => pickScope("all"),
               disabled: !multi,
@@ -335,7 +347,23 @@ function ExportBody({
           ]}
         />
 
-        {/* 2. Kind */}
+        {/* 2. File Name (Selected) or Recipe + Batch settings (All). Each
+            image in a ZIP keeps its own name, so All has no name field; a
+            recipe shapes a ZIP, so Selected has no recipe. An SVG ZIP is the
+            uploaded files as they are, so it takes no recipe either. */}
+        {scope === "selected" ? (
+          <ExportFileNameField
+            value={fileName.value}
+            defaultStem={fileName.defaultStem}
+            onChange={fileName.onChange}
+            ext={ext}
+            onSubmit={onDownload}
+          />
+        ) : (
+          kind === "raster" && <ZipRecipePicker zipFormat={zipFormat} />
+        )}
+
+        {/* 3. Kind. With Layers is one file at a time, so All leaves it out. */}
         <ToggleButtonGroup
           mode="select"
           aria-label="Kind of file"
@@ -351,79 +379,98 @@ function ExportBody({
               disabled: !vectorOn,
               tooltip: { label: vectorOn ? "Vector: the SVG you uploaded" : "Vector: only for images uploaded as SVG" },
             },
-            {
-              key: "layers",
-              icon: Layers,
-              label: "With Layers",
-              active: kind === "layers",
-              onToggle: () => pickKind("layers"),
-              disabled: !layersOn,
-              tooltip: { label: layersOn ? "With Layers: every layer kept, to open in another editor" : "With Layers: one image at a time, not in a ZIP" },
-            },
+            ...(scope === "selected"
+              ? [
+                  {
+                    key: "layers",
+                    icon: Layers,
+                    label: "With Layers",
+                    active: kind === "layers",
+                    onToggle: () => pickKind("layers"),
+                    tooltip: { label: "With Layers: every layer kept, to open in another editor" },
+                  },
+                ]
+              : []),
           ]}
         />
 
-        {/* 3. Format — the Shapes picker's tiles */}
-        <ToolButtonGroup<FormatTileId>
-          aria-label="Format"
-          stacked
-          // Four to a row, not three (11-23): the raster set wrapped to a
-          // second row of one or two. Same tiles, the group's own 4 variant.
-          columns={4}
-          value={tileValue}
-          onChange={(id) => {
-            const t = tiles.find((o) => o.id === id);
-            if (t && !("disabled" in t && t.disabled)) onFormatChange(id as DownloadFormat);
-          }}
-          options={tiles}
-        />
-
-        {/* 4. Camera Info (ADR-108). An SVG carries no camera info. */}
-        {kind !== "vector" && (
-          <CameraInfoPicker variant="section" recipeChoice={scope === "all" ? recipe?.cameraInfo : undefined} />
-        )}
-
-        {/* 5. Recipe — shapes a ZIP, so grayed out for Download Selected. */}
-        {kind === "raster" && <ZipRecipePicker zipFormat={zipFormat} disabled={scope === "selected"} />}
-
-        {/* 5.5 File Name — Download Selected; grayed for All, where each
-            image in the ZIP keeps its own name. */}
-        <ExportFileNameField
-          value={fileName.value}
-          defaultStem={fileName.defaultStem}
-          onChange={fileName.onChange}
-          ext={ext}
-          onSubmit={onDownload}
-          disabled={scope === "all"}
-        />
-
-        {allSvg && svg.all < photoCount && (
-          <p className="text-2xs text-theme-muted-foreground">
-            {`Only the ${svg.all} images uploaded as SVG go in the ZIP; the others are left out.`}
+        {/* 4. Format — the Shapes picker's tiles, named for the format, and
+            one line saying what the picked one is for. */}
+        <div className="space-y-2">
+          <ToolButtonGroup<FormatTileId>
+            aria-label="Format"
+            stacked
+            columns={kind === "raster" ? 4 : 3}
+            value={tileValue}
+            onChange={(id) => {
+              const t = tiles.find((o) => o.id === id);
+              if (t && !t.disabled) onFormatChange(id as DownloadFormat);
+            }}
+            options={tiles.map(({ hint: _hint, ...t }) => t)}
+          />
+          <p data-testid="export-format-says" className="text-2xs text-theme-muted-foreground">
+            {pickedTile && !pickedTile.disabled ? `${pickedTile.label} — ${pickedTile.hint}` : ""}
+            {psdOff ? ` ${PSD_OFF_HINT}` : ""}
           </p>
+          {allSvg && svg.all < photoCount && (
+            <p className="text-2xs text-theme-muted-foreground">
+              {`Only the ${svg.all} images uploaded as SVG go in the ZIP; the others are left out.`}
+            </p>
+          )}
+        </div>
+
+        {/* 5. Privacy & metadata (ADR-108), a drop-down. An SVG carries no
+            camera info. */}
+        {kind !== "vector" && (
+          <CameraInfoPicker variant="dropdown" recipeChoice={scope === "all" ? recipe?.cameraInfo : undefined} />
         )}
 
-        {/* 6. Actions */}
-        {scope === "selected" ? (
-          <PanelActionBar layout="thirds">
-            <PanelAction icon={Download} onClick={onDownload}>
-              {downloadLabel}
-            </PanelAction>
-            {shareAction}
-            <PanelAction icon={ClipboardCopy} onClick={onCopy}>
-              Clipboard
-            </PanelAction>
-          </PanelActionBar>
-        ) : (
-          <PanelActionBar layout="halves">
-            <PanelAction icon={FolderArchive} onClick={onDownloadAll}>
-              {`Download ZIP (${zipCount} as ${zipAs})`}
-            </PanelAction>
-            <PanelAction icon={Share2} disabled title="Share all: a paid feature, coming soon">
-              Share All · Soon
-            </PanelAction>
-          </PanelActionBar>
-        )}
+        {/* 6. Footer: what you'll get, the quiet actions, ONE primary — the
+            confirm dialogs' solid "yes, do it" fill. */}
+        <div data-slot="export-footer" className={cn(PANEL_DIVIDER, "space-y-3")}>
+          <p id="export-summary" className="truncate text-2xs text-theme-muted-foreground">
+            {scope === "selected" ? (
+              <>
+                <span className="font-mono text-text-primary">{fileTitle}</span>
+                {` · 1 image · ${formatName}`}
+              </>
+            ) : (
+              `${zipCount} images · ${zipAs} · ZIP`
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {scope === "selected" ? (
+              <>
+                {shareAction}
+                <PanelAction icon={ClipboardCopy} onClick={onCopy}>
+                  Clipboard
+                </PanelAction>
+                <PanelAction
+                  icon={Download}
+                  onClick={onDownload}
+                  aria-describedby="export-summary"
+                  className={cn("ml-auto", CONFIRM_AFFIRMATIVE)}
+                >
+                  {downloadLabel}
+                </PanelAction>
+              </>
+            ) : (
+              <>
+                <PanelAction icon={Share2} disabled title="Share all: a paid feature, coming soon">
+                  Share All · Soon
+                </PanelAction>
+                <PanelAction
+                  icon={FolderArchive}
+                  onClick={onDownloadAll}
+                  aria-describedby="export-summary"
+                  className={cn("ml-auto", CONFIRM_AFFIRMATIVE)}
+                >
+                  Download ZIP
+                </PanelAction>
+              </>
+            )}
+          </div>
+        </div>
       </DialogBody>
     </>
   );

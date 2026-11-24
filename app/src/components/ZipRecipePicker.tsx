@@ -1,6 +1,10 @@
-// Export › All Images › Recipe (Night 10-28, 229). Pick a recipe for the next
+// Export › All images › Recipe (Night 10-28, 229). Pick a recipe for the next
 // ZIP, or save the current choices as one. A recipe shapes the export only;
 // it never changes a photo in the gallery (lib/exportRecipes.ts).
+//
+// Shown on All images only (Chris, 11-24-2026: no grayed-out rows on Selected
+// image). Under the menu, "Batch settings" spells out what the ZIP will hold —
+// size, naming, camera info, packaging — with or without a recipe.
 //
 // Saved recipes are Preferences, so they stay on this device when signed out
 // and follow a signed-in person to their other devices (ADR-061).
@@ -12,6 +16,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { NumberField, TextField } from "@/components/ui/number-field";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { CAMERA_INFO_LABEL, cameraInfoOf } from "@/lib/exif/cameraInfo";
+import { PANEL_DIVIDER } from "@/lib/styles";
 import { usePreferences } from "@/lib/preferences";
 import {
   BUILT_IN_RECIPES,
@@ -34,16 +39,21 @@ const FIT_OPTIONS = [
 ] as const;
 type Fit = (typeof FIT_OPTIONS)[number]["id"];
 
-export function ZipRecipePicker({
-  zipFormat,
-  disabled = false,
-}: {
-  zipFormat: ExportFormat;
-  /** Shown but off: a recipe shapes a ZIP, so with Download Selected it is
-   *  grayed out rather than hidden, and the Export dialog keeps one shape
-   *  (Chris, 11-23-2026). */
-  disabled?: boolean;
-}) {
+/** A recipe's size, in words, for the Batch settings list. */
+function sizeWords(size: RecipeSize): string {
+  switch (size.fit) {
+    case "exact":
+      return `${size.width}×${size.height}`;
+    case "width":
+      return `${size.size} px wide`;
+    case "long":
+      return `${size.size} px long edge`;
+    case "keep":
+      return "Original size";
+  }
+}
+
+export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
   const [prefs, applyPrefs] = usePreferences();
   const recipeId = useZipRecipeStore((s) => s.recipeId);
   const setRecipeId = useZipRecipeStore((s) => s.setRecipeId);
@@ -88,7 +98,7 @@ export function ZipRecipePicker({
   };
 
   return (
-    <div className={disabled ? "space-y-2 opacity-50" : "space-y-2"}>
+    <div className="space-y-2">
       <label htmlFor={selectId} className="block text-xs font-semibold text-text-muted">
         Recipe
       </label>
@@ -101,10 +111,9 @@ export function ZipRecipePicker({
           <SelectField
             id={selectId}
             value={recipeId ?? ""}
-            disabled={disabled}
             onChange={(e) => setRecipeId(e.target.value || null)}
           >
-            <option value="">None — the format above, each at its size</option>
+            <option value="">Custom — the format below, each at its size</option>
             <optgroup label="Built in">
               {BUILT_IN_RECIPES.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -126,7 +135,6 @@ export function ZipRecipePicker({
           {recipe && !recipe.id.startsWith("builtin:") && (
             <Button
               size="default"
-              disabled={disabled}
               title={`Delete the recipe "${recipe.name}"`}
               onClick={() => remove(recipe.id)}
             >
@@ -135,26 +143,44 @@ export function ZipRecipePicker({
             </Button>
           )}
         </div>
-        <Button
-          size="default"
-          className="flex-1"
-          onClick={() => setSaving(true)}
-          disabled={disabled || saving || saved.length >= MAX_SAVED_RECIPES}
-          title="Save the current format, size and name as a recipe"
-        >
-          <Save className="h-3.5 w-3.5" />
-          Save…
-        </Button>
+        {/* Hidden while the form is open: the form's own Save recipe is the
+            one to press then. */}
+        {!saving && (
+          <Button
+            size="default"
+            className="flex-1"
+            onClick={() => setSaving(true)}
+            disabled={saved.length >= MAX_SAVED_RECIPES}
+            title="Save the current format, size and name as a recipe"
+          >
+            <Save className="h-3.5 w-3.5" />
+            Save recipe
+          </Button>
+        )}
       </div>
-      {recipe && !disabled && (
-        <p className="text-2xs text-theme-muted-foreground">
-          {`${describeRecipe(recipe)}, quality ${recipe.quality}, named ${recipe.pattern}${
-            recipe.cameraInfo ? `, camera info ${CAMERA_INFO_LABEL[recipe.cameraInfo]}` : ""
-          }. The gallery is not changed.`}
-        </p>
-      )}
 
-      {saving && !disabled && (
+      {/* Batch settings: what the ZIP will hold, in plain rows. */}
+      <dl
+        aria-label="Batch settings"
+        title={recipe ? describeRecipe(recipe) : undefined}
+        className={`${PANEL_DIVIDER} grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-2xs`}
+      >
+        {[
+          ["Size", recipe ? sizeWords(recipe.size) : "Original size"],
+          ...(recipe ? [["Quality", String(recipe.quality)]] : []),
+          ["Naming", recipe && recipe.pattern !== "{name}" ? recipe.pattern : "Original file names"],
+          ["Camera info", CAMERA_INFO_LABEL[recipe?.cameraInfo ?? cameraInfoOf(prefs)]],
+          ["Packaging", "ZIP archive"],
+        ].map(([term, value]) => (
+          <div key={term} className="contents">
+            <dt className="text-theme-muted-foreground">{term}</dt>
+            <dd className="text-text-primary">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {recipe && <p className="text-2xs text-theme-muted-foreground">The gallery is not changed.</p>}
+
+      {saving && (
         <form
           aria-label="New recipe"
           className="space-y-2 rounded-md border border-border p-2"

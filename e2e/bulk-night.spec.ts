@@ -258,7 +258,7 @@ async function openDownloadAll(page: Page) {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  await dialog.getByRole("radio", { name: /^All images/ }).click();
   return dialog;
 }
 
@@ -270,7 +270,8 @@ test("Recipe Instagram 1080×1350: 1080×1350 JPEGs named by the pattern; the ga
 
   const dialog = await openDownloadAll(page);
   await dialog.getByLabel("Recipe").selectOption({ label: "Instagram 1080×1350" });
-  const button = dialog.getByRole("button", { name: "Download ZIP (3 as Instagram 1080×1350)" });
+  await expect(dialog.locator("#export-summary")).toHaveText("3 images · Instagram 1080×1350 · ZIP");
+  const button = dialog.getByRole("button", { name: "Download ZIP", exact: true });
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120_000 }), button.click()]);
   const zip = readZip(readFileSync((await dl.path())!));
   expect([...zip.keys()].sort()).toEqual(specs.map((s) => `${s.name}-instagram.jpg`).sort());
@@ -288,14 +289,15 @@ test("a recipe file name fills the shared rename tokens (ticket 237)", async ({ 
   const specs = LARGE.slice(0, 2).map((s, i) => ({ ...s, w: 800 + i * 40, h: 600 }));
   await open(page, specs);
   const dialog = await openDownloadAll(page);
-  await dialog.getByRole("button", { name: "Save…", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save recipe" }).click();
   await dialog.getByLabel("Recipe name").fill("Dated");
   await dialog.getByRole("radio", { name: "Keep", exact: true }).click();
   await dialog.getByLabel("Name pattern").fill("{original}-{width}x{height}-{ext}-{date:YYYY}");
   await dialog.getByRole("button", { name: "Save recipe" }).click();
   await expect(dialog.getByLabel("Recipe")).toHaveValue(/^r-/);
 
-  const button = dialog.getByRole("button", { name: "Download ZIP (2 as Dated)" });
+  await expect(dialog.locator("#export-summary")).toHaveText("2 images · Dated · ZIP");
+  const button = dialog.getByRole("button", { name: "Download ZIP", exact: true });
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120_000 }), button.click()]);
   const names = [...readZip(readFileSync((await dl.path())!)).keys()].sort();
   // The drawn JPEGs carry no EXIF, so {date} is the file's date: this year.
@@ -311,7 +313,7 @@ test("a saved recipe survives a reload", async ({ page }) => {
   test.setTimeout(180_000);
   await open(page, LARGE.slice(0, 2).map((s) => ({ ...s, w: 800, h: 600 })));
   let dialog = await openDownloadAll(page);
-  await dialog.getByRole("button", { name: "Save…", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save recipe" }).click();
   await dialog.getByLabel("Recipe name").fill("Blog 1200");
   await dialog.getByRole("radio", { name: "Width", exact: true }).click();
   await dialog.getByLabel("Size (px)").fill("1200");

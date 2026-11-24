@@ -67,6 +67,14 @@ export const FIELD_NUMERIC = `${FIELD_BASE} px-2 py-1.5 text-sm tabular-nums`;
  *  type size as the textarea, so a dialog holding both reads as one set. */
 export const FIELD_TEXT = `${FIELD_BASE} px-3 py-2 text-sm`;
 
+/** A field with a fixed part inside its border — the Export dialog's File
+ *  Name, whose extension sits at the right end. The box is the wrapper, so the
+ *  focus ring follows the input with `focus-within`; the input inside is
+ *  borderless and transparent. */
+export const FIELD_BASE_GROUP =
+  "w-full overflow-hidden rounded-lg bg-theme-muted border border-theme-border " +
+  "focus-within:ring-1 focus-within:ring-theme-ring";
+
 /** A multi-line field. `resize-none` because the dialogs size their own panels
  *  and a user-dragged corner fights the layout. */
 export const FIELD_TEXTAREA = `${FIELD_BASE} resize-none px-3 py-2 text-sm`;

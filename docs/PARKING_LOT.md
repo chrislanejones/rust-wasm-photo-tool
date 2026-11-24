@@ -4,6 +4,27 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — Export dialog leftovers (`feat/export-hierarchy`, 11-24-2026)
+
+The Export dialog now adapts to the task (v9.75). The design review that led to it
+also listed these. Each is its own change, and none is started.
+
+| Idea | Why it waits |
+|---|---|
+| **Estimated file size** before downloading | Resize & Compress already measures "Image weight"; reuse that, don't build a second estimator |
+| **Quality slider** for JPEG, WebP and AVIF in the dialog | Quality lives in Resize & Compress today; two places for one setting need a decision first |
+| **Resize during export** (original, %, width × height, max edge) | Recipes already do this for ZIPs; tied to single-image recipes below |
+| **Compression preview** (original vs. compressed) | Large; the compare-mode work is the place to start |
+| **Recipes for single images** | Recommended 11-23, waiting for Chris's go; reuse `applyRecipe`. Needs its own design pass |
+
+Noticed along the way:
+
+| Where | What |
+|---|---|
+| `marketing/scripts/gen-trail-data.mjs` | GitHub PR commits are dated by their **UTC** day, so an evening (EST) commit makes a square on the next day (#514 showed on 11-24 for 11-23) |
+| App bundle | Main JS chunk ~862 KB gzip on the local test build (827 KB at v9.71). The emoji data (~80 KB gzip) is still loaded up front in `StampSettings.tsx`; lazy-loading it is the cheapest win |
+| `pnpm lint` | Warnings went 54 → 55 with #514 (warnings are the backlog, not a gate) |
+
 ## FIXED 11-23-2026 (`marketing/facts-v969`) — marketing facts sweep leftovers
 
 | Where | Was stale | Now |

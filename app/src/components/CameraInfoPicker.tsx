@@ -6,7 +6,12 @@
 //
 // A recipe that saved its own choice shows it here, locked, because that is
 // what its files will carry.
+//
+// In the Export dialog it is a "Privacy & metadata" drop-down (Chris,
+// 11-24-2026): shut by default, with the current choice ("Remove all") on its
+// right, so the setting is never hidden while it takes no room.
 import { Eraser, MapPinOff, Tag } from "lucide-react";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { ControlRow } from "@/components/ui/control-row";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import {
@@ -34,13 +39,14 @@ export function CameraInfoPicker({
   variant = "row",
 }: {
   recipeChoice?: CameraInfo;
-  /** `section` in the Export dialog, where it is one of the pane's sections. */
-  variant?: "row" | "section";
+  /** `row` — a plain labeled row. `dropdown` — the Export dialog's
+   *  "Privacy & metadata" section, shut until opened. */
+  variant?: "row" | "dropdown";
 }) {
   const [prefs, applyPrefs] = usePreferences();
   const value = recipeChoice ?? cameraInfoOf(prefs);
-  return (
-    <ControlRow label="Camera Info" variant={variant}>
+  const row = (
+    <ControlRow label="Camera Info" variant={variant === "dropdown" ? "section" : "row"}>
       {({ labelId }) => (
         <div className="space-y-1">
           <ToolButtonGroup<CameraInfo>
@@ -57,5 +63,11 @@ export function CameraInfoPicker({
         </div>
       )}
     </ControlRow>
+  );
+  if (variant === "row") return row;
+  return (
+    <CollapsibleSection label="Privacy & metadata" summary={CAMERA_INFO_LABEL[value]}>
+      {row}
+    </CollapsibleSection>
   );
 }

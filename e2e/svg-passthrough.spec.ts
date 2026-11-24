@@ -66,7 +66,7 @@ test("the SVG tile is disabled for a raster image", async ({ page }) => {
   await expect(dialog.getByRole("radio", { name: "Vector" })).toBeDisabled();
   // PSD ships as a separate plugin, so its tile points there, not at a date.
   await dialog.getByRole("radio", { name: "With Layers" }).click();
-  const psd = dialog.getByRole("radio", { name: "Activate with plugin" });
+  const psd = dialog.getByRole("radio", { name: "PSD", exact: true });
   await expect(psd).toBeDisabled();
 });
 
@@ -111,10 +111,11 @@ test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox c
 test("All Images zips just the SVGs", async ({ page }) => {
   await upload(page, [svgFile("one.svg"), pngFile(), svgFile("two.svg")]);
   const dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  await dialog.getByRole("radio", { name: /^All images/ }).click();
   await dialog.getByRole("radio", { name: "Vector" }).click();
   await svgTile(dialog).click();
-  const button = dialog.getByRole("button", { name: "Download ZIP (2 as SVG)" });
+  await expect(dialog.locator("#export-summary")).toHaveText("2 images · SVG · ZIP");
+  const button = dialog.getByRole("button", { name: "Download ZIP", exact: true });
   await expect(button).toBeVisible();
   await expect(dialog.getByText(/the others are left out/)).toBeVisible();
   const dl = await downloadText(page, () => button.click());
