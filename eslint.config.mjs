@@ -249,8 +249,11 @@ export default tseslint.config(
     // shared helpers above rather than keeping a second copy.
     // 2166 -> 2141 (text stroke): the inline `textSettings` prop type moved to
     // lib/textOverlaySettings.ts, beside the stroke's CSS preview.
+    // 2141 -> 2106 (stamps, ADR-109): the bubble tail's geometry moved to
+    // lib/bubbleTail.ts and the box border's preview is its own component,
+    // features/canvas/TextBorderPreview.tsx.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["error", { max: 2141 }] },
+    rules: { "max-lines": ["error", { max: 2106 }] },
   },
   {
     // 1428 -> 1276 (ticket 237, 11-15-2026): Batch › Rename moved out to

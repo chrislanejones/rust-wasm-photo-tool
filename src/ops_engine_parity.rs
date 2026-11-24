@@ -256,6 +256,7 @@ fn text_add_replay_matches_live_annotation() {
             font_id: String::new(),
             stroke: Default::default(),
             align: 0,
+            border: Default::default(),
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -553,6 +554,7 @@ fn persist_restore_keeps_base_annotations_live() {
         font_id: String::new(),
         stroke: Default::default(),
         align: 0,
+        border: Default::default(),
         id: 1,
         text: "base".into(),
         x: 6,
@@ -2437,5 +2439,39 @@ fn aligned_text_replays_byte_identically_and_is_one_step() {
         assert!(t.redo());
         t.recomposite();
         assert!(t.composite_cache == aligned, "{ctx}: redo restores it");
+    }
+}
+
+/// A stamp — a bold word in a bordered, transparent, tilted box — and a
+/// bordered speech bubble replay to the engine's own pixels, and the border
+/// joins the commit's one undo step (ADR-109).
+#[test]
+fn bordered_text_replays_byte_identically_and_is_one_step() {
+    // (background kind, bg alpha, rotation): the stamp, an opaque rect, a bubble.
+    for (kind, bg_a, rot) in [(1u8, 0u8, -5.0f64), (1, 255, 0.0), (2, 255, 0.0)] {
+        let (mut t, _px) = seeded_tool(800, 400);
+        t.set_oplog_undo(true);
+        let id = t.add_text_annotation(
+            "APPROVED", 48.0, 22, 163, 74, true, 200, 150, rot, kind, 22, 163, 74, bg_a, 14, 4,
+            100, "",
+        );
+        t.recomposite();
+        t.continue_step();
+        assert!(t.set_text_align(id, 1));
+        t.continue_step();
+        assert!(t.set_text_border(id, 4, "#16a34a", 255));
+        t.recomposite();
+        let ctx = format!("kind {kind}, bg_a {bg_a}, rot {rot}");
+        let replay = t.oplog.as_ref().unwrap().live_document().composite_flat(); // allow: rust-panic
+        assert_flat_identical(&t.composite_cache, &replay, t.width(), &ctx);
+        assert_eq!(t.oplog_coverage(), 1, "{ctx}");
+        assert_eq!(t.undo_count(), 1, "{ctx}: one step");
+        assert!(t.set_text_border(id, 4, "#16a34a", 255));
+        assert_eq!(t.undo_count(), 1, "{ctx}: a no-op takes no step");
+        let bordered = t.composite_cache.clone();
+        assert!(t.undo());
+        assert!(t.redo());
+        t.recomposite();
+        assert!(t.composite_cache == bordered, "{ctx}: redo restores it");
     }
 }

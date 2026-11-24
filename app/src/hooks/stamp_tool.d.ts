@@ -770,17 +770,6 @@ declare module "stamp_tool" {
       bold: boolean,
       font_id: string,
     ): Uint32Array;
-    /** Render a stamp label (bordered, rotated) entirely in Rust and composite centered on dest. */
-    commit_red_stamp(
-      label: string,
-      r: number,
-      g: number,
-      b: number,
-      dest_x: number,
-      dest_y: number,
-      target_size: number,
-      angle_deg: number,
-    ): void;
     /** Snapshot the layer (history `label`) + prime the per-stroke coverage
      *  buffer. Called internally by paint_down / erase_down. */
     paint_begin(label: string): void;
@@ -1132,6 +1121,11 @@ declare module "stamp_tool" {
      *  over 8 is top-left). No-op, and no history step, when unchanged
      *  (v16, ADR-104). */
     set_text_align(id: number, align: number): boolean;
+    /** A border around the text's BOX: `width` px (0 = none, clamped to 20)
+     *  in `color_hex` at `alpha` (0-255), drawn inside the box edge so nothing
+     *  moves. Only visible with a background (rect or bubble). No-op, and no
+     *  history step, when nothing visible changes (v17, ADR-109). */
+    set_text_border(id: number, width: number, color_hex: string, alpha: number): boolean;
     remove_text_annotation(id: number): boolean;
     get_text_annotations(): string;
     /** Returns the matching annotation id, or -1 if no hit. */
@@ -1362,6 +1356,12 @@ declare module "stamp_tool" {
       stroke_a: number,
       /** Where the text sits in its box (v16): `row * 3 + column`, 0-8. */
       align: number,
+      /** Box border width in px (0 = none), then its RGBA (v17, ADR-109). */
+      border_width: number,
+      border_r: number,
+      border_g: number,
+      border_b: number,
+      border_a: number,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;

@@ -196,5 +196,11 @@ export function restoreStoredText(
     a.stroke_a ?? 0,
     // Line alignment (v16, ADR-104). Absent before it: 0, left.
     a.align ?? 0,
+    // The box border (v17, ADR-109). Absent before it: width 0, none.
+    a.border_width ?? 0,
+    a.border_r ?? 0,
+    a.border_g ?? 0,
+    a.border_b ?? 0,
+    a.border_a ?? 0,
   );
 }

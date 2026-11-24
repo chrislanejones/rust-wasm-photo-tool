@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MutableRefObject } from "react";
-import { Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
+import { Type, PaintBucket, ScanText, Lock, Copy, Stamp } from "lucide-react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -25,6 +25,7 @@ import { ErrorNote } from "@/components/ui/status-note";
 import { Button } from "@/components/ui/button";
 import { ControlRow } from "@/components/ui/control-row";
 import { ToolPanel } from "@/components/ui/tool-panel";
+import { StampsSettings } from "./StampsSettings";
 
 /**
  * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
@@ -125,6 +126,12 @@ const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
     icon: ScanText,
     info: "Read the text out of the photo (Replicate-backed) — extract, then copy it.",
   },
+  {
+    id: "stamps",
+    label: "Stamps",
+    icon: Stamp,
+    info: "Pick a stamp or type any word, then click the photo to place it. A stamp is a text: click it to retype it, drag it to move it, or turn it with the rotate handle.",
+  },
 ];
 
 interface TextSettingsProps {
@@ -220,6 +227,8 @@ export function TextSettings({
       const m = mode;
       return (
         <>
+        {m === "stamps" && <StampsSettings settings={settings} onChange={onChange} />}
+
         {m === "text" && (
           <div className="space-y-4">
             {/* Font Size */}
@@ -386,6 +395,37 @@ export function TextSettings({
                     unit="%"
                     onChange={(v) => onChange({ ...settings, bgOpacity: v })}
                   />
+
+                  {/* Border — around the box (rect or bubble, tail included),
+                      drawn INSIDE its edge by `box_border_ring` in
+                      src/layer.rs, so the text never moves. A stamp is a
+                      text with one (ADR-109). Width 0 is off. */}
+                  <SizeSlider
+                    label="Border"
+                    value={settings.textBorderWidth}
+                    min={0}
+                    max={TEXT_STROKE_MAX}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, textBorderWidth: v })}
+                  />
+                  {settings.textBorderWidth > 0 && (
+                    <>
+                      <ColorSwatchGrid
+                        label="Border Color"
+                        colors={TEXT_COLORS}
+                        value={settings.textBorderColor}
+                        onChange={(color) => onChange({ ...settings, textBorderColor: color })}
+                      />
+                      <SizeSlider
+                        label="Border Opacity"
+                        value={settings.textBorderOpacity}
+                        min={0}
+                        max={100}
+                        unit="%"
+                        onChange={(v) => onChange({ ...settings, textBorderOpacity: v })}
+                      />
+                    </>
+                  )}
                 </>
               )}
             </CollapsibleSection>
@@ -602,10 +642,10 @@ export function TextSettings({
       </CollapsibleSection>
     )}
 
-    {/* Placement only applies to the Text mode — Background/OCR aren't
-        placing a new object on the canvas. Collapsed under "Placement" since
-        09-30-2026; see the note in ShapeSettings. */}
-    {mode === "text" && onPlace && (
+    {/* Placement applies to the modes that put an object on the canvas —
+        Text and Stamps; Background/OCR don't. Collapsed under "Placement"
+        since 09-30-2026; see the note in ShapeSettings. */}
+    {(mode === "text" || mode === "stamps") && onPlace && (
       <CollapsibleSection
         label="Placement"
         info={

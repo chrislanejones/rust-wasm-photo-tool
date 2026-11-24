@@ -156,6 +156,14 @@ function legacyToolRoute(
     return groupRoute("select");
   }
 
+  // v17 (ADR-109): Red Stamps left the Stamp tool to become the Text tool's
+  // Stamps mode, so `#/tool/stamps/red` no longer matches a Stamp sub-mode.
+  // Same sub-tool, same `#/create/stamps` it always opened — not Clone Stamp,
+  // which is where the reverse lookup would otherwise fall.
+  if (tool === "stamp" && modeSlug?.toLowerCase() === "red") {
+    return { kind: "tool", group: "create", subTool: "stamps" };
+  }
+
   const rawMode = modeSlug?.toLowerCase();
   const mode = rawMode ? (MODE_ALIASES[tool]?.[rawMode] ?? rawMode) : undefined;
 

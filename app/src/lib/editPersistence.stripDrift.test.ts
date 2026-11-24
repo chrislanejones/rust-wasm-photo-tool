@@ -96,6 +96,8 @@ const FULL_ANNOTATION: Required<PersistedAnnotation> = {
   stroke_width: 18,
   stroke_r: 19, stroke_g: 20, stroke_b: 21, stroke_a: 22,
   align: 1,
+  border_width: 23,
+  border_r: 24, border_g: 25, border_b: 26, border_a: 27,
 };
 
 describe("stripLiveAnnotations", () => {

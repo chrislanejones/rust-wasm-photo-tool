@@ -63,7 +63,7 @@ import {
 
 const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
-  "Red Stamps": BadgeCheck,
+  "Stamps": BadgeCheck,
   "Edit group (Crop · Transform · Perspective · Color Picker · Layers · Canvas Size · Guides · Rulers and Grid)": Move,
   "Select group": SquareDashedMousePointer,
   "Placement grid": Grid3x3,

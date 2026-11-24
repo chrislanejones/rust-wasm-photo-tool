@@ -87,7 +87,6 @@ interface ToolModeInfo {
 const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   stamp: [
     { id: "clone", label: "Clone Stamp", icon: Copy, keywords: ["clone", "heal", "duplicate"] },
-    { id: "red", label: "Red Stamps", icon: StampIcon, keywords: ["red", "batch stamp", "marker"] },
     { id: "emojis", label: "Emoji", icon: Smile, keywords: ["emoji", "emojis", "sticker"] },
   ],
   shapes: [
@@ -99,6 +98,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
     { id: "text", label: "Text", icon: Type, keywords: ["text", "type", "caption", "label"] },
     { id: "background", label: "Background", icon: PaintBucket, keywords: ["background", "fill", "bubble", "plate"] },
     { id: "ocr", label: "OCR", icon: ScanText, keywords: ["ocr", "read", "extract", "scan text"] },
+    { id: "stamps", label: "Stamps", icon: StampIcon, keywords: ["stamp", "approved", "rejected", "draft", "confidential", "marker"] },
   ],
   ai: [
     { id: "brush", label: "Eraser", icon: Eraser, keywords: ["erase", "brush", "rub out"] },

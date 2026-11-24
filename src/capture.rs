@@ -1001,6 +1001,11 @@ mod capture_tests {
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
+                0,
+                0, // no box border (v17)
             ),
             0
         );

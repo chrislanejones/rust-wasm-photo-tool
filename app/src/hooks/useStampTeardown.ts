@@ -3,37 +3,35 @@ import type { ToolType } from "@/lib/types";
 import type { StampSubMode } from "@/stores/useToolStore";
 
 /**
- * Stamp-tool state teardown. The Stamp tool keeps three pieces of "armed
+ * Stamp-tool state teardown. The Stamp tool keeps two pieces of "armed
  * stamp" state that used to survive leaving it — so re-entering (or switching
  * sub-mode) kept stamping the last-selected stamp:
- *   • clone source      — engine set_source + useCloneStamp.sourcePosRef
- *   • pending red stamp — useRedStampTool.pendingStamp (the worst offender:
- *     useEffectiveTool routes stamp-tool clicks to the red stamp whenever one
- *     is pending, even in Clone sub-mode)
- *   • selected emoji    — useToolStore.toolSettings.emoji
+ *   • clone source   — engine set_source + useCloneStamp.sourcePosRef
+ *   • selected emoji — useToolStore.toolSettings.emoji
  *
- * This hook watches the (activeTool, stampSubMode) pair and fires all three
- * clear callbacks on EITHER exit: deactivating the Stamp tool or switching
- * between its Clone/Stamps/Emojis sub-modes. Re-entering always starts clean.
- * Stamping behavior WITHIN a mode is untouched.
+ * (A third, the pending red stamp, left with v17: Stamps are a Text mode now,
+ * and a text mode has no armed state to leak — ADR-109.)
+ *
+ * This hook watches the (activeTool, stampSubMode) pair and fires both clear
+ * callbacks on EITHER exit: deactivating the Stamp tool or switching between
+ * its Clone/Emoji sub-modes. Re-entering always starts clean. Stamping
+ * behavior WITHIN a mode is untouched.
  */
 export function useStampTeardown({
   activeTool,
   stampSubMode,
   clearCloneSource,
-  clearPendingStamp,
   clearEmoji,
 }: {
   activeTool: ToolType;
   stampSubMode: StampSubMode;
   clearCloneSource: () => void;
-  clearPendingStamp: () => void;
   clearEmoji: () => void;
 }) {
   // Callbacks ride in refs so an unstable identity (e.g. an inline clearEmoji
   // arrow in AppShell) can't re-fire the transition effect on every render.
-  const clearsRef = useRef({ clearCloneSource, clearPendingStamp, clearEmoji });
-  clearsRef.current = { clearCloneSource, clearPendingStamp, clearEmoji };
+  const clearsRef = useRef({ clearCloneSource, clearEmoji });
+  clearsRef.current = { clearCloneSource, clearEmoji };
 
   const prevRef = useRef({ tool: activeTool, mode: stampSubMode });
   useEffect(() => {
@@ -49,7 +47,6 @@ export function useStampTeardown({
 
     const clears = clearsRef.current;
     clears.clearCloneSource();
-    clears.clearPendingStamp();
     clears.clearEmoji();
   }, [activeTool, stampSubMode]);
 }

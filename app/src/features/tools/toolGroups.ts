@@ -537,12 +537,15 @@ const createGroup: ToolGroupDefinition = {
     {
       id: "stamps",
       label: "Stamps",
-      description: "Red marker stamps — approved, rejected, and the rest",
+      // A Text mode since v17 (ADR-109), like OCR: a stamp is a text, so the
+      // Text tool's click, re-edit, move and rotate all apply to it. The id
+      // stays `stamps` — URLs.
+      description: "Approved, rejected or any word — a bordered stamp you can move, retype and recolor",
       icon: BadgeCheck,
-      tool: "stamp",
-      mode: "red",
+      tool: "text",
+      mode: "stamps",
       cursor: "crosshair",
-      keywords: ["stamp", "red", "marker", "batch stamp", "numbered"],
+      keywords: ["stamp", "red", "marker", "approved", "rejected", "draft", "confidential", "paid"],
     },
   ],
 };

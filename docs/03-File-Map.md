@@ -18,8 +18,8 @@ src/
 │                   calculate_histogram; zoom; history wrappers (undo/redo/jump, snapshot
 │                   inject/labels, make_snapshot/snap/restore_snapshot); clone-stamp setters +
 │                   begin/continue/end_stroke; export_png / thumbnail; flip/rotate/crop/copy/paste/
-│                   resize_with_filter; adjust_brightness/contrast; stamp_pixels / stamp_red /
-│                   commit_text / measure_text / commit_red_stamp; get_pixel / get_pixel_region;
+│                   resize_with_filter; adjust_brightness/contrast; stamp_pixels /
+│                   commit_text / measure_text; get_pixel / get_pixel_region;
 │                   stateless free fns composite_pixels, resize_pixels, resize_pixels_filter
 │                   (stateless filtered resize: nearest/bilinear/Catmull/Lanczos), encode_png_pixels,
 │                   blank_png (solid/transparent RGBA fill → PNG), parse_color, photo_limit,
@@ -157,8 +157,6 @@ app/src/
 │   │                                 click an existing text to re-open the input pre-filled with
 │   │                                 its content, font, color, and rotation; sticky-input listener
 │   │                                 so the box survives color-swatch / font-dropdown clicks
-│   ├── useRedStampTool.ts            Red stamp presets — OffscreenCanvas renders label →
-│   │                                 WASM stamp_red (scales to brush size, "Red Stamp" history)
 │   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
 │   ├── useEditPersistence.ts         Per-photo edit persistence — Convex (signed in) or IDB
 │   │                                 (anonymous). Archive v5 serializes the full layer stack
@@ -254,8 +252,10 @@ app/src/
 │   │   ├── ToolGrid.tsx              Gradient icon buttons
 │   │   ├── ToolButton.tsx            Individual tool button
 │   │   └── settings/
-│   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
-│   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)
+│   │       ├── StampSettings.tsx     2-tab: Clone Stamp (size/hardness/opacity) +
+│   │       │                         Emojis (full picker + size)
+│   │       ├── StampsSettings.tsx    Create › Stamps, the Text tool's Stamps mode (ADR-109):
+│   │       │                         presets, any word, color, size; lib/stamps.ts places it
 │   │       ├── TransformCropSettings.tsx  Flip, rotate; crop apply button
 │   │       ├── ResizeSettings.tsx    ONE panel: both scores, then Resize (width/height, aspect
 │   │       │                         lock), then Compress (method/format/quality). A/B compare,

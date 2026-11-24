@@ -283,7 +283,17 @@ use serde::{Deserialize, Serialize};
 ///     (index 26).
 ///   * `encode_annotations` gained a FOURTEENTH tuple element, read as a tail
 ///     after v15's, so an empty tail is a v15-or-older blob: all Left.
-pub const OP_FORMAT_VERSION: u8 = 16;
+///
+/// **17** — a text's BOX BORDER (ADR-109), what a stamp is: the recipe again.
+///
+///   * `border` is `#[serde(skip)]` on [`TextParams`]; the wire layout is
+///     still v2's. Its skipped default (width 0) IS no border, what every
+///     older text means, so no normalization step is needed.
+///   * The border rides in an APPENDED variant, [`Op::TextBorder`]
+///     (index 27).
+///   * `encode_annotations` gained a FIFTEENTH tuple element, read as a tail
+///     after v16's, so an empty tail is a v16-or-older blob: no borders.
+pub const OP_FORMAT_VERSION: u8 = 17;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -429,6 +439,14 @@ pub struct TextParams {
     /// every annotation written before v16 meant.
     #[serde(skip)]
     pub align: u8,
+    /// The BOX BORDER. v17, ADR-109.
+    ///
+    /// ⚠️ `#[serde(skip)]` for the identical reason as `wrap_width` above.
+    /// It travels as the fifteenth element of `encode_annotations` and as
+    /// [`Op::TextBorder`] in the log. Deserialises to width 0, "no border",
+    /// which is what every annotation written before v17 meant.
+    #[serde(skip)]
+    pub border: crate::annotations::TextBorder,
 }
 
 /// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
@@ -568,6 +586,7 @@ impl TextParams {
             font_id: a.font_id.clone(),
             stroke: a.stroke,
             align: a.align,
+            border: a.border,
         }
     }
 
@@ -608,6 +627,8 @@ impl TextParams {
         self.stroke = prev.stroke;
         // v16: the sixth, the line alignment.
         self.align = prev.align;
+        // v17: the seventh, the box border.
+        self.border = prev.border;
     }
 }
 
@@ -771,6 +792,7 @@ pub(crate) fn annotation_sync_ops(
                 let font = params.font_id.clone();
                 let stroke = params.stroke;
                 let align = params.align;
+                let border = params.border;
                 pending.push(Op::TextAdd(params));
                 if wrap != 0 {
                     pending.push(Op::TextWrap {
@@ -808,6 +830,10 @@ pub(crate) fn annotation_sync_ops(
                 if align != crate::annotations::TEXT_ALIGN_LEFT {
                     pending.push(Op::TextAlign { id: a.id, align });
                 }
+                // No border is what a skipped-field decode already holds.
+                if border.is_on() {
+                    pending.push(Op::text_border(a.id, border));
+                }
             }
             Some(t) => {
                 if t.wrap_width != params.wrap_width {
@@ -843,6 +869,9 @@ pub(crate) fn annotation_sync_ops(
                         align: params.align,
                     });
                 }
+                if t.border != params.border {
+                    pending.push(Op::text_border(a.id, params.border));
+                }
                 // Compare everything EXCEPT the four skipped fields,
                 // which the branches above already accounted for —
                 // otherwise a box-only drag would also emit a redundant
@@ -856,6 +885,7 @@ pub(crate) fn annotation_sync_ops(
                 without_box.font_id = params.font_id.clone();
                 without_box.stroke = params.stroke;
                 without_box.align = params.align;
+                without_box.border = params.border;
                 if without_box != params {
                     pending.push(Op::TextEdit(params));
                 }
@@ -1175,6 +1205,12 @@ pub enum Op {
     /// `TextAdd`/`TextEdit` cannot carry it. Appended after
     /// [`Op::TextStroke`] (index 26); same rule as every variant since v2.
     TextAlign { id: u32, align: u8 },
+    /// v17 — the border around a text's BOX (ADR-109): width in px (0 =
+    /// none) and its RGBA, the [`Op::TextStroke`] shape. `#[serde(skip)]` on
+    /// [`TextParams::border`] means `TextAdd`/`TextEdit` cannot carry it.
+    /// Appended after [`Op::TextAlign`] (index 27); same rule as every
+    /// variant since v2.
+    TextBorder { id: u32, width: u32, rgba: [u8; 4] },
 }
 
 impl Op {
@@ -1233,6 +1269,8 @@ impl Op {
             Op::TextStroke { .. } => "Text Stroke",
             // `set_text_align`'s own snapshot label.
             Op::TextAlign { .. } => "Text Align",
+            // `set_text_border`'s own snapshot label.
+            Op::TextBorder { .. } => "Text Border",
         }
     }
 }
@@ -1244,6 +1282,15 @@ impl Op {
             id,
             width: s.width,
             rgba: [s.r, s.g, s.b, s.a],
+        }
+    }
+
+    /// The `TextBorder` op for a box border, in the wire's flat form.
+    pub(crate) fn text_border(id: u32, b: crate::annotations::TextBorder) -> Op {
+        Op::TextBorder {
+            id,
+            width: b.width,
+            rgba: [b.r, b.g, b.b, b.a],
         }
     }
 }
@@ -1440,6 +1487,16 @@ pub fn encode_annotations(
         .collect();
     // v16 appends the per-TEXT line alignment as the fourteenth.
     let text_aligns: Vec<u8> = texts.iter().map(|t| t.align).collect();
+    // v17 appends the per-TEXT box border (width, rgba) as the fifteenth.
+    let text_borders: Vec<(u32, [u8; 4])> = texts
+        .iter()
+        .map(|t| {
+            (
+                t.border.width,
+                [t.border.r, t.border.g, t.border.b, t.border.a],
+            )
+        })
+        .collect();
     if let Ok(body) = postcard::to_allocvec(&(
         texts,
         shapes,
@@ -1455,6 +1512,7 @@ pub fn encode_annotations(
         &shape_corner_radii,
         &text_strokes,
         &text_aligns,
+        &text_borders,
     )) {
         out.extend_from_slice(&body);
     }
@@ -1565,9 +1623,17 @@ pub fn decode_annotations(
                     }
                     // v16: the line alignments. An empty tail is a
                     // v15-or-older blob, and every text keeps Left.
-                    if let Ok(aligns) = postcard::from_bytes::<Vec<u8>>(v16_tail) {
+                    if let Ok((aligns, v17_tail)) = postcard::take_from_bytes::<Vec<u8>>(v16_tail) {
                         for (t, al) in texts.iter_mut().zip(aligns) {
                             t.align = crate::annotations::canonical_text_align(al);
+                        }
+                        // v17: the box borders. An empty tail is a
+                        // v16-or-older blob, and every text keeps no border.
+                        if let Ok(borders) = postcard::from_bytes::<Vec<(u32, [u8; 4])>>(v17_tail) {
+                            for (t, (w, c)) in texts.iter_mut().zip(borders) {
+                                t.border =
+                                    crate::annotations::TextBorder::new(w, c[0], c[1], c[2], c[3]);
+                            }
                         }
                     }
                 }
@@ -1902,6 +1968,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
         &t.font_id,
         t.stroke,
         t.align,
+        t.border,
     );
     let pixels =
         std::sync::Arc::try_unwrap(a.tile_pixels).unwrap_or_else(|shared| (*shared).clone());
@@ -2127,6 +2194,12 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::TextAlign { id, align } => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.align = crate::annotations::canonical_text_align(*align);
+            }
+        }
+        Op::TextBorder { id, width, rgba } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.border =
+                    crate::annotations::TextBorder::new(*width, rgba[0], rgba[1], rgba[2], rgba[3]);
             }
         }
         Op::ShapeRotation { id, rotation_deg } => {
@@ -2622,6 +2695,7 @@ mod tests {
             font_id: String::new(),
             stroke: Default::default(),
             align: 0,
+            border: Default::default(),
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -3321,6 +3395,7 @@ mod v2_migration_tests {
             font_id: String::new(),
             stroke: Default::default(),
             align: 0,
+            border: Default::default(),
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -3923,6 +3998,84 @@ mod v2_migration_tests {
     }
 
     #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_border_field() {
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.border = crate::annotations::TextBorder::new(4, 1, 2, 3, 255);
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "the border must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn v17_round_trips_text_borders_and_v16_blobs_mean_none() {
+        let mut t = a_text(1);
+        t.align = crate::annotations::TEXT_ALIGN_CENTER;
+        t.stroke = crate::annotations::TextStroke::new(3, 1, 2, 3, 255);
+        t.border = crate::annotations::TextBorder::new(5, 220, 38, 38, 255);
+        let blob = encode_annotations(&[t.clone(), a_text(2)], &[a_shape(3)], None);
+        let (texts, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(texts[0].border, t.border, "the border survives");
+        assert_eq!(texts[0].align, t.align, "v16's element still reads");
+        assert_eq!(texts[0].stroke, t.stroke, "v15's element still reads");
+        assert_eq!(texts[1].border, Default::default(), "no border stays none");
+
+        // A v16 blob is the same tuple minus the fifteenth element.
+        let texts_in = [t.clone()];
+        let shapes_in = [a_shape(3)];
+        let mut v16 = vec![16u8];
+        v16.extend_from_slice(
+            &postcard::to_allocvec(&(
+                &texts_in[..],
+                &shapes_in[..],
+                None::<CanvasParams>,
+                &vec![0u32],
+                &vec![0u32],
+                &vec![crate::perspective::IDENTITY_QUAD],
+                &vec![crate::perspective::IDENTITY_QUAD],
+                &vec![0u8],
+                &vec![""],
+                &vec![0.0f64],
+                &vec![0u8],
+                &vec![[0u16; 4]],
+                &vec![(3u32, [1u8, 2, 3, 255])],
+                &vec![1u8],
+            ))
+            .unwrap(), // allow: rust-panic
+        );
+        let (texts, _, _) = decode_annotations(&v16).unwrap(); // allow: rust-panic
+        assert_eq!(
+            texts[0].border,
+            Default::default(),
+            "a v16 text had no border"
+        );
+        assert_eq!(texts[0].align, 1, "and keeps its alignment");
+        assert_eq!(texts[0].stroke.width, 3, "and its outline");
+    }
+
+    #[test]
+    fn text_border_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextBorder {
+                id: 2,
+                width: 4,
+                rgba: [9, 8, 7, 255],
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].border, Default::default(), "untouched");
+        assert_eq!(
+            doc.texts[1].border,
+            crate::annotations::TextBorder::new(4, 9, 8, 7, 255)
+        );
+    }
+
+    #[test]
     fn text_align_op_applies_to_the_right_annotation_and_unknown_values_are_left() {
         let mut doc = Document::new(32, 32);
         doc.texts.push(a_text(1));
@@ -4500,8 +4653,8 @@ mod v2_migration_tests {
         let blob = encode_annotations(&[], &[a_styled_star(2), a_shape(3)], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
         assert_eq!(
-            OP_FORMAT_VERSION, 16,
-            "16 adds the text line alignment (ADR-104); earlier op indices stay fixed"
+            OP_FORMAT_VERSION, 17,
+            "17 adds the text box border (ADR-109); earlier op indices stay fixed"
         );
         let (_, shapes, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(
@@ -4668,6 +4821,15 @@ mod v2_migration_tests {
             idx(&Op::TextAlign { id: 1, align: 0 }),
             26,
             "TextAlign (v16)"
+        );
+        assert_eq!(
+            idx(&Op::TextBorder {
+                id: 1,
+                width: 0,
+                rgba: [0; 4]
+            }),
+            27,
+            "TextBorder (v17)"
         );
     }
 

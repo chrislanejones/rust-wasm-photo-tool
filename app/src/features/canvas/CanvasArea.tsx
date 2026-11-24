@@ -26,6 +26,8 @@ import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { AnnotationSelectionLayer } from "./AnnotationSelectionLayer";
+import { TextBorderPreview } from "./TextBorderPreview";
+import { bubbleTailPoints, svgPoints } from "@/lib/bubbleTail";
 import { PerspectiveLayer } from "./PerspectiveLayer";
 import { ShapeEditOverlay, type ShapeDrawSettings } from "./ShapeEditOverlay";
 import { CalloutLabelInput } from "./CalloutLabelInput";
@@ -1786,66 +1788,22 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const bgW = plateW + (bgPad + tailMargin) * 2;
           const bgH = plateH + (bgPad + tailMargin) * 2;
 
-          // Triangle tail rendered as an SVG inside the rotated wrapper so it
-          // tracks the textarea's orientation. Geometry matches the Rust path:
-          // project a ray from the rect center at `tailAngle`° onto the rect's
-          // bounding edge; that exit point is the base, apex sits tailLen past.
-          const tailSvg = (() => {
-            if (tailAngle === null) return null;
-            const rectX0 = tailMargin;
-            const rectY0 = tailMargin;
-            const rectX1 = rectX0 + plateW + bgPad * 2;
-            const rectY1 = rectY0 + plateH + bgPad * 2;
-            const cx = (rectX0 + rectX1) / 2;
-            const cy = (rectY0 + rectY1) / 2;
-            const hw = (rectX1 - rectX0) / 2;
-            const hh = (rectY1 - rectY0) / 2;
-            const theta = (tailAngle * Math.PI) / 180;
-            const dx = Math.cos(theta);
-            const dy = Math.sin(theta);
-            const tx = Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : Infinity;
-            const ty = Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : Infinity;
-            const t = Math.min(tx, ty);
-            const ex = cx + dx * t;
-            const ey = cy + dy * t;
-            // Base runs ALONG the exit edge (not perpendicular to the ray) so
-            // both corners stay flush; clamped off the rounded corners and sunk
-            // into the body. Mirrors the Rust tail geometry exactly.
-            const overlap = 4 * scaleX;
-            const radEff = Math.min(bgRadius, Math.min(hw, hh));
-            let p1: [number, number];
-            let p2: [number, number];
-            let p3: [number, number];
-            if (tx <= ty) {
-              const lo = rectY0 + radEff + tailHalf;
-              const hi = rectY1 - radEff - tailHalf;
-              const yc = lo <= hi ? Math.max(lo, Math.min(hi, ey)) : cy;
-              const bx = ex + (dx >= 0 ? -overlap : overlap);
-              p1 = [bx, yc - tailHalf];
-              p2 = [bx, yc + tailHalf];
-              p3 = [ex + dx * tailLen, yc + dy * tailLen];
-            } else {
-              const lo = rectX0 + radEff + tailHalf;
-              const hi = rectX1 - radEff - tailHalf;
-              const xc = lo <= hi ? Math.max(lo, Math.min(hi, ex)) : cx;
-              const by = ey + (dy >= 0 ? -overlap : overlap);
-              p1 = [xc - tailHalf, by];
-              p2 = [xc + tailHalf, by];
-              p3 = [xc + dx * tailLen, ey + dy * tailLen];
-            }
-            return (
-              <svg
-                width={bgW}
-                height={bgH}
-                style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}
-              >
-                <polygon
-                  points={`${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`}
-                  fill={bgColorRaw}
-                />
-              </svg>
-            );
-          })();
+          // The tail as an SVG inside the rotated wrapper, so it tracks the
+          // textarea's orientation; geometry mirrors the Rust path.
+          const tailPoints = tailAngle === null ? undefined : svgPoints(bubbleTailPoints({
+            x0: tailMargin, y0: tailMargin,
+            x1: tailMargin + plateW + bgPad * 2, y1: tailMargin + plateH + bgPad * 2,
+            angleDeg: tailAngle, radius: bgRadius, tailLen, tailHalf, overlap: 4 * scaleX,
+          }));
+          const tailSvg = tailPoints ? (
+            <svg width={bgW} height={bgH} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
+              <polygon points={tailPoints} fill={bgColorRaw} />
+            </svg>
+          ) : null;
+          // The box border (v17, ADR-109) — see TextBorderPreview.
+          const borderW = Math.max(0, Math.round(textSettings.textBorderWidth ?? 0)) * scaleX;
+          const borderOpacity01 = Math.max(0, Math.min(100, textSettings.textBorderOpacity ?? 100)) / 100;
+          const bgOrigin = `${pivotLocalX + (pivot[0] - bgLeft)}px ${pivotLocalY + (pivot[1] - bgTop)}px`;
 
           return (
             <>
@@ -1867,7 +1825,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     opacity: bgOpacity01,
                     transform: `rotate(${rotation}deg)`,
                     // Same pivot as the text, relative to the BG wrapper's own top-left.
-                    transformOrigin: `${pivotLocalX + (pivot[0] - bgLeft)}px ${pivotLocalY + (pivot[1] - bgTop)}px`,
+                    transformOrigin: bgOrigin,
                   }}
                 >
                   {/* The rounded rect itself — inset by the uniform tail margin.
@@ -1886,6 +1844,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   />
                   {tailSvg}
                 </div>
+              )}
+              {showBg && borderW > 0 && borderOpacity01 > 0 && (
+                <TextBorderPreview
+                  left={bgLeft} top={bgTop} width={bgW} height={bgH}
+                  rotation={rotation} transformOrigin={bgOrigin}
+                  rect={{ x: tailMargin, y: tailMargin, w: plateW + bgPad * 2, h: plateH + bgPad * 2, radius: bgRadius }}
+                  tail={tailPoints} borderWidth={borderW}
+                  color={textSettings.textBorderColor ?? "#000000"} opacity={borderOpacity01}
+                />
               )}
               {/* Draggable box body */}
               <div

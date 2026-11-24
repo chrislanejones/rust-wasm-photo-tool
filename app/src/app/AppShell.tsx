@@ -17,7 +17,6 @@ import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useMagicEraserTool } from "@/hooks/useMagicEraserTool";
 import { useTextTool } from "@/hooks/useTextTool";
-import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { namePastedImage } from "@/lib/pastedImageName";
@@ -1493,23 +1492,13 @@ export function AppShell() {
     [shapeActions.overlay, photoBounds, stamp.state.historyNode],
   );
 
-  const redStampTool = useRedStampTool({
-    toolRef: stamp.toolRef,
-    canvasRef,
-    flushToCanvas: flushAndSync,
-    syncState: stamp.syncState,
-    active: activeTool === "stamp",
-    brushSize: stampSettings.brushSize,
-  });
-
   // Stamp teardown: deactivating the Stamp tool or switching its sub-mode
-  // clears the armed stamp (clone source, pending red stamp, selected emoji)
-  // so leaving stops stamping entirely and re-entering starts clean.
+  // clears the armed stamp (clone source, selected emoji) so leaving stops
+  // stamping entirely and re-entering starts clean.
   useStampTeardown({
     activeTool,
     stampSubMode,
     clearCloneSource: stamp.clearCloneSource,
-    clearPendingStamp: redStampTool.clearPendingStamp,
     clearEmoji: () =>
       setToolSettings((p) => (p.emoji ? { ...p, emoji: "" } : p)),
   });
@@ -1533,7 +1522,6 @@ export function AppShell() {
     blurUp,
     paintTool,
     emojiTool,
-    redStampTool,
   });
 
   // ── Drag / paste image import ────────────────────────────────────────────

@@ -16,7 +16,6 @@ import type { useDrawingTools } from "./useDrawingTools";
 import type { usePaintTool } from "./usePaintTool";
 import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
-import type { useRedStampTool } from "./useRedStampTool";
 import { resolveSubTool } from "@/features/tools/toolGroups";
 
 type Stamp = ReturnType<typeof useCloneStamp>;
@@ -26,7 +25,6 @@ type DrawingTools = ReturnType<typeof useDrawingTools>;
 type PaintTool = ReturnType<typeof usePaintTool>;
 type MagicEraserTool = ReturnType<typeof useMagicEraserTool>;
 type EmojiTool = ReturnType<typeof useEmojiTool>;
-type RedStampTool = ReturnType<typeof useRedStampTool>;
 
 /** A distinct spy-triple per tool's mock, so a test can prove exactly whose
  *  handlers came back (by identity, not just "a function"). */
@@ -71,13 +69,6 @@ function makeEmojiTool(): EmojiTool {
   return mouseHandlers() as unknown as EmojiTool;
 }
 
-function makeRedStampTool(hasPending = false): RedStampTool {
-  return {
-    onMouseDown: vi.fn(),
-    hasPendingStamp: vi.fn(() => hasPending),
-  } as unknown as RedStampTool;
-}
-
 /** Full param set with sane defaults; each test overrides only what it's
  *  exercising, matching the fixture style routeState.test.ts already uses. */
 function baseParams(overrides: Partial<Parameters<typeof useEffectiveTool>[0]> = {}) {
@@ -99,7 +90,6 @@ function baseParams(overrides: Partial<Parameters<typeof useEffectiveTool>[0]> =
     blurUp: vi.fn(),
     paintTool: makePaintTool(),
     emojiTool: makeEmojiTool(),
-    redStampTool: makeRedStampTool(),
     ...overrides,
   };
 }
@@ -287,14 +277,18 @@ describe("useEffectiveTool — no cross-tool leakage (regression net)", () => {
     expect(clone.onMouseDown).not.toBe(emojiTool.onMouseDown);
   });
 
-  it("Clone Stamp's combinedDown defers to the red-stamp tool only when one is pending", () => {
+  it("Clone Stamp is the clone stamp's own press, nothing in front of it", () => {
+    // Until v17 a pending red stamp took this press, even in Clone sub-mode.
     const stamp = makeStamp();
-    const redStampTool = makeRedStampTool(true);
-    const result = useEffectiveTool(
-      baseParams({ subTool: sub("create", "clone-stamp"), stamp, redStampTool }),
-    );
+    const result = useEffectiveTool(baseParams({ subTool: sub("create", "clone-stamp"), stamp }));
+    expect(result.onMouseDown).toBe(stamp.onMouseDown);
+  });
+
+  it("Stamps is a Text mode (ADR-109): it idles here, the Text tool places the stamp", () => {
+    const stamp = makeStamp();
+    const result = useEffectiveTool(baseParams({ subTool: sub("create", "stamps"), stamp }));
+    expect(sub("create", "stamps").subTool.tool).toBe("text");
     result.onMouseDown({} as Parameters<Stamp["onMouseDown"]>[0]);
-    expect(redStampTool.onMouseDown).toHaveBeenCalledTimes(1);
     expect(stamp.onMouseDown).not.toHaveBeenCalled();
   });
 

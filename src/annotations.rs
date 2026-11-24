@@ -99,6 +99,11 @@ pub struct TextAnnotation {
     /// Outline around the glyphs. Width 0 (the default, and what every
     /// annotation written before the text stroke existed means) = none.
     pub stroke: TextStroke,
+    /// A border drawn around the text's BOX — the rect or the bubble, tail
+    /// included — inside its edge. Width 0 (the default, and what every
+    /// annotation written before v17 means) = none. Only drawn when the text
+    /// has a box (`background_kind != 0`). v17, ADR-109: what a stamp is.
+    pub border: TextBorder,
 }
 
 /// Where a text sits in its box (v16, ADR-104): one byte, `row * 3 + column`
@@ -165,6 +170,16 @@ impl TextStroke {
         self.width > 0 && self.a > 0
     }
 }
+
+/// The border around a text's box (v17, ADR-109): the same five numbers as
+/// [`TextStroke`], with the same clamp and the same canonical "off", drawn
+/// around the box instead of the glyphs. An alias rather than a copy so the
+/// two cannot drift apart in what "invisible" means.
+///
+/// Drawn INSIDE the box edge (`layer::box_border_ring`), so turning it on
+/// never grows the tile or moves the text: the anchor→ink mapping and the
+/// overlay preview need no border term.
+pub type TextBorder = TextStroke;
 /// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
 /// shapes sit in an overlay and are re-selectable / movable until
 /// `flatten_text_annotations` (which also flattens shapes) burns them into the
@@ -348,6 +363,8 @@ pub(crate) fn build_text_annotation(
     stroke: TextStroke,
     // …and the line alignment (v16), for the same reason again.
     align: u8,
+    // …and the box border (v17, ADR-109), for the same reason again.
+    border: TextBorder,
 ) -> TextAnnotation {
     let align = canonical_text_align(align);
     // The tile renders WRAPPED text; the annotation stores the author's RAW
@@ -385,6 +402,7 @@ pub(crate) fn build_text_annotation(
         stroke,
         align,
         wrap_width,
+        border,
     );
     // PERSPECTIVE IS THE LAST STAGE, deliberately: it warps the finished,
     // already-rotated tile. Doing it here rather than inside
@@ -446,6 +464,7 @@ pub(crate) fn build_text_annotation(
         shadow_dy,
         shadow_blur,
         stroke,
+        border,
     }
 }
 
@@ -484,7 +503,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{},\"stroke_width\":{},\"stroke_r\":{},\"stroke_g\":{},\"stroke_b\":{},\"stroke_a\":{},\"align\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{},\"stroke_width\":{},\"stroke_r\":{},\"stroke_g\":{},\"stroke_b\":{},\"stroke_a\":{},\"align\":{},\"border_width\":{},\"border_r\":{},\"border_g\":{},\"border_b\":{},\"border_a\":{}}}",
             a.id,
             a.wrap_width,
             a.box_height,
@@ -505,6 +524,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
             a.shadow_dx, a.shadow_dy, a.shadow_blur,
             a.stroke.width, a.stroke.r, a.stroke.g, a.stroke.b, a.stroke.a, a.align,
+            a.border.width, a.border.r, a.border.g, a.border.b, a.border.a,
         ));
     }
     out.push(']');
@@ -990,9 +1010,8 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let chars = label.chars().count().max(1) as f64;
     let font_size = (radius * if chars <= 1.0 { 1.2 } else { 1.9 / chars }).max(9.0) as f32;
     // The embedded face, not the text tool's: a numbered pin is a fixed
-    // graphic whose disc is sized from the glyph's ink box, the same reasoning
-    // that keeps `render_stamp_label` on it. Following a user font would mean
-    // the pin resizes when the Text tool's dropdown changes.
+    // graphic whose disc is sized from the glyph's ink box. Following a user
+    // font would mean the pin resizes when the Text tool's dropdown changes.
     let rendered = crate::text::render_text(
         &label,
         font_size,
@@ -2208,6 +2227,7 @@ impl ImageHorseTool {
             &a.font_id.clone(),
             stroke,
             a.align,
+            a.border,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
     }
@@ -2487,6 +2507,7 @@ impl ImageHorseTool {
             font_id,
             TextStroke::default(),
             TEXT_ALIGN_LEFT,
+            TextBorder::default(),
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -2604,6 +2625,7 @@ impl ImageHorseTool {
             self.layers[self.active].text_annotations[idx].stroke,
             align,
             wrap_width,
+            self.layers[self.active].text_annotations[idx].border,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
@@ -2702,6 +2724,7 @@ impl ImageHorseTool {
             &a.font_id.clone(),
             a.stroke,
             a.align,
+            a.border,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2776,6 +2799,7 @@ impl ImageHorseTool {
             &a.font_id.clone(),
             a.stroke,
             a.align,
+            a.border,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2880,6 +2904,7 @@ impl ImageHorseTool {
             font_id,
             a.stroke,
             a.align,
+            a.border,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -2948,6 +2973,7 @@ impl ImageHorseTool {
             &a.font_id.clone(),
             a.stroke,
             a.align,
+            a.border,
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -3161,6 +3187,7 @@ impl ImageHorseTool {
             self.layers[self.active].text_annotations[idx].stroke,
             align,
             wrap_w,
+            self.layers[self.active].text_annotations[idx].border,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
@@ -3233,6 +3260,39 @@ impl ImageHorseTool {
         let stroke = self.layers[self.active].text_annotations[idx].stroke;
         // Rebuilds through `build_text_annotation` with every field as it is
         // now, the new alignment included.
+        self.apply_text_stroke_at(idx, stroke);
+        self.recomposite();
+        true
+    }
+
+    /// Set the border around a text's BOX: `width` px (0 = none, clamped to
+    /// 20) in `color_hex` at `alpha` (0-255), drawn inside the box edge, so the
+    /// text and its tile do not move. Only visible when the text has a box
+    /// (`background_kind != 0`); it is stored either way, so turning the box
+    /// back on brings the border back. v17, ADR-109.
+    /// Returns false if `id` isn't on the active layer.
+    ///
+    /// The `set_text_stroke` contract: called on every commit, a no-op with
+    /// no history snapshot when nothing visible changes, a "Text Border" step
+    /// otherwise, mapped 1:1 onto the `Op::TextBorder` the recorder emits.
+    pub fn set_text_border(&mut self, id: u32, width: u32, color_hex: &str, alpha: u8) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        let c = drawing::parse_hex_color(color_hex);
+        let border = TextBorder::new(width, c[0], c[1], c[2], alpha);
+        if self.layers[self.active].text_annotations[idx].border == border {
+            return true;
+        }
+        self.snap("Text Border");
+        self.layers[self.active].text_annotations[idx].border = border;
+        let stroke = self.layers[self.active].text_annotations[idx].stroke;
+        // Rebuilds through `build_text_annotation` with every field as it is
+        // now, the new border included.
         self.apply_text_stroke_at(idx, stroke);
         self.recomposite();
         true
@@ -3778,5 +3838,35 @@ mod text_stroke_history_tests {
         assert!(t.history_labels().contains("Text Stroke"));
         assert!(t.get_text_annotations().contains("\"stroke_width\":3"));
         assert!(!t.set_text_stroke(999, 3, "#ff0000", 255), "unknown id");
+    }
+    #[test]
+    fn a_box_border_is_one_undoable_step_survives_edits_and_reads_back() {
+        let mut t = ImageHorseTool::new(64, 64);
+        let id = t.add_text_annotation(
+            "OK", 24.0, 0, 160, 0, true, 10, 10, -5.0, 1, 0, 160, 0, 0, 8, 0, 0, "",
+        );
+        assert_eq!(t.undo_count(), 1);
+        // Off with a dormant color: invisible, so not a step.
+        assert!(t.set_text_border(id, 0, "#00a000", 255));
+        assert_eq!(t.undo_count(), 1);
+        assert!(t.set_text_border(id, 3, "#00a000", 255));
+        assert_eq!(t.undo_count(), 2);
+        assert!(t.history_labels().contains("Text Border"));
+        // The same border again is free.
+        assert!(t.set_text_border(id, 3, "#00a000", 255));
+        assert_eq!(t.undo_count(), 2);
+        let json = t.get_text_annotations();
+        assert!(json.contains("\"border_width\":3"), "{json}");
+        assert!(json.contains("\"border_g\":160"), "{json}");
+        // Retyping keeps it: an edit does not take the border away.
+        assert!(t.update_text_annotation(
+            id, "PAID", 24.0, 0, 160, 0, true, 10, 10, -5.0, 1, 0, 160, 0, 0, 8, 0, 0,
+        ));
+        assert!(t.get_text_annotations().contains("\"border_width\":3"));
+        // Undo takes the border off again (back to before the edit, then the border).
+        t.undo();
+        t.undo();
+        assert!(t.get_text_annotations().contains("\"border_width\":0"));
+        assert!(!t.set_text_border(999, 3, "#ff0000", 255), "unknown id");
     }
 }

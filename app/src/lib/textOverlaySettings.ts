@@ -34,6 +34,10 @@ export interface TextOverlaySettings {
   textStrokeOpacity?: number;
   /** Line alignment in the box (ADR-104); absent = left. */
   textAlign?: TextAlign;
+  /** Box border preview: width in canvas px (0 = none), hex, 0-100 (ADR-109). */
+  textBorderWidth?: number;
+  textBorderColor?: string;
+  textBorderOpacity?: number;
 }
 
 /** The overlay's slice of the tool settings. */
@@ -54,6 +58,9 @@ export function textOverlaySettings(s: ToolSettings): TextOverlaySettings {
     textStrokeColor: s.textStrokeColor,
     textStrokeOpacity: s.textStrokeOpacity,
     textAlign: s.textAlign,
+    textBorderWidth: s.textBorderWidth,
+    textBorderColor: s.textBorderColor,
+    textBorderOpacity: s.textBorderOpacity,
   };
 }
 
@@ -65,6 +72,19 @@ export function textStrokeEngineArgs(
   return [
     Math.max(0, Math.round(s.textStrokeWidth ?? 0)),
     s.textStrokeColor ?? "#000000",
+    Math.round(opacity * 2.55),
+  ];
+}
+
+/** `set_text_border`'s arguments after the id: width px, hex, alpha 0-255.
+ *  The `textStrokeEngineArgs` shape, for the box border (ADR-109). */
+export function textBorderEngineArgs(
+  s: Pick<ToolSettings, "textBorderWidth" | "textBorderColor" | "textBorderOpacity">,
+): [number, string, number] {
+  const opacity = Math.max(0, Math.min(100, s.textBorderOpacity ?? 100));
+  return [
+    Math.max(0, Math.round(s.textBorderWidth ?? 0)),
+    s.textBorderColor ?? "#000000",
     Math.round(opacity * 2.55),
   ];
 }

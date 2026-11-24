@@ -236,6 +236,13 @@ mod tests {
         // A text's alignment is per text, not part of a photo's look
         // (ADR-104): Copy look never carries it to another photo.
         assert!(look_of(&[Op::TextAlign { id: 1, align: 1 }]).is_empty());
+        // Nor its box border (ADR-109): a stamp is per text, not a photo's look.
+        assert!(look_of(&[Op::TextBorder {
+            id: 1,
+            width: 3,
+            rgba: [1, 2, 3, 255]
+        }])
+        .is_empty());
     }
 
     /// What `applyLookAsOneStep` (app/src/lib/look.ts) sends, on a real

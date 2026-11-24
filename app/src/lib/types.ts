@@ -192,6 +192,21 @@ export interface ToolSettings extends StampSettings {
   textStrokeColor: string;  // hex
   textStrokeOpacity: number; // 0-100
 
+  // Box border (Rust-rendered, drawn INSIDE the box edge) — around the
+  // background rect or bubble, not the glyphs. Width 0 = none; it only shows
+  // when bgKind isn't "none". v17, ADR-109: a stamp is text with one.
+  textBorderWidth: number;   // 0-20 px
+  textBorderColor: string;   // hex
+  textBorderOpacity: number; // 0-100
+
+  // Stamps (Create › Stamps, the Text tool's `stamps` mode, ADR-109): what a
+  // click on empty canvas places. The panel writes these and the Text tool's
+  // click reads them — the store replaces the window CustomEvent that used to
+  // carry the pick from panel to canvas.
+  stampLabel: string;  // the word; placed in capitals
+  stampColor: string;  // hex, for the word and its border
+  stampSize: number;   // font size, canvas px
+
   // Pins (Shapes tool → Pins tab) — drop auto-sequenced callout discs.
   /** Pin label style: numbers (1, 2, 3…) or letters (A, B, C…). */
   pinLabel: "numbers" | "letters";

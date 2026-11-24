@@ -16,7 +16,8 @@ const withTips = (ui: ReactElement) => render(<TooltipProvider>{ui}</TooltipProv
 
 vi.mock("@emoji-mart/react", () => ({ default: () => null }));
 vi.mock("@emoji-mart/data", () => ({ default: {} }));
-import { StampSettingsPanel } from "@/features/tools/settings/StampSettings";
+import { StampsSettings } from "@/features/tools/settings/StampsSettings";
+import { defaultToolSettings } from "@/lib/defaultToolSettings";
 
 describe("Histogram channels", () => {
   it("is a named radio group that says which channel is drawn", () => {
@@ -50,21 +51,26 @@ describe("Placement grid", () => {
   });
 });
 
-describe("Red Stamp presets", () => {
-  it("are a named radio group, nothing checked until one is picked", () => {
-    withTips(
-      <StampSettingsPanel
-        settings={{ brushSize: 20 } as never}
-        onChange={() => {}}
-        activeMode="red"
-      />,
-    );
+describe("Stamp presets", () => {
+  it("are a named radio group; the picked one is checked, and a custom word unchecks it", () => {
+    let settings = { ...defaultToolSettings, stampLabel: "APPROVED", stampColor: "#22c55e" };
+    const onChange = vi.fn((next: typeof settings) => {
+      settings = next;
+    });
+    const { rerender } = render(<StampsSettings settings={settings} onChange={onChange} />);
     const group = screen.getByRole("radiogroup", { name: "Stamp" });
     const radios = group.querySelectorAll('[role="radio"]');
     expect(radios).toHaveLength(5);
-    expect(group.querySelectorAll('[aria-checked="true"]')).toHaveLength(0);
+    expect(group.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
+    expect(radios[0]!.getAttribute("aria-checked")).toBe("true");
     act(() => (radios[1] as HTMLElement).click());
+    expect(settings.stampLabel).toBe("REJECTED");
+    rerender(<StampsSettings settings={settings} onChange={onChange} />);
     expect(radios[1]!.getAttribute("aria-checked")).toBe("true");
+    // A word of your own is a custom stamp: no preset is checked.
+    rerender(<StampsSettings settings={{ ...settings, stampLabel: "paid" }} onChange={onChange} />);
+    expect(group.querySelectorAll('[aria-checked="true"]')).toHaveLength(0);
+    expect(screen.getByLabelText("Word")).toBeTruthy();
   });
 });
 

@@ -1,0 +1,14 @@
+{
+  "capturedAtUtc": "2026-11-23",
+  "generator": "capture-text-border.rs.txt (copy to tests/zz_capture.rs; cargo test --features tiles --test zz_capture -- --ignored, OUT=<dir>)",
+  "document": "320x200 flat gray (240), oplog undo on",
+  "baseKeyframe": "base-keyframe-320x200.png (identical bytes)",
+  "file": "v17-text-border.frames.bin",
+  "crate": "claude/eloquent-ramanujan-bim725 (OP_FORMAT_VERSION 17)",
+  "session": "a stamp (APPROVED: bold green, transparent box, -5 degrees, centered, 3 px border) placed as one step; a white speech bubble; then a 2 px red border on the bubble as its own step",
+  "ops": 7,
+  "cursor": 7,
+  "undoSteps": 3,
+  "coverageAtCapture": 1,
+  "compositeFnv1a": "0x75ba0896b2c2c6f4"
+}

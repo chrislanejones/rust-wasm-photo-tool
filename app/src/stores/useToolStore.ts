@@ -12,6 +12,7 @@ import type { ObjectRef } from "@/lib/objectSelection";
 import { CLEAN_UP, type RefineSettings } from "@/lib/selectionRefine";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings, TextAlign } from "@/lib/types";
+import { pickTextLook, type TextLook } from "@/lib/textLook";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { readPreferences, subscribePreferences } from "@/lib/preferences";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
@@ -44,7 +45,9 @@ import { idbStorage } from "./storage/idbStorage";
 const BRUSH_MODES = ["paint", "blur", "pen"] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
-const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
+// "red" (Red Stamps) left in v17 (ADR-109): Stamps are a Text mode now. A
+// stored "red" falls back to Clone through the validator.
+const STAMP_SUB_MODES = ["clone", "emojis"] as const;
 export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
 const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
@@ -73,7 +76,7 @@ export type EffectsMode = "adjust" | "levels" | "presets";
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
  *  component state the mode was invisible to the command palette, hash routing
  *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
-const TEXT_MODES = ["text", "background", "ocr"] as const;
+const TEXT_MODES = ["text", "background", "ocr", "stamps"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
 
 /** Perspective tool sub-modes (v8.42). Not three tools — ONE quad and three
@@ -658,4 +661,31 @@ export function restoreTextAlignPreference(): void {
   const pref = readPreferences().textAlign;
   const s = useToolStore.getState();
   if (s.toolSettings.textAlign !== pref) s.setToolSettings((t) => ({ ...t, textAlign: pref }));
+}
+
+// The panel's own look from before an existing text was opened, while one is
+// (see `holdTextLookForEdit`); null when no edit holds it.
+let lookBeforeEdit: TextLook | null = null;
+
+/** Opening an existing text shows ITS box look in the panel — background,
+ *  shadow, outline, border — for that edit, the Text in Box rule above applied
+ *  to the rest of the look. Committing without touching the panel then keeps
+ *  the text as it was: retyping a stamp keeps its box (ADR-109). Before this a
+ *  commit applied whatever the panel last held, so a stamp re-edited with the
+ *  Background on None lost its box. A change made during the edit is that
+ *  text's own; closing the editor puts the panel back. */
+export function holdTextLookForEdit(look: TextLook): void {
+  const s = useToolStore.getState();
+  // Re-opening another text mid-hold keeps the FIRST pre-edit look.
+  lookBeforeEdit ??= pickTextLook(s.toolSettings);
+  s.setToolSettings((t) => ({ ...t, ...look }));
+}
+
+/** Close an existing text's edit hold: the Text in Box preference and the
+ *  panel's own look come back. Every way the editor closes calls this. */
+export function releaseTextEditHold(): void {
+  restoreTextAlignPreference();
+  const before = lookBeforeEdit;
+  lookBeforeEdit = null;
+  if (before) useToolStore.getState().setToolSettings((t) => ({ ...t, ...before }));
 }

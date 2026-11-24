@@ -169,6 +169,14 @@ export interface PersistedAnnotation {
   /** Where the text sits in its box: `row * 3 + column`, 0-8 (v16, ADR-104).
    *  Absent on every archive written before it: 0, top-left, what it meant. */
   align?: number;
+  /** The BOX BORDER: width in px (0 / absent = none) and its RGBA (v17,
+   *  ADR-109, what a stamp is). Optional, not indexed, no Dexie bump — the
+   *  outline's reasoning above. Absent reads back as 0: no border. */
+  border_width?: number;
+  border_r?: number;
+  border_g?: number;
+  border_b?: number;
+  border_a?: number;
 }
 
 /** One live (non-destructive) shape/arrow annotation, as emitted by Rust's

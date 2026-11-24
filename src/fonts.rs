@@ -185,17 +185,6 @@ pub fn em_ratio(font_id: &str, bold: bool) -> f32 {
     })
 }
 
-/// The embedded Bold face, directly.
-///
-/// The red-stamp presets (`render_stamp_label`) use it unconditionally and
-/// deliberately: a stamp is a fixed graphic asset with baked-in proportions,
-/// not user-authored type, so it does not take a `font_id` and does not follow
-/// the text tool's font. Exposed here so `text.rs` no longer owns the
-/// `include_bytes!` and there is one place that knows where the face lives.
-pub fn embedded_bold() -> FontRef<'static> {
-    FontRef::try_from_slice(EMBEDDED_BOLD).expect("embedded font is valid")
-}
-
 /// The embedded Regular face, directly. Used by `text.rs`'s wrap tests, which
 /// measure against the fallback deliberately.
 #[cfg(test)]

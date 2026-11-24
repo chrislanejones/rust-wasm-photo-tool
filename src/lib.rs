@@ -2040,6 +2040,7 @@ impl ImageHorseTool {
                     &t.font_id,
                     t.stroke,
                     t.align,
+                    t.border,
                 )
             })
             .collect();
@@ -2978,6 +2979,14 @@ impl ImageHorseTool {
                             a.stroke.a,
                         ),
                         a.align,
+                        // The box border, scaled for the same reason.
+                        crate::annotations::TextBorder::new(
+                            (a.border.width as f64 * s_uniform).round() as u32,
+                            a.border.r,
+                            a.border.g,
+                            a.border.b,
+                            a.border.a,
+                        ),
                     )
                 })
                 .collect();
@@ -3417,46 +3426,6 @@ impl ImageHorseTool {
             src_h,
             dest_x,
             dest_y,
-        );
-    }
-
-    /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
-    /// `target_size`, and composite it centered on (dest_x, dest_y).
-    /// Replaces the JS OffscreenCanvas → stamp_red pipeline for red stamps.
-    pub fn commit_red_stamp(
-        &mut self,
-        label: &str,
-        r: u8,
-        g: u8,
-        b: u8,
-        dest_x: i32,
-        dest_y: i32,
-        target_size: u32,
-        angle_deg: f32,
-    ) {
-        let font_size = 48.0f32;
-        let rendered = crate::text::render_stamp_label(label, font_size, r, g, b, angle_deg);
-        // Scale to target_size preserving aspect ratio
-        let scale = target_size as f64 / rendered.width.max(rendered.height) as f64;
-        let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
-        let new_h = ((rendered.height as f64 * scale).round() as u32).max(1);
-        let scaled = transform::resize_bilinear(
-            &rendered.pixels,
-            rendered.width,
-            rendered.height,
-            new_w,
-            new_h,
-        );
-        self.snap("Red Stamp");
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            &scaled,
-            new_w,
-            new_h,
-            dest_x - new_w as i32 / 2,
-            dest_y - new_h as i32 / 2,
         );
     }
 
@@ -5004,6 +4973,11 @@ mod layer_persistence_tests {
             0,
             255,
             0,
+            0,
+            0,
+            0,
+            0,
+            0, // no box border (v17)
         );
         assert_ne!(id, 0);
         let snap = &t.hist.undo_stack[0];
@@ -5051,6 +5025,11 @@ mod layer_persistence_tests {
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
+                0,
+                0, // no box border (v17)
             ),
             0
         );
@@ -5110,6 +5089,11 @@ mod layer_persistence_tests {
             0,
             0,
             0,
+            0,
+            0,
+            0,
+            0,
+            0, // no box border (v17)
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);
