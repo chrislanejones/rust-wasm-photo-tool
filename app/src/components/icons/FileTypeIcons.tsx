@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
  *
  * The lettering is real SVG `<text>`, squeezed to a fixed `textLength` so a
  * four-letter name and a three-letter one both fill the corner without the
- * font deciding the width. It is NOT aria-hidden: the tile's name is the
- * format's hint ("Lossless · transparency"), and the lettering is what puts
- * the format itself into that name for a screen reader.
+ * font deciding the width. It IS aria-hidden (11-24-2026): the Export
+ * dialog's tiles are now labeled with the format itself ("PNG"), so lettering
+ * in the name too would read "PNG PNG". (Before, the label was the hint and
+ * the lettering was how the format got into the name.)
  */
 const FILE_OUTLINE =
   "M12 22h6a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v6";
@@ -48,6 +49,7 @@ export function makeFileTypeIcon(label: string) {
         strokeLinejoin="round"
         className={cn("lucide", className)}
         style={style}
+        aria-hidden="true"
       >
         <path d={FILE_OUTLINE} />
         <path d={FILE_FOLD} />

@@ -28,7 +28,7 @@ test("Download All makes a ZIP of every photo and says so", async ({ page }) => 
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  await dialog.getByRole("radio", { name: /^All images/ }).click();
   const button = dialog.getByRole("button", { name: /^Download/ }).last();
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), button.click()]);
   expect(dl.suggestedFilename()).toBe("photos.zip");

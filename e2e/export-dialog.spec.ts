@@ -2,14 +2,15 @@ import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
 
-// The Export dialog as ONE step (Chris, 11-23-2026):
-//   1. Download Selected | Download All (N)        — top bar style group
-//   2. Raster | Vector | With Layers               — top bar style group
-//   3. that kind's format tiles                    — the Shapes picker's tiles
-//   4. Camera Info · 5. Recipe · 5.5 File Name
-//   6. Selected: Download <format> · Share link · Clipboard
-//      All:      Download ZIP (N as <format>) · Share All · Soon (off)
-// Rows that don't apply are grayed out, not removed. Alt+E opens it.
+// The Export dialog as ONE step that adapts to the task (Chris, 11-24-2026):
+//   1. Selected image | All images (N)             — top bar style group
+//   2. Selected: File Name (+ its extension)  ·  All: Recipe + Batch settings
+//   3. Raster | Vector | With Layers (Selected only) — top bar style group
+//   4. that kind's format tiles, named JPEG PNG…   — the Shapes picker's tiles
+//   5. Privacy & metadata                          — a drop-down, shut
+//   6. footer: what you'll get, Share link · Clipboard, ONE primary Download
+//      (All: Share All · Soon (off), Download ZIP)
+// A row that cannot apply is left out, not grayed. Alt+E opens it.
 
 const FIXTURES = [join(__dirname, "fixtures", "checker.png"), join(__dirname, "fixtures", "sky-building.png")];
 
@@ -39,32 +40,44 @@ test("Alt+E opens Export, as the top bar's hint says", async ({ page }) => {
   await expect(dialog.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
 });
 
-test("one step: the rows, and what each scope greys out", async ({ page }) => {
+test("one step: the rows, and how each scope adapts", async ({ page }) => {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   const what = dialog.getByRole("radiogroup", { name: "What to export" });
   const kind = dialog.getByRole("radiogroup", { name: "Kind of file" });
   const format = dialog.getByRole("radiogroup", { name: "Format" });
-  await expect(what.getByRole("radio", { name: "Download Selected" })).toHaveAttribute("aria-checked", "true");
+  await expect(what.getByRole("radio", { name: "Selected image" })).toHaveAttribute("aria-checked", "true");
   await expect(kind.getByRole("radio", { name: "Raster" })).toHaveAttribute("aria-checked", "true");
-  await expect(format.getByRole("radio")).toHaveCount(4); // JPEG PNG WebP AVIF
-  for (const label of ["Camera Info", "Recipe", "File Name"]) {
-    await expect(dialog.getByText(label, { exact: true }), label).toBeVisible();
+  // The tiles are named for their format.
+  for (const name of ["JPEG", "PNG", "WebP", "AVIF"]) {
+    await expect(format.getByRole("radio", { name, exact: true }), name).toBeVisible();
   }
-  await expect(dialog.getByText(/Every open image, each with its edits/)).toHaveCount(0);
+  await expect(format.getByRole("radio")).toHaveCount(4);
+  await expect(dialog.getByTestId("export-format-says")).toHaveText(/^(JPEG|PNG|WebP|AVIF) — /);
 
-  // Selected: the recipe is off, the name is live, three actions.
-  await expect(dialog.getByLabel("Recipe")).toBeDisabled();
+  // Selected: the name with its extension, no recipe, one primary.
   await expect(dialog.getByLabel("File Name")).toBeEnabled();
+  await expect(dialog.locator("#export-file-ext")).toHaveText(/^\.\w+$/);
+  await expect(dialog.getByLabel("Recipe")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Share link" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Clipboard" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^Download (JPEG|PNG|WebP|AVIF)$/ })).toBeEnabled();
+  await expect(dialog.locator("#export-summary")).toContainText("1 image");
   // No SVG open: Vector is off.
   await expect(kind.getByRole("radio", { name: "Vector" })).toBeDisabled();
 
+  // Privacy & metadata: shut, its choice on the right; opens to Camera Info.
+  const privacy = dialog.getByRole("button", { name: /^Privacy & metadata/ });
+  await expect(privacy).toHaveAttribute("aria-expanded", "false");
+  await expect(dialog.getByRole("radiogroup", { name: "Camera Info" })).toBeHidden();
+  await privacy.click();
+  await expect(dialog.getByRole("radiogroup", { name: "Camera Info" })).toBeVisible();
+
   // With Layers: ORA, and the PSD placeholder.
   await kind.getByRole("radio", { name: "With Layers" }).click();
-  await expect(format.getByRole("radio", { name: /Krita/ })).toHaveAttribute("aria-checked", "true");
-  await expect(format.getByRole("radio", { name: "Activate with plugin" })).toBeDisabled();
+  await expect(format.getByRole("radio", { name: "ORA", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(format.getByRole("radio", { name: "PSD", exact: true })).toBeDisabled();
+  await expect(dialog.getByTestId("export-format-says")).toContainText("PSD plugin");
   await expect(dialog.getByRole("button", { name: "Download ORA" })).toBeVisible();
 
   // Raster is the default on every open: an ORA pick doesn't stick.
@@ -75,13 +88,20 @@ test("one step: the rows, and what each scope greys out", async ({ page }) => {
   await kind.getByRole("radio", { name: "With Layers" }).click();
 
   // All: layered files can't go in a ZIP, so the kind falls back to Raster
-  // and With Layers is off; the recipe is live, the name is off.
-  await what.getByRole("radio", { name: /^Download All/ }).click();
+  // and With Layers is left out; the recipe and its Batch settings come in,
+  // the name field goes.
+  await what.getByRole("radio", { name: /^All images/ }).click();
   await expect(kind.getByRole("radio", { name: "Raster" })).toHaveAttribute("aria-checked", "true");
-  await expect(kind.getByRole("radio", { name: "With Layers" })).toBeDisabled();
+  await expect(kind.getByRole("radio", { name: "With Layers" })).toHaveCount(0);
   await expect(dialog.getByLabel("Recipe")).toBeEnabled();
-  await expect(dialog.getByLabel("File Name")).toBeDisabled();
-  await expect(dialog.getByRole("button", { name: /^Download ZIP \(2 as / })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Save recipe" })).toBeEnabled();
+  const batch = dialog.getByLabel("Batch settings");
+  await expect(batch).toContainText("Original size");
+  await expect(batch).toContainText("Original file names");
+  await expect(batch).toContainText("ZIP archive");
+  await expect(dialog.getByLabel("File Name")).toHaveCount(0);
+  await expect(dialog.locator("#export-summary")).toContainText("2 images");
+  await expect(dialog.getByRole("button", { name: "Download ZIP", exact: true })).toBeEnabled();
   await expect(dialog.getByRole("button", { name: /^Share All/ })).toBeDisabled();
 });
 

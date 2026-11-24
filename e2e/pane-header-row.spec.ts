@@ -93,7 +93,7 @@ test("Export dialog: one step — one Export header, one close, no Back", async 
   await expect(dialog.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Close", exact: true })).toHaveCount(1);
   await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
-  await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  await dialog.getByRole("radio", { name: /^All images/ }).click();
   await expect(dialog.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
   await dialog.screenshot({ path: "test-results/export-one-step.png" });

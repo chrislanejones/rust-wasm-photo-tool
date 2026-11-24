@@ -1,33 +1,34 @@
-import { FIELD_TEXT } from "@/lib/styles";
+import { FIELD_BASE_GROUP } from "@/lib/styles";
 
 interface Props {
   value: string;
   defaultStem: string;
   onChange: (value: string) => void;
-  /** Shown after the field, not editable — it follows the chosen format (and
-   *  the AVIF→PNG fallback), so the name can never disagree with the bytes. */
+  /** Shown inside the field's right end, not editable — it follows the chosen
+   *  format (and the AVIF→PNG fallback), so the name can never disagree with
+   *  the bytes. */
   ext: string;
-  /** Enter in the field downloads, same as the Download tile. */
+  /** Enter in the field downloads, same as the Download button. */
   onSubmit: () => void;
-  /** Download All: shown but off — each image in the ZIP keeps its own name
-   *  (a recipe's name pattern can change that). */
-  disabled?: boolean;
 }
 
-/** "File name" for the export dialog's single-image Download. */
-export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmit, disabled = false }: Props) {
+/** "File Name" for the export dialog's single-image Download. Only on
+ *  Selected image: on All images each file keeps its own name, and the
+ *  recipe's Naming line says so (Chris, 11-24-2026: no grayed-out field). */
+export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmit }: Props) {
   return (
-    <div className={disabled ? "space-y-2 opacity-50" : "space-y-2"}>
+    <div className="space-y-2">
       <label htmlFor="export-file-name" className="text-xs font-semibold text-text-muted">
         File Name
       </label>
-      <div className="flex items-center gap-2">
+      {/* One box: the name, then its extension as a fixed suffix inside the
+          same border, so the two read as one file name. */}
+      <div className={`${FIELD_BASE_GROUP} flex items-center`}>
         <input
           id="export-file-name"
           type="text"
-          value={disabled ? "" : value}
-          placeholder={disabled ? "Each image keeps its own name" : defaultStem}
-          disabled={disabled}
+          value={value}
+          placeholder={defaultStem}
           onChange={(e) => onChange(e.target.value)}
           onFocus={(e) => e.currentTarget.select()}
           onKeyDown={(e) => {
@@ -38,9 +39,12 @@ export function ExportFileNameField({ value, defaultStem, onChange, ext, onSubmi
           }}
           spellCheck={false}
           autoComplete="off"
-          className={`${FIELD_TEXT} min-w-0 flex-1`}
+          aria-describedby="export-file-ext"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
         />
-        {!disabled && <span className="shrink-0 font-mono text-sm text-text-muted">{ext}</span>}
+        <span id="export-file-ext" className="shrink-0 border-l border-theme-border px-3 py-2 font-mono text-sm text-text-muted">
+          {ext}
+        </span>
       </div>
     </div>
   );

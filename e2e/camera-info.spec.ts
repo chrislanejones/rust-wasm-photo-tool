@@ -60,7 +60,10 @@ async function openExport(page: Page, pane: "Selected" | "All") {
   await expect(dialog).toBeVisible({ timeout: 10_000 });
   // One step now: pick Selected or All in the first row (All is off with
   // one photo, and Selected is already picked).
-  if (pane === "All") await dialog.getByRole("radio", { name: /^Download All/ }).click();
+  if (pane === "All") await dialog.getByRole("radio", { name: /^All images/ }).click();
+  // Camera Info lives in the shut "Privacy & metadata" drop-down: open it.
+  const privacy = dialog.getByRole("button", { name: /^Privacy & metadata/ });
+  if ((await privacy.getAttribute("aria-expanded")) === "false") await privacy.click();
   return dialog;
 }
 
@@ -128,10 +131,11 @@ test("Download All with a recipe: the recipe carries the Camera info it was save
   // Save a recipe while the dialog says Remove location.
   await chooseCameraInfo(dialog, "Remove location");
   await dialog.locator('[title^="JPEG"]').first().click();
-  await dialog.getByRole("button", { name: "Save…", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save recipe" }).click();
   await dialog.getByLabel("Recipe name").fill("No GPS");
   await dialog.getByRole("button", { name: "Save recipe" }).click();
-  await expect(dialog.getByText(/camera info Remove location/)).toBeVisible();
+  // Batch settings lists the camera info the recipe was saved with.
+  await expect(dialog.getByLabel("Batch settings")).toContainText(/Camera info\s*Remove location/);
   // The picker shows the recipe's choice, locked.
   await expect(dialog.getByRole("radio", { name: "Remove location", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(dialog.getByRole("radio", { name: "Keep all", exact: true })).toBeDisabled();
@@ -139,9 +143,10 @@ test("Download All with a recipe: the recipe carries the Camera info it was save
   await dialog.getByLabel("Recipe").selectOption("");
   await chooseCameraInfo(dialog, "Keep all");
   await dialog.getByLabel("Recipe").selectOption({ label: "No GPS" });
+  await expect(dialog.locator("#export-summary")).toHaveText("2 images · No GPS · ZIP");
   const [dl] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),
-    dialog.getByRole("button", { name: /^Download ZIP \(2 as No GPS/ }).click(),
+    dialog.getByRole("button", { name: "Download ZIP", exact: true }).click(),
   ]);
   const zip = readFileSync((await dl.path())!);
   // JSZip stores without compression, so each JPEG's bytes sit in the zip.
