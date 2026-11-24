@@ -68,12 +68,17 @@ async function pastePng(page: Page, name: string): Promise<void> {
   );
 }
 
-/** Alt+E → handleExport, the same call the Export dialog's Download tile makes. */
+/** Alt+E opens the Export dialog (#515); its one primary Download writes the
+ *  file under the name in the File Name field, which starts on the default. */
 async function exportedStem(page: Page): Promise<string> {
+  await page.keyboard.press("Alt+KeyE");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 30_000 }),
-    page.keyboard.press("Alt+KeyE"),
+    dialog.getByRole("button", { name: /^Download (JPEG|PNG|WebP|AVIF)$/ }).click(),
   ]);
+  await expect(dialog).toBeHidden();
   const name = download.suggestedFilename();
   console.log(`  exported as: ${name}`);
   return name.replace(/\.[^.]+$/, "");
