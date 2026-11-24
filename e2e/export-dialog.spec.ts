@@ -4,11 +4,11 @@ import { join } from "node:path";
 
 // The Export dialog as ONE step that adapts to the task (Chris, 11-24-2026):
 //   1. Selected image | All images (N)             — top bar style group
-//   2. Selected: File Name (+ its extension)  ·  All: Recipe + Batch settings
+//   2. Selected: File Name (+ its extension), Recipe  ·  All: Recipe + Batch settings
 //   3. Raster | Vector | With Layers (Selected only) — top bar style group
 //   4. that kind's format tiles, named JPEG PNG…   — the Shapes picker's tiles
-//   5. Privacy & metadata                          — a drop-down, shut
-//   6. footer: what you'll get, Share link · Clipboard, ONE primary Download
+//   5. Privacy & Metadata                          — a drop-down, shut
+//   6. footer: what you'll get (how compressed on the right), Share link · Clipboard, ONE primary Download
 //      (All: Share All · Soon (off), Download ZIP)
 // A row that cannot apply is left out, not grayed. Alt+E opens it.
 
@@ -55,19 +55,21 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
   await expect(format.getByRole("radio")).toHaveCount(4);
   await expect(dialog.getByTestId("export-format-says")).toHaveText(/^(JPEG|PNG|WebP|AVIF) — /);
 
-  // Selected: the name with its extension, no recipe, one primary.
+  // Selected: the name with its extension, a recipe under it, one primary.
   await expect(dialog.getByLabel("File Name")).toBeEnabled();
   await expect(dialog.locator("#export-file-ext")).toHaveText(/^\.\w+$/);
-  await expect(dialog.getByLabel("Recipe")).toHaveCount(0);
+  await expect(dialog.getByLabel("Recipe")).toBeEnabled();
+  await expect(dialog.getByLabel("Image settings")).toContainText("Original size");
   await expect(dialog.getByRole("button", { name: "Share link" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Clipboard" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: /^Download (JPEG|PNG|WebP|AVIF)$/ })).toBeEnabled();
   await expect(dialog.locator("#export-summary")).toContainText("1 image");
+  await expect(dialog.getByTestId("export-compressed")).toHaveText(/compressed|larger/i);
   // No SVG open: Vector is off.
   await expect(kind.getByRole("radio", { name: "Vector" })).toBeDisabled();
 
-  // Privacy & metadata: shut, its choice on the right; opens to Camera Info.
-  const privacy = dialog.getByRole("button", { name: /^Privacy & metadata/ });
+  // Privacy & Metadata: shut, its choice on the right; opens to Camera Info.
+  const privacy = dialog.getByRole("button", { name: /^Privacy & Metadata/ });
   await expect(privacy).toHaveAttribute("aria-expanded", "false");
   await expect(dialog.getByRole("radiogroup", { name: "Camera Info" })).toBeHidden();
   await privacy.click();
@@ -98,7 +100,8 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
   const batch = dialog.getByLabel("Batch settings");
   await expect(batch).toContainText("Original size");
   await expect(batch).toContainText("Original file names");
-  await expect(batch).toContainText("ZIP archive");
+  await expect(batch).not.toContainText("Packaging");
+  await expect(dialog.getByTestId("export-compressed")).toHaveText(/^\d+ of 2 compressed$/);
   await expect(dialog.getByLabel("File Name")).toHaveCount(0);
   await expect(dialog.locator("#export-summary")).toContainText("2 images");
   await expect(dialog.getByRole("button", { name: "Download ZIP", exact: true })).toBeEnabled();
