@@ -24,7 +24,7 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
-import { TEXT_COLORS } from "@/lib/colors";
+import { FILL_COLORS, TEXT_COLORS, TRANSPARENT, isTransparent } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { FILL_FIRST_KINDS, SHAPE_KIND_NAME, SHAPE_NAME_KIND } from "@/lib/drawEditState";
 import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
@@ -66,6 +66,10 @@ const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
 // color is picked while it is still None is the first real one.
 const SHAPE_STROKE_PRESETS = [0, 2, 4, 8] as const;
 const SHAPE_STROKE_ON = SHAPE_STROKE_PRESETS[1];
+
+/** The one editable Fill Color palette — the Shapes tab's fill and a diagram
+ *  shape's solid fill share it (useEditablePalette). */
+const FILL_PALETTE_KEY = "fill";
 
 // Corner radius presets, px — numbers variant like Points. Square, a soft
 // round, a card, and a pill on most shapes (the engine clamps to what fits).
@@ -203,14 +207,34 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                   {fillFirst ? (
                     <ColorSwatchGrid
                       label="Fill Color"
-                      colors={TEXT_COLORS}
-                      value={settings.shapeFillColor}
-                      // A reselected older shape may be outline-only, a
-                      // gradient or a pixelate box: then no swatch is its
-                      // fill, and picking one makes it a solid.
-                      selected={settings.shapeFillMode === "solid"}
+                      // Every site color, and the user's own edits of it
+                      // (Chris, 11-24-2026) — one palette with the Arrows
+                      // tab's Fill Color.
+                      colors={FILL_COLORS}
+                      paletteKey={FILL_PALETTE_KEY}
+                      value={
+                        settings.shapeFillMode === "none" ? TRANSPARENT : settings.shapeFillColor
+                      }
+                      // A reselected older shape may be a gradient or a
+                      // pixelate box: then no swatch is its fill, and picking
+                      // one makes it a solid. An outline-only one lights the
+                      // checkerboard: no fill IS a transparent fill.
+                      selected={
+                        settings.shapeFillMode === "solid" || settings.shapeFillMode === "none"
+                      }
                       onChange={(color) =>
-                        onChange({ ...settings, shapeFillMode: "solid", shapeFillColor: color })
+                        onChange(
+                          isTransparent(color)
+                            ? {
+                                ...settings,
+                                // Transparent is NO fill — so a shape with no
+                                // stroke either gets one, or it would be an
+                                // invisible object (ShapeStrokeSection's rule).
+                                shapeFillMode: "none",
+                                shapeStrokeWidth: settings.shapeStrokeWidth || SHAPE_STROKE_ON,
+                              }
+                            : { ...settings, shapeFillMode: "solid", shapeFillColor: color },
+                        )
                       }
                     />
                   ) : (
@@ -413,6 +437,7 @@ function StrokeFirst({
       <ColorSwatchGrid
         label={colorLabel}
         colors={TEXT_COLORS}
+        transparent={false}
         value={settings.strokeColor}
         onChange={(color) => onChange({ ...settings, strokeColor: color })}
       />
@@ -446,6 +471,7 @@ function ShapeStrokeSection({ settings, onChange }: PanelProps) {
       <ColorSwatchGrid
         label="Stroke Color"
         colors={TEXT_COLORS}
+        transparent={false}
         value={settings.shapeStrokeColor}
         selected={width > 0}
         onChange={(color) =>
@@ -498,7 +524,8 @@ function FillSection({ settings, onChange }: PanelProps) {
       {settings.fillMode === "solid" && (
         <ColorSwatchGrid
           label="Fill Color"
-          colors={TEXT_COLORS}
+          colors={FILL_COLORS}
+          paletteKey={FILL_PALETTE_KEY}
           value={settings.fillColor}
           onChange={(color) => onChange({ ...settings, fillColor: color })}
         />

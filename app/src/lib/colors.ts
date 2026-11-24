@@ -39,3 +39,23 @@ export const OVERLAY_COLORS = [
 
 /** Photoshop opens Color Overlay at full strength; the slider dials it back. */
 export const DEFAULT_OVERLAY_OPACITY = 1;
+
+/** The checkerboard swatch every ColorSwatchGrid shows just before its "+":
+ *  the CSS keyword, which both Rust color parsers read as alpha 0
+ *  (`drawing::parse_hex_color`, `parse_color`), so a transparent fill draws
+ *  nothing. Offered on fills and backgrounds; a grid whose color is INK (a
+ *  stroke, text, a brush, a guide, a redaction) turns it off. */
+export const TRANSPARENT = "transparent";
+
+export function isTransparent(color: string | null | undefined): boolean {
+  return color?.trim().toLowerCase() === TRANSPARENT;
+}
+
+/** Every color the site ships with, in hue order — what the Fill Color
+ *  palette starts as. The user can replace, remove and add to it
+ *  (`useEditablePalette`); Reset brings this back. White first, so the
+ *  default fill (`TEXT_COLORS[0]`) is still the first swatch. */
+export const FILL_COLORS = [
+  p.white, p.red, p.orange, p.yellow, p.green, p.teal,
+  p.cyan, p.blue, p.violet, p.purple, p.pink, p.black,
+] as const;

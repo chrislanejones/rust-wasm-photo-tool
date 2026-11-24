@@ -2,7 +2,7 @@
 // saved-palette tile (which used to carry its own copy, `PaletteSwatch`, of this
 // exact button). Its own module because the grid imports the picker, so the
 // picker importing the grid back would be a cycle.
-import { X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import type { RadioItemProps } from "@/components/ui/use-radio-group";
 
 interface SwatchProps {
@@ -10,6 +10,11 @@ interface SwatchProps {
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
+  /** Shows a pencil badge (top-left) that replaces this swatch's color —
+   *  the editable Fill Color palette (useEditablePalette). */
+  onEdit?: () => void;
+  /** Accessible name of the edit badge. Defaults to "Replace #hex". */
+  editLabel?: string;
   disabled?: boolean;
   /** Accessible name. Defaults to "Color #hex" (or the checkerboard's name). */
   label?: string;
@@ -27,6 +32,8 @@ export function Swatch({
   active,
   onClick,
   onRemove,
+  onEdit,
+  editLabel,
   disabled,
   label,
   removeLabel,
@@ -44,7 +51,7 @@ export function Swatch({
   // so it sits on the swatch checkerboard the same way the dialog previews it.
   const isTranslucent = /^#[0-9a-f]{8}$/i.test(color) && !/ff$/i.test(color);
   return (
-    <span className="relative inline-flex group">
+    <span className="relative inline-flex group/swatch">
       <button
         type="button"
         {...radio}
@@ -69,6 +76,20 @@ export function Swatch({
           <span className="block h-full w-full" style={{ backgroundColor: color }} />
         )}
       </button>
+      {onEdit && !disabled && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="absolute -top-1 -left-1 hidden group-hover/swatch:flex group-focus-within/swatch:flex items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground"
+          aria-label={editLabel ?? `Replace ${color}`}
+          title="Replace this color"
+        >
+          <Pencil className="h-2 w-2" />
+        </button>
+      )}
       {onRemove && (
         <button
           type="button"
@@ -76,7 +97,7 @@ export function Swatch({
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground"
+          className="absolute -top-1 -right-1 hidden group-hover/swatch:flex group-focus-within/swatch:flex items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground"
           aria-label={removeLabel ?? `Remove ${color}`}
         >
           <X className="h-2 w-2" />

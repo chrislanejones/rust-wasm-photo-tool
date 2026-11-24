@@ -175,7 +175,7 @@ export function RedactBatchPanel({ photos, activePhotoId, stampToolRef, flushToC
         />
       )}
       {look.style === "solid" && (
-        <ColorSwatchGrid colors={TEXT_COLORS} value={look.color} onChange={(color) => setLook(editing, { color })} />
+        <ColorSwatchGrid colors={TEXT_COLORS} transparent={false} value={look.color} onChange={(color) => setLook(editing, { color })} />
       )}
 
       <ControlRow label="Where on the other photos">

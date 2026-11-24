@@ -3,6 +3,7 @@ import { useTextBoxStore } from "@/stores/useTextBoxStore";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
+import { isTransparent } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { measureTextAwaited, textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 import { faceCss } from "@/lib/engineFonts";
@@ -355,9 +356,11 @@ export function useTextTool({
     const fontId = s.textFontId ?? "";
     const bgKind = BG_KIND_MAP[s.bgKind];
     const [bgR, bgG, bgB] = hexToRgb(s.bgColor);
-    const bgA = Math.round(
-      Math.max(0, Math.min(100, s.bgOpacity)) * 2.55,
-    );
+    // The checkerboard swatch: a box with no paint — what a border-only
+    // box (a stamp outline) is drawn on.
+    const bgA = isTransparent(s.bgColor)
+      ? 0
+      : Math.round(Math.max(0, Math.min(100, s.bgOpacity)) * 2.55);
     const bgPadding = Math.max(0, Math.round(s.bgPadding));
     const bgCornerRadius = Math.max(0, Math.round(s.bgCornerRadius));
     // Tail angle in degrees, normalized to 0-359 for the Rust u32 param.

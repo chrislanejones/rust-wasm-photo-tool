@@ -43,6 +43,7 @@ export function StampsSettings({ settings, onChange }: StampsSettingsProps) {
       <ColorSwatchGrid
         label="Color"
         colors={TEXT_COLORS}
+        transparent={false}
         value={settings.stampColor}
         onChange={(color) => onChange({ ...settings, stampColor: color })}
       />

@@ -3,6 +3,7 @@
 // what a pending edit IS. Moved out of useDrawingTools.ts (which re-exports
 // every name here, so no import changed) so the hook file holds the hook.
 import type { ShapeName, ToolSettings } from "@/lib/types";
+import { TRANSPARENT } from "@/lib/colors";
 import {
   canonicalCornerRadii,
   effectiveStarPoints,
@@ -478,8 +479,10 @@ export function editStateFromShape(sh: ShapeMeta): DrawEditState {
       kindByte: sh.kind,
       sloppiness,
       fillMode: FILL_KIND_MODE[sh.fill_kind] ?? "none",
-      fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
-      fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
+      // Alpha 0 is the checkerboard swatch's fill (the engine parses
+      // "transparent" to it): it reopens as Transparent, not as black.
+      fillColor: sh.fill_a === 0 ? TRANSPARENT : rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
+      fillColor2: sh.fill2_a === 0 ? TRANSPARENT : rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
       gradientAngle: sh.fill_angle,
       fillBlock: sh.fill_block ?? 16,
       starPoints: effectiveStarPoints(sh.starPoints),

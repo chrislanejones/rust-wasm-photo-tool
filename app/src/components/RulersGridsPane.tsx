@@ -189,6 +189,7 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
           <ColorSwatchGrid
             label="Color"
             colors={GRID_COLORS}
+            transparent={false}
             value={value.gridColor}
             onChange={(hex) => onChange({ gridColor: hex })}
             allowCustom={false}
