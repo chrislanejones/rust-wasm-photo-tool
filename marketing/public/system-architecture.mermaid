@@ -1,4 +1,4 @@
-%%-- Image Horse — whole-app system architecture (AS SHIPPED, v9.70, 11-23-2026)
+%%-- Image Horse — whole-app system architecture (AS SHIPPED, v9.77, 11-24-2026)
 %%--
 %%-- The downloadable source behind the hand-drawn map on /architecture. Both
 %%-- are maintained BY HAND and have drifted apart before (this file sat at
@@ -72,7 +72,7 @@ flowchart TB
 
         subgraph persist["Persistence plane · IndexedDB / Dexie · no backup, no server copy"]
             ORIG["originals<br/>SHA-256 content-addressed · immutable"]
-            OPS["opLogs + keyframes<br/>op format v16"]
+            OPS["opLogs + keyframes<br/>op format v17"]
             GAL["gallery manifest"]
             CACHE["renderCache<br/>disposable"]
         end

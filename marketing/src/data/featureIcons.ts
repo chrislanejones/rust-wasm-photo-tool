@@ -59,6 +59,9 @@ import {
   ScrollText,
   Eraser,
   PackageOpen,
+  RectangleHorizontal,
+  SquarePen,
+  FileCode,
 } from "lucide-react";
 
 const FEATURE_ICONS: Record<string, ElementType> = {
@@ -101,7 +104,7 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Multi-photo Gallery": GalleryHorizontalEnd,
   "Review Panel": PanelRight,
   Upload: Upload,
-  "Export Dropdown": FileDown,
+  "Export formats": FileDown,
   "Keyboard Shortcut Modal": Command,
   "Diagnostics Log": ScrollText,
   "Erasers and AI removal": Eraser,
@@ -123,6 +126,10 @@ const FEATURE_ICONS: Record<string, ElementType> = {
   "Batch Crop": PackageOpen,
   "Compare two photos": GitCompare,
   "Masonry view": LayoutDashboard,
+  // v9.71–v9.74.
+  "Text Border": RectangleHorizontal,
+  "Re-editing keeps a text's look": SquarePen,
+  "Paste SVG": FileCode,
 };
 
 // A DOT, not a square — deliberately. `Square` was the fallback, and "Blank

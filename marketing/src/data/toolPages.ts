@@ -184,7 +184,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Speech bubbles and real text, in real typefaces",
       "Emoji, and stamps you can move, retype and recolor",
       "Snap to a nine-cell grid so things line up",
-      "Shift-click several and align, distribute or nudge them together",
+      "Press V, Shift-click several or drag a box around them, and align, distribute or nudge them together",
       "Move, recolor or delete anything right up until export",
     ],
     sections: [
@@ -307,7 +307,7 @@ export const TOOL_PAGES: readonly ToolPage[] = [
       "Strip the location, or all camera info, from every stored photo",
       "Tick the odd few as Exceptions and give them their own settings",
       "Copy one photo's look and paste it onto the rest",
-      "Find look-alike photos and tick the extra copies",
+      "Find look-alike photos, turned or flipped copies too, and tick the extras",
       "Rename by pattern: a counter, the date it was taken, its size or its old name",
       "Or name each file from its colors, tone and subject",
       "Export the whole set as a ZIP",

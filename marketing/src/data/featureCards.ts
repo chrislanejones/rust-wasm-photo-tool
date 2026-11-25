@@ -155,9 +155,9 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "annotate",
     title: "Fill Color and Stroke",
     plain:
-      "A new shape starts filled with the first color in the palette and no outline. Fill Color comes first on the Shapes panel, and the outline lives under Stroke, which starts at None. Diagram shapes can still fill with a gradient or the photo underneath pixelated.",
+      "A new shape starts filled with the first color in the palette and no outline. The Fill Color palette is yours: replace a swatch, remove one, add your own, or Reset to the site colors. The checkerboard swatch is transparent.",
     detail:
-      "An even-odd point-in-polygon clip against the same vertex list the engine strokes, so the fill and the outline cannot disagree; a star's missed corners stay empty. A filled shape rotates on the warp route, so gradient direction and pixelate grid turn with it.",
+      "The outline lives under Stroke, which starts at None. Your palette stays on this device, saved only once you change it. A shape with no stroke given a transparent fill gets a stroke, so it can't vanish. The fill is clipped by the same outline the engine strokes, so the two can't disagree. Diagram shapes can still fill with a gradient or the photo underneath pixelated.",
   },
   Text: {
     group: "annotate",
@@ -180,6 +180,20 @@ const CARD_COPY: Record<string, CardCopy> = {
     plain: "An outline around the letters, 0 to 20 px, with its own color and opacity.",
     detail:
       "Drawn in Rust outside the glyphs (outline_glyphs), so a thick stroke never thins the type and the letters never move. Op log v15.",
+  },
+  "Text Border": {
+    group: "annotate",
+    title: "Text Border",
+    plain: "A border around a text's box, 0 to 20 px, with its own color and opacity. It's what frames a stamp.",
+    detail:
+      "Text › Background › Border. Drawn in Rust inside the box's edge (box_border_ring), around a speech bubble's tail too, so the text never moves. Op log v17.",
+  },
+  "Re-editing keeps a text's look": {
+    group: "annotate",
+    title: "Re-editing keeps the look",
+    plain: "Open a text you placed earlier and the panel shows its own background, border, outline and shadow.",
+    detail:
+      "Commit it without touching the panel and it stays the way it was. It used to take whatever the panel last held.",
   },
   "Text in Box": {
     group: "annotate",
@@ -456,7 +470,8 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "export",
     title: "Upload",
     plain: "Drag and drop, browse, or paste from the clipboard.",
-    detail: "Modal with file browser and Ctrl+V / paste button.",
+    detail:
+      "New opens two rows of three: Browse Files · Paste · New Canvas, then Sample Images · Create AI Image · Paste SVG. Ctrl+V pastes too.",
   },
   "Multi-photo Gallery": {
     group: "export",
@@ -483,9 +498,9 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Export recipes": {
     group: "export",
     title: "Export recipes",
-    plain: "Download All in one shape: Instagram 1080×1350, Web 1600, Email small, or a recipe you save.",
+    plain: "Instagram 1080×1350, Web 1600, Email small, or a recipe you save. Use one on a single image or the whole ZIP.",
     detail:
-      "A recipe sets size, format, quality and a file name pattern, and shapes the ZIP only. Saved recipes sync when you're signed in.",
+      "A recipe sets size, format, quality and camera info, plus a name pattern for the ZIP. One image keeps the name you typed. Photos in the gallery stay as they are. Saved recipes sync when you're signed in.",
   },
   // Keyed by the feature name in features.ts (docs/04-Features.md); the two move together.
   "Compare two photos": {
@@ -553,15 +568,15 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "export",
     title: "Export",
     plain:
-      "Save the finished photo losslessly or compressed — and an SVG you uploaded comes back out as an SVG.",
+      "Alt+E opens one screen: this image or all of them, Raster, Vector or With Layers, then the format. What doesn't apply is left out.",
     detail:
-      "Lossless PNG via the Rust encoder; JPEG and WebP via the browser; AVIF through an encoder that loads on first use. An uploaded SVG is rewritten with its crop, so it stays a vector.",
+      "The footer says how compressed the download is. Lossless PNG via the Rust encoder; JPEG and WebP via the browser; AVIF through an encoder that loads on first use. An uploaded SVG comes back out as an SVG.",
   },
-  "Export Dropdown": {
+  "Export formats": {
     group: "export",
-    title: "Export dropdown",
-    plain: "Pick PNG, JPEG, WebP or AVIF right from the top bar.",
-    detail: "Format selector in the top bar.",
+    title: "Export formats",
+    plain: "JPEG, PNG, WebP and AVIF are tiles in Export, with one line about the one you pick.",
+    detail: "A format plugin adds its own tile. The top bar's Export button, or Alt+E, opens the dialog.",
   },
   "Share links, and Settings → Shared": {
     group: "export",
@@ -574,9 +589,9 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Camera info on export": {
     group: "export",
     title: "Camera info on export",
-    plain: "Keep all, Remove location or Remove all, right in the Download dialog. Location goes only when you say so.",
+    plain: "Keep all, Remove location or Remove all, in Export's Privacy & metadata drop-down. Location leaves with a photo only when you say so.",
     detail:
-      "The same setting as Settings › Security, in the Download dialog, recipes and the phone's Save. Kept camera info no longer turns a portrait photo sideways.",
+      "The same setting as Settings › Security, in Export, recipes and the phone's Save. Kept camera info no longer turns a portrait photo sideways.",
   },
   "Security tab": {
     group: "export",
@@ -674,7 +689,7 @@ const CARD_COPY: Record<string, CardCopy> = {
   "Five-group toolbar": {
     group: "hood",
     title: "Five-group toolbar",
-    plain: "Enhance · Select · Create · Edit · Batch, owning 38 sub-tools from one registry.",
+    plain: "Enhance · Select · Create · Edit · Batch, owning 43 sub-tools from one registry.",
     detail:
       "features/tools/toolGroups.ts drives the rail, sub-tool row, digits 1–5, shortcut sheet, dispatch and cursor.",
   },
@@ -696,7 +711,7 @@ const CARD_COPY: Record<string, CardCopy> = {
     group: "hood",
     title: "Review panel",
     plain: "Up to three stacked sections sharing the right-hand panel.",
-    detail: "Alt+R; 1 full / 2 halves / 3 thirds, each scrollable.",
+    detail: "Alt+R; 1 full / 2 halves / 3 thirds, each scrollable. The arrow on Reselect picks several objects at once, the same as pressing V.",
   },
   "Animated Panels": {
     group: "hood",
