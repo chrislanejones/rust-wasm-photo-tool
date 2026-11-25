@@ -94,6 +94,20 @@ it("OK with no palette change saves nothing", () => {
   expect(p.save).not.toHaveBeenCalled();
 });
 
+it("OK without an edit never saves a stale draft over another tab's save", () => {
+  const p = palette();
+  const { rerender } = open(p);
+  // Another tab saves while this dialog is open: the row's colors change.
+  const newer = palette({ colors: ["#ffffff", "#123456"], save: p.save });
+  rerender(
+    <TooltipProvider>
+      <ColorPickerDialog open onOpenChange={vi.fn()} initialColor="#8b5cf6" onPick={vi.fn()} title="Edit Fill Color swatches" palette={newer} />
+    </TooltipProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
+  expect(p.save).not.toHaveBeenCalled();
+});
+
 it("Reset puts the site colors back in the draft, and only shows when they differ", () => {
   const p = palette({ colors: ["#ffffff", "#123456"] });
   open(p);

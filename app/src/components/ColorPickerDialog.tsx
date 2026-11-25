@@ -139,9 +139,15 @@ export function ColorPickerDialog({
   const [startHex, setStartHex] = useState<string | null>(null);
   // The palette being edited, saved on OK. Fresh from the row on every open.
   const [draft, setDraft] = useState<readonly string[]>(palette?.colors ?? []);
+  // What the draft started as. OK saves only a draft the user changed: an
+  // untouched one may be stale (another tab saved meanwhile) and would undo it.
+  const [draftBase, setDraftBase] = useState<readonly string[]>(palette?.colors ?? []);
   const paletteColors = palette?.colors;
   useEffect(() => {
-    if (open && paletteColors) setDraft(paletteColors);
+    if (open && paletteColors) {
+      setDraft(paletteColors);
+      setDraftBase(paletteColors);
+    }
     // Only on open: a draft in progress must not be reset by a re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -205,7 +211,7 @@ export function ColorPickerDialog({
   };
 
   const confirm = () => {
-    if (palette && !sameColors(draft, palette.colors)) palette.save(draft);
+    if (palette && !sameColors(draft, draftBase)) palette.save(draft);
     onPick(hex);
     onOpenChange(false);
   };
@@ -338,7 +344,7 @@ export function ColorPickerDialog({
                   sameColors(draft, palette.defaults) ? undefined : () => setDraft(palette.defaults)
                 }
                 removeAlwaysVisible
-                note={sameColors(draft, palette.colors) ? undefined : "OK saves these changes."}
+                note={sameColors(draft, draftBase) ? undefined : "OK saves these changes."}
               />
             )}
 
