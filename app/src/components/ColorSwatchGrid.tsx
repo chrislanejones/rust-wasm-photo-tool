@@ -16,6 +16,8 @@ import { Swatch } from "@/components/ui/swatch";
 import { ControlRow } from "@/components/ui/control-row";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRadioGroup } from "@/components/ui/use-radio-group";
+import { useAltOverRow } from "@/hooks/useAltOverRow";
+import { ModeRing } from "@/components/ui/mode-ring";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -79,64 +81,6 @@ interface Entry {
 const OPACITY_HINT = "Hold Alt (⌥ Option on a Mac) over the swatches to change the opacity";
 /** The readout's hover text — short, a tooltip not a manual. */
 const OPACITY_HINT_SHORT = "Hold Alt (⌥) to change opacity — or click";
-
-/**
- * Alt held over (or inside) the row: the opacity mode. Listens on the window
- * only while the row is hovered or focused, so Alt everywhere else in the app
- * keeps whatever it does there.
- */
-function useAltOverRow(enabled: boolean) {
-  const [over, setOver] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const [alt, setAlt] = useState(false);
-  const live = enabled && (over || focused);
-
-  useEffect(() => {
-    if (!live) {
-      setAlt(false);
-      return;
-    }
-    const down = (e: KeyboardEvent) => {
-      if (e.key !== "Alt") return;
-      // Windows browsers move focus to the menu bar on a bare Alt.
-      e.preventDefault();
-      setAlt(true);
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.key !== "Alt") return;
-      e.preventDefault();
-      setAlt(false);
-    };
-    const reset = () => setAlt(false);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", reset);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", reset);
-    };
-  }, [live]);
-
-  const handlers = enabled
-    ? {
-        onPointerEnter: (e: React.PointerEvent) => {
-          setOver(true);
-          setAlt(e.altKey);
-        },
-        // Alt pressed BEFORE the pointer arrived: no keydown reaches us.
-        onPointerMove: (e: React.PointerEvent) => {
-          if (e.altKey !== alt) setAlt(e.altKey);
-        },
-        onPointerLeave: () => setOver(false),
-        onFocus: () => setFocused(true),
-        onBlur: (e: React.FocusEvent) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
-        },
-      }
-    : {};
-  return { alt: live && alt, handlers };
-}
 
 /**
  * A row of preset swatches + the user's saved palette + the transparent
@@ -316,7 +260,9 @@ export function ColorSwatchGrid({
 
   return (
     <>
-      <div {...handlers}>
+      <div {...handlers} className="relative">
+        {/* The mode ring (Compare's): the swatches are opacity steps now. */}
+        {opacityMode && <ModeRing inset={6} radius={10} thickness={2} />}
         <ControlRow
           label={label}
           // No lightbulb (Chris, 11-25-2026: "not little light bulbs just

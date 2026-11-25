@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ModeRing } from "@/components/ui/mode-ring";
 import { motion } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, instantTransition } from "@/lib/animations";
 import { Thumb } from "./Thumb";
@@ -499,13 +500,7 @@ export function GalleryBar({
         {/* Compare mode: the image-drop ring (styles.css, the same one a file
             dragged over the app gets) round the gallery. What to do is said
             in the header, where Compress was (GalleryCompareStatus). */}
-        {comparing && (
-          <div
-            aria-hidden
-            className="image-drop-ring pointer-events-none z-10 motion-reduce:animate-none"
-            style={vertical ? { borderRadius: "inherit" } : { inset: -4, borderRadius: 16 }}
-          />
-        )}
+        {comparing && (vertical ? <ModeRing radius="inherit" /> : <ModeRing inset={4} radius={16} />)}
         <GalleryLoadingRegion state={gallery} className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "@container p-4"}>
           <div
             inert={chromeInert}

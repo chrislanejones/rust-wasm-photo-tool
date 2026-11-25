@@ -14,6 +14,7 @@ import { strokeDown } from "@/lib/strokeGate";
 import { useRef, type ReactNode } from "react";
 import { ControlRow, type ControlRowProps } from "@/components/ui/control-row";
 import { PresetRow } from "@/components/ui/preset-row";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Presets divide the slider into equal segments so the thumb lines up under each dot.
 // e.g. 4 presets → segments at 0%, 33%, 67%, 100%.
@@ -60,6 +61,9 @@ interface CommonProps {
   edited?: ControlRowProps["edited"];
   /** A one-click icon between the reset arrow and the value (see ControlRow). */
   action?: ControlRowProps["action"];
+  /** Hover text on the value — how to reach the row's Alt form, said where
+   *  the eye already is instead of in a lightbulb (Chris, 11-25-2026). */
+  valueHint?: string;
 }
 
 interface PlainSliderProps extends CommonProps {
@@ -77,13 +81,26 @@ interface DotsSliderProps extends CommonProps {
   max?: number;
   blurredDots?: boolean;
   renderPreset?: (preset: number, index: number, isActive: boolean) => ReactNode;
+  /** Shown IN PLACE of the preset row, the track keeping the presets' scale —
+   *  a row's alternate form while Alt is held (Corner Radius's corners). */
+  presetsSlot?: ReactNode;
 }
 
 type SizeSliderProps = PlainSliderProps | DotsSliderProps;
 
 export function SizeSlider(props: SizeSliderProps) {
-  const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit, edited, action } = props;
+  const { label, labelInfo, value, onChange, unit = "", valueDisplay, disabled, reason, onCommit, edited, action, valueHint } = props;
   const display = valueDisplay ?? `${value}${unit}`;
+  const shownValue = valueHint ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={-1} className="cursor-help">{display}</span>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-56 text-2xs leading-relaxed">
+        {valueHint}
+      </TooltipContent>
+    </Tooltip>
+  ) : display;
   const keyboardValue = useRef<number | null>(null);
 
   // A slider drag counts as a stroke for the autosave gate (lib/strokeGate):
@@ -99,13 +116,13 @@ export function SizeSlider(props: SizeSliderProps) {
     : undefined;
 
   return (
-    <ControlRow label={label} info={labelInfo} value={display} reason={reason} edited={edited} action={action}>
+    <ControlRow label={label} info={labelInfo} value={shownValue} reason={reason} edited={edited} action={action}>
       {({ reasonId }) => {
         if (props.presets) {
-          const { presets, blurredDots, renderPreset, variant = "dots" } = props;
+          const { presets, blurredDots, renderPreset, variant = "dots", presetsSlot } = props;
           return (
             <div className="space-y-1.5">
-              <PresetRow
+              {presetsSlot ?? <PresetRow
                 label={label}
                 presets={presets}
                 value={value}
@@ -116,7 +133,7 @@ export function SizeSlider(props: SizeSliderProps) {
                 renderPreset={renderPreset}
                 disabled={disabled}
                 aria-describedby={reasonId}
-              />
+              />}
               <input
                 type="range"
                 aria-label={label}

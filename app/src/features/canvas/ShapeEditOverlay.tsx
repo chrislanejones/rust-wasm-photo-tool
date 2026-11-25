@@ -22,6 +22,7 @@ import {
   type CornerRadii,
 } from "@/lib/shapeSloppiness";
 import { cornerHandles, radiusAfterDrag, type CornerHandle } from "@/lib/cornerRadiusHandles";
+import { useCornerFocusStore } from "@/stores/useCornerFocusStore";
 import { SHAPE_NAME_KIND, shapeCanFill } from "@/lib/drawEditState";
 import { diagramGeometry, diagramStrokes, strokesToPath } from "@/lib/diagramShapes";
 import {
@@ -85,6 +86,7 @@ export function ShapeEditOverlay({
   // builds — and AppShell is being dismantled, not extended.
   const liveStarPoints = useToolStore((s) => s.toolSettings.starPoints);
   const liveCornerRadii = useToolStore((s) => s.toolSettings.cornerRadii);
+  const focusedCorner = useCornerFocusStore((s) => s.corner);
   const dotRadii = useLiveRadii(); // a corner-dot drag in flight
   const actionMode = useToolStore((s) => s.shapeActionMode);
 
@@ -847,10 +849,14 @@ export function ShapeEditOverlay({
             <circle
               key={`radius-${c.index}`}
               data-shape-radius-handle={c.index}
-              cx={toSX(c.dot.x)} cy={toSY(c.dot.y)} r={RADIUS_DOT_R}
-              fill="white"
+              cx={toSX(c.dot.x)} cy={toSY(c.dot.y)}
+              // The corner the Corner Radius row is editing alone (Alt →
+              // a corner tile) is lit, so you can see which one moves.
+              r={focusedCorner === c.index ? RADIUS_DOT_R + 1.5 : RADIUS_DOT_R}
+              fill={focusedCorner === c.index ? "var(--color-theme-primary)" : "white"}
               stroke="rgba(0,0,0,0.5)"
               strokeWidth={1}
+              data-focused={focusedCorner === c.index ? "" : undefined}
               style={{ cursor: "default", pointerEvents: "all" }}
               onPointerDown={(e) =>
                 handleDrawPointerDown(e, "radius", String(c.index), {

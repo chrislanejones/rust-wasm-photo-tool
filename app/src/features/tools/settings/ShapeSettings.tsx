@@ -27,7 +27,8 @@ import type { ShapesMode } from "@/stores/useToolStore";
 import { FILL_COLORS, TEXT_COLORS, TRANSPARENT, isTransparent } from "@/lib/colors";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { FILL_FIRST_KINDS, SHAPE_KIND_NAME, SHAPE_NAME_KIND } from "@/lib/drawEditState";
-import { canonicalCornerRadii, cornerCount } from "@/lib/shapeSloppiness";
+import { cornerCount } from "@/lib/shapeSloppiness";
+import { CornerRadiusControl } from "./CornerRadiusControl";
 import type { DiagramShapeName } from "@/lib/types";
 import { isDiagramKind } from "@/lib/diagramShapes";
 import { DIAGRAM_SHAPE_GROUPS } from "./diagramShapeIcons";
@@ -70,10 +71,6 @@ const SHAPE_STROKE_ON = SHAPE_STROKE_PRESETS[1];
 /** The one editable Fill Color palette — the Shapes tab's fill and a diagram
  *  shape's solid fill share it (useEditablePalette). */
 const FILL_PALETTE_KEY = "fill";
-
-// Corner radius presets, px — numbers variant like Points. Square, a soft
-// round, a card, and a pill on most shapes (the engine clamps to what fits).
-const CORNER_RADIUS_PRESETS = [0, 8, 24, 64] as const;
 
 // Sloppiness presets — numbers variant, same 4-above-the-track layout as the
 // Eraser's Opacity slider. 0 (firm) is a real preset, then 25/50/100, so the
@@ -153,9 +150,6 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
   const radiusOf = (name: string | undefined) =>
     name && cornerCount(name) > 0 ? name : null;
   const radiusShape = editingKind == null ? radiusOf(currentShape) : radiusOf(editingShape);
-  const radii = canonicalCornerRadii(radiusShape ?? "rect", settings.cornerRadii);
-  const cornersUsed = radiusShape === "triangle" ? 3 : radiusShape === "star" ? 1 : 4;
-  const mixed = radii.slice(0, cornersUsed).some((r) => r !== radii[0]);
   // Fill first, or stroke first? The shape in hand decides — the reselected
   // one if there is one, else the tile. Everything with an interior on this
   // tab is fill first; the line (and a reselected pin or arrow) has only a
@@ -260,24 +254,10 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       or the line). Sets all corners at once; the dots inside
                       the corners on the canvas do the same, and Shift-drag on
                       one rounds that corner only, which reads here as Mixed.
-                      The reset arrow (Chris, 11-25-2026, as on Scale and
-                      Quality) squares every corner in one click — the way
-                      back from a one-corner Shift-drag. */}
+                      Hold Alt over it to pick one corner, and the reset
+                      arrow squares them all (CornerRadiusControl). */}
                   {radiusShape && (
-                    <SizeSlider
-                      label="Corner Radius"
-                      value={Math.max(...radii.slice(0, cornersUsed))}
-                      valueDisplay={mixed ? "Mixed" : undefined}
-                      edited={{
-                        isEdited: radii.slice(0, cornersUsed).some((r) => r > 0),
-                        onReset: () => onChange({ ...settings, cornerRadii: [0, 0, 0, 0] }),
-                        dot: false,
-                      }}
-                      onChange={(v) => onChange({ ...settings, cornerRadii: [v, v, v, v] })}
-                      presets={CORNER_RADIUS_PRESETS}
-                      variant="numbers"
-                      unit="px"
-                    />
+                    <CornerRadiusControl shape={radiusShape} settings={settings} onChange={onChange} />
                   )}
 
                   {/* Sloppiness — how hand-drawn the outline is, firm (0) →

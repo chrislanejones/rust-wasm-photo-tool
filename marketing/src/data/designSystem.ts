@@ -93,6 +93,7 @@ export const COMPONENTS: readonly ComponentDoc[] = [
   { name: "Spinner", category: "Feedback", source: "app/src/components/ui/spinner.tsx", what: "Work in progress inside a button or line. Keeps turning under Reduce Motion: a frozen spinner reads as a hang." },
   { name: "StatusMark", category: "Feedback", source: "app/src/components/ui/status-mark.tsx", what: "One mark per meaning: complete, working, attention, failed, backed up, on this device." },
   { name: "AsyncStatus", category: "Feedback", source: "app/src/components/ui/async-status.tsx", what: "The five states of anything that waits, in one view." },
+  { name: "ModeRing", category: "Feedback", source: "app/src/components/ui/mode-ring.tsx", what: "The still gold ring that says a mode is on: Compare round the gallery, Alt over Fill Color or Corner Radius. It doesn't animate; words beside it say what the mode is." },
   { name: "ReasonNote", category: "Feedback", source: "app/src/components/ui/status-note.tsx", what: "Why a control is off right now. Muted, not a warning: a step is missing." },
   { name: "ToolPanel", category: "Surfaces", source: "app/src/components/ui/tool-panel.tsx", what: "The vertical rhythm of a tool panel's body: header, controls, sections and actions, 16px apart." },
   { name: "Dialog", category: "Surfaces", source: "app/src/components/ui/dialog.tsx", what: "The modal primitive, with the shared scrim and focus trap." },
