@@ -18,7 +18,7 @@ catalog:
   typescript: ^5.7.2
   tailwindcss: ^4.3.3
   '@tailwindcss/vite': ^4.3.5
-  convex: ^1.50.0
+  convex: ^1.51.0
 
 # Security/version floors, applied repo-wide (previously copy-pasted per package).
 overrides:
