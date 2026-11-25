@@ -236,6 +236,7 @@ export function TextSettings({
             <ColorSwatchGrid
               label="Text Color"
               colors={TEXT_COLORS}
+              transparent={false}
               value={settings.textColor}
               onChange={(color) => onChange({ ...settings, textColor: color })}
             />
@@ -416,6 +417,7 @@ export function TextSettings({
                       <ColorSwatchGrid
                         label="Border Color"
                         colors={TEXT_COLORS}
+                        transparent={false}
                         value={settings.textBorderColor}
                         onChange={(color) => onChange({ ...settings, textBorderColor: color })}
                       />
@@ -457,6 +459,7 @@ export function TextSettings({
                   <ColorSwatchGrid
                     label="Stroke Color"
                     colors={TEXT_COLORS}
+                    transparent={false}
                     value={settings.textStrokeColor}
                     onChange={(color) => onChange({ ...settings, textStrokeColor: color })}
                   />
@@ -506,6 +509,7 @@ export function TextSettings({
                   <ColorSwatchGrid
                     label="Shadow Color"
                     colors={TEXT_COLORS}
+                    transparent={false}
                     value={settings.shadowColor}
                     onChange={(color) =>
                       onChange({ ...settings, shadowColor: color })

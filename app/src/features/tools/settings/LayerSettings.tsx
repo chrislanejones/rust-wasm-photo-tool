@@ -557,6 +557,8 @@ export function LayerSettings({
             <ColorSwatchGrid
               label="Overlay Color"
               colors={OVERLAY_COLORS}
+              // A tint, not a fill: "no overlay" is the Remove button below.
+              transparent={false}
               value={overlayColorOf(activeLayer)}
               disabled={disabled || activeLayerIsEmpty === true}
               onChange={(color) =>
@@ -714,6 +716,7 @@ export function LayerSettings({
         <ColorSwatchGrid
           label="Guide Color"
           colors={GUIDE_COLORS}
+          transparent={false}
           value={guideColor}
           onChange={setGuideColor}
         />

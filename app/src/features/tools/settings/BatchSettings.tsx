@@ -14,7 +14,7 @@ import { batchToolModes } from "@/features/tools/toolModes";
 import { SizeSlider } from "@/components/ui/size-slider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
-import { TEXT_COLORS } from "@/lib/colors";
+import { TEXT_COLORS, isTransparent } from "@/lib/colors";
 import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -858,7 +858,9 @@ function TextBatchPanel({
       // otherwise the box would poke past the requested margin.
       const bgKindNum = bgKind === "background" ? 1 : 0;
       const [bgR, bgG, bgB] = hexToRgb(bgColor);
-      const bgA = Math.round(Math.max(0, Math.min(100, bgOpacity)) * 2.55);
+      const bgA = isTransparent(bgColor)
+        ? 0
+        : Math.round(Math.max(0, Math.min(100, bgOpacity)) * 2.55);
       const bgPad = bgKindNum === 1 ? Math.max(0, Math.round(bgPadding)) : 0;
       const bgRadius = Math.max(0, Math.round(bgCornerRadius));
       let done = 0;
@@ -1182,6 +1184,7 @@ function TextBatchPanel({
 
       <ColorSwatchGrid
         colors={TEXT_COLORS}
+        transparent={false}
         value={textColor}
         onChange={setTextColor}
       />

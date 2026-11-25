@@ -445,6 +445,12 @@ fn sign(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)) -> f64 {
 }
 
 pub fn parse_hex_color(hex: &str) -> [u8; 4] {
+    // The swatch grids' checkerboard swatch (ColorSwatchGrid) stores the CSS
+    // keyword, not a hex. Alpha 0 — `blend_pixel` skips it, so a transparent
+    // fill draws nothing. Without this arm it read as `#transp…` → opaque black.
+    if hex.trim().eq_ignore_ascii_case("transparent") {
+        return [0, 0, 0, 0];
+    }
     let hex = hex.trim_start_matches('#');
     if hex.len() < 6 {
         return [0, 0, 0, 255];
@@ -1991,5 +1997,18 @@ mod geometry_tests {
         );
         assert!(Rotation::about_bbox_center(0.0, 0.0, 0.0, 1.0, 1.0).is_none());
         assert!(Rotation::about_bbox_center(f64::NAN, 0.0, 0.0, 1.0, 1.0).is_none());
+    }
+}
+
+#[cfg(test)]
+mod transparent_tests {
+    use super::parse_hex_color;
+
+    /// The swatch grids' checkerboard swatch stores `transparent`; it used to
+    /// parse as `#transp…` → opaque black.
+    #[test]
+    fn the_transparent_keyword_is_alpha_zero() {
+        assert_eq!(parse_hex_color("transparent"), [0, 0, 0, 0]);
+        assert_eq!(parse_hex_color("#3b82f6"), [0x3b, 0x82, 0xf6, 255]);
     }
 }

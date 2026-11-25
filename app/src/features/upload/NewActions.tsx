@@ -28,7 +28,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { UserMenu } from "@/components/UserMenu";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
-import { TEXT_COLORS } from "@/lib/colors";
+import { TEXT_COLORS, TRANSPARENT, isTransparent } from "@/lib/colors";
 import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 import { DEFAULT_IMAGE_MODEL_ID } from "./aiImageDraft";
@@ -525,16 +525,17 @@ export function NewActions({
                   )}
                 </ControlRow>
 
-                <div
-                  className={transparent ? "pointer-events-none opacity-40" : ""}
-                >
-                  <ColorSwatchGrid
-                    colors={TEXT_COLORS}
-                    value={bgColor}
-                    onChange={setBgColor}
-                    label="Background"
-                  />
-                </div>
+                {/* The checkerboard swatch and the Transparent switch below
+                    are one state: either one turns the other on. */}
+                <ColorSwatchGrid
+                  colors={TEXT_COLORS}
+                  value={transparent ? TRANSPARENT : bgColor}
+                  onChange={(c) => {
+                    setTransparent(isTransparent(c));
+                    if (!isTransparent(c)) setBgColor(c);
+                  }}
+                  label="Background"
+                />
 
                 {/* One binary with no visible pair: a SWITCH (UI_CONSISTENCY §7),
                     not a hand-rolled pressed button. */}

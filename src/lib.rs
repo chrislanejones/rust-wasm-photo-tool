@@ -3667,8 +3667,13 @@ pub fn parse_color(input: &str) -> Vec<u8> {
         return parse_hex(hex).map(|c| c.to_vec()).unwrap_or_default();
     }
 
-    // ── Functional notation: rgb(...) / rgba(...) ──────────────────────
     let lower = s.to_ascii_lowercase();
+    // ── The CSS keyword the swatch grids' checkerboard swatch stores ──────
+    if lower == "transparent" {
+        return vec![0, 0, 0, 0];
+    }
+
+    // ── Functional notation: rgb(...) / rgba(...) ──────────────────────
     let (has_alpha, body) = if let Some(rest) = lower.strip_prefix("rgba(") {
         (true, rest)
     } else if let Some(rest) = lower.strip_prefix("rgb(") {

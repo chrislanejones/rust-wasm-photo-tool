@@ -210,8 +210,11 @@ test("an outline-only shape from before keeps its style, and a Fill Color fills 
   const edge = await screenPoint(page, BOX[0], MIDDLE[1]);
   await page.mouse.click(edge.x, edge.y);
   await expect(editBox(page)).toBeAttached();
-  // The panel shows ITS style: no fill swatch checked, a 4 px stroke.
-  await expect(page.getByRole("radiogroup", { name: "Fill Color", exact: true }).locator('[aria-checked="true"]')).toHaveCount(0);
+  // The panel shows ITS style: no fill — the transparent swatch is the one
+  // checked — and a 4 px stroke.
+  const lit = page.getByRole("radiogroup", { name: "Fill Color", exact: true }).locator('[aria-checked="true"]');
+  await expect(lit).toHaveCount(1);
+  await expect(lit).toHaveAttribute("aria-label", "Transparent (checkerboard)");
   await expect(strokeHeader(page)).toContainText("4 px");
   // Committing it untouched changes nothing.
   await key(page, "Enter");

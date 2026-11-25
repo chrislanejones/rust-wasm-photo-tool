@@ -23,7 +23,7 @@ vi.hoisted(() => {
 afterAll(() => vi.unstubAllEnvs());
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
-import { TEXT_COLORS } from "@/lib/colors";
+import { FILL_COLORS, TEXT_COLORS } from "@/lib/colors";
 import type { ToolSettings } from "@/lib/types";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { ShapesSettings } from "./ShapeSettings";
@@ -88,10 +88,13 @@ it("the default fill is the palette's first color, and it is the one checked", (
 });
 
 it("picking a Fill Color makes the fill solid — on an outline-only shape too", () => {
-  // A reselected older shape: no fill, a stroke. No swatch stands for "none".
+  // A reselected outline-only shape: no fill IS a transparent fill, so the
+  // checkerboard swatch is the one lit.
   const { onChange } = renderPanel({ shapeFillMode: "none", shapeStrokeWidth: 3 });
   const group = screen.getByRole("radiogroup", { name: "Fill Color" });
-  expect(checkedIn(group)).toHaveLength(0);
+  expect(checkedIn(group).map((r) => r.getAttribute("aria-label"))).toEqual([
+    "Transparent (checkerboard)",
+  ]);
   fireEvent.click(group.querySelectorAll('[role="radio"]')[1]!);
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ shapeFillMode: "solid", shapeFillColor: TEXT_COLORS[1] }),
@@ -198,4 +201,33 @@ it("the default fill is the Fill Color row's first swatch, white — user colors
   const group = screen.getByRole("radiogroup", { name: "Fill Color" });
   const firstSwatch = group.querySelector('[role="radio"]')!;
   expect(firstSwatch.getAttribute("aria-checked")).toBe("true");
+});
+
+it("Fill Color starts as every site color, then the checkerboard, then the +", () => {
+  localStorage.clear();
+  renderPanel();
+  const group = screen.getByRole("radiogroup", { name: "Fill Color" });
+  const names = Array.from(group.querySelectorAll('[role="radio"]')).map((r) =>
+    r.getAttribute("aria-label"),
+  );
+  expect(names).toEqual([
+    ...FILL_COLORS.map((c) => `Color ${c}`),
+    "Transparent (checkerboard)",
+  ]);
+  // The "+" of this palette ADDS to it.
+  expect(screen.getByRole("button", { name: "Add a color to Fill Color" })).toBeTruthy();
+});
+
+it("a transparent Fill Color is no fill — and a strokeless shape gets a stroke, never invisible", () => {
+  const { onChange } = renderPanel();
+  fireEvent.click(screen.getByRole("radio", { name: "Transparent (checkerboard)" }));
+  const sent = onChange.mock.lastCall![0] as ToolSettings;
+  expect(sent.shapeFillMode).toBe("none");
+  expect(sent.shapeStrokeWidth).toBeGreaterThan(0);
+});
+
+it("the Stroke Color is ink: no transparent swatch", () => {
+  renderPanel();
+  const stroke = screen.getByRole("radiogroup", { name: "Stroke Color", hidden: true });
+  expect(stroke.querySelector('[aria-label="Transparent (checkerboard)"]')).toBeNull();
 });

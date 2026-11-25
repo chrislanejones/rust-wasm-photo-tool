@@ -15,7 +15,7 @@ import { FieldLabel } from "@/components/ui/field-label";
 import { NumberField } from "@/components/ui/number-field";
 import { Switch } from "@/components/ui/switch";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
-import { TEXT_COLORS } from "@/lib/colors";
+import { TEXT_COLORS, TRANSPARENT, isTransparent } from "@/lib/colors";
 import { parseColor } from "@/lib/colorParser";
 import { FIELD_TEXTAREA } from "@/lib/styles";
 import { cn } from "@/lib/utils";
@@ -173,14 +173,17 @@ export function PasteSvgPanel({ onBack, closable, initialText = "", onCreate }: 
         </div>
       </div>
 
-      <div className={transparent ? "pointer-events-none opacity-40" : ""}>
-        <ColorSwatchGrid
-          colors={TEXT_COLORS}
-          value={bgColor}
-          onChange={setBgColor}
-          label="Background"
-        />
-      </div>
+      {/* The checkerboard swatch and the Transparent switch below are one
+          state: either one turns the other on. */}
+      <ColorSwatchGrid
+        colors={TEXT_COLORS}
+        value={transparent ? TRANSPARENT : bgColor}
+        onChange={(c) => {
+          setTransparent(isTransparent(c));
+          if (!isTransparent(c)) setBgColor(c);
+        }}
+        label="Background"
+      />
 
       <div className="flex items-center justify-between gap-2">
         <label

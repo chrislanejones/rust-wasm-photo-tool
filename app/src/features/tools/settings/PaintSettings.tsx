@@ -127,6 +127,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     panel's first row, then Brush Size. */}
                 <ColorSwatchGrid
                   colors={TEXT_COLORS}
+                  transparent={false}
                   value={settings.brushColor}
                   onChange={(color) => onChange({ ...settings, brushColor: color })}
                 />
@@ -270,6 +271,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 {settings.blurMode === "solid" && (
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
+                    transparent={false}
                     value={settings.redactColor ?? "#000000"}
                     onChange={(color) => onChange({ ...settings, redactColor: color })}
                   />
@@ -291,6 +293,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               <>
                 <ColorSwatchGrid
                   colors={TEXT_COLORS}
+                  transparent={false}
                   value={settings.strokeColor}
                   onChange={(color) => onChange({ ...settings, strokeColor: color })}
                 />
