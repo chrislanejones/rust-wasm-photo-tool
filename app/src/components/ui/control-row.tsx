@@ -62,7 +62,15 @@ export interface ControlRowProps {
   /** A per-photo value moved off its default: shows the edited dot and a
    *  reset button that calls `onReset`. Omit, or pass `isEdited: false`, for
    *  a default. */
-  edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
+  edited?: {
+    isEdited: boolean;
+    onReset: () => void;
+    disabled?: boolean;
+    /** False: the reset arrow alone, no "changed on this photo" dot — for a
+     *  value that isn't per-photo but still wants one-click back to default
+     *  (Shapes › Corner Radius, Chris 11-25-2026). */
+    dot?: boolean;
+  };
   /** A one-click icon button between the reset arrow and the value, e.g. an
    *  Auto that fills the control in. `label` is its name and its hover title. */
   action?: { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean };
@@ -96,7 +104,7 @@ export function ControlRow({ label, info, value, reason, edited, action, childre
             {label}
           </span>
           {info && <InfoTooltip info={info} label={label} />}
-          {edited?.isEdited && (
+          {edited?.isEdited && edited.dot !== false && (
             <span
               data-slot="edited"
               role="img"

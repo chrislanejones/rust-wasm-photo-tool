@@ -259,12 +259,20 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                   {/* Corner Radius — every shape with corners (not the circle
                       or the line). Sets all corners at once; the dots inside
                       the corners on the canvas do the same, and Shift-drag on
-                      one rounds that corner only, which reads here as Mixed. */}
+                      one rounds that corner only, which reads here as Mixed.
+                      The reset arrow (Chris, 11-25-2026, as on Scale and
+                      Quality) squares every corner in one click — the way
+                      back from a one-corner Shift-drag. */}
                   {radiusShape && (
                     <SizeSlider
                       label="Corner Radius"
                       value={Math.max(...radii.slice(0, cornersUsed))}
                       valueDisplay={mixed ? "Mixed" : undefined}
+                      edited={{
+                        isEdited: radii.slice(0, cornersUsed).some((r) => r > 0),
+                        onReset: () => onChange({ ...settings, cornerRadii: [0, 0, 0, 0] }),
+                        dot: false,
+                      }}
                       onChange={(v) => onChange({ ...settings, cornerRadii: [v, v, v, v] })}
                       presets={CORNER_RADIUS_PRESETS}
                       variant="numbers"

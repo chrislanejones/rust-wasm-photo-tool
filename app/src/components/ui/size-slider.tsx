@@ -57,7 +57,7 @@ interface CommonProps {
   reason?: ReactNode;
   onCommit?: (v: number) => void;
   /** Per-photo values only: the edited dot + reset (see ControlRow). */
-  edited?: { isEdited: boolean; onReset: () => void; disabled?: boolean };
+  edited?: ControlRowProps["edited"];
   /** A one-click icon between the reset arrow and the value (see ControlRow). */
   action?: ControlRowProps["action"];
 }
