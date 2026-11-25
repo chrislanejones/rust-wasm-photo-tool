@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.77",
+    date: "2026-11-24",
+    headline: "Make the Fill Color palette your own.",
+    entries: [
+      { tag: "feature", text: "Fill Color's swatches are editable: replace one, remove one, add your own, or Reset to the site colors." },
+      { tag: "ui", text: "Every fill and background palette ends with a checkerboard swatch for transparent." },
+      { tag: "rust", text: "The engine reads the color \"transparent\" as see-through instead of black." },
+      { tag: "fix", text: "Confirming the color picker on transparent no longer makes a New canvas black." },
+    ],
+  },
+  {
     version: "v9.76",
     date: "2026-11-24",
     headline: "Recipes work on one image too.",

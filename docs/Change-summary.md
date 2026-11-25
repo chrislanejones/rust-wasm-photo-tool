@@ -12336,6 +12336,27 @@ Engine: **979,674 B** (was 973,825; +5,849 for the border). One fix on landing #
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,545/2,545; marketing build passes. e2e on a production build, 15 specs touched by the three changes (`stamps`, `ui-night8-finish`, `annotation-multiselect`, `callout-leader`, `one-tile-per-subtool`, `text-box-survives`, `export-dialog`, `diagram-shapes`, `shapes-fill-first`, `ui-night3-panels`, `text-align`, `text-commit-one-step`, `text-placement-undo`, `text-preview-size`, `annotation-performance`): 108 passed, 9 skipped (opt-in), 0 failed. Rust gates run by the pre-push hook.
 
+## v9.77 Change Summary — 2026-11-24
+
+**Make the Fill Color palette your own.**
+
+| Area | Change |
+| --- | --- |
+| Swatches (#517) | Every `ColorSwatchGrid` reads presets → saved colors → a **transparent** (checkerboard) swatch → "+". Offered on fills and backgrounds: shape Fill Color, diagram fill and gradient stops, the Pen's fill, the text box Background, the New canvas and pasted SVG Background, and the backing canvas. Ink grids (strokes, text, brush, stamps, guides, grid, overlay tint, redaction) leave it out. A strokeless shape given a transparent fill gets a stroke, so it can't vanish. |
+| Fill Color (#517) | Starts as all twelve site colors and is editable: hover a swatch to replace (pencil) or remove (×) it, "+" adds the picked color, **Reset** restores the site colors. Saved in localStorage per palette (`useEditablePalette`), only once changed; the Shapes tab and the diagram Fill share one palette. |
+| Engine (#517) | Both Rust color parsers read the CSS keyword `transparent` as alpha 0; it used to parse as opaque black. New `tests/transparent_color.rs`. |
+| UI (#517) | Swatch badges use a named Tailwind group, so an ancestor `.group` no longer shows them on every swatch at once. |
+| Fix (landing) | Open grids stay in step through a listener set inside `useEditablePalette`, not a new window event (new CustomEvents are forbidden). |
+| Fix (landing) | Replace follows the color, not its slot: if another tab removed an earlier swatch while the picker was open, the wrong swatch got replaced. |
+| Fix (landing) | A disabled grid no longer shows Remove or Replace. |
+| Fix (landing) | `isTransparent()` also reads alpha-0 hex (`#rgb0`, `#rrggbb00`), so confirming the color picker on transparent no longer makes a New canvas opaque black. |
+| Docs | ADR-110 (draft): every swatch grid ends in transparent, and Fill Color is an editable palette. Features chapter. |
+| Trail Log | Squares catch up through 11-24. |
+
+Engine 980,281 B (+607). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561 (4 new in `ColorSwatchGrid.palette.test.tsx`); marketing build passes. Rust: fmt, clippy (both feature sets), 916 tests. e2e on a production build, 13 specs (`batch-redact`, `color-overlay`, `diagram-shapes`, `export-matches-canvas`, `guides-grid`, `oplog-undo-shapes`, `paste-svg`, `shapes-fill-first`, `shapes-ux`, `stamps`, `text-box-survives`, `ui-night3-panels`, `ui-night8-finish`): 54/54.
+
 ## v9.76 Change Summary — 2026-11-24
 
 **Recipes work on one image too.**

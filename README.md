@@ -99,17 +99,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.76 — 2026-11-24
+### v9.77 — 2026-11-24
 
-**Recipes work on one image too.**
+**Make the Fill Color palette your own.**
 
-The **Recipe** picker now sits under **File Name** when you export the
-**Selected image**, not just on All images. Pick one and that one file gets
-the recipe's size, format, quality and camera info. It keeps the name you
-typed.
+The **Fill Color** swatches are yours now. Hover one: the pencil swaps it for
+another color, the × takes it out, and "+" adds your own. **Reset** puts the
+site's colors back. It stays on this device and only saves once you change it.
 
-The bottom of Export also says how much your download is compressed ("Not
-compressed" when it isn't), or on All images, how many of them are.
+Every fill and background palette also ends with a **checkerboard swatch**
+for "no color", right before the "+". Pick it on a shape with no outline and
+the shape gets one, so it can't vanish.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).
