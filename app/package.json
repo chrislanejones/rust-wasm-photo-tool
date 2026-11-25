@@ -34,7 +34,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "^2.0.8",
-    "tailwind-merge": "^3.7.0",
+    "tailwind-merge": "^3.7.1",
     "uqr": "0.1.3",
     "zustand": "^5.1.0"
   },
