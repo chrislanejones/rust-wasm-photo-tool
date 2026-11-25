@@ -24,6 +24,7 @@ vi.mock("@/components/ColorPickerDialog", () => ({
 }));
 
 import { ColorSwatchGrid } from "./ColorSwatchGrid";
+import { isTransparent } from "@/lib/colors";
 
 const DEFAULTS = ["#ffffff", "#ef4444", "#000000"] as const;
 
@@ -119,4 +120,43 @@ it("replacing a swatch that isn't lit edits the palette only", () => {
   act(() => screen.getByRole("button", { name: /^use in: Replace/ }).click());
   expect(onChange).not.toHaveBeenCalled();
   expect(radios("Color")).toContain("Color #123456");
+});
+
+it("two grids on the same palette stay in step, with no window event", () => {
+  // The in-tab sync is a listener set in useEditablePalette, not a window
+  // CustomEvent (CLAUDE.md: new CustomEvents are forbidden).
+  const dispatch = vi.spyOn(window, "dispatchEvent");
+  render(
+    <>
+      <ColorSwatchGrid label="Fill A" colors={DEFAULTS} paletteKey="test" value="#ffffff" onChange={vi.fn()} />
+      <ColorSwatchGrid label="Fill B" colors={DEFAULTS} paletteKey="test" value="#ffffff" onChange={vi.fn()} />
+    </>,
+  );
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove #000000" })[0]);
+  expect(radios("Fill B")).toEqual(["Color #ffffff", "Color #ef4444", "Transparent (checkerboard)"]);
+  expect(dispatch).not.toHaveBeenCalled();
+  dispatch.mockRestore();
+});
+
+it("a replace follows its swatch when another tab removes an earlier one", () => {
+  render(<ColorSwatchGrid colors={DEFAULTS} paletteKey="test" value="#ffffff" onChange={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Replace #ef4444" }));
+  // Another tab removes white while the dialog is open: red is now slot 0.
+  act(() => {
+    localStorage.setItem("image-horse-palette:test", JSON.stringify(["#ef4444", "#000000"]));
+    window.dispatchEvent(new StorageEvent("storage"));
+  });
+  act(() => screen.getByRole("button", { name: /^use in: Replace/ }).click());
+  expect(radios("Color")).toEqual(["Color #123456", "Color #000000", "Transparent (checkerboard)"]);
+});
+
+it("a disabled grid offers no remove or replace", () => {
+  render(<ColorSwatchGrid colors={DEFAULTS} paletteKey="test" value="#ffffff" onChange={vi.fn()} disabled />);
+  expect(screen.queryByRole("button", { name: /^Remove / })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Replace / })).toBeNull();
+});
+
+it("a color with alpha 0 counts as transparent", () => {
+  for (const c of ["transparent", " Transparent ", "#00000000", "#ffffff00", "#0000"]) expect(isTransparent(c)).toBe(true);
+  for (const c of ["#000000", "#000000ff", "#00000001", "#fff", "rgb(10, 20, 0)", "", null, undefined]) expect(isTransparent(c)).toBe(false);
 });

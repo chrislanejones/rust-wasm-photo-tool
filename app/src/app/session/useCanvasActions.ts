@@ -17,6 +17,8 @@ import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/expor
 import type { ExportFormat } from "@/lib/exportImage";
 import { compareBaselineKey } from "@/lib/compareBaseline";
 import { defaultExportStem } from "@/lib/exportFileName";
+import type { ExportRecipe } from "@/lib/exportRecipes";
+import { applyRecipe } from "@/lib/applyRecipe";
 import { revokeObjectUrlLater } from "@/lib/revokeObjectUrlLater";
 
 export function useCanvasActions({
@@ -192,8 +194,12 @@ export function useCanvasActions({
 
   /** Download the active image. `stem` is the export dialog's file-name field
    *  (already sanitized); omitted everywhere else, which keeps the
-   *  `<name>-revised` default. */
-  const exportAsInner = useCallback(async (stem?: string) => {
+   *  `<name>-revised` default. `recipe` is the one picked under the name
+   *  field (Chris, 11-24-2026): its size, format, quality and camera info
+   *  shape this one file. The name stays the field's — the recipe's name
+   *  pattern is for a ZIP. Only the dialog passes it, so the shortcut and the
+   *  context menu keep the plain download. */
+  const exportAsInner = useCallback(async (stem?: string, recipe?: ExportRecipe | null) => {
     const entry = photos.find((p) => p.id === activePhotoId) ?? null;
     const tool = stamp.toolRef.current;
     // Excluding the canvas background crops the export to the photo's own
@@ -201,11 +207,24 @@ export function useCanvasActions({
     // encoded so the WebP EXIF transplant below declares the right size.
     let exportW = stamp.state.width;
     let exportH = stamp.state.height;
+    const format: ExportFormat = recipe?.format ?? exportFormat;
     let blob: Blob | null;
-    // THE JPEG BORDER FIX. "Include canvas" + a transparent backing + a format
-    // with no alpha would hand the encoder pixels it cannot write, and it fills
-    // them with black — a frame the user never saw on screen.
-    if (
+    if (recipe && tool) {
+      // The composite as it stands (canvas background or not, by the same
+      // rule as below), then the recipe on a copy.
+      const cap = includeCanvasInExport({ exportCanvasBackground, format, canvasBgTransparent })
+        ? await tool.capture_composite()
+        : await tool.capture_composite_excluding_background();
+      const { rgba, width, height } = cap;
+      cap.free();
+      const made = await applyRecipe(rgba, width, height, recipe);
+      blob = made.blob;
+      exportW = made.width;
+      exportH = made.height;
+    } else if (
+      // THE JPEG BORDER FIX. "Include canvas" + a transparent backing + a
+      // format with no alpha would hand the encoder pixels it cannot write,
+      // and it fills them with black — a frame the user never saw on screen.
       includeCanvasInExport({
         exportCanvasBackground,
         format: exportFormat,
@@ -238,13 +257,14 @@ export function useCanvasActions({
     // Remove location transplant the true original's EXIF into JPEG/WebP —
     // Orientation reset to 1, and GPS scrubbed for Remove location; Remove all
     // leaves it clean. ADR-108.
-    const choice = cameraInfoOf(readPreferences());
+    // A recipe that saved its own choice uses it.
+    const choice = recipe?.cameraInfo ?? cameraInfoOf(readPreferences());
     let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-    if (entry && carriesSourceTiff(choice, exportFormat)) {
+    if (entry && carriesSourceTiff(choice, format)) {
       const orig = await getOriginal(compareBaselineKey(entry) ?? "");
       if (orig) sourceTiff = readExifTiff(new Uint8Array(orig.bytes), orig.mimeType);
     }
-    bytes = cameraInfoForReencoded(bytes, exportFormat, choice, sourceTiff, exportW, exportH);
+    bytes = cameraInfoForReencoded(bytes, format, choice, sourceTiff, exportW, exportH);
 
     const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
     const a = document.createElement("a");
@@ -254,7 +274,7 @@ export function useCanvasActions({
     // what stops an AVIF request — which Chrome silently satisfies with PNG —
     // from landing as a `.avif` file full of PNG. EXT stays as the fallback for
     // the rare blob with no type at all.
-    const ext = extFromMime(blob.type) || EXT[exportFormat];
+    const ext = extFromMime(blob.type) || EXT[format];
     a.download = `${stem ?? defaultExportStem(entry?.name)}${ext}`;
     a.click();
     revokeObjectUrlLater(url);
@@ -273,14 +293,14 @@ export function useCanvasActions({
   // failure used to vanish — no file, no word. The Error state says so and
   // offers the way back; a superseded engine read is dropped (Plan C §3).
   const handleExportAs = useCallback(
-    async (stem?: string): Promise<void> => {
+    async (stem?: string, recipe?: ExportRecipe | null): Promise<void> => {
       try {
-        await exportAsInner(stem);
+        await exportAsInner(stem, recipe);
       } catch (err) {
         if (isSuperseded(err)) return;
         console.error("Download failed", err);
         toast.error("Couldn't download the image.", {
-          action: { label: "Try again", onClick: () => void exportAsInner(stem).catch(dropSuperseded) },
+          action: { label: "Try again", onClick: () => void exportAsInner(stem, recipe).catch(dropSuperseded) },
         });
       }
     },

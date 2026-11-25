@@ -98,7 +98,7 @@ export const GROUPS: Group[] = [
       { name: "Talk to it", body: "Say what you want changed instead of finding the tool." },
       {
         name: "Your own tools, plugged in",
-        body: "The door is open for file formats: add a plugin in Settings and its format joins the Download dialog. A plugin that adds a tool to the toolbar is the half still to come.",
+        body: "The door is open for file formats: add a plugin in Settings and its format joins the Export dialog. A plugin that adds a tool to the toolbar is the half still to come.",
       },
     ],
   },

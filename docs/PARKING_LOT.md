@@ -7,15 +7,15 @@ wait their turn.
 ## OPEN — Export dialog leftovers (`feat/export-hierarchy`, 11-24-2026)
 
 The Export dialog now adapts to the task (v9.75). The design review that led to it
-also listed these. Each is its own change, and none is started.
+also listed these. Each is its own change.
 
 | Idea | Why it waits |
 |---|---|
 | **Estimated file size** before downloading | Resize & Compress already measures "Image weight"; reuse that, don't build a second estimator |
 | **Quality slider** for JPEG, WebP and AVIF in the dialog | Quality lives in Resize & Compress today; two places for one setting need a decision first |
-| **Resize during export** (original, %, width × height, max edge) | Recipes already do this for ZIPs; tied to single-image recipes below |
+| **Resize during export** (original, %, width × height, max edge) | A recipe does it on one image now (v9.76); a size picked without saving a recipe is what's left |
 | **Compression preview** (original vs. compressed) | Large; the compare-mode work is the place to start |
-| **Recipes for single images** | Recommended 11-23, waiting for Chris's go; reuse `applyRecipe`. Needs its own design pass |
+| ~~**Recipes for single images**~~ | **Done v9.76 (#516)**, under File Name on Selected image |
 
 Noticed along the way:
 

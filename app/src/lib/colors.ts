@@ -47,8 +47,15 @@ export const DEFAULT_OVERLAY_OPACITY = 1;
  *  stroke, text, a brush, a guide, a redaction) turns it off. */
 export const TRANSPARENT = "transparent";
 
+/** The keyword, or any color with alpha 0: the picker hands back
+ *  `#00000000` when it is confirmed on the checkerboard swatch, and that
+ *  must stay "transparent", not become an opaque black background. */
 export function isTransparent(color: string | null | undefined): boolean {
-  return color?.trim().toLowerCase() === TRANSPARENT;
+  const c = color?.trim().toLowerCase();
+  if (!c) return false;
+  if (c === TRANSPARENT) return true;
+  const hex = /^#([0-9a-f]{4}|[0-9a-f]{8})$/.exec(c)?.[1];
+  return hex !== undefined && (hex.length === 4 ? hex[3] === "0" : hex.slice(6) === "00");
 }
 
 /** Every color the site ships with, in hue order — what the Fill Color

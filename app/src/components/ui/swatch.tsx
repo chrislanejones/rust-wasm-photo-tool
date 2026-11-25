@@ -107,7 +107,7 @@ export function Swatch({
           <Pencil className="h-2 w-2" />
         </button>
       )}
-      {onRemove && (
+      {onRemove && !disabled && (
         <button
           type="button"
           onClick={(e) => {

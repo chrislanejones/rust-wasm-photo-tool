@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.78",
+    date: "2026-11-25",
+    headline: "The website catches up with the editor.",
+    entries: [
+      { tag: "ui", text: "Every feature has a card again, including Text Border and re-editing a text's look." },
+      { tag: "ui", text: "The Features page describes Export as one screen with Alt+E, recipes on one image, and the editable Fill Color palette." },
+      { tag: "infra", text: "The Architecture page and chart PDF read v9.77: a 980 KB engine and op log v17." },
+    ],
+  },
+  {
+    version: "v9.77",
+    date: "2026-11-24",
+    headline: "Make the Fill Color palette your own.",
+    entries: [
+      { tag: "feature", text: "Fill Color's swatches are editable: replace one, remove one, add your own, or Reset to the site colors." },
+      { tag: "ui", text: "Every fill and background palette ends with a checkerboard swatch for transparent." },
+      { tag: "rust", text: "The engine reads the color \"transparent\" as see-through instead of black." },
+      { tag: "fix", text: "Confirming the color picker on transparent no longer makes a New canvas black." },
+    ],
+  },
+  {
+    version: "v9.76",
+    date: "2026-11-24",
+    headline: "Recipes work on one image too.",
+    entries: [
+      { tag: "feature", text: "Export's Recipe picker works on the selected image too: its size, format, quality and camera info, with the name you typed." },
+      { tag: "ui", text: "Export's footer says how much your download is compressed, or how many of your images are." },
+      { tag: "fix", text: "Switching to All images after a plugin format no longer hides the recipe the ZIP is about to use." },
+    ],
+  },
+  {
     version: "v9.75",
     date: "2026-11-24",
     headline: "Export shows only what applies.",

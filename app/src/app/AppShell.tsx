@@ -49,6 +49,7 @@ import { ShortcutModal } from "@/components/ShortcutModal";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
+import { pickedRecipe } from "@/stores/useZipRecipeStore";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
@@ -1027,7 +1028,8 @@ export function AppShell() {
       plugin.download(exportName.stem());
       return;
     }
-    void handleExportAs(exportName.stem());
+    // With the recipe picked under the name field (Raster only: the branches above return first).
+    void handleExportAs(exportName.stem(), pickedRecipe());
   };
 
   const handleDeleteAll = useCallback(() => {

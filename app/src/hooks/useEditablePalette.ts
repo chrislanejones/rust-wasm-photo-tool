@@ -2,14 +2,16 @@
 // the user can replace any swatch, remove one, or add their own. Kept per
 // palette (`key`) in localStorage — the no-login cache, the same backing the
 // signed-out global palette uses (useUserColors). Every grid showing the same
-// key stays in step in this tab (custom event) and across tabs (storage).
+// key stays in step in this tab (the listener set below, no window event)
+// and across tabs (the browser's storage event).
 //
 // Nothing is stored until the user edits: an untouched palette IS the
 // defaults, so a new site color shows up without a migration.
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 const LS_PREFIX = "image-horse-palette:";
-const CHANGE_EVENT = "image-horse-palette-change";
+/** This tab's subscribers: a write calls them directly. */
+const listeners = new Set<() => void>();
 /** Same cap as the global palette (MAX_USER_COLORS). */
 export const MAX_PALETTE_COLORS = 32;
 
@@ -44,14 +46,14 @@ function write(key: string, colors: string[] | null) {
     // localStorage may be unavailable (private mode, quota); the edit is
     // dropped, the palette stays as it was.
   }
-  window.dispatchEvent(new Event(CHANGE_EVENT));
+  for (const cb of listeners) cb();
 }
 
 function subscribe(cb: () => void) {
-  window.addEventListener(CHANGE_EVENT, cb);
+  listeners.add(cb);
   window.addEventListener("storage", cb);
   return () => {
-    window.removeEventListener(CHANGE_EVENT, cb);
+    listeners.delete(cb);
     window.removeEventListener("storage", cb);
   };
 }

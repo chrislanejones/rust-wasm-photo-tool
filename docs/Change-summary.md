@@ -12353,3 +12353,63 @@ No engine change (979,674 B). No Dexie or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,548/2,548 (3 new in `DownloadDialog.adapts.test.tsx`); marketing build passes. e2e on a production build, 10 export specs (`export-dialog`, `camera-info`, `bulk-night`, `svg-passthrough`, `zip-export`, `pane-header-row`, `plugins`, `beta-switches`, `batch-redact`, `export-file-name`): 31 passed; one stale assertion updated, then `camera-info` 4/4.
 
+## v9.76 Change Summary — 2026-11-24
+
+**Recipes work on one image too.**
+
+| Area | Change |
+| --- | --- |
+| Export (#516) | The **Recipe** picker sits under **File Name** on Selected image too. A picked recipe sets the one file's size, format, quality and camera info; the name stays the field's (the recipe's name pattern is for ZIPs). Raster built-in formats only: plugin, Vector and With Layers downloads take none. The extension and the Download label follow the recipe's format. |
+| Export (#516) | `applyRecipe()` moves from `useZipExport.ts` to `lib/applyRecipe.ts`, shared by the ZIP and the single download (same Lanczos3 resize and encoder). |
+| Export (#516) | The footer says how much the download is compressed, or "Not compressed"; on All images, "2 of 3 compressed". Read from the gallery's saved Resize & Compress results. |
+| Export (#516) | The settings list is named for the task: **Image settings** (Size, Camera info) on Selected, **Batch settings** on All. Privacy & Metadata shows the full choice when closed ("Keep All Metadata"). |
+| Fix (landing) | A one-image plugin format picked on Selected stayed picked on All images. That hid the recipe and showed the Settings camera-info choice, while the ZIP still used the hidden recipe's camera info. Moving to All now resets a plugin format to the raster one. Found by CodeRabbit; new regression test, which fails with the fix reverted. |
+| Structure (landing) | The dialog's recipe lookup is `pickedRecipe()` in `useZipRecipeStore.ts`, so AppShell grows by 2 lines, not 5. |
+| Docs | Features chapter; the Parking Lot marks single-image recipes done. |
+| Trail Log | Squares catch up through 11-24. |
+
+No engine change (979,674 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,549/2,549 (1 new); e2e on a production build, 10 export specs (`export-dialog`, `zip-export`, `camera-info`, `pasted-export-name`, `paste-svg`, `svg-passthrough`, `pane-header-row`, `bulk-night`, `stamps`, `oplog-preset-undo`): 36/36. PR CI: 19 pass, 1 skipped.
+
+## v9.77 Change Summary — 2026-11-24
+
+**Make the Fill Color palette your own.**
+
+| Area | Change |
+| --- | --- |
+| Swatches (#517) | Every `ColorSwatchGrid` reads presets → saved colors → a **transparent** (checkerboard) swatch → "+". Offered on fills and backgrounds: shape Fill Color, diagram fill and gradient stops, the Pen's fill, the text box Background, the New canvas and pasted SVG Background, and the backing canvas. Ink grids (strokes, text, brush, stamps, guides, grid, overlay tint, redaction) leave it out. A strokeless shape given a transparent fill gets a stroke, so it can't vanish. |
+| Fill Color (#517) | Starts as all twelve site colors and is editable: hover a swatch to replace (pencil) or remove (×) it, "+" adds the picked color, **Reset** restores the site colors. Saved in localStorage per palette (`useEditablePalette`), only once changed; the Shapes tab and the diagram Fill share one palette. |
+| Engine (#517) | Both Rust color parsers read the CSS keyword `transparent` as alpha 0; it used to parse as opaque black. New `tests/transparent_color.rs`. |
+| UI (#517) | Swatch badges use a named Tailwind group, so an ancestor `.group` no longer shows them on every swatch at once. |
+| Fix (landing) | Open grids stay in step through a listener set inside `useEditablePalette`, not a new window event (new CustomEvents are forbidden). |
+| Fix (landing) | Replace follows the color, not its slot: if another tab removed an earlier swatch while the picker was open, the wrong swatch got replaced. |
+| Fix (landing) | A disabled grid no longer shows Remove or Replace. |
+| Fix (landing) | `isTransparent()` also reads alpha-0 hex (`#rgb0`, `#rrggbb00`), so confirming the color picker on transparent no longer makes a New canvas opaque black. |
+| Docs | ADR-110 (draft): every swatch grid ends in transparent, and Fill Color is an editable palette. Features chapter. |
+| Trail Log | Squares catch up through 11-24. |
+
+Engine 980,281 B (+607). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561 (4 new in `ColorSwatchGrid.palette.test.tsx`); marketing build passes. Rust: fmt, clippy (both feature sets), 916 tests. e2e on a production build, 13 specs (`batch-redact`, `color-overlay`, `diagram-shapes`, `export-matches-canvas`, `guides-grid`, `oplog-undo-shapes`, `paste-svg`, `shapes-fill-first`, `shapes-ux`, `stamps`, `text-box-survives`, `ui-night3-panels`, `ui-night8-finish`): 54/54.
+
+
+## v9.78 Change Summary — 2026-11-25
+
+**The website catches up with the editor.**
+
+| Area | Change |
+| --- | --- |
+| /features | **86 of 86** features carded (2 were showing raw repo text): new **Text Border** and **Re-editing keeps the look** cards, with icons, plus an icon for Paste SVG. |
+| /features | Export: one screen opened by Alt+E (Selected or All, Raster / Vector / With Layers, then format). "Export dropdown" in the top bar was false; it is now **Export formats**, the tiles inside Export. Recipes work on one image or the ZIP. Camera info lives in Export's Privacy & metadata drop-down. |
+| /features | Fill Color: the editable palette and the transparent swatch. Upload: the New menu's two rows of three. Review panel: Reselect's arrow picks several objects, same as V. Toolbar: 43 sub-tools (was 38). |
+| /architecture | As of v9.77; one 980 KB engine (was 974 KB); op format v17 (was v16). `system-architecture.mermaid` and its PDF regenerated (overlap check passed). |
+| Tool pages | /annotate-image: press V or drag a box to pick several. /batch-image-editor: Find duplicates catches turned or flipped copies. |
+| /in-the-works | A format plugin joins the Export dialog (was "Download dialog"). |
+| Docs | Features chapter: Upload, Export formats, 43 sub-tools, and Create AI Image is always shown (since v9.71). This also fixes the ⌘K palette hints, which quote it. |
+| Docs | The v9.75–v9.77 Change Summary sections are back in oldest-first order. |
+| Trail Log | Squares catch up through 11-25. |
+
+No app or engine change (980,281 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561; marketing build + prerender (29 URLs) passes, new text found in the built HTML. Chart PDF overlap check passed (26 boxes, 29 lines).

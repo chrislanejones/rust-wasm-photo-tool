@@ -60,7 +60,9 @@ interface Props {
   opacity?: boolean;
 }
 
-type PickerTarget = { kind: "pick" } | { kind: "add" } | { kind: "replace"; index: number };
+// A replace remembers the swatch's COLOR, not its slot: another tab can
+// remove an earlier swatch while the dialog is open, and the slots shift.
+type PickerTarget = { kind: "pick" } | { kind: "add" } | { kind: "replace"; color: string };
 
 /** One circle in the row's radio group. */
 interface Entry {
@@ -175,7 +177,7 @@ export function ColorSwatchGrid({
           active,
           pick: () => emit(color),
           onEdit: editable
-            ? () => setPicker({ kind: "replace", index: paletteIndex(color) })
+            ? () => setPicker({ kind: "replace", color })
             : undefined,
           onRemove:
             editable && presets.length > 1 ? () => palette.remove(paletteIndex(color)) : undefined,
@@ -221,8 +223,11 @@ export function ColorSwatchGrid({
 
   const onPick = (color: string) => {
     if (picker?.kind === "replace") {
-      const was = palette.colors[picker.index];
-      palette.replace(picker.index, color);
+      const was = picker.color;
+      const at = paletteIndex(was);
+      // Gone meanwhile (removed in another tab): nothing to replace.
+      if (at < 0) return;
+      palette.replace(at, color);
       // Replacing the lit swatch recolors what it was lighting; replacing
       // another one only edits the palette.
       if (selected && matches(was)) emit(color);
@@ -327,7 +332,7 @@ export function ColorSwatchGrid({
           onOpenChange={(open) => {
             if (!open) setPicker(null);
           }}
-          initialColor={picker?.kind === "replace" ? palette.colors[picker.index] : value}
+          initialColor={picker?.kind === "replace" ? picker.color : value}
           onPick={onPick}
           title={
             picker?.kind === "replace"

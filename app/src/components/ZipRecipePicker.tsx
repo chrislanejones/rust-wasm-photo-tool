@@ -2,9 +2,12 @@
 // ZIP, or save the current choices as one. A recipe shapes the export only;
 // it never changes a photo in the gallery (lib/exportRecipes.ts).
 //
-// Shown on All images only (Chris, 11-24-2026: no grayed-out rows on Selected
-// image). Under the menu, "Batch settings" spells out what the ZIP will hold —
-// size, naming, camera info, packaging — with or without a recipe.
+// Shown on both panes (Chris, 11-24-2026: "can single image have recipe too"):
+// on Selected image it sits under the File Name field and shapes that one
+// file; on All images it shapes every file in the ZIP. Under the menu, the
+// settings list spells out what you will get — size, quality, naming (All
+// only: on Selected the name field above is the name), camera info — term on
+// the left, value on the right.
 //
 // Saved recipes are Preferences, so they stay on this device when signed out
 // and follow a signed-in person to their other devices (ADR-061).
@@ -53,7 +56,14 @@ function sizeWords(size: RecipeSize): string {
   }
 }
 
-export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
+export function ZipRecipePicker({
+  zipFormat,
+  scope = "all",
+}: {
+  zipFormat: ExportFormat;
+  /** `selected` — one file, named by the field above. `all` — the ZIP. */
+  scope?: "selected" | "all";
+}) {
   const [prefs, applyPrefs] = usePreferences();
   const recipeId = useZipRecipeStore((s) => s.recipeId);
   const setRecipeId = useZipRecipeStore((s) => s.setRecipeId);
@@ -113,7 +123,9 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
             value={recipeId ?? ""}
             onChange={(e) => setRecipeId(e.target.value || null)}
           >
-            <option value="">Custom — the format below, each at its size</option>
+            <option value="">
+              {scope === "all" ? "Custom — the format below, each at its size" : "Custom — the format below, at its size"}
+            </option>
             <optgroup label="Built in">
               {BUILT_IN_RECIPES.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -159,22 +171,24 @@ export function ZipRecipePicker({ zipFormat }: { zipFormat: ExportFormat }) {
         )}
       </div>
 
-      {/* Batch settings: what the ZIP will hold, in plain rows. */}
+      {/* What you will get, in plain rows: the term on the left, its value
+          pushed to the right (Chris, 11-24-2026). */}
       <dl
-        aria-label="Batch settings"
+        aria-label={scope === "all" ? "Batch settings" : "Image settings"}
         title={recipe ? describeRecipe(recipe) : undefined}
         className={`${PANEL_DIVIDER} grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-2xs`}
       >
         {[
           ["Size", recipe ? sizeWords(recipe.size) : "Original size"],
           ...(recipe ? [["Quality", String(recipe.quality)]] : []),
-          ["Naming", recipe && recipe.pattern !== "{name}" ? recipe.pattern : "Original file names"],
+          ...(scope === "all"
+            ? [["Naming", recipe && recipe.pattern !== "{name}" ? recipe.pattern : "Original file names"]]
+            : []),
           ["Camera info", CAMERA_INFO_LABEL[recipe?.cameraInfo ?? cameraInfoOf(prefs)]],
-          ["Packaging", "ZIP archive"],
         ].map(([term, value]) => (
           <div key={term} className="contents">
             <dt className="text-theme-muted-foreground">{term}</dt>
-            <dd className="text-text-primary">{value}</dd>
+            <dd className="text-right text-text-primary">{value}</dd>
           </div>
         ))}
       </dl>

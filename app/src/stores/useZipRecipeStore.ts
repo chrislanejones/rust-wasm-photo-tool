@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { usePreferences } from "@/lib/preferences";
+import { readPreferences, usePreferences } from "@/lib/preferences";
 import { findRecipe, type ExportRecipe } from "@/lib/exportRecipes";
 
 /** The recipe the next Download All applies (Night 10-28, 229). Picked in the
@@ -21,4 +21,10 @@ export function useZipRecipe(): ExportRecipe | null {
   const [prefs] = usePreferences();
   const id = useZipRecipeStore((s) => s.recipeId);
   return findRecipe(id, prefs.exportRecipes);
+}
+
+/** The same recipe, read once outside React — the Export dialog's Download
+ *  passes it to the single-image export. */
+export function pickedRecipe(): ExportRecipe | null {
+  return findRecipe(useZipRecipeStore.getState().recipeId, readPreferences().exportRecipes);
 }

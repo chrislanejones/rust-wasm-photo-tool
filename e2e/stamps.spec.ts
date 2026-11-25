@@ -85,6 +85,10 @@ async function placeRejected(page: Page): Promise<{ steps: number; t: Text }> {
   const steps = await undoCount(page);
   await clickCanvas(page, AT.x, AT.y);
   await expect.poll(async () => (await texts(page)).length).toBe(1);
+  // The text lands first and its align and border join it in later awaits
+  // (lib/stamps placeStamp), so wait for the placement to finish rather
+  // than reading the text the moment it exists.
+  await expect.poll(async () => (await texts(page))[0]?.border_width ?? 0, "the stamp gets its border").toBeGreaterThan(0);
   const [t] = await texts(page);
   return { steps, t };
 }
