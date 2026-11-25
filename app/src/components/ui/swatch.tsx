@@ -2,11 +2,17 @@
 // saved-palette tile (which used to carry its own copy, `PaletteSwatch`, of this
 // exact button). Its own module because the grid imports the picker, so the
 // picker importing the grid back would be a cycle.
+import type * as React from "react";
 import { Pencil, X } from "lucide-react";
 import type { RadioItemProps } from "@/components/ui/use-radio-group";
 
 interface SwatchProps {
   color: string;
+  /** What the circle SHOWS when it isn't `color` itself — the lit swatch of a
+   *  row that carries an opacity shows the color at that opacity. */
+  shows?: string;
+  /** A number in the middle (the Alt opacity steps' percents). */
+  text?: string;
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
@@ -29,6 +35,8 @@ interface SwatchProps {
 
 export function Swatch({
   color,
+  shows,
+  text,
   active,
   onClick,
   onRemove,
@@ -45,11 +53,12 @@ export function Swatch({
   // styles.css — also used by CanvasArea) instead of a flat panel-colored
   // square, so the swatch reads as "no fill / checkerboard". Solid colors keep
   // their flat fill.
-  const isTransparent = color === "transparent";
+  const paint = shows ?? color;
+  const isTransparent = paint === "transparent";
   // A translucent pick from the dialog arrives as `#rrggbbaa`. Flat-filled it
   // reads as a darker opaque color (50% blue looks navy on the dark panel),
   // so it sits on the swatch checkerboard the same way the dialog previews it.
-  const isTranslucent = /^#[0-9a-f]{8}$/i.test(color) && !/ff$/i.test(color);
+  const isTranslucent = /^#[0-9a-f]{8}$/i.test(paint) && !/ff$/i.test(paint);
   return (
     <span className="relative inline-flex group/swatch">
       <button
@@ -58,7 +67,7 @@ export function Swatch({
         onClick={onClick}
         disabled={disabled}
         className={[
-          "w-7 h-7 rounded-full border-2 border-transparent transition-all overflow-hidden",
+          "relative w-7 h-7 rounded-full border-2 border-transparent transition-all overflow-hidden",
           isTransparent && "checkerboard-canvas",
           isTranslucent && "checkerboard",
           disabled && "opacity-40 pointer-events-none",
@@ -68,12 +77,20 @@ export function Swatch({
         ]
           .filter(Boolean)
           .join(" ")}
-        style={isTransparent || isTranslucent ? undefined : { backgroundColor: color }}
-        aria-label={label ?? (isTransparent ? "Transparent (checkerboard)" : `Color ${color}`)}
+        style={isTransparent || isTranslucent ? undefined : { backgroundColor: paint }}
+        aria-label={label ?? (color === "transparent" ? "Transparent (checkerboard)" : `Color ${color}`)}
         title={title}
       >
         {isTranslucent && (
-          <span className="block h-full w-full" style={{ backgroundColor: color }} />
+          <span className="block h-full w-full" style={{ backgroundColor: paint }} />
+        )}
+        {text && (
+          <span
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center font-mono text-2xs font-bold text-on-photo [text-shadow:0_0_3px_#000,0_0_2px_#000]"
+          >
+            {text}
+          </span>
         )}
       </button>
       {onEdit && !disabled && (
@@ -104,5 +121,36 @@ export function Swatch({
         </button>
       )}
     </span>
+  );
+}
+
+/** A round ACTION in a swatch row — the "+" (dashed) and the palette's
+ *  Reset: the size and ring of a swatch, but a button, not a color. One
+ *  primitive so a swatch row has no hand-rolled buttons of its own. `open`
+ *  lights it while the dialog it opened is up. */
+export function SwatchAction({
+  open = false,
+  dashed = false,
+  className,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { open?: boolean; dashed?: boolean }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={[
+        "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
+        open
+          ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
+          : `${dashed ? "border-dashed " : ""}border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50`,
+        props.disabled && "opacity-40 pointer-events-none",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </button>
   );
 }

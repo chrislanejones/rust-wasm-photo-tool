@@ -162,8 +162,9 @@ mod tests {
             p[1] = (i / 160) as u8;
         }
         tool.load_image(&pixels);
-        // Restore accepts explicit alpha; the CSS-style add API reads RGB
-        // only. This fixture must genuinely exercise translucent blending.
+        // Restore accepts explicit alpha (the add API takes it only as an
+        // 8-digit hex). This fixture must genuinely exercise translucent
+        // blending.
         tool.restore_shape_annotation(
             0, 10.25, 15.5, 70.25, 65.5, 255, 17, 34, 5.0, 0, 1, 68, 85, 102, 136, 0, 0, 0, 0, 0,
             8, 0,

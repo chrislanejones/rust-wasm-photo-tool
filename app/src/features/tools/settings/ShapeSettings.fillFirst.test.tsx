@@ -231,3 +231,13 @@ it("the Stroke Color is ink: no transparent swatch", () => {
   const stroke = screen.getByRole("radiogroup", { name: "Stroke Color", hidden: true });
   expect(stroke.querySelector('[aria-label="Transparent (checkerboard)"]')).toBeNull();
 });
+
+it("Corner Radius gets the reset arrow once a corner is rounded — one Shift-dragged corner too", () => {
+  renderPanel();
+  expect(screen.queryByRole("button", { name: "Reset Corner Radius" })).toBeNull();
+  const { onChange, container } = renderPanel({ cornerRadii: [0, 24, 0, 0] });
+  // No "changed on this photo" dot: a shape's corners aren't per-photo.
+  expect(container.querySelector('[data-slot="edited"]')).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Reset Corner Radius" }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cornerRadii: [0, 0, 0, 0] }));
+});

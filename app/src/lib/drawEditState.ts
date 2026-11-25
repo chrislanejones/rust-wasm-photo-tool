@@ -445,6 +445,14 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
+/** A fill as the panel holds it: `#rrggbb` opaque, `#rrggbbaa` translucent,
+ *  `transparent` at alpha 0. A payload without alpha (older engine) is opaque. */
+function hexWithAlpha(r: number, g: number, b: number, a: number | undefined): string {
+  if (a === 0) return TRANSPARENT;
+  const hex = rgbToHex(r, g, b);
+  return a === undefined || a >= 255 ? hex : hex + a.toString(16).padStart(2, "0");
+}
+
 /**
  * The pending edit a saved shape opens as when it is reselected. Pure: the hook
  * keeps the engine calls (`set_editing_shape`, the flush) and this keeps the
@@ -479,10 +487,11 @@ export function editStateFromShape(sh: ShapeMeta): DrawEditState {
       kindByte: sh.kind,
       sloppiness,
       fillMode: FILL_KIND_MODE[sh.fill_kind] ?? "none",
-      // Alpha 0 is the checkerboard swatch's fill (the engine parses
-      // "transparent" to it): it reopens as Transparent, not as black.
-      fillColor: sh.fill_a === 0 ? TRANSPARENT : rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
-      fillColor2: sh.fill2_a === 0 ? TRANSPARENT : rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
+      // The fill's alpha comes back with it: 0 is the checkerboard swatch's
+      // (the engine parses "transparent" to it), below 255 a Fill Color
+      // opacity step (`#rrggbbaa`). Dropping it re-committed the shape solid.
+      fillColor: hexWithAlpha(sh.fill_r, sh.fill_g, sh.fill_b, sh.fill_a),
+      fillColor2: hexWithAlpha(sh.fill2_r, sh.fill2_g, sh.fill2_b, sh.fill2_a),
       gradientAngle: sh.fill_angle,
       fillBlock: sh.fill_block ?? 16,
       starPoints: effectiveStarPoints(sh.starPoints),
