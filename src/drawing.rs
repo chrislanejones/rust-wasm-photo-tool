@@ -458,7 +458,16 @@ pub fn parse_hex_color(hex: &str) -> [u8; 4] {
     let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
     let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
     let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
-    [r, g, b, 255]
+    // `#rrggbbaa`: the Fill Color row's opacity steps (hold Alt over it) and a
+    // translucent pick from the color dialog. Only the 8-digit form carries
+    // alpha; anything else is opaque, as it always was. Callers that store
+    // RGB only (a stroke's r,g,b) simply ignore [3].
+    let a = if hex.len() == 8 {
+        u8::from_str_radix(&hex[6..8], 16).unwrap_or(255)
+    } else {
+        255
+    };
+    [r, g, b, a]
 }
 
 pub fn draw_arrow(
@@ -2010,5 +2019,12 @@ mod transparent_tests {
     fn the_transparent_keyword_is_alpha_zero() {
         assert_eq!(parse_hex_color("transparent"), [0, 0, 0, 0]);
         assert_eq!(parse_hex_color("#3b82f6"), [0x3b, 0x82, 0xf6, 255]);
+    }
+
+    /// `#rrggbbaa` keeps its alpha — the Fill Color opacity steps.
+    #[test]
+    fn an_eight_digit_hex_keeps_its_alpha() {
+        assert_eq!(parse_hex_color("#3b82f699"), [0x3b, 0x82, 0xf6, 0x99]);
+        assert_eq!(parse_hex_color("#3b82f6zz"), [0x3b, 0x82, 0xf6, 255]);
     }
 }

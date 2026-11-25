@@ -212,6 +212,8 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                       // tab's Fill Color.
                       colors={FILL_COLORS}
                       paletteKey={FILL_PALETTE_KEY}
+                      // Hold Alt over it for opacity steps (mock-up D).
+                      opacity
                       value={
                         settings.shapeFillMode === "none" ? TRANSPARENT : settings.shapeFillColor
                       }
@@ -526,6 +528,7 @@ function FillSection({ settings, onChange }: PanelProps) {
           label="Fill Color"
           colors={FILL_COLORS}
           paletteKey={FILL_PALETTE_KEY}
+          opacity
           value={settings.fillColor}
           onChange={(color) => onChange({ ...settings, fillColor: color })}
         />

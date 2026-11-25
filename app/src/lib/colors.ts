@@ -59,3 +59,34 @@ export const FILL_COLORS = [
   p.white, p.red, p.orange, p.yellow, p.green, p.teal,
   p.cyan, p.blue, p.violet, p.purple, p.pink, p.black,
 ] as const;
+
+const HEX6 = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i;
+
+/** A color's opacity, 0–100: `transparent` is 0, `#rrggbbaa` its alpha, any
+ *  other color 100. */
+export function alphaOf(color: string | null | undefined): number {
+  if (isTransparent(color)) return 0;
+  const m = HEX6.exec(color?.trim() ?? "");
+  if (!m || !m[2]) return 100;
+  return Math.round((parseInt(m[2], 16) / 255) * 100);
+}
+
+/** The opaque `#rrggbb` part of a hex color (lowercased), or the color as it
+ *  is when it isn't one. */
+export function rgbOf(color: string): string {
+  const m = HEX6.exec(color.trim());
+  return m ? `#${m[1].toLowerCase()}` : color;
+}
+
+/** `color` at `pct`% opacity: `#rrggbb` at 100, `transparent` at 0, else
+ *  `#rrggbbaa` — the form both Rust color parsers read alpha from. */
+export function withAlpha(color: string, pct: number): string {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  if (p === 0) return TRANSPARENT;
+  const rgb = rgbOf(color);
+  if (p === 100 || !HEX6.test(rgb)) return rgb;
+  return rgb + Math.round((p / 100) * 255).toString(16).padStart(2, "0");
+}
+
+/** The steps the Fill Color row turns into while Alt is held over it. */
+export const OPACITY_STEPS = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0] as const;

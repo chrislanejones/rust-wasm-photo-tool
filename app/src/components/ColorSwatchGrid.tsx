@@ -1,13 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, RotateCcw } from "lucide-react";
 import { useUserColors } from "@/hooks/useUserColors";
 import { useEditablePalette, MAX_PALETTE_COLORS } from "@/hooks/useEditablePalette";
-import { TRANSPARENT, isTransparent } from "@/lib/colors";
+import {
+  OPACITY_STEPS,
+  TRANSPARENT,
+  alphaOf,
+  isTransparent,
+  rgbOf,
+  withAlpha,
+} from "@/lib/colors";
 import { warmColorParser } from "@/lib/colorParser";
 import { ColorPickerDialog } from "@/components/ColorPickerDialog";
 import { Swatch } from "@/components/ui/swatch";
 import { ControlRow } from "@/components/ui/control-row";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRadioGroup } from "@/components/ui/use-radio-group";
+import { cn } from "@/lib/utils";
 
 interface Props {
   colors: readonly string[];
@@ -20,8 +29,8 @@ interface Props {
    */
   allowCustom?: boolean;
   /** False when the thing being edited has NO color of this kind right now —
-   *  a reselected outline-only shape's Fill Color. No swatch is checked or
-   *  lit; `value` is still what the "+" picker opens on. Default true. */
+   *  a reselected gradient shape's Fill Color. No swatch is checked or lit;
+   *  `value` is still what the "+" picker opens on. Default true. */
   selected?: boolean;
   /** Grays out every swatch and the "+" button, and stops them being
    *  keyboard-reachable. The CALLER owns the explanation — a disabled control
@@ -39,9 +48,95 @@ interface Props {
    *  the palette as well as using it, and Reset brings the defaults back.
    *  Grids sharing a key share the palette. */
   paletteKey?: string;
+  /** The color carries an OPACITY (Chris, 11-25-2026 — mock-up D): the row's
+   *  value slot shows it (100% by default), and while Alt (⌥ Option) is held
+   *  with the pointer or focus on the row — or after a click on that % — the
+   *  swatches turn into the current color at 100% … 0%. Emits `#rrggbb` at
+   *  100%, `#rrggbbaa` below, `TRANSPARENT` at 0%; a color swatch picked
+   *  keeps the opacity. Only for a value the engine stores alpha for (a
+   *  shape's fill). */
+  opacity?: boolean;
 }
 
 type PickerTarget = { kind: "pick" } | { kind: "add" } | { kind: "replace"; index: number };
+
+/** One circle in the row's radio group. */
+interface Entry {
+  key: string;
+  /** What the swatch IS (its name, its remove/replace target). */
+  color: string;
+  /** What the swatch SHOWS — the lit color swatch at the row's opacity. */
+  shows: string;
+  label?: string;
+  text?: string;
+  active: boolean;
+  pick: () => void;
+  onEdit?: () => void;
+  onRemove?: () => void;
+  title?: string;
+}
+
+const OPACITY_HINT = "Hold Alt (⌥ Option on a Mac) over the swatches to change the opacity";
+/** The readout's hover text — short, a tooltip not a manual. */
+const OPACITY_HINT_SHORT = "Hold Alt (⌥) to change opacity — or click";
+
+/**
+ * Alt held over (or inside) the row: the opacity mode. Listens on the window
+ * only while the row is hovered or focused, so Alt everywhere else in the app
+ * keeps whatever it does there.
+ */
+function useAltOverRow(enabled: boolean) {
+  const [over, setOver] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [alt, setAlt] = useState(false);
+  const live = enabled && (over || focused);
+
+  useEffect(() => {
+    if (!live) {
+      setAlt(false);
+      return;
+    }
+    const down = (e: KeyboardEvent) => {
+      if (e.key !== "Alt") return;
+      // Windows browsers move focus to the menu bar on a bare Alt.
+      e.preventDefault();
+      setAlt(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key !== "Alt") return;
+      e.preventDefault();
+      setAlt(false);
+    };
+    const reset = () => setAlt(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", reset);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", reset);
+    };
+  }, [live]);
+
+  const handlers = enabled
+    ? {
+        onPointerEnter: (e: React.PointerEvent) => {
+          setOver(true);
+          setAlt(e.altKey);
+        },
+        // Alt pressed BEFORE the pointer arrived: no keydown reaches us.
+        onPointerMove: (e: React.PointerEvent) => {
+          if (e.altKey !== alt) setAlt(e.altKey);
+        },
+        onPointerLeave: () => setOver(false),
+        onFocus: () => setFocused(true),
+        onBlur: (e: React.FocusEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+        },
+      }
+    : {};
+  return { alt: live && alt, handlers };
+}
 
 /**
  * A row of preset swatches + the user's saved palette + the transparent
@@ -60,12 +155,18 @@ export function ColorSwatchGrid({
   disabled = false,
   transparent = true,
   paletteKey,
+  opacity = false,
 }: Props) {
   const { userColors, removeColor } = useUserColors();
   const palette = useEditablePalette(paletteKey ?? "", colors);
   const editable = paletteKey !== undefined;
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const pickerOpen = picker !== null;
+  // The % was clicked: opacity mode without a held key (touch, or anyone
+  // who'd rather click). A step picked closes it.
+  const [pinned, setPinned] = useState(false);
+  const { alt, handlers } = useAltOverRow(opacity && !disabled);
+  const opacityMode = opacity && !disabled && (alt || pinned);
 
   // Warm the Rust parser once any picker mounts so the dialog's first open
   // (which may need it to read an rgba() value) is snappy.
@@ -79,26 +180,100 @@ export function ColorSwatchGrid({
   const presets = (editable ? palette.colors : colors).filter(keep);
   const saved = allowCustom ? userColors.filter(keep) : [];
 
-  // Every swatch, presets then the user's own then transparent, is ONE radio
-  // group: picking a color is exactly one of N (UI_CONSISTENCY §7). One Tab
-  // stop, arrows move and pick. The "+" (and Reset) are actions, not colors,
-  // so they stay outside the group. A color may appear twice (a preset the
-  // user also saved); the FIRST is the one checked, and both still light.
-  const shown = [...presets, ...saved, ...(transparent ? [TRANSPARENT] : [])];
-  const radioIds = shown.map((c, i) => `${i}:${c}`);
-  const firstIndex = selected
-    ? shown.findIndex((c) => c === value || (isTransparent(c) && isTransparent(value)))
-    : -1;
-  const radio = useRadioGroup({
-    ids: radioIds,
-    selected: firstIndex >= 0 ? radioIds[firstIndex] : undefined,
-    isDisabled: () => disabled,
-    onSelect: (id) => onChange(shown[radioIds.indexOf(id)]),
-  });
+  // The opacity row's color: the value's own, or — while the value is
+  // transparent (0%) — the last solid color this row held.
+  const lastSolid = useRef<string | null>(null);
+  if (!isTransparent(value)) lastSolid.current = rgbOf(value);
+  const base = lastSolid.current ?? presets[0] ?? "#000000";
+  const pct = selected ? alphaOf(value) : 100;
+
+  // A color swatch matches the value by its RGB when the row carries an
+  // opacity (60% blue is still the blue swatch), exactly otherwise.
+  const matches = (c: string) =>
+    opacity && !isTransparent(value) ? rgbOf(c) === rgbOf(value) : c === value;
+  // A color picked keeps the row's opacity; from transparent it is solid.
+  const emit = (c: string) =>
+    onChange(opacity && pct > 0 && pct < 100 ? withAlpha(c, pct) : c);
 
   // A preset's index in the STORED palette (presets may have had
   // "transparent" filtered out of it).
   const paletteIndex = (color: string) => palette.colors.indexOf(color);
+
+  let entries: Entry[];
+  if (opacityMode) {
+    entries = OPACITY_STEPS.map((n) => ({
+      key: `opacity:${n}`,
+      color: withAlpha(base, n),
+      shows: withAlpha(base, n),
+      label: `Opacity ${n}%`,
+      text: String(n),
+      active: selected && pct === n,
+      pick: () => {
+        onChange(withAlpha(base, n));
+        setPinned(false);
+      },
+    }));
+  } else {
+    // Only the FIRST matching swatch lights (a preset the user also saved).
+    let lit = false;
+    const lights = (c: string) => {
+      if (lit || !selected || !matches(c)) return false;
+      lit = true;
+      return true;
+    };
+    entries = [
+      ...presets.map((color) => {
+        const active = lights(color);
+        return {
+          key: color,
+          color,
+          shows: active && opacity ? value : color,
+          active,
+          pick: () => emit(color),
+          onEdit: editable
+            ? () => setPicker({ kind: "replace", index: paletteIndex(color) })
+            : undefined,
+          onRemove:
+            editable && presets.length > 1 ? () => palette.remove(paletteIndex(color)) : undefined,
+        };
+      }),
+      ...saved.map((color) => {
+        const active = lights(color);
+        return {
+          key: `user:${color}`,
+          color,
+          shows: active && opacity ? value : color,
+          active,
+          pick: () => emit(color),
+          onRemove: () => removeColor(color),
+        };
+      }),
+      ...(transparent
+        ? [
+            {
+              key: TRANSPARENT,
+              color: TRANSPARENT,
+              shows: TRANSPARENT,
+              active: selected && isTransparent(value),
+              pick: () => onChange(TRANSPARENT),
+              title: "Transparent",
+            },
+          ]
+        : []),
+    ];
+  }
+
+  // Every swatch is ONE radio group: picking a color is exactly one of N
+  // (UI_CONSISTENCY §7). One Tab stop, arrows move and pick. The "+" (and
+  // Reset) are actions, not colors, so they stay outside the group.
+  const radioIds = entries.map((e) => e.key);
+  const litIndex = entries.findIndex((e) => e.active);
+  const radio = useRadioGroup({
+    ids: radioIds,
+    selected: litIndex >= 0 ? radioIds[litIndex] : undefined,
+    isDisabled: () => disabled,
+    onSelect: (id) => entries[radioIds.indexOf(id)]?.pick(),
+  });
 
   const onPick = (color: string) => {
     if (picker?.kind === "replace") {
@@ -106,7 +281,7 @@ export function ColorSwatchGrid({
       palette.replace(picker.index, color);
       // Replacing the lit swatch recolors what it was lighting; replacing
       // another one only edits the palette.
-      if (selected && was === value) onChange(color);
+      if (selected && matches(was)) emit(color);
       return;
     }
     if (picker?.kind === "add") palette.add(color);
@@ -116,98 +291,104 @@ export function ColorSwatchGrid({
   const full = editable && palette.colors.length >= MAX_PALETTE_COLORS;
   const plusLabel = editable ? `Add a color to ${label}` : "Pick a custom color";
 
+  const readout = opacity ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={() => setPinned((p) => !p)}
+          disabled={disabled}
+          aria-pressed={opacityMode}
+          aria-label={`${label} opacity ${pct}%. ${OPACITY_HINT}, or click here.`}
+          className={cn(
+            "rounded-sm px-0.5 tabular-nums transition hover:text-theme-primary disabled:opacity-40",
+            opacityMode && "text-theme-primary",
+          )}
+        >
+          <span className="text-theme-muted-foreground">Opacity</span> {pct}%
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-56 text-2xs leading-relaxed">
+        {OPACITY_HINT_SHORT}
+      </TooltipContent>
+    </Tooltip>
+  ) : undefined;
+
   return (
     <>
-      <ControlRow label={label}>
-        {({ labelId }) => (
-          <div className="flex flex-wrap gap-2 py-1">
-            {/* `contents`: the group has no box of its own, so the swatches
-                and the "+" keep wrapping as ONE row of circles. The role
-                survives (checked in Chromium's accessibility tree, Night 3). */}
-            <div {...radio.groupProps} aria-labelledby={labelId} className="contents">
-              {presets.map((color, i) => (
-                <Swatch
-                  key={color}
-                  color={color}
-                  active={selected && value === color}
-                  onClick={() => onChange(color)}
-                  onEdit={
-                    editable ? () => setPicker({ kind: "replace", index: paletteIndex(color) }) : undefined
-                  }
-                  onRemove={
-                    editable && presets.length > 1
-                      ? () => palette.remove(paletteIndex(color))
-                      : undefined
-                  }
+      <div {...handlers}>
+        <ControlRow
+          label={label}
+          // No lightbulb (Chris, 11-25-2026: "not little light bulbs just
+          // everywhere"): the "Opacity N%" readout carries the hint itself.
+          value={readout}
+        >
+          {({ labelId }) => (
+            <div className="flex flex-wrap gap-2 py-1">
+              {/* `contents`: the group has no box of its own, so the swatches
+                  and the "+" keep wrapping as ONE row of circles. The role
+                  survives (checked in Chromium's accessibility tree, Night 3). */}
+              <div {...radio.groupProps} aria-labelledby={labelId} className="contents">
+                {entries.map((e, i) => (
+                  <Swatch
+                    key={e.key}
+                    color={e.color}
+                    shows={e.shows}
+                    text={e.text}
+                    label={e.label}
+                    title={e.title}
+                    active={e.active}
+                    onClick={e.pick}
+                    onEdit={e.onEdit}
+                    onRemove={e.onRemove}
+                    disabled={disabled}
+                    radio={radio.itemProps(i)}
+                  />
+                ))}
+              </div>
+              {allowCustom && !opacityMode && (
+                <button
+                  type="button"
+                  onClick={() => setPicker({ kind: editable ? "add" : "pick" })}
+                  disabled={disabled || full}
+                  aria-label={plusLabel}
+                  title={full ? `The palette holds ${MAX_PALETTE_COLORS} colors` : undefined}
+                  aria-haspopup="dialog"
+                  aria-expanded={pickerOpen && picker?.kind !== "replace"}
+                  className={[
+                    "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
+                    pickerOpen && picker?.kind !== "replace"
+                      ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
+                      : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
+                    (disabled || full) && "opacity-40 pointer-events-none",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {editable && palette.edited && !opacityMode && (
+                <button
+                  type="button"
+                  onClick={palette.reset}
                   disabled={disabled}
-                  radio={radio.itemProps(i)}
-                />
-              ))}
-              {saved.map((color, i) => (
-                <Swatch
-                  key={`user:${color}`}
-                  color={color}
-                  active={selected && value === color}
-                  onClick={() => onChange(color)}
-                  onRemove={() => removeColor(color)}
-                  disabled={disabled}
-                  radio={radio.itemProps(presets.length + i)}
-                />
-              ))}
-              {transparent && (
-                <Swatch
-                  key={TRANSPARENT}
-                  color={TRANSPARENT}
-                  active={selected && isTransparent(value)}
-                  onClick={() => onChange(TRANSPARENT)}
-                  disabled={disabled}
-                  title="Transparent"
-                  radio={radio.itemProps(presets.length + saved.length)}
-                />
+                  aria-label={`Reset ${label} to the site colors`}
+                  title="Reset to the site colors"
+                  className={[
+                    "flex items-center justify-center w-7 h-7 rounded-full border-2 border-theme-border bg-theme-muted/20 text-theme-muted-foreground transition-all hover:text-theme-foreground hover:border-theme-foreground/50",
+                    disabled && "opacity-40 pointer-events-none",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
-            {allowCustom && (
-              <button
-                type="button"
-                onClick={() => setPicker({ kind: editable ? "add" : "pick" })}
-                disabled={disabled || full}
-                aria-label={plusLabel}
-                title={full ? `The palette holds ${MAX_PALETTE_COLORS} colors` : undefined}
-                aria-haspopup="dialog"
-                aria-expanded={pickerOpen && picker?.kind !== "replace"}
-                className={[
-                  "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
-                  pickerOpen && picker?.kind !== "replace"
-                    ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
-                    : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
-                  (disabled || full) && "opacity-40 pointer-events-none",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {editable && palette.edited && (
-              <button
-                type="button"
-                onClick={palette.reset}
-                disabled={disabled}
-                aria-label={`Reset ${label} to the site colors`}
-                title="Reset to the site colors"
-                className={[
-                  "flex items-center justify-center w-7 h-7 rounded-full border-2 border-theme-border bg-theme-muted/20 text-theme-muted-foreground transition-all hover:text-theme-foreground hover:border-theme-foreground/50",
-                  disabled && "opacity-40 pointer-events-none",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-      </ControlRow>
+          )}
+        </ControlRow>
+      </div>
 
       {(allowCustom || editable) && (
         <ColorPickerDialog
