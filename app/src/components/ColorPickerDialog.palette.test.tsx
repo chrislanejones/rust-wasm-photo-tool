@@ -43,17 +43,17 @@ const wrap = (ui: React.ReactElement) => render(<TooltipProvider>{ui}</TooltipPr
 
 const open = (p: DialogPalette, initial = "#8b5cf6", onPick = vi.fn(), onOpenChange = vi.fn()) =>
   wrap(
-    <ColorPickerDialog open onOpenChange={onOpenChange} initialColor={initial} onPick={onPick} title="Fill Color palette" palette={p} />,
+    <ColorPickerDialog open onOpenChange={onOpenChange} initialColor={initial} onPick={onPick} title="Edit Fill Color swatches" palette={p} />,
   );
 
 const paletteRadios = () =>
-  within(screen.getByRole("radiogroup", { name: "Fill Color palette" })).getAllByRole("radio");
+  within(screen.getByRole("radiogroup", { name: "Fill Color swatches" })).getAllByRole("radio");
 
-it("shows the Fill Color palette's 12 colors, each with a × that is always there", () => {
+it("shows the Fill Color swatches's 12 colors, each with a × that is always there", () => {
   open(palette());
   expect(paletteRadios()).toHaveLength(12);
-  expect(screen.getByText("Fill Color palette (12/32)")).toBeTruthy();
-  const removes = screen.getAllByRole("button", { name: /^Remove .* from Fill Color palette$/ });
+  expect(screen.getByText("Fill Color swatches (12/32)")).toBeTruthy();
+  const removes = screen.getAllByRole("button", { name: /^Remove .* from Fill Color swatches$/ });
   expect(removes).toHaveLength(12);
   // Not hover-only: the dialog is the place to edit it.
   for (const r of removes) expect(r.className).not.toMatch(/(^|\s)hidden(\s|$)/);
@@ -67,8 +67,8 @@ it("× and + edit a draft; OK saves it and uses the color", () => {
   const onPick = vi.fn();
   // A color not already in it (#8b5cf6 is one of the 12: violet).
   open(p, "#123456", onPick);
-  fireEvent.click(screen.getByRole("button", { name: `Remove ${FILL_COLORS[1]} from Fill Color palette` }));
-  fireEvent.click(screen.getByRole("button", { name: "Save to Fill Color palette" }));
+  fireEvent.click(screen.getByRole("button", { name: `Remove ${FILL_COLORS[1]} from Fill Color swatches` }));
+  fireEvent.click(screen.getByRole("button", { name: "Save to Fill Color swatches" }));
   expect(paletteRadios()).toHaveLength(12); // −1 +1
   expect(screen.getByText("OK saves these changes.")).toBeTruthy();
   expect(p.save).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ it("× and + edit a draft; OK saves it and uses the color", () => {
 it("Cancel drops the draft", () => {
   const p = palette();
   open(p);
-  fireEvent.click(screen.getByRole("button", { name: `Remove ${FILL_COLORS[0]} from Fill Color palette` }));
+  fireEvent.click(screen.getByRole("button", { name: `Remove ${FILL_COLORS[0]} from Fill Color swatches` }));
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(p.save).not.toHaveBeenCalled();
 });
@@ -98,9 +98,9 @@ it("Reset puts the site colors back in the draft, and only shows when they diffe
   const p = palette({ colors: ["#ffffff", "#123456"] });
   open(p);
   expect(paletteRadios()).toHaveLength(2);
-  fireEvent.click(screen.getByRole("button", { name: "Reset Fill Color palette to the site colors" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reset Fill Color swatches to the site colors" }));
   expect(paletteRadios()).toHaveLength(12);
-  expect(screen.queryByRole("button", { name: /^Reset Fill Color palette/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Reset Fill Color swatches/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "OK" }));
   expect(p.save).toHaveBeenCalledWith(FILL_COLORS);
 });
@@ -126,5 +126,5 @@ it("with no editable palette it is the global palette, as before", () => {
   wrap(<ColorPickerDialog open onOpenChange={() => {}} initialColor="#8b5cf6" onPick={() => {}} />);
   expect(screen.getByRole("radiogroup", { name: "Palette" })).toBeTruthy();
   expect(screen.getByText("Palette (0/32)")).toBeTruthy();
-  expect(screen.queryByRole("radiogroup", { name: "Fill Color palette" })).toBeNull();
+  expect(screen.queryByRole("radiogroup", { name: "Fill Color swatches" })).toBeNull();
 });

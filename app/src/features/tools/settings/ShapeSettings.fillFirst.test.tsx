@@ -215,7 +215,7 @@ it("Fill Color starts as every site color, then the checkerboard, then the +", (
     "Transparent (checkerboard)",
   ]);
   // The "+" of this palette ADDS to it.
-  expect(screen.getByRole("button", { name: "Edit the Fill Color palette" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Edit Fill Color swatches" })).toBeTruthy();
 });
 
 it("a transparent Fill Color is no fill — and a strokeless shape gets a stroke, never invisible", () => {

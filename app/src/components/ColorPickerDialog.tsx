@@ -231,8 +231,8 @@ export function ColorPickerDialog({
           <DialogDescription className="text-2xs">
             {palette ? (
               <>
-                Pick a color, then + adds it to the palette and × takes one off. OK saves the
-                palette.
+                Pick a color, then + adds it as a swatch and × takes one off. OK saves the
+                swatches.
               </>
             ) : (
               <>
@@ -322,9 +322,9 @@ export function ColorPickerDialog({
             {/* ── The grid's own palette (Fill Color), edited here ──────── */}
             {palette && (
               <PaletteSection
-                title={`${palette.label} palette (${draft.length}/${palette.max})`}
+                title={`${palette.label} swatches (${draft.length}/${palette.max})`}
                 info={`The colors on the ${palette.label} row. × takes one off, + adds the color above, Reset puts the site's colors back. OK saves the palette; Cancel leaves it as it was. It stays in this browser.`}
-                name={`${palette.label} palette`}
+                name={`${palette.label} swatches`}
                 colors={draft}
                 hex={hex}
                 max={palette.max}

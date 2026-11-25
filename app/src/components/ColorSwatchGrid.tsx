@@ -217,7 +217,7 @@ export function ColorSwatchGrid({
 
   const onPick = (color: string) => onChange(color);
 
-  const plusLabel = editable ? `Edit the ${label} palette` : "Pick a custom color";
+  const plusLabel = editable ? `Edit ${label} swatches` : "Pick a custom color";
 
   const readout = opacity ? (
     <Tooltip>
@@ -279,6 +279,7 @@ export function ColorSwatchGrid({
                   onClick={() => setPicker({ kind: editable ? "add" : "pick" })}
                   disabled={disabled}
                   aria-label={plusLabel}
+                  title={editable ? "Edit swatches" : undefined}
                   aria-haspopup="dialog"
                   aria-expanded={pickerOpen}
                   open={pickerOpen}
@@ -304,7 +305,7 @@ export function ColorSwatchGrid({
           onPick={onPick}
           title={
             picker?.kind === "add"
-              ? `${label} palette`
+              ? `Edit ${label} swatches`
               : label === "Color"
                 ? "Pick a color"
                 : `${label} color`

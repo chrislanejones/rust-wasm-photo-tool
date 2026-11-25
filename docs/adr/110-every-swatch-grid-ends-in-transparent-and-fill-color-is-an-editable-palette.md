@@ -66,7 +66,7 @@ global palette, but could not replace or remove a site color.
 Chris: no pencil or × on the panel; they belong "on the swatch selector".
 The row is plain circles now, and the pencil (replace) is gone. Its job is a
 × and a "+". The "+" dialog takes the row's palette as a `palette` prop and
-lists it under **Fill Color palette (N/32)**: the twelve site colors until
+lists it under **Fill Color swatches (N/32)** in a dialog titled **Edit Fill Color swatches**: the twelve site colors until
 changed, each with a × that is always shown (the last color has none), a "+"
 that adds the color being picked, and Reset once it differs. Those edits are
 a DRAFT: OK saves the whole list (`useEditablePalette.set`) and uses the

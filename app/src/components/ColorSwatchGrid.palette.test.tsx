@@ -104,7 +104,7 @@ it("emits 'transparent', and an ink grid can turn it off", () => {
 });
 
 const openDialog = () =>
-  fireEvent.click(screen.getByRole("button", { name: "Edit the Fill Color palette" }));
+  fireEvent.click(screen.getByRole("button", { name: "Edit Fill Color swatches" }));
 
 it("the row has no pencil, no ×, and no Reset: editing is in the dialog", () => {
   localStorage.setItem("image-horse-palette:test", JSON.stringify(["#ffffff", "#000000"]));
@@ -127,7 +127,7 @@ it("the dialog gets the palette; what it saves is the row, and OK uses the color
     <ColorSwatchGrid label="Fill Color" colors={DEFAULTS} paletteKey="test" value="#ef4444" onChange={onChange} />,
   );
   openDialog();
-  expect(screen.getByRole("button", { name: /^ok in: Fill Color palette$/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^ok in: Edit Fill Color swatches$/ })).toBeTruthy();
   expect(screen.getAllByRole("button", { name: /^dialog remove / })).toHaveLength(DEFAULTS.length);
 
   fireEvent.click(screen.getByRole("button", { name: "dialog add" }));
