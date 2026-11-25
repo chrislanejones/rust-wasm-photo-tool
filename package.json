@@ -33,7 +33,7 @@
     "convex-test": "^0.0.62",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.7",
+    "eslint-plugin-react-refresh": "^0.5.8",
     "globals": "^17.14.0",
     "typescript": "catalog:",
     "typescript-eslint": "^8.72.1",
