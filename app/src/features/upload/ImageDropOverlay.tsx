@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ImageDown } from "lucide-react";
 import { fadeIn, springSoft } from "@/lib/animations";
+import { ModeRing } from "@/components/ui/mode-ring";
 
 /**
  * Full-window drop affordance shown while an image is dragged anywhere over the
- * app — an ambient animated gradient border (à la the "Claude in Chrome" glow)
- * around the whole viewport, plus a centered prompt. Purely visual and
+ * app — the still gold mode ring (components/ui/mode-ring.tsx) round the
+ * whole viewport, plus a centered prompt. Purely visual and
  * non-interactive (`pointer-events: none`) so it never swallows the drop; the
  * actual drop is handled by window-level listeners in AppShell.
  */
@@ -21,8 +22,8 @@ export function ImageDropOverlay({ show }: { show: boolean }) {
           exit="exit"
           aria-hidden
         >
-          {/* Spinning gradient border ring (hollow center via mask). */}
-          <div className="image-drop-ring" />
+          {/* The mode ring: a file drag is a mode, marked like the others. */}
+          <ModeRing radius={0} />
           <motion.div
             className="image-drop-card"
             initial={{ scale: 0.92, y: 10 }}

@@ -7,10 +7,9 @@
 // Decoration only (aria-hidden): what the mode IS is said in words beside it.
 // Its parent must be `position: relative`.
 //
-// STILL, NOT TURNING (Chris, 11-25-2026). It used to spin on Compare. Now
-// that several modes share it, the gold ring itself is the signal: "I clicked
-// it, and there's the gold round it". So the animation is off here, always;
-// the class's spin is left only to a file dragged over the app.
+// STILL, NOT TURNING (Chris, 11-25-2026). It used to spin. Now that several
+// modes share it, the gold ring itself is the signal: "I clicked it, and
+// there's the gold round it". The file-drag overlay's ring is still too.
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +23,7 @@ interface ModeRingProps {
 }
 
 export function ModeRing({ inset = 0, radius = 10, thickness = 4, className }: ModeRingProps) {
-  // Inline, so it beats the unlayered `.image-drop-ring { animation }` rule.
-  const style: CSSProperties = { inset: -inset, borderRadius: radius, padding: thickness, animation: "none" };
+  const style: CSSProperties = { inset: -inset, borderRadius: radius, padding: thickness };
   return (
     <div
       aria-hidden

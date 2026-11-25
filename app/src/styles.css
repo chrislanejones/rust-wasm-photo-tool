@@ -1397,18 +1397,16 @@ textarea:focus-visible {
   backdrop-filter: blur(var(--overlay-blur));
 }
 
-@property --drop-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
+/* THE MODE RING's look (components/ui/mode-ring.tsx): a still gold ring.
+   It used to spin; since several modes share it (a file drag, Compare, Alt
+   over Fill Color or Corner Radius), the gold itself is the signal and it
+   no longer moves (Chris, 11-25-2026). */
 .image-drop-ring {
   position: absolute;
   inset: 0;
   padding: 4px; /* ring thickness */
   background: conic-gradient(
-    from var(--drop-angle),
+    from 0deg,
     var(--color-theme-accent, #b6764e),
     #e9c69e,
     var(--color-theme-accent, #b6764e),
@@ -1424,14 +1422,7 @@ textarea:focus-visible {
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   mask-composite: exclude;
-  animation: drop-ring-spin 4s linear infinite;
   opacity: 0.95;
-}
-
-@keyframes drop-ring-spin {
-  to {
-    --drop-angle: 360deg;
-  }
 }
 
 .image-drop-card {
@@ -1464,11 +1455,6 @@ textarea:focus-visible {
 .image-drop-sub {
   font-size: 12px;
   color: var(--text-muted, rgba(255, 255, 255, 0.6));
-}
-
-/* Honour reduced motion — drop the spin (the ring still shows, just static). */
-.reduce-motion .image-drop-ring {
-  animation: none;
 }
 
 /* Import-dialog preview thumbnail. */

@@ -45,10 +45,15 @@ import { InboxDialog } from "./InboxDialog";
 import { TransferHost } from "./TransferHost";
 import { useTransferStore } from "./transferStore";
 
+// The download's body is BYTES with a content-type, not a `Blob`: jsdom's
+// Blob has no `.stream()`, and Node's own `Response` (undici) reads a Blob
+// body through it — "object.stream is not a function", thrown inside the
+// mocked fetch, so every Inbox download failed before the code under test
+// ran. A real browser Blob has it; this is the test double catching up.
 const fetchSpy = vi.fn(async (url: string) =>
   url.startsWith("https://upload")
     ? new Response(JSON.stringify({ storageId: "st" }), { status: 200 })
-    : new Response(new Blob([new Uint8Array(4)], { type: "image/jpeg" }), { status: 200 }),
+    : new Response(new Uint8Array(4), { status: 200, headers: { "content-type": "image/jpeg" } }),
 );
 
 // jsdom has no IntersectionObserver; the Inbox's lazy thumbnails
