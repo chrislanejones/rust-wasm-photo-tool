@@ -1,6 +1,12 @@
 import { ControlRow } from "@/components/ui/control-row";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolSettings } from "@/lib/types";
+import {
+  StabilizerOffIcon,
+  StabilizerLowIcon,
+  StabilizerMedIcon,
+  StabilizerHighIcon,
+} from "./stabilizerIcons";
 
 /** Stroke-stabilizer strength (off → high leash). Off by default.
  *
@@ -9,10 +15,10 @@ import type { ToolSettings } from "@/lib/types";
  *  that it must not be duplicated once a second panel renders it — four
  *  independent copies of a level table is four places to forget to update. */
 const STABILIZER_LEVELS = [
-  { id: "off", label: "Off" },
-  { id: "low", label: "Low" },
-  { id: "med", label: "Med" },
-  { id: "high", label: "High" },
+  { id: "off",  label: "Off",  icon: StabilizerOffIcon  },
+  { id: "low",  label: "Low",  icon: StabilizerLowIcon  },
+  { id: "med",  label: "Med",  icon: StabilizerMedIcon  },
+  { id: "high", label: "High", icon: StabilizerHighIcon },
 ] as const;
 
 type Level = ToolSettings["paintStabilizer"];
@@ -40,10 +46,14 @@ export function StabilizerRow({ value, onChange, label = "Stroke Stabilizer" }: 
   return (
     // A ControlRow with no value slot: the lit tile already says the level.
     // The radio group is named by the label on screen, not a repeat of it.
+    // Four stacked tiles in one row — the Shapes picker's icon-over-label
+    // tile, so the trail behind the pen shows the level at a glance.
     <ControlRow label={label}>
       {({ labelId }) => (
         <ToolButtonGroup
           aria-labelledby={labelId}
+          stacked
+          columns={4}
           options={STABILIZER_LEVELS}
           value={value ?? "off"}
           onChange={(id) => onChange(id as Level)}
