@@ -6,6 +6,8 @@ wait their turn.
 
 ## OPEN — Export dialog leftovers (`feat/export-hierarchy`, 11-24-2026)
 
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the emoji data (`@emoji-mart/data`) loads when the picker first opens, not up front; the main chunk went 868,420 → 758,791 B gzip. Still open: the trail-square day (Chris's call: count every square in America/New_York, or keep each commit's own offset; the 11-24 square came from #514's commit being written with a UTC timestamp) and the four dialog ideas.
+
 The Export dialog now adapts to the task (v9.75). The design review that led to it
 also listed these. Each is its own change.
 
@@ -233,7 +235,9 @@ it anyway: it subtracts only when no row of the user still points at the file. T
 | Top bar hidden | The host sits beside Settings (the one place with the live engine in both layouts, so AppShell gains nothing). With the top bar hidden there is no host: Ctrl+Alt+C / V and the menu items do nothing | Moving it needs an AppShell mount, off-limits that night |
 | Peak memory | The e2e records the JS heap peak only; the scratch engine's wasm memory is not in it | `performance.memory` sees only JS |
 
-## OPEN — two e2e failures on master after v9.45 (10-31-2026)
+## CLOSED 11-25-2026 — STALE: two e2e failures on master after v9.45 (10-31-2026)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. Every row is fixed; the callout-leader one is closed by the 11-22-2026 FIXED entry above.
 
 | Test | What is true now | Why it waited |
 |---|---|---|
@@ -367,7 +371,9 @@ Out of the night's scope: the plan asked for the Arrows name only.
   `pnpm -C marketing test:scripts` (node --test, fixture git repos). Total squares 930 → 1283; 10-23 stays 9, 10-24 goes
   10 → 5 (the double-counted squashes), 10-21 2 → 7 (Night 10-21's #390).
 
-## OPEN — screenshot compare leftovers after the #394 user-test fixes (10-23-2026; C13, C20 and the flake fixed 10-24)
+## CLOSED 11-25-2026 — STALE: screenshot compare leftovers after the #394 user-test fixes (10-23-2026; C13, C20 and the flake fixed 10-24)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. All four bullets were struck as FIXED on 10-24-2026.
 
 - ~~**C13, a JPEG re-save of text in a saturated color shows a false change.**
   The default sensitivity (50, tolerance 28) stays. Measured: the fixture
@@ -601,7 +607,9 @@ indexed save-safety foundation. See [AI reference storage](10-AI-Reference-Stora
 Historical unrecorded orphans still need the separate sweep policy; its cron
 remains disabled. Input/mask/output retention (row 203) is documented, not built. **Built 11-03-2026 (feat/ai-job-files-expire), off until Chris reads the dry run.**
 
-## OPEN — small leftovers from the 10-14 night (10-14-2026)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — small leftovers from the 10-14 night (10-14-2026)
+
+> **Fixed 11-25-2026:** `stillScreenPoints` moved into `e2e/annotation-benchmark-harness.ts` and is exported; smart-callout imports it. The other rows were already stale (preset arrows fixed in v9.31, the Diagnostics dialog no longer exists).
 
 | Item | Where | Owner |
 |---|---|---|
@@ -835,6 +843,8 @@ Still open from the same work: stale engine handles reject with "engine
 document replaced" as an UNHANDLED rejection (console noise, ~140 per 30 runs).
 
 ## OPEN — the retired Netlify site is still linked to the GitHub repo (09-27-2026)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: `features/hostMove/`, `lib/legacyHost.ts`, its test and the `<MovedNotice />` mount are removed. Still open: unlinking the repo in the Netlify UI and the env vars there (a person with the dashboard).
 
 Netlify was retired on 09-27-2026 (see docs/12-Deploying.md, "Retiring Netlify").
 Everything landed except one step: the site is still connected to
@@ -1080,7 +1090,9 @@ warning in an otherwise clean build, and a real CSS warning would hide behind it
 token in a `z-[var(…)]` class") so no complete class string appears, then
 confirm the build prints no CSS warning. Same shape as the guardrails
 comment-counted-as-code trap in CLAUDE.md.
-## OPEN — two loose ends from the v8.96 three.js graphics (09-24-2026)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — two loose ends from the v8.96 three.js graphics (09-24-2026)
+
+> **Fixed 11-25-2026:** `CubeLetters.tsx`'s dynamic import has a `.catch` that falls back to the static letters. The "three 0.165" comment was already gone.
 
 Found while ADR-067 was drafted, left out of the release on purpose:
 
@@ -1214,6 +1226,8 @@ be deleted (the shim note there asks for exactly that).
 
 ## OPEN — app SSOT leftovers that change pixels or need a call (09-22-2026)
 
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the stale `#6366f1` and `#b6764e` fallbacks in `styles.css` (both tokens are always defined) and "colour-utility" in the inert-class audit and `docs/06.2-UI-Inventory.md`. Still open: everything here that changes pixels or an API.
+
 From the fallow + style/UI survey on `refactor/ssot-ui-cleanup`. That branch did
 the pixel-identical consolidations (see its three commits); these either change
 how something looks or need a decision:
@@ -1280,6 +1294,8 @@ interactivity by a frame or two, which is why it was not folded into the speed
 PR unasked.
 
 ## OPEN — marketing design-audit leftovers (09-21-2026)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: ⌘K has an About entry. Still open: the style choices.
 
 From the token/consistency audit run on `feat/marketing-speed-contact`. That
 branch fixed the safe items (one tier filter, one `.coda`, one "latest" pill,
@@ -1375,7 +1391,9 @@ made it 2048×1365 inside a 2068×1385 artboard):
 fixed. Observation only; no cause guessed. First check whether it corrects
 itself after the next edit.
 
-## OPEN — a trailing-slash URL hydrates with the 404 head (09-18-2026)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — a trailing-slash URL hydrates with the 404 head (09-18-2026)
+
+> **Fixed 11-25-2026:** `useHead()` strips one trailing slash before both lookups, so `/pricing/` gets the pricing head, not the 404 one.
 
 Found while checking the worker post's header banner (branch
 `feat/blog-worker-topper`) against a local static server that redirects
@@ -1397,7 +1415,9 @@ the mismatch. The prerendered HTML is correct either way, so crawlers that do
 not run JS never see it. A fix would be to strip one trailing slash before the
 lookups in `useHead()`.
 
-## OPEN — ADR-057's blast radius no longer holds: the worker post fetches three.js on arrival (09-18-2026)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — ADR-057's blast radius no longer holds: the worker post fetches three.js on arrival (09-18-2026)
+
+> **Fixed 11-25-2026:** ADR-057 has a dated amendment saying the worker post's `Topper` banner fetches the chunk on arrival, after load plus idle.
 
 For Dara. `feat/blog-worker-topper` puts FIG 1's scene behind the post's
 headline as a header banner. A banner is in the viewport at load, so the post
@@ -1409,7 +1429,9 @@ weigh the cost as paid only by readers who scroll to a figure. Both are now
 false for this post. The chunk boundary is unchanged: no new `from "three"`
 import, and the same 19-class re-export module.
 
-## OPEN — the worker post's header design and the live post disagree on four facts (09-18-2026)
+## CLOSED 11-25-2026 — STALE: the worker post's header design and the live post disagree on four facts (09-18-2026)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The post's title and date were settled: "Moving a Rust engine into a Web Worker", published 2026-09-18, and the date format was decided 09-22 (`marketing/src/data/posts.ts:170`).
 
 Chris's calls. Found while building the header banner from his design file
 ("The engine left the main thread (4).html"). The banner went in with the
@@ -1422,7 +1444,9 @@ Chris's calls. Found while building the header banner from his design file
 | Reading time | not shown | "~12 minutes" | Left out. It needs a count derived from the body, not a typed number that goes stale on the next edit. |
 | Date format | "13 August 2026" (`fmtPostDate`; Trail Log's `fmtDate` matches) | "16 Sep 2026" | Neither is MM-DD-YYYY, the global rule for dates a person reads. That is site-wide, not a banner question. |
 
-## OPEN — `marketing/` has no lint gate (09-18-2026)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — `marketing/` has no lint gate (09-18-2026)
+
+> **Fixed 11-25-2026:** `pnpm lint` now covers `marketing/src`, with a block in `eslint.config.mjs` (browser globals, the underscore convention, the two classic hook rules). It found one unused type import (`entropy.scenes.ts`, removed) and adds one `exhaustive-deps` warning.
 
 `pnpm lint` is `eslint app/src eslint.config.mjs`, so nothing lints the
 marketing site. Pointing the root config at it works for the `.ts`/`.tsx`
@@ -1606,7 +1630,9 @@ decide it stays and drop the "safe to delete" line so the next reader does not
 have to re-ask. `scripts/convex-deploy-check.mjs` lists it as expected today,
 so whichever way it goes, that list changes with it.
 
-## OPEN — marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
+## CLOSED 11-25-2026 — STALE: marketing sells "4× upscale" and the editor has no surface for it (2026-09-16)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. Neither `Pricing.tsx` nor `seo.ts` says "4×" or "upscale" any more.
 
 Found by the records audit while retiring the Quick Adjust grid for the Presets
 tile (#88), and **caused by that retirement** — flagged rather than fixed,
@@ -1719,7 +1745,9 @@ on this evidence it would copy the un-undone document to the second device and
 hand it back to the first on the next pull — two devices disagreeing with the
 user instead of one. Fix and cover with a test before any sync code is written.
 
-## OPEN — two shape edits still route undo to the snapshot path on purpose (10-13-2026)
+## CLOSED 11-25-2026 — STALE: two shape edits still route undo to the snapshot path on purpose (10-13-2026)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. Since op log v12 one op-log undo takes the box and its arrows back together (`src/annotations.rs`, `tests/annotation_group.rs`).
 
 `move_shape_annotation` and `reroute_connector` (src/annotations.rs) record
 several ops under one snapshot (a box move plus every re-routed connector),
@@ -1847,6 +1875,8 @@ nothing else surfaced before flipping it.
 
 ## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
 
+> **11-25-2026:** still red on the 11-02, 11-09, 11-16 and 11-23 scheduled runs, and the cause is not the audit: it finds no vulnerabilities (11 warnings). The step fails when it tries to open a GitHub issue, because the job has no `issues: write` permission (`.github/workflows/ci.yml`). Fix: grant that permission or stop the action filing issues. Either way it's a workflow edit, and the agent's token can't push those.
+
 Every **scheduled** run of `ci.yml` in the last eight weeks concluded `failure`,
 and it was never a vulnerability. Read from the 2026-09-14 run's log:
 
@@ -1956,7 +1986,9 @@ lesson is narrower than "clear the UI setting" — it is that an override hiding
 bad default is not a fix, and you find out which one you actually had on the day
 the override goes away.
 
-## OPEN — #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
+## CLOSED 11-25-2026 — STALE: #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `get_layers()` emits `textCount` and `shapeCount` (`src/layer.rs`).
 
 #63 has been scoped for months as "display-only, from state the rows already
 receive, no new store subscriptions." **That premise is false**, checked before
@@ -1996,7 +2028,9 @@ rediscovered.
 Related: the same active-layer scoping is the crosstalk finding from
 2026-08-18 — annotation getters and hit-tests are active-layer-only while the
 canvas renders every visible layer.
-## OPEN — #62 is not a TS item: the shape z-order primitive does not exist (2026-09-04)
+## CLOSED 11-25-2026 — STALE: #62 is not a TS item: the shape z-order primitive does not exist (2026-09-04)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `move_shape_annotation` exists (`src/annotations.rs`).
 
 #62 has been carried as "the biggest purely-TS item left, and the engine half
 (#29) has been done since before the handoff." **Both halves of that are
@@ -2071,7 +2105,9 @@ whose "small TS job" scoping did not survive contact with the code — #63
 on an engine export). The backlog is systematically optimistic about what is TS
 and what is Rust. Check the engine surface before estimating.
 
-## OPEN → UNBLOCKED — #71: the emptiness scan is cheap, and it must not go in `get_layers()` (2026-09-04)
+## CLOSED 11-25-2026 — STALE: #71: the emptiness scan is cheap, and it must not go in `get_layers()` (2026-09-04)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `layer_is_empty` exists (`src/layer.rs`).
 
 The 08-31 correction was right that #71 is blocked on an engine export rather
 than a product decision. What it left open is the design question it ended on:
@@ -2151,7 +2187,9 @@ Still needs: the ADR for the new API surface, the size band (ADR-037), the
 toolchain pins (ADR-038), and a wasm-side timing to replace the native numbers
 above. It does **not** touch ADR-041's "tints, never fills".
 
-## OPEN — the engine sitting: what it contains and what it does NOT (2026-09-04)
+## CLOSED 11-25-2026 — STALE: the engine sitting: what it contains and what it does NOT (2026-09-04)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. #63, #71 and #62 all landed; #70's remaps are in `.cargo/config.toml`; the deploy sentinel's tier-2 sha check supersedes #65's size band.
 
 Five backlog items now all end with "ride the engine sitting", which is only
 useful if the sitting has a shape. It does, and two of the items have quietly
@@ -2195,6 +2233,8 @@ systematically optimistic about where work lives.** Check the engine surface
 before estimating — grep the exported method list, not the issue title.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: ADR-048 has a dated amendment (`frame-ancestors` only reports inside a report-only CSP, `X-Frame-Options: DENY` does the work, and the headers live in the two `vercel.json` files). Still open: flipping the CSP to enforcing.
 
 **Update 2026-09-14 — measured on the live responses, not the config.** The
 headers shipped in v8.70 (ADR-048) and are on all three origins. What is still
@@ -2318,7 +2358,9 @@ reason. That is a UI decision, not an accessibility patch.
 Until then `role="group"` is on the container, honestly: the rows are buttons,
 so the implicit `list` role was claiming `listitem` children it never had.
 
-## OPEN — this repo cannot test a component, so no panel a11y is pinned (2026-09-01)
+## CLOSED 11-25-2026 — STALE: this repo cannot test a component, so no panel a11y is pinned (2026-09-01)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `@testing-library/react` is an app dev dependency and component and hook tests exist.
 
 `@testing-library/*` is **not a dependency** and there are zero component tests
 in `app/src` — every one of the 53 test files is a pure-module test. So the
@@ -2335,7 +2377,9 @@ Playwright can reach these — the `imagehorse-qc` spec already drives the real
 DOM — so the cheaper path may be an e2e assertion rather than a unit harness.
 Either way it is a decision, not a chore.
 
-## OPEN — the marketing architecture page promises a service worker that does not ship (2026-09-01)
+## CLOSED 11-25-2026 — STALE: the marketing architecture page promises a service worker that does not ship (2026-09-01)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `Architecture.tsx` now says the service worker ships dark, and describes the engine worker and codec worker.
 
 Found by the v8.62 docs catch-up, which was scoped to flag marketing drift and
 not touch it — public copy is a human call. Four findings on
@@ -2354,7 +2398,9 @@ does not exist, and somebody already left a comment on the same page warning
 about exactly this failure mode. The last row is the bigger omission — the
 page describes the architecture and is missing its largest structural fact.
 
-## OPEN — 13 broken in-page anchors in docs/archive/Refactor-Playbook.md (2026-09-01)
+## FIXED 11-25-2026 (`chore/parking-lot-1125`) — 13 broken in-page anchors in docs/archive/Refactor-Playbook.md (2026-09-01)
+
+> **Fixed 11-25-2026:** The 12 broken TOC links in `docs/archive/Refactor-Playbook.md` now match the suffixed slugs; all 15 resolve.
 
 Its table of contents links `#0-the-one-rule`, `#2-color--theme-tokens` and
 eleven more, but the headings carry `[generic]` / `[IH conventions]` suffixes
@@ -2466,7 +2512,9 @@ Recorded only because the two fixes were byte-identical in the block and
 differed only in comment, and the perspective branch took master's. Nothing
 outstanding.
 
-## OPEN — the sub-mode axis has a THIRD hand-written copy (2026-08-17)
+## CLOSED 11-25-2026 — STALE: the sub-mode axis has a THIRD hand-written copy (2026-08-17)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `activateSubTool.ts` delegates to `selectModeOf`; no third copy is left in `routeState.ts`.
 
 Found while wiring Perspective's routing. `routeState.ts`'s `modeOfActiveTool`
 is a `switch` mapping each ToolType to the store field holding its sub-mode —
@@ -2481,7 +2529,9 @@ which is the only reason it did not ship.
 Derive it from `MODE_ACCESS` instead. Not done here: it touches every tool's
 routing and this session was scoped to one tool.
 
-## OPEN — Perspective does not warp SHAPE annotations (2026-08-17)
+## CLOSED 11-25-2026 — STALE: Perspective does not warp SHAPE annotations (2026-08-17)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `set_shape_perspective` exists, with `tests/shape_perspective.rs` (circles too).
 
 Named in ADR-034, deliberately not built. Text warps non-destructively; shapes
 do not. A homography maps straight lines to straight lines, so a rect's four
@@ -2721,7 +2771,9 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   needs its own session (Silas + a roadmap entry, see
   docs/Engine-Roadmap.md).
 
-## ADR-024 — a12.3 gate 1, and why it cannot be automated here
+## CLOSED 11-25-2026 — STALE: ADR-024 — a12.3 gate 1, and why it cannot be automated here
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The engine worker has been the default since v8.32, so this gate is history.
 
 - **✅ "Loading your workspace…" is SOLVED — and it was never a bug.**
   A **backgrounded tab gets ZERO `requestAnimationFrame` callbacks**
@@ -2745,7 +2797,9 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   ready — the rejection now REPORTS rather than returning silently, and a
   contract test requires both the guard and the report.
 
-## ADR-024 — leftovers from the conversion arc
+## CLOSED 11-25-2026 — STALE: ADR-024 — leftovers from the conversion arc
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `syncOplog` was removed on 10-14-2026 (the engine-async contract test records it).
 
 - **`syncOplog` is nine engine reads per flush, for a diagnostics panel.**
   `flushToCanvas` calls it on every flush and `registerOplogStats` stores
@@ -2759,7 +2813,9 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   open. **Read Stage 5's frame timeline with this in mind rather than
   blaming the architecture.** `tryTilesFlush` has the same shape at 3 reads.
 
-## ADR-024 — a10 blocks a12, and the ADR said otherwise
+## CLOSED 11-25-2026 — STALE: ADR-024 — a10 blocks a12, and the ADR said otherwise
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The worker shipped and the ADR was corrected in place.
 
 - **a10 (the hot-path bucket) is a PREREQUISITE for turning
   `ih_engine_worker` on, and ADR-024 line 84 claimed Stage 4 was "gated on
@@ -2814,6 +2870,8 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   idle pause while any modal is open, or always rendering it topmost.
 
 ## From the 2026-07-10→11 night run (tile-wiring + persistent-undo, ih-wire)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: `app/src/lib/dexie/USAGE.md` documents the `opLogs` / `keyframes` / `oplogManifests` tables, and the unused `--shadow-sm/md/lg` tokens are gone (0 `var()` uses in the built CSS). Still open: the product and engine rows.
 
 - **Suppress snapshot pushes while the op log is healthy** — the actual
   memory win of op-log undo; needs dogfooding confidence first (ADR-013
@@ -2981,7 +3039,9 @@ or the flood itself crawls and reads as a >30 s backlog that does not exist.
   nothing is overwritten) but nothing references them and there is no UI to get
   back. Fix candidates: keep a pristine-original pointer separate from the
   working source, and/or skip the write when the re-encode comes out larger.
-## From the night-repair run (2026-07-25, fix/night-repair)
+## CLOSED 11-25-2026 — STALE: From the night-repair run (2026-07-25, fix/night-repair)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `useRealTier` is wired (`useUserMode.ts`), ShortcutModal is on `ui/dialog`, and the old baselines are moot. The Dexie duplicate exports are tracked under "app SSOT leftovers".
 
 Items 5–7 were NOT attempted — 1–4 were the stated success bar and are done.
 
@@ -3013,7 +3073,9 @@ Items 5–7 were NOT attempted — 1–4 were the stated success bar and are don
   additive/subtractive ants tint; pristine-original pointer for Auto Compress;
   `loadFromSaved` at 111 cyclomatic.
 
-## From the clonestamp-split session (2026-07-25, refactor/clonestamp-split)
+## CLOSED 11-25-2026 — STALE: From the clonestamp-split session (2026-07-25, refactor/clonestamp-split)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `app/tsconfig.tsbuildinfo` is untracked; Step 2 has its own entry below.
 - **Step 2 of the decomposition — useEngineStore.** Move the serializable
   snapshot (CloneStampState) into a zustand store with selector subscriptions;
   toolRef and callbacks stay in hooks. Then drop hookResult from CanvasArea's
@@ -3078,6 +3140,8 @@ instead of the 62-key object.
 ---
 
 ## Toolbar five-group arc — leftovers (v7.51 → v7.53, 2026-07-26)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the in-app shortcut sheet lists Copy look, Paste look and a Layers group (Ctrl+M, Ctrl+J, Ctrl+Shift+J, Ctrl+Shift+] / [), and `docs/05` no longer says "not in the in-app modal yet". Still open: color history and the Ctrl+K chord.
 
 The arc itself shipped; these three are what it didn't finish.
 
@@ -3194,6 +3258,8 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 
 ## From the v7.58 night run (rings, status bar, GC audit — 2026-07-28)
 
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the `db.ts` header no longer calls the Dexie database new and parallel. Still open: the update prompt, `--destructive` and where ink Stamps live.
+
 - **The update prompt cannot fire in production.** `UpdatePrompt` is wired to
   both existing triggers, but both sit behind `__IH_SW_MODE__`, which ships
   "off": `swBoot.setupServiceWorker()` returns on the constant, and
@@ -3294,6 +3360,8 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   anything else changes the save ordering.
 
 ## From NIGHT JOB III (2026-07-30, `night/job-iii`)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the orphaned `.shortcut-modal`, `-header`, `-title`, `-icon`, `-close` and `-close-icon` rules are gone (the dialog is `ui/dialog`; `-body` and `-footer` stay). Still open: where coordinate rounding lives.
 
 - **OPEN — the canvas coordinate mapping is duplicated in ~8 more places, and
   fallow does not report them.** Phase 1 extracted `useCanvasCoords` and used it
@@ -3409,6 +3477,8 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
 
 ## From NIGHT JOB IV (2026-08-01, `night/job-iv`)
 
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the New dialog's paste handler ignores a paste into an input, textarea or contenteditable, so the Paste SVG box can't open a photo. Still open: the routing rows, which need a browser repro first.
+
 - **OPEN: both failure modes of the start-screen "Paste (Ctrl+V)" button are
   silent.** `handlePasteFromClipboard`'s async fallback wraps
   `navigator.clipboard.read()` in a bare `catch {}` and then falls through to
@@ -3467,7 +3537,9 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   the next attempt needs spatial clustering (is the region contiguous and
   face-sized?), not another scalar.
 
-## From NIGHT JOB V (2026-08-04, `night/job-v`)
+## CLOSED 11-25-2026 — STALE: From NIGHT JOB V (2026-08-04, `night/job-v`)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `?v=` is the share parameter by design (`routes.ts`); Paste was closed by a human; the "Edit Shape" labels were deferred by Chris on 08-04-2026.
 
 - **DONE: `feat/vector-tool` no longer exists — but it was already gone when
   this run started.** The brief asked for it to be deleted locally and on both
@@ -3598,6 +3670,8 @@ interceptable in Chrome (Linear, Notion and GitHub all take it), unlike
   tool has to reproduce that mask, or brush strokes will come out square.
 
 ## From NIGHT JOB VI (2026-08-05, `night/job-vi`)
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: `contentAudit` adds `collectExtraRoots()` to its root set, so Batch's live baselines are no longer listed as orphans. Still open: whether Start fresh should delete the old session's originals, and the one-shot cleanup.
 
 - **DONE: audit finding #2 fixed for single delete, fixture-proven.** Phase 1
   reproduced the leak (two stranded blobs per delete, green tests as evidence),
@@ -3791,7 +3865,9 @@ ever been written to it.
   identical undo counts. Kept the instrumentation in the worktree for exactly
   that re-measure.
 
-## Convex outage (2026-08-05) — free plan exceeded, deployment disabled
+## CLOSED 11-25-2026 — STALE: Convex outage (2026-08-05) — free plan exceeded, deployment disabled
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `discardFailedUpload` is live (`useEditPersistence.ts`) and `convex/storageSweep.ts` replaced the uncommitted cleanup.
 
 - **CAUSE, confirmed from the usage dashboard: File Storage 3.68 GB against a
   1 GB limit — the ONLY resource over.** Everything else is far under: function
@@ -3886,7 +3962,9 @@ ever been written to it.
   following sync (`set_editing_shape` ×7, `load_image` ×7, `set_selection_combine`
   ×3 …). May or may not touch a published field.
 
-## Orphan generator closed (2026-08-05, `fix/orphan-on-failed-pointer`)
+## CLOSED 11-25-2026 — STALE: Orphan generator closed (2026-08-05, `fix/orphan-on-failed-pointer`)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The client calls `discardFailedUpload`, and quality-slider undo is done (`commit_export_quality`).
 
 - **DONE: `photoEdits.discardFailedUpload` + the client catch that calls it.**
   The upload-commits-before-pointer hole is closed. The catch did NOT already
@@ -4188,7 +4266,9 @@ ever been written to it.
   forward without verification. This is the highest-value item in this section;
   everything above is a symptom.
 
-## OPEN — drag-and-drop sometimes adds a duplicate photo (2026-08-07)
+## CLOSED 11-25-2026 — STALE: drag-and-drop sometimes adds a duplicate photo (2026-08-07)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The window drop listener now returns on `e.defaultPrevented` (`AppShell.tsx`), and the New dialog's drop zone prevents default, which was the double-add path.
 
 Reported by Chris, seen on **initial** drag-and-drop into an empty gallery.
 Upload and paste are clean — neither goes near the window drop listener.
@@ -4447,7 +4527,9 @@ one is on the drawing path rather than the export path.
 
 ---
 
-## `useExportDimensions`' cancellation guard has no test (v8.6, 2026-08-11)
+## CLOSED 11-25-2026 — STALE: `useExportDimensions`' cancellation guard has no test (v8.6, 2026-08-11)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `app/src/app/session/useExportDimensions.test.ts` pins the cancellation flag (#67).
 
 **What shipped.** ADR-024 Stage 3.5 made the effect's engine read an `await`.
 An effect callback cannot be `async` — React reads the returned Promise as its
@@ -4719,7 +4801,9 @@ that should have caught it cannot — see `docs/vacuous-checks.md`.
 
 ---
 
-## The long-form date formatter is written twice
+## CLOSED 11-25-2026 — STALE: The long-form date formatter is written twice
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The two formats now differ on purpose ("a decision, not drift", `marketing/src/data/posts.ts`).
 
 `fmtDate` in `marketing/src/pages/Trail.tsx` and `fmtPostDate` in
 `marketing/src/data/posts.ts` are the same eight lines: parse `YYYY-MM-DD` off
@@ -4739,7 +4823,9 @@ home; `lib/` already exists for `analytics.ts`.
 
 ---
 
-## `dialogZoom` is down to one consumer
+## CLOSED 11-25-2026 — STALE: `dialogZoom` is down to one consumer
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `dialogZoom` was removed (`animations.ts`).
 
 Retiring `ObjectRemovalModal` (its mask painter moved onto the canvas) left
 `dialogZoom` in `app/src/lib/animations.ts` with exactly one caller,
@@ -4826,7 +4912,9 @@ remotes, one deliberately broken — `pipefail` on → `CAUGHT by the if`,
 `pipefail` off → `MISSED — the if saw sed`. The hazard is real only where
 `pipefail` is absent, which is every `run:` block in `ci.yml` and every
 `$(cmd | filter)` assignment whose status nobody reads.
-## `ToggleButtonGroup` never says which button is on
+## CLOSED 11-25-2026 — STALE: `ToggleButtonGroup` never says which button is on
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. `ToggleButtonGroup` now requires `mode: "toggle" | "select"` and exposes aria-pressed or a radiogroup.
 
 Every Settings pane states its choices with `ToggleButtonGroup`, and the active
 button is marked **visually only** — a raised `bg-bg-elevated` pill with
@@ -4849,6 +4937,8 @@ pass of its own, not a rider on a feature.
 `app/src/components/ui/toggle-button-group.tsx`, one place.
 
 ## Dead CSS in `marketing/src/styles.css` after the v2 redesign
+
+> **11-25-2026 (`chore/parking-lot-1125`):** Done (§ assets cache): the app's root `vercel.json` sends `public, max-age=31536000, immutable` for `/assets/*`, as `marketing/vercel.json` already did; every file there has a hashed name. Still open: the rest of this section.
 
 The v2 port moved every marketing page onto its own stylesheet
 (`about.css`, `blog.css`, `features.css`, `tool-page.css`, `trail.css`,
@@ -5089,6 +5179,8 @@ on touch, which is most of the phone surface, and the two densest files
 
 ## OPEN — UI Night 8 leftovers (10-06-2026)
 
+> **11-25-2026 (`chore/parking-lot-1125`):** Done: the stale "Generate is STILL disabled" comments in `NewActions.tsx` and `aiImageDraft.ts` are gone; Generate has run since #337. Still open: the style decisions.
+
 | Item | Where | Why it waits |
 | --- | --- | --- |
 | **Fold `FieldLabel` into `ControlRow`?** It moves the lightbulb from the far right to just after the words. Screenshots of both, both themes: `~/ai-repo/night8-finish-shots/fieldlabel/` (`*-now-*` vs `*-folded-*`; color picker Palette and Batch › Crop Keep) | `ui/field-label`, 7 call sites | A look decision — Chris's call, not done unattended |
@@ -5123,7 +5215,9 @@ on touch, which is most of the phone surface, and the two densest files
   their implementation is pending review, not a master release.
 
 
-## PR overlap review (10-10-2026)
+## CLOSED 11-25-2026 — STALE: PR overlap review (10-10-2026)
+
+> **Closed 11-25-2026 (parking-lot sweep):** already true on master at v9.79. The Enter-listener race was fixed by #356 (`useLayoutEffect`).
 
 - The 4× CPU run of `fast-drags-are-not-dropped` exposed a startup wait that
   accepted an empty canvas, then slept 1.2 seconds before probing the engine.

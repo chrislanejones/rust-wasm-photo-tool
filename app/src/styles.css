@@ -25,9 +25,6 @@
   --radius-lg: 10px;
   --font-mono: "JetBrains Mono", monospace;
   --font-sans: "DM Sans", sans-serif;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   /* Floating side-panel / sidebar elevation (Tools, Review, Gallery, MasterBar
      + the `.shadow-panel` utility defined in the ELEVATION section below).
      THEME-SCOPED: the dark counterpart lives in `.dark`. This LIGHT value is
@@ -1200,7 +1197,7 @@ textarea:focus-visible {
 }
 
 .layer-active {
-  outline: 1px solid var(--accent, #6366f1);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
@@ -1209,7 +1206,7 @@ textarea:focus-visible {
    selection made after the op is silently discarded on undo. The swap is
    deferred, not fixed; this is the part that stops it being invisible. */
 @keyframes layer-swapped-flash {
-  0%   { background-color: color-mix(in srgb, var(--accent, #6366f1) 38%, transparent); }
+  0%   { background-color: color-mix(in srgb, var(--accent) 38%, transparent); }
   100% { background-color: transparent; }
 }
 
@@ -1222,7 +1219,7 @@ textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .layer-swapped {
     animation: none;
-    background-color: color-mix(in srgb, var(--accent, #6366f1) 24%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 24%, transparent);
   }
 }
 
@@ -1240,7 +1237,7 @@ textarea:focus-visible {
   min-width: 0;
   font: inherit;
   padding: 1px 4px;
-  border: 1px solid var(--accent, #6366f1);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.25);
   color: inherit;
@@ -1407,11 +1404,11 @@ textarea:focus-visible {
   padding: 4px; /* ring thickness */
   background: conic-gradient(
     from 0deg,
-    var(--color-theme-accent, #b6764e),
+    var(--color-theme-accent),
     #e9c69e,
-    var(--color-theme-accent, #b6764e),
+    var(--color-theme-accent),
     #8a5a39,
-    var(--color-theme-accent, #b6764e)
+    var(--color-theme-accent)
   );
   /* Punch out the center so only the border shows. */
   -webkit-mask:
@@ -1443,7 +1440,7 @@ textarea:focus-visible {
   width: 40px;
   height: 40px;
   margin-bottom: 4px;
-  color: var(--color-theme-accent, #b6764e);
+  color: var(--color-theme-accent);
 }
 
 .image-drop-title {
@@ -2624,69 +2621,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
      SHORTCUT MODAL
      ═══════════════════════════════════════════════════════════════════════════ */
 
-.shortcut-modal {
-  width: 100%;
-  max-width: 760px;
-  max-height: 80vh;
-  margin: 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-.shortcut-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.shortcut-modal-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.shortcut-modal-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--accent);
-}
-
-.shortcut-modal-close {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: all 0.15s;
-}
-
-.shortcut-modal-close:hover {
-  color: var(--text-primary);
-  border-color: var(--border-active);
-}
-
-.shortcut-modal-close-icon {
-  width: 14px;
-  height: 14px;
-}
+/* The dialog box itself is ui/dialog (`size="xl"`); only the body and footer
+   below are this file's. */
 
 .shortcut-modal-body {
   flex: 1;

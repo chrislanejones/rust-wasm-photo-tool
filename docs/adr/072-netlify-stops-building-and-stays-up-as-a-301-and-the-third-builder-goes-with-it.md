@@ -58,7 +58,9 @@ what #56 had written down as the fix.
   and the laptop becomes the third opinion only if someone deliberately uses it.
   Prior art: ADR-037, ADR-038, ADR-045, ADR-046.
 - `legacyHost.ts` and `features/hostMove/` are now unreachable dead code, left in
-  place on purpose for a separate session.
+  place on purpose for a separate session. *(Removed 11-25-2026, with
+  `legacyHost.test.ts` and the `<MovedNotice />` mount in `App.tsx`. The 301
+  on the Netlify site is what keeps old links working, and it is unchanged.)*
 - The GitHub repo is still linked to the Netlify site: the API silently ignores
   both `{"repo":null}` and `{"build_settings":{"repo_url":null,…}}`. Cosmetic
   while builds are stopped, but it needs the UI, and it is a new open item in

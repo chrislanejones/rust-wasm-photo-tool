@@ -4,7 +4,6 @@ import { AppShell } from "./AppShell";
 import { ShareViewer } from "@/components/ShareViewer";
 import { CommandPalette } from "@/features/commandPalette";
 import { RouteSync, SHARE_PARAM } from "@/features/routing";
-import { MovedNotice } from "@/features/hostMove";
 import { SyncProvider } from "@/lib/sync";
 import { PairHost } from "@/features/pair/PairHost";
 
@@ -33,9 +32,6 @@ export default function App() {
       {/* URL <-> state mirror: #/tool/paint/blur, #/settings/security. Renders
           nothing; see features/routing. */}
       <RouteSync />
-      {/* Retired Netlify address only: "we moved, download your library
-          first". Renders nothing anywhere else; see features/hostMove. */}
-      <MovedNotice />
       {/* Keeps preferences, remembered UI choices and tool modes the same in
           every tab, and on every device the user is signed in on. Renders
           nothing; see lib/sync and ADR-061. Mounted here rather than in

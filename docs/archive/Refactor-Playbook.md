@@ -16,20 +16,20 @@ Don't `git push`/merge without asking.
 
 ## Contents
 
-0. [The one rule](#0-the-one-rule)
-1. [Dependencies & build — single pnpm workspace](#1-dependencies--build--single-pnpm-workspace)
-2. [Color & theme tokens](#2-color--theme-tokens)
-3. [Layout tokens — z / shadow / radius / motion / heights](#3-layout-tokens--z-index--shadow--radius--motion--heights)
-4. [Typography (+ reusable playbook)](#4-typography)
-5. [React health](#5-react-health)
+0. [The one rule](#0-the-one-rule-generic)
+1. [Dependencies & build — single pnpm workspace](#1-dependencies--build--single-pnpm-workspace-generic-_applied-on-branch-choressot-monorepo_)
+2. [Color & theme tokens](#2-color--theme-tokens-ih-conventions-generic-method)
+3. [Layout tokens — z / shadow / radius / motion / heights](#3-layout-tokens--z-index--shadow--radius--motion--heights-ih)
+4. [Typography (+ reusable playbook)](#4-typography-ih-conventions)
+5. [React health](#5-react-health-generic-patterns-ih-line-refs)
    - 5a. [Skeleton / loading-state SSOT](#5a-skeleton--loading-state-ssot-ih)
-6. [Rust / WASM health](#6-rust--wasm-health)
-7. [Responsive snapped side panels](#7-responsive-snapped-side-panels)
-8. [Accessibility](#8-accessibility)
-9. [Target folder structure — React](#9-target-folder-structure--react-feature-first)
-10. [Target folder structure — Rust](#10-target-folder-structure--rust-facade--engine)
+6. [Rust / WASM health](#6-rust--wasm-health-generic-patterns-ih-line-refs)
+7. [Responsive snapped side panels](#7-responsive-snapped-side-panels-ih)
+8. [Accessibility](#8-accessibility-generic-checklist-ih-line-refs)
+9. [Target folder structure — React](#9-target-folder-structure--react-feature-first-generic-blueprint)
+10. [Target folder structure — Rust](#10-target-folder-structure--rust-facade--engine-generic-blueprint)
 11. [Master punch-list](#11-master-punch-list-suggested-order)
-12. [Reusable guardrail bundle](#12-reusable-guardrail-bundle)
+12. [Reusable guardrail bundle](#12-reusable-guardrail-bundle-generic)
 13. [Doc conventions (ratchet, whitelist, retirement)](#13-doc-conventions)
 
 ---

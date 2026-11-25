@@ -24,8 +24,6 @@
  * (scene/figure.tsx loads it with a dynamic import), so Node never evaluates it.
  */
 
-import type * as THREE from "three";
-
 import { createScene as mount, fade, orbit, seg, stream, type Builder, type SceneHandle, type SceneKit, type SceneOptions, type Ticker } from "./scene/kit";
 
 /* ── FIG 1 · the giants against the 900-line ceiling ─────────────────────── *

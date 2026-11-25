@@ -122,7 +122,7 @@ const inert = [...seen.entries()]
   .sort(([a], [b]) => a.localeCompare(b));
 
 console.log(`scanned ${files.length} source files`);
-console.log(`colour-utility candidates: ${seen.size}  ·  allowlisted: ${ALLOW.size}`);
+console.log(`color-utility candidates: ${seen.size}  ·  allowlisted: ${ALLOW.size}`);
 
 if (!inert.length) {
   console.log("\nNo inert color utilities. TOTAL: 0");

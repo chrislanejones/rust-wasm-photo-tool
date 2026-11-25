@@ -140,3 +140,14 @@ page. The rule that holds now: every runtime `three` import lives in a
 `*.three.ts` module reached only by dynamic `import()`, the pin stays exact,
 and `three` and `three/webgpu` never share a scene. The 0.165 sizes above are
 historical.
+
+*Amended 11-25-2026:* the worker post (`engine-in-a-worker`) now has a header
+banner, `Topper`, which shows FIG 1's scene behind the headline. A banner is in
+the viewport when the page loads, so the post requests the
+`engine-in-a-worker.three-*.js` chunk on every visit: after the load event plus
+an idle callback, not when a figure nears the viewport. Two sentences above are
+now false for this one post: "the post itself does not request it until a
+figure nears the viewport", and the Consequences' cost "paid only by readers
+who scroll to a figure". It is still the only page that asks for the chunk,
+and the chunk boundary is unchanged: no new `from "three"` import and the same
+re-export module.
