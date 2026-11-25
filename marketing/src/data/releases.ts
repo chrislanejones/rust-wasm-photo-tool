@@ -24,6 +24,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.80",
+    date: "2026-11-25",
+    headline: "Steady the Pen, and the editor opens faster.",
+    entries: [
+      { tag: "feature", text: "The Pen panel gets its own Stroke Stabilizer row." },
+      { tag: "ui", text: "Stabilizer levels are four icon tiles: one pen, its trail going from jagged to a clean sweep." },
+      { tag: "perf", text: "The emoji list loads when the picker opens, so the editor's main script drops from 868 KB to 759 KB." },
+      { tag: "infra", text: "The editor's hashed files are cached for a year instead of checked on every visit." },
+      { tag: "fix", text: "A paste into a text box on the New screen stays in the box instead of opening a clipboard image as a photo." },
+      { tag: "ui", text: "The shortcut sheet lists the Layers keys and Copy Look / Paste Look." },
+      { tag: "infra", text: "The marketing site gets an About entry in its command palette and joins the lint gate." },
+    ],
+  },
+  {
     version: "v9.79",
     date: "2026-11-25",
     headline: "Hold Alt for the other half of a control.",

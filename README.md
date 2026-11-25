@@ -99,21 +99,33 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.79 — 2026-11-25
+### v9.80 — 2026-11-25
 
-**Hold Alt for the other half of a control.**
+**Steady the Pen, and the editor opens faster.**
 
-Hold **Alt** (⌥ on a Mac) over **Fill Color** and the swatches turn into
-opacity steps, 100% down to 0%. Let go and your colors come back. The
-"Opacity 60%" on the right says where you are, and clicking it does the same
-thing without the key.
+The Pen panel has a **Stroke Stabilizer** row now, last in the panel like in
+Paint and Blur. The Pen was already steadied by that setting, but the only
+way to change it was from another tool. Every stabilizer row also swapped its
+four words for four tiles: one pen, with a trail behind it that goes from
+jagged (Off) to a clean sweep (High), so you can see the level at a glance.
 
-Hold **Alt** over **Corner Radius** and the presets become the corners. Pick
-Top Left and the slider rounds just that one, with its dot lit on the shape.
-The reset arrow squares them all again.
+The emoji list used to ride along with every page load, whether you ever
+opened Create › Emoji or not. Now it loads the first time the picker opens.
+That takes the editor's main script from 868 KB to 759 KB (gzipped).
 
-Either way, the row gets the same tan ring Compare uses, so you know you're
-in the other mode.
+The editor's files are also cached for a year now. Every one of them has a
+hash in its name, so a new release gets new names and your browser never
+holds on to an old copy. Before this, it asked the server again on every visit.
+
+Smaller things:
+
+- Pasting into a text box on the New screen, like the Paste SVG box, goes
+  into that box. If the clipboard also held an image, it no longer opens as
+  a photo.
+- The in-app keyboard shortcuts sheet lists the Layers keys and Copy Look /
+  Paste Look.
+- The marketing site's command palette has About, and its code is linted
+  with the editor's.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

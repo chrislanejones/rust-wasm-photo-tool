@@ -12434,3 +12434,27 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 Engine 980,450 B (+169). No Dexie or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,577/2,577 (5 new at landing, each fails with its fix reverted); marketing build passes. Rust: fmt, clippy (both feature sets), tests pass. e2e on a production build, 17 specs (`shapes-fill-first`, `shapes-ux`, `diagram-shapes`, `shape-corner-radius`, `oplog-undo-shapes`, `export-matches-canvas`, `color-overlay`, `stamps`, `text-box-survives`, `ui-night3-panels`, `ui-night8-finish`, `paste-svg`, `batch-redact`, `guides-grid`, `compare-photo-rect`, `screenshot-compare`, `pair-send`): 79 passed, 1 skipped.
+
+## v9.80 Change Summary — 2026-11-25
+
+**Steady the Pen, and the editor opens faster.**
+
+| Area | Change |
+| --- | --- |
+| Pen (#519) | The Pen panel ends with a **Stroke Stabilizer** row, as Paint and Blur do. The Pen already read that setting (anchor moves and handle pulls are leashed) but had no control of its own. |
+| UI (#519) | Every Stroke Stabilizer row shows four stacked icon tiles: one pen, its trail jagged (Off), wobbly (Low), a soft wave (Med) or a clean sweep (High). New `stabilizerIcons.tsx`. |
+| Speed (#518) | The emoji list (`@emoji-mart/data`) loads the first time Create › Emoji opens, not with the editor. Main script **868,420 → 758,791 B** gzipped. New e2e `emoji-picker-lazy` checks the picker still fills. |
+| Hosting (#518) | The editor's `/assets/*` files are sent `public, max-age=31536000, immutable`. Every file there has a hash in its name; it was `max-age=0`. The marketing site already did this. |
+| Fix (#518) | A paste into a text box on the New screen (the Paste SVG box) stays in that box. An image on the clipboard beside the text no longer opens as a photo. Same check the editor's own paste handler uses. |
+| Fix (#518) | The read-only storage audit counts Batch's live baselines as in use (`collectExtraRoots`), so it no longer lists them as orphans. |
+| Shortcuts (#518) | The in-app shortcut sheet lists the Layers keys (Ctrl+M, Ctrl+J, Ctrl+Shift+J, Ctrl+Shift+], Ctrl+Shift+[) and Copy Look / Paste Look (Ctrl+Alt+C / V). |
+| Marketing (#518) | About is in the command palette. The page title and description match a URL with a trailing slash. The 3D letters fall back cleanly if their script fails to load. |
+| Lint (#518) | `pnpm lint` covers `marketing/src` too: 0 errors. |
+| Cleanup (#518) | The old-Netlify-address notice and its code are gone (`hostMove/`, `legacyHost.ts`). Unused CSS (the old shortcut modal shell, `--shadow-sm/md/lg`), stale color fallbacks and stale comments removed. |
+| Docs (#518) | ADR-048, 057 and 072 get dated notes. The Dexie usage guide covers the op-log tables. Refactor-Playbook links fixed. "colour" → "color". |
+| Parking lot (#518) | 27 entries closed as already done, with evidence; 6 fixed; 13 marked with what's done and what's left. |
+| Trail Log | Squares catch up through 11-25. |
+
+No engine change (980,450 B). No Dexie schema or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,564/2,564; marketing build passes. e2e on a production build: `ui-night3-panels` (incl. the stabilizer row) and `emoji-picker-lazy`, 5 passed.
