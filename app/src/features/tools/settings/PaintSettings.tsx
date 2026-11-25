@@ -334,6 +334,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     />
                   )}
                 </CollapsibleSection>
+
+                {/* The pen was already stabilized (PenOverlay leashes anchor
+                    moves and handle pulls off this same field) but had no
+                    control here, so the only way to set it was from another
+                    tool. Last and visible, as in Paint and Blur. */}
+                <StabilizerRow
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
               </>
             );
 
