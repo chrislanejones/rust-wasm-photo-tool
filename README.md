@@ -99,17 +99,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.77 — 2026-11-24
+### v9.78 — 2026-11-25
 
-**Make the Fill Color palette your own.**
+**The website catches up with the editor.**
 
-The **Fill Color** swatches are yours now. Hover one: the pencil swaps it for
-another color, the × takes it out, and "+" adds your own. **Reset** puts the
-site's colors back. It stays on this device and only saves once you change it.
+Eight releases went out since the site last got a once-over, so it was
+describing an editor that no longer exists in a few places. The Features page
+now has one Export screen (Alt+E) instead of a format menu in the top bar,
+recipes for one image, the New menu's two rows of three, and the Fill Color
+palette you can edit. Text Border and re-editing a text's look get their own
+cards, so every feature has one again.
 
-Every fill and background palette also ends with a **checkerboard swatch**
-for "no color", right before the "+". Pick it on a shape with no outline and
-the shape gets one, so it can't vanish.
+The Architecture page and its chart PDF read v9.77, a 980 KB engine and op
+log v17.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

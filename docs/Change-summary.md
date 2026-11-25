@@ -12336,6 +12336,42 @@ Engine: **979,674 B** (was 973,825; +5,849 for the border). One fix on landing #
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,545/2,545; marketing build passes. e2e on a production build, 15 specs touched by the three changes (`stamps`, `ui-night8-finish`, `annotation-multiselect`, `callout-leader`, `one-tile-per-subtool`, `text-box-survives`, `export-dialog`, `diagram-shapes`, `shapes-fill-first`, `ui-night3-panels`, `text-align`, `text-commit-one-step`, `text-placement-undo`, `text-preview-size`, `annotation-performance`): 108 passed, 9 skipped (opt-in), 0 failed. Rust gates run by the pre-push hook.
 
+## v9.75 Change Summary — 2026-11-24
+
+**Export shows only what applies.**
+
+| Area | Change |
+| --- | --- |
+| Export (#515) | Adapts to the task; nothing is grayed out to keep the dialog's shape. **Selected image \| All images (N)**. Selected: **File Name** with the extension inside the same box (`FIELD_BASE_GROUP`). All: **Recipe** + Save recipe, then **Batch settings** (Size, Naming, Camera info, Packaging). Raster \| Vector \| With Layers, With Layers left out on All. |
+| Export (#515) | Format tiles named **JPEG / PNG / WebP / AVIF** (plugin formats by their name), one line under them for the picked one. Camera Info moves into a closed **Privacy & metadata** drop-down (`CollapsibleSection`) with its choice on the right. Footer: "name.jpg · 1 image · JPEG", Share link, Clipboard and **one solid primary** (`CONFIRM_AFFIRMATIVE`). 512 → 576 px. |
+| Accessibility (#515) | The file-type icons are `aria-hidden`: with the format as the label, their lettering made a screen reader say "JPEG JPEG". |
+| Docs | Features chapter; Parking Lot gains the design review's "eventually" list (size estimate, quality slider, resize on export, compression preview, single-image recipes), the trail-data UTC day quirk and the emoji lazy-load size win. |
+| Marketing | The Annotate page no longer says "red review stamps": stamps take any word and can be retyped later (v9.74). The architecture diagram's engine reads 980 KB (979,674 B), and its PDF is regenerated (overlap check passed). |
+| Trail Log | Squares catch up through 11-24. |
+
+No engine change (979,674 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,548/2,548 (3 new in `DownloadDialog.adapts.test.tsx`); marketing build passes. e2e on a production build, 10 export specs (`export-dialog`, `camera-info`, `bulk-night`, `svg-passthrough`, `zip-export`, `pane-header-row`, `plugins`, `beta-switches`, `batch-redact`, `export-file-name`): 31 passed; one stale assertion updated, then `camera-info` 4/4.
+
+## v9.76 Change Summary — 2026-11-24
+
+**Recipes work on one image too.**
+
+| Area | Change |
+| --- | --- |
+| Export (#516) | The **Recipe** picker sits under **File Name** on Selected image too. A picked recipe sets the one file's size, format, quality and camera info; the name stays the field's (the recipe's name pattern is for ZIPs). Raster built-in formats only: plugin, Vector and With Layers downloads take none. The extension and the Download label follow the recipe's format. |
+| Export (#516) | `applyRecipe()` moves from `useZipExport.ts` to `lib/applyRecipe.ts`, shared by the ZIP and the single download (same Lanczos3 resize and encoder). |
+| Export (#516) | The footer says how much the download is compressed, or "Not compressed"; on All images, "2 of 3 compressed". Read from the gallery's saved Resize & Compress results. |
+| Export (#516) | The settings list is named for the task: **Image settings** (Size, Camera info) on Selected, **Batch settings** on All. Privacy & Metadata shows the full choice when closed ("Keep All Metadata"). |
+| Fix (landing) | A one-image plugin format picked on Selected stayed picked on All images. That hid the recipe and showed the Settings camera-info choice, while the ZIP still used the hidden recipe's camera info. Moving to All now resets a plugin format to the raster one. Found by CodeRabbit; new regression test, which fails with the fix reverted. |
+| Structure (landing) | The dialog's recipe lookup is `pickedRecipe()` in `useZipRecipeStore.ts`, so AppShell grows by 2 lines, not 5. |
+| Docs | Features chapter; the Parking Lot marks single-image recipes done. |
+| Trail Log | Squares catch up through 11-24. |
+
+No engine change (979,674 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,549/2,549 (1 new); e2e on a production build, 10 export specs (`export-dialog`, `zip-export`, `camera-info`, `pasted-export-name`, `paste-svg`, `svg-passthrough`, `pane-header-row`, `bulk-night`, `stamps`, `oplog-preset-undo`): 36/36. PR CI: 19 pass, 1 skipped.
+
 ## v9.77 Change Summary — 2026-11-24
 
 **Make the Fill Color palette your own.**
@@ -12357,39 +12393,23 @@ Engine 980,281 B (+607). No Dexie or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561 (4 new in `ColorSwatchGrid.palette.test.tsx`); marketing build passes. Rust: fmt, clippy (both feature sets), 916 tests. e2e on a production build, 13 specs (`batch-redact`, `color-overlay`, `diagram-shapes`, `export-matches-canvas`, `guides-grid`, `oplog-undo-shapes`, `paste-svg`, `shapes-fill-first`, `shapes-ux`, `stamps`, `text-box-survives`, `ui-night3-panels`, `ui-night8-finish`): 54/54.
 
-## v9.76 Change Summary — 2026-11-24
 
-**Recipes work on one image too.**
+## v9.78 Change Summary — 2026-11-25
 
-| Area | Change |
-| --- | --- |
-| Export (#516) | The **Recipe** picker sits under **File Name** on Selected image too. A picked recipe sets the one file's size, format, quality and camera info; the name stays the field's (the recipe's name pattern is for ZIPs). Raster built-in formats only: plugin, Vector and With Layers downloads take none. The extension and the Download label follow the recipe's format. |
-| Export (#516) | `applyRecipe()` moves from `useZipExport.ts` to `lib/applyRecipe.ts`, shared by the ZIP and the single download (same Lanczos3 resize and encoder). |
-| Export (#516) | The footer says how much the download is compressed, or "Not compressed"; on All images, "2 of 3 compressed". Read from the gallery's saved Resize & Compress results. |
-| Export (#516) | The settings list is named for the task: **Image settings** (Size, Camera info) on Selected, **Batch settings** on All. Privacy & Metadata shows the full choice when closed ("Keep All Metadata"). |
-| Fix (landing) | A one-image plugin format picked on Selected stayed picked on All images. That hid the recipe and showed the Settings camera-info choice, while the ZIP still used the hidden recipe's camera info. Moving to All now resets a plugin format to the raster one. Found by CodeRabbit; new regression test, which fails with the fix reverted. |
-| Structure (landing) | The dialog's recipe lookup is `pickedRecipe()` in `useZipRecipeStore.ts`, so AppShell grows by 2 lines, not 5. |
-| Docs | Features chapter; the Parking Lot marks single-image recipes done. |
-| Trail Log | Squares catch up through 11-24. |
-
-No engine change (979,674 B). No Dexie or op-log change.
-
-Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,549/2,549 (1 new); e2e on a production build, 10 export specs (`export-dialog`, `zip-export`, `camera-info`, `pasted-export-name`, `paste-svg`, `svg-passthrough`, `pane-header-row`, `bulk-night`, `stamps`, `oplog-preset-undo`): 36/36. PR CI: 19 pass, 1 skipped.
-
-## v9.75 Change Summary — 2026-11-24
-
-**Export shows only what applies.**
+**The website catches up with the editor.**
 
 | Area | Change |
 | --- | --- |
-| Export (#515) | Adapts to the task; nothing is grayed out to keep the dialog's shape. **Selected image \| All images (N)**. Selected: **File Name** with the extension inside the same box (`FIELD_BASE_GROUP`). All: **Recipe** + Save recipe, then **Batch settings** (Size, Naming, Camera info, Packaging). Raster \| Vector \| With Layers, With Layers left out on All. |
-| Export (#515) | Format tiles named **JPEG / PNG / WebP / AVIF** (plugin formats by their name), one line under them for the picked one. Camera Info moves into a closed **Privacy & metadata** drop-down (`CollapsibleSection`) with its choice on the right. Footer: "name.jpg · 1 image · JPEG", Share link, Clipboard and **one solid primary** (`CONFIRM_AFFIRMATIVE`). 512 → 576 px. |
-| Accessibility (#515) | The file-type icons are `aria-hidden`: with the format as the label, their lettering made a screen reader say "JPEG JPEG". |
-| Docs | Features chapter; Parking Lot gains the design review's "eventually" list (size estimate, quality slider, resize on export, compression preview, single-image recipes), the trail-data UTC day quirk and the emoji lazy-load size win. |
-| Marketing | The Annotate page no longer says "red review stamps": stamps take any word and can be retyped later (v9.74). The architecture diagram's engine reads 980 KB (979,674 B), and its PDF is regenerated (overlap check passed). |
-| Trail Log | Squares catch up through 11-24. |
+| /features | **86 of 86** features carded (2 were showing raw repo text): new **Text Border** and **Re-editing keeps the look** cards, with icons, plus an icon for Paste SVG. |
+| /features | Export: one screen opened by Alt+E (Selected or All, Raster / Vector / With Layers, then format). "Export dropdown" in the top bar was false; it is now **Export formats**, the tiles inside Export. Recipes work on one image or the ZIP. Camera info lives in Export's Privacy & metadata drop-down. |
+| /features | Fill Color: the editable palette and the transparent swatch. Upload: the New menu's two rows of three. Review panel: Reselect's arrow picks several objects, same as V. Toolbar: 43 sub-tools (was 38). |
+| /architecture | As of v9.77; one 980 KB engine (was 974 KB); op format v17 (was v16). `system-architecture.mermaid` and its PDF regenerated (overlap check passed). |
+| Tool pages | /annotate-image: press V or drag a box to pick several. /batch-image-editor: Find duplicates catches turned or flipped copies. |
+| /in-the-works | A format plugin joins the Export dialog (was "Download dialog"). |
+| Docs | Features chapter: Upload, Export formats, 43 sub-tools, and Create AI Image is always shown (since v9.71). This also fixes the ⌘K palette hints, which quote it. |
+| Docs | The v9.75–v9.77 Change Summary sections are back in oldest-first order. |
+| Trail Log | Squares catch up through 11-25. |
 
-No engine change (979,674 B). No Dexie or op-log change.
+No app or engine change (980,281 B). No Dexie or op-log change.
 
-Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,548/2,548 (3 new in `DownloadDialog.adapts.test.tsx`); marketing build passes. e2e on a production build, 10 export specs (`export-dialog`, `camera-info`, `bulk-night`, `svg-passthrough`, `zip-export`, `pane-header-row`, `plugins`, `beta-switches`, `batch-redact`, `export-file-name`): 31 passed; one stale assertion updated, then `camera-info` 4/4.
-
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561; marketing build + prerender (29 URLs) passes, new text found in the built HTML. Chart PDF overlap check passed (26 boxes, 29 lines).

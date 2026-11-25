@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.78",
+    date: "2026-11-25",
+    headline: "The website catches up with the editor.",
+    entries: [
+      { tag: "ui", text: "Every feature has a card again, including Text Border and re-editing a text's look." },
+      { tag: "ui", text: "The Features page describes Export as one screen with Alt+E, recipes on one image, and the editable Fill Color palette." },
+      { tag: "infra", text: "The Architecture page and chart PDF read v9.77: a 980 KB engine and op log v17." },
+    ],
+  },
+  {
     version: "v9.77",
     date: "2026-11-24",
     headline: "Make the Fill Color palette your own.",
