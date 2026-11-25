@@ -130,7 +130,7 @@ export function CornerRadiusControl({ shape, settings, onChange }: Props) {
               shape={shape}
               lit={all ? names.map((_, k) => k) : [i - 1]}
             />
-            <span className="font-mono text-[10px] font-normal">{all ? "All" : shown}</span>
+            <span className="font-mono text-2xs font-normal">{all ? "All" : shown}</span>
           </ToolButton>
         );
       })}

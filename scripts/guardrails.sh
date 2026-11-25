@@ -150,7 +150,7 @@ ui_count() { printf '%s\n' "$ui_counts" | awk -v k="$1" '$1==k {print $2}'; }
 # splits it, and picking the family's radius is a call for Chris.
 check "ui-spacing" 41 "spacing off the scale — docs/06.1-UI-Consistency.md R1" "$(ui_count ui-spacing)"
 check "ui-radius" 22 "radius outside rounded-sm/md/lg/full — R3" "$(ui_count ui-radius)"
-check "ui-raw-button" 13 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
+check "ui-raw-button" 12 "raw <button> outside components/ui/ — use ui/button" "$(ui_count ui-raw-button)"
 
 # ── The exception registry explains every row (UI Night 8, 10-06-2026) ──
 # docs/06.3-UI-Exceptions.md is where an escape hatch says WHY. A row reading

@@ -12,7 +12,7 @@ import {
 } from "@/lib/colors";
 import { warmColorParser } from "@/lib/colorParser";
 import { ColorPickerDialog } from "@/components/ColorPickerDialog";
-import { Swatch } from "@/components/ui/swatch";
+import { Swatch, SwatchAction } from "@/components/ui/swatch";
 import { ControlRow } from "@/components/ui/control-row";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRadioGroup } from "@/components/ui/use-radio-group";
@@ -293,43 +293,28 @@ export function ColorSwatchGrid({
                 ))}
               </div>
               {allowCustom && !opacityMode && (
-                <button
-                  type="button"
+                <SwatchAction
                   onClick={() => setPicker({ kind: editable ? "add" : "pick" })}
                   disabled={disabled || full}
                   aria-label={plusLabel}
                   title={full ? `The palette holds ${MAX_PALETTE_COLORS} colors` : undefined}
                   aria-haspopup="dialog"
                   aria-expanded={pickerOpen && picker?.kind !== "replace"}
-                  className={[
-                    "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
-                    pickerOpen && picker?.kind !== "replace"
-                      ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
-                      : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
-                    (disabled || full) && "opacity-40 pointer-events-none",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  open={pickerOpen && picker?.kind !== "replace"}
+                  dashed
                 >
                   <Plus className="h-3.5 w-3.5" />
-                </button>
+                </SwatchAction>
               )}
               {editable && palette.edited && !opacityMode && (
-                <button
-                  type="button"
+                <SwatchAction
                   onClick={palette.reset}
                   disabled={disabled}
                   aria-label={`Reset ${label} to the site colors`}
                   title="Reset to the site colors"
-                  className={[
-                    "flex items-center justify-center w-7 h-7 rounded-full border-2 border-theme-border bg-theme-muted/20 text-theme-muted-foreground transition-all hover:text-theme-foreground hover:border-theme-foreground/50",
-                    disabled && "opacity-40 pointer-events-none",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                </button>
+                </SwatchAction>
               )}
             </div>
           )}

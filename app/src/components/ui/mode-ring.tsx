@@ -28,7 +28,7 @@ export function ModeRing({ inset = 0, radius = 10, thickness = 4, className }: M
     <div
       aria-hidden
       data-mode-ring=""
-      className={cn("image-drop-ring pointer-events-none z-10", className)}
+      className={cn("image-drop-ring pointer-events-none z-[var(--z-canvas-overlay)]", className)}
       style={style}
     />
   );

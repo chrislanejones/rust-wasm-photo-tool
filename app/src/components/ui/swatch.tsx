@@ -2,6 +2,7 @@
 // saved-palette tile (which used to carry its own copy, `PaletteSwatch`, of this
 // exact button). Its own module because the grid imports the picker, so the
 // picker importing the grid back would be a cycle.
+import type * as React from "react";
 import { Pencil, X } from "lucide-react";
 import type { RadioItemProps } from "@/components/ui/use-radio-group";
 
@@ -86,7 +87,7 @@ export function Swatch({
         {text && (
           <span
             aria-hidden
-            className="absolute inset-0 flex items-center justify-center font-mono text-[9px] font-bold text-white [text-shadow:0_0_3px_#000,0_0_2px_#000]"
+            className="absolute inset-0 flex items-center justify-center font-mono text-2xs font-bold text-on-photo [text-shadow:0_0_3px_#000,0_0_2px_#000]"
           >
             {text}
           </span>
@@ -120,5 +121,36 @@ export function Swatch({
         </button>
       )}
     </span>
+  );
+}
+
+/** A round ACTION in a swatch row — the "+" (dashed) and the palette's
+ *  Reset: the size and ring of a swatch, but a button, not a color. One
+ *  primitive so a swatch row has no hand-rolled buttons of its own. `open`
+ *  lights it while the dialog it opened is up. */
+export function SwatchAction({
+  open = false,
+  dashed = false,
+  className,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { open?: boolean; dashed?: boolean }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={[
+        "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
+        open
+          ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
+          : `${dashed ? "border-dashed " : ""}border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50`,
+        props.disabled && "opacity-40 pointer-events-none",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </button>
   );
 }
