@@ -181,9 +181,6 @@ interface Props {
  * account, no network" false (ADR-051). Putting those behind this switch means
  * self-hosting or a fallback face, but the flag is named for that job now so
  * it will not need a second one.
- *
- * Generate is STILL disabled (see GENERATE_BLOCKED_REASON) — the switch
- * restores the way in; the job type restores the way out.
  */
 
 export function NewActions({
@@ -408,6 +405,19 @@ export function NewActions({
   // Ctrl+V paste anywhere on the surface.
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
+      // A paste into a field is for that field: the Paste SVG box in this
+      // dialog, a rename input. Copying from a web page can put an image on
+      // the clipboard next to the text, and that must not open as a photo.
+      // Same check as the editor's own paste handler in AppShell.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       const items = e.clipboardData?.items;
       if (!items) return;
       const files = Array.from(items)

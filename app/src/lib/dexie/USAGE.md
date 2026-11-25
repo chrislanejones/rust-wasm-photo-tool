@@ -16,6 +16,10 @@
 originals      id                       // raw uploads (Blob), content-addressed (SHA-256)
 workingCopies  id, photoId              // edited renders, one per photo
 photos         id, updatedAt, originalId // lightweight gallery rows + references
+// v2 (op-log persistence, ADR-006), additive only:
+opLogs         [photoId+branch+chunkSeq], photoId // the op log, in chunks
+keyframes      [photoId+branch+atOp], photoId     // pixel snapshots the replay starts from
+oplogManifests photoId                  // head record per photo, written LAST
 ```
 
 This split gives **fast gallery loads** (read the small `photos` table, not the pixels), the **full original** on demand, and a **separate working copy** so originals are never overwritten.
@@ -57,6 +61,31 @@ function Gallery() {
 
 > `useLiveQuery` needs `dexie-react-hooks` (not yet installed). Without it, call `getAllPhotos()` in an effect. Install with the corepack workaround:
 > `COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm@11.7.0 --pm-on-fail=ignore --filter stamp-tool add dexie-react-hooks`
+
+## The op-log tables (v2)
+
+These three hold a photo's edit history so a reload can replay it (ADR-006).
+The save and restore logic is **not** in `db.ts`: it lives in
+[`@/lib/oplogPersistence`](../oplogPersistence.ts) (`saveOplogNow`,
+`onOplogFlush`, `restoreOplog`, `hasPersistedOplog`). `db.ts` only has the
+low-level reads (`getOpLogChunks`, `latestKeyframeAtOrBefore`).
+
+| Table | Key | Holds |
+|---|---|---|
+| `opLogs` | `[photoId+branch+chunkSeq]` | The ops, in numbered chunks |
+| `keyframes` | `[photoId+branch+atOp]` | A pixel snapshot taken at op `atOp`; the replay starts from the nearest one at or before its target |
+| `oplogManifests` | `photoId` | The head: op count, chunk count, container version |
+
+- **The manifest is written last.** A save that tears halfway leaves chunks or
+  keyframes past the manifest's counts. Restore ignores them and the next save
+  overwrites them, so a torn write is harmless.
+- **The manifest has its own table**, keyed by the gallery photo id, rather
+  than a field on `photos`, because the live gallery still runs on the legacy
+  manifest and real photos have no Dexie `photos` row.
+- **Deleting a photo** goes through the cascade helper in `db.ts`, which clears
+  its `opLogs`, `keyframes` and manifest in the same transaction as its row.
+- Any change to these tables is a schema change: it goes through the
+  `dexie-migration` skill.
 
 ## Recommended architecture
 

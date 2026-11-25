@@ -61,6 +61,20 @@ export const SHORTCUT_GROUPS = [
       { keys: ["Ctrl", "C"], action: "Copy Selection / Canvas" },
       { keys: ["Ctrl", "Shift", "C"], action: "Copy to Clipboard" },
       { keys: ["Alt", "D"], action: "Delete All Images" },
+      { keys: ["Ctrl", "Alt", "C"], action: "Copy Look" },
+      { keys: ["Ctrl", "Alt", "V"], action: "Paste Look to Selected" },
+    ],
+  },
+  {
+    // Bound in useKeyboardShortcuts. Ctrl+J only claims the key while there is
+    // a selection, so the browser keeps its own Ctrl+J otherwise.
+    title: "Layers",
+    shortcuts: [
+      { keys: ["Ctrl", "M"], action: "Toggle Move Layer" },
+      { keys: ["Ctrl", "J"], action: "New Layer via Copy" },
+      { keys: ["Ctrl", "Shift", "J"], action: "New Layer via Cut" },
+      { keys: ["Ctrl", "Shift", "]"], action: "Layer to Front" },
+      { keys: ["Ctrl", "Shift", "["], action: "Layer to Back" },
     ],
   },
   {

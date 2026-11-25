@@ -61,6 +61,11 @@ export default function CubeLetters() {
           scene.ready.then((b) => {
             if (!cancelled) setBackend(b);
           });
+        })
+        // A chunk that fails to load (offline, a deploy swapped the hash) is
+        // the same as no GPU: show the static letters, don't leave "pending".
+        .catch(() => {
+          if (!cancelled) setBackend("none");
         });
       },
       { rootMargin: "300px 0px" },

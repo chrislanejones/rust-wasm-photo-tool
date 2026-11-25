@@ -66,6 +66,32 @@ export async function screenPoint(page: Page, x: number, y: number) {
   }, [x, y]);
 }
 
+/** Canvas px to screen px for several points, all from ONE reading of the
+ *  canvas's box, taken once it has held still for two frames. Opening a tool
+ *  panel resizes the canvas over a few frames (after the reload, Pins takes
+ *  it from 1200 x 900 to 1184 x 888 in about 70 ms). A drag whose start was
+ *  read mid-resize and whose end was read after it carried the canvas's own
+ *  motion: the pin landed 1 px off in y, 1 run in 20 (smart-callout.spec.ts). Any drag
+ *  spec that reads both ends of a drag can use it. */
+export async function stillScreenPoints(page: Page, points: { x: number; y: number }[]) {
+  return page.evaluate(async (points) => {
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
+    const read = () => {
+      const r = canvas.getBoundingClientRect();
+      return [r.left, r.top, r.width, r.height];
+    };
+    let box = read();
+    for (let still = 0, frames = 0; still < 2 && frames < 120; frames++) {
+      await new Promise((r) => requestAnimationFrame(r));
+      const next = read();
+      still = next.every((v, i) => v === box[i]) ? still + 1 : 0;
+      box = next;
+    }
+    const [left, top, width, height] = box;
+    return points.map((p) => ({ x: left + p.x / canvas.width * width, y: top + p.y / canvas.height * height }));
+  }, points);
+}
+
 export async function observeDrag(page: Page, selector = "svg[data-draw-overlay]") {
   await page.evaluate((selector) => {
     const overlay = document.querySelector(selector);

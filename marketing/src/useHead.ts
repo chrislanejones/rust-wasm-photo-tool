@@ -201,10 +201,13 @@ function postOnPath(pathname: string): Post | undefined {
 export default function useHead() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const route = routeFor(pathname);
+    // `/pricing/` is the same page as `/pricing` (the router matches both), so
+    // it gets the same head, not the 404 one.
+    const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+    const route = routeFor(path);
     if (route) return applyHead(route);
 
-    const post = postOnPath(pathname);
+    const post = postOnPath(path);
     if (post) return applyPostHead(post);
 
     applyNotFoundHead();

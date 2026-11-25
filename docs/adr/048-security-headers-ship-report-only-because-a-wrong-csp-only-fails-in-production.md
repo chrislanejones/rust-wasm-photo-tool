@@ -111,3 +111,12 @@ Second most likely: someone hit a violation, added a directive to silence it
 without reading what it was, and widened the policy until it permitted
 everything. A CSP that allows everything is worse than none, because it looks
 like protection on an audit.
+
+*Amended 11-25-2026:* two facts above no longer match what ships.
+
+| Above | Now |
+|---|---|
+| `frame-ancestors 'none'` is enforcing "inside the policy" | It sits inside the **report-only** CSP, so it only reports. A browser ignores `frame-ancestors` in a report-only policy, so `X-Frame-Options: DENY` is the header doing the clickjacking work on both sites |
+| The headers live in `netlify.toml` (app) and the root `vercel.json` | Netlify was retired and `netlify.toml` deleted on 09-27-2026 (ADR-072). The app's headers live in the root `vercel.json`, the marketing site's in `marketing/vercel.json` |
+
+The CSP is still `Content-Security-Policy-Report-Only` on both sites.

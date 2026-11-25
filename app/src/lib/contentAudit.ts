@@ -55,6 +55,9 @@
 // report says so. `navigator.storage.estimate()` is included as an independent
 // cross-check on the same order of magnitude.
 
+// extraRoots holds no write path: it only collects keys from live providers.
+import { collectExtraRoots } from "@/lib/extraRoots";
+
 /** One audited object store. */
 export interface ContentAuditClass {
   /** "<database>/<store>" */
@@ -346,7 +349,10 @@ export async function auditContentStores(): Promise<ContentAuditReport> {
     );
   }
 
-  const rootKeys = new Set<string>([...originalKeys, ...uploadKeys]);
+  // Plus the keys only a live tool holds (Batch's pre-logo / pre-text
+  // baselines). They are in no manifest, so without them the audit would list
+  // them as orphans, and a cleanup driven off that list would break re-apply.
+  const rootKeys = new Set<string>([...originalKeys, ...uploadKeys, ...collectExtraRoots()]);
   const classes: ContentAuditClass[] = [];
 
   // ── image-horse-originals: content-addressed blobs ───────────────────────

@@ -99,12 +99,9 @@ export interface ImageModel {
 /**
  * The menu, cheapest-and-fastest first — the order is the recommendation.
  *
- * ⚠️ STILL AHEAD OF THE BACKEND. `convex/aiJobs.ts` accepts rembg | upscale |
- * inpaint | ocr | alt and nothing else, so no entry here can run yet and
- * Generate stays disabled (see GENERATE_BLOCKED_REASON in NewActions). What
- * changed is that "which model" is no longer the open question it was: the
- * list is real, the capability flags are real, and the job type is the only
- * missing piece.
+ * Generate runs these: `convex/aiJobs.ts` has accepted a `generate` job since
+ * #337 (Paid-only, behind the online switch). Until then this list was ahead
+ * of the backend and Generate was disabled.
  */
 export const IMAGE_MODELS: readonly ImageModel[] = [
   {

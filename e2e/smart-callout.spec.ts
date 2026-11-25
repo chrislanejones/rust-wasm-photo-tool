@@ -1,7 +1,7 @@
 import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
-import { installAnnotationProbe, screenPoint } from "./annotation-benchmark-harness";
+import { installAnnotationProbe, screenPoint, stillScreenPoints } from "./annotation-benchmark-harness";
 import { findCallouts, type CalloutShape, type CalloutText } from "../app/src/lib/callouts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,31 +85,6 @@ async function placeCallout(page: Page, label: string) {
   await input.press("Enter");
   await expect(input).toHaveCount(0);
   await expect.poll(() => callout(page).then((c) => c?.counts)).toEqual([2, 1]);
-}
-
-/** Canvas px to screen px for several points, all from ONE reading of the
- *  canvas's box, taken once it has held still for two frames. Opening a tool
- *  panel resizes the canvas over a few frames (after the reload, Pins takes
- *  it from 1200 x 900 to 1184 x 888 in about 70 ms). A drag whose start was
- *  read mid-resize and whose end was read after it carried the canvas's own
- *  motion: the pin landed 1 px off in y, 1 run in 20. */
-async function stillScreenPoints(page: Page, points: { x: number; y: number }[]) {
-  return page.evaluate(async (points) => {
-    const canvas = document.querySelector<HTMLCanvasElement>("canvas.main-canvas")!;
-    const read = () => {
-      const r = canvas.getBoundingClientRect();
-      return [r.left, r.top, r.width, r.height];
-    };
-    let box = read();
-    for (let still = 0, frames = 0; still < 2 && frames < 120; frames++) {
-      await new Promise((r) => requestAnimationFrame(r));
-      const next = read();
-      still = next.every((v, i) => v === box[i]) ? still + 1 : 0;
-      box = next;
-    }
-    const [left, top, width, height] = box;
-    return points.map((p) => ({ x: left + p.x / canvas.width * width, y: top + p.y / canvas.height * height }));
-  }, points);
 }
 
 /** Drag the pin's edit box body by (dx, dy) canvas px, then Apply. */

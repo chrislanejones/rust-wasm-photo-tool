@@ -2,13 +2,14 @@
 // schema for the heavy data (originals, edited working copies, gallery
 // metadata). See app/src/lib/dexie/USAGE.md and docs/archive/IndexedDB-Investigation.md.
 //
-// This is a NEW, parallel database ("image-horse-dexie") — it does NOT touch the
-// three live hand-rolled stores (image-horse-originals / -edits / -gallery). It
-// exists so the app can migrate to Dexie incrementally and reversibly:
-// `putOriginal` mirrors the legacy `originalsStore.putOriginal` signature so
-// `originalsAdapter` can dual-write with no call-site changes. (The rest of the
-// never-wired convenience mirror was removed in the 2026-07-17 fallow cleanup;
-// the op-log tables + helpers below are the live surface.)
+// "image-horse-dexie" is adopted and on the live path (see USAGE.md's Status
+// line). The three legacy hand-rolled stores (image-horse-originals / -edits /
+// -gallery) are only read now, never written by the migration path, so they
+// stay a byte-identical rollback target; `USE_DEXIE_ORIGINALS` in `flags.ts` is
+// the kill switch. `putOriginal` mirrors the legacy `originalsStore.putOriginal`
+// signature so `originalsAdapter` can dual-write with no call-site changes. (The
+// rest of the never-wired convenience mirror was removed in the 2026-07-17
+// fallow cleanup; the op-log tables + helpers below are the live surface.)
 import Dexie, { type Table } from "dexie";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 

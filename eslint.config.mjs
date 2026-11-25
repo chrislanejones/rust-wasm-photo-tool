@@ -304,6 +304,36 @@ export default tseslint.config(
   },
 
   {
+    // The marketing site's own source. Linted from 11-25-2026; before that the
+    // gate stopped at `marketing/scripts`. Same correctness floor as the app:
+    // the underscore convention, the two classic hook rules. The app's React
+    // Compiler rules are not adopted here; that is its own decision.
+    files: ["marketing/src/**/*.{ts,tsx}"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.browser },
+    },
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+
+  {
     // The marketing generator scripts (trail data, sitemap dates, prerender,
     // OG images) and their node:test specs. Plain ESM under Node, run by hand
     // or by `pnpm -C marketing build`. Before this block nothing linted them:

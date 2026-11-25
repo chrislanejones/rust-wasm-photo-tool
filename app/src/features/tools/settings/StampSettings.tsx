@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Picker from "@emoji-mart/react";
-import data from "@emoji-mart/data";
 import { Copy, Smile } from "lucide-react";
 import type { StampSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/ui/size-slider";
@@ -9,6 +8,11 @@ import { useToolStore } from "@/stores/useToolStore";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { useResolvedTheme } from "@/lib/useTheme";
+
+// The emoji list is ~80 KB gzipped. Imported at the top it rode in the main
+// chunk on every load; emoji-mart takes `data` as an async function, so the
+// list is fetched the first time the picker opens and never before.
+const loadEmojiData = async () => (await import("@emoji-mart/data")).default;
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
@@ -146,7 +150,7 @@ export function StampSettingsPanel({
               <>
                 <div className="emoji-picker-host">
                   <Picker
-                    data={data}
+                    data={loadEmojiData}
                     onEmojiSelect={(e: { native: string }) =>
                       onEmojiChange?.(e.native)
                     }
