@@ -99,19 +99,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.78 — 2026-11-25
+### v9.79 — 2026-11-25
 
-**The website catches up with the editor.**
+**Hold Alt for the other half of a control.**
 
-Eight releases went out since the site last got a once-over, so it was
-describing an editor that no longer exists in a few places. The Features page
-now has one Export screen (Alt+E) instead of a format menu in the top bar,
-recipes for one image, the New menu's two rows of three, and the Fill Color
-palette you can edit. Text Border and re-editing a text's look get their own
-cards, so every feature has one again.
+Hold **Alt** (⌥ on a Mac) over **Fill Color** and the swatches turn into
+opacity steps, 100% down to 0%. Let go and your colors come back. The
+"Opacity 60%" on the right says where you are, and clicking it does the same
+thing without the key.
 
-The Architecture page and its chart PDF read v9.77, a 980 KB engine and op
-log v17.
+Hold **Alt** over **Corner Radius** and the presets become the corners. Pick
+Top Left and the slider rounds just that one, with its dot lit on the shape.
+The reset arrow squares them all again.
+
+Either way, the row gets the same tan ring Compare uses, so you know you're
+in the other mode.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

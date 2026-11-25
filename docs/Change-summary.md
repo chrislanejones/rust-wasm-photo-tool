@@ -12413,3 +12413,24 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No app or engine change (980,281 B). No Dexie or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,561/2,561; marketing build + prerender (29 URLs) passes, new text found in the built HTML. Chart PDF overlap check passed (26 boxes, 29 lines).
+
+## v9.79 Change Summary — 2026-11-25
+
+**Hold Alt for the other half of a control.**
+
+| Area | Change |
+| --- | --- |
+| Fill Color (#517) | The row reads **Opacity N%** on the right. Hold **Alt** (⌥) over the swatches, or click the %, and they become the color at 100% … 0%; a pick closes them. Picking another color keeps the opacity. No lightbulb: the readout carries the hint. |
+| Corner Radius (#517) | Hold **Alt** over the row and the presets become **All** plus each corner (rectangle 4, diamond 4, triangle 3; a star has one radius). Pick one and the slider and label move that corner only, and its dot lights on the edit overlay, until All. A reset arrow (as on Scale and Quality) squares every corner. |
+| UI (#517) | One tan **ModeRing** (`ui/mode-ring.tsx`) marks a surface in another mode: Compare, a file drag (it no longer moves), and both Alt rows. `useAltOverRow`: the pointer wins over keyboard focus, and the window listens only while the row is hovered or focused. |
+| Engine (#517) | `parse_hex_color` keeps the alpha of an 8-digit `#rrggbbaa`; every other form stays opaque. New test. |
+| Fix (landing) | Picking a color kept a rounded percent, so `#3b82f601` (0%) came out opaque. It now keeps the exact alpha byte (`keepAlpha`). |
+| Fix (landing) | The Alt swap unmounted a focused swatch, preset or corner tile, and focus fell to the page. `useKeepFocusOnSwap` hands it to the new set's lit control, or back to the slider; a control that survives (the readout) keeps it. |
+| Fix (landing) | The Corner Radius Alt hint was hover text only; the slider now reads it as its description. |
+| Guardrails (#517) | No new raw colors, off-scale type, z-index or raw buttons; `ui-raw-button` baseline 13 → 12. |
+| Docs | ADR-111 (draft): a row shows its other form while Alt is held, and one mode ring marks every mode. Features chapter; UI Consistency; DESIGN.md. |
+| Trail Log | Squares catch up through 11-25. |
+
+Engine 980,450 B (+169). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (55 warnings); guardrails pass; vitest 2,577/2,577 (5 new at landing, each fails with its fix reverted); marketing build passes. Rust: fmt, clippy (both feature sets), tests pass. e2e on a production build, 17 specs (`shapes-fill-first`, `shapes-ux`, `diagram-shapes`, `shape-corner-radius`, `oplog-undo-shapes`, `export-matches-canvas`, `color-overlay`, `stamps`, `text-box-survives`, `ui-night3-panels`, `ui-night8-finish`, `paste-svg`, `batch-redact`, `guides-grid`, `compare-photo-rect`, `screenshot-compare`, `pair-send`): 79 passed, 1 skipped.

@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.79",
+    date: "2026-11-25",
+    headline: "Hold Alt for the other half of a control.",
+    entries: [
+      { tag: "feature", text: "Hold Alt over Fill Color for opacity steps from 100% to 0%, or click the Opacity readout." },
+      { tag: "feature", text: "Hold Alt over Corner Radius to round one corner at a time; the reset arrow squares them all." },
+      { tag: "ui", text: "One tan mode ring marks Compare, a file drag and both Alt rows." },
+      { tag: "rust", text: "The engine reads an 8-digit hex color's alpha, so a translucent fill stays translucent." },
+      { tag: "fix", text: "Keyboard focus survives the Alt swap, and the Corner Radius hint reaches screen readers." },
+    ],
+  },
+  {
     version: "v9.78",
     date: "2026-11-25",
     headline: "The website catches up with the editor.",
